@@ -39,6 +39,13 @@ SLICE 3 (lane `live-stat-progress-expert`, 2026-11-13).
   rebuilt from `book_quotes` with the board's own de-vig rules (`prop_prior`). Agresti-Coull at n = simsRun, MC sigma,
   as `live_resim`. Rows at a ladder line no book quoted are counted, not opined (`stat_progress_opinions`).
 
+SLICE 4 (lane `live-segment-expert`, 2026-11-13).
+- `live_segment` (live): an unsettled segment (college h1 / h2) totals or spreads line some book was quoting at a
+  logged re-sim tick, priced from the tick's segment histogram exactly as the live join would price it (its estimator,
+  its away-frame line; the join itself refuses college segments, #763), against the in-play book prior rebuilt from
+  `book_quotes` (`prop_prior`). Enumerated from the evidence log's ticks (`live_segment_opinions`), because the
+  ledger keeps one row per segment line per day.
+
 Every expert reads its inputs through `Reader`, which records the paths it actually touched, so the input
 checklist (`scripts/engine_experts.py checklist`) compares CONSUMED (observed at run time, never a name grep)
 against POPULATED (measured on real rows).
@@ -816,28 +823,392 @@ def stat_progress_opinions(props_rows: Iterable[Mapping[str, Any]], quotes: Prop
     return out, skipped
 
 
+def board_fair_over(entries: Sequence[tuple], at: datetime | None, books: set[str]) -> float | None:
+    """P(over) by the BOARD's own fair-value function (`odds_book_quotes._fair_value_fields`) over the index entries
+    captured by `at` from `books` -- the independent recomputation both prior checks compare an expert's prior with."""
+    from syndicate.features.shared.odds_book_quotes import _fair_value_fields
+
+    if at is None:
+        return None
+    rows = [{"bookmaker": book, "selection": side, "price": price, "book_updated_at": stamp.isoformat()}
+            for seen, stamp, book, side, price, _sel in entries if seen <= at and book in books]
+    best = min((r["price"] for r in rows if r["selection"] == "over"), default=None)
+    fair = _fair_value_fields(rows, selection="over", price=best or 100, best_price=best or 100)
+    p = fair.get("fair_probability")
+    return None if p is None else float(p)
+
+
+# ----------------------------------------------------------------------------- live expert: segments (halves)
+#
+# Lane `live-segment-expert` (2026-11-13, user "Yes, start it"). The plan ranks college live totals and second halves
+# first (`plan_one_engine_pregame_live.md` §4). The live re-sim keeps, per tick, a block per segment (h1 / h2, and
+# quarters where the sport has them) with the segment's own total and home-margin histograms
+# (`live_evidence.segments.<seg>`: total_dist, margin_dist, sims, settled, marginAnchored). The live join REFUSES every
+# college segment line (`segment_pricing_disabled`, #763) and its ledger keeps one row per line per day with no market
+# price on purpose (`live_gameline_join.attach_live_gamelines`), so the ledger cannot say WHEN a segment line stood.
+# This expert therefore enumerates the evidence log's ticks: at each logged tick of a game, each unsettled segment,
+# and each totals / spreads line some book was quoting within `PROP_QUOTE_MAX_AGE_S`, it opines with the histogram the
+# join would price (its estimator, its away-frame line) against the in-play book prior rebuilt from `book_quotes`
+# with the board's own rules (`prop_prior`, as `stat_progress`).
+#
+# Measured on the fleet, NCAAB 11-12: in-play h1 / h2 totals and spreads quotes from 6 books; WNCAAB has segment
+# blocks in the evidence log but NO segment quotes, so it gets no prior. No books quote in-play segment moneylines.
+
+SEGMENT_MARKETS = _TOTALS | _SPREADS
+_GAME_QUOTE_PATHS = ("kind", "market", "segment", "selection", "line", "price", "bookmaker", "home_team", "away_team",
+                     "captured_at", "book_updated_at", "snapshot_ts")
+
+
+def canonical_quote_side(market: Any, selection: Any, line: Any) -> tuple[str, float] | None:
+    """One `book_quotes` game-line row -> (side, L) in the LIVE JOIN's frame, or None.
+
+    Totals: over / under at the line. Spreads: each side carries its OWN handicap -- `selection` is "home" / "away"
+    and the two lines have opposite signs (13,946 of 14,257 same-snapshot pairs on NCAAB 11-12; the rest are books
+    quoting several lines at once). The join's line is the AWAY-frame one: home covers when margin > L
+    (`live_gameline_join.price_distribution_market`). So home at h is ("over", -h) -- "over" meaning home covers --
+    and away at a is ("under", a). Getting the sign backwards is the 2026-08-08 phantom-edge defect; the runner's
+    FRAME check reads the rebuilt prior against the join's own on full-game lines to catch it."""
+    mkt = str(market or "").strip().lower()
+    sel = str(selection or "").strip().lower()
+    value = _f(line)
+    if value is None:
+        return None
+    if mkt in _TOTALS:
+        return (sel, value) if sel in ("over", "under") else None
+    if mkt in _SPREADS:
+        if sel == "home":
+            return "over", -value + 0.0  # + 0.0: no -0.0 key
+        if sel == "away":
+            return "under", value + 0.0
+    return None
+
+
+class GameLineQuoteIndex:
+    """`book_quotes` TOTALS / SPREADS rows for one sport-date, every segment, by (home key, away key, market, segment)
+    -> canonical line L -> entries in the order we CAPTURED them: (captured_at, observed stamp, book, side, price, raw
+    selection), the `PropQuoteIndex` entry shape, so `prop_prior` and `board_fair_over` read both. Side "over" is
+    P(over) on totals and P(home covers) on spreads (`canonical_quote_side`).
+
+    Every field read goes through `reader` as source `book_quotes`, and the non-null count of each is kept over the
+    totals / spreads rows, the population the expert reads (`populated`)."""
+
+    def __init__(self, rows: Iterable[Mapping[str, Any]], reader: Reader | None = None,
+                 expert: str = "live_segment") -> None:
+        self.by_key: dict[tuple[str, str, str, str], dict[float, list[tuple]]] = {}
+        self.rows = 0
+        self.non_null: dict[str, int] = {}
+        self.unmapped = 0
+        reader = reader or Reader()
+        for row in rows:
+            got = {path: reader.get(expert, "book_quotes", row, path) for path in _GAME_QUOTE_PATHS}
+            market = str(got["market"] or "").lower()
+            if str(got["kind"] or "") == "prop" or market not in SEGMENT_MARKETS:
+                continue
+            self.rows += 1
+            for path, value in got.items():
+                if value is not None and not (isinstance(value, float) and value != value):
+                    self.non_null[path] = self.non_null.get(path, 0) + 1
+            mapped = canonical_quote_side(market, got["selection"], got["line"])
+            seen = _parse(got["captured_at"])
+            price = _f(got["price"])
+            if mapped is None or seen is None or price is None:
+                self.unmapped += 1
+                continue
+            side, line = mapped
+            stamp = _parse(got["book_updated_at"]) or _parse(got["snapshot_ts"]) or seen
+            segment = str(got["segment"] or "full").strip().lower() or "full"
+            key = (team_key(got["home_team"]), team_key(got["away_team"]), market, segment)
+            self.by_key.setdefault(key, {}).setdefault(float(line), []).append(
+                (seen, stamp, str(got["bookmaker"] or "").lower(), side, int(price), str(got["selection"] or "")))
+        for lines in self.by_key.values():
+            for entries in lines.values():
+                entries.sort(key=lambda e: e[0])
+
+    def populated(self) -> tuple[int, dict[str, int]]:
+        return self.rows, dict(self.non_null)
+
+    def lines(self, home_key: str, away_key: str, market: str, segment: str) -> dict[float, list[tuple]]:
+        return self.by_key.get((home_key, away_key, market, segment)) or {}
+
+    def segment_games(self) -> dict[tuple[str, str], set[str]]:
+        """(home key, away key) -> the non-full segments the books quoted for that game this date."""
+        out: dict[tuple[str, str], set[str]] = {}
+        for home, away, _market, segment in self.by_key:
+            if segment != "full":
+                out.setdefault((home, away), set()).add(segment)
+        return out
+
+
+def line_live_at(entries: Sequence[tuple], at: datetime, max_age_s: float = PROP_QUOTE_MAX_AGE_S) -> bool:
+    """True when some book's quote on this line, captured by `at`, was observed within `max_age_s` of it: the line
+    stood at that instant. A line no book carried then is not a line a bettor could take, so it is not an opinion."""
+    for seen, stamp, *_rest in entries:
+        if seen > at:
+            break
+        if (at - stamp).total_seconds() <= max_age_s:
+            return True
+    return False
+
+
+def live_segment_expert(evidence_row: Mapping[str, Any], segment: str, market: str, line: float,
+                        entries: Sequence[tuple], reader: Reader, off: frozenset[str] = frozenset(),
+                        game_key: tuple[str, str] | None = None) -> ExpertOpinion:
+    """One segment line at one logged tick -> an opinion on OVER (totals) / HOME COVERS (spreads).
+
+    p_expert: the segment block's histogram, two-way (push sims out) and Agresti-Coull smoothed -- the join's
+    estimator, as `live_resim`; sigma: its Monte Carlo error on the logit scale. Prior: `prop_prior` over the line's
+    `GameLineQuoteIndex` entries at the tick's instant. A spread needs `marginAnchored` (the join's own rule)."""
+    name, version = "live_segment", "live_segment/1"
+    e = lambda path: reader.get(name, "live_evidence", evidence_row, path)  # noqa: E731
+    sport = str(e("sport") or "").lower()
+    event_id = str(e("event_id") or "")
+    t = str(e("t") or "")
+    market = str(market or "").lower()
+    segment = str(segment or "").lower()
+    side = "home" if market in _SPREADS else "over"
+    op = _opinion(name, version, PHASE_LIVE, t=t, sport=sport, event_id=event_id, market=market, segment=segment,
+                  side=side, line=line,
+                  line_key="|".join([sport, event_id, market, segment, "", side, "" if line is None else f"{line:g}"]))
+    op.prior_basis = "book_quotes:median_devig_2way"
+    op.elapsed_share, op.clock_bucket = elapsed_share(sport, e("state"))
+    segs = e("segments")
+    block = segs.get(segment) if isinstance(segs, Mapping) else None
+    # The block's fields are their own source (`segment_block`), so the checklist measures each field once over the
+    # blocks read, not once per segment key (NBA's blocks carry no `marginAnchored` / `remainingFraction` at all).
+    b = lambda path: reader.get(name, "segment_block", block, path)  # noqa: E731
+    sims = _f(b("sims"))
+    anchored = b("marginAnchored") is True
+    op.inputs = {"home_key": game_key[0] if game_key else None, "away_key": game_key[1] if game_key else None,
+                 "remaining_fraction": _f(b("remainingFraction")), "segment_sims": sims,
+                 "margin_anchored": anchored}
+    if name in off:
+        op.refusal = "expert_off"
+        return op
+    at = _parse(t)
+    if at is None:
+        op.refusal = "no_instant"
+        return op
+    if not isinstance(block, Mapping):
+        op.refusal = "segment_absent"
+        return op
+    if b("settled"):
+        op.refusal = "segment_settled"
+        return op
+    if market not in SEGMENT_MARKETS:
+        op.refusal = "unknown_market"
+        return op
+    if market in _SPREADS and not anchored:
+        op.refusal = "segment_margin_unanchored"
+        return op
+    dist = b("total_dist") if market in _TOTALS else b("margin_dist")
+    if not isinstance(dist, Mapping) or not dist:
+        op.refusal = "no_distribution"
+        return op
+    if line is None:
+        op.refusal = "no_line"
+        return op
+    prior = prop_prior(entries, at)
+    op.inputs.update({"prior_books": prior["books"], "book_p": prior["book_p"], "prior_hold_pct": prior["hold_pct"],
+                      **{k: prior[k] for k in ("one_sided_books", "unpaired_books", "stale_books") if k in prior}})
+    if prior["p"] is None:
+        op.refusal = prior["refusal"]
+        return op
+    op.p_prior = round(prior["p"], 6)
+    op.prior_age_s = prior["age_s"]
+    k, n2, push = two_way_share(dist, line)
+    op.inputs.update({"k": k, "n": n2, "push": push})
+    if n2 <= 0:
+        op.refusal = "all_push"
+        return op
+    # THE JOIN REFUSES A SAMPLE CERTAINTY (`prop_projections._dist_prob_over`, #624): every sim on one side of the line
+    # says something about the sample, not the world, and the smoothing would turn it into a number the sim did not
+    # produce. Measured on NCAAB 11-12 before this rule: 442 of 21,462 half-point segment lines were 200 of 200 (or 0),
+    # all of them lines the join would have refused. The live_resim expert never meets them: the ledger prices none.
+    if k == 0 or k == n2:
+        op.refusal = "sample_certainty"
+        return op
+    p_adj, se = agresti_coull(k, n2)
+    return _finish(op, p_adj, sigma_logit_from_se(p_adj, se), "mc_agresti_coull")
+
+
+def live_segment_opinions(index: EvidenceIndex, quotes: GameLineQuoteIndex, reader: Reader | None = None,
+                          env: Mapping[str, str] | None = None, keep_rows: list[Mapping[str, Any]] | None = None,
+                          keep_blocks: list[Mapping[str, Any]] | None = None
+                          ) -> tuple[list[ExpertOpinion], dict[str, Any]]:
+    """Every logged tick of every game the books quoted segment lines for -> one opinion per UNSETTLED segment x
+    market x line that stood at that tick (`line_live_at`).
+
+    The second value counts what was not a line: games the books quoted that no evidence game matches by team key
+    (`games_unmatched`, with `games_matched`), and (tick, segment) pairs skipped because the segment had settled or the
+    tick had no block for it. `keep_rows` / `keep_blocks`, when given, collect the evidence rows and the segment blocks
+    that produced opinions (the checklist's `live_evidence` and `segment_block` populations)."""
+    reader = reader or Reader()
+    off = experts_off(env)
+    out: list[ExpertOpinion] = []
+    stats: dict[str, Any] = {"games_quoted": 0, "games_matched": 0, "games_unmatched": [], "ticks": 0,
+                             "segment_settled": 0, "segment_not_in_tick": 0}
+    for game_key, segments in sorted(quotes.segment_games().items()):
+        stats["games_quoted"] += 1
+        series = index.by_game.get(game_key)
+        if not series:
+            stats["games_unmatched"].append("|".join(game_key))
+            continue
+        stats["games_matched"] += 1
+        for t, row in series:
+            stats["ticks"] += 1
+            blocks = row.get("segments") if isinstance(row.get("segments"), Mapping) else {}
+            used = False
+            for segment in sorted(segments):
+                block = blocks.get(segment)
+                if not isinstance(block, Mapping):
+                    stats["segment_not_in_tick"] += 1
+                    continue
+                if block.get("settled"):
+                    stats["segment_settled"] += 1
+                    continue
+                block_used = False
+                for market in sorted(SEGMENT_MARKETS):
+                    for line, entries in sorted(quotes.lines(game_key[0], game_key[1], market, segment).items()):
+                        if not line_live_at(entries, t):
+                            continue
+                        out.append(live_segment_expert(row, segment, market, line, entries, reader, off, game_key))
+                        used = block_used = True
+                if block_used and keep_blocks is not None:
+                    keep_blocks.append(block)
+            if used and keep_rows is not None:
+                keep_rows.append(row)
+    return out, stats
+
+
+def segment_join_reproduction(opinions: Sequence[ExpertOpinion], index: EvidenceIndex,
+                              tol: float = 1e-6) -> dict[str, Any]:
+    """The segment expert against the LIVE JOIN's own pricing function on the same histogram.
+
+    For each opined line, the tick's segment block is handed to `live_gameline_join.price_distribution_market` (the
+    function that would price this line were college segment pricing on; prob_scale 1, as the join prices segments).
+    THE GATE is half-point lines, where no sim can push and the two estimators must agree to `tol`; this is what pins
+    the expert's line frame and side to the join's. Whole-number lines are counted beside it, not gated: the expert
+    drops push sims on purpose (the prior it is compared with is two-way)."""
+    from syndicate.features.shared.live_gameline_join import price_distribution_market
+
+    rows_at: dict[tuple[str, str, str], Mapping[str, Any]] = {}
+    for key, series in index.by_game.items():
+        for _t, row in series:
+            rows_at[(key[0], key[1], str(row.get("t") or ""))] = row
+    out: dict[str, Any] = {"checked": 0, "mismatched": 0, "examples": [],
+                           "whole_number": {"checked": 0, "differ": 0}}
+    for op in opinions:
+        if op.expert != "live_segment" or op.p_expert is None or op.line is None:
+            continue
+        row = rows_at.get((str(op.inputs.get("home_key")), str(op.inputs.get("away_key")), op.t))
+        block = ((row or {}).get("segments") or {}).get(op.segment) if row else None
+        if not isinstance(block, Mapping):
+            out["checked"] += 1
+            out["mismatched"] += 1
+            if len(out["examples"]) < 10:
+                out["examples"].append({"line_key": op.line_key, "t": op.t, "why": "tick_not_found"})
+            continue
+        dist = block.get("total_dist") if op.market in _TOTALS else block.get("margin_dist")
+        priced = price_distribution_market(dist=dist, line=op.line, side=op.side, market=op.market,
+                                           market_prob=op.p_prior, sims=block.get("sims"), sport=op.sport,
+                                           prob_scale=1.0)
+        join_p = priced.get("model_prob")
+        whole = float(op.line) == math.floor(float(op.line))
+        bucket = out["whole_number"] if whole else out
+        bucket["checked"] += 1
+        bad = join_p is None or abs(float(join_p) - float(op.p_expert)) > tol
+        if whole:
+            bucket["differ"] += int(bad)
+            continue
+        if bad:
+            out["mismatched"] += 1
+            if len(out["examples"]) < 10:
+                out["examples"].append({"line_key": op.line_key, "t": op.t, "expert": op.p_expert, "join": join_p,
+                                        "join_refusal": priced.get("withheld_reason"), "k": op.inputs.get("k"),
+                                        "n": op.inputs.get("n")})
+    return out
+
+
+def segment_prior_reproduction(opinions: Sequence[ExpertOpinion], quotes: GameLineQuoteIndex,
+                               tol: float = 1e-6) -> dict[str, Any]:
+    """The segment expert's prior against the board's own fair-value function (`board_fair_over`), recomputed from the
+    raw index entries of the books it used. The gate: 0 mismatched."""
+    out: dict[str, Any] = {"checked": 0, "mismatched": 0, "examples": []}
+    for op in opinions:
+        if op.expert != "live_segment" or op.p_prior is None or op.line is None:
+            continue
+        entries = quotes.lines(str(op.inputs.get("home_key")), str(op.inputs.get("away_key")), op.market,
+                               op.segment).get(float(op.line)) or []
+        p_board = board_fair_over(entries, _parse(op.t), set((op.inputs.get("book_p") or {}).keys()))
+        out["checked"] += 1
+        if p_board is None or abs(p_board - float(op.p_prior)) > tol:
+            out["mismatched"] += 1
+            if len(out["examples"]) < 10:
+                out["examples"].append({"line_key": op.line_key, "t": op.t, "p_prior": op.p_prior, "board": p_board})
+    return out
+
+
+def segment_frame_check(ledger_rows: Iterable[Mapping[str, Any]], quotes: GameLineQuoteIndex) -> dict[str, Any]:
+    """A READING, not a gate: the prior this expert would rebuild (`prop_prior` over `GameLineQuoteIndex`) against the
+    live join's OWN de-vigged price (`market_fair_prob`), on the full-game totals / spreads rows the join priced, at
+    the instant it priced them. The two use different rules (the join de-vigs the grid's consensus price per side; the
+    expert takes the median of per-book de-vigs), so they differ by a little; what this catches is a wrong FRAME. For
+    spreads it also reads the sign-flipped frame (the quotes at -L), which must be clearly worse."""
+    diffs: dict[str, list[float]] = {"totals": [], "spreads": []}
+    flipped: list[float] = []
+    no_quotes = refused = 0
+    for row in ledger_rows:
+        if is_ledger_refusal_row(row) or str(row.get("segment") or "full").lower() != "full":
+            continue
+        market = str(row.get("market") or "").lower()
+        if market not in SEGMENT_MARKETS:
+            continue
+        p_join, line, at = _f(row.get("market_fair_prob")), _f(row.get("line")), _parse(row.get("recorded_at"))
+        if p_join is None or line is None or at is None:
+            continue
+        lines = quotes.lines(team_key(row.get("home_team")), team_key(row.get("away_team")), market, "full")
+        entries = lines.get(float(line))
+        if not entries:
+            no_quotes += 1
+            continue
+        prior = prop_prior(entries, at)
+        if prior["p"] is None:
+            refused += 1
+            continue
+        family = "totals" if market in _TOTALS else "spreads"
+        diffs[family].append(abs(prior["p"] - p_join))
+        if family == "spreads" and line != 0:
+            other = lines.get(-float(line) + 0.0)
+            p_other = prop_prior(other, at)["p"] if other else None
+            if p_other is not None:
+                flipped.append(abs(p_other - p_join))
+
+    def summary(values: list[float]) -> dict[str, Any] | None:
+        if not values:
+            return None
+        v = sorted(values)
+        return {"n": len(v), "median_pp": round(100 * v[len(v) // 2], 3), "p90_pp": round(100 * v[int(len(v) * 0.9)], 3),
+                "within_2pp": round(sum(1 for x in v if x <= 0.02) / len(v), 4)}
+
+    return {"totals": summary(diffs["totals"]), "spreads": summary(diffs["spreads"]),
+            "spreads_sign_flipped": summary(flipped), "rows_without_quotes": no_quotes, "prior_refused": refused}
+
+
 def prior_reproduction(opinions: Sequence[ExpertOpinion], quotes: PropQuoteIndex, tol: float = 1e-6) -> dict[str, Any]:
     """The stat-progress prior against the BOARD's own fair-value function, recomputed from the raw index entries.
 
     For each opined line: the entries captured by `t` from the books the expert used (`book_p`), handed to
-    `odds_book_quotes._fair_value_fields` -- the function the board prices with -- must give the same `p_prior`.
-    And the expert's probability must be the published P(over) smoothed at n = simsRun."""
-    from syndicate.features.shared.odds_book_quotes import _fair_value_fields
-
+    `odds_book_quotes._fair_value_fields` (`board_fair_over`) -- the function the board prices with -- must give the
+    same `p_prior`. And the expert's probability must be the published P(over) smoothed at n = simsRun."""
     out: dict[str, Any] = {"checked": 0, "prior_mismatched": 0, "p_mismatched": 0, "examples": []}
     for op in opinions:
         if op.expert != "stat_progress" or op.p_prior is None or op.p_expert is None:
             continue
-        at = _parse(op.t)
         entries, _ = quotes.lookup(op.inputs.get("home_name"), op.inputs.get("away_name"), op.player, op.market,
                                    op.line)
         books = set((op.inputs.get("book_p") or {}).keys())
-        rows = [{"bookmaker": book, "selection": side, "price": price, "book_updated_at": stamp.isoformat()}
-                for seen, stamp, book, side, price, _sel in (entries or []) if seen <= at and book in books]
-        best = min((r["price"] for r in rows if r["selection"] == "over"), default=None)
-        fair = _fair_value_fields(rows, selection="over", price=best or 100, best_price=best or 100)
         out["checked"] += 1
-        p_board = fair.get("fair_probability")
+        p_board = board_fair_over(entries or [], _parse(op.t), books)
         bad_prior = p_board is None or abs(float(p_board) - float(op.p_prior)) > tol
         k, n = op.inputs.get("k"), op.inputs.get("n")
         p_adj = None if k is None or not n else agresti_coull(float(k), float(n))[0]
@@ -851,7 +1222,8 @@ def prior_reproduction(opinions: Sequence[ExpertOpinion], quotes: PropQuoteIndex
 
 
 LIVE_EXPERTS: dict[str, Callable[..., ExpertOpinion]] = {"live_resim": live_resim_expert,
-                                                         "stat_progress": stat_progress_expert}
+                                                         "stat_progress": stat_progress_expert,
+                                                         "live_segment": live_segment_expert}
 
 
 def live_opinions(ledger_rows: Iterable[Mapping[str, Any]], index: EvidenceIndex, reader: Reader | None = None,
@@ -1028,6 +1400,12 @@ EXPECTED_SPARSE: dict[str, str] = {
     "live_resim:live_gameline_ledger:prob_scale": "ledger v7 (#780, 2026-11-13): set only on totals rows the join "
                                                   "priced from a distribution; None on spreads and moneylines, and "
                                                   "absent from every record written before v7",
+    "live_segment:out:player": "segment lines are game lines; no player",
+    "nba:live_segment:segment_block:marginAnchored": "NBA's segment blocks carry no margin anchor (fleet 11-11 / "
+                                                     "11-12: 0 of every block read), so its segment spreads refuse "
+                                                     "segment_margin_unanchored, the join's own rule",
+    "nba:live_segment:segment_block:remainingFraction": "NBA's segment blocks do not carry it; recorded in inputs "
+                                                        "only, nothing branches on it",
     "live_resim:live_gameline_ledger:model_home_win_prob_unscaled": "ledger v7 (#780): set only where prob_scale != 1 "
                                                                     "(NBA / NCAAF full-game totals), and read only there",
 }

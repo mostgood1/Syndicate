@@ -493,6 +493,183 @@ def test_stat_progress_checklist_reads_the_streamed_population():
     assert starved.populated() == (4, {k: 4 for k in starved.non_null}) and "captured_at" not in starved.non_null
 
 
+# ----------------------------------------------------------------------------- live segment expert (college halves)
+#
+# Fixtures in the fleet's shapes (NCAAB 11-12): an evidence tick carrying `segments.<seg>` blocks (total_dist /
+# margin_dist histograms, 200 sims, settled, marginAnchored, remainingFraction) and `book_quotes` game-line rows, where
+# a spread's `selection` is "home" / "away" and each side carries its OWN handicap.
+
+SEG_HOME, SEG_AWAY = "Sacred Heart Pioneers", "Central Connecticut St Blue Devils"
+H2_TOTAL = {"30": 50, "34": 50, "38": 50, "42": 50}
+H2_MARGIN = {"-6": 50, "-2": 50, "3": 50, "8": 50}
+
+
+def _seg_block(*, settled=False, anchored=True, total=None, margin=None):
+    return {"total_dist": dict(total or H2_TOTAL), "margin_dist": dict(margin or H2_MARGIN), "sims": 200,
+            "settled": settled, "marginAnchored": anchored, "remainingFraction": 0.5, "total_mean": 36.0,
+            "includesOvertime": True}
+
+
+def _seg_evidence(t=T_TICK, *, h2=None, h1=None, sport="ncaab"):
+    return {"t": t, "as_of": "2026-11-13T00:59:50+00:00", "sport": sport, "event_id": "401922250",
+            "home_name": SEG_HOME, "away_name": SEG_AWAY, "refusal": None, "carried": False,
+            "state": {"period": 2, "clockSeconds": 1200}, "segments": {
+                "h1": h1 if h1 is not None else _seg_block(settled=True),
+                "h2": h2 if h2 is not None else _seg_block()}}
+
+
+def _gq(book, market, selection, line, price, *, segment="h2", captured="2026-11-13T00:58:00Z",
+        updated="2026-11-13T00:57:50Z"):
+    return {"captured_at": captured, "snapshot_ts": updated, "book_updated_at": updated, "sport": "ncaab",
+            "date": "2026-11-12", "kind": "game", "event_id": "fc5d", "commence_time": "2026-11-13T00:00:00Z",
+            "home_team": SEG_HOME, "away_team": SEG_AWAY, "bookmaker": book, "market": market, "segment": segment,
+            "selection": selection, "player_name": None, "line": line, "price": price}
+
+
+def _seg_quotes(**kw):
+    """h2 total 35.5 and h2 spread home -2.5 / away +2.5, two books each."""
+    return [_gq("fanduel", "totals", "over", 35.5, -120, **kw), _gq("fanduel", "totals", "under", 35.5, 100, **kw),
+            _gq("draftkings", "totals", "over", 35.5, -110, **kw),
+            _gq("draftkings", "totals", "under", 35.5, -110, **kw),
+            _gq("fanduel", "spreads", "home", -2.5, -105, **kw), _gq("fanduel", "spreads", "away", 2.5, -115, **kw),
+            _gq("draftkings", "spreads", "home", -2.5, -110, **kw),
+            _gq("draftkings", "spreads", "away", 2.5, -110, **kw)]
+
+
+def _seg(evidence, quotes, *, env=None):
+    index = ee.EvidenceIndex(evidence)
+    reader = ee.Reader()
+    qi = ee.GameLineQuoteIndex(quotes, reader)
+    rows, blocks = [], []
+    ops, stats = ee.live_segment_opinions(index, qi, reader, env=env, keep_rows=rows, keep_blocks=blocks)
+    return ops, stats, index, qi, reader, rows, blocks
+
+
+def _by(ops, market):
+    return [o for o in ops if o.market == market]
+
+
+def test_canonical_quote_side_puts_spreads_in_the_joins_away_frame():
+    assert ee.canonical_quote_side("totals", "over", 35.5) == ("over", 35.5)
+    assert ee.canonical_quote_side("totals", "Under", 35.5) == ("under", 35.5)
+    # home -2.5 and away +2.5 are ONE line: home covers when margin > 2.5 (`price_distribution_market`, no negation)
+    assert ee.canonical_quote_side("spreads", "home", -2.5) == ("over", 2.5)
+    assert ee.canonical_quote_side("spreads", "away", 2.5) == ("under", 2.5)
+    side, line = ee.canonical_quote_side("spreads", "home", 0.0)
+    assert (side, line, math.copysign(1.0, line)) == ("over", 0.0, 1.0)  # no -0.0 key
+    assert ee.canonical_quote_side("spreads", "Sacred Heart Pioneers", -2.5) is None
+    assert ee.canonical_quote_side("h2h", "home", None) is None
+
+
+def test_live_segment_prices_the_tick_histogram_exactly_as_the_join_would():
+    from syndicate.features.shared.live_gameline_join import price_distribution_market
+
+    ops, stats, index, qi, _, _, _ = _seg([_seg_evidence()], _seg_quotes())
+    assert stats["games_matched"] == 1 and stats["games_unmatched"] == []
+    total, spread = _by(ops, "totals")[0], _by(ops, "spreads")[0]
+    # P(h2 total > 35.5) = 100 of 200; P(home covers -2.5) = P(margin > 2.5) = 100 of 200. Read in the WRONG frame
+    # (margin > -2.5) the spread would be 150 of 200, which is what pins the sign.
+    assert (total.inputs["k"], total.inputs["n"]) == (100, 200)
+    assert (spread.inputs["k"], spread.inputs["n"], spread.line, spread.side) == (100, 200, 2.5, "home")
+    for op, dist in ((total, H2_TOTAL), (spread, H2_MARGIN)):
+        joined = price_distribution_market(dist=dist, line=op.line, side=op.side, market=op.market,
+                                           market_prob=op.p_prior, sims=200, sport="ncaab", prob_scale=1.0)
+        assert op.p_expert == pytest.approx(joined["model_prob"], abs=1e-6)
+        assert (op.segment, op.phase, op.clock_bucket, op.elapsed_share) == ("h2", "live", "50-75", 0.5)
+        assert op.line_key == f"ncaab|401922250|{op.market}|h2||{op.side}|{op.line:g}"
+        assert op.sigma_basis == "mc_agresti_coull" and op.prior_basis == "book_quotes:median_devig_2way"
+    fd = (120 / 220) / (120 / 220 + 0.5)  # fanduel -120 / +100 over; draftkings -110 / -110 is 0.5
+    assert total.p_prior == pytest.approx(round((fd + 0.5) / 2, 6))
+    rep = ee.segment_join_reproduction(ops, index)
+    assert (rep["checked"], rep["mismatched"]) == (2, 0)
+
+
+def test_live_segment_on_then_off():
+    on, *_ = _seg([_seg_evidence()], _seg_quotes())
+    off, *_ = _seg([_seg_evidence()], _seg_quotes(), env={ee.OFF_ENV: "live_segment"})
+    assert len(on) == len(off) == 2
+    assert all(o.delta_logit is not None for o in on)
+    assert all(o.refusal == "expert_off" and o.delta_logit is None and o.p_expert is None for o in off)
+
+
+def test_only_lines_standing_at_the_tick_are_opined_and_a_settled_half_is_skipped():
+    stale = [_gq("fanduel", "totals", "over", 33.5, -110, captured="2026-11-13T00:40:00Z",
+                 updated="2026-11-13T00:40:00Z"),
+             _gq("fanduel", "totals", "under", 33.5, -110, captured="2026-11-13T00:40:00Z",
+                 updated="2026-11-13T00:40:00Z")]
+    later = [_gq("fanduel", "totals", "over", 37.5, -110, captured="2026-11-13T01:00:30Z",
+                 updated="2026-11-13T01:00:20Z"),
+             _gq("fanduel", "totals", "under", 37.5, -110, captured="2026-11-13T01:00:30Z",
+                 updated="2026-11-13T01:00:20Z")]
+    h1 = [_gq("fanduel", "totals", "over", 70.5, -110, segment="h1"),
+          _gq("fanduel", "totals", "under", 70.5, -110, segment="h1")]
+    ops, stats, *_ = _seg([_seg_evidence()], _seg_quotes() + stale + later + h1)
+    # 33.5 was last quoted 20 min before the tick, 37.5 only after it, and h1 has settled: none is a line then
+    assert sorted((o.market, o.line) for o in ops) == [("spreads", 2.5), ("totals", 35.5)]
+    assert stats["segment_settled"] == 1 and stats["ticks"] == 1
+
+
+def test_a_sample_certainty_is_refused_as_the_join_refuses_it():
+    far = [_gq("fanduel", "totals", "over", 45.5, -110), _gq("fanduel", "totals", "under", 45.5, -110)]
+    ops, *_ = _seg([_seg_evidence()], far)
+    assert len(ops) == 1
+    assert ops[0].refusal == "sample_certainty" and ops[0].delta_logit is None
+    assert (ops[0].inputs["k"], ops[0].inputs["n"]) == (0, 200)
+
+
+def test_an_unanchored_segment_margin_refuses_spreads_only():
+    ops, *_ = _seg([_seg_evidence(h2=_seg_block(anchored=False))], _seg_quotes())
+    assert _by(ops, "spreads")[0].refusal == "segment_margin_unanchored"
+    assert _by(ops, "totals")[0].delta_logit is not None
+
+
+def test_unmatched_games_are_counted_not_opined():
+    ops, stats, *_ = _seg([_seg_evidence()], [dict(q, home_team="Other Home", away_team="Other Away")
+                                             for q in _seg_quotes()])
+    assert ops == [] and stats["games_matched"] == 0
+    assert stats["games_unmatched"] == ["other home|other away"]
+
+
+def test_the_segment_prior_reproduces_the_boards_own_fair_value_function():
+    ops, _, _, qi, *_ = _seg([_seg_evidence()], _seg_quotes())
+    rep = ee.segment_prior_reproduction(ops, qi)
+    assert (rep["checked"], rep["mismatched"]) == (2, 0)
+    ops[0].p_prior = round(ops[0].p_prior + 0.01, 6)
+    assert ee.segment_prior_reproduction(ops, qi)["mismatched"] == 1
+
+
+def test_the_frame_reading_scores_the_joins_own_prior_and_the_flipped_frame_worse():
+    full = [_gq("fanduel", "spreads", "home", -2.5, -150, segment="full"),
+            _gq("fanduel", "spreads", "away", 2.5, 130, segment="full"),
+            _gq("fanduel", "spreads", "home", 2.5, 200, segment="full"),
+            _gq("fanduel", "spreads", "away", -2.5, -240, segment="full")]
+    qi = ee.GameLineQuoteIndex(full, ee.Reader())
+    p_home = (150 / 250) / (150 / 250 + 100 / 230)  # home -2.5 at -150 against away +2.5 at +130, de-vigged
+    row = _ledger("spreads", 2.5, recorded_at="2026-11-13T01:00:00+00:00", prior=round(p_home, 4), home=SEG_HOME,
+                  away=SEG_AWAY)
+    fr = ee.segment_frame_check([row], qi)
+    assert fr["spreads"]["n"] == 1 and fr["spreads"]["median_pp"] < 0.01
+    assert fr["spreads_sign_flipped"]["median_pp"] > 20.0
+
+
+def test_segment_checklist_reads_the_block_population_and_names_nbas_missing_anchor():
+    nba_block = {k: v for k, v in _seg_block().items() if k not in ("marginAnchored", "remainingFraction")}
+    ev = [_seg_evidence(h2=nba_block, sport="nba")] + [_seg_evidence(t=f"2026-11-12T19:00:{s:02d}-06:00",
+                                                                     h2=nba_block, sport="nba") for s in range(1, 25)]
+    ops, _, _, qi, reader, rows, blocks = _seg(ev, _seg_quotes())
+    assert len(blocks) == 25 and all(o.market == "totals" or o.refusal == "segment_margin_unanchored" for o in ops)
+    cl = ee.checklist(ops, reader, {"live_evidence": rows, "segment_block": blocks}, sport="nba",
+                      populated={"book_quotes": qi.populated()})
+    assert cl["ok"], cl["alarms"]
+    documented = {i["input"] for i in cl["inputs"] if i.get("documented_sparse")}
+    assert {"segment_block:marginAnchored", "segment_block:remainingFraction"} <= documented
+    # the same gap on a sport that has not documented it is an alarm
+    alarmed = ee.checklist(ops, reader, {"live_evidence": rows, "segment_block": blocks}, sport="ncaab",
+                           populated={"book_quotes": qi.populated()})
+    assert {a["input"] for a in alarmed["alarms"]} == {"segment_block:marginAnchored",
+                                                       "segment_block:remainingFraction"}
+
+
 # ----------------------------------------------------------------------------- shadow: no reader, no order module
 
 

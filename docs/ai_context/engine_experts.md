@@ -33,6 +33,7 @@ expert agrees with the market" from "the expert had nothing to say". Off switch:
 | `sim` | pregame | the record's `model.p_model` (calibrated sim) | `None`, basis `unrecorded:no_sims_in_record`: the record has no sim count | `model_anchored_to_prior` (below), `game_not_pregame`, `no_model_probability` |
 | `under_tilt` | pregame | prior + the SUPPORTED prop under-bias (`matchup_signals.likelihood_adjustments`: NBA 1.23 pp, NCAAF 2.38 pp) | the measured residual's own uncertainty: max(binomial SE, half the two-window gap) = 0.30 pp NBA, 0.60 pp NCAAF | `signal_not_applicable` |
 | `live_resim` | live | the live re-sim histogram at the instant the join priced the line: two-way (push sims out), Agresti-Coull smoothed | Monte Carlo SE of that estimate, logit scale | `ledger_refusal_row`, `no_prior`, `no_game_match`, `no_evidence_before_instant`, `evidence_stale` (> 900 s), `segment_settled`, `segment_margin_unanchored`, `no_distribution` |
+| `live_segment` (slice 4, lane `live-segment-expert`) | live | an UNSETTLED segment (college h1 / h2; NBA halves and quarters) totals or spreads line some book was quoting at a logged re-sim tick, priced from that tick's segment histogram exactly as `live_gameline_join.price_distribution_market` would (two-way, Agresti-Coull, the away-frame line); the join itself refuses college segments (`segment_pricing_disabled`, #763) | Monte Carlo SE of that estimate, logit scale (200 sims a block) | `segment_absent`, `segment_settled`, `segment_margin_unanchored` (NBA: its blocks carry no anchor), `no_distribution`, `sample_certainty` (every sim on one side: the join refuses it, #624), `prior_one_sided`, `prior_unpaired`, `prior_stale`, `prior_implausible_hold` |
 | `stat_progress` (slice 3, lane `live-stat-progress-expert`) | live | one player prop's published live P(over) at one logged tick (banked actual + the re-sim's rest-of-game draws), Agresti-Coull smoothed at n = `simsRun` (100 on NBA) | Monte Carlo SE of that estimate, logit scale | producer reasons verbatim (`quote_pulled`, `certainty_refused`), `no_quote_before_instant`, `prior_one_sided`, `prior_unpaired`, `prior_stale` (> 900 s), `prior_implausible_hold` |
 
 **The `stat_progress` prior** (`prop_prior`) is the live BOOK prior at the props row's instant `t`, rebuilt from
@@ -45,6 +46,21 @@ expert agrees with the market" from "the expert had nothing to say". Off switch:
 One rule is added in play: a book whose newer side is older than `PROP_QUOTE_MAX_AGE_S = 900` s is left out.
 `book_quotes` appends on a change, so the age is time since the price last moved. Doubles markets are Yes/No with a
 NaN line: Yes is OVER the producer's fixed line (1.5 / 2.5).
+
+**The `live_segment` prior** is the same rule (`prop_prior`) over `book_quotes` GAME-LINE rows
+(`GameLineQuoteIndex`). A spread quote carries its own side's handicap (`selection` home / away, opposite signs), and
+`canonical_quote_side` puts it in the join's away frame: home at h is "home covers" at L = -h. A sign error here is
+the 2026-08-08 phantom-edge defect, so the runner reads the rebuilt prior against the join's OWN de-vigged price on the
+full-game lines the join priced (`SEG_FRAME`), and the sign-flipped frame beside it. The two priors use different
+rules (the join de-vigs the grid's consensus price per side; the expert takes the median of per-book de-vigs), so they
+differ a little; a wrong frame differs a lot.
+
+**Why the segment expert enumerates ticks, not ledger rows.** The ledger keeps one row per segment line per day, with
+no market price, on purpose (`live_gameline_join.attach_live_gamelines`: a moving price would rewrite every segment row
+each build and fill the file). So the ledger cannot say when a segment line stood. `live_segment_opinions` walks the
+evidence log's ticks of every game the books quoted segment lines for, and opines on each unsettled segment x market x
+line some book was quoting within 900 s of the tick (`line_live_at`). A settled half, and a game no evidence game
+matches by team key, are counted, not opined.
 
 **Not a line.** The re-sim publishes each posted line with +-3 neighbour lines. A row at a line no book quoted that
 day (`line_not_quoted`), or for a player and market no book quoted that day (`no_quotes_for_player_market`), is
@@ -108,6 +124,22 @@ scripts/engine_experts.py stat_progress()  props rows + the date's quote shard +
   engine_experts.prior_reproduction    (the board's _fair_value_fields on the same quotes: the gate)
 ```
 
+**Live (`live_segment`).**
+
+```
+live re-sim ticks (NCAAB / WNCAAB / NBA)  ->  lane rows carrying segments.<seg> {total_dist, margin_dist, sims,
+                                               settled, marginAnchored, remainingFraction}
+  live_evidence_log.Collector  writes live_evidence/<sport>/<producer date>.jsonl   (M0, as above)
+odds fetchers  ->  odds_book_quotes.append_book_quotes
+  writes <sport>_source/tracking/book_quotes/<date>.jsonl[.gz]   (game lines carry `segment`: full / h1 / h2 / q1..)
+scripts/engine_experts.py segments()  evidence rows (date -1 .. +1) + the date's quote shard + the date's ledger
+  engine_experts.GameLineQuoteIndex (home key, away key, market, segment -> canonical line; streamed, counts population)
+  engine_experts.live_segment_opinions -> live_segment_expert -> prop_prior
+  engine_experts.segment_join_reproduction   (price_distribution_market on the same histogram: the gate)
+  engine_experts.segment_prior_reproduction  (the board's _fair_value_fields on the same quotes: the gate)
+  engine_experts.segment_frame_check         (the rebuilt prior vs the join's own, full-game lines: a reading)
+```
+
 Nothing writes opinions under the data root. `run --opinions OUT` writes them where pointed.
 
 ## The gate (plan §3 M1: off != on per expert; a coverage table per sport, phase and clock bucket)
@@ -148,6 +180,27 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
   - The sim's minutes for some players: Aldama's projected 1.08 rebounds against 7 books at about 0.5 for over 3.5.
   - A single book quoting a pregame line long after it was passed: P.J. Washington PRA 21.5 at 0.46 with 12
     banked at 24% elapsed.
+- **Segment checks** (`live_segment`, lane `live-segment-expert`): `SEG_JOIN`, the expert against
+  `price_distribution_market` on the same segment histogram, half-point lines, must be 0 mismatched (whole-number lines
+  differ by design: the expert drops push sims); `SEG_PRIOR`, its prior against `_fair_value_fields`, must be 0
+  mismatched. Fleet readings 2026-11-13 (the worktree's code on fleet data, read-only, nice 19):
+
+  | night | sport | games quoted / matched | lines | opined | SEG_JOIN checked / mismatched | SEG_PRIOR mismatched | SEG_FRAME median spreads / flipped / totals | checklist |
+  |---|---|---|---|---|---|---|---|---|
+  | 11-11 | NCAAB | 94 / 89 | 43,324 | 41,762 | 40,876 / 0 | 0 | 0.24 / 4.9 / 0.17 pp | ok |
+  | 11-12 | NCAAB | 37 / 34 | 22,704 | 21,902 | 21,020 / 0 | 0 | 0.21 / 4.2 / 0.20 pp | ok |
+  | 11-11 | NBA | 10 / 10 | 110,808 | 47,562 | 43,056 / 0 | 0 | 0.10 / 39.9 / 0.22 pp | ok |
+  | 11-12 | NBA | 4 / 4 | 52,495 | 21,995 | 19,872 / 0 | 0 | 0.06 / 41.7 / 0.21 pp | ok |
+
+  - WNCAAB: no segment quotes in `book_quotes` on either night, so no prior and no opinion.
+  - Unmatched NCAAB games are team-name misses between the ESPN lanes and the odds feed (UMKC / Florida A&M, South
+    Florida / Saint Joseph's on both nights).
+  - NBA segment spreads all refuse `segment_margin_unanchored`: its segment blocks carry no margin anchor, which is
+    the join's own rule (documented sparse for NBA). Its segment totals are opined.
+  - Before `sample_certainty` existed, 442 of 21,462 NCAAB half-point lines on 11-12 were 200 of 200 (or 0): lines the
+    join refuses as a certainty (#624). They are refused now.
+  - Expert off: 0 opined of the same lines on every sport and night.
+  - The shifts are NOT edges: nothing here is graded against an outcome or a close. That is M2's job.
 - **Readings:** `.syndicate/deploys.md` and the lane block in `lanes.md`.
 
 ## Known gaps (not this slice)
@@ -162,6 +215,11 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
 - **NFL live totals/spreads have no prior.** The live join refuses every one as `no_distribution`, because the NFL
   lane publishes its histograms at lane level (snake_case); leads 2026-11-10.
 - **NHL live** prices only the moneyline (no distributions).
+- **Segments:** WNCAAB has segment blocks but no segment quotes, so no prior. NBA segment spreads refuse for want of a
+  margin anchor. `#780`'s measured over-confidence was on FULL-GAME totals (k NBA 2.16, NCAAF 2.48); the segment
+  histograms are untempered, which is right for an expert (the learner weighs it), but a segment edge must never be
+  priced off them raw. If college segment pricing is ever switched on, `live_resim` will opine on the same lines from
+  the ledger, and the learner must use one of the two.
 - **Rest, referee crew, weather, steam** are collected but not turned into a line shift anywhere (survey
   2026-11-10). Each needs its own measured model before it can be an expert.
 - `live_evidence/` is not in `EXPORT_ONLY_ARTIFACT_PATTERNS` (`model_engine_standard.md` §3). Its size (~7 MB a
