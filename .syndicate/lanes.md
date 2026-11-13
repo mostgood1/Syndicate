@@ -940,6 +940,14 @@ death, never life — do not invert it.
 - Verification: A file:line trace from the anchor's write to the live resume's read; a fleet read-only comparison at tip (progress < 0.15) of live P(home), the served pregame P(home) and the market fair P(home) on the same NBA games; the findings name where the anchor is lost or confirm it is carried
 - Blocked by: none
 
+### nfl-segment-skill — OPEN — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: NFL quarter/half game-line probabilities (h1/h2/q1-q4 x totals/spreads/h2h) carry a MEASURED pregame skill note on the served board, from a pre-registered held-out grade against the de-vigged pregame consensus and against final linescores, instead of a note whose text says unmeasured while its status says measured; plus an engine read of smartsim2's per-quarter scoring. Done = findings file, the entries and the lookup on main, loaded on web (user OK), served NFL segment rows carrying the measured note (todo #752).
+- Files: scripts/nfl_segment_skill.py (NEW), tests/test_nfl_segment_skill.py (NEW), syndicate/features/shared/nfl_segment_projections.py (the model_skill stamp in attach_nfl_segment_projections only), syndicate/features/shared/measured_market_skill.py (new NFL segment entries only), .syndicate/findings_2026-11-13_nfl_segment_skill.md (NEW), docs/ai_context/todo.md (#752 section only)
+- Hypothesis: smartsim2's NFL segment probabilities lose to the de-vigged pregame segment consensus, as its full-game numbers do (2022-25 backtest), and the loss is concentrated where the sim misallocates scoring between quarters
+- Falsification test: per market family, the game-clustered 95% CI of Brier(model) - Brier(de-vigged consensus) on held-out segment rows has its upper bound below 0 (the model beats the market); a CI spanning 0 is parity, reported with its n as underpowered
+- Verification: findings file with per-family games, dBrier [CI], calibration slope and PIT; entries + lookup on main; served NFL segment rows carry status measured with established_loss_rel equal to the entry; web loaded and read
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
