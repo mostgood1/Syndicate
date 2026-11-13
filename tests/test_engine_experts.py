@@ -642,6 +642,18 @@ def test_only_lines_standing_at_the_tick_are_opined_and_a_settled_half_is_skippe
     assert stats["segment_settled"] == 1 and stats["ticks"] == 1
 
 
+def test_a_row_whose_abbreviations_reduce_to_its_names_is_one_tick_not_two():
+    """NCAAB's evidence rows carry `home` / `away` with the same team key as the names. Filed under both, every
+    tick sat twice in one series and every NCAAB segment opinion was written twice (fleet 11-09..11-12)."""
+    row = {**_seg_evidence(), "home": SEG_HOME.upper(), "away": SEG_AWAY}
+    index = ee.EvidenceIndex([row])
+    assert [len(s) for s in index.by_game.values()] == [1]
+    ops, stats, *_ = _seg([row], _seg_quotes())
+    assert stats["ticks"] == 1 and sorted((o.market, o.line) for o in ops) == [("spreads", 2.5), ("totals", 35.5)]
+    nba = {**_evidence(), "home": "CHA", "away": "CLE"}  # distinct abbreviations: one series per key, as before
+    assert sorted(len(s) for s in ee.EvidenceIndex([nba]).by_game.values()) == [1, 1]
+
+
 def test_a_sample_certainty_is_refused_as_the_join_refuses_it():
     far = [_gq("fanduel", "totals", "over", 45.5, -110), _gq("fanduel", "totals", "under", 45.5, -110)]
     ops, *_ = _seg([_seg_evidence()], far)

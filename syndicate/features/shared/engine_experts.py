@@ -425,8 +425,13 @@ class EvidenceIndex:
             t = _parse(row.get("t"))
             if t is None:
                 continue
-            for home, away in ((row.get("home_name"), row.get("away_name")), (row.get("home"), row.get("away"))):
-                key = (team_key(home), team_key(away))
+            # ONCE PER DISTINCT KEY (lane college-segment-grade, 2026-11-13). NCAAB's evidence rows carry `home` /
+            # `away` that reduce to the same key as the names, and a row filed under both landed TWICE in one series:
+            # on the fleet's NCAAB 11-09..11-12, 3,529-6,029 duplicate instants a night, so `live_segment_opinions`
+            # (which walks every tick) wrote every NCAAB segment opinion twice. `lookup` was unaffected.
+            keys = {(team_key(home), team_key(away))
+                    for home, away in ((row.get("home_name"), row.get("away_name")), (row.get("home"), row.get("away")))}
+            for key in sorted(keys):
                 if key[0] and key[1]:
                     self.by_game.setdefault(key, []).append((t, row))
         for series in self.by_game.values():

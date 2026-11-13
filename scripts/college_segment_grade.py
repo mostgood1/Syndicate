@@ -5,10 +5,12 @@ college segment quote-age ceiling ... then a scored sample") and `#736` (the eng
 
 WHAT IS GRADED
 --------------
-Every OPINED row of `engine_experts.live_segment_expert` (`live_segment/1`, on main `0f14bdcc1`) on NCAAB, h1 / h2 x
-totals / spreads, on the registered evidence dates: at one logged re-sim tick, one half line some book was quoting,
-the engine's two-way probability (`p_expert`, the live join's own estimator) beside the books' de-vigged median at the
-same instant (`p_prior`), with `prior_age_s` = the age of the NEWEST usable book's quote at that instant.
+Every OPINED row of `engine_experts.live_segment_expert` (`live_segment/1`, on main `0f14bdcc1`; its evidence index
+de-duplicated as of this lane) on NCAAB, h1 / h2 x totals / spreads, for every game FINAL on the registered dates'
+scoreboards: at one logged re-sim tick, one half line some book was quoting, the engine's two-way probability
+(`p_expert`, the live join's own estimator) beside the books' de-vigged median at the same instant (`p_prior`), with
+`prior_age_s` = the age of the NEWEST usable book's quote at that instant. One enumeration covers every evidence file
+and quote shard from the day before the first date to the day after the last (`span`).
 
     outcome   ESPN's half scores (`ncaab_source/data/scoreboard/scoreboard_<date>.json`, `games[].live_state`
               `{home,away}_linescores`, final games only), joined on the ESPN event id the evidence log carries.
@@ -176,7 +178,7 @@ def build_rows(opinions: Iterable[Any], teams: Mapping[str, Mapping[str, Any]],
                games: Mapping[str, Mapping[str, Any]], *, read_scores: bool) -> tuple[list[GradeRow], dict[str, int]]:
     """Opined NCAAB half rows -> graded rows. `read_scores=False` (the count-only run) keeps every row whose game is
     FINAL and orientable without reading a score, so the registration's counts come before any outcome."""
-    counts = {"opined": 0, "duplicate": 0, "out_of_scope": 0, "no_age": 0, "no_final_score": 0,
+    counts = {"opined": 0, "duplicate": 0, "out_of_scope": 0, "no_age": 0, "not_a_final_window_game": 0,
               "orientation_unresolved": 0, "unscorable": 0, "push": 0, "kept": 0}
     seen: set[tuple] = set()
     rows: list[GradeRow] = []
@@ -198,7 +200,7 @@ def build_rows(opinions: Iterable[Any], teams: Mapping[str, Mapping[str, Any]],
             continue
         game = games.get(str(op.event_id))
         if game is None:
-            counts["no_final_score"] += 1
+            counts["not_a_final_window_game"] += 1
             continue
         orient = orientation(teams.get(str(op.event_id)) or {}, game)
         if op.market == "spreads" and orient is None:
@@ -346,35 +348,40 @@ def _runner():
     return module
 
 
+def span(dates: Sequence[str]) -> list[str]:
+    """The registered game dates widened by a day each side: a late tip's ticks fall on the next Central date, and a
+    game whose quote rows carry two kickoff times is split across two `book_quotes` shards (`kickoff_shard_date`)."""
+    first, last = date.fromisoformat(min(dates)), date.fromisoformat(max(dates))
+    return [(first + timedelta(days=k)).isoformat() for k in range(-1, (last - first).days + 2)]
+
+
 def collect(dates: Sequence[str], root: Path | None = None) -> tuple[list[Any], dict[str, dict[str, Any]],
                                                                      dict[str, Any]]:
-    """The expert's NCAAB segment opinions over `dates` (the runner's own enumeration), the evidence log's team names
-    per ESPN event id, and per-date expert stats."""
+    """The expert's NCAAB segment opinions, ONE enumeration over every evidence file and every quote shard in `span`
+    (so a game split across two shards is priced against all of its quotes, not two partial halves), the evidence
+    log's team names per ESPN event id, and the expert's stats. The window is applied after, by game: `final_games`
+    over the registered dates' scoreboards."""
     from syndicate.features.shared import engine_experts as ee
     from syndicate.features.shared import live_evidence_log as lel
 
     runner = _runner()
     sport = PREREG["sport"]
-    opinions: list[Any] = []
+    days = span(dates)
+    evidence = [row for d in days for row in lel.iter_rows(sport, d, root=root)]
     teams: dict[str, dict[str, Any]] = {}
-    stats: dict[str, Any] = {}
-    for d in dates:
-        evidence = [row for dd in runner._days_around(d) for row in lel.iter_rows(sport, dd, root=root)]
-        for row in evidence:
-            eid = str(row.get("event_id") or "")
-            if eid and eid not in teams:
-                teams[eid] = {k: row.get(k) for k in ("home_name", "away_name", "home", "away")}
-        index = ee.EvidenceIndex(evidence)
-        quotes = ee.GameLineQuoteIndex(runner._iter_quote_rows(sport, d), ee.Reader())
-        ops, st = ee.live_segment_opinions(index, quotes, ee.Reader())
-        stats[d] = {k: (len(v) if isinstance(v, list) else v) for k, v in st.items()}
-        stats[d]["lines"] = len(ops)
-        # only what the grade reads, so four nights of opinions (each carrying its inputs) are not held at once
-        slim = [SlimOpinion(**{f: getattr(o, f) for f in SlimOpinion.__dataclass_fields__})
+    for row in evidence:
+        eid = str(row.get("event_id") or "")
+        if eid and eid not in teams:
+            teams[eid] = {k: row.get(k) for k in ("home_name", "away_name", "home", "away")}
+    index = ee.EvidenceIndex(evidence)
+    quotes = ee.GameLineQuoteIndex((row for d in days for row in runner._iter_quote_rows(sport, d)), ee.Reader())
+    ops, st = ee.live_segment_opinions(index, quotes, ee.Reader())
+    stats = {k: (len(v) if isinstance(v, list) else v) for k, v in st.items()}
+    stats.update({"days": days, "evidence_rows": len(evidence), "quote_rows": quotes.rows, "lines": len(ops)})
+    # only what the grade reads, so the opinions' inputs are not held through the bootstrap
+    opinions = [SlimOpinion(**{f: getattr(o, f) for f in SlimOpinion.__dataclass_fields__})
                 for o in ops if o.delta_logit is not None]
-        stats[d]["opined"] = len(slim)
-        opinions.extend(slim)
-        del ops, index, quotes, evidence
+    stats["opined"] = len(opinions)
     return opinions, teams, stats
 
 
@@ -396,16 +403,14 @@ class SlimOpinion:
 
 
 def load_scoreboards(dates: Sequence[str]) -> list[Mapping[str, Any]]:
+    """The registered dates' scoreboards, exactly: a game is in the window when ESPN lists it on one of them."""
     from syndicate.features.ncaab.slate import slate_artifact_path
 
-    first, last = date.fromisoformat(min(dates)), date.fromisoformat(max(dates))
     boards = []
-    day = first - timedelta(days=1)
-    while day <= last + timedelta(days=1):
-        path = slate_artifact_path(day.isoformat(), "ncaab")
+    for d in sorted(dates):
+        path = slate_artifact_path(d, "ncaab")
         if path.exists():
             boards.append(json.loads(path.read_text(encoding="utf-8")))
-        day += timedelta(days=1)
     return boards
 
 

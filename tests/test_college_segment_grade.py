@@ -94,8 +94,13 @@ def test_rows_are_deduplicated_scored_and_counted():
            _op(age=None, t="2026-11-11T19:35:00-06:00")]
     rows, counts = csg.build_rows(ops, TEAMS, games, read_scores=True)
     assert [(r.market, r.y) for r in rows] == [("totals", 1), ("spreads", 1)]
-    assert counts == {**counts, "duplicate": 1, "push": 1, "no_final_score": 1, "out_of_scope": 1, "no_age": 1,
-                      "kept": 2}
+    assert counts == {**counts, "duplicate": 1, "push": 1, "not_a_final_window_game": 1, "out_of_scope": 1,
+                      "no_age": 1, "kept": 2}
+
+
+def test_the_span_widens_the_window_a_day_each_side():
+    assert csg.span(["2026-11-09", "2026-11-12"]) == ["2026-11-08", "2026-11-09", "2026-11-10", "2026-11-11",
+                                                     "2026-11-12", "2026-11-13"]
 
 
 def test_a_swapped_neutral_site_flips_the_spread_and_not_the_total():
