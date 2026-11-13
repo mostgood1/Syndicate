@@ -13,8 +13,10 @@ shape that is safe on web's request path.
 
 Lookup order per name: the normalised display name, location or abbreviation;
 then `team_aliases.canonical_team` (the one alias map -- nflverse `LA`/`WAS` vs
-ESPN `LAR`/`WSH`, short club names) and the same index again. Unknown -> None,
-never a guess: a wrong crest on a betting row reads as a different game.
+ESPN `LAR`/`WSH`, short club names) and the same index again. The index also
+keys each club's canonical name (#796: ESPN "LA Clippers", the odds feed "Los
+Angeles Clippers"). Unknown -> None, never a guess: a wrong crest on a betting
+row reads as a different game.
 """
 
 from __future__ import annotations
@@ -78,15 +80,42 @@ def _branding_files(sport: str) -> Iterable[Path]:
 @lru_cache(maxsize=16)
 def _index(sport: str) -> dict[str, str]:
     index: dict[str, str] = {}
+    branded: list[tuple[str, tuple[Any, ...]]] = []
     for path in _branding_files(sport):
         for row in read_team_branding_snapshot(path):
             url = str(getattr(row, "logo_url", "") or "").strip()
             if not url:
                 continue
+            branded.append((url, (row.display_name, row.abbreviation)))
             for key in (row.display_name, row.location, row.abbreviation):
                 normalized = _norm(key)
                 if normalized:
                     index.setdefault(normalized, url)
+    # The alias map's canonical name for each club too (#796). `logo_url`'s
+    # second pass looks the CANONICAL name up here, but ESPN's snapshot spells
+    # some clubs differently: "LA Clippers" / "LAC", while the odds feed and the
+    # alias map say "Los Angeles Clippers". Measured on the 11-13 board: 177 of
+    # 1,567 NBA rows had no Clippers crest, and the 22 Clippers prop rows no
+    # side (`player_headshots.player_side` matches sides by crest). ESPN's own
+    # keys win; a canonical name that two crests claim is left out, never guessed.
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+    except Exception:  # noqa: BLE001 -- no alias map is the ESPN-only index
+        return index
+    claims: dict[str, set[str]] = {}
+    for url, names in branded:
+        for name in names:
+            if not str(name or "").strip():
+                continue
+            try:
+                normalized = _norm(canonical_team(sport, str(name)))
+            except Exception:  # noqa: BLE001
+                normalized = ""
+            if normalized:
+                claims.setdefault(normalized, set()).add(url)
+    for normalized, urls in claims.items():
+        if len(urls) == 1:
+            index.setdefault(normalized, next(iter(urls)))
     return index
 
 
