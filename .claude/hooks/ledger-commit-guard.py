@@ -5,6 +5,13 @@ Covers `lanes.md`, `state.md` and `learnings.md`. The predicates live in
 `ledger_invariants.py` so the write-time hook enforces exactly the same set --
 two guards disagreeing about what "broken" means is worse than one guard.
 
+ESCAPE DAMAGE, added 2026-11-13, over a WIDER set: every markdown file under
+`.syndicate/` and `docs/ai_context/` that the commit records, not just TRACKED.
+A Windows path whose backslashes were read as escapes (`C:\\tmp` -> `C:<TAB>mp`)
+is refused when HEAD's blob of the same file does not already carry it. The
+predicate and its measurements live in `ledger_bytes.py`; this file only finds
+the bytes the commit would record (`_raw_to_be_committed`) and HEAD's.
+
 WHY THIS EXISTS, and why the PreToolUse file-tool guard was not enough.
 `ledger-append-guard.py` blocks the two ways `lanes.md` goes wrong, but it matches
 `Edit|Write|MultiEdit` and is therefore BLIND TO BASH. That is not an edge case
@@ -83,6 +90,12 @@ try:
     from commit_context import command_cwd, env_set_for_command, worktree_root
 except Exception:
     sys.exit(0)
+try:
+    from ledger_bytes import LEDGER_DIRS, REMEDY, describe, introduced, is_ledger_path
+except Exception:
+    # The byte check is the newer half; a missing module must not take the
+    # invariants down with it.
+    LEDGER_DIRS = None
 
 ALLOW_ENV = "SYNDICATE_ALLOW_LEDGER_COMMIT"
 # The lane/archive regexes that used to live here were dead: the predicates
@@ -102,13 +115,38 @@ def _git(root, *args):
         return None
 
 
+def _git_bytes(root, *args):
+    try:
+        r = subprocess.run(["git", "-C", root, *args], capture_output=True)
+        return r.stdout if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
 def _content_to_be_committed(root, command, rel):
-    """The lanes.md text this commit would record, or None if it records none.
+    """The text this commit would record for `rel`, or None if it records none.
+
+    Decoded the way this function always read it -- utf-8 with replacement,
+    universal newlines -- so the invariant predicates see exactly what they saw
+    before the BYTES were needed (`_raw_to_be_committed`).
+    """
+    raw = _raw_to_be_committed(root, command, rel)
+    if raw is None:
+        return None
+    return raw.decode("utf-8", "replace").replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _raw_to_be_committed(root, command, rel):
+    """The BYTES this commit would record for `rel`, or None if it records none.
+
+    Bytes, not text, because one of the damage classes `ledger_bytes` refuses is
+    a lone CR -- and text mode's universal newlines turn a lone CR into an LF
+    before anything can see it, on both the `git show` pipe and `open()`.
 
     Three cases, and they genuinely differ:
-      - an explicit pathspec naming lanes.md  -> the WORKING TREE file
-      - `-a` / `--all` with lanes.md modified -> the WORKING TREE file
-      - otherwise, if lanes.md is staged      -> the STAGED blob (`:path`)
+      - an explicit pathspec naming the file  -> the WORKING TREE file
+      - `-a` / `--all` with the file modified -> the WORKING TREE file
+      - otherwise, if the file is staged      -> the STAGED blob (`:path`)
     """
     # MATCH THE GIT INVOCATION, NOT THE COMMIT MESSAGE. `command` is the whole
     # Bash string, heredoc body included, so a substring test against all of it
@@ -134,16 +172,62 @@ def _content_to_be_committed(root, command, rel):
         modified = _git(root, "status", "--porcelain", "--", rel)
         if names_path or (modified or "").strip():
             try:
-                with open(os.path.join(root, rel), encoding="utf-8", errors="replace") as fh:
+                with open(os.path.join(root, rel), "rb") as fh:
                     return fh.read()
             except OSError:
                 return None
 
     staged = _git(root, "diff", "--cached", "--name-only", "--", rel)
     if staged and staged.strip():
-        return _git(root, "show", f":{rel}")
+        return _git_bytes(root, "show", f":{rel}")
     return None
 
+
+def _damage(root, command):
+    """[(rel, [Finding])] for ledger files this commit would record with NEW
+    escape damage -- damage `HEAD`'s blob of the same file does not carry.
+
+    Candidates are every ledger markdown file that is staged OR modified in the
+    working tree; `_raw_to_be_committed` then decides which version (if any)
+    this particular commit records, exactly as it does for the invariants.
+    """
+    names = set()
+    for args in (("diff", "--cached", "--name-only"), ("diff", "--name-only")):
+        out = _git(root, *args, "--", *LEDGER_DIRS)
+        names.update(n.strip() for n in (out or "").splitlines() if n.strip())
+    found = []
+    for rel in sorted(n for n in names if is_ledger_path(n)):
+        try:
+            new = _raw_to_be_committed(root, command, rel)
+        except Exception:
+            continue
+        if not new:
+            continue
+        old = _git_bytes(root, "show", f"HEAD:{rel}") or b""
+        bad = introduced(new, old)
+        if bad:
+            found.append((rel, bad))
+    return found
+
+
+
+def _write_damage(root, damage, per_file=8):
+    n = sum(len(b) for _, b in damage)
+    sys.stderr.write(f"BLOCKED: this commit would record {n} NEW escape-damaged "
+                     f"character(s) in {len(damage)} ledger file(s).\n\n")
+    for rel, bad in damage:
+        sys.stderr.write(f"{rel}\n")
+        for f in bad[:per_file]:
+            sys.stderr.write(f"  * {describe(f)}\n")
+        if len(bad) > per_file:
+            sys.stderr.write(f"  ... and {len(bad) - per_file} more\n")
+        sys.stderr.write("\n")
+    sys.stderr.write(REMEDY + "\n")
+    sys.stderr.write(
+        "Only damage that HEAD's copy of the same file does not already carry\n"
+        "counts, so an old damaged line never blocks an unrelated commit.\n"
+        f"Tree read:   {root}\n"
+        f"Override:    {ALLOW_ENV}=1 git commit ...   (as a prefix on the command)\n\n")
 
 
 def main():
@@ -182,8 +266,19 @@ def main():
         bad = violations(rel, text, root)
         if bad:
             report.append((rel, bad))
-    if not report:
+
+    damage = []
+    if LEDGER_DIRS is not None:
+        try:
+            damage = _damage(root, command)
+        except Exception:
+            damage = []
+    if not report and not damage:
         return 0
+    if damage:
+        _write_damage(root, damage)
+    if not report:
+        return 2
 
     sys.stderr.write("BLOCKED: this commit would record a ledger file that fails its invariants.\n\n")
     for rel, bad in report:

@@ -65,6 +65,7 @@ FAILS OPEN on anything unexpected. Override: `SYNDICATE_LEDGER_POSTCHECK=off`.
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -73,6 +74,10 @@ try:
     from ledger_invariants import TRACKED, violations
 except Exception:
     sys.exit(0)
+try:
+    from ledger_bytes import LEDGER_DIRS, REMEDY, describe, introduced
+except Exception:
+    LEDGER_DIRS = None
 
 OFF_ENV = "SYNDICATE_LEDGER_POSTCHECK"
 
@@ -93,6 +98,103 @@ def _state_path(root):
 #
 # Aliased back to the private names so nothing else in this file changed.
 from hook_trees import ledger_root as _ledger_root, roots as _roots
+
+
+# ESCAPE DAMAGE (`ledger_bytes.py`, added 2026-11-13) is checked over EVERY
+# ledger markdown file, not just TRACKED: the 11-13 repair found damaged paths
+# in 36 files, most of them daily logs and findings files TRACKED never names.
+#
+# Same budget rules as above. The tree is walked with `os.scandir`, whose
+# entries carry (mtime, size) without a stat call per file on Windows: 6.2 ms
+# for 597 files, measured 11-13. Only a file whose (mtime, size) moved is read,
+# and only then is HEAD's copy fetched (one `git show`) so that damage already
+# COMMITTED never reports -- the same rule the commit guard applies.
+#
+# TWO CASES ARE SEEDED, NOT CHECKED, both to keep a single call bounded:
+#   * the first sighting of a tree (no state yet) -- 597 reads + 597 `git show`
+#     would be ~25 s on one Bash call;
+#   * more than _BYTES_MAX_CHANGED files moving in one call, which is a
+#     checkout, a fast-forward or a rebase, not a hand-written append.
+# Damage that lands in either window is still refused at commit.
+_BYTES_KEY = "__escape_damage__"
+_BYTES_MAX_CHANGED = 20
+
+
+def _ledger_files(root):
+    """{rel: [mtime_ns, size]} for every markdown file under LEDGER_DIRS."""
+    out = {}
+
+    def walk(path, rel):
+        try:
+            it = os.scandir(path)
+        except OSError:
+            return
+        with it:
+            for e in it:
+                r = rel + "/" + e.name
+                try:
+                    if e.is_dir(follow_symlinks=False):
+                        walk(e.path, r)
+                    elif e.name.endswith(".md"):
+                        st = e.stat(follow_symlinks=False)
+                        out[r] = [int(st.st_mtime_ns), st.st_size]
+                except OSError:
+                    continue
+
+    for d in LEDGER_DIRS:
+        walk(os.path.join(root, *d.split("/")), d)
+    return out
+
+
+def _head_blob(root, rel):
+    try:
+        r = subprocess.run(["git", "-C", root, "show", f"HEAD:{rel}"],
+                           capture_output=True, timeout=10)
+        return r.stdout if r.returncode == 0 else b""
+    except Exception:
+        return b""
+
+
+def _scan_bytes(root, prev):
+    """(report, state) -- report is [(rel, [(what, how)])] like `violations`.
+
+    State is {rel: [mtime_ns, size, digest]}; digest is "" for clean, None for
+    seeded-but-unread, else a hash of the introduced findings, so the same
+    damage reports once and a CHANGE in the damage reports again.
+    """
+    now = _ledger_files(root)
+    if not isinstance(prev, dict):
+        return [], {r: s + [None] for r, s in now.items()}
+    state, changed = {}, []
+    for r, s in now.items():
+        old = prev.get(r)
+        if isinstance(old, list) and len(old) == 3 and old[:2] == s:
+            state[r] = old
+        else:
+            changed.append(r)
+            state[r] = s + [None]
+    if len(changed) > _BYTES_MAX_CHANGED:
+        return [], state
+    report = []
+    for r in changed:
+        try:
+            with open(os.path.join(root, *r.split("/")), "rb") as fh:
+                data = fh.read()
+        except OSError:
+            continue
+        bad = introduced(data, _head_blob(root, r))
+        digest = ""
+        if bad:
+            keys = repr(sorted((f.kind, f.line) for f in bad))
+            digest = hashlib.sha1(keys.encode("utf-8", "replace")).hexdigest()[:16]
+        before = prev.get(r)
+        state[r][2] = digest
+        if bad and not (isinstance(before, list) and len(before) == 3 and before[2] == digest):
+            shown = "\n".join("    " + describe(f) for f in bad[:8])
+            more = f"\n    ... and {len(bad) - 8} more" if len(bad) > 8 else ""
+            report.append((r, [(f"{len(bad)} NEW escape-damaged character(s), not in "
+                                f"HEAD's copy:\n{shown}{more}", REMEDY)]))
+    return report, state
 
 
 def _scan(root):
@@ -126,11 +228,19 @@ def _scan(root):
         if bad:
             report.append((rel, bad))
 
-    try:
-        with open(spath, "w", encoding="utf-8") as fh:
-            json.dump(new_state, fh)
-    except Exception:
-        pass
+    if LEDGER_DIRS is not None:
+        try:
+            dmg, new_state[_BYTES_KEY] = _scan_bytes(root, prev.get(_BYTES_KEY))
+            report.extend(dmg)
+        except Exception:
+            pass
+
+    if new_state != prev:
+        try:
+            with open(spath, "w", encoding="utf-8") as fh:
+                json.dump(new_state, fh)
+        except Exception:
+            pass
     return report
 
 
@@ -159,8 +269,9 @@ def main():
     # author. On the shared primary tree the writer is very often another
     # session, and claiming otherwise sent people looking through their own
     # command for a write that was not there.
-    sys.stderr.write("LEDGER INVARIANTS BROKEN -- a tracked file CHANGED and now "
-                     "fails its invariants.\nThe write already happened; this is a "
+    sys.stderr.write("LEDGER FILE BROKEN -- a ledger file CHANGED and now "
+                     "fails its invariants or carries\nnew escape damage. "
+                     "The write already happened; this is a "
                      "warning, not a block. It may have\nbeen another session: the "
                      "check sees the change, not who made it.\n\n")
     for root, rel, bad in findings:
