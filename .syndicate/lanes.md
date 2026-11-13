@@ -700,14 +700,6 @@ death, never life — do not invert it.
 - Verification: Grid replays (scale 1.00..0.80) on the fleet host at nice 19 with production inputs; walk-forward scale per date; by-cutoff total bias + discrete CRPS on vs off with game-bootstrap CIs; end-game p re-fit at the chosen scale; puck-line and moneyline Brier on vs production; unit tests (off == today seed for seed, reachability through build_live_lens_snapshot, mutation-checked); findings file with a load / do-not-load recommendation
 - Blocked by: none
 
-### onedrive-path-refs — CLOSED 2026-11-13 (goal MET: ad83437e3 + 25ed212a4; scripts/ grep leaves only the helper docstring, in-play two-path fallbacks, move_git_store history; 9+18 tests pass; loan returned) — opened 2026-11-13 — session eeaddaa6-9251-44ab-b4c4-546b2d84cd8e
-- Goal: No script under scripts/ resolves the repo through the old OneDrive path: hard-coded C:\Users\tempadmin\OneDrive\Coding\Syndicate constants replaced by scripts/_primary_tree.py (SYNDICATE_PRIMARY_TREE -> git common dir -> own repo), /mnt/c constants defaulting to the new path with an env override, the memory-key derived from the path; git_store_relocation docs marked superseded; operational docs updated. Done = git grep for the old path in scripts/ returns only intentionally kept fixtures/history, touched scripts' tests pass.
-- Files: scripts/_primary_tree.py (NEW), tests/test_primary_tree.py (NEW), scripts/audit_lane_unguarding.py, scripts/backfill_uefa_historical_closes.py, scripts/backtest_football_attribution_props.py, scripts/backtest_ncaaf_lines_props.py, scripts/backtest_ncaaf_total_units.py, scripts/commit_live_gameline_history.py, scripts/copy_backfill_to_fleet.py, scripts/diagnose_nfl_passing_yards_prop.py, scripts/e3_history_loaders.py, scripts/fetch_ncaaf_historical_props.py, scripts/football_attribution_tables.py, scripts/grade_football_model_weight.py, scripts/grade_football_playability.py, scripts/ncaaf_attribution_usage.py, scripts/release_phantom_lane_claims.py, scripts/survey_nhl_club_tokens.py, scripts/watch_unknown_submit.ps1, scripts/move_git_store.py, docs/ai_context/git_store_relocation.md, docs/ai_context/end_to_end_context.md, README.md, RENDER_SELF_HOST_BACKLOG.md, RENDER_SELF_HOST_REFACTOR_PLAN.md (absolute c:/Users/*/OneDrive links -> repo-relative), scripts/football_scenario_rates.py + scripts/football_scenario_refit_v4.py (old-path constant ONLY -- LOAN from football-scenario-calibration, user-approved 2026-11-13 "Yes, take the loan")
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: git grep result + targeted pytest
-- Blocked by: none
-
 ### team-logo-canonical-names — CLOSED 2026-11-13 (GOAL MET: served NBA rows with no crest 145 -> 0, NBA props with no side 19 -> 0 of 354) — opened 2026-11-13 — session 2ba5509d-5605-427a-b4bd-acd7926e2bea
 - **GOAL VERDICT 2026-11-13 10:25 AM CST (16:25Z):** A team the odds feed names differently from ESPN's branding snapshot (Los Angeles Clippers vs ESPN LA Clippers / LAC: 177 of 1567 NBA rows on the 11-13 board with no Clippers crest, and the 22 Clippers prop rows with no player_side) resolves to its crest: team_logos._index also keys each branding row's team_aliases.canonical_team name (existing keys win; a canonical name on two crests is dropped), with tests incl. off != on, a fleet replay over every served team showing the gain and 0 changed crests or sides already set, and -- once loaded -- a served reading -- **GOAL: MET** (fix `eb4a43688`, loaded 15:47:13Z: fleet ff + reload-web + refresh-worker TERM 15:59:49Z, user "Yes, load it". Served: NBA rows with no crest 145 -> 0 of 1,453 on the same build 8 s after the reload; NBA props with no side 19 -> 0 of 354 after the new worker's first build, 16:20:13Z. deploys.md 2026-11-13 15:47:13Z; todo #796 closed.)
 - Goal: A team the odds feed names differently from ESPN's branding snapshot (Los Angeles Clippers vs ESPN LA Clippers / LAC: 177 of 1567 NBA rows on the 11-13 board with no Clippers crest, and the 22 Clippers prop rows with no player_side) resolves to its crest: team_logos._index also keys each branding row's team_aliases.canonical_team name (existing keys win; a canonical name on two crests is dropped), with tests incl. off != on, a fleet replay over every served team showing the gain and 0 changed crests or sides already set, and -- once loaded -- a served reading
@@ -767,11 +759,6 @@ death, never life — do not invert it.
 - Falsification test: On the first 200 unseen qualifying games the hit is <= 0.524 (the -110 break-even)
 - Verification: Registration commit on origin/main with a timestamp earlier than any grade run on dates >= 2026-11-10; count-only check prints counts and no outcomes; the single registered grade run recorded with its verdict
 - Blocked by: none
-
-### closed-lane-archive-20261113-0840 — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 754c7c5a-fa6d-41cc-8c2e-c9ea87309053
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 of 8 CLOSED blocks SAFE; moved to lanes_closed.md with one pointer: closed-lane-archive-20261113-0240. Table, WAIT reasons and Part B (dormant set CHANGED, 14 -> 12) in .syndicate/log/2026-11-13.md.
 
 ### cheat-sheet-section-optimization — OPEN — opened 2026-11-13 — session 35bdf3a7-5afc-483e-98bb-d0d7f4d2ecc3
 - **STATUS 2026-11-13 2:04 PM CT: rules v3 LOADED and MET** (user "Yes, cap at 2" then "Load both now"). Fleet ff `0eb6f8d99` -> `754d5f3e4` 19:51:17Z, reload-web, and a manual build. Every 11-13 sheet is rules 3, and Sim vs the line has at most 2 picks per player per game (NBA / NHL 3 -> 2). #790's season-phase cache rode into web (deploys.md 19:51:17Z). Still OWED: `record.json` with `sim_edge` after the 10:50 PM reconcile; the 11-14 review's against-the-price lines; probation sections at 30+ bets.
@@ -919,6 +906,11 @@ death, never life — do not invert it.
 - Falsification test: With the fix a stub OT state still yields a sim with |margin| > 1 or a total other than tied + 1; or the OT goal events carry no usable time order to name the first goal; or pregame run_hockeysim_game output changes
 - Verification: tests (off != on on the real engine; pregame identity); replay under the fleet's code and inputs: OT and tied-late states' OT sims end +-1 only; moneyline/total shift reported per state; served lanes carry liveOvertime after the user's yes to load
 - Blocked by: none
+
+### closed-lane-archive-20261113-1440 — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 411547c9-ea26-4f27-b313-2b2d937164ef
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness --idle-min 240 read 2 of 17 CLOSED blocks SAFE; both moved to lanes_closed.md with one pointer each: onedrive-path-refs, closed-lane-archive-20261113-0840. Table and WAIT reasons in log/2026-11-13.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1162,6 +1154,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261113-0240` — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 3614e560-22cb-4c27-8284-d1b36a481e8b
 - `closed-lane-archive-20261113-0440` — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 7892d138-f9c4-46ae-88f1-f80e105ede73
 - `closed-lane-archive-20261113-0640` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 38196abb-579a-4240-ab44-f099e35ef716
+- `closed-lane-archive-20261113-0840` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 754c7c5a-fa6d-41cc-8c2e-c9ea87309053
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1524,6 +1517,7 @@ death, never life — do not invert it.
 - `odds-run-135535-failure` — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
 - `one-engine-alignment-audit` — CLOSED-MET 2026-10-30 (stale-lane-triage, user-approved) — opened 2026-10-20 — session e13a70a0 (side session of 332cb014's group)
 - `one-read-746-747-749` — CLOSED 2026-11-11 (GOAL MET: #749 / #747 / #746 read and recorded, deploys.md 2026-11-12 00:28Z; all three archived to todo_closed.md) — opened 2026-11-11 — session 345d60ab-9db5-4a93-9d01-d57374578f65
+- `onedrive-path-refs` — CLOSED 2026-11-13 (goal MET: ad83437e3 + 25ed212a4; scripts/ grep leaves only the helper docstring, in-play two-path fallbacks, move_git_store history; 9+18 tests pass; loan returned) — opened 2026-11-13 — session eeaddaa6-9251-44ab-b4c4-546b2d84cd8e
 - `open-bet-live-status` — ORPHANED, **UNOWNED** [ownership sweep 2026-08-31: owning session gone, no live session on this machine] — — opened 2026-08-26 — session syndicate-27
 - `open-block-bloat-batch` — CLOSED — opened 2026-09-25, closed 2026-09-25 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `ops-export-schedules` — CLOSED 2026-10-21 (GOAL MET) — opened 2026-10-20 — session 2d413211

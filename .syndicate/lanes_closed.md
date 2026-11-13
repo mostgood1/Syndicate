@@ -15523,3 +15523,16 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: GOAL MET -- owner_liveness --idle-min 240 read 1 SAFE of 4 CLOSED; moved to lanes_closed.md with one pointer; invariants unchanged vs origin/main baseline (same 2 contested files).
 - Moved: closed-lane-archive-20261113-0040. Table in .syndicate/log/2026-11-13.md.
+
+### onedrive-path-refs — CLOSED 2026-11-13 (goal MET: ad83437e3 + 25ed212a4; scripts/ grep leaves only the helper docstring, in-play two-path fallbacks, move_git_store history; 9+18 tests pass; loan returned) — opened 2026-11-13 — session eeaddaa6-9251-44ab-b4c4-546b2d84cd8e
+- Goal: No script under scripts/ resolves the repo through the old OneDrive path: hard-coded C:\Users\tempadmin\OneDrive\Coding\Syndicate constants replaced by scripts/_primary_tree.py (SYNDICATE_PRIMARY_TREE -> git common dir -> own repo), /mnt/c constants defaulting to the new path with an env override, the memory-key derived from the path; git_store_relocation docs marked superseded; operational docs updated. Done = git grep for the old path in scripts/ returns only intentionally kept fixtures/history, touched scripts' tests pass.
+- Files: scripts/_primary_tree.py (NEW), tests/test_primary_tree.py (NEW), scripts/audit_lane_unguarding.py, scripts/backfill_uefa_historical_closes.py, scripts/backtest_football_attribution_props.py, scripts/backtest_ncaaf_lines_props.py, scripts/backtest_ncaaf_total_units.py, scripts/commit_live_gameline_history.py, scripts/copy_backfill_to_fleet.py, scripts/diagnose_nfl_passing_yards_prop.py, scripts/e3_history_loaders.py, scripts/fetch_ncaaf_historical_props.py, scripts/football_attribution_tables.py, scripts/grade_football_model_weight.py, scripts/grade_football_playability.py, scripts/ncaaf_attribution_usage.py, scripts/release_phantom_lane_claims.py, scripts/survey_nhl_club_tokens.py, scripts/watch_unknown_submit.ps1, scripts/move_git_store.py, docs/ai_context/git_store_relocation.md, docs/ai_context/end_to_end_context.md, README.md, RENDER_SELF_HOST_BACKLOG.md, RENDER_SELF_HOST_REFACTOR_PLAN.md (absolute c:/Users/*/OneDrive links -> repo-relative), scripts/football_scenario_rates.py + scripts/football_scenario_refit_v4.py (old-path constant ONLY -- LOAN from football-scenario-calibration, user-approved 2026-11-13 "Yes, take the loan")
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: git grep result + targeted pytest
+- Blocked by: none
+
+### closed-lane-archive-20261113-0840 — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 754c7c5a-fa6d-41cc-8c2e-c9ea87309053
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 of 8 CLOSED blocks SAFE; moved to lanes_closed.md with one pointer: closed-lane-archive-20261113-0240. Table, WAIT reasons and Part B (dormant set CHANGED, 14 -> 12) in .syndicate/log/2026-11-13.md.
