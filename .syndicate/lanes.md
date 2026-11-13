@@ -932,6 +932,14 @@ death, never life — do not invert it.
 - Verification: scripts/live_moneyline_gap.py run on the fleet (read-only, nice 19) reproduces the fit script's model - market Brier (NBA +0.020, NCAAB +0.009) on the same population, then prints each hypothesis's table with game-clustered intervals; findings file names the verdict per hypothesis
 - Blocked by: none
 
+### nba-live-anchor-trace — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: State, with file:line evidence and a fleet reading at tip, whether the NBA pregame market anchor (#721, market_anchor) reaches the NBA live re-sim's resumed engine, and if not, where it is lost; findings committed; nothing changed in production
+- Files: .syndicate/findings_2026-11-13_nba_live_anchor_trace.md (NEW), docs/ai_context/todo.md (#780 section only)
+- Hypothesis: Written before tracing (2026-11-13 21:05Z). H: the #721 anchor is applied to the pregame SmartSim's OUTPUT (or to a layer the live resume does not read), so the NBA live re-sim resumes un-anchored engine inputs; at tip the live P(home) tracks the raw pregame engine, not the market. Prediction: persist_engine_inputs saves kwargs that carry no market line, and at tip the live P(home) sits farther from the market than the served pregame number does.
+- Falsification test: H is falsified if the persisted engine inputs the live resume loads carry the market-anchored team strength (a market line or a target derived from it), or if at tip the live P(home) is no farther from the market than the served pregame P(home) on the same games
+- Verification: A file:line trace from the anchor's write to the live resume's read; a fleet read-only comparison at tip (progress < 0.15) of live P(home), the served pregame P(home) and the market fair P(home) on the same NBA games; the findings name where the anchor is lost or confirm it is carried
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
