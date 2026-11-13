@@ -360,7 +360,8 @@ class SeedSaltTests(unittest.TestCase):
             common =["--league", "ncaab", "--current", OLD, "--dates", "2026-11-05", "--data-root", tmp,
                       "--receipt-dir", tmp]
             base = common + ["--candidate", OLD]
-            refused = [base, base + ["--seed-salt", "1001"], common + ["--aa-salts", "1002"],
+            refused = [base, base + ["--current-salts", "4", "--seed-salt", "1001"],
+                       common + ["--current-salts", "4", "--aa-salts", "1002"],
                        common + ["--aa-salts", "0"], common + ["--aa-salts", "3,3"]]
             for argv in refused:
                 buf = io.StringIO()
@@ -373,8 +374,7 @@ class SeedSaltTests(unittest.TestCase):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 rc = gate.main(base + ["--seed-salt", "1"])
-            self.assertEqual(calls, [[("current@0", 0), ("current@1001", 1001), ("current@1002", 1002),
-                                      ("current@1003", 1003), ("candidate", 1)]])
+            self.assertEqual(calls, [[("current@0", 0), ("candidate", 1)]])  # default: one current draw
             self.assertIn("NOISE CHECK", buf.getvalue())
             self.assertEqual(rc, 2)  # no games -> no receipt
             self.assertIn("NO RECEIPT", buf.getvalue())
@@ -456,10 +456,10 @@ class NullBaselineTests(unittest.TestCase):
         self.assertEqual((fam["worse"], fam["better"]), ([], []))
         self.assertTrue(all(z == 0.0 for z in fam["z"].values()))
 
-    def test_off_switch_through_main_restores_the_one_draw_per_cell_refusal(self) -> None:
+    def test_opt_in_k_draws_and_family_rule_through_main_vs_the_one_draw_per_cell_default(self) -> None:
         """off != on through main(): an A/A whose current draw 0 is LUCKY on 20 m win Brier (STEP 3j's shape). The
-        default (mean of 4 draws, family rule) writes no WORSE cell; --current-salts 1 --flag-rule per-cell refuses
-        it, and every receipt's legacy block does too."""
+        DEFAULT (one draw, per-cell; restored 2026-11-13 after the family rule failed to refuse RC46) refuses it;
+        the opt-in --current-salts 4 --flag-rule family writes no WORSE cell; every receipt's legacy block refuses."""
         n = 200
         base = _base(n)
         table = {"current@0": _arm(base, 11, n, shift={("20m", "win_brier"): -0.06}),
@@ -480,10 +480,10 @@ class NullBaselineTests(unittest.TestCase):
                       "--data-root", tmp, "--receipt-dir", tmp]
             receipt = Path(tmp) / gate.receipt_name("ncaab", h, h, 1)
             with redirect_stdout(io.StringIO()):
-                rc_on = gate.main(common)
+                rc_on = gate.main(common + ["--current-salts", "4", "--flag-rule", "family"])
             on = json.loads(receipt.read_text(encoding="utf-8"))
             with redirect_stdout(io.StringIO()):
-                rc_off = gate.main(common + ["--current-salts", "1", "--flag-rule", "per-cell"])
+                rc_off = gate.main(common)
             off = json.loads(receipt.read_text(encoding="utf-8"))
         self.assertEqual(seen[0], ["current@0", "current@1001", "current@1002", "current@1003", "aa1"])
         self.assertEqual(seen[1], ["current@0", "aa1"])

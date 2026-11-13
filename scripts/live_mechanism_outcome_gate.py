@@ -25,18 +25,20 @@ paired candidate - current over games. Every metric is lower-is-better. Coverage
 not as "higher", because the 7-field config over-covers (0.83-0.91) and RC46 under-covers (0.69-0.83): neither
 direction is good by itself.
 
-THE FLAG RULE (todo #784, lane `outcome-gate-null-baseline`, 2026-11-13). A cell is WORSE when its z (paired diff over
-its bootstrap SD) exceeds a FAMILY-WISE critical value: the 95th percentile, over one joint bootstrap of games, of the
-largest standardized deviation among all 30 cells (max-T). So a NULL change is refused in any cell with probability
-about 5%, not 1 - 0.975^30. BETTER is the mirror. And the CURRENT arm is the mean of K seed-salted Monte Carlo draws
-(`--current-salts`, default 4: salts 0, 1001, 1002, 1003), not one draw.
+THE FLAG RULE (the DEFAULT; todo #784). A cell is WORSE when its own 1.96 x bootstrap-SE interval clears 0, against
+ONE current-arm Monte Carlo draw (production's seeds). This rule is known to refuse NULL changes: two A/A runs (the
+running value against itself, candidate seeds salted; findings PHASE 2 STEP 3j) flagged 4 and 2 cells on 11-03..12,
+because every candidate on those dates shares that one draw. Read any WORSE cell beside an A/A receipt for the same
+dates (`--aa-salts`).
 
-Why both: until 2026-11-13 a cell was WORSE when its own 1.96 x SE interval cleared 0, against ONE current-arm draw.
-Two A/A runs (the running value against itself, candidate seeds salted; findings PHASE 2 STEP 3j) then flagged 4 and 2
-cells on 11-03..12, repeating 10 m margin CRPS and 20 m log loss. Every candidate on those dates shared that one draw,
-which happened to score well there, and all three candidates scored that day were refused on it. `--current-salts 1
---flag-rule per-cell` is the old rule (the off switch); every receipt also carries a `legacy` block computed that way
-for audit. The per-cell 1.96 x SE is still printed beside each cell, for reading, not for flagging.
+OPT-IN, FALSIFIED AS A DEFAULT `[2026-11-13, lane outcome-gate-null-baseline, findings PHASE 2 STEP 3k]`:
+`--current-salts K` (the current arm is the mean of K seed-salted draws: 0, 1001, ...) and `--flag-rule family` (WORSE
+needs z above the 95th percentile of the max standardized deviation over all 30 cells in one joint bootstrap). With
+K = 4 both A/A transitions flagged 0 cells, but RC46 -- reverted 2026-11-10 on outcome scoring -- was not refused
+either (20 m win Brier z 3.10 against a critical value of 3.47). The critical values ran 2.98-3.63, inflated by the
+coverage cells: |coverage - 0.80| folds near 0.80, so its bootstrap is skewed and dominates the max. Do not make it the
+default until a redesign refuses RC46 and passes the A/A pairs. Every receipt carries a `legacy` block (one draw,
+per-cell) whichever rule is chosen, and the 1.96 x SE is printed beside each cell.
 
 THE RECEIPT. `<main tree>/.syndicate/deploy/outcome_gate/<league>__<candidate12>__<current12>.json`, keyed on the
 sha256 of the canonical JSON of each value, so it names the exact TRANSITION. `deploy_preflight.py` reads it (through
@@ -109,7 +111,7 @@ COVERAGE_NOMINAL = 0.80
 METRICS = ("margin_crps", "margin_cov80_dev", "total_crps", "total_cov80_dev", "win_brier", "win_logloss")
 # The current arm: mean of K draws. Salt 0 is production's own seed (and the candidate's, so a real candidate keeps
 # common random numbers with draw 0); the others sit far from any candidate or A/A salt.
-DEFAULT_CURRENT_SALTS = 4
+DEFAULT_CURRENT_SALTS = 1  # K = 4 + the family rule was FALSIFIED as a default 2026-11-13 (see THE FLAG RULE)
 CURRENT_SALT_BASE = 1000
 FAMILY_ALPHA = 0.05
 FAMILY_DRAWS = 2000
@@ -758,10 +760,11 @@ def main(argv: Optional[list[str]] = None) -> int:
                     help="comma list: also score the CURRENT value against itself with these candidate salts (A/A "
                          "noise checks; their receipts never clear preflight)")
     ap.add_argument("--current-salts", type=int, default=DEFAULT_CURRENT_SALTS,
-                    help=f"the current arm is the mean of this many seed-salted draws (default {DEFAULT_CURRENT_SALTS}; "
-                         "1 = one draw, the pre-2026-11-13 arm)")
-    ap.add_argument("--flag-rule", choices=("family", "per-cell"), default="family",
-                    help="family = max-T family-wise (default); per-cell = 1.96 x SE per cell (the pre-2026-11-13 rule)")
+                    help=f"the current arm is the mean of this many seed-salted draws (default {DEFAULT_CURRENT_SALTS}: "
+                         "one draw, production's seeds)")
+    ap.add_argument("--flag-rule", choices=("family", "per-cell"), default="per-cell",
+                    help="per-cell = 1.96 x SE per cell (default); family = max-T family-wise (opt-in: it did not "
+                         "refuse RC46 on 2026-11-13, see THE FLAG RULE)")
     ap.add_argument("--family-alpha", type=float, default=FAMILY_ALPHA)
     ap.add_argument("--dump-arms", default="", help="write every arm's per-game features (JSON) here")
     args = ap.parse_args(argv)
