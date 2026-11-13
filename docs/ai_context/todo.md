@@ -332,6 +332,14 @@
   - Code: `live_gameline_join.spreads_prob_scale` and `full_game_prob_scale` (one place decides a row's k for the pricer and the Live column). Ledger v7 unchanged in shape; spreads rows now carry `prob_scale`.
   - Tests: `tests/test_live_margin_prob_scale.py`, 43, incl. off != on through the join and the production caller. 8 mutations caught. 1,512 of 1,513 pass across the 73 join/ledger test files; the one failure was a display test asserting the untempered NCAAF spreads number, updated to read both.
   - Load: a fleet ff plus a claimed refresh-worker restart.
+- **THE LIVE MONEYLINE GAP, DIAGNOSED (read-only):** NBA's is disagreement with the market that carries no information, early in games. It is not bias, staleness or over-confidence. `[2026-11-13, user "Diagnose it now", lane live-moneyline-gap-diagnosis, .syndicate/findings_2026-11-13_live_moneyline_gap.md]`:
+  - Reproduced: model - market Brier NBA +0.018 +- 0.011 (3,962 states / 162 games), NCAAB +0.009 +- 0.005. Priced rows only: +0.042 / +0.021.
+  - H1 bias, falsified in NBA: the model is calibrated (slope 0.97). The market's de-vigged price is the compressed one (slope 1.47). NCAAB has a home lean both share; the model's (intercept +0.44) is beyond noise.
+  - H2 stage, supported in NBA: tip +0.039 +- 0.015, 0.15-0.40 +0.029 +- 0.014, later about +0.011. NCAAB is flat.
+  - H3 staleness, falsified in NBA (flat by state age). Weak in NCAAB: +0.006 -> +0.015 when the quote is >= 120 s newer than the state.
+  - H4 information, holds: with the market given, the model's coefficient is NBA -0.46 [-0.87, -0.09] and NCAAB -0.15 [-0.47, +0.15]. NCAAF is the counter-case, +0.30 [+0.05, +0.58]: its model informs.
+  - Where it sits: NBA states >= 10 pp from the market (25%) carry ~85% of the gap. The model's side wins 0.40 there, against its claim of 0.64 and the market's 0.48. They are worst at tip (+0.095).
+  - **LEAD, OPEN:** at tip, 33% of NBA states are already >= 10 pp from the market, against 11% in NCAAB. The college live re-sims are margin-anchored to the market (`marginAnchored`); the NBA live re-sim resumes the pregame engine's own inputs. The next step is a code trace of whether `#721`'s pregame market anchor reaches the NBA live resume, then a replay. Not a market-wide pause: every line is its own decision.
 - **PRE-REGISTERED 2026-11-13** (lane `ncaab-live-edge20-prereg`, `.syndicate/findings_2026-11-13_ncaab_edge20_prereg.md`):
   - The cell: NCAAB fresh-quote (<= 30 s) |edge| >= 20 pp, one bet per game, ledger dates >= 11-13, the first 200 games.
   - PASS if the one-sided 95% lower bound clears 0.524 (hit >= 0.581). KILL if hit <= 0.524. INCONCLUSIVE extends once to 400 games.

@@ -322,5 +322,6 @@ def report(sport):
         print("   WALK-FORWARD: fewer than 3 dates, not run")
 
 
-for sp in SPORTS:
-    report(sp)
+if __name__ == "__main__":  # importable for its finals / orientation helpers (scripts/live_moneyline_gap.py)
+    for sp in SPORTS:
+        report(sp)

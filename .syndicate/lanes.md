@@ -914,7 +914,17 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness --idle-min 240 read 2 of 17 CLOSED blocks SAFE; both moved to lanes_closed.md with one pointer each: onedrive-path-refs, closed-lane-archive-20261113-0840. Table and WAIT reasons in log/2026-11-13.md.
 
-### live-moneyline-gap-diagnosis — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+### live-moneyline-gap-diagnosis — CLOSED 2026-11-13 (GOAL MET: NBA's gap is uninformative disagreement early in games; findings committed) — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- GOAL VERDICT 2026-11-13 2:58 PM CST (20:58Z): **GOAL: MET.**
+  - The Verification ran: `scripts/live_moneyline_gap.py` on the fleet, read-only, reproduced model - market Brier NBA +0.018 +- 0.011 / NCAAB +0.009 +- 0.005 on the same 3,962 / 3,557 states and printed every table.
+  - Verdicts:
+    - H1 bias: falsified in NBA (model calibrated, slope 0.97; the market's de-vig is compressed, 1.47). NCAAB has a shared home lean, the model's intercept +0.44 beyond noise.
+    - H2 stage: supported in NBA (tip +0.039, early +0.029, later ~+0.011); falsified in NCAAB.
+    - H3 staleness: falsified in NBA; weak in NCAAB.
+    - H4 information: holds (NBA b1 -0.46 [-0.87, -0.09], NCAAB -0.15).
+  - Prediction "H3 carries the largest share in NBA": WRONG. "H4 holds in both": right.
+  - Findings: `.syndicate/findings_2026-11-13_live_moneyline_gap.md`.
+  - The lead (whether `#721`'s pregame market anchor reaches the NBA live resume) is recorded under todo #780 as OPEN. It needs its own lane.
 - Goal: Name, with game-clustered 95% intervals on the fleet's live gameline ledgers, where the live full-game moneyline's Brier gap to the market comes from in NBA (+0.020) and NCAAB (+0.009): signed bias, game stage, state staleness, and whether the market encompasses the model; findings committed; nothing changed in production
 - Files: scripts/live_moneyline_gap.py (NEW), scripts/live_totals_width_fit.py (a __main__ guard ONLY, so its helpers import), .syndicate/findings_2026-11-13_live_moneyline_gap.md (NEW), docs/ai_context/todo.md (#780 section only)
 - Hypothesis: Written before any test (2026-11-13 20:30Z). H1 BIAS: the model's P(home wins) is signed-biased against outcomes where the market's is not (mean y - p differs from 0, or the model's favourite wins less often than it says). H2 STAGE: the gap is concentrated early (points scored / model total < 0.40), i.e. the prior, not the live update. H3 STALENESS: the gap grows with state age (recorded_at - live_state_as_of) or where the quote is newer than the state, i.e. the market has seen score the model has not. H4 INFORMATION: after H1-H3, logit(y) on logit(p_model) and logit(p_market) gives the model's coefficient near 0 (the market encompasses it). Prediction: H3 carries the largest share in NBA; H4 holds in both (model coefficient < 0.3).
