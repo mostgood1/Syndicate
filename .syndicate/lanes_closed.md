@@ -15511,3 +15511,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 2 of 6 CLOSED blocks. Moved: college-odds-feed-team-names, closed-lane-archive-20261112-2039. The reading and the WAIT reasons are in `.syndicate/log/2026-11-13.md`.
+
+### closed-lane-archive-20261113-0440 — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 7892d138-f9c4-46ae-88f1-f80e105ede73
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET -- owner_liveness --idle-min 240 read 2 SAFE of 5 CLOSED; both moved to lanes_closed.md with one pointer each; invariants unchanged vs origin/main baseline (same 2 contested files).
+- Moved: ncaaf-live-join-team-alias, closed-lane-archive-20261112-2240. Table + Part B in .syndicate/log/2026-11-13.md.
