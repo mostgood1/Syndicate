@@ -63,6 +63,9 @@ def _score_row(period=3, remaining="05:00", secs=300, home=2, away=1):
 def _lane(monkeypatch, calibration):
     monkeypatch.setattr(LR, "NHL_LIVE_ENDGAME_CALIBRATION", dict(calibration))
     monkeypatch.delenv(LR.LIVE_ENDGAME_ENV, raising=False)
+    # The end-game's own contract, under LEGACY scoring: it moves the margin only. With the scoring
+    # calibration on, its goals also count in the total (tests/test_nhl_live_total_calibration.py).
+    monkeypatch.setattr(LR, "NHL_LIVE_SCORING_CALIBRATION", dict(LR.LEGACY_LIVE_SCORING))
     snap = LR.build_live_lens_snapshot(DATE, sims=60, score_rows=[_score_row()], slate_features=[_features()])
     (lane,) = snap["games"][0]["gameLens"]
     assert lane["source"] == LR.LIVE_RESIM_LENS_SOURCE

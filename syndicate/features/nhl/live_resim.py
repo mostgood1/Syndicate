@@ -171,11 +171,101 @@ LIVE_ENDGAME_ENV = "SYNDICATE_NHL_LIVE_ENDGAME_CALIBRATION"
 _ONE_GOAL_SECONDS_BIN = 5
 _ONE_GOAL_SECONDS_CAP = 600
 
+# THE LIVE SCORING LEVEL (lane nhl-live-total-calibration, todo #773, 2026-11-13). The same cutoff replay
+# measured the live TOTAL running high early: model mean minus the actual final total +0.81 goals at puck
+# drop, +0.34 at P2 10:00, -0.20 at P3 05:00 (185 games out of sample). The engine's per-shot goal chance
+# is `goals_per_60 / shots_per_60` (`engine.py`), and `goals_per_60` is the projection's FULL-GAME rate --
+# OT goals and shootout credits included -- used as a REGULATION rate: exactly the issue the pregame
+# game-market path corrects with `adapters.NHL_GAME_MARKET_CALIBRATION['regulation_scale']` (0.9398, fit
+# on that path's Poisson sim; this engine's level is its own, so it is fit on THIS engine).
+# TWO WAYS TO LOWER IT WERE MEASURED, on the same replayed states (the findings file):
+#   `goal_scale` multiplies both teams' `goals_per_60` before the sims run: the ENGINE scores less, so the
+#     total, the margin and the moneyline all move. It fixed the early total, and made the +-1.5 and the
+#     moneyline Brier slightly WORSE (within noise, but the moneyline is a number the join can price): the
+#     margin was already too NARROW, and fewer goals narrow it further.
+#   `total_keep` thins the TOTAL only: each sim's REGULAR-PLAY goals (regulation goals after the live state
+#     with more than `total_keep_late_seconds` of regulation left) are kept with probability q, post-sim, on
+#     their own RNG. The engine's draws are untouched, so the margin, the puck line and the moneyline are
+#     today's EXACTLY, and the total's fix is the same (out-of-sample CRPS -0.0142 vs -0.0140). The late
+#     window is spared because the engine's LATE play is not high: the keep that zeroes the bias was ~0.87
+#     with 20+ minutes left and ~1.0 inside the last five. THIS is what production runs; `goal_scale` stays
+#     1.0 and is the replay's knob.
+# THE END-GAME'S GOALS COUNT IN THE TOTAL WHEN THIS IS ON (`count_endgame_in_total`), added after the
+# thinning (they are not the engine's goals). Real empty-net goals are in every real final; the end-game
+# was kept out of the total only because the total's level was wrong (the 2026-11-11 note above), and
+# this is the re-fit that note was waiting for. Off, the total is today's: the raw engine total, no
+# thinning, the end-game out of it.
+# Off switch: SYNDICATE_NHL_LIVE_SCORING_CALIBRATION=off (legacy: scale 1.0, keep 1.0, end-game out).
+# FIT (findings_2026-11-13_nhl_live_total_calibration.md): 301 games / 43 dates (2026-10-01..11-12), 8 cutoffs,
+# mean CRPS of the total over (window 0..600 s) x (keep 0.70..1.00). Walk-forward: keep 0.82-0.85, window
+# 120-240 s on every out-of-sample date; out of sample (202 games) the late window beats one keep for the whole
+# game by CRPS -0.0025 [-0.0045, -0.0007]. Full-sample fit below: every cutoff's bias within +-0.08 goals
+# (today +0.87 at puck drop), pooled CRPS 0.6950 -> 0.6692.
+NHL_LIVE_SCORING_CALIBRATION: dict[str, Any] = {
+    "goal_scale": 1.0,
+    "total_keep": 0.85,
+    "total_keep_late_seconds": 240.0,
+    "count_endgame_in_total": True,
+}
+LEGACY_LIVE_SCORING: dict[str, Any] = {"goal_scale": 1.0, "total_keep": 1.0, "total_keep_late_seconds": 0.0,
+                                       "count_endgame_in_total": False}
+LIVE_SCORING_ENV = "SYNDICATE_NHL_LIVE_SCORING_CALIBRATION"
+# A value outside these ranges is a typo, not a fit: refuse it (read as 1.0) rather than run it.
+_GOAL_SCALE_BOUNDS = (0.5, 1.5)
+_TOTAL_KEEP_BOUNDS = (0.5, 1.0)
+
 
 def live_endgame_calibration() -> dict[str, float]:
     """The end-game production uses: the fitted one unless the env switch says off."""
     raw = str(os.environ.get(LIVE_ENDGAME_ENV) or "").strip().lower()
     return dict(LEGACY_LIVE_ENDGAME if raw in {"off", "0", "false", "legacy"} else NHL_LIVE_ENDGAME_CALIBRATION)
+
+
+def live_scoring_calibration() -> dict[str, Any]:
+    """The scoring level production uses: the fitted one unless the env switch says off."""
+    raw = str(os.environ.get(LIVE_SCORING_ENV) or "").strip().lower()
+    return dict(LEGACY_LIVE_SCORING if raw in {"off", "0", "false", "legacy"} else NHL_LIVE_SCORING_CALIBRATION)
+
+
+def scoring_goal_scale(calibration: Mapping[str, Any]) -> float:
+    """The `goal_scale` to run: 1.0 when absent, unreadable, or outside `_GOAL_SCALE_BOUNDS`."""
+    try:
+        scale = float(calibration.get("goal_scale", 1.0))
+    except (TypeError, ValueError, AttributeError):
+        return 1.0
+    lo, hi = _GOAL_SCALE_BOUNDS
+    return scale if (scale == scale and lo <= scale <= hi) else 1.0
+
+
+def scoring_total_keep(calibration: Mapping[str, Any]) -> float:
+    """The `total_keep` to run: 1.0 when absent, unreadable, or outside `_TOTAL_KEEP_BOUNDS`."""
+    try:
+        keep = float(calibration.get("total_keep", 1.0))
+    except (TypeError, ValueError, AttributeError):
+        return 1.0
+    lo, hi = _TOTAL_KEEP_BOUNDS
+    return keep if (keep == keep and lo <= keep <= hi) else 1.0
+
+
+def scoring_late_seconds(calibration: Mapping[str, Any]) -> float:
+    """`total_keep_late_seconds`: 0 when absent or unreadable, clipped to one period."""
+    try:
+        late = float(calibration.get("total_keep_late_seconds", 0.0) or 0.0)
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+    return min(float(_PERIOD_SECONDS), max(0.0, late)) if late == late else 0.0
+
+
+def thin_total(raw_total: int, goal_seconds_left: Sequence[float], keep: float, late_seconds: float,
+               rng: random.Random) -> int:
+    """The raw total less the REGULAR-PLAY goals not kept: each regulation goal after the live state scored with
+    more than `late_seconds` of regulation left is kept with probability `keep` (one draw per such goal, none
+    at all when keep is 1, so the stream is untouched). Goals in the last `late_seconds`, OT goals and the
+    shootout credit are always kept: the engine's late play is measured about right, its regular play high."""
+    if keep >= 1.0:
+        return int(raw_total)
+    early = sum(1 for s in goal_seconds_left if s > late_seconds)
+    return int(raw_total) - sum(1 for _ in range(early) if rng.random() >= keep)
 
 
 def regulation_seconds_left(period: int, clock_seconds: int) -> int:
@@ -210,7 +300,14 @@ def seconds_left_at_last_goal(events: Any, *, start_period_idx: int, start_secon
     period runs only `start_seconds` (`simulate_with_lineups` passes `period_seconds = resume_seconds_remaining`),
     every later one 1200. So `within = t - period_idx * T`, and the time left is `(T - within)` plus the
     full periods still to come."""
-    best: Optional[float] = None
+    lefts = regulation_goal_seconds_left(events, start_period_idx=start_period_idx, start_seconds=start_seconds)
+    return float(default) if not lefts else min(lefts)
+
+
+def regulation_goal_seconds_left(events: Any, *, start_period_idx: int, start_seconds: int) -> list[float]:
+    """Regulation seconds left at EVERY regulation goal this sim scored after the live state, in event order
+    (the clock arithmetic is `seconds_left_at_last_goal`'s). OT goals and the shootout credit are not here."""
+    out: list[float] = []
     for event in events or ():
         if getattr(event, "kind", None) != "goal":
             continue
@@ -223,9 +320,8 @@ def seconds_left_at_last_goal(events: Any, *, start_period_idx: int, start_secon
             continue
         length = float(start_seconds) if pd == int(start_period_idx) else float(_PERIOD_SECONDS)
         within = t - pd * length
-        left = max(0.0, length - within) + (_REGULATION_PERIODS - 1 - pd) * _PERIOD_SECONDS
-        best = left if best is None else min(best, left)
-    return float(default) if best is None else best
+        out.append(max(0.0, length - within) + (_REGULATION_PERIODS - 1 - pd) * _PERIOD_SECONDS)
+    return out
 
 
 def _went_past_regulation(events: Any) -> bool:
@@ -435,11 +531,18 @@ def resim_live_game(
     profile: Any = None,
     base_seed: Optional[int] = None,
     endgame: Optional[Mapping[str, Any]] = None,
+    scoring: Optional[Mapping[str, Any]] = None,
+    record_sims: bool = False,
 ) -> dict[str, Any] | NhlResimRefusal:
     """Run `sims` resumed games and aggregate the moneyline.
 
     `endgame` defaults to :func:`live_endgame_calibration` (production); pass
     `LEGACY_LIVE_ENDGAME` for the pre-calibration histogram, reproduced seed for seed.
+    `scoring` defaults to :func:`live_scoring_calibration` (production); pass
+    `LEGACY_LIVE_SCORING` for today's scoring level and total, reproduced seed for seed.
+    `record_sims` (the replay harness only) adds `sim_records`: per sim, `[raw total, the regulation seconds
+    its one-goal margin had left (-1 if not end-game eligible), [seconds left at each regulation goal after
+    the live state]]` -- what the total's grade needs to apply any (keep, late window, end-game) exactly.
 
     `features` is a `HockeyGameFeatures` -- the SAME object the pregame board
     builds from -- so the live number rests on the same rates, lineups and
@@ -472,15 +575,21 @@ def resim_live_game(
     if home_feat is None or away_feat is None:
         return NhlResimRefusal("no_team_features", state.game_pk)
 
+    scoring_cal = dict(scoring if scoring is not None else live_scoring_calibration())
+    goal_scale = scoring_goal_scale(scoring_cal)
+    total_keep = scoring_total_keep(scoring_cal)
+    late_seconds = scoring_late_seconds(scoring_cal)
+    endgame_in_total = bool(scoring_cal.get("count_endgame_in_total"))
     rates = RateModels(
         home=TeamRates(
             shots_per_60=float(home_feat.shots_per_60),
-            goals_per_60=float(home_feat.goals_per_60),
+            # NHL_LIVE_SCORING_CALIBRATION: the full-game rate brought to this engine's regulation level.
+            goals_per_60=float(home_feat.goals_per_60) * goal_scale,
             faceoff_win_pct=float(home_feat.faceoff_win_pct),
         ),
         away=TeamRates(
             shots_per_60=float(away_feat.shots_per_60),
-            goals_per_60=float(away_feat.goals_per_60),
+            goals_per_60=float(away_feat.goals_per_60) * goal_scale,
             faceoff_win_pct=float(away_feat.faceoff_win_pct),
         ),
         player_rates={},
@@ -510,14 +619,21 @@ def resim_live_game(
     one_goal_seconds: dict[str, dict[str, int]] = {"1": {}, "-1": {}}
     # Its own stream, so the engine's draws (and `off`'s histogram) are identical with it on or off.
     empty_net_rng = random.Random((seed0 * 2_654_435_761 + 0xE6) % (2**32))
+    # The total's thinning has its own stream too: the engine's draws AND the end-game's are untouched by it.
+    total_rng = random.Random((seed0 * 2_654_435_761 + 0x70) % (2**32))
     home_wins = 0
     empty_net_goals = 0
     margins: list[int] = []
     totals: list[int] = []
+    raw_totals: list[int] = []
     # The RAW margins (before the end-game), split by how the sim ended. A grade applies any p to these
     # in expectation without re-simulating (scripts/backtest_nhl_live_puckline.py).
     regulation_margins: list[int] = []
     overtime_margins: list[int] = []
+    # The same regulation-end +-1 sims by their RAW total, then by timing bin: what an end-game applied in
+    # expectation moves from total t to t + 1 (the total grade, lane nhl-live-total-calibration).
+    one_goal_totals: dict[str, dict[str, int]] = {}
+    sim_records: list[list[Any]] = []
     for i in range(int(sims)):
         gs, events = run_hockeysim_game_from_state(
             state.home_name,
@@ -537,15 +653,26 @@ def resim_live_game(
             seed=seed0 + i,
         )
         hs, as_ = int(gs.home.score), int(gs.away.score)
-        totals.append(hs + as_)        # BEFORE the end-game: it moves the margin only (see the constant)
+        raw_total = hs + as_
+        raw_totals.append(raw_total)
         past_regulation = _went_past_regulation(events)
         (overtime_margins if past_regulation else regulation_margins).append(hs - as_)
-        if not past_regulation and abs(hs - as_) == 1:
-            left = seconds_left_at_last_goal(events, start_period_idx=period_idx, start_seconds=seconds_remaining,
-                                             default=cutoff_left)
+        empty_net_this_sim = 0
+        en_secs = -1.0
+        one_goal_end = not past_regulation and abs(hs - as_) == 1
+        # Only read when something needs them (off: the one-goal sims only, as before).
+        goal_lefts = (regulation_goal_seconds_left(events, start_period_idx=period_idx,
+                                                   start_seconds=seconds_remaining)
+                      if (one_goal_end or total_keep < 1.0 or record_sims) else [])
+        if one_goal_end:
+            # `seconds_left_at_last_goal`, from the goal times already read
+            left = min(goal_lefts) if goal_lefts else float(cutoff_left)
+            en_secs = left if in_regulation else -1.0
             side = one_goal_seconds["1" if hs > as_ else "-1"]
             key = str(int(min(left, _ONE_GOAL_SECONDS_CAP) // _ONE_GOAL_SECONDS_BIN * _ONE_GOAL_SECONDS_BIN))
             side[key] = side.get(key, 0) + 1
+            by_total = one_goal_totals.setdefault(str(raw_total), {})
+            by_total[key] = by_total.get(key, 0) + 1
             p_sim = endgame_empty_net_prob(calibration, seconds_left=left) if in_regulation else 0.0
             if p_sim > 0.0 and empty_net_rng.random() < p_sim:
                 if hs > as_:
@@ -553,9 +680,17 @@ def resim_live_game(
                 else:
                     as_ += 1
                 empty_net_goals += 1
+                empty_net_this_sim = 1
         if hs > as_:
             home_wins += 1
         margins.append(hs - as_)
+        # Off: the raw total, the end-game out of it (today's). On: the engine's regular-play goals thinned to
+        # `total_keep`, then the end-game's goal (not the engine's, so never thinned). An overtime state has
+        # no regulation goals left, so nothing in it is thinned.
+        total = thin_total(raw_total, goal_lefts, total_keep, late_seconds, total_rng)
+        totals.append(total + (empty_net_this_sim if endgame_in_total else 0))
+        if record_sims:
+            sim_records.append([raw_total, round(en_secs, 1), [round(s, 1) for s in goal_lefts]])
 
     if not margins:
         return NhlResimRefusal("no_sims_run", state.game_pk)
@@ -578,12 +713,26 @@ def resim_live_game(
         "overtime_margin_dist": _histogram(overtime_margins),
         # The regulation-end +-1 sims by the regulation time their margin had left (5 s bins, capped).
         "regulation_one_goal_seconds": one_goal_seconds,
+        # TOTALS (lane nhl-live-total-calibration; not published): the total's draws as `total_mean` counts
+        # them, the RAW engine totals, and the regulation-end +-1 sims by raw total then timing bin.
+        "total_dist": _histogram(totals),
+        "raw_total_dist": _histogram(raw_totals),
+        "regulation_one_goal_totals": one_goal_totals,
         "endgame": {
             "empty_net_p": p_empty_net,
             "ramp_seconds": float(calibration.get("ramp_seconds") or 0.0),
             "empty_net_goals": empty_net_goals,
             "calibration": "on" if float(calibration.get("empty_net_p") or 0.0) > 0.0 else "off",
         },
+        # Which scoring level this number carries (NHL_LIVE_SCORING_CALIBRATION). Lane-level; no pricer reads it.
+        "scoring": {
+            "goal_scale": goal_scale,
+            "total_keep": total_keep,
+            "total_keep_late_seconds": late_seconds,
+            "endgame_in_total": endgame_in_total,
+            "calibration": "on" if (goal_scale != 1.0 or total_keep != 1.0 or endgame_in_total) else "off",
+        },
+        **({"sim_records": sim_records} if record_sims else {}),
     }
 
 
@@ -634,6 +783,9 @@ def build_game_lens(
         # Which end-game this number carries (lane nhl-live-endgame-calibration): a production reading
         # can tell `on` from `off` and see the p this state got. Lane-level, so no pricer reads it.
         "liveEndgame": dict(result.get("endgame") or {}),
+        # Which scoring level (lane nhl-live-total-calibration): `goal_scale` and whether the end-game's
+        # goals are in `projection.total`. Lane-level, so no pricer reads it.
+        "liveScoring": dict(result.get("scoring") or {}),
         # DISPLAY ONLY. `live_gameline_join` reads `projection.total` and
         # `projection.homeMargin` for display and prices NEITHER: totals and
         # puck lines are priced from `totalRunsDist` / `marginDist`, which this

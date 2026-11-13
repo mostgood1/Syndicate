@@ -200,15 +200,19 @@ def stable_seed(pk: str, cutoff_index: int) -> int:
 # ---------------------------------------------------------------------------
 
 def replay_game(features: Any, game: Mapping[str, Any], *, sims: int = DEFAULT_SIMS,
-                resim: Any = None, endgame: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+                resim: Any = None, endgame: Mapping[str, Any] | None = None,
+                scoring: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
     """One row per cutoff: the producer's histogram at the rebuilt state, beside the official final.
 
     `endgame` is passed to the producer when given (`LR.LEGACY_LIVE_ENDGAME` = the raw histogram); None runs
-    production's own setting."""
+    production's own setting. `scoring` likewise (`{"goal_scale": s}` replays the engine at that level)."""
     from syndicate.features.nhl import live_resim as LR
 
     resim = resim or LR.resim_live_game
-    extra = {"endgame": endgame} if endgame is not None else {}
+    extra: dict[str, Any] = {"endgame": endgame} if endgame is not None else {}
+    if scoring is not None:
+        extra["scoring"] = scoring
+    extra["record_sims"] = True        # the total's grade applies any (keep, late window, end-game) exactly
     rows = []
     for idx, (period, remaining, label) in enumerate(CUTOFFS):
         h, a = score_at(game["goals"], period, remaining)
@@ -234,6 +238,13 @@ def replay_game(features: Any, game: Mapping[str, Any], *, sims: int = DEFAULT_S
             "ot_hist": result.get("overtime_margin_dist"),
             "reg_one_goal_secs": result.get("regulation_one_goal_seconds"),
             "endgame": result.get("endgame"),
+            # TOTALS (lane nhl-live-total-calibration): the RAW engine totals and the regulation-end +-1 sims by
+            # raw total then timing bin, so any end-game applies to the total in expectation; the official final.
+            "final_total": int(game["final_home"]) + int(game["final_away"]),
+            "total_hist": result.get("raw_total_dist"),
+            "total_one_goal_secs": result.get("regulation_one_goal_totals"),
+            "scoring": result.get("scoring"),
+            "sims": result.get("sim_records"),
         })
     return rows
 
@@ -242,9 +253,13 @@ def replay_date(args_tuple: tuple) -> dict[str, Any]:
     """Pool worker: every completed game on one date. Returns rows + per-date accounting."""
     date, source_root, cache_dir, sims = args_tuple[:4]
     endgame_mode = args_tuple[4] if len(args_tuple) > 4 else "off"
+    goal_scale = args_tuple[5] if len(args_tuple) > 5 else None
     from syndicate.features.nhl import live_resim as LR
 
     endgame = LR.LEGACY_LIVE_ENDGAME if endgame_mode == "off" else None
+    # A replayed scale runs with the end-game OUT of the total: the rows carry the raw totals, and the grade
+    # applies any end-game to them in expectation. None = today's level (`LEGACY_LIVE_SCORING`).
+    scoring = {"goal_scale": float(goal_scale) if goal_scale is not None else 1.0, "count_endgame_in_total": False}
     from syndicate.features.nhl.sim_engine.hockeysim.features.loaders import build_slate_features
 
     out: dict[str, Any] = {"date": date, "rows": [], "games_completed": 0, "games_no_features": [],
@@ -272,7 +287,7 @@ def replay_date(args_tuple: tuple) -> dict[str, Any]:
         if f is None:
             out["games_no_features"].append(g["pk"])
             continue
-        for r in replay_game(f, g, sims=sims, endgame=endgame):
+        for r in replay_game(f, g, sims=sims, endgame=endgame, scoring=scoring):
             r["date"] = date
             out["rows"].append(r)
     out["elapsed_s"] = round(time.monotonic() - started, 1)
@@ -709,6 +724,443 @@ def _count(values: Iterable[Any]) -> dict[str, int]:
 
 
 # ---------------------------------------------------------------------------
+# the live TOTAL (lane nhl-live-total-calibration): a scoring scale, fit across replays run at several scales
+# ---------------------------------------------------------------------------
+
+def total_classes(row: Mapping[str, Any], endgame: Mapping[str, Any] | None,
+                  late_seconds: float) -> dict[tuple[int, int], list[float]]:
+    """From the row's per-sim records: {(raw total less its regular-play goals, regular-play goals): [sims,
+    expected end-game goals]}. Regular-play = regulation goals after the live state with more than
+    `late_seconds` left (`live_resim.thin_total`'s definition); the end-game's p is the producer's
+    (`endgame_empty_net_prob`), 0 for a sim it does not reach (recorded -1)."""
+    from syndicate.features.nhl import live_resim as LR
+
+    out: dict[tuple[int, int], list[float]] = {}
+    for raw, en_secs, lefts in row["sims"]:
+        early = sum(1 for s in lefts if s > late_seconds)
+        p = LR.endgame_empty_net_prob(endgame, seconds_left=en_secs) if (endgame and en_secs >= 0) else 0.0
+        c = out.setdefault((int(raw) - early, early), [0.0, 0.0])
+        c[0] += 1.0
+        c[1] += p
+    return out
+
+
+def hist_from_classes(classes: Mapping[tuple[int, int], Sequence[float]], keep: float) -> dict[int, float]:
+    """The total's histogram in expectation: each class's regular-play goals thinned Binomial(early, keep), and
+    its expected end-game goals +1 on top (the producer draws the two on separate streams)."""
+    out: dict[int, float] = {}
+    q = float(keep)
+    for (base, early), (n, m) in classes.items():
+        for mass, extra in ((n - m, 0), (m, 1)):
+            if not mass:
+                continue
+            if q >= 1.0 or early == 0:
+                out[base + early + extra] = out.get(base + early + extra, 0.0) + mass
+                continue
+            for j in range(early + 1):
+                w = mass * math.comb(early, j) * q ** j * (1.0 - q) ** (early - j)
+                out[base + j + extra] = out.get(base + j + extra, 0.0) + w
+    return {k: v for k, v in out.items() if abs(v) > 1e-12}
+
+
+def total_hist(row: Mapping[str, Any], endgame: Mapping[str, Any] | None = None,
+               keep: float = 1.0, late_seconds: float = 0.0) -> dict[int, float]:
+    """The final-total histogram in expectation, exactly as `resim_live_game` builds `total_dist`: the RAW
+    engine totals, the regular-play goals thinned to `keep` (`thin_total`), then -- when `endgame` is given --
+    the end-game's goal on top. `endgame=None, keep=1` returns the raw totals exactly: today's published total.
+
+    Exact from the per-sim records (`sims`, `record_sims=True`). A row without them supports keep = 1 only
+    (the end-game applied from `total_one_goal_secs`); a thinning there would be a guess, so it is refused."""
+    from syndicate.features.nhl import live_resim as LR
+
+    if row.get("sims"):
+        return hist_from_classes(total_classes(row, endgame, late_seconds), keep)
+    if float(keep) < 1.0:
+        raise ValueError("thinning needs the per-sim records (replay with record_sims)")
+    out = hist_ints(row.get("total_hist") or {})
+    if not endgame or int(row["period"]) > REGULATION_PERIODS:
+        return out
+    half = LR._ONE_GOAL_SECONDS_BIN / 2.0
+    for t, bins in (row.get("total_one_goal_secs") or {}).items():
+        moved = 0.0
+        for k, v in (bins or {}).items():
+            mid = float(k) + (half if float(k) < LR._ONE_GOAL_SECONDS_CAP else 0.0)
+            moved += LR.endgame_empty_net_prob(endgame, seconds_left=mid) * float(v)
+        if moved:
+            out[int(t)] = out.get(int(t), 0.0) - moved
+            out[int(t) + 1] = out.get(int(t) + 1, 0.0) + moved
+    return {k: v for k, v in out.items() if abs(v) > 1e-12}
+
+
+def hist_mean(hist: Mapping[int, float]) -> float:
+    n = sum(hist.values())
+    return sum(k * v for k, v in hist.items()) / n if n else float("nan")
+
+
+def crps_discrete(hist: Mapping[int, float], y: int) -> float:
+    """CRPS of an integer forecast (the ranked probability score over unit steps): sum_k (F(k) - 1{y <= k})^2.
+    Proper: its expectation is minimised by the true distribution, so a level AND a spread error both cost."""
+    n = sum(hist.values())
+    if not n:
+        return float("nan")
+    lo, hi = min(min(hist), int(y)), max(max(hist), int(y))
+    acc, out = 0.0, 0.0
+    for k in range(lo, hi + 1):
+        acc += hist.get(k, 0.0)
+        out += (acc / n - (1.0 if int(y) <= k else 0.0)) ** 2
+    return out
+
+
+def _total_rows(rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [r for r in rows if "hist" in r and r.get("total_hist") and r.get("final_total") is not None]
+
+
+def totals_by_cutoff(rows: Sequence[Mapping[str, Any]], endgame: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Per cutoff and pooled: n, mean model total, mean actual final total, bias (model - actual), mean CRPS."""
+    scored = _total_rows(rows)
+    out: dict[str, Any] = {"by_cutoff": {}}
+
+    def _agg(sub):
+        if not sub:
+            return {"n": 0}
+        means = [hist_mean(total_hist(r, endgame)) for r in sub]
+        actual = [int(r["final_total"]) for r in sub]
+        crps = [crps_discrete(total_hist(r, endgame), int(r["final_total"])) for r in sub]
+        return {"n": len(sub), "model_mean": round(sum(means) / len(sub), 4),
+                "actual_mean": round(sum(actual) / len(sub), 4),
+                "bias": round((sum(means) - sum(actual)) / len(sub), 4), "crps": round(sum(crps) / len(sub), 5)}
+
+    for _p, _r, label in CUTOFFS:
+        out["by_cutoff"][label] = _agg([r for r in scored if r["cutoff"] == label])
+    out["pooled"] = _agg(scored)
+    return out
+
+
+def load_scale_runs(spec: str) -> dict[float, list[dict[str, Any]]]:
+    """`"1.0=/path/run_a,0.9=/path/run_b"` -> {scale: rows}. Each run's rows must say they ran at that scale."""
+    runs: dict[float, list[dict[str, Any]]] = {}
+    for part in [p for p in spec.split(",") if p.strip()]:
+        scale_text, path = part.split("=", 1)
+        scale = round(float(scale_text), 4)
+        rows_path = Path(os.path.expanduser(path.strip())) / "rows.jsonl"
+        rows = [json.loads(l) for l in rows_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        rows = [r for r in rows if "pk" in r]
+        ran = {round(float((r.get("scoring") or {}).get("goal_scale", float("nan"))), 4) for r in _total_rows(rows)}
+        if ran != {scale}:
+            raise ValueError(f"run {path} says goal_scale {sorted(ran)}, not {scale}")
+        runs[scale] = rows
+    return runs
+
+
+def _key(r: Mapping[str, Any]) -> tuple[str, str]:
+    return (str(r["pk"]), str(r["cutoff"]))
+
+
+def _indexed(runs: Mapping[float, Sequence[Mapping[str, Any]]]) -> tuple[dict[float, dict], list[tuple[str, str]]]:
+    """Each run indexed by (game, cutoff), and the keys present in EVERY run: every scale is graded on the same
+    states, or a scale could win by losing hard rows."""
+    idx = {s: {_key(r): r for r in _total_rows(rows)} for s, rows in runs.items()}
+    common = set.intersection(*(set(v) for v in idx.values())) if idx else set()
+    return idx, sorted(common)
+
+
+def _parabola_min(xs: Sequence[float], ys: Sequence[float]) -> float | None:
+    """Vertex of the parabola through three points; None if it does not open upward."""
+    (x0, x1, x2), (y0, y1, y2) = xs, ys
+    den = (x0 - x1) * (x0 - x2) * (x1 - x2)
+    if den == 0:
+        return None
+    a = (x2 * (y1 - y0) + x1 * (y0 - y2) + x0 * (y2 - y1)) / den
+    b = (x2 * x2 * (y0 - y1) + x1 * x1 * (y2 - y0) + x0 * x0 * (y1 - y2)) / den
+    return None if a <= 0 else -b / (2 * a)
+
+
+def fit_goal_scale(runs: Mapping[float, Sequence[Mapping[str, Any]]], endgame: Mapping[str, Any] | None, *,
+                   dates: Iterable[str] | None = None) -> dict[str, Any]:
+    """The grid scale minimising mean total CRPS over the common states (on `dates` when given), and the
+    parabola-refined scale through it and its neighbours (clipped to the grid; None at an edge)."""
+    idx, common = _indexed(runs)
+    keep = set(dates) if dates is not None else None
+    keys = [k for k in common if keep is None or idx[next(iter(idx))][k].get("date") in keep]
+    if not keys:
+        return {"rows": 0}
+    grid = {s: sum(crps_discrete(total_hist(idx[s][k], endgame), int(idx[s][k]["final_total"])) for k in keys)
+            / len(keys) for s in sorted(idx)}
+    scales = sorted(grid)
+    best = min(scales, key=lambda s: (grid[s], abs(s - 1.0)))
+    i = scales.index(best)
+    s_star = None
+    if 0 < i < len(scales) - 1:
+        v = _parabola_min(scales[i - 1:i + 2], [grid[s] for s in scales[i - 1:i + 2]])
+        if v is not None:
+            s_star = round(min(scales[i + 1], max(scales[i - 1], v)), 3)
+    return {"rows": len(keys), "grid_crps": {str(s): round(c, 6) for s, c in grid.items()},
+            "best_grid": best, "s_star": s_star}
+
+
+def walk_forward_goal_scale(runs: Mapping[float, Sequence[Mapping[str, Any]]], endgame: Mapping[str, Any] | None,
+                            *, min_dates: int = WALK_FORWARD_MIN_DATES) -> dict[str, Any]:
+    """For each date after the first `min_dates`, the best GRID scale fit on the dates BEFORE it only."""
+    idx, common = _indexed(runs)
+    any_run = idx[next(iter(idx))] if idx else {}
+    dates = sorted({any_run[k].get("date") for k in common})
+    fits: dict[str, float] = {}
+    for i, d in enumerate(dates):
+        if i < min_dates:
+            continue
+        f = fit_goal_scale(runs, endgame, dates=dates[:i])
+        fits[d] = f.get("best_grid")
+    vals = [v for v in fits.values() if v is not None]
+    return {"fits": fits, "oos_dates": sorted(fits), "range": [min(vals), max(vals)] if vals else None}
+
+
+def _pl_cells(r: Mapping[str, Any], endgame: Mapping[str, Any] | None) -> list[tuple[str, float, int]]:
+    h = endgame_hist(r, endgame)
+    return [(str(r["pk"]), p_cover(h, ln), int(r["final_margin"] > ln)) for ln in PRIMARY_LINES]
+
+
+def _ml_cell(r: Mapping[str, Any]) -> tuple[str, float, int]:
+    return (str(r["pk"]), float(r["home_win_prob"]), int(r["final_margin"] > 0))
+
+
+def goal_scale_report(runs: Mapping[float, Sequence[Mapping[str, Any]]], *,
+                      endgame_today: Mapping[str, Any], min_dates: int = WALK_FORWARD_MIN_DATES) -> dict[str, Any]:
+    """TODAY = the 1.0 run as production publishes it (raw total; the margin with `endgame_today`). ON = each
+    out-of-sample date at its walk-forward scale, the end-game's goals IN the total. Same states throughout.
+    Also: every grid scale on the full sample (the shape), the end-game re-fit at each scale, and the
+    margin (+-1.5) and moneyline Brier on vs today, bootstrapped over games."""
+    idx, common = _indexed(runs)
+    if 1.0 not in idx:
+        raise ValueError("the 1.0 run (today's level) is required")
+    full = fit_goal_scale(runs, endgame_today)
+    wf = walk_forward_goal_scale(runs, endgame_today, min_dates=min_dates)
+    oos_keys = [k for k in common if idx[1.0][k].get("date") in set(wf["oos_dates"])]
+    today_rows = [idx[1.0][k] for k in oos_keys]
+    on_rows = [idx[wf["fits"][idx[1.0][k]["date"]]][k] for k in oos_keys]
+
+    games = sorted({k[0] for k in oos_keys})
+    per_game: dict[str, list[tuple]] = {}
+    for t_row, o_row in zip(today_rows, on_rows):
+        g = str(t_row["pk"])
+        per_game.setdefault(g, []).append((
+            crps_discrete(total_hist(t_row, None), int(t_row["final_total"])),
+            crps_discrete(total_hist(o_row, endgame_today), int(o_row["final_total"])),
+            _pl_cells(t_row, endgame_today), _pl_cells(o_row, endgame_today),
+            _ml_cell(t_row), _ml_cell(o_row),
+            hist_mean(total_hist(t_row, None)) - int(t_row["final_total"]),
+            hist_mean(total_hist(o_row, endgame_today)) - int(o_row["final_total"]),
+            t_row["cutoff"]))
+
+    def _diff(sample, pick):
+        items = [x for g in sample for x in per_game[g]]
+        return pick(items) if items else None
+
+    def _crps_d(items):
+        return sum(x[1] - x[0] for x in items) / len(items)
+
+    def _pl_d(items):
+        return brier([c for x in items for c in x[3]]) - brier([c for x in items for c in x[2]])
+
+    def _ml_d(items):
+        return brier([x[5] for x in items]) - brier([x[4] for x in items])
+
+    def _bias_ci(label, which):
+        def stat(sample):
+            items = [x for g in sample for x in per_game[g] if x[8] == label]
+            return sum(x[which] for x in items) / len(items) if items else None
+        return [round(v, 3) for v in game_bootstrap(games, stat)]
+
+    all_items = [x for g in games for x in per_game[g]]
+    shape = {str(s): totals_by_cutoff([idx[s][k] for k in common], endgame_today) for s in sorted(idx)}
+    refit = {}
+    for s in sorted(idx):
+        rows_s = [idx[s][k] for k in common]
+        f = fit_endgame(rows_s)
+        refit[str(s)] = {"refit": f, "brier_pm1_5_at_today_endgame": round(
+            brier([c for r in rows_s for c in _pl_cells(r, endgame_today)]), 6)}
+    return {
+        "states_common": len(common),
+        "full_sample_fit": full,
+        "walk_forward": wf,
+        "oos": {
+            "dates": len(wf["oos_dates"]), "games": len(games), "rows": len(oos_keys),
+            "today": totals_by_cutoff(today_rows, None),
+            "on": totals_by_cutoff(on_rows, endgame_today),
+            "crps_on_minus_today": round(_crps_d(all_items), 5),
+            "crps_on_minus_today_ci95": [round(v, 5) for v in game_bootstrap(games, lambda s: _diff(s, _crps_d))],
+            "pm1_5_brier_on_minus_today": round(_pl_d(all_items), 6),
+            "pm1_5_brier_on_minus_today_ci95": [round(v, 6) for v in game_bootstrap(games, lambda s: _diff(s, _pl_d))],
+            "moneyline_brier_today": round(brier([x[4] for x in all_items]), 6),
+            "moneyline_brier_on": round(brier([x[5] for x in all_items]), 6),
+            "moneyline_brier_on_minus_today_ci95": [round(v, 6) for v in game_bootstrap(
+                games, lambda s: _diff(s, _ml_d))],
+            "bias_ci95": {label: {"today": _bias_ci(label, 6), "on": _bias_ci(label, 7)}
+                          for label in ("P1 20:00", "P2 20:00", "P2 10:00", "P3 10:00", "P3 05:00")},
+        },
+        "full_sample_shape_by_scale": shape,
+        "endgame_refit_by_scale": refit,
+    }
+
+
+TOTAL_KEEP_GRID = tuple(round(0.70 + 0.01 * i, 2) for i in range(31))     # 0.70 .. 1.00
+# Regular play ends this many regulation seconds before the end: goals inside the window are never thinned.
+TOTAL_LATE_GRID = (0.0, 120.0, 240.0, 300.0, 420.0, 600.0)
+
+
+def _keep_crps_table(rows: Sequence[Mapping[str, Any]], endgame: Mapping[str, Any] | None,
+                     keeps: Sequence[float], lates: Sequence[float]) -> dict[tuple[float, float], list[float]]:
+    """CRPS of every row at every (late window, keep), computed once: the fits and the walk-forward only sum it."""
+    table: dict[tuple[float, float], list[float]] = {}
+    for late in lates:
+        classes = [total_classes(r, endgame, late) for r in rows]
+        for q in keeps:
+            table[(late, q)] = [crps_discrete(hist_from_classes(c, q), int(r["final_total"]))
+                                for c, r in zip(classes, rows)]
+    return table
+
+
+def _best_keep(table: Mapping[tuple[float, float], Sequence[float]], idx: Sequence[int]) -> dict[str, Any]:
+    """The (late window, keep) with the lowest mean CRPS over rows `idx`; ties go to the simpler setting
+    (keep nearer 1, then the shorter window)."""
+    means = {k: sum(v[i] for i in idx) / len(idx) for k, v in table.items()}
+    best = min(means, key=lambda k: (round(means[k], 9), abs(k[1] - 1.0), k[0]))
+    at_one = [v for (late, q), v in means.items() if q == 1.0]
+    return {"late_seconds": best[0], "keep": best[1], "crps": round(means[best], 6),
+            "crps_at_keep_1": round(at_one[0], 6) if at_one else None,
+            "best_keep_by_late": {str(late): min((q for (l2, q) in means if l2 == late),
+                                                 key=lambda q: means[(late, q)])
+                                  for late in sorted({k[0] for k in means})}}
+
+
+def fit_total_keep(rows: Sequence[Mapping[str, Any]], endgame: Mapping[str, Any] | None, *,
+                   keeps: Sequence[float] = TOTAL_KEEP_GRID, lates: Sequence[float] = TOTAL_LATE_GRID) -> dict[str, Any]:
+    """The (late window, keep) minimising mean total CRPS over `rows`, the end-game's goals in the total."""
+    scored = [r for r in _total_rows(rows) if r.get("sims")]
+    if not scored:
+        return {"rows": 0}
+    table = _keep_crps_table(scored, endgame, keeps, lates)
+    return {"rows": len(scored), **_best_keep(table, range(len(scored)))}
+
+
+def walk_forward_total_keep(rows: Sequence[Mapping[str, Any]], endgame: Mapping[str, Any] | None, *,
+                            min_dates: int = WALK_FORWARD_MIN_DATES, keeps: Sequence[float] = TOTAL_KEEP_GRID,
+                            lates: Sequence[float] = TOTAL_LATE_GRID,
+                            table: Mapping[tuple[float, float], Sequence[float]] | None = None) -> dict[str, Any]:
+    """For each date after the first `min_dates`, the best (late window, keep) fit on the dates BEFORE it only."""
+    scored = [r for r in _total_rows(rows) if r.get("sims")]
+    table = table if table is not None else _keep_crps_table(scored, endgame, keeps, lates)
+    dates = sorted({r["date"] for r in scored})
+    fits: dict[str, dict[str, float]] = {}
+    for i, d in enumerate(dates):
+        if i < min_dates:
+            continue
+        train = set(dates[:i])
+        b = _best_keep(table, [j for j, r in enumerate(scored) if r["date"] in train])
+        fits[d] = {"late_seconds": b["late_seconds"], "keep": b["keep"]}
+    keeps_seen = [f["keep"] for f in fits.values()]
+    lates_seen = [f["late_seconds"] for f in fits.values()]
+    return {"fits": fits, "oos_dates": sorted(fits),
+            "keep_range": [min(keeps_seen), max(keeps_seen)] if keeps_seen else None,
+            "late_range": [min(lates_seen), max(lates_seen)] if lates_seen else None}
+
+
+def total_keep_report(rows: Sequence[Mapping[str, Any]], *, endgame_today: Mapping[str, Any],
+                      min_dates: int = WALK_FORWARD_MIN_DATES) -> dict[str, Any]:
+    """TODAY = the raw total (no thinning, the end-game out of it). ON = each out-of-sample date at its
+    walk-forward (late window, keep), the end-game's goals in the total. Also END-GAME ONLY (keep 1, its goals
+    in), UNIFORM (late window 0, the walk-forward keep at 0), and the full-sample fit a ship would use. The
+    margin and the moneyline are not graded here: the thinning cannot reach them (`resim_live_game`; pinned by
+    the tests)."""
+    scored = [r for r in _total_rows(rows) if r.get("sims")]
+    table = _keep_crps_table(scored, endgame_today, TOTAL_KEEP_GRID, TOTAL_LATE_GRID)
+    full = {"rows": len(scored), **_best_keep(table, range(len(scored)))}
+    wf = walk_forward_total_keep(scored, endgame_today, min_dates=min_dates, table=table)
+    uniform_table = {k: v for k, v in table.items() if k[0] == 0.0}
+    dates = sorted({r["date"] for r in scored})
+    uni_fit = {}
+    for i, d in enumerate(dates):
+        if i >= min_dates:
+            train = set(dates[:i])
+            uni_fit[d] = _best_keep(uniform_table, [j for j, r in enumerate(scored) if r["date"] in train])["keep"]
+    oos = [r for r in scored if r["date"] in set(wf["oos_dates"])]
+    games = sorted({str(r["pk"]) for r in oos})
+    per_game: dict[str, list[tuple]] = {}
+    hists = []
+    for r in oos:
+        y = int(r["final_total"])
+        f = wf["fits"][r["date"]]
+        h = {"today": total_hist(r, None),
+             "endgame_only": total_hist(r, endgame_today),
+             "uniform": total_hist(r, endgame_today, keep=uni_fit[r["date"]], late_seconds=0.0),
+             "on": total_hist(r, endgame_today, keep=f["keep"], late_seconds=f["late_seconds"])}
+        hists.append((r, h))
+        per_game.setdefault(str(r["pk"]), []).append((
+            {k: crps_discrete(v, y) for k, v in h.items()}, {k: hist_mean(v) - y for k, v in h.items()}, r["cutoff"]))
+
+    def _crps_diff(which):
+        def stat(sample):
+            items = [x for g in sample for x in per_game[g]]
+            return sum(x[0][which] - x[0]["today"] for x in items) / len(items) if items else None
+        return stat
+
+    def _bias_ci(label, which):
+        def stat(sample):
+            items = [x for g in sample for x in per_game[g] if x[2] == label]
+            return sum(x[1][which] for x in items) / len(items) if items else None
+        return [round(v, 3) for v in game_bootstrap(games, stat)]
+
+    def _table(which):
+        out = {}
+        for _p, _r, label in CUTOFFS:
+            sub = [(r, h[which]) for r, h in hists if r["cutoff"] == label]
+            if sub:
+                out[label] = {"n": len(sub),
+                              "bias": round(sum(hist_mean(h) - int(r["final_total"]) for r, h in sub) / len(sub), 4),
+                              "crps": round(sum(crps_discrete(h, int(r["final_total"])) for r, h in sub) / len(sub), 5)}
+        return out
+
+    items = [x for g in games for x in per_game[g]]
+    variants = ("endgame_only", "uniform", "on")
+    return {
+        "rows": len(scored), "full_sample_fit": full, "walk_forward": wf,
+        "uniform_walk_forward_keeps": [min(uni_fit.values()), max(uni_fit.values())] if uni_fit else None,
+        "oos": {
+            "dates": len(wf["oos_dates"]), "games": len(games), "rows": len(oos),
+            "by_cutoff": {v: _table(v) for v in ("today",) + variants},
+            "crps_minus_today": {v: round(sum(x[0][v] - x[0]["today"] for x in items) / len(items), 5)
+                                 for v in variants},
+            "crps_minus_today_ci95": {v: [round(z, 5) for z in game_bootstrap(games, _crps_diff(v))]
+                                      for v in variants},
+            "bias_ci95": {label: {"today": _bias_ci(label, "today"), "on": _bias_ci(label, "on")}
+                          for _p, _r, label in CUTOFFS},
+        },
+    }
+
+
+def _total_keep_text(rep: Mapping[str, Any]) -> str:
+    L = []
+    full, wf, oos = rep["full_sample_fit"], rep["walk_forward"], rep["oos"]
+    L.append(f"LIVE TOTAL THINNING -- {rep['rows']} states")
+    L.append(f"full-sample fit: late window {full.get('late_seconds')} s, keep {full.get('keep')}  CRPS "
+             f"{full.get('crps')} vs keep 1.0 {full.get('crps_at_keep_1')}; best keep by window "
+             f"{full.get('best_keep_by_late')}")
+    L.append(f"walk-forward: {len(wf['oos_dates'])} OOS dates, keep {wf['keep_range']}, window {wf['late_range']}"
+             f"; uniform (window 0) keeps {rep.get('uniform_walk_forward_keeps')}")
+    L.append(f"OUT OF SAMPLE: {oos['dates']} dates, {oos['games']} games, {oos['rows']} states  "
+             "(bias = model total - actual final)")
+    L.append("  cutoff      n   bias: today  end-game only  uniform  ON      CRPS: today  uniform  ON     ON bias 95%")
+    t = oos["by_cutoff"]
+    for label, row in t["today"].items():
+        e, u, o = t["endgame_only"][label], t["uniform"][label], t["on"][label]
+        L.append(f"  {label:9} {row['n']:5}   {row['bias']:+.3f}     {e['bias']:+.3f}      {u['bias']:+.3f}  "
+                 f"{o['bias']:+.3f}    {row['crps']:.4f}  {u['crps']:.4f}  {o['crps']:.4f}  "
+                 f"{oos['bias_ci95'][label]['on']}")
+    for v in ("endgame_only", "uniform", "on"):
+        L.append(f"  pooled CRPS {v} - today {oos['crps_minus_today'][v]:+.5f}  95% {oos['crps_minus_today_ci95'][v]}")
+    return "\n".join(L) + "\n"
+
+
+# ---------------------------------------------------------------------------
 # provenance
 # ---------------------------------------------------------------------------
 
@@ -833,10 +1285,40 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--fit-endgame", action="store_true",
                     help="walk-forward fit of the end-game (p, ramp) and an out-of-sample on-vs-off grade")
     ap.add_argument("--wf-min-dates", type=int, default=WALK_FORWARD_MIN_DATES)
+    ap.add_argument("--goal-scale", type=float, default=None,
+                    help="replay the engine at this live scoring scale (lane nhl-live-total-calibration); "
+                         "default 1.0, today's level. The end-game stays out of the stored raw totals either way")
+    ap.add_argument("--scale-runs", default=None,
+                    help='"1.0=<run dir>,0.9=<run dir>,...": fit and grade the live scoring scale across saved '
+                         "replays (no simulation); writes goal_scale_report.{json,txt} to --out-dir")
+    ap.add_argument("--fit-total-keep", action="store_true",
+                    help="fit the TOTAL-ONLY thinning (`total_keep`) walk-forward on --out-dir's saved rows (no "
+                         "simulation); writes total_keep_report.{json,txt}")
     args = ap.parse_args(argv)
 
     out_dir = Path(os.path.expanduser(args.out_dir))
     out_dir.mkdir(parents=True, exist_ok=True)
+    if args.fit_total_keep:
+        from syndicate.features.nhl import live_resim as LR
+
+        saved = [json.loads(l) for l in (out_dir / "rows.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
+        saved = [r for r in saved if "pk" in r and args.start <= str(r.get("date")) <= args.end]
+        rep = total_keep_report(saved, endgame_today=LR.NHL_LIVE_ENDGAME_CALIBRATION, min_dates=args.wf_min_dates)
+        (out_dir / "total_keep_report.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
+        text = _total_keep_text(rep)
+        (out_dir / "total_keep_report.txt").write_text(text, encoding="utf-8")
+        print(text, flush=True)
+        return 0
+    if args.scale_runs:
+        from syndicate.features.nhl import live_resim as LR
+
+        rep = goal_scale_report(load_scale_runs(args.scale_runs), endgame_today=LR.NHL_LIVE_ENDGAME_CALIBRATION,
+                                min_dates=args.wf_min_dates)
+        (out_dir / "goal_scale_report.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
+        text = _goal_scale_text(rep)
+        (out_dir / "goal_scale_report.txt").write_text(text, encoding="utf-8")
+        print(text, flush=True)
+        return 0
     cache = out_dir / "score_cache"
     rows_path = out_dir / "rows.jsonl"
     root = Path(os.path.expanduser(args.source_root)) if args.source_root else None
@@ -849,7 +1331,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 done.add(json.loads(line).get("date"))
         todo = [d for d in dates if d not in done]
         accounting = []
-        tasks = [(d, str(root) if root else None, str(cache), args.sims, args.endgame) for d in todo]
+        tasks = [(d, str(root) if root else None, str(cache), args.sims, args.endgame, args.goal_scale)
+                 for d in todo]
         if args.workers > 1:
             import multiprocessing as mp
             with mp.get_context("fork" if hasattr(os, "fork") else "spawn").Pool(args.workers) as pool:
@@ -885,6 +1368,41 @@ def main(argv: Sequence[str] | None = None) -> int:
     (out_dir / "report.txt").write_text(text, encoding="utf-8")
     print(text, flush=True)
     return 0
+
+
+def _goal_scale_text(rep: Mapping[str, Any]) -> str:
+    """The scale report a person reads: the fit, then out of sample today vs on by cutoff, then the margin and
+    moneyline cost, then the full-sample shape at every grid scale."""
+    L = []
+    full, wf, oos = rep["full_sample_fit"], rep["walk_forward"], rep["oos"]
+    L.append(f"LIVE SCORING SCALE -- {rep['states_common']} states common to every run")
+    L.append(f"full-sample fit: best grid {full.get('best_grid')}  refined {full.get('s_star')}  "
+             f"CRPS by grid {full.get('grid_crps')}")
+    L.append(f"walk-forward: {len(wf['oos_dates'])} OOS dates, scale range {wf['range']}")
+    L.append(f"OUT OF SAMPLE: {oos['dates']} dates, {oos['games']} games, {oos['rows']} states")
+    L.append("  cutoff      n   today bias  on bias   today CRPS  on CRPS   (bias = model total - actual final)")
+    for label, t in oos["today"]["by_cutoff"].items():
+        o = oos["on"]["by_cutoff"].get(label, {})
+        if not t.get("n"):
+            continue
+        L.append(f"  {label:9} {t['n']:5}   {t['bias']:+.3f}     {o.get('bias', float('nan')):+.3f}    "
+                 f"{t['crps']:.4f}     {o.get('crps', float('nan')):.4f}")
+    L.append(f"  pooled CRPS on - today {oos['crps_on_minus_today']:+.5f}  95% {oos['crps_on_minus_today_ci95']}")
+    L.append(f"  bias 95% (games): {oos['bias_ci95']}")
+    L.append(f"  +-1.5 Brier on - today {oos['pm1_5_brier_on_minus_today']:+.6f}  "
+             f"95% {oos['pm1_5_brier_on_minus_today_ci95']}")
+    L.append(f"  moneyline Brier today {oos['moneyline_brier_today']}  on {oos['moneyline_brier_on']}  "
+             f"on - today 95% {oos['moneyline_brier_on_minus_today_ci95']}")
+    L.append("FULL-SAMPLE SHAPE (end-game in the total at today's p), bias by cutoff:")
+    for s, sh in rep["full_sample_shape_by_scale"].items():
+        L.append(f"  scale {s}: " + "  ".join(f"{lab} {v['bias']:+.3f}" for lab, v in sh["by_cutoff"].items()
+                                               if v.get("n")) + f"   CRPS {sh['pooled'].get('crps')}")
+    L.append("END-GAME RE-FIT BY SCALE (+-1.5 Brier):")
+    for s, f in rep["endgame_refit_by_scale"].items():
+        r = f["refit"]
+        L.append(f"  scale {s}: p {r.get('empty_net_p')} ramp {r.get('ramp_seconds')} brier {r.get('brier')}  "
+                 f"(at today's end-game {f['brier_pm1_5_at_today_endgame']})")
+    return "\n".join(L) + "\n"
 
 
 def _append(rows_path: Path, res: Mapping[str, Any], accounting: list) -> None:
