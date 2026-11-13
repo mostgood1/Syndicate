@@ -774,6 +774,14 @@ death, never life — do not invert it.
 - Verification: study script reproduces the findings numbers from the fleet's reconciled sheets; after deploy, the section appears on served NBA sheets and its bets enter record.json; review prints excess-over-fair per section
 - Blocked by: none
 
+### ledger-mangled-path-guard — OPEN — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: A commit that would record NEW escape damage in a ledger markdown file (.syndicate/**/*.md, docs/ai_context/**/*.md) is refused: a C0/C1 control character, a lone CR, or a TAB inside a C: path that HEAD's blob of the same file does not already carry. A Bash/PowerShell write that introduces the same damage is reported right after the command. Pre-existing damage never blocks. The residual damage outside the 11-13 repair's file set (findings_2026-10-06/10-09, learnings_evidence/index mojibake, todo #797's new path) is repaired in place.
+- Files: .claude/hooks/ledger_bytes.py, .claude/hooks/ledger-commit-guard.py, .claude/hooks/ledger-postwrite-check.py, .claude/hooks/test_ledger_bytes.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: test_ledger_bytes.py green over throwaway repos (new damage blocked, pre-existing passes, CRLF working copy vs LF blob, override env); the existing ledger hook suites still green; a live trial in this worktree: a damaged staged line is refused by the real hook, then accepted once fixed; a rescan of origin/main finds 0 damaged characters across every ledger markdown file.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
