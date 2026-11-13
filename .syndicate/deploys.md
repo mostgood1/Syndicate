@@ -59398,3 +59398,21 @@ ailload\load.sh 3f11114c2 e102faf79`):
 - Fleet dry run before the ff (worktree code): whole watchdog 1.37 s.
 - **Revert:** `SYNDICATE_WATCHDOG_TEAM_NAMES=0` in the watchdog's environment, or `git revert a133df703` + a fleet ff.
 - Claim web released 22:56Z.
+
+## 2026-11-13 00:05:34Z (6:05 PM CST 11-12) -- READING, no deploy: todo #795 tip reading 1 of 2, NCAAB CSU Bakersfield @ Western Illinois (ESPN `401920135`, tip 00:00Z), lane `college-odds-feed-team-names` -- **MET: the first live re-sim published with the margin anchor (no `no_margin_anchor`), and the anchor's inputs re-derive by hand**
+- **Read:** `C:\tmp\railload\tip_watch.py`, read-only over `~/syndicate-prod/data/live_evidence/ncaab/2026-11-12.jsonl`, polled every 2 min.
+- **First `live_resim` row**, observed 00:04:46Z (6:04 PM CST), with the clock at 1137 s left in H1 and WIU leading 3-2:
+  - `refusal` null, 1 row, 0 refusals.
+  - `proj.homeMargin` **-7.475** vs `rawHomeMargin` -0.94.
+  - `modelHomeWinProb` 0.315 vs raw 0.505.
+  - Segment `h1`: `marginAnchored` true, `marginAnchorOffset` -3.18 at `remainingFraction` 0.4738.
+- **Anchor re-derived (00:07Z)** with the fleet's own code (`~/Syndicate` at `a133df703`, `SYNDICATE_DATA_ROOT=~/syndicate-prod/data`):
+  - `home_spread_quotes` finds the game under `('western illinois', 'cal state bakersfield')`, 60 home-spread quotes. Before the fix it sat under `'csu bakersfield roadrunners'`, a key ESPN's side never forms (baseline 22:03:18Z above).
+  - `closing_home_margin` = **-9.0 from 9 books**, each book's last full-game quote before the tip: betmgm 8.5, betonline 9.0, betrivers 9.5, betus 9.0, bovada 9.0, draftkings 8.5, fanatics 9.0, fanduel 9.5, lowvig 9.0.
+  - Pregame sim `home_margin_mean` -2.29 (`ncaab_source/data/pregame_sim/pregame_sim_2026-11-12.json`).
+  - Offset = -9.0 - (-2.29) = **-6.71**.
+    - Full game: -0.94 + (-6.71 x 0.974) = -7.47. The served value is -7.475.
+    - H1: -6.71 x 0.4738 = -3.18. The served value is -3.18.
+  - The served anchored margin sits 1.5 points on WIU's side of the close. That matches what the design allows: at the tip the offset is fixed, and the live state (WIU up 1) plus a 200-sim raw mean move the rest.
+- **Trap, recorded:** my first read of the quote log printed home lines +4.5 / +5 / +5.5 at 23:58Z for this game. Those rows are not in the anchor's full-game set; its own filter, re-run above, gives 8.5-9.5. Read the anchor through `home_spread_quotes`, not a grep for `"spreads"`.
+- **Owed:** reading 2 of 2, WNCAAB CSUB @ Washington (`401921495`, tip 03:00Z = 9 PM CST). Watcher started 00:07Z, deadline 03:50Z. Pre-tip at 00:07:15Z, its anchor sources are present: `('washington', 'cal state bakersfield')`, 3 books at a median Washington -43.5, and a pregame sim of +42.21.
