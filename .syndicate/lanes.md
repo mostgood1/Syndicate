@@ -831,6 +831,14 @@ death, never life — do not invert it.
 - Verification: git -C <primary> rev-parse HEAD == the target SHA; 0 staged; kept files byte-identical to the backup; backup manifest sha256 re-verified; check_lane_invariants.py from the primary tree compared before vs after and vs a worktree at the target
 - Blocked by: none
 
+### wncaab-team-crests — OPEN — opened 2026-11-13 — session 2ba5509d-5605-427a-b4bd-acd7926e2bea
+- Goal: WNCAAB board rows carry team crests as NCAAB rows do (fleet served board 2026-11-13 17:46Z: 39 of 39 WNCAAB rows in 6 games with no crest): a committed ESPN women's college basketball branding snapshot (build_team_branding_snapshot.py --sport wncaab; a narrow .gitignore exception like the other sports) read by team_logos with wncaab among its sports; a college team missing from its own league's snapshot takes the sibling league's crest for the same school (ESPN uses one team id and logo per school), which also closes NCAAB Lindenwood; tests incl. off != on; a fleet replay over the served board showing the gain and 0 crests already set changed; on main; load (fleet ff + reload-web) is the user's decision (todo #798)
+- Files: scripts/build_team_branding_snapshot.py (SPORT_CONFIG only), syndicate/features/shared/team_logos.py (_SPORTS + logo_url + a new sibling-league helper only), data/wncaab_source/source_artifacts/data/processed/team_branding/wncaab_team_branding.csv (NEW), .gitignore (a wncaab team_branding exception only), tests/test_team_logos_wncaab.py (NEW), docs/ai_context/todo.md (#798 section only)
+- Hypothesis: team_logos._SPORTS excludes wncaab and no WNCAAB branding snapshot exists in the repo or on the fleet, so logo_url returns None for every WNCAAB row; ESPN's women's list shares team ids with the men's (359 of 362 per the wncaab registry) so a shared id carries the same logo URL in both snapshots
+- Falsification test: the replay leaves a WNCAAB row on the served board without a crest that ESPN's women's list holds, changes any crest already set, or a shared ESPN id carries different logo URLs in the two snapshots
+- Verification: fleet replay over the served board under the worker environ: WNCAAB and NCAAB rows lacking a crest before and after, crests already set changed (all sports); after load the same read from the served board
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
