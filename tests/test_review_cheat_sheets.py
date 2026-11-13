@@ -83,3 +83,42 @@ def test_a_large_losing_slice_is_flagged_as_a_proposal(tmp_path, monkeypatch):
     assert review["scope"] == "official" and review["trends"]["value"]["season"]["verdict"].startswith("FLAG: losing")
     assert any(f.startswith("Value at the best price: season FLAG") for f in review["flags"])
     assert "Never remove a sport, a market or a market family" in (tmp_path / "cheatsheets" / "reviews" / "latest.md").read_text(encoding="utf-8")
+
+
+def test_against_the_price_reads_excess_and_lift_by_game_and_calls_only_beyond_noise():
+    # 2026-11-13: a section is judged against the fair it was shown with and against matched non-members, with a 95%
+    # interval over GAMES. Synthetic: section "value" members hit every time at a 50% fair; non-members of the same
+    # stratum hit half the time. 40 games, one member and two non-members each.
+    m = _script()
+    bets, population = [], []
+    for g in range(40):
+        bets.append({"section": "value", "y": 1.0, "p_market": 0.5, "event_id": f"g{g}"})
+        population.append({"stratum": ("nba", "over", "near even", False), "event_id": f"g{g}", "ex": 0.5, "sections": {"value"}})
+        population += [{"stratum": ("nba", "over", "near even", False), "event_id": f"g{g}", "ex": ex, "sections": set()}
+                       for ex in (0.5, -0.5)]
+    got = m.against_the_price(bets, population)["value"]
+    assert got["excess"]["pts"] == 50.0 and got["excess"]["call"] == "beats" and got["excess"]["games"] == 40
+    assert got["lift"]["pts"] == 50.0 and got["lift"]["ci"] == [50.0, 50.0]          # control mean 0: lift = +50 pts
+    assert m.against_the_price(bets, population) == m.against_the_price(bets, population)   # seeded: reproducible
+    review = {"against_price": {"value": got}}
+    assert m.price_flags(review)[0].startswith("Value at the best price beats its own fair: +50.0 pts")
+    # A coin-flip section is "not separable", and 10 bets never make a flag.
+    flip = [{"section": "consistency", "y": float(g % 2), "p_market": 0.5, "event_id": f"g{g}"} for g in range(40)]
+    assert m.against_the_price(flip, [])["consistency"]["excess"]["call"] == "not separable from"
+    few = {"against_price": {"value": {"excess": dict(got["excess"], n=10)}}}
+    assert m.price_flags(few) == []
+
+
+def test_the_population_is_the_primary_rows_under_the_sheets_own_rules():
+    m = _script()
+    def row(side, projected, ev, verdict="neutral"):
+        f = {"games": 10, "hits": 5, "rate": 0.5}
+        return {"player": "Big", "market": "player_points", "side": side, "line": 20.5, "projected": projected,
+                "event_id": "e", "check": {"verdict": verdict, "ev_market": ev, "price": -110, "p_market": 0.5,
+                                           "form5": f, "form10": f}}
+    rows = [row("under", 16.0, -1.0), row("over", 16.0, 3.0, "value")]
+    rec = {"props": {cs.prop_result_key(r): {"y": y} for r, y in zip(rows, (1.0, 0.0))}}
+    v1 = m.sheet_population({"sport": "nba", "date": DAY, "rows": rows}, rec)
+    v2 = m.sheet_population({"sport": "nba", "date": DAY, "rows": rows, "section_rules": 2}, rec)
+    assert [(p["stratum"][1], p["sections"]) for p in v1] == [("over", {"value"})]
+    assert [(p["stratum"][1], p["sections"]) for p in v2] == [("under", {"sim_edge"})]

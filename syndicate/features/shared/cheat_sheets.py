@@ -373,13 +373,155 @@ def featurable(row: Mapping[str, Any]) -> bool:
     return isinstance(price, (int, float)) and FEATURED_MIN_PRICE <= price <= FEATURED_MAX_PRICE
 
 
+# SECTION RULES ARE VERSIONED (lane cheat-sheet-section-optimization, user 2026-11-13). Every reader -- the page, the
+# season record, the reconcile and the review -- re-derives a day's sections from its rows, so a rule change applied to
+# every sheet would rewrite what past days FEATURED. The builder stamps the version a sheet was built under
+# (`section_rules`); a sheet without the stamp is version 1. Version 2 comes from
+# `findings_2026-11-13_cheat_sheet_section_assessment.md` (official 10-15..11-12, 95% intervals by game):
+#   - a group's side is the one SmartSim projects >= SIM_EDGE_MIN beyond the line, else the better-EV side (the EV rule
+#     alone is adverse: two-sided rows claiming +2..+5% hit 3.1 pts BELOW their fair; NBA sim side +8.0% [+2.1, +14.0]);
+#   - "Sim vs the line" (new): that side, on the main line, ordered by the edge;
+#   - Value needs the sim on its side (Value alone hit -4.0 pts [-7.4, -0.5] below its own fair over 871 bets);
+#   - Hot form, one-sided is retired (-36.1% [-57.2, -14.9]; its one-sided fairs -38.7% ROI over 3,556 rows);
+#   - Matchups admit on the same-line vs-opponent record (basketball +19.7% [+9.0, +30.8]); a defense's rank alone no
+#     longer admits (NFL rank-only overs -32.8% on 65);
+#   - player-vs-player sections admit a row only when its own history points to its side (on probation).
+SECTION_RULES = 2
+SIM_EDGE_MIN = 0.05
+RETIRED_SECTIONS = {"hot_form": "2026-11-13"}
+
+# The measured record behind "Sim vs the line" before it was published: the main line, the sim's side, edge >= 5%,
+# featurable two-sided rows of every official sheet 10-15..11-12, 1 u at the sheet's best price (findings 2026-11-13).
+# Shown in the section's header for its sport -- a sport where it lost says so (label, never hide: 2026-10-05).
+SIM_EDGE_MEASURED = {"nba": (1251, 8.0), "wnba": (318, 15.4), "ncaaf": (863, 2.9), "mlb": (366, 1.2),
+                     "nhl": (755, 0.5), "nfl": (924, -5.7)}
+SIM_EDGE_MEASURED_WINDOW = "Oct 15 - Nov 12"
+
+
+def sheet_rules(sheet: Mapping[str, Any] | None) -> int:
+    """The section-rules version a sheet was built under (1 when it carries no stamp)."""
+    v = (sheet or {}).get("section_rules") if isinstance(sheet, Mapping) else None
+    return int(v) if isinstance(v, int) and not isinstance(v, bool) and v >= 1 else 1
+
+
+def sim_edge_measured_text(sport: str) -> str:
+    """The line "Sim vs the line" prints for a sport: what the rule returned before it was published."""
+    n_roi = SIM_EDGE_MEASURED.get(str(sport or "").lower())
+    if not n_roi:
+        return f"Not yet measured for this sport: no graded sheet carried a sim projection {SIM_EDGE_MEASURED_WINDOW}."
+    n, roi = n_roi
+    return (f"Measured before launch over every official sheet {SIM_EDGE_MEASURED_WINDOW}: {n:,} bets, ROI {roi:+.1f}% at the "
+            f"best price, 1 unit each{'' if roi > 0 else ' -- in this sport it has not beaten the price'}.")
+
+
+def _side_of(row: Mapping[str, Any]) -> str | None:
+    side = str(row.get("side") or "").strip().lower()
+    return "over" if side in ("over", "yes") else "under" if side in ("under", "no") else None
+
+
+def sim_edge(row: Mapping[str, Any]) -> float | None:
+    """How far SmartSim's projection sits beyond the line TOWARD the row's side, as a share of the line (a line under 1
+    counts as 1, so a 0.5 line is judged in units). Positive = the sim is on this side. None without both numbers."""
+    proj, line, side = row.get("projected"), row.get("line"), _side_of(row)
+    if side is None or not isinstance(proj, (int, float)) or isinstance(proj, bool) \
+            or not isinstance(line, (int, float)) or isinstance(line, bool) or line <= 0:
+        return None
+    edge = (float(proj) - float(line)) / max(float(line), 1.0)
+    return edge if side == "over" else -edge
+
+
+def sim_backs(row: Mapping[str, Any]) -> bool:
+    edge = sim_edge(row)
+    return edge is not None and edge >= SIM_EDGE_MIN
+
+
+# Player vs player, DIRECTION (rules v2, on probation): the side a history points to for THIS row's market, or None
+# when the history carries no stat for that market or sits inside the dead band. Each rule compares the history's own
+# rate with the line (or with the player's usual rate where the history is a rate). Thresholds are judgement, stated
+# here, and judged by the daily review once a section has 30+ bets.
+PVP_SCORER_RATIO = 0.10      # NBA: points per 100 possessions vs these defenders at least 10% above / below his usual
+PVP_MLB_MIN_PA = 10          # MLB: a direction needs 10+ PA (the section's own floor, 3, is a context line)
+PVP_MLB_OPS = (0.500, 0.900)
+PVP_PITCHER_K = (0.19, 0.25)
+PVP_PITCHER_AVG = (0.220, 0.280)
+PVP_RECEIVER_CATCH = 0.75    # NFL: catch rate on the plays today's defenders made on his targets
+PVP_RECEIVER_STOPS = 0.25    # ... breakups + interceptions per play
+
+
+def _rate_vs_line(rate: float, line: Any) -> str | None:
+    if not isinstance(line, (int, float)) or isinstance(line, bool) or rate == float(line):
+        return None
+    return "over" if rate > float(line) else "under"
+
+
+def pvp_lean(row: Mapping[str, Any]) -> str | None:
+    pvp = row.get("pvp") or {}
+    kind, ln = pvp.get("kind"), pvp.get("line") or {}
+    if not isinstance(ln, Mapping):
+        return None
+    market = str(row.get("market") or "").strip().lower()
+    num = lambda k: float(ln[k]) if isinstance(ln.get(k), (int, float)) and not isinstance(ln.get(k), bool) else None
+    if kind in ("skater_vs_goalie", "goalie_vs_team"):
+        games = num("games") or 0
+        stat = {"sog": "sog", "goals": "goals", "saves": "saves"}.get(market)
+        if games < PVP_MIN_GAMES or stat is None or num(stat) is None:
+            return None
+        return _rate_vs_line(num(stat) / games, row.get("line"))
+    if kind == "scorer_vs_defenders":
+        them, usual = num("pts_per_100"), num("overall_pts_per_100")
+        if (num("poss") or 0) < PVP_MIN_POSS or "points" not in market or not them or not usual:
+            return None
+        ratio = them / usual
+        return "over" if ratio >= 1 + PVP_SCORER_RATIO else "under" if ratio <= 1 - PVP_SCORER_RATIO else None
+    if kind == "receiver_vs_defenders":
+        plays = num("plays") or 0
+        if plays < PVP_MIN_PLAYS or market not in ("receptions", "receiving yards"):
+            return None
+        stops = ((num("pbu") or 0) + (num("int") or 0)) / plays
+        if stops >= PVP_RECEIVER_STOPS:
+            return "under"
+        return "over" if (num("catches") or 0) / plays >= PVP_RECEIVER_CATCH else None
+    if kind == "qb_vs_defenders":
+        games = num("games") or 0
+        if market != "interceptions" or games < 2 or num("int") is None:
+            return None
+        return _rate_vs_line(num("int") / games, row.get("line"))
+    if kind == "batter_vs_pitcher":
+        pa = num("plateAppearances") or 0
+        try:
+            ops = float(ln.get("ops"))
+        except (TypeError, ValueError):
+            return None
+        if pa < PVP_MLB_MIN_PA or market not in ("batter_hits", "batter_total_bases", "batter_hits_runs_rbis"):
+            return None
+        return "over" if ops >= PVP_MLB_OPS[1] else "under" if ops <= PVP_MLB_OPS[0] else None
+    if kind == "pitcher_vs_lineup":
+        if (num("plateAppearances") or 0) < PVP_MLB_MIN_PA * 2:
+            return None
+        if "strikeout" in market and num("k_rate") is not None:
+            k = num("k_rate")
+            return "over" if k >= PVP_PITCHER_K[1] else "under" if k <= PVP_PITCHER_K[0] else None
+        if market == "hits_allowed":
+            try:
+                avg = float(ln.get("avg"))
+            except (TypeError, ValueError):
+                return None
+            return "over" if avg >= PVP_PITCHER_AVG[1] else "under" if avg <= PVP_PITCHER_AVG[0] else None
+    return None
+
+
+def pvp_points_to_side(row: Mapping[str, Any]) -> bool:
+    lean = pvp_lean(row)
+    return lean is not None and lean == _side_of(row)
+
+
 def _stat_key(row: Mapping[str, Any]) -> tuple[str, str]:
     """A player + stat, whatever the rung or side ("player_points" and "player_points_alternate" are one stat)."""
     market = re.sub(r"_(alt|alternate)$", "", str(row.get("market") or "").strip().lower())
     return str(row.get("player") or ""), market
 
 
-def primary_lines(rows: Sequence[Mapping[str, Any]]) -> set[int]:
+def primary_lines(rows: Sequence[Mapping[str, Any]], *, rules: int = SECTION_RULES) -> set[int]:
     """ONE line per player + stat for the whole sheet (user 2026-10-15: "reduce some of duplicate player/lines across
     the sheets. players with o4.5 and o5.5 lines and pick one"). Measured on that day's sheets: no section repeated a
     player's stat, but ACROSS sections the same player sat at two rungs (NCAAF Josh Rodriguez u30.5 in Hot streaks,
@@ -392,7 +534,11 @@ def primary_lines(rows: Sequence[Mapping[str, Any]]) -> set[int]:
 
     A row the build flagged `primary_locked` wins its group outright while it is still featurable: the line and side
     the day's first build chose stay put (user 2026-10-23, after NHL 10-16 Karlsson SOG u2.5 at 7/10 became the over
-    at 3/10 when the prices moved -- `build_cheat_sheets.lock_primaries`)."""
+    at 3/10 when the prices moved -- `build_cheat_sheets.lock_primaries`).
+
+    Rules v2 (2026-11-13): of the main line's two sides, the one SmartSim projects >= SIM_EDGE_MIN beyond the line
+    wins first, so "Sim vs the line" and every other section show ONE side of a player's stat. Measured over the
+    official record: where the sim took the side the EV rule did not, NBA +14.1% (230 bets) against +6.7% (1,021)."""
     groups: dict[tuple[str, str], list[int]] = {}
     for i, r in enumerate(rows):
         if featurable(r):
@@ -415,24 +561,34 @@ def primary_lines(rows: Sequence[Mapping[str, Any]]) -> set[int]:
         def side_score(i: int) -> tuple:
             c = rows[i].get("check") or {}
             ev = c.get("ev_market")
-            return c.get("verdict") != "one_sided_fair", float(ev) if isinstance(ev, (int, float)) else float("-inf")
+            sim = rules >= 2 and sim_backs(rows[i])
+            return c.get("verdict") != "one_sided_fair", sim, float(ev) if isinstance(ev, (int, float)) else float("-inf")
 
         keep.add(max((i for i in ids if rows[i].get("line") == main), key=side_score))
     return keep
 
 
-def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, list[int]]:
+def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25, rules: int = SECTION_RULES) -> dict[str, list[int]]:
     """Index lists into `rows` for each sheet section, each sorted by the number that matters for it. Every featured
-    section draws from the same one line per player + stat (`primary_lines`); "every prop" stays complete."""
+    section draws from the same one line per player + stat (`primary_lines`); "every prop" stays complete. `rules` is
+    the version the sheet was built under (`sheet_rules`): a reader must pass it, or a past day is re-judged."""
     rows = list(rows)
+    v2 = rules >= 2
     def ev(i: int, key: str) -> float:
         v = (rows[i].get("check") or {}).get(key)
         return float(v) if isinstance(v, (int, float)) else float("-inf")
     every = range(len(rows))
-    idx = sorted(primary_lines(rows))
+    idx = sorted(primary_lines(rows, rules=rules))
     verdict = lambda i: (rows[i].get("check") or {}).get("verdict")
+    edge = lambda i: sim_edge(rows[i]) or 0.0
+    pvp_ok = (lambda i: pvp_points_to_side(rows[i])) if v2 else (lambda i: True)
     out = {
-        "value": sorted((i for i in idx if verdict(i) == "value"), key=lambda i: -ev(i, "ev_market")),
+        "value": sorted((i for i in idx if verdict(i) == "value" and (not v2 or sim_backs(rows[i]))),
+                        key=lambda i: -ev(i, "ev_market")),
+        # Sim vs the line (rules v2): the main line, the side SmartSim projects at least SIM_EDGE_MIN beyond it, the
+        # biggest edge first. Two-sided prices only: a one-sided "fair" was measured 3.9 pts overstated.
+        "sim_edge": sorted((i for i in idx if v2 and featurable(rows[i]) and verdict(i) != "one_sided_fair"
+                            and sim_backs(rows[i])), key=lambda i: -edge(i)),
         "streaks_with_room": sorted((i for i in idx if verdict(i) == "streak_with_room"),
                                     key=lambda i: -ev(i, "ev_posterior")),
         "streaks_priced_in": sorted((i for i in idx if verdict(i) == "streak_priced_in"),
@@ -446,8 +602,9 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
                               key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0))),
         # Strong form where only one side is quoted (soccer shots / SOT / assists are almost all one book, over only):
         # no fair price exists to measure the streak against, so it is shown as form and model -- never as edge.
-        "hot_form": sorted((i for i in idx if verdict(i) == "one_sided_fair" and _hot(rows[i])),
-                           key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0))),
+        # RETIRED in rules v2 (RETIRED_SECTIONS): its past days keep their record under rules 1.
+        "hot_form": [] if v2 else sorted((i for i in idx if verdict(i) == "one_sided_fair" and _hot(rows[i])),
+                                         key=lambda i: (-_form(rows[i], "form10").get("rate", 0), -_form(rows[i], "form5").get("hits", 0))),
         # Consistency (user 2026-10-15: "a consistency section for every sport to show the recent hit rate trends"):
         # every row with a full L10 sample and a 70%+ hit rate, best record first, whatever its price says -- the page
         # shows the trend (L5 vs L10) and the price beside it, and says plainly that streaks measured as priced in.
@@ -457,46 +614,49 @@ def sections(rows: Iterable[Mapping[str, Any]], *, top: int = 25) -> dict[str, l
                                              -(_form(rows[i], "form5").get("rate") or 0))),
         # Matchups (user 2026-10-15: "matchup based cheat sheets"): the opponent ranks in the softest fifth at allowing
         # this stat for an over (toughest fifth for an under), most extreme first.
-        "matchup_spots": sorted((i for i in idx if matchup_favors_side(rows[i]) or vs_opponent_strong(rows[i])),
-                                key=lambda i: _matchup_extremity(rows[i])),
+        # Rules v2: the same-line record against this opponent admits; the defense's rank is shown, not used to pick.
+        "matchup_spots": sorted((i for i in idx if vs_opponent_strong(rows[i])), key=lambda i: _vs_opponent_order(rows[i]))
+        if v2 else sorted((i for i in idx if matchup_favors_side(rows[i]) or vs_opponent_strong(rows[i])),
+                          key=lambda i: _matchup_extremity(rows[i])),
         # Player vs player (MLB). Batters vs the probable starter: one row per hitter + stat (the better-EV side),
         # biggest sample first. Pitchers vs the opposing roster: ONE row per pitcher -- his strikeout line when he has
         # one -- because the lineup line is the same for every market he is priced in.
         "pvp_batters": _one_per_player(rows, sorted(
-            (i for i in idx if _pvp_kind(rows[i]) == "batter_vs_pitcher" and _pvp_pa(rows[i]) >= PVP_MIN_PA and featurable(rows[i])),
+            (i for i in idx if _pvp_kind(rows[i]) == "batter_vs_pitcher" and _pvp_pa(rows[i]) >= PVP_MIN_PA and featurable(rows[i])
+             and pvp_ok(i)),
             key=lambda i: -_pvp_pa(rows[i])))[:top],
         "pvp_pitchers": _one_per_pitcher(rows, [i for i in idx if _pvp_kind(rows[i]) == "pitcher_vs_lineup"
-                                                and _pvp_pa(rows[i]) >= PVP_MIN_PA and featurable(rows[i])])[:top],
+                                                and _pvp_pa(rows[i]) >= PVP_MIN_PA and featurable(rows[i]) and pvp_ok(i)])[:top],
         # NHL: skaters vs the opposing likely starter (2+ meetings), goalies vs today's opponent -- one row a player.
         "pvp_skaters": _one_per_player(rows, sorted(
             (i for i in idx if _pvp_kind(rows[i]) == "skater_vs_goalie" and _pvp_games(rows[i]) >= PVP_MIN_GAMES
-             and featurable(rows[i])),
+             and featurable(rows[i]) and pvp_ok(i)),
             key=lambda i: (-_pvp_games(rows[i]), -(((rows[i].get("pvp") or {}).get("line") or {}).get("sog") or 0))))[:top],
         "pvp_goalies": _one_per_player(rows, sorted(
             (i for i in idx if _pvp_kind(rows[i]) == "goalie_vs_team" and _pvp_games(rows[i]) >= PVP_MIN_GAMES
-             and featurable(rows[i])),
+             and featurable(rows[i]) and pvp_ok(i)),
             key=lambda i: -_pvp_games(rows[i])))[:top],
         # NBA defender matchups: who guarded him, 40+ partial possessions against today's opponent's defenders.
         "pvp_scorers": _one_per_player(rows, sorted(
             (i for i in idx if _pvp_kind(rows[i]) == "scorer_vs_defenders"
-             and _pvp_stat(rows[i], "poss") >= PVP_MIN_POSS and featurable(rows[i])),
+             and _pvp_stat(rows[i], "poss") >= PVP_MIN_POSS and featurable(rows[i]) and pvp_ok(i)),
             key=lambda i: -_pvp_stat(rows[i], "poss")))[:top],
         # NFL plays on the ball (NOT coverage): receivers with 2+ plays by today's defenders on their targets, and
         # every quarterback against today's secondary.
         "pvp_receivers": _one_per_player(rows, sorted(
             (i for i in idx if _pvp_kind(rows[i]) == "receiver_vs_defenders"
-             and _pvp_stat(rows[i], "plays") >= PVP_MIN_PLAYS and featurable(rows[i])),
+             and _pvp_stat(rows[i], "plays") >= PVP_MIN_PLAYS and featurable(rows[i]) and pvp_ok(i)),
             key=lambda i: -_pvp_stat(rows[i], "plays")))[:top],
         "pvp_qbs": _one_per_player(rows, sorted(
             (i for i in idx if _pvp_kind(rows[i]) == "qb_vs_defenders" and featurable(rows[i])
-             and (_pvp_stat(rows[i], "plays") or (((rows[i].get("pvp") or {}).get("line")) or {}).get("hawks"))),
+             and (_pvp_stat(rows[i], "plays") or (((rows[i].get("pvp") or {}).get("line")) or {}).get("hawks")) and pvp_ok(i)),
             key=lambda i: -_pvp_stat(rows[i], "plays")))[:top],
         # Everything on the board, for a game's own sheet (the page shows it there only).
         "every_prop": sorted(every, key=lambda i: (str(rows[i].get("market")), str(rows[i].get("player")),
                                                    rows[i].get("line") if isinstance(rows[i].get("line"), (int, float)) else 0,
                                                    str(rows[i].get("side"))))[:EVERY_PROP_CAP],
     }
-    for key in ("value", "hot_streaks", "streaks_with_room", "streaks_priced_in", "hot_form", "consistency",
+    for key in ("value", "sim_edge", "hot_streaks", "streaks_with_room", "streaks_priced_in", "hot_form", "consistency",
                 "matchup_spots", "shop_gaps"):
         out[key] = out[key][:top]
     return out
@@ -746,6 +906,15 @@ def vs_opponent_strong(row: Mapping[str, Any]) -> bool:
     return bool(vs.get("same_line")) and vs.get("games", 0) >= VS_OPPONENT_MIN_GAMES and (vs.get("hits") or 0) / vs["games"] >= 2 / 3
 
 
+def _vs_opponent_order(row: Mapping[str, Any]) -> tuple:
+    """Rules v2 Matchups order: the best record against this opponent on this line, more meetings first on ties, then
+    the defense's rank as the last tiebreak."""
+    vs = row.get("vs_opponent") or {}
+    games = int(vs.get("games") or 0)
+    rate = (vs.get("hits") or 0) / games if games else 0.0
+    return -rate, -games, _matchup_extremity(row)
+
+
 def _matchup_extremity(row: Mapping[str, Any]) -> float:
     mu = row.get("matchup") or {}
     if not mu.get("nth_most"):
@@ -989,13 +1158,23 @@ def _card_day(card: Mapping[str, Any]) -> str:
     return str(card.get("game_date") or card.get("source_board_date") or "")[:10]
 
 
+def _pick_price_featurable(card: Mapping[str, Any]) -> bool:
+    """A pick's price inside the featured band every other section uses (user 2026-10-15 "sanity cap"; extended to the
+    picks 2026-11-13: picks and price plays above +250 went 124 bets -42.1% [-72.0, -3.4], 95% by game). A price
+    gate is a property of the LINE, so the 2026-10-05 directive allows it; the board still shows the opportunity."""
+    odds = card.get("odds")
+    return isinstance(odds, (int, float)) and not isinstance(odds, bool) and FEATURED_MIN_PRICE <= odds <= FEATURED_MAX_PRICE
+
+
 def select_picks(cards: Sequence[Mapping[str, Any]], *, sport: str, day: str) -> list[Mapping[str, Any]]:
-    """The board's suggested, pregame, main-line opportunities for this sport's games on `day`, best score first."""
+    """The board's suggested, pregame, main-line opportunities for this sport's games on `day`, priced inside the
+    featured band, best score first."""
     primaries = alt_primaries(cards)
     chosen = [c for c in cards
               if c.get("suggested") and str(c.get("sport") or "").lower() == sport and _card_day(c) == day
               and str(c.get("market_state") or c.get("lane") or "").lower() == "pregame"
-              and str(c.get("board_lane") or "opportunity") == "opportunity" and not is_alt_line(c, primaries)]
+              and str(c.get("board_lane") or "opportunity") == "opportunity" and not is_alt_line(c, primaries)
+              and _pick_price_featurable(c)]
     return sorted(chosen, key=lambda c: -(_num(c.get("board_score") or c.get("score")) or 0))
 
 
@@ -1705,17 +1884,20 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         row_group = lambda i: _stat_key(rows[i])
         # FROZEN ONCE POSTED (user 2026-10-23): a section that went out on a graphic is exactly its posted rows in every
         # view; what qualifies after it is listed apart, never exported. A section never posted keeps its own rows.
-        own = sections(rows)
+        rules = sheet_rules(sheet)
+        own = sections(rows, rules=rules)
         doc["sections"] = pin_posted(own, row_ids, row_entries, only=True)
         doc["sections_after_post"] = sections_after_post(own, doc["sections"], group=row_group)
         doc["game_sections"], doc["game_sections_after_post"] = {}, {}
         for event, idx in by_game.items():
-            own = {k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx]).items()}
+            own = {k: [idx[j] for j in ids] for k, ids in sections([rows[i] for i in idx], rules=rules).items()}
             frozen = pin_posted(own, row_ids, row_entries, events=row_events, event=event, only=True)
             doc["game_sections"][str(event)] = frozen
             later = sections_after_post(own, frozen, group=row_group)
             if later:
                 doc["game_sections_after_post"][str(event)] = later
+        doc["section_rules"] = rules
+        doc["sim_edge_measured"] = sim_edge_measured_text(sport)
         if posted:
             doc["posted"] = {"posts": len(posted.get("posts") or []), "rows": len(posted_rows), "lines": len(posted_lines)}
         finals = (rec or {}).get("scores") or {}

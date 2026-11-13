@@ -663,7 +663,8 @@ def build_sport(sport: str, rows: list[dict[str, Any]], *, selected_date: str, c
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "groups_on_board": len(groups), "groups_built": len(ordered), "groups_sticky": len(ordered) - len(top),
         "rows": out_rows,
-        "games": list(games.values()), "sections": cs.sections(out_rows), "game_lines": game_lines,
+        "games": list(games.values()), "sections": cs.sections(out_rows), "section_rules": cs.SECTION_RULES,
+        "game_lines": game_lines,
         "dvp_file": dvp.get("_file") if sport == "nfl" else None,
         "method": {"prior_strength_k": cs.PRIOR_STRENGTH, "k_is_provisional": cs.K_IS_PROVISIONAL, "streak_rate": cs.STREAK_RATE,
                    "streak_min_games": cs.STREAK_MIN_GAMES, "value_ev_pct": cs.VALUE_EV_PCT},
@@ -929,7 +930,7 @@ def merge_with_record(sheet: dict[str, Any], prior: dict[str, Any] | None, *, no
     merged = dict(sheet)
     merged["rows"] = sheet["rows"] + kept_rows
     merged["games"] = list(sheet["games"]) + kept_games
-    merged["sections"] = cs.sections(merged["rows"])
+    merged["sections"], merged["section_rules"] = cs.sections(merged["rows"]), cs.SECTION_RULES
     merged["rows_frozen"] = len(kept_rows)
     return merged
 
@@ -1439,7 +1440,8 @@ def main_build(args: Any, data_root: Path) -> int:
         sheet["primary_lock"] = lock_primaries(sheet["rows"], (prior or {}).get("primary_lock"), selected=selected,
                                                today=today, at=sheet["generated_at"])
         sheet["pool"] = pool_record(sheet, prior, today=today, at=sheet["generated_at"])
-        sheet["sections"] = cs.sections(sheet["rows"])
+        # The rules version the sections were derived under: every reader re-derives this day under it (2026-11-13).
+        sheet["sections"], sheet["section_rules"] = cs.sections(sheet["rows"]), cs.SECTION_RULES
         try:
             pending = dict((prior or {}).get("pick_pending") or {})
             sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),

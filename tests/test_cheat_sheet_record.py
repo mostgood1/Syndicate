@@ -30,7 +30,7 @@ def _day(date, sport="nfl", results=(1.0, 0.0, 1.0)):
 
 def test_a_day_counts_what_the_sheet_featured_once_each():
     sheet, rec = _day("2026-10-15")
-    secs = cs.sections(sheet["rows"])
+    secs = cs.sections(sheet["rows"], rules=cs.sheet_rules(sheet))     # unstamped: rules v1, as the record reads it
     assert secs["value"] == [0, 1] and 0 in secs["consistency"]          # A is in two sections ...
     d = csr.day_record(sheet, rec)
     assert d["sections"]["value"] == {"w": 1, "l": 1, "n": 2, "units": round(100 / 139 - 1, 2), "win_pct": 50.0,

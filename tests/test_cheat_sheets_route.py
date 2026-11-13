@@ -247,7 +247,7 @@ def test_the_page_spells_out_the_club(tmp_path, monkeypatch):
 
     page = (Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "cheat_sheets.html").read_text(encoding="utf-8")
     assert "function clubLine(r)" in page and "function playerCell(r, withPos)" in page
-    assert page.count("${playerCell(r, ") == 4 and "${clubLine(r)}" in page
+    assert page.count("${playerCell(r, ") == 5 and "${clubLine(r)}" in page             # + Sim vs the line (2026-11-13)
 
 
 def test_news_is_tied_to_its_game_on_this_sheet():

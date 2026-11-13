@@ -13,6 +13,14 @@ Runs right after the reconcile (Windows task `SyndicateCheatSheetsReconcile`, 7:
 
 A trend is FLAGGED only with 30+ bets AND a z of 2+ on ROI (z = ROI / its standard error, from the win rate and the
 average payout). Below that it is printed as a reading, never a flag: a day or a week of results is mostly noise.
+
+  AGAINST THE PRICE (2026-11-13, lane cheat-sheet-section-optimization): W-L alone cannot say whether a section's
+           SELECTION beats the price, and its close is no help when the close is the same consensus fair the section
+           was selected on (Value read +2.8% at the close while its bets hit 4 pts BELOW that fair). So each section
+           also gets: its excess over the fair it was shown with (hits minus `p_market`, in points), and its lift over
+           MATCHED NON-MEMBERS -- graded rows of the same sheets the section did not feature, same sport, side, price
+           band and fair method. Both carry a 95% interval from a bootstrap over GAMES (same-game props move
+           together), and a section is called beating / trailing the price only when that interval excludes 0.
 A flag is a PROPOSAL for a person to weigh: tighten that section's own entry rule, re-order sections, re-label. It
 never removes a sport, a market or a market family -- accuracy ranks and stakes, it never hides (2026-10-05).
 
@@ -44,6 +52,9 @@ STALE_HOURS = 26       # the record should be rebuilt every morning
 MIN_GRADED_SHARE = 0.8
 RECENT_DAYS = 7
 LABELS = dict(csr.FEATURED)
+BOOT_RESAMPLES = 1000
+BOOT_SEED = 20261113
+MIN_CONTROLS = 10      # a member needs this many matched non-members in its stratum to count toward the lift
 
 
 def central_today() -> str:
@@ -107,7 +118,7 @@ def featured_bets(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> li
     """Every featured bet of one sheet with its section, sport, price, EV and graded result (per-bet, for slices)."""
     rows = list(sheet.get("rows") or [])
     props = reconciled.get("props") or {}
-    secs = cs.sections(rows)
+    secs = cs.sections(rows, rules=cs.sheet_rules(sheet))
     out = []
     pick_results = reconciled.get("picks") or {}
     for pk in sheet.get("picks") or []:                         # the Syndicate picks: the board's suggested opps
@@ -115,7 +126,8 @@ def featured_bets(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> li
         if res is not None and res.get("y") in (0.0, 1.0):
             section = "price_plays" if (pk.get("label") or cs.pick_label(pk)) == cs.PRICE_PLAY_LABEL else "picks"
             out.append({"section": section, "sport": sheet.get("sport"), "date": sheet.get("date"), "price": pk.get("price"),
-                        "ev": pk.get("ev_pct"), "y": res["y"], "units": res["units"] or 0.0})
+                        "ev": pk.get("ev_pct"), "y": res["y"], "units": res["units"] or 0.0,
+                        "p_market": pk.get("p_market"), "event_id": pk.get("event_id")})
     for key, _label in csr.FEATURED:
         if key in ("lines_value", "picks", "price_plays"):
             continue
@@ -126,7 +138,102 @@ def featured_bets(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> li
             if res is None or res.get("y") not in (0.0, 1.0):
                 continue
             out.append({"section": key, "sport": sheet.get("sport"), "date": sheet.get("date"), "price": check.get("price"),
-                        "ev": check.get("ev_market"), "y": res["y"], "units": res["units"] or 0.0})
+                        "ev": check.get("ev_market"), "y": res["y"], "units": res["units"] or 0.0,
+                        "p_market": check.get("p_market"), "event_id": r.get("event_id")})
+    return out
+
+
+def sheet_population(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Every graded PRIMARY featurable row of one sheet -- the pool a section chose from -- with its stratum and the
+    sections that featured it, under the rules the sheet was built with."""
+    rows = list(sheet.get("rows") or [])
+    props = reconciled.get("props") or {}
+    rules = cs.sheet_rules(sheet)
+    member: dict[int, set[str]] = defaultdict(set)
+    for key, ids in cs.sections(rows, rules=rules).items():
+        if key in LABELS:
+            for i in ids:
+                member[i].add(key)
+    out = []
+    for i in sorted(cs.primary_lines(rows, rules=rules)):
+        r, check = rows[i], rows[i].get("check") or {}
+        p = check.get("p_market")
+        res = cs.result_for(check.get("price"), props.get(cs.prop_result_key(r)))
+        if res is None or res.get("y") not in (0.0, 1.0) or not isinstance(p, (int, float)):
+            continue
+        side = "over" if str(r.get("side") or "").lower() in ("over", "yes") else "under"
+        stratum = (sheet.get("sport"), side, price_band(check.get("price")), check.get("verdict") == "one_sided_fair")
+        out.append({"stratum": stratum, "event_id": r.get("event_id"), "ex": res["y"] - float(p),
+                    "sections": member.get(i, set())})
+    return out
+
+
+def _boot_ci(groups: list[list[float]], *, seed: int = BOOT_SEED,
+             resamples: int = BOOT_RESAMPLES) -> tuple[float, float] | None:
+    """95% interval of the mean, resampling whole GAMES (each inner list is one game's values)."""
+    import random
+
+    groups = [g for g in groups if g]
+    if len(groups) < 2:
+        return None
+    rng = random.Random(seed)
+    sums = [(sum(g), len(g)) for g in groups]
+    means = []
+    for _ in range(resamples):
+        total = count = 0
+        for _g in range(len(sums)):
+            t, c = sums[rng.randrange(len(sums))]
+            total += t
+            count += c
+        means.append(total / count)
+    means.sort()
+    return means[int(0.025 * resamples)], means[int(0.975 * resamples) - 1]
+
+
+def _by_game(items: Iterable[tuple[Any, float]]) -> list[list[float]]:
+    games: dict[Any, list[float]] = defaultdict(list)
+    for game, value in items:
+        games[game].append(value)
+    return list(games.values())
+
+
+def _reading(values: list[tuple[Any, float]]) -> dict[str, Any] | None:
+    if not values:
+        return None
+    mean = sum(v for _g, v in values) / len(values)
+    ci = _boot_ci(_by_game(values))
+    out: dict[str, Any] = {"pts": round(100 * mean, 1), "n": len(values), "games": len({g for g, _v in values})}
+    if ci:
+        out["ci"] = [round(100 * ci[0], 1), round(100 * ci[1], 1)]
+        out["call"] = "beats" if ci[0] > 0 else "trails" if ci[1] < 0 else "not separable from"
+    return out
+
+
+def against_the_price(bets: list[dict[str, Any]], population: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Per section: excess over the fair it was shown with, and lift over matched non-members (both in points)."""
+    out: dict[str, dict[str, Any]] = {}
+    by_section: dict[str, list[dict]] = defaultdict(list)
+    for b in bets:
+        if isinstance(b.get("p_market"), (int, float)):
+            by_section[b["section"]].append(b)
+    strata: dict[Any, list[dict]] = defaultdict(list)
+    for r in population:
+        strata[r["stratum"]].append(r)
+    for key, rows in by_section.items():
+        entry = {"excess": _reading([(b.get("event_id"), b["y"] - float(b["p_market"])) for b in rows])}
+        lifts = []
+        control_mean: dict[Any, float | None] = {}
+        for r in population:
+            if key not in r["sections"]:
+                continue
+            if r["stratum"] not in control_mean:
+                ctrl = [c["ex"] for c in strata[r["stratum"]] if key not in c["sections"]]
+                control_mean[r["stratum"]] = sum(ctrl) / len(ctrl) if len(ctrl) >= MIN_CONTROLS else None
+            mean = control_mean[r["stratum"]]
+            if mean is not None:
+                lifts.append((r["event_id"], r["ex"] - mean))
+        entry["lift"] = _reading(lifts)
+        out[key] = entry
     return out
 
 
@@ -231,6 +338,19 @@ def trends(bets: list[dict[str, Any]], *, today: str) -> dict[str, Any]:
     return out
 
 
+def price_flags(review: Mapping[str, Any]) -> list[str]:
+    """A section whose excess over its fair, or lift over matched non-members, has a 95% interval that excludes 0."""
+    out = []
+    for key, p in (review.get("against_price") or {}).items():
+        label = LABELS.get(key, key)
+        for name, what in (("excess", "its own fair"), ("lift", "matched non-members")):
+            r = p.get(name) or {}
+            if r.get("call") in ("beats", "trails") and r.get("n", 0) >= MIN_BETS:
+                out.append(f"{label} {r['call']} {what}: {r['pts']:+.1f} pts [{r['ci'][0]:+.1f}, {r['ci'][1]:+.1f}] "
+                           f"over {r['n']} bets / {r['games']} games")
+    return out
+
+
 def render(review: Mapping[str, Any]) -> str:
     def rec(t: Mapping[str, Any]) -> str:
         roi = "–" if t.get("roi_pct") is None else f"{t['roi_pct']:+.1f}%"
@@ -243,9 +363,19 @@ def render(review: Mapping[str, Any]) -> str:
     lines += ["", "## Section trends", ""]
     if not review["trends"]:
         lines.append("- no graded featured bets in this scope yet")
+    def price_text(r: Mapping[str, Any] | None) -> str:
+        if not r:
+            return "–"
+        ci = f" [{r['ci'][0]:+.1f}, {r['ci'][1]:+.1f}]" if r.get("ci") else ""
+        return f"{r['pts']:+.1f} pts{ci} ({r['n']} bets, {r['games']} games)"
+
     for key, t in review["trends"].items():
         lines.append(f"- **{t['label']}** season {rec(t['season'])} -- {t['season']['verdict']}; "
                      f"last {RECENT_DAYS} days {rec(t['last_7_days'])}")
+        p = (review.get("against_price") or {}).get(key)
+        if p:
+            lines.append(f"  - against the price: vs its fair {price_text(p.get('excess'))}; "
+                         f"vs matched non-members {price_text(p.get('lift'))}")
         for name, groups in t["slices"].items():
             flagged = [f"{g}: {rec(v)} -- {v['verdict']}" for g, v in groups.items() if v["verdict"].startswith("FLAG")]
             for f in flagged:
@@ -253,6 +383,9 @@ def render(review: Mapping[str, Any]) -> str:
     lines += ["", "## Flags", ""]
     flags = review["flags"]
     lines += [f"- {f}" for f in flags] if flags else ["- none: nothing is beyond noise (30+ bets and |z| >= 2 needed)"]
+    against = review.get("price_flags") or []
+    lines += ["", "## Against the price (95% intervals by game)", ""]
+    lines += [f"- {f}" for f in against] if against else ["- no section's interval excludes 0: none is shown to beat or trail the price"]
     lines += ["", "A flag is a proposal for a person: tighten that section's own entry rule, re-order, or re-label. "
               "Never remove a sport, a market or a market family."]
     return "\n".join(lines) + "\n"
@@ -286,14 +419,17 @@ def main(argv: list[str] | None = None) -> int:
     official = [(s, r) for s, r in days if str(s.get("date")) >= pc.OFFICIAL_START]
     scope = "official" if official else "beta"
     bets = [b for s, r in (official or days) for b in featured_bets(s, r)]
+    population = [p for s, r in (official or days) for p in sheet_population(s, r)]
     review = {"date": today, "scope": scope, "generated_at": now.isoformat(timespec="seconds"),
               "generated_ct": pc.central(now).strftime("%b %d %I:%M %p CT"),
               "health": health(sheets_dir, days, record, today=today, now=now, log_tail=log_tail),
-              "trends": trends(bets, today=today)}
+              "trends": trends(bets, today=today),
+              "against_price": against_the_price(bets, population)}
     flags = [f"{t['label']}: season {t['season']['verdict']}" for t in review["trends"].values() if t["season"]["verdict"].startswith("FLAG")]
     flags += [f"{t['label']} / {name} {g}: {v['verdict']}" for t in review["trends"].values()
               for name, groups in t["slices"].items() for g, v in groups.items() if v["verdict"].startswith("FLAG")]
     review["flags"] = flags
+    review["price_flags"] = price_flags(review)
     out_dir = sheets_dir / "reviews"
     out_dir.mkdir(parents=True, exist_ok=True)
     text = render(review)

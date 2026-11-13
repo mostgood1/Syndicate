@@ -674,7 +674,7 @@ def open_featured(sheet: Mapping[str, Any], rec: Mapping[str, Any] | None) -> in
     rows, lines, picks = sheet.get("rows") or [], sheet.get("game_lines") or [], sheet.get("picks") or []
     done_props = set(rec.get("props") or {}) | set(rec.get("void") or {})
     done_picks = set(rec.get("picks") or {}) | set(rec.get("picks_void") or {})
-    secs = cs.sections(rows)
+    secs = cs.sections(rows, rules=cs.sheet_rules(sheet))
     keys = {cs.prop_result_key(rows[i]) for k, _ in csr.FEATURED for i in secs.get(k) or []} - done_props
     line_keys = {cs.line_result_key(lines[i]) for i in (cs.game_line_sections(lines).get("value") if lines else [])}
     line_keys -= set(rec.get("lines") or {})

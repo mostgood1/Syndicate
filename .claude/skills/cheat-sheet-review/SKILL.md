@@ -50,5 +50,28 @@ A flag is a **proposal for a person**, never an automatic change:
 Never propose removing a sport, a market or a market family: accuracy ranks and stakes, it never hides (2026-10-05).
 And never size up a section on results alone: a winning flag says keep it and keep watching.
 
+## Against the price (since 2026-11-13)
+
+Under each section the review prints **vs its fair** (hits minus the `p_market` the bet was shown with, in points) and
+**vs matched non-members** (the same sheets' graded primary rows the section did NOT feature, same sport, side, price
+band and fair method), each with a 95% interval from a bootstrap over GAMES. "## Against the price" lists every section
+of 30+ bets whose interval excludes 0. That is the stronger reading: it asks whether the section's SELECTION beats the
+price, which W-L cannot. First replay (official 10-15..11-12): Hot streaks +3.0 [+0.3, +5.8], Consistency +2.4
+[+0.1, +4.8] and Matchups +3.9 [+0.6, +6.9] beat matched non-members; Value trails its own fair -4.0 [-7.3, -0.7].
+
+## Section rules are versioned
+
+A sheet carries `section_rules` (stamped by the builder). Every reader re-derives that day's sections under the
+sheet's own version, so a rule change never rewrites a past day. Version 2 (2026-11-13, user-approved, evidence in
+`.syndicate/findings_2026-11-13_cheat_sheet_section_assessment.md`):
+- **Sim vs the line** (new): the main line, the side SmartSim projects 5%+ beyond it. It runs on every sport, and its
+  header prints the sport's pre-launch record (NBA +8.0% over 1,251; NFL -5.7% over 924).
+- **Value** needs the sim on its side.
+- **Hot form, one-sided** is retired (record label "(retired 11/13)").
+- **Matchups** admit on the same-line vs-opponent record only.
+- **Player-vs-player** sections need their history to point to the bet's side. They are ON PROBATION: judge each at
+  30+ bets.
+- **Picks** are capped at the featured price band.
+
 Better than results, when it exists: the price at the close. `scripts/grade_play_cards.py` already measures EV at the
 closing line for play cards; extending it to every featured bet is the next step for this review.

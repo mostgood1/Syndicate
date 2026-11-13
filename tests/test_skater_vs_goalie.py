@@ -68,7 +68,7 @@ def test_the_sheet_sections_need_two_meetings_one_row_a_player():
 
     rows = [row("Matthews", 6), row("Matthews", 6, market="Points", ev=1.0), row("Once", 1), row("Dahlin", 4),
             row("Luukkonen", 6, kind="goalie_vs_team", market="Saves")]
-    s = cs.sections(rows)
+    s = cs.sections(rows, rules=1)            # rules v1 (past days); v2 also needs the history to point to the side
     assert [(rows[i]["player"], rows[i]["market"]) for i in s["pvp_skaters"]] == [("Matthews", "Points"), ("Dahlin", "SOG")]
     assert [rows[i]["player"] for i in s["pvp_goalies"]] == ["Luukkonen"]
 

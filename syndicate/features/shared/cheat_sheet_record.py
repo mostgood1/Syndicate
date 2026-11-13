@@ -24,6 +24,8 @@ FEATURED: tuple[tuple[str, str], ...] = (
     # ... and the ones it does not: the same price edge without the sim's backing. Kept apart so the record itself says
     # whether the sim's backing adds anything (user 2026-10-15: "split the season record into picks vs price plays").
     ("price_plays", "Price plays"),
+    # Rules v2 (2026-11-13): the main line, the side SmartSim projects 5%+ beyond it (NBA +8.0% [+2.1, +14.0] before launch).
+    ("sim_edge", "Sim vs the line"),
     ("value", "Value at the best price"),
     ("hot_streaks", "Hot streaks"),
     ("hot_form", "Hot form, one-sided"),
@@ -92,6 +94,15 @@ def cross_totals(graded_docs: Iterable[Mapping[str, Any]], *, beta: bool
 
 def applies(key: str, sport: str) -> bool:
     return sport in CATEGORY_SPORTS.get(key, frozenset(cs.SPORT_ORDER))
+
+
+def _label_of(key: str, label: str) -> str:
+    """A retired section keeps its record under its own name, marked with the day it stopped being featured."""
+    retired = cs.RETIRED_SECTIONS.get(key)
+    if not retired:
+        return label
+    month, day = int(retired[5:7]), int(retired[8:10])
+    return f"{label} (retired {month}/{day})"
 
 
 def _sgp_tally() -> dict[str, float]:
@@ -189,7 +200,7 @@ def day_record(sheet: Mapping[str, Any], reconciled: Mapping[str, Any],
     picks = list(sheet.get("picks") or [])
     pick_results = reconciled.get("picks") or {}
     pick_result = [cs.result_for(pk.get("price"), pick_results.get(cs.pick_result_key(pk))) for pk in picks]
-    secs = cs.pin_posted(cs.sections(rows), row_ids, cs.posted_entries(posted, "rows"))
+    secs = cs.pin_posted(cs.sections(rows, rules=cs.sheet_rules(sheet)), row_ids, cs.posted_entries(posted, "rows"))
     line_secs = cs.pin_posted(cs.game_line_sections(lines), line_ids, cs.posted_entries(posted, "lines")) if lines else {}
     tallies: dict[str, dict[str, float]] = {}
     # Every featured bet ONCE, keyed the grader's way: a Syndicate pick that is also a value row is one bet.
@@ -329,13 +340,15 @@ def season_record(days: Iterable[Mapping[str, Any]], *, generated_at: str,
         for sport, kinds in sports.items():
             scope["by_sport"].setdefault(sport, {}).update(kinds)
     return {"generated_at": generated_at, "official_start": OFFICIAL_START,
-            "sections": [{"key": k, "label": label} for k, label in FEATURED] + [{"key": ALL, "label": "All featured picks"},
+            "sections": [{"key": k, "label": _label_of(k, label)} for k, label in FEATURED] + [{"key": ALL, "label": "All featured picks"},
                                                                                  {"key": SGP, "label": SGP_LABEL, "paper": True}]
                         + [{"key": key, "label": label, "cross": True} for key, label, _kind in CROSS_KINDS],
             # Every sport, and which sports each category applies to: a scorecard lists every category that applies
             # to its sport, "no bets yet" included, rather than only the ones that happen to have bets.
             "sports": list(cs.SPORT_ORDER),
-            "applies": {**{k: sorted(s for s in cs.SPORT_ORDER if applies(k, s)) for k, _ in FEATURED + ((SGP, ""),)},
+            # A RETIRED section applies to no sport: its scorecard row shows where it has a record, never "no bets yet".
+            "applies": {**{k: sorted(s for s in cs.SPORT_ORDER if applies(k, s) and k not in cs.RETIRED_SECTIONS)
+                           for k, _ in FEATURED + ((SGP, ""),)},
                         **{key: list(cs.SPORT_ORDER) for key, _label, _kind in CROSS_KINDS}},   # one-sport tickets: each sport
             "official": official,
             "beta": beta,
