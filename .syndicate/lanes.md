@@ -922,6 +922,14 @@ death, never life — do not invert it.
 - Verification: Replay rows for both arms on the fleet checkout at nice 19, PYTHONHASHSEED=0, production's 200 sims; report.txt per arm and per window (10-01..11-10 = the 11-11 population, and 10-01..11-13); the lead-state table on vs off; findings file; todo #773 bullet; lane closed with the verdict
 - Blocked by: none
 
+### live-rail-fast-poll — OPEN — opened 2026-11-14 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: The games rail refreshes its live lines every ~15 s instead of with the 60 s whole-board poll: a light read-only endpoint serves today's live game-line rows from the in-play overlay, built through the same card path as the board and trimmed to the rail's fields; the page polls it under the same idle / hidden pauses and swaps rows in by the server merge's identity, keeping the strip's scroll; tests incl. off != on; payload and handler time measured on the fleet; on main; load (reload-web) is the user's decision (todo #803)
+- Files: syndicate/features/shared/live_rail_rows.py (NEW), syndicate/blueprints/intelligence.py (a new /api/board/live-rail route ONLY), syndicate/templates/intelligence.html (the LIVE RAIL LINES block + renderGameCards' liveRowsByGame lines + a new fast-poll start beside the SyndicatePolling init ONLY), tests/test_live_rail_rows.py (NEW), tests/js/games_rail_live_lines.test.mjs, docs/ai_context/todo.md (#803 section ONLY)
+- Hypothesis: After the live-first round (8553a38cc) a live price reaches the board every ~90 s, and the page's 60 s whole-board poll adds ~30 s on average (up to 60 s) before the rail shows it; a 15 s rail-only poll of the same rows cuts that to ~7 s average at a small payload
+- Falsification test: The endpoint's rows differ from the full board's live game rows of the same identity in any field the rail reads, or the handler costs more than ~0.3 s or the payload more than ~200 KB compressed at a busy slate, or the rail strip loses its scroll on a fast refresh
+- Verification: Unit: endpoint rows == the board path's rows for the same overlay (fields the rail reads), off switch returns enabled false and the page stops polling; JS: identity merge replaces only identities the board shows, keeps the rest, keeps scroll. Fleet replay (read-only): endpoint vs served board rows field-by-field, payload size, handler time. After the user's reload-web: the rail's rows refresh between full polls (network log), no errors
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
