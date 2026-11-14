@@ -840,6 +840,14 @@ death, never life — do not invert it.
 - Verification: C:/tmp/score_effect_load/step3l_compare.py scores receipts_3l and arms_3l.json against N1/N2/C/K/S; the result and the decision go to findings PHASE 2 STEP 3l and todo #784; only if all hold: the default flip with tests (off != on through main()) and receipts copied deliberately into the live dir.
 - Blocked by: none (the RUN waits for >= 510 replayable games after 11-12, ~11-22..24)
 
+### ncaaf-evening-kickoff-projection — OPEN — opened 2026-11-14 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: NCAAF games kicking off at or after 00:00Z carry their SmartSim2 projection on their own Central date's board (full game and segments): the game and segment joins scope by the row's Central kickoff date, the index counts games by Central date, and no row attached today loses its projection; fix on main with tests incl. off != on; fleet load is the user's decision
+- Files: syndicate/features/ncaaf/game_projections.py, syndicate/features/ncaaf/segment_projections.py, syndicate/features/shared/board_enrichment.py (the NCAAF game-projection index gate in attach_projections only), tests/test_ncaaf_game_projections.py, tests/test_ncaaf_segment_projections.py, .syndicate/findings_2026-11-14_ncaaf_evening_kickoff_projection.md, docs/ai_context/todo.md (#801 section only)
+- Hypothesis: the UTC commence_time[:10] != selected_date filter (game_projections.py:701-704, segment_projections.py:435-437) plus the UTC-keyed index.games gate drop every 00:00Z+ kickoff from its Central date's board
+- Falsification test: a 00:05Z kickoff row on its Central-date board still carries no projection after the fix, or the served board after load still shows 0 projected rows for 6 PM CST+ kickoffs
+- Verification: tests: off != on for a 00:05Z kickoff, 7-day gap still a miss, a row counted on one date only, carryover rows keep their projection; after a fleet load, the served ncaaf book grid shows projected rows for 6 PM CST+ kickoffs
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

@@ -398,9 +398,18 @@ def load_ncaaf_game_projections(selected_date: str) -> NcaafGameProjectionIndex:
     # and (home, away) -> its OWN schedule date for every game in that window.
     # Keyed on the schedule's date rather than this one so `lookup` can prefer
     # an exact-date match and only then fall back to a neighbour.
+    from syndicate.features.ncaaf.sources import ncaaf_game_calendar_date
+
     window = set(_date_window(date_key))
     weeks: set[int] = set()
     kickoff: dict[tuple[str, str], str] = {}
+    # (pair) -> the CENTRAL day the game is played on, which is the day whose
+    # board owns it (`row_date_scope`). The index stays keyed on CFBD's own UTC
+    # date, because `lookup` matches it against the row's UTC commence date; only
+    # the per-date COUNTS below are read through this. `todo #801`: they were
+    # read off the UTC key, so a weeknight whose every game kicks off at 7 PM ET
+    # (00:00Z, the next UTC day) counted 0 games on its own date.
+    central_by_pair: dict[frozenset[str], str] = {}
     # Every scheduled pair in the season, either orientation. A CSV row whose
     # pair is scheduled OUTSIDE this window is another date's game; one whose
     # pair is not scheduled at all is a game this copy of the schedule predates.
@@ -420,12 +429,21 @@ def load_ncaaf_game_projections(selected_date: str) -> NcaafGameProjectionIndex:
             weeks.add(week)
         if home and away:
             kickoff[(_norm(home), _norm(away))] = game_date
+            played_on = ncaaf_game_calendar_date(game)
+            central_by_pair[frozenset((_norm(home), _norm(away)))] = (
+                played_on.isoformat() if played_on is not None else game_date
+            )
             reason = _unratable_reason(game)
             if reason:
                 index.unratable[(game_date, _norm(home), _norm(away))] = reason
+
+    def _played_on(key: tuple[str, str, str]) -> str:
+        return central_by_pair.get(frozenset(key[1:]), key[0])
+
     # A RATE, so it stays scoped to THIS date: the window's neighbours are here
-    # only so a moved kickoff can still be explained.
-    index.unratable_games = sum(1 for key in index.unratable if key[0] == date_key)
+    # only so a moved kickoff can still be explained. THIS date is the CENTRAL
+    # day the game is played on, the same day `row_date_scope` counts its rows on.
+    index.unratable_games = sum(1 for key in index.unratable if _played_on(key) == date_key)
     if not weeks:
         return index
 
@@ -475,9 +493,10 @@ def load_ncaaf_game_projections(selected_date: str) -> NcaafGameProjectionIndex:
             # else: scheduled on another date outside the window. Not an error --
             # a week spans many days.
     # Scoped to THIS date, as before, so `games_indexed` beside
-    # `games_unratable_opponent` still reads as a per-date rate. Undated entries
-    # count because they may be on this date and nothing says otherwise.
-    index.games = sum(1 for key in index.by_date_teams if key[0] == date_key) + len(index.undated)
+    # `games_unratable_opponent` still reads as a per-date rate -- by the Central
+    # day the game is played on (see `central_by_pair`). Undated entries count
+    # because they may be on this date and nothing says otherwise.
+    index.games = sum(1 for key in index.by_date_teams if _played_on(key) == date_key) + len(index.undated)
     return index
 
 
@@ -652,6 +671,61 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any], no
         projection["edge_unavailable_reason"] = "no no-vig fair: the market is not quoted on both sides"
 
 
+# ---------------------------------------------------------------------------
+# WHICH BOARD DATE A ROW BELONGS TO. `[2026-11-14, todo #801]`
+#
+# A board date is a CENTRAL calendar day: the quote shards are filed by Central
+# kickoff day (`odds_book_quotes.kickoff_shard_date`), `layer2_shortlist` loops
+# Central days, and `prop_projections._row_date` already scopes the props join
+# this way. The game and segment joins compared the row's UTC `commence_time[:10]`
+# instead, and a kickoff at or after 00:00Z is the NEXT UTC day.
+#
+# Measured on the fleet 2026-11-14: every weeknight 11-03..11-13 priced 0% of
+# its live NCAAF lines (since 11-01, 7 PM ET is 00:00Z), Saturdays lost every
+# game first seen at 00:14Z or later, and the served 11-14 board carried a
+# projection on 262 of 262 rows kicking off before 6 PM CST and on 0 of 112 after.
+# The book grid for a date is built from that date's Central shard, so those
+# rows were on the board, and a pass whose date their UTC prefix matched never ran.
+#
+# THE UTC MATCH IS KEPT, AS ATTACH-ONLY. Before this, a row was joined on the
+# pass for its UTC date. A late Saturday game still live past midnight Central
+# depends on that, because the Sunday pass is the only pass it gets:
+# `layer2_shortlist._row_kickoff_dates` adds no date BEFORE the slate. Dropping
+# the UTC match would fix one evening and break the carryover after midnight.
+# So such a row is joined on both passes (the value is the same; `lookup` keys on
+# the row's own date, not the pass's) and COUNTED only on its Central day, which
+# keeps the 2026-09-03 rule that the window's summed counters see each row once.
+# ---------------------------------------------------------------------------
+ROW_SCOPE_OWN = "own"
+ROW_SCOPE_CARRY = "carry"
+
+
+def row_date_scope(row: Mapping[str, Any], selected_date: str | None) -> str | None:
+    """How `row` stands on the `selected_date` pass: OWN, CARRY or None.
+
+    - `ROW_SCOPE_OWN`: its Central kickoff day is `selected_date` (or there is no
+      date to scope by: no `selected_date`, or no `commence_time`). Joined and
+      counted.
+    - `ROW_SCOPE_CARRY`: only its UTC commence date is `selected_date`, so it is
+      the previous Central evening's game. Joined, NOT counted.
+    - None: another date's row. Neither.
+    """
+    if not selected_date:
+        return ROW_SCOPE_OWN
+    target = str(selected_date)[:10]
+    utc_date = str(row.get("commence_time") or "")[:10]
+    if not utc_date:
+        return ROW_SCOPE_OWN
+    from syndicate.features.shared.timezone import central_date_from_iso
+
+    played_on = central_date_from_iso(row.get("commence_time"))
+    if (played_on.isoformat() if played_on is not None else utc_date) == target:
+        return ROW_SCOPE_OWN
+    if utc_date == target:
+        return ROW_SCOPE_CARRY
+    return None
+
+
 def attach_ncaaf_game_projections(
     grid: Iterable[Mapping[str, Any]],
     index: NcaafGameProjectionIndex,
@@ -681,8 +755,12 @@ def attach_ncaaf_game_projections(
     model's documented FBS-vs-FBS boundary. That 9.3% was reported up the chain
     as a production outage and it was a counting artefact.
 
-    ATTACHMENT IS UNCHANGED by this: a skipped row would have failed
-    `index.lookup` on that date anyway. Only the counters move.
+    "ATTACHMENT IS UNCHANGED by this: a skipped row would have failed
+    `index.lookup` on that date anyway" WAS FALSE, and that sentence is how
+    `todo #801` went unseen for ten weeks. The scoping compared the row's UTC
+    date, so every kickoff at or after 00:00Z was skipped on its own Central
+    date's board, while the index held its game. The pass is now scoped by
+    `row_date_scope`, which is the Central day (see the block above it).
     """
     from syndicate.features.shared.prop_projections import _no_vig_over_probability
 
@@ -697,15 +775,16 @@ def attach_ncaaf_game_projections(
             continue
         # BEFORE `considered`, deliberately: a row belonging to another date is
         # not a miss on THIS date, and counting it as one is what made a healthy
-        # join read as a near-total failure.
-        if selected_date:
-            row_date = str(row.get("commence_time") or "")[:10]
-            if row_date and row_date != str(selected_date)[:10]:
-                continue
-        considered += 1
+        # join read as a near-total failure. A CARRY row is joined and not
+        # counted: its own Central date's pass counts it.
+        scope = row_date_scope(row, selected_date)
+        if scope is None:
+            continue
+        counted = scope == ROW_SCOPE_OWN
+        considered += int(counted)
         if str(row.get("segment") or "full").strip().lower() not in {"", "full"}:
             # margin/total means are full-game; a quarter market is a different bet.
-            non_full_segment += 1
+            non_full_segment += int(counted)
             continue
         entry = index.lookup(str(row.get("commence_time") or "")[:10], row.get("home_team"), row.get("away_team"))
         if entry is None:
@@ -727,16 +806,16 @@ def attach_ncaaf_game_projections(
             )
             if reason:
                 row["projection_absent_reason"] = reason  # type: ignore[index]
-                unratable_rows += 1
+                unratable_rows += int(counted)
             else:
-                unmatched += 1
+                unmatched += int(counted)
             continue
 
         projection = _game_projection(row, market, entry)
         if projection is not None:
             _price_against_market(row, projection, _no_vig_over_probability)
             row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
-            attached += 1
+            attached += int(counted)
 
     return {
         "supported": True,

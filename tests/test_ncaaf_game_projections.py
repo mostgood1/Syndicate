@@ -514,10 +514,138 @@ def test_without_selected_date_the_old_behaviour_is_UNCHANGED() -> None:
 
 
 def test_scoping_moves_the_COUNTERS_and_not_the_ATTACHMENT() -> None:
-    """A skipped row would have failed `index.lookup` on this date anyway, so no
-    row gains or loses a projection because of this change."""
+    """A row a WEEK away would have failed `index.lookup` on this date anyway, so
+    scoping does not change whether it gains a projection. That held for this
+    shape and not in general: an evening kickoff WAS joinable and was skipped
+    (`todo #801`, the tests below)."""
     unscoped = _grid() + _grid_on("2026-09-05")
     scoped = _grid() + _grid_on("2026-09-05")
     gp.attach_ncaaf_game_projections(unscoped, _index())
     gp.attach_ncaaf_game_projections(scoped, _index(), selected_date="2026-08-29")
     assert [("projection" in r) for r in unscoped] == [("projection" in r) for r in scoped]
+
+
+# --------------------------------------------------------------------------
+# `todo #801` -- an evening kickoff belongs to its CENTRAL date's board
+# --------------------------------------------------------------------------
+#
+# A kickoff at or after 00:00Z is the next UTC day. The join compared the row's
+# UTC date with the board's Central date and skipped it, while the index held
+# its game: measured on the fleet 2026-11-14, 262 of 262 rows kicking off before
+# 6 PM CST carried a projection and 0 of 112 after. CFBD dates its games in UTC,
+# so the index is keyed 08-30 for a game the board files under 08-29.
+
+_EVENING = "2026-08-30T00:05:00Z"  # 7:05 PM CDT on Saturday 08-29
+
+
+def _index_keyed(date_key: str):
+    idx = _index()
+    idx.by_date_teams = {(date_key, home, away): entry for (_, home, away), entry in idx.by_date_teams.items()}
+    return idx
+
+
+def _evening_grid(commence: str = _EVENING):
+    return [{**row, "commence_time": commence} for row in _grid()]
+
+
+def test_an_evening_kickoff_joins_on_its_CENTRAL_date_board() -> None:
+    """Off != on. The row's UTC prefix is NOT the board's date -- the exact
+    predicate the old filter skipped on -- and it still joins and counts."""
+    grid = _evening_grid()
+    assert all(str(r["commence_time"])[:10] != "2026-08-29" for r in grid), "this is the #801 row shape"
+
+    coverage = gp.attach_ncaaf_game_projections(grid, _index_keyed("2026-08-30"), selected_date="2026-08-29")
+
+    assert coverage["rows_considered"] == 3
+    assert coverage["rows_with_projection"] == 3
+    assert all("projection" in r for r in grid)
+    # Matched on CFBD's own UTC date, so it is an exact match, not a shifted one
+    # (the projection carries the flag only when it is true).
+    assert not any(r["projection"].get("kickoff_date_shifted") for r in grid)
+
+
+def test_an_evening_row_is_COUNTED_on_one_date_only() -> None:
+    """The 2026-09-03 rule still holds: `_attach_projections_over_window` sums
+    the per-date counters, so a row may count on one pass only -- its Central
+    day -- even though the next day's pass also joins it."""
+    own, carry = _evening_grid(), _evening_grid()
+    on_own = gp.attach_ncaaf_game_projections(own, _index_keyed("2026-08-30"), selected_date="2026-08-29")
+    on_next = gp.attach_ncaaf_game_projections(carry, _index_keyed("2026-08-30"), selected_date="2026-08-30")
+
+    assert on_own["rows_considered"] + on_next["rows_considered"] == 3
+    assert on_own["rows_with_projection"] + on_next["rows_with_projection"] == 3
+    assert on_next["rows_unmatched"] == 0
+    assert [r["projection"] for r in own] == [r["projection"] for r in carry], "both passes write the same value"
+
+
+def test_a_late_game_live_past_midnight_KEEPS_its_projection_on_the_next_pass() -> None:
+    """The carryover the UTC match used to provide, and still must. A 10:30 PM
+    CDT kickoff is live after midnight, and `layer2_shortlist._row_kickoff_dates`
+    adds no date before the slate, so the next day's pass is the only one it gets
+    once the board rolls. Dropping the UTC match would have traded one window
+    for the other."""
+    grid = _evening_grid("2026-08-30T03:30:00Z")
+    coverage = gp.attach_ncaaf_game_projections(grid, _index_keyed("2026-08-30"), selected_date="2026-08-30")
+    assert all("projection" in r for r in grid)
+    assert coverage["rows_considered"] == 0, "counted on 08-29, its Central day"
+
+
+def test_a_row_neither_date_names_is_still_out_of_scope() -> None:
+    """Central 08-31 and UTC 08-31: not this board's row on 08-29 either way."""
+    grid = _evening_grid("2026-08-31T16:00:00Z")
+    coverage = gp.attach_ncaaf_game_projections(grid, _index_keyed("2026-08-31"), selected_date="2026-08-29")
+    assert coverage["rows_considered"] == 0
+    assert not any("projection" in r for r in grid)
+
+
+def test_the_index_counts_an_evening_game_on_its_CENTRAL_date(monkeypatch, tmp_path):
+    """`games_indexed` and `games_unratable_opponent` were read off the UTC key,
+    so a weeknight whose every game kicks off at 7 PM ET counted 0 games on its
+    own date -- and `board_enrichment` then skipped the join outright."""
+    schedule = [
+        _game("TCU", "Baylor", "2026-09-20T00:05:00.000Z"),  # 7:05 PM CDT 09-19
+        _game("Oregon", "Portland State", "2026-09-20T01:00:00.000Z", away_class="fcs"),
+    ]
+    _fake_schedule_and_csv(monkeypatch, tmp_path, schedule, [("TCU", "Baylor", 7.0, 0.7)])
+
+    saturday = gp.load_ncaaf_game_projections("2026-09-19")
+    assert saturday.games == 1
+    assert saturday.unratable_games == 1
+    entry = saturday.lookup("2026-09-20", "TCU Horned Frogs", "Baylor Bears")
+    assert entry is not None and entry["kickoff_date_shifted"] is False
+
+    sunday = gp.load_ncaaf_game_projections("2026-09-20")
+    assert sunday.games == 0 and sunday.unratable_games == 0, "counted on Saturday only"
+    assert sunday.by_date_teams, "but still held, for the carryover pass"
+
+
+def test_board_enrichment_joins_an_evening_kickoff_end_to_end(monkeypatch, tmp_path):
+    """Reachability through the real loader and the real gate, the path the
+    served board takes (`_attach_projections_by_sport` -> load -> attach)."""
+    from syndicate.features.shared import board_enrichment
+
+    _fake_schedule_and_csv(
+        monkeypatch, tmp_path, [_game("TCU", "Baylor", "2026-09-20T00:05:00.000Z")], [("TCU", "Baylor", 7.0, 0.7)]
+    )
+    grid = [
+        {**row, "commence_time": "2026-09-20T00:05:00Z", "away_team": "Baylor Bears"}
+        for row in _grid()
+    ]
+    board_enrichment._attach_projections_by_sport(grid, sport="ncaaf", selected_date="2026-09-19")
+    assert all(isinstance(r.get("projection"), dict) for r in grid)
+
+
+def test_the_gate_still_joins_a_date_with_no_games_of_its_own(monkeypatch):
+    """A Sunday: no game is played on it, yet Saturday's late game is still live.
+    The gate used to read `index.games`, which was the UTC count and so included
+    that game; it now asks whether the index holds anything at all."""
+    from syndicate.features.ncaaf import game_projections as module
+    from syndicate.features.shared import board_enrichment
+
+    idx = _index_keyed("2026-08-30")
+    idx.games = 0
+    monkeypatch.setattr(module, "load_ncaaf_game_projections", lambda _date: idx)
+    grid = _evening_grid("2026-08-30T03:30:00Z")
+    coverage = board_enrichment._attach_projections_by_sport(grid, sport="ncaaf", selected_date="2026-08-30")
+    assert all(isinstance(r.get("projection"), dict) for r in grid)
+    assert coverage is not None

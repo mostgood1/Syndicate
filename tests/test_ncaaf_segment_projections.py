@@ -39,7 +39,10 @@ if str(REPO_ROOT) not in sys.path:
 
 from syndicate.features.ncaaf import segment_projections as sp  # noqa: E402
 
-FUTURE = "2099-01-01T00:00:00Z"
+# NOON CST, not 00:00Z. 00:00Z is 6 PM CST on the PREVIOUS Central day, so the
+# fixture was itself an evening kickoff, and it read as "on 2099-01-01" only
+# because the join compared UTC dates -- the defect `todo #801` fixed.
+FUTURE = "2099-01-01T18:00:00Z"
 
 
 def _block(**segs) -> dict:
@@ -238,6 +241,33 @@ def test_rows_from_another_date_are_not_counted(monkeypatch):
         [row], blocks={"gid1": _block(q1=_seg())}, game_id_by_pair=_ids(), selected_date="2099-01-01"
     )
     assert cov["segment_rows_considered"] == 0
+
+
+def test_an_evening_segment_row_joins_on_its_CENTRAL_date(monkeypatch):
+    """Off != on (`todo #801`). 00:05Z is 6:05 PM CST on the 1st. The UTC prefix
+    names the 2nd, and the join used to skip the row on its own board."""
+    monkeypatch.setattr("syndicate.features.ncaaf.oddsapi_lines.resolve_team", lambda n: n)
+    row = dict(_row("totals", line=10.0), commence_time="2099-01-02T00:05:00Z")
+    cov = sp.attach_ncaaf_segment_projections(
+        [row], blocks={"gid1": _block(q1=_seg())}, game_id_by_pair=_ids(), selected_date="2099-01-01"
+    )
+    assert cov["segment_rows_considered"] == 1
+    assert cov["segment_rows_with_projection"] == 1
+    assert row.get("projection")
+
+
+def test_a_carryover_segment_row_is_joined_and_NOT_counted(monkeypatch):
+    """The next day's pass still joins it (a game live past midnight has no
+    other pass once the board rolls), and counts it on its own Central day only."""
+    monkeypatch.setattr("syndicate.features.ncaaf.oddsapi_lines.resolve_team", lambda n: n)
+    row = dict(_row("totals", line=10.0), commence_time="2099-01-02T03:30:00Z")
+    cov = sp.attach_ncaaf_segment_projections(
+        [row], blocks={"gid1": _block(q1=_seg())}, game_id_by_pair=_ids(), selected_date="2099-01-02"
+    )
+    assert row.get("projection")
+    assert cov["segment_rows_considered"] == 0
+    assert cov["segment_rows_with_projection"] == 0
+    assert cov["segment_rows_with_probability"] == 0
 
 
 def test_absent_inputs_return_empty_rather_than_raising(monkeypatch):

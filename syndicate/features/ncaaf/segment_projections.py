@@ -415,7 +415,7 @@ def attach_ncaaf_segment_projections(
     already refuses at full game, not a join defect. They are counted as
     `segment_rows_unmatched_game` rather than dropped.
     """
-    from syndicate.features.ncaaf.game_projections import _norm
+    from syndicate.features.ncaaf.game_projections import ROW_SCOPE_OWN, _norm, row_date_scope
     from syndicate.features.ncaaf.oddsapi_lines import resolve_team
     from syndicate.features.shared.prop_projections import _no_vig_over_probability
 
@@ -432,11 +432,14 @@ def attach_ncaaf_segment_projections(
         segment = str(row.get("segment") or "").strip().lower()
         if market not in MARKETS or segment not in SEGMENTS:
             continue
-        if selected_date:
-            row_date = str(row.get("commence_time") or "")[:10]
-            if row_date and row_date != str(selected_date)[:10]:
-                continue
-        considered += 1
+        # THE CENTRAL DAY, by the full-game join's own rule (`row_date_scope`,
+        # `todo #801`): the UTC prefix skipped every 00:00Z+ kickoff on its own
+        # board. A CARRY row is joined and not counted.
+        scope = row_date_scope(row, selected_date)
+        if scope is None:
+            continue
+        counted = scope == ROW_SCOPE_OWN
+        considered += int(counted)
         # THE SAME RESOLVER THE FULL-GAME JOIN USES, not a second one.
         # `resolve_team` canonicalises the BOARD's OddsAPI name against the
         # team registry; the map is keyed on `_norm` of the CSV's own name.
@@ -445,20 +448,22 @@ def attach_ncaaf_segment_projections(
         key = (_norm(resolve_team(row.get("home_team"))), _norm(resolve_team(row.get("away_team"))))
         game_id = game_id_by_pair.get(key)
         if game_id is None:
-            unmatched_game += 1
+            unmatched_game += int(counted)
             continue
         block = blocks.get(str(game_id))
         if not isinstance(block, Mapping):
-            no_segment_block += 1
+            no_segment_block += int(counted)
             continue
         projection = segment_projection(
             row, market=market, segment=segment, block=block, sims=block.get("sims")
         )
         if projection is None:
-            no_segment_block += 1
+            no_segment_block += int(counted)
             continue
         _price_against_market(row, projection, _no_vig_over_probability)
         row["projection"] = refuse_published_certainty(projection)  # type: ignore[index]
+        if not counted:
+            continue
         attached += 1
         if projection.get("model_prob_over") is not None:
             priced += 1

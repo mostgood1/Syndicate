@@ -2027,7 +2027,13 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
             )
 
             index = load_ncaaf_game_projections(selected_date)
-            if not index.games:
+            # THE GATE ASKS WHETHER THERE IS ANYTHING TO JOIN, not whether this
+            # date has games of its own (`todo #801`). `index.games` counts games
+            # played on this Central date; a Sunday has none, yet Saturday's late
+            # games still live past midnight are joined on the Sunday pass
+            # (`game_projections.ROW_SCOPE_CARRY`), as they were before the
+            # count moved off the UTC date.
+            if not (index.by_date_teams or index.undated):
                 game_coverage = {
                     "supported": True,
                     "rows_with_projection": 0,
@@ -2035,6 +2041,8 @@ def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) 
                 }
             else:
                 game_coverage = attach_ncaaf_game_projections(grid, index, selected_date=selected_date)
+                if not index.games:
+                    game_coverage.setdefault("reason", "no NCAAF SmartSim2 projections for this date")
         except Exception:
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=ncaaf date=%s", selected_date)
             game_coverage = {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
