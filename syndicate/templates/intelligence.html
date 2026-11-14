@@ -36,6 +36,8 @@
         <input id="board-date" type="date" class="board-date-input" aria-label="Pick a date" value="{{ initial_intelligence_selected_date | default('', true) }}" />
         <button type="submit" class="cards-submit-button">Refresh</button>
       </div>
+      {# Wider than a phone (board_cards.css): folds the filter grid below so the rail can lead (todo #806). #}
+      <button type="button" class="cards-nav-pill board-filter-fold" id="board-filter-fold" aria-controls="board-filter-grid" aria-expanded="true">Hide filters</button>
       {# Phone only (board_cards.css): the filters below become a bottom sheet. #}
       <button type="button" class="board-filter-sheet-open" id="board-filter-sheet-open" aria-controls="board-filter-grid" aria-expanded="false">Filters</button>
     </div>
@@ -675,6 +677,9 @@
     // Kept out of FILTER_DEFAULTS on purpose -- those count and clear BOARD-row filters, and this one narrows
     // only the rail.
     liveEdge: ["any", "spreads", "totals", "h2h"].includes(String(urlParams.get("live_edge") || "")) ? urlParams.get("live_edge") : "all",
+    // Games-rail sport selector (todo #806): a rail-only view, like liveEdge, and out of FILTER_DEFAULTS for the
+    // same reason. The panel's sport row (`sport` above) still narrows the board and the rail together.
+    railSport: String(urlParams.get("rail_sport") || "all").trim().toLowerCase() || "all",
     // Blotter column sort, client-side only (not persisted to the URL --
     // this is a viewing preference for the current session, not a
     // shareable board configuration like sport/date/filters are). null
@@ -855,6 +860,7 @@
     if (state.altLines !== "main") url.searchParams.set("alt_lines", state.altLines); else url.searchParams.delete("alt_lines");
     if (state.betType !== "all") url.searchParams.set("bet_type", state.betType); else url.searchParams.delete("bet_type");
     if (state.liveEdge !== "all") url.searchParams.set("live_edge", state.liveEdge); else url.searchParams.delete("live_edge");
+    if (state.railSport !== "all") url.searchParams.set("rail_sport", state.railSport); else url.searchParams.delete("rail_sport");
     window.history.replaceState({}, "", url.toString());
   }
 
@@ -1094,6 +1100,41 @@
     const scrim = document.getElementById("board-sheet-scrim");
     if (scrim && open) scrim.hidden = false;
     if (scrim && !open) syncSheetScrim();
+  }
+
+  // THE FILTER GRID FOLDS (todo #806; user 2026-11-14, relayed by session 8062940b: "The top section needs an
+  // accordian option so we can shrink it so the rail can be the main thing seen if the user chooses"). The
+  // toolbar's first row (sport, day, refresh) stays; everything in `#board-filter-grid` folds away behind one
+  // toggle, and the results bar below still lists every active filter as a removable chip. Remembered per
+  // viewer in this browser only -- a convenience, so a blocked or empty storage just starts unfolded. Wider
+  // than a phone only (board_cards.css): on a phone the grid is already a bottom sheet behind "Filters".
+  const FILTER_FOLD_STORAGE_KEY = "syndicate.board.filtersFolded";
+
+  function setupFilterFold() {
+    const form = document.getElementById("board-toolbar");
+    const button = document.getElementById("board-filter-fold");
+    if (!form || !button) return;
+    const apply = (folded) => {
+      form.classList.toggle("board-toolbar--folded", folded);
+      button.setAttribute("aria-expanded", String(!folded));
+      button.textContent = folded ? "Show filters" : "Hide filters";
+    };
+    let folded = false;
+    try {
+      folded = window.localStorage.getItem(FILTER_FOLD_STORAGE_KEY) === "1";
+    } catch (error) {
+      folded = false;
+    }
+    apply(folded);
+    button.addEventListener("click", () => {
+      folded = !form.classList.contains("board-toolbar--folded");
+      apply(folded);
+      try {
+        window.localStorage.setItem(FILTER_FOLD_STORAGE_KEY, folded ? "1" : "0");
+      } catch (error) {
+        // Per-viewer convenience only: the fold still works for this page view.
+      }
+    });
   }
 
   function setupFilterSheet() {
@@ -3590,6 +3631,39 @@
     return out;
   }
 
+  // RAIL SPORT SELECTOR (todo #806; user 2026-11-14, relayed by session 8062940b: "The rail needs a sport
+  // selector"). A VIEW over the rail, like the live-edge filter: it narrows the rail only -- never the board's
+  // rows -- and is kept out of FILTER_DEFAULTS. The panel's own sport row still narrows both. The options are the
+  // sports the rail's games carry, in the panel's sport order, each counted under the rail's other filter; the
+  // row shows when the rail spans two or more sports, or while one is picked (so it can always be cleared).
+  const RAIL_SPORT_ORDER = ["mlb", "nba", "wnba", "nfl", "ncaaf", "ncaab", "wncaab", "nhl", "soccer"];
+
+  function railSportOf(game) {
+    return String((game && (game.sportSlug || game.sport)) || "").trim().toLowerCase();
+  }
+
+  function railSportLabel(slug) {
+    return slug === "soccer" ? "Soccer" : String(slug || "").toUpperCase();
+  }
+
+  function railSportMatches(game, railSport) {
+    return !railSport || railSport === "all" || railSportOf(game) === railSport;
+  }
+
+  function railSportOptions(games, railSport) {
+    const counts = new Map();
+    for (const game of games || []) {
+      const sport = railSportOf(game);
+      if (sport) counts.set(sport, (counts.get(sport) || 0) + 1);
+    }
+    const rank = (sport) => { const i = RAIL_SPORT_ORDER.indexOf(sport); return i < 0 ? RAIL_SPORT_ORDER.length : i; };
+    const sports = [...counts.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+    // A picked sport with no game left on the rail stays listed, so it can be cleared.
+    if (railSport && railSport !== "all" && !counts.has(railSport)) sports.push(railSport);
+    return [{ value: "all", label: "All", count: (games || []).length },
+      ...sports.map((sport) => ({ value: sport, label: railSportLabel(sport), count: counts.get(sport) || 0 }))];
+  }
+
   function liveEdgeFilterMatches(summary, filter) {
     if (!filter || filter === "all") return true;
     if (!summary) return false;
@@ -4399,14 +4473,26 @@
     }
     liveRailHasLive = liveSummaries.size > 0;
     const liveFilter = state.liveEdge || "all";
+    const railSport = state.railSport || "all";
+    const edgeMatch = (game) => liveEdgeFilterMatches(liveSummaries.get(game.key), liveFilter);
     // The selected game always stays on the rail: hiding the card a reader just
     // picked would strand the board's one-game filter with nothing to un-click.
-    const shownGames = games.filter((game) => game.key === state.game || liveEdgeFilterMatches(liveSummaries.get(game.key), liveFilter));
+    const shownGames = games.filter((game) => game.key === state.game || (railSportMatches(game, railSport) && edgeMatch(game)));
+    // Each rail filter's counts are taken under the OTHER one (todo #806).
+    const sportGames = games.filter((game) => railSportMatches(game, railSport));
     const edgeCounts = {};
     for (const tab of LIVE_EDGE_FILTER_TABS) {
-      edgeCounts[tab.value] = tab.value === "all" ? games.length
-        : games.filter((game) => liveEdgeFilterMatches(liveSummaries.get(game.key), tab.value)).length;
+      edgeCounts[tab.value] = tab.value === "all" ? sportGames.length
+        : sportGames.filter((game) => liveEdgeFilterMatches(liveSummaries.get(game.key), tab.value)).length;
     }
+    const railSports = new Set(games.map(railSportOf).filter(Boolean));
+    const sportFilter = railSports.size >= 2 || railSport !== "all"
+      ? `<div class="game-rail-filter game-rail-filter--sport" role="tablist" aria-label="Rail sport">${railSportOptions(games.filter(edgeMatch), railSport).map((option) => {
+        const active = option.value === railSport;
+        const empty = option.count === 0 && !active;
+        return `<button type="button" role="tab" class="game-rail-filter__tab${active ? " is-active" : ""}${empty ? " is-empty" : ""}" aria-selected="${active}" data-rail-sport="${escapeHtml(option.value)}">${escapeHtml(option.label)}<span class="board-tab-count">${option.count}</span></button>`;
+      }).join("")}</div>`
+      : "";
     // Shown whenever a live game is on the rail (or the filter is on, so it can
     // always be turned off again).
     const edgeFilter = liveSummaries.size || liveFilter !== "all"
@@ -4417,11 +4503,13 @@
       }).join("")}</div>`
       : "";
     const emptyNote = !shownGames.length
-      ? `<div class="game-rail-filter__empty">No live game has our model off a fresh ${liveFilter === "any" ? "" : `${escapeHtml(((LIVE_RAIL_MARKETS.find((m) => m.key === liveFilter) || {}).label || "").toLowerCase())} `}line (a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less when priced) right now.</div>`
+      ? (!sportGames.length
+        ? `<div class="game-rail-filter__empty">No ${escapeHtml(railSportLabel(railSport))} game on the rail right now.</div>`
+        : `<div class="game-rail-filter__empty">No live game has our model off a fresh ${liveFilter === "any" ? "" : `${escapeHtml(((LIVE_RAIL_MARKETS.find((m) => m.key === liveFilter) || {}).label || "").toLowerCase())} `}line (a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less when priced) right now.</div>`)
       : "";
     container.innerHTML = `
       <h2 class="board-section-title">Games${renderChipFreshness()}</h2>
-      ${edgeFilter}${emptyNote}
+      ${sportFilter}${edgeFilter}${emptyNote}
       <div class="game-card-strip">
         ${shownGames.map((game) => {
           const isSelected = state.game === game.key;
@@ -4488,7 +4576,14 @@
         renderBoardBody();
       });
     });
-    // A rail-only view: re-renders the rail and leaves the board's rows alone.
+    // Rail-only views: re-render the rail and leave the board's rows alone.
+    container.querySelectorAll("[data-rail-sport]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.railSport = String(button.getAttribute("data-rail-sport") || "all").trim().toLowerCase() || "all";
+        syncUrlState();
+        renderGameCards(items);
+      });
+    });
     container.querySelectorAll("[data-live-edge-filter]").forEach((button) => {
       button.addEventListener("click", () => {
         const value = button.getAttribute("data-live-edge-filter");
@@ -6069,6 +6164,7 @@
   window.SyndicateAskBar.init();
   setupResearchAndSlip();
   setupFilterSheet();
+  setupFilterFold();
   setRefreshStatus("Loading board…", "loading");
 
   void loadSlatePhases();

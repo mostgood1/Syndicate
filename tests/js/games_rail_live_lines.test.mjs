@@ -379,7 +379,8 @@ check('rows are keyed through the #165 merge map', /gameKeyMergeMap\.get\(raw\) 
 check('a live chip card renders the live lines', /\$\{isLive \? renderLiveRailLines\(liveSummary\) : ""\}/.test(r), true);
 check('a chip-less live card renders them too', /\$\{game\.hasLive \? renderLiveRailLines\(liveSummary\) : ""\}/.test(r), true);
 check('the card highlight is the fresh-edge flag', /liveEdge \? " game-mini-card--live-edge" : ""/.test(r), true);
-check('the rail is filtered by the live-edge filter', /games\.filter\(\(game\) => game\.key === state\.game \|\| liveEdgeFilterMatches\(liveSummaries\.get\(game\.key\), liveFilter\)\)/.test(r), true);
+check('the rail is filtered by the live-edge filter (and the rail sport, #806)', /const edgeMatch = \(game\) => liveEdgeFilterMatches\(liveSummaries\.get\(game\.key\), liveFilter\);/.test(r)
+  && /games\.filter\(\(game\) => game\.key === state\.game \|\| \(railSportMatches\(game, railSport\) && edgeMatch\(game\)\)\)/.test(r), true);
 check('the filter tabs are rendered', /data-live-edge-filter=/.test(r), true);
 check('the empty note speaks of a fresh line, not an edge', r.includes('No live game has our model off a fresh ${liveFilter === "any" ? "" :'), true);
 check('the card badge reads MODEL ≠ LINE, never EDGE', /MODEL ≠ LINE<\/span>/.test(r) && !/>▲ EDGE</.test(r), true);

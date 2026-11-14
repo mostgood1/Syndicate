@@ -2412,6 +2412,16 @@ table.board-blotter tbody tr:last-child td {
 .board-toolbar > * { min-width: 0; }
 .board-filter-sheet-open, .board-filter-sheet-head, .board-filter-sheet-done { display: none; }
 
+/* ---- the filter grid folds (todo #806): the toolbar's first row stays, the rail can lead ---- */
+.board-filter-fold { justify-self: start; align-self: center; margin-left: auto; cursor: pointer; }
+@media (min-width: 768px) {
+  .board-toolbar--folded .board-filter-grid { display: none; }
+}
+/* A phone already folds the grid into the bottom sheet behind "Filters". */
+@media (max-width: 767px) {
+  .board-filter-fold { display: none; }
+}
+
 @media (min-width: 1024px) and (max-width: 1279px) {
   /* iPad landscape: 7 columns beside a 260px rail; Move is in the row's tooltip trail. */
   .board-layout--research table.board-blotter { min-width: 0; }
