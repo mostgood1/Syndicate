@@ -955,6 +955,14 @@ death, never life — do not invert it.
 - Verification: JS harness: sport options and counts, rail-only filtering, URL round trip, fold wiring + storage + CSS scoped to >= 768 px; the page rendered in the built-in browser with both controls working (after the user's load, on the fleet page)
 - Blocked by: none
 
+### fast-exit-state-size — OPEN — opened 2026-11-14 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: execution_exits_fast.json stays under the 8 MB keyvalue cap: entries whose position date is older than the slow document's retention floor (lookback + 2 days) move to execution_exits_archive/fast_YYYY-MM.jsonl before the save that omits them. On the fleet after a user-approved live-odds-worker load: 0 KEYVALUE_WRITE_REJECTED for the fast key over an in-play window, FAST_EXIT_PASS summary lines back, the document under ~4 MB, and FAST_EXIT_LIVE_DISPATCH still placing sales.
+- Files: syndicate/features/shared/execution_exits_fast.py (LOAN from in-game-trading approved by the user 2026-11-14 in this session's chat choosing Yes borrow it; owner session 15ceeb14 last dated 11-09; the document retention prune and its call before the save ONLY), tests/test_execution_exits_fast.py (the prune tests only)
+- Hypothesis: the fast document is never pruned (marks / exits / live_dispatch grow per entry forever): the stored copy is 8,388,431 B compact with 10,801 entries back to 10-18, and every save has been refused since 11-14 17:00:32Z (1,163 by 22:55Z); the slow file's lookback + 2 rule takes it to 1,220,006 B in a read-only dry run
+- Falsification test: after the load the fast key is still rejected; or the pruned document passes ~4 MB on a Saturday; or an entry inside the floor loses its marks or first trigger (FAST_EXIT_PAPER re-booked for an entry still in play)
+- Verification: pytest tests/test_execution_exits_fast.py with an off != on prune test (an old entry is archived then dropped, an entry inside the floor is kept, the archive line exists before the save); the built function dry-run read-only on the fleet's stored copy; after the user-approved load, 0 fast-key rejects over 30 min of in-play passes, FAST_EXIT_PASS lines present, FAST_STATE_PRUNED logged, document bytes read back
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
