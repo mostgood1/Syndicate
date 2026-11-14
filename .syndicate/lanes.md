@@ -807,6 +807,14 @@ death, never life — do not invert it.
 - Verdict: MET. owner_liveness.py --idle-min 240 at 14:40Z (8:40 AM CST) gave 1 SAFE; dry run + apply clean, invariants unchanged vs origin/main baseline.
 - Moved: closed-lane-archive-20261114-0240. Table + 7 waited in .syndicate/log/2026-11-14.md.
 
+### nba-grid-per-build-lookups — OPEN — opened 2026-11-14 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: Each NBA book-grid build resolves its three per-row NBA file lookups (season phase + game book blend + prop book blend) once per build instead of once per row, and the grid and in-play overlay files are written with one C-encoded write; identical payloads and byte-identical files; tests incl. off != on; a fleet replay shows the stat-like calls and write time cut; on main; load (refresh-worker) is the user's decision (todo #790 residual: NBA's own overlay went stale at web once at the 11-13 peak, 371 s)
+- Files: syndicate/features/shared/build_lookup_scope.py (NEW), syndicate/features/shared/nba_prop_calibration.py (book_blend_weights + a new _resolve_book_blend helper ONLY), syndicate/features/shared/nba_game_projections.py (season_phase_for_date ONLY), syndicate/features/shared/book_grid_artifact.py (build_book_grid_artifact's lookup scope + write_book_grid_artifact + write_book_grid_inplay_overlay ONLY), tests/test_nba_grid_per_build_lookups.py (NEW), docs/ai_context/todo.md (#790 section ONLY)
+- Hypothesis: Under the busy board-loop thread, NBA grid stages that make GIL-releasing syscalls grow 5-6x vs 2-3x for CPU stages (lane book-grid-overlay-starvation H3); 135,090 of 137,279 stat-like calls per build are these three lookups at about 10 per row, and the grid write is about 3,600 8 KB writes through the pure-Python encoder. Resolving each lookup once per build and writing once cuts the build's syscalls by over 95% with identical output
+- Falsification test: A fleet replay with the fix still makes > 10,000 stat-like calls per NBA build, or any payload field differs from the current code on the same shard (minus clock fields), or the written file is not byte-identical, or attach_projections under the busy thread does not drop by at least a third
+- Verification: Unit: inside the scope each lookup resolves once per key and returns what the unscoped call returns; the off switch resolves every call (off != on); the scope does not leak across threads or past an exception; build_book_grid_artifact opens it; both writers' bytes equal json.dump's. Fleet replay (read-only, nice 19): stat-like calls and per-stage times alone and with a busy thread, old vs new, payload diff. After the user's load: build_seconds.nba while NBA is live and NBA overlay gaps vs the 360 s cutoff
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
