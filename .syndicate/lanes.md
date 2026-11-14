@@ -768,17 +768,6 @@ death, never life — do not invert it.
 - Verification: study script reproduces the findings numbers from the fleet's reconciled sheets; after deploy, the section appears on served NBA sheets and its bets enter record.json; review prints excess-over-fair per section
 - Blocked by: none
 
-### ledger-mangled-path-guard — CLOSED 2026-11-13 (GOAL MET: guard on main `f636b7128` and loaded in the primary checkout 12:08:59 PM CST; a damaged commit refused live) — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
-- Goal: A commit that would record NEW escape damage in a ledger markdown file (.syndicate/**/*.md, docs/ai_context/**/*.md) is refused: a C0/C1 control character, a lone CR, or a TAB inside a C: path that HEAD's blob of the same file does not already carry. A Bash/PowerShell write that introduces the same damage is reported right after the command. Pre-existing damage never blocks. The residual damage outside the 11-13 repair's file set (findings_2026-10-06/10-09, learnings_evidence/index mojibake, todo #797's new path) is repaired in place.
-- Files: .claude/hooks/ledger_bytes.py, .claude/hooks/ledger-commit-guard.py, .claude/hooks/ledger-postwrite-check.py, .claude/hooks/test_ledger_bytes.py
-- Hypothesis: n/a
-- Falsification test: n/a
-- Verification: test_ledger_bytes.py green over throwaway repos (new damage blocked, pre-existing passes, CRLF working copy vs LF blob, override env); the existing ledger hook suites still green; a live trial in this worktree: a damaged staged line is refused by the real hook, then accepted once fixed; a rescan of origin/main finds 0 damaged characters across every ledger markdown file.
-- Blocked by: none
-- STATUS 2026-11-13 10:05 AM CST (16:05Z): BUILT AND VERIFIED, NOT PUSHED. The guard is commit `57bed6228` (local). Tests 42/42, the 6 existing ledger suites green, live trial refused + override + warn-once. The rest of the damage was repaired (66 edits, 7 files; rescan of 597 files = 0). Owed: the user's OK to push, then a primary-tree fast-forward. Hooks load from the primary checkout, 406 commits behind main, so nothing pushed is live until that tree moves (log 2026-11-13 16:05Z).
-- STATUS 2026-11-13 12:00 PM CST (18:00Z): the guard is now local commit `992d64a51` after rebasing (the 10:05 line's `57bed6228` predates it); still NOT PUSHED. The primary tree is now at main (lane primary-tree-ff-1113), and main has no other hook change it lacked. So owed: the user's OK to push, then one more primary-tree ff to load it. Until the push, check_lane_claims flags this lane's `test_ledger_bytes.py` claim as naming no file.
-- **RESULT 2026-11-13 12:09 PM CST (18:09Z): GOAL MET.** The guard is on main as `f636b7128` (user "Push and load it") and is loaded in the primary checkout (ff `5ede12329` -> `f636b7128`). Tests: 42/42, plus the existing suites green. Live: post-write state gained the escape-damage key for 3 trees, a damaged line warned at once, and `git commit` was REFUSED by the live commit guard; the file was restored byte-exact. todo #799. Detail: log 2026-11-13 18:09Z.
-
 ### live-stat-progress-expert — CLOSED 2026-11-13 (GOAL MET: the stat_progress live expert on main `00d55f97a`, verified on the fleet's 11-11 / 11-12 NBA nights, 0 prior / p mismatches, 0 checklist alarms; shadow only) — opened 2026-11-13 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **GOAL VERDICT `[2026-11-13 17:49Z]`: GOAL: MET -- on main `00d55f97a` (user "Yes, push it"; rebased on `2027ac336`, none of the 7 commits since the build touched the lane's files; 59 tests pass on the rebased tree). The Verification ran on the fleet with this code on fleet data, read-only, nice 19: 11-11 340,087 lines / 84,773 opined, 11-12 165,473 / 40,057; the COVERAGE table printed per clock bucket; PRIOR reproduction 0 / 0 mismatched; CHECKLIST ok (0 alarms); exit 0. Nothing in the app imports it (test pinned), so no restart; the fleet checkout is not ff'd and needs none. Left for later lanes: Kalshi's mid as the preferred in-play prior; sports other than NBA once their re-sim publishes liveProps; the M2 learner.** Goal, verbatim: "Phase 1B M1 live stat progress, shadow only: a stat_progress live expert in engine_experts.py turns every logged NBA liveProps row (live_evidence/<sport>/<date>.props.jsonl, read through props_at's rows) at a line the books quoted into an ExpertOpinion against the live book prior at the same instant (book_quotes, each book's two-way de-vig, median across books, the board's simultaneity and hold rules), with a named refusal wherever it cannot opine; off != on reachability tests pass; and on the fleet scripts/engine_experts.py prints the stat_progress coverage table by clock bucket for the logged NBA nights (2026-11-11, 2026-11-12) with 0 checklist alarms. No stake, order, board or worker reads it."
 - Goal: Phase 1B M1 live stat progress, shadow only: a stat_progress live expert in engine_experts.py turns every logged NBA liveProps row (live_evidence/<sport>/<date>.props.jsonl, read through props_at's rows) at a line the books quoted into an ExpertOpinion against the live book prior at the same instant (book_quotes, each book's two-way de-vig, median across books, the board's simultaneity and hold rules), with a named refusal wherever it cannot opine; off != on reachability tests pass; and on the fleet scripts/engine_experts.py prints the stat_progress coverage table by clock bucket for the logged NBA nights (2026-11-11, 2026-11-12) with 0 checklist alarms. No stake, order, board or worker reads it.
@@ -811,15 +800,6 @@ death, never life — do not invert it.
 - Verification: Unit tests: salt 0 leaves the seed unchanged and a salt changes it; jobs salt the candidate arm only; main() refuses candidate == current without a salt and runs with one; a salted receipt has its own file name and check_receipt refuses one renamed to the gate's name. Fleet: 3 receipts (2 salted A/A, 1 SE2) on >= 150 games; SE2's current arm equals STEP 3i's; findings STEP 3j table against these ranges; todo #765 names SE2's verdict with its receipt.
 - Blocked by: none
 
-### primary-tree-ff-1113 — CLOSED 2026-11-13 (GOAL MET: primary tree `9936ef1fb` -> `5ede12329` at 17:53Z, 425 commits, nothing lost) — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
-- Goal: The shared PRIMARY checkout C:/Users/tempadmin/Coding/Syndicate is fast-forwarded from 9936ef1fb to an exact origin/main SHA with every previously-dirty path either still present or proven duplicated upstream, every dirty file sha256-backed-up outside the repo first (recipe: auto-memory project_primary_tree_fast_forward_recipe)
-- Files: none (ledger-only in git: this lane block + the log entry; the ff rewrites the primary tree's working copy, not repo content)
-- Hypothesis: n/a (maintenance)
-- Falsification test: n/a
-- Verification: git -C <primary> rev-parse HEAD == the target SHA; 0 staged; kept files byte-identical to the backup; backup manifest sha256 re-verified; check_lane_invariants.py from the primary tree compared before vs after and vs a worktree at the target
-- Blocked by: none
-- **RESULT 2026-11-13 11:53 AM CST (17:53Z): GOAL MET.** HEAD == `5ede12329`, 0 staged, 598/598 kept files byte-identical to the sha256 backup (`C:\tmp\primary-tree-backup-2026-11-13\`, 599 files, re-hash 599/599). 1 blocker (`history.jsonl`, row-identical to the target), 0 collisions. Invariants: the same 2 contested files as a worktree at origin/main. 12/12 hook suites pass from the primary tree. Detail: log 2026-11-13 17:53Z.
-
 ### live-resim-join-unscaled — CLOSED 2026-11-13 (GOAL MET: on main `2f4dea263`; fleet replay re-tempered at k 2.16 0 mismatched vs 5,506 / 4,779 on the old reading; untouched 0, checklist ok) — opened 2026-11-13 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **GOAL VERDICT `[2026-11-13 18:07Z]`: GOAL: MET -- on main `2f4dea263` (user "Yes, push it"; the build commit `7784097ce` rebased twice, main moved only in the ledger and todo.md; 61 tests pass on the rebased tree, and disabling the fix fails the new test). The Verification ran with this code on the fleet's NBA ledgers, read-only, nice 19: 11-11 untouched 9,863 checked / 0 mismatched, re-tempered 5,552 tempered half-point totals checked / 0 mismatched, old reading 5,506 mismatched; 11-12 8,891 / 0, 4,831 / 0, old 4,779; CHECKLIST ok both nights; opinions identical. Nothing imports it, so no restart and no fleet ff are owed.** Goal, verbatim: "The live_resim expert's join check (engine_experts.join_reproduction) compares the expert's histogram share with the join's UNTEMPERED probability: on a live gameline ledger record whose prob_scale is set and != 1 (#780 v7, NBA / NCAAF full-game totals) join_model_p is model_home_win_prob_unscaled, else model_home_win_prob; a test fails on the old reading; on the fleet's real NBA ledger rows, re-tempered by the join's own scale_prob, JOIN reports 0 mismatched with the fix and > 0 without, and the untouched rows still read 0 mismatched with the checklist ok. No stake, order, board or worker reads it."
 - Goal: The live_resim expert's join check (engine_experts.join_reproduction) compares the expert's histogram share with the join's UNTEMPERED probability: on a live gameline ledger record whose prob_scale is set and != 1 (#780 v7, NBA / NCAAF full-game totals) join_model_p is model_home_win_prob_unscaled, else model_home_win_prob; a test fails on the old reading; on the fleet's real NBA ledger rows, re-tempered by the join's own scale_prob, JOIN reports 0 mismatched with the fix and > 0 without, and the untouched rows still read 0 mismatched with the checklist ok. No stake, order, board or worker reads it.
@@ -838,16 +818,6 @@ death, never life — do not invert it.
 - Falsification test: H-A false if any method's lean differs from Shin's by >= 1 pt. H-D false if the lean's slope on hold has a CI including 0. H-E false if the close-fair lean has a CI including 0. CORRECTION: a per-sport side shift fitted on kickoffs before 11-02 must cut log loss on 11-02..11-12 with a game-clustered CI below 0 in NBA, else it is not proposed.
 - Verification: findings file with the per-sport per-market lean, the H-A/H-C/H-D/H-E verdicts with CIs, and the held-out log-loss reading; the correction (if any) as a tested module with off != on; a user decision recorded before any wiring
 - Blocked by: none
-
-### primary-tree-auto-ff — CLOSED 2026-11-13 (GOAL MET: on main `d692f4e6a` + session-start trigger `2c773a9cb`; installed; a real session start fast-forwarded the primary checkout 2c773a9cb -> 10a2155b3 at 20:13:51Z) — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
-- Goal: The shared primary checkout stops drifting behind origin/main: scripts/primary_tree_ff.py fast-forwards it to origin/main ONLY when every guard passes (main worktree on main, not mid-operation, 0 staged, HEAD an ancestor of an exact origin/main SHA, every locally modified file the target changes identical to the target, every on-disk file the target adds identical to it), backs up whatever it resets or moves, re-hashes before acting, rolls back on failure, and records each run; a refusal or a stale run surfaces as one line in the session-start digest; the trigger is installed only on the user's explicit OK
-- Files: scripts/primary_tree_ff.py, tests/test_primary_tree_ff.py, .claude/hooks/session-start.sh (the primary-tree auto-ff digest/trigger block only)
-- Hypothesis: n/a (build)
-- Falsification test: n/a
-- Verification: pytest tests/test_primary_tree_ff.py (every refusal leaves HEAD and every dirty file byte-identical; a clean ff lands; a fault-injected merge failure restores; off != on); a dry run against the real primary tree reports correctly; after the user's trigger choice, one real automatic run seen in the status file and the digest silent on success
-- Blocked by: none
-- STATUS 2026-11-13 1:55 PM CST (19:55Z): BUILT AND VERIFIED, NOT PUSHED. Local commit `2568f1b4c` (changes on rebase). Tests 25/25, 9/9 guard mutations caught, digest block checked on a throwaway tree, dry run on the real primary CLEAR. Owed: the user's push OK + trigger choice (session-start spawn or a scheduled task), then a hand --apply to install and one automatic run seen (log 2026-11-13 19:55Z).
-- **RESULT 2026-11-13 2:14 PM CST (20:14Z): GOAL MET.** Pushed `d692f4e6a` + `2c773a9cb` (user "Push: session start"). Tests 25/25, 9/9 guard mutations caught, and the end-to-end spawn on a throwaway checkout was clean. Installed by one hand run (`f636b7128` -> `2c773a9cb`). The first automatic run, from a real session start, went `2c773a9cb` -> `10a2155b3` (4 commits, 19.4 s, ff); the digest is silent. todo #800. Detail: log 2026-11-13 20:14Z.
 
 ### live-margin-prob-scale — OPEN — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
 - STATUS 2026-11-13 2:20 PM CST (20:20Z): **GOAL: NOT MET** -- LOADED 20:18:40Z (user "Load it now"; ff `754d5f3e4` -> `273a4a599` + claimed, drained refresh-worker TERM 465592 -> 469244 by this lane). The new worker resolves spreads NBA 2.02 / NCAAF 1.80 / NCAAB 1.34 / others 1.0, h2h 1.0. Left: the fleet reading -- tonight's watcher (`watch780.sh` -> `read780.py`, which now also judges spreads rows recorded >= 20:18:41Z and every h2h row untouched). The goal itself (on main, tests, fit) is otherwise met.
@@ -890,43 +860,6 @@ death, never life — do not invert it.
 - Hypothesis: engine.simulate_with_lineups plays OT as a full self.cfg.overtime_seconds segment and sums its goals (not sudden death), and a state resumed IN OT gets the full 5:00 whatever the clock shows; so ~10% of OT sims end 2-3 past the tie (stub P4 2-2: 31 of 300)
 - Falsification test: With the fix a stub OT state still yields a sim with |margin| > 1 or a total other than tied + 1; or the OT goal events carry no usable time order to name the first goal; or pregame run_hockeysim_game output changes
 - Verification: tests (off != on on the real engine; pregame identity); replay under the fleet's code and inputs: OT and tied-late states' OT sims end +-1 only; moneyline/total shift reported per state; served lanes carry liveOvertime after the user's yes to load
-- Blocked by: none
-
-### closed-lane-archive-20261113-1440 — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 411547c9-ea26-4f27-b313-2b2d937164ef
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness --idle-min 240 read 2 of 17 CLOSED blocks SAFE; both moved to lanes_closed.md with one pointer each: onedrive-path-refs, closed-lane-archive-20261113-0840. Table and WAIT reasons in log/2026-11-13.md.
-
-### live-moneyline-gap-diagnosis — CLOSED 2026-11-13 (GOAL MET: NBA's gap is uninformative disagreement early in games; findings committed) — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
-- GOAL VERDICT 2026-11-13 2:58 PM CST (20:58Z): **GOAL: MET.**
-  - The Verification ran: `scripts/live_moneyline_gap.py` on the fleet, read-only, reproduced model - market Brier NBA +0.018 +- 0.011 / NCAAB +0.009 +- 0.005 on the same 3,962 / 3,557 states and printed every table.
-  - Verdicts:
-    - H1 bias: falsified in NBA (model calibrated, slope 0.97; the market's de-vig is compressed, 1.47). NCAAB has a shared home lean, the model's intercept +0.44 beyond noise.
-    - H2 stage: supported in NBA (tip +0.039, early +0.029, later ~+0.011); falsified in NCAAB.
-    - H3 staleness: falsified in NBA; weak in NCAAB.
-    - H4 information: holds (NBA b1 -0.46 [-0.87, -0.09], NCAAB -0.15).
-  - Prediction "H3 carries the largest share in NBA": WRONG. "H4 holds in both": right.
-  - Findings: `.syndicate/findings_2026-11-13_live_moneyline_gap.md`.
-  - The lead (whether `#721`'s pregame market anchor reaches the NBA live resume) is recorded under todo #780 as OPEN. It needs its own lane.
-- Goal: Name, with game-clustered 95% intervals on the fleet's live gameline ledgers, where the live full-game moneyline's Brier gap to the market comes from in NBA (+0.020) and NCAAB (+0.009): signed bias, game stage, state staleness, and whether the market encompasses the model; findings committed; nothing changed in production
-- Files: scripts/live_moneyline_gap.py (NEW), scripts/live_totals_width_fit.py (a __main__ guard ONLY, so its helpers import), .syndicate/findings_2026-11-13_live_moneyline_gap.md (NEW), docs/ai_context/todo.md (#780 section only)
-- Hypothesis: Written before any test (2026-11-13 20:30Z). H1 BIAS: the model's P(home wins) is signed-biased against outcomes where the market's is not (mean y - p differs from 0, or the model's favourite wins less often than it says). H2 STAGE: the gap is concentrated early (points scored / model total < 0.40), i.e. the prior, not the live update. H3 STALENESS: the gap grows with state age (recorded_at - live_state_as_of) or where the quote is newer than the state, i.e. the market has seen score the model has not. H4 INFORMATION: after H1-H3, logit(y) on logit(p_model) and logit(p_market) gives the model's coefficient near 0 (the market encompasses it). Prediction: H3 carries the largest share in NBA; H4 holds in both (model coefficient < 0.3).
-- Falsification test: H1 falsified if model and market have the same signed residual within CI and the same calibration slope; H2 if the gap is no larger early than late; H3 if the gap does not differ by state-age band (CIs overlap and point estimates within 0.005); H4 if the model's encompassing coefficient's 95% interval excludes 0 and exceeds 0.3
-- Verification: scripts/live_moneyline_gap.py run on the fleet (read-only, nice 19) reproduces the fit script's model - market Brier (NBA +0.020, NCAAB +0.009) on the same population, then prints each hypothesis's table with game-clustered intervals; findings file names the verdict per hypothesis
-- Blocked by: none
-
-### nba-live-anchor-trace — CLOSED 2026-11-13 (GOAL MET: the anchor reaches the live resume; the engine loses it, as noise) — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
-- GOAL VERDICT 2026-11-13 3:55 PM CST (21:55Z): **GOAL: MET.**
-  - **Trace:** anchor pre-sim `basketball_props_smart_sim.py:1218` -> `target_home/away_points` `orchestrator/smart_sim.py:1568` -> persisted `nba/live_resim.py:108` -> loaded by the live resume. The loss is inside `engine.py:1114-1175`.
-  - **Fleet reading:** over 171 games, target - market is 0.31 points mean abs; engine - market 2.43 (sd 3.18), slope on outcomes -0.26 [-0.89, +0.40], MSE 222.3 vs the market's 206.8. At tip, 24 of 65 games are >= 10 pp off the market both pregame and live.
-  - **H FALSIFIED;** the prediction was wrong in both parts.
-  - **Candidate fix (NBA post-sim margin anchor, like college's):** recorded under todo #780 as OPEN, not built.
-  - Findings: `.syndicate/findings_2026-11-13_nba_live_anchor_trace.md`.
-- Goal: State, with file:line evidence and a fleet reading at tip, whether the NBA pregame market anchor (#721, market_anchor) reaches the NBA live re-sim's resumed engine, and if not, where it is lost; findings committed; nothing changed in production
-- Files: .syndicate/findings_2026-11-13_nba_live_anchor_trace.md (NEW), docs/ai_context/todo.md (#780 section only)
-- Hypothesis: Written before tracing (2026-11-13 21:05Z). H: the #721 anchor is applied to the pregame SmartSim's OUTPUT (or to a layer the live resume does not read), so the NBA live re-sim resumes un-anchored engine inputs; at tip the live P(home) tracks the raw pregame engine, not the market. Prediction: persist_engine_inputs saves kwargs that carry no market line, and at tip the live P(home) sits farther from the market than the served pregame number does.
-- Falsification test: H is falsified if the persisted engine inputs the live resume loads carry the market-anchored team strength (a market line or a target derived from it), or if at tip the live P(home) is no farther from the market than the served pregame P(home) on the same games
-- Verification: A file:line trace from the anchor's write to the live resume's read; a fleet read-only comparison at tip (progress < 0.15) of live P(home), the served pregame P(home) and the market fair P(home) on the same NBA games; the findings name where the anchor is lost or confirm it is carried
 - Blocked by: none
 
 ### nfl-segment-skill — OPEN — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
@@ -986,6 +919,11 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. 3 CLOSED blocks whose owners were idle >= 240m moved to lanes_closed.md with one pointer each; 17 others waited (owner or block < 240m, or transcript not found). Table in .syndicate/log/2026-11-14.md.
 - Moved: team-logo-canonical-names, wncaab-team-crests, closed-lane-archive-20261113-1239
+
+### closed-lane-archive-20261113-2040 — CLOSED 2026-11-13 (GOAL MET: 6 blocks archived) — opened 2026-11-13 — session ae8d3d6e-ff96-46ee-b21e-1d066bea31ee
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 6 of 20 CLOSED blocks. Moved: ledger-mangled-path-guard, primary-tree-ff-1113, primary-tree-auto-ff, closed-lane-archive-20261113-1440, live-moneyline-gap-diagnosis, nba-live-anchor-trace. The reading and the WAIT reasons are in `.syndicate/log/2026-11-14.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1232,6 +1170,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261113-0840` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 754c7c5a-fa6d-41cc-8c2e-c9ea87309053
 - `closed-lane-archive-20261113-1040` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session bffcc5ab-631c-4977-b8b5-829506b085ad
 - `closed-lane-archive-20261113-1239` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 55ea853b-e2bc-4587-909b-39828f95ffb8
+- `closed-lane-archive-20261113-1440` — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 411547c9-ea26-4f27-b313-2b2d937164ef
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1361,6 +1300,7 @@ death, never life — do not invert it.
 - `layer2-unmeasured-per-line` — CLOSED 2026-10-05 — opened 2026-10-05 — session f028352c-8cd6-4236-9dae-f51b4216c08c
 - `lead-deferral-and-lane-census` — **CLOSED 2026-09-08 — falsification test RAN: rate passes (0.50 firings/session, 73% silent), precision does NOT (6 of 11 firings were in-goal). Kept,
 - `learnings-instrument-family-consolidation` — **CLOSED 2026-09-08 — THE FOLD WAS REJECTED ON THE EVIDENCE; A MAP SHIPPED INSTEAD** — opened 2026-09-08 — session e51345f0-a9cd-4de1-939e-deaa6ea9918
+- `ledger-mangled-path-guard` — CLOSED 2026-11-13 (GOAL MET: guard on main `f636b7128` and loaded in the primary checkout 12:08:59 PM CST; a damaged commit refused live) — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
 - `ledger-repair-invariants` — **ORPHANED 2026-09-08** — opened 2026-09-05 — session 3492626c-1ec4-4366-9dbe-f194ae319c84 To resume: **NO FILES CLAIMED** (`.syndicate/` and `.claude
 - `ledger-tab-escape-fix` — CLOSED 2026-09-18 — opened 2026-09-18 — session 4991d2ec-b2c2-4040-9042-d98867b768ab — **GOAL MET: 3 lines repaired, 0 tab or BEL bytes left in lanes.md / lanes_closed.md**
 - `ledger-trim-1004` — CLOSED — closed 2026-10-04 — opened 2026-10-04 — session 4ab694ed-003e-4dbe-8966-f39ec57c0b31
@@ -1378,6 +1318,7 @@ death, never life — do not invert it.
 - `live-gameline-rescore-prefix-window` — CLOSED — opened 2026-09-24 — closed 2026-09-24 — session 25e0f859-2737-46ab-ad06-86879c7fd5f8
 - `live-mech-outcome-gate` — CLOSED 2026-11-11 (GOAL MET: on main `89e8dcee5`, verified by tests, a real run and a read-only fleet read) — opened 2026-11-11 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
 - `live-min-stake-five` — CLOSED 2026-10-29 — opened 2026-10-21 — session 332cb014 (live-trading coordinator, handover from 34fdabd0)
+- `live-moneyline-gap-diagnosis` — CLOSED 2026-11-13 (GOAL MET: NBA's gap is uninformative disagreement early in games; findings committed) — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
 - `live-odds-latest-tick-stale` — CLOSED — opened 2026-10-02 — closed 2026-10-02 — session f6c21ef3-cd93-4b23-beb2-5375129fd7e3
 - `live-odds-memory-spikes` — CLOSED 2026-10-31 (fleet reading verified: soccer run peak 1,710 -> 896 MB) — opened 2026-10-31 — session 28697bd7-c2b8-416a-b80c-66f00938c780
 - `live-odds-worker-nfl-week-alignment` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
@@ -1444,6 +1385,7 @@ death, never life — do not invert it.
 - `nba-layer2-projections` — CLOSED-HANDOFF 2026-10-30 (stale-lane-triage, user-approved -> todo #747) — opened 2026-10-03 — session ed75e56a-d3c4-4a0a-9fed-9550778f9ecc (session ARCHIVED 2026-10-05 by user decision after checkpoint 3a0aff80; lane is free to adopt -- the remaining reading is opening night ~10-20: NBA prop quotes in nba book_quotes, served prop_rows_with_projection > 0, edge_sign_by_side read)
 - `nba-lens-live-state` — CLOSED (GOAL MET) — opened 2026-11-07 — closed 2026-11-08 — session 41b9ecce-0019-4143-ab62-f74bc2f862c8
 - `nba-lines-props-backtest` — CLOSED-DRIFTED 2026-10-30 (owner e0a3e383, on stale-lane-triage's ask: nothing owed to the goal; measurement half MET, gate list withdrawn by user, fixes shipped by nba-prop-calibration, vs-book measured 10-05) — opened 2026-10-02 — session e0a3e383-4fa1-4669-8740-c9a46b681c7a — **GOAL: DRIFTED by user decision (gate list withdrawn -> diagnosis + ranked fixes, delivered 2026-10-03; the fixes were built and put in production by lane nba-prop-calibration); vs-book MEASURED 2026-10-05 (no information beyond the book)**
+- `nba-live-anchor-trace` — CLOSED 2026-11-13 (GOAL MET: the anchor reaches the live resume; the engine loses it, as noise) — opened 2026-11-13 — session 8062940b-57fd-454a-8de5-25fdd4804d85
 - `nba-live-board` — CLOSED 2026-10-21 00:02Z (display MET; Kalshi/Polymarket clause superseded by a newer user decision) — opened 2026-10-20 — session 9e18a0e7-aec9-4825-91b6-88ef1589591d
 - `nba-live-proj-actuals` — CLOSED 2026-11-10 (GOAL MET: every live NBA game served Live proj./actual; 11-09 slate 95.3-100% of live prop rows per poll, misses = not-yet-entered players; (7) name splits verified, 203/204 alias row-polls) — opened 2026-11-04 — session c3e396a7-b445-45b4-9dfd-3713ff67d5a9
 - `nba-live-prop-audit-default-window` — CLOSED 2026-10-01 — opened 2026-10-01 — session 0bafeeeb-4766-4142-9294-a51e7591d647
@@ -1636,8 +1578,10 @@ death, never life — do not invert it.
 - `preflight-fleet-path` — CLOSED 2026-10-25 (GOAL MET: preflight reads the fleet by default -- live 15:27Z web/refresh-worker/live-odds-worker returned verdicts with fleet HEAD 6753375b, per-role loaded commits, worker spacing and the fleet board build, 0 Render calls; 74 tests) — opened 2026-10-25 — session 4b29d941-3df8-4b0d-b2d0-f5ec0f49d3a3
 - `pregame-record-keep` — CLOSED 2026-11-11 (GOAL MET: 11-10's NBA lines kept past tip-off, experts read source=kept_lines, 0.54 s CPU per merge, ~2.7 MB/day, 0 failures; deploys.md 2026-11-11 03:06Z) — opened 2026-11-10 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - `pricing-plane-v1` — CLOSED-MEASURED 2026-09-12 — opened 2026-09-08 — session 2edf8b82-9f8a-4d32-bf26-ca43ecd1ea5a (archived 2026-09-11, so UNOWNED)
+- `primary-tree-auto-ff` — CLOSED 2026-11-13 (GOAL MET: on main `d692f4e6a` + session-start trigger `2c773a9cb`; installed; a real session start fast-forwarded the primary checkout 2c773a9cb -> 10a2155b3 at 20:13:51Z) — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
 - `primary-tree-fastforward` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `primary-tree-ff` — CLOSED 2026-11-08 (GOAL MET: primary tree f5427e385 -> 711e299d6 -> 517d47dbc = origin/main at 17:51Z, nothing lost, preflight there has target_is_fleet) — opened 2026-11-08 — session 8a93d939-bc0c-4fd2-aa61-bcd76b63680d
+- `primary-tree-ff-1113` — CLOSED 2026-11-13 (GOAL MET: primary tree `9936ef1fb` -> `5ede12329` at 17:53Z, 425 commits, nothing lost) — opened 2026-11-13 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
 - `primary-tree-hook-sync` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `profitable-buckets` — **ORPHANED 2026-09-15 — RE-RUN DONE (74 games), NO BUCKET SURVIVES IN ANY MARKET; harness now scores point forecasts vs non-constant nulls** — opened 2026-09-08 — session 3492626c — **NO DEMONSTRATED LIVE-GAMELINE EDGE ON MLB. totals = always-over, spreads q4_late = scoreboard-follower; `findings_2026-09-15_bucket_rerun.md`**
 - `prop-evidence-parity` — CLOSED 2026-09-17 — opened 2026-09-17 — session 4a583d41-5e1a-477f-82f6-04aaabbf368c — **GOAL: MET.** Seven-layer prop evidence live for MLB/WNBA/NBA/NHL/NFL/NCAAF/soccer; production checklist PASS on all four sports with slates; MLB 8 tables -> 10 with its reference answer intact; the BvP ... — body in `lanes_history.md`.
