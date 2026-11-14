@@ -156,14 +156,82 @@ def _index_last_seen(last_seen: Mapping[str, str]) -> dict[tuple[str, ...], dict
     return index
 
 
+def _index_own_looks(last_seen: Mapping[str, str]) -> dict[tuple[str, ...], str]:
+    """`{(group..., line, bookmaker) -> freshest stamp}`: when THIS file last looked at a row's own quote. `#801`.
+
+    **A ROW'S AGE AND THE REFERENCE IT IS JUDGED AGAINST MUST COME FROM THE SAME READ, and they did not.** A row's
+    `quote_seen_age_seconds` is computed when the shortlist builds that sport's grid, early in the board build. The
+    reference (`_sweep_reference_age`) is read from the state file at the drop step, minutes later. An odds pull that
+    lands in between re-stamps the row's own key, so the reference says "a pass looked seconds ago" while the row still
+    carries the age it had BEFORE that pass, and every single-line prop group reads as dead.
+
+    Measured 2026-11-14 (lane `board-market-gone-snapshot-age`): NFL's pull was captured 12:38:02Z and written before
+    the 12:38:20Z drop step (reference 17 s); `MARKET_GONE_DROPPED nfl=454` and the NFL board went 1,216 -> 883 rows.
+    The next build, 12:42Z, read the SAME pass (reference 213 s) with no new pull and kept them (`nfl=6`). The NFL
+    writer stamps one `captured_at` after fetching and writes every shard at once
+    (`fetch_nfl_oddsapi_props_local.py`), so the pass was whole by the drop step. Same cause behind 11 of the 12 NFL
+    board drops 11-12..11-13 (290-580 rows each, baseline ~50), the 11-12 3:30 PM cheat sheet among them.
+
+    Keyed by the row's OWN book and line, not by "any book on the line": a different book still quoting the line says
+    nothing about the price this row carries. Selection is left out because the board row's side and the log's
+    `selection` are different vocabularies, and either side of the same book's line is a look at that book's market.
+    Group terms are folded exactly as `_index_last_seen` folds them.
+    """
+    index: dict[tuple[str, ...], str] = {}
+    width = len(_QUOTE_KEY_ORDER)
+    group_positions = [_QUOTE_KEY_ORDER.index(f) for f in _QUOTE_GROUP_FIELDS]
+    book_position = _QUOTE_KEY_ORDER.index("bookmaker")
+    for key, stamp in last_seen.items():
+        parts = key.split("|")
+        if len(parts) != width or not stamp:
+            continue
+        own = tuple(_fold_group_term(_QUOTE_KEY_ORDER[i], parts[i]) for i in group_positions) + (
+            parts[-1],
+            parts[book_position].strip().lower(),
+        )
+        if str(stamp) > index.get(own, ""):
+            index[own] = str(stamp)
+    return index
+
+
+def _row_own_look_age(row: Mapping[str, Any], own_index: Mapping[tuple[str, ...], str] | None, now: Any) -> float | None:
+    """Seconds since the judging file last looked at this row's own book and line, or None when it never did. `#801`.
+
+    The line is spelled as `odds_book_quotes._quote_key` spells it (`str(value or "")`), the book as the price's own
+    `quote.bookmaker`. None (no book, no entry, unparseable stamp) changes nothing: the row keeps its grid age.
+    """
+    if not own_index:
+        return None
+    from datetime import datetime, timezone
+
+    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    book = str((quote or {}).get("bookmaker") or row.get("bookmaker") or "").strip().lower()
+    if not book:
+        return None
+    stamp = own_index.get(_row_quote_group(row) + (str(row.get("line") or ""), book))
+    if not stamp:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max(0.0, (now - parsed).total_seconds())
+
+
 def _classify_stale_row(
     row: Mapping[str, Any],
     last_seen: Mapping[str, str],
     now_iso: str,
     sidecar_newest_age: float | None = None,
     group_index: Mapping[tuple[str, ...], Mapping[str, str]] | None = None,
+    row_seen_age: float | None = None,
 ) -> str:
     """`sidecar_frozen` / `orphaned_line` / `market_gone` for one stale row. `#569`.
+
+    `row_seen_age`, when given, is the row's age measured from the SAME state-file read as `sidecar_newest_age`
+    (`_row_own_look_age`, `#801`) and replaces the grid's `quote_seen_age_seconds` in both tests below.
 
     **`sidecar_frozen` IS THE FIRST QUESTION, and it was missing from the first
     version — which produced a WRONG ANSWER in production, not a near miss.**
@@ -211,6 +279,8 @@ def _classify_stale_row(
 
     row_quote = row.get("quote")
     row_seen = row_quote.get("quote_seen_age_seconds") if isinstance(row_quote, Mapping) else None
+    if row_seen_age is not None:
+        row_seen = row_seen_age
     if not isinstance(row_seen, (int, float)) or isinstance(row_seen, bool):
         return "unknown_no_row_age"
     if float(row_seen) <= sidecar_newest_age * 1.5 + 300.0:
@@ -277,11 +347,8 @@ def _classify_stale_row(
     except Exception:
         return "unknown_unparsable_stamp"
 
-    row_age = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
-    seen = row_age.get("quote_seen_age_seconds") if isinstance(row_age, Mapping) else None
-    if not isinstance(seen, (int, float)) or isinstance(seen, bool):
-        return "unknown_no_row_age"
-    return "orphaned_line" if (float(seen) - sib_age) > 900 else "market_gone"
+    # `row_seen` was read and type-checked above (and replaced by `row_seen_age` when the caller measured one).
+    return "orphaned_line" if (float(row_seen) - sib_age) > 900 else "market_gone"
 
 
 # The share of recently-seen keys a pass must have re-observed to count as "the
@@ -374,6 +441,16 @@ def _row_commence_date(row: Mapping[str, Any]) -> str:
     return text if len(text) == 10 and text[4] == "-" and text[7] == "-" else ""
 
 
+def _row_kickoff_shard_date(row: Mapping[str, Any]) -> str:
+    """The CENTRAL kickoff date the quote writers file the row under (`odds_book_quotes.kickoff_shard_date`), or ''."""
+    try:
+        from syndicate.features.shared.odds_book_quotes import kickoff_shard_date
+
+        return str(kickoff_shard_date(row) or "")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def _row_quote_group(row: Mapping[str, Any]) -> tuple[str, ...]:
     """The row's `_index_last_seen` group key -- built exactly as
     `_classify_stale_row` builds its lookup, so "this file holds the group" and
@@ -438,6 +515,7 @@ def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None)
 
         kept: list = []
         dropped: dict[str, int] = {}
+        relooked_kept: dict[str, int] = {}
         for slug, sport_rows in by_sport.items():
             # One view per state FILE, built only when a row needs it:
             # (last_seen, reference_age, group_index), None for "no evidence",
@@ -484,7 +562,9 @@ def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None)
                     f"reference_age_s={int(reference_age)} coverage={_MARKET_GONE_REFERENCE_COVERAGE}",
                     flush=True,
                 )
-                views[date] = (last_seen, reference_age, group_index)
+                # The 4th element is the row-age side of the same read (`#801`): a row is judged on when THIS file
+                # last looked at its own book and line, not only on the age its grid read gave it minutes ago.
+                views[date] = (last_seen, reference_age, group_index, _index_own_looks(last_seen))
                 return views[date]
 
             for row in sport_rows:
@@ -506,7 +586,15 @@ def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None)
                 # selected date's when the row has none), which is the old "no
                 # sibling was seen" case.
                 commence = _row_commence_date(row)
-                dates = [commence, selected] if commence and commence != selected else [selected]
+                # PLUS THE CENTRAL KICKOFF DATE (`#801`), which is what the NFL/NCAAF prop writers file by
+                # (`odds_book_quotes.kickoff_shard_date`). For a kickoff after 6 PM CST the UTC date is the NEXT day,
+                # so neither the UTC file nor the board's date held the row's group: measured 2026-11-14, 133 of 1,224
+                # served NFL rows (SNF 01:20Z, MNF 01:15Z) were judged by a file without their group, which reads as
+                # "no sibling seen" -> `market_gone` once stale. Only ADDED: a file judges only if it holds the group.
+                dates = [commence] if commence else []
+                for extra in (_row_kickoff_shard_date(row), selected):
+                    if extra and extra not in dates:
+                        dates.append(extra)
                 candidate_views = [_view(date) for date in dates]
                 if any(view == "unreadable" for view in candidate_views):
                     kept.append(row)
@@ -517,9 +605,20 @@ def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None)
                     continue
                 group = _row_quote_group(row)
                 judges = [view for view in present if group in view[2]] or present[:1]
-                labels = [
-                    _classify_stale_row(row, view[0], now_iso, view[1], view[2]) for view in judges
-                ]
+                labels = []
+                relooked = False
+                for view in judges:
+                    # SAME READ AS THE REFERENCE (`#801`). The grid age is from before any pull that landed during
+                    # this build; the judging file says whether that pull looked at this row's own book and line.
+                    own_age = _row_own_look_age(row, view[3], now)
+                    if own_age is not None and own_age < float(seen):
+                        relooked = True
+                        if own_age < 900:
+                            labels.append("relooked_in_judging_file")
+                            continue
+                        labels.append(_classify_stale_row(row, view[0], now_iso, view[1], view[2], row_seen_age=own_age))
+                    else:
+                        labels.append(_classify_stale_row(row, view[0], now_iso, view[1], view[2]))
                 # ONLY `market_gone`, and only when EVERY judge says so. Every
                 # other label -- including every `unknown_*` -- keeps the row. An
                 # unclassifiable row is not evidence of a dead market, and
@@ -528,6 +627,12 @@ def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None)
                 if all(label == "market_gone" for label in labels):
                     dropped[slug] = dropped.get(slug, 0) + 1
                     continue
+                if relooked:
+                    # Kept BECAUSE of the same-read age: what the old rule would have judged on the grid age alone.
+                    if all(
+                        _classify_stale_row(row, view[0], now_iso, view[1], view[2]) == "market_gone" for view in judges
+                    ):
+                        relooked_kept[slug] = relooked_kept.get(slug, 0) + 1
                 kept.append(row)
 
         if dropped:
@@ -541,9 +646,19 @@ def _drop_market_gone_rows(rows: Any, selected_date: Any, shortlist: Any = None)
             # A zero is a reading too -- "ran and found none" must not look the
             # same as "never ran".
             print(f"[layer2_shortlist] MARKET_GONE_DROPPED none of {len(rows)}", flush=True)
+        # The branch-ran instrument for `#801`, ALWAYS printed: rows the grid age alone would have dropped and the
+        # judging file's own look at them kept. Its own line, so a `<sport>=N` reader of the DROPPED line cannot
+        # pick these numbers up. Large right after a pull lands mid-build; 0 between pulls.
+        print(
+            "[layer2_shortlist] MARKET_GONE_RELOOKED_KEPT "
+            + (" ".join(f"{s}={n}" for s, n in sorted(relooked_kept.items())) or "none")
+            + f" total={sum(relooked_kept.values())} of {len(rows)}",
+            flush=True,
+        )
         if isinstance(shortlist, dict):
             shortlist["rows_market_gone_dropped"] = sum(dropped.values())
             shortlist["rows_market_gone_dropped_by_sport"] = dropped
+            shortlist["rows_market_gone_relooked_kept_by_sport"] = relooked_kept
         return kept
     except Exception as exc:  # noqa: BLE001
         print(f"[layer2_shortlist] MARKET_GONE_DROP_FAILED {type(exc).__name__}: {exc}", flush=True)
@@ -638,9 +753,17 @@ def _report_stale_row_causes(rows: Any, selected_date: Any) -> None:
             # Affordable because `_index_last_seen` replaced the per-row rescan;
             # see its docstring for the 6.5M-iteration figure this avoids.
             group_index = _index_last_seen(last_seen)
+            # Same read for the row's age as for the sidecar's (`#801`), so a row the drop kept because this file
+            # re-looked at it is not counted here as `market_gone` on its pre-pull grid age.
+            own_index = _index_own_looks(last_seen)
+            now_dt = datetime.now(timezone.utc)
             counts: dict[str, int] = {}
             for _age, row in entries:
-                label = _classify_stale_row(row, last_seen, now_iso, sidecar_age, group_index)
+                own_age = _row_own_look_age(row, own_index, now_dt)
+                label = _classify_stale_row(
+                    row, last_seen, now_iso, sidecar_age, group_index,
+                    row_seen_age=own_age if own_age is not None and own_age < _age else None,
+                )
                 counts[label] = counts.get(label, 0) + 1
             age_txt = "unknown" if sidecar_age is None else f"{sidecar_age:.0f}s"
             parts.append(
