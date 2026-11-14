@@ -479,9 +479,12 @@ class NullBaselineTests(unittest.TestCase):
             common = ["--league", "ncaab", "--current", OLD, "--aa-salts", "1", "--dates", "2026-11-05",
                       "--data-root", tmp, "--receipt-dir", tmp]
             receipt = Path(tmp) / gate.receipt_name("ncaab", h, h, 1)
+            opt_in = Path(tmp) / gate.receipt_name("ncaab", h, h, 1, gate.rule_id("family", 4))
+            self.assertNotEqual(receipt, opt_in)
             with redirect_stdout(io.StringIO()):
                 rc_on = gate.main(common + ["--current-salts", "4", "--flag-rule", "family"])
-            on = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertFalse(receipt.exists())  # the opt-in run never writes the default's file name
+            on = json.loads(opt_in.read_text(encoding="utf-8"))
             with redirect_stdout(io.StringIO()):
                 rc_off = gate.main(common)
             off = json.loads(receipt.read_text(encoding="utf-8"))
@@ -497,6 +500,141 @@ class NullBaselineTests(unittest.TestCase):
         self.assertEqual(off["legacy"]["cells"], off["cells"])  # K = 1 + per-cell IS the legacy computation
         self.assertEqual(on["seed_salt"], 1)
         self.assertLess(on["cells"]["20m"]["win_brier"]["diff"], off["cells"]["20m"]["win_brier"]["diff"])
+
+
+def _with_coverage(arm: dict, cp: str, value: float) -> dict:
+    """A copy of `arm` whose margin_in80 at `cp` is `value` for every game: a coverage-only change."""
+    out = json.loads(json.dumps(arm))
+    for by_cp in out.values():
+        by_cp[cp]["margin_in80"] = value
+    return out
+
+
+class SmoothFamilyTests(unittest.TestCase):
+    """lane gate-smooth-family: the family rule over the 20 smooth cells (coverage reported, never flagged), and a
+    receipt scored by any rule but the default getting its own name and never clearing preflight (the STEP 3k
+    validation overwrote the live receipts with family-rule verdicts on 2026-11-13 22:58Z)."""
+
+    def test_smooth_family_reports_coverage_with_its_z_but_never_flags_it(self) -> None:
+        n = 300
+        base = _base(n)
+        cand = _with_coverage(_arm(base, 2, n), "0m", 1.0)  # coverage 0.85 -> 1.00: |dev| 0.05 -> 0.20
+        paired = gate.pair(_arm(base, 1, n), cand)
+        every = gate.family_flags(paired, CPS5)
+        smooth = gate.family_flags(paired, CPS5, metrics=gate.FAMILY_CELLS["smooth"])
+        self.assertIn("0m:margin_cov80_dev", every["worse"])
+        self.assertGreater(smooth["z"]["0m:margin_cov80_dev"], smooth["critical_worse"])  # reported, and large
+        self.assertNotIn("0m:margin_cov80_dev", smooth["worse"])
+        self.assertIn("0m:margin_cov80_dev", smooth["report_only"])
+        self.assertEqual((every["n_cells"], smooth["n_cells"], len(smooth["report_only"])), (30, 20, 10))
+        self.assertEqual(len(smooth["z"]), 30)
+
+    def test_the_smooth_family_is_the_post_hoc_construction_and_a_cells_z_does_not_depend_on_the_family(self) -> None:
+        """STEP 3k's post hoc numbers came from scoring with METRICS cut to the smooth four; the option must reproduce
+        them exactly, so the confirmation tests the rule that was chosen and not a cousin of it."""
+        import numpy as np
+
+        n = 250
+        base = _base(n)
+        cand = _arm(base, 2, n, shift={("20m", "win_brier"): 0.03})
+        rng = np.random.default_rng(9)  # the candidate's OWN per-game coverage, so the coverage cells' t is not 0
+        for by_cp in cand.values():
+            for feats in by_cp.values():
+                feats["margin_in80"], feats["total_in80"] = float(rng.random() < 0.82), float(rng.random() < 0.82)
+        paired = gate.pair(_arm(base, 1, n), cand)
+        smooth = gate.family_flags(paired, CPS5, metrics=gate.FAMILY_CELLS["smooth"])
+        every = gate.family_flags(paired, CPS5)
+        with mock.patch.object(gate, "METRICS", gate.FAMILY_CELLS["smooth"]):
+            post_hoc = gate.family_flags(paired, CPS5)
+        self.assertEqual((smooth["critical_worse"], smooth["critical_better"], smooth["worse"], smooth["better"]),
+                         (post_hoc["critical_worse"], post_hoc["critical_better"], post_hoc["worse"], post_hoc["better"]))
+        self.assertEqual({c: smooth["z"][c] for c in post_hoc["z"]}, post_hoc["z"])
+        self.assertEqual({c: every["z"][c] for c in post_hoc["z"]}, post_hoc["z"])
+        # a max over a superset is >= the max over the subset in every draw, so its quantile is too; strictly here,
+        # because the coverage cells vary (which is what lets this test see a family that is ignored)
+        self.assertLess(smooth["critical_worse"], every["critical_worse"])
+        with self.assertRaises(ValueError):
+            gate.family_flags(paired, CPS5, metrics=("win_brier", "spread_cover"))
+
+    def test_rule_ids_and_receipt_names(self) -> None:
+        self.assertEqual(gate.DEFAULT_RULE_ID, "percell-k1")
+        self.assertEqual(gate.rule_id("family", 4, "smooth"), "family-smooth-k4-a0.05")
+        self.assertEqual(gate.rule_id("per-cell", 4, "smooth", 0.2), "percell-k4")  # cells / alpha unused per-cell
+        h1, h2 = gate.value_hash(NEW), gate.value_hash(OLD)
+        default = gate.receipt_name("ncaab", h1, h2)
+        self.assertEqual(gate.receipt_name("ncaab", h1, h2, 0, gate.DEFAULT_RULE_ID), default)
+        self.assertTrue(gate.receipt_name("ncaab", h1, h2, 0, "family-smooth-k4-a0.05").endswith(
+            "__rule-family-smooth-k4-a0.05.json"))
+        self.assertTrue(gate.receipt_name("ncaab", h1, h2, 2, "percell-k4").endswith("__salt2__rule-percell-k4.json"))
+        # derived from the receipt's fields: a pre-opt-in receipt (no fields) is per-cell K = 1; STEP 3k's are not
+        self.assertEqual(gate.receipt_rule_id({}), "percell-k1")
+        self.assertEqual(gate.receipt_rule_id({"flag_rule": "family", "current_salts": [0, 1001, 1002, 1003],
+                                               "family": {"alpha": 0.05}}), "family-all-k4-a0.05")
+        self.assertEqual(gate.receipt_rule_id({"flag_rule": "per-cell", "current_salts": [0, 1001]}), "percell-k2")
+
+    def test_an_opt_in_receipt_never_clears_even_renamed_and_a_pre_opt_in_one_still_does(self) -> None:
+        h1, h2 = gate.value_hash(NEW), gate.value_hash(OLD)
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            path = gate.write_receipt(d, {"league": "ncaab", "candidate_hash": h1, "current_hash": h2, "games": 360,
+                                          "worse": [], "better": [], "written_at": time.time(), "flag_rule": "family",
+                                          "family_cells": "smooth", "current_salts": [0, 1001, 1002, 1003],
+                                          "family": {"alpha": 0.05}})
+            self.assertTrue(path.name.endswith("__rule-family-smooth-k4-a0.05.json"), path.name)
+            self.assertIn("no outcome-gate receipt", gate.check_receipt(d, "ncaab", h1, h2, time.time())[0])
+            path.rename(d / gate.receipt_name("ncaab", h1, h2))
+            problem, detail = gate.check_receipt(d, "ncaab", h1, h2, time.time())
+            self.assertIn("opt-in rule family-smooth-k4-a0.05", problem)
+            self.assertEqual(detail["rule"], "family-smooth-k4-a0.05")
+            _receipt(d)  # the pre-opt-in shape (no rule fields) at the default name
+            problem, detail = gate.check_receipt(d, "ncaab", h1, h2, time.time())
+            self.assertIsNone(problem, problem)
+            self.assertEqual(detail["rule"], "percell-k1")
+
+    def test_smooth_cells_through_main_off_vs_on_and_only_the_default_receipt_is_read(self) -> None:
+        """off != on through main(): a candidate whose ONLY change is 0 m margin coverage (0.85 -> 1.00). The default
+        (per-cell) and the 30-cell family rule refuse it; --family-cells smooth writes no WORSE cell but keeps the
+        coverage z on the receipt. Each rule writes its own file, and check_receipt reads only the default's."""
+        n = 200
+        base = _base(n)
+        table = {"current@0": _arm(base, 11, n), "current@1001": _arm(base, 12, n), "current@1002": _arm(base, 13, n),
+                 "current@1003": _arm(base, 14, n), "candidate": _with_coverage(_arm(base, 15, n), "0m", 1.0)}
+
+        def fake_run(league, arms, dates, data_root, sims, procs, log=print):
+            return {a: table[a] for a, _v, _s in arms}, {}
+
+        h1, h2 = gate.value_hash(NEW), gate.value_hash(OLD)
+        k4 = ["--current-salts", "4", "--flag-rule", "family"]
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(gate, "run_arms", side_effect=fake_run), \
+                mock.patch.dict("os.environ"):
+            d = Path(tmp)
+            common = ["--league", "ncaab", "--current", OLD, "--candidate", NEW, "--dates", "2026-11-05",
+                      "--data-root", tmp, "--receipt-dir", tmp]
+            rcs, out = {}, {}
+            for name, extra in (("all", k4), ("smooth", k4 + ["--family-cells", "smooth"]), ("default", [])):
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    rcs[name] = gate.main(common + extra)
+                out[name] = buf.getvalue()
+            files = sorted(p.name for p in d.glob("*.json"))
+            smooth = json.loads((d / gate.receipt_name("ncaab", h1, h2, 0, "family-smooth-k4-a0.05")).read_text(
+                encoding="utf-8"))
+            every = json.loads((d / gate.receipt_name("ncaab", h1, h2, 0, "family-all-k4-a0.05")).read_text(
+                encoding="utf-8"))
+            problem, detail = gate.check_receipt(d, "ncaab", h1, h2, time.time())
+        self.assertEqual(len(files), 3, files)
+        self.assertEqual((rcs["all"], rcs["smooth"], rcs["default"]), (1, 0, 1))
+        self.assertIn("0m:margin_cov80_dev", every["worse"])
+        self.assertEqual(smooth["worse"], [])
+        self.assertIn("0m:margin_cov80_dev", smooth["family"]["report_only"])
+        self.assertGreater(smooth["family"]["z"]["0m:margin_cov80_dev"], smooth["family"]["critical_worse"])
+        self.assertEqual((smooth["rule_id"], smooth["family_cells"], smooth["family"]["n_cells"]),
+                         ("family-smooth-k4-a0.05", "smooth", 20))
+        self.assertIn("0m:margin_cov80_dev", smooth["legacy"]["worse"])  # the legacy block still sees it
+        self.assertIn("(reported, not flagged)", out["smooth"])
+        self.assertIn("OPT-IN", out["smooth"])
+        self.assertEqual(detail["rule"], "percell-k1")  # preflight read the DEFAULT run's receipt ...
+        self.assertIn("0m:margin_cov80_dev", problem)  # ... and refuses on its coverage cell
 
 
 if __name__ == "__main__":

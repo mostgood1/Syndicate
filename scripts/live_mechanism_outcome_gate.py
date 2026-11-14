@@ -40,10 +40,24 @@ coverage cells: |coverage - 0.80| folds near 0.80, so its bootstrap is skewed an
 default until a redesign refuses RC46 and passes the A/A pairs. Every receipt carries a `legacy` block (one draw,
 per-cell) whichever rule is chosen, and the 1.96 x SE is printed beside each cell.
 
+OPT-IN, UNDER CONFIRMATION `[2026-11-14, lane gate-smooth-family, findings PHASE 2 STEP 3l]`: `--family-cells smooth`
+runs the max-T over the 20 SMOOTH cells only (margin / total CRPS, win Brier, win log loss); the two coverage metrics
+keep their z on the receipt and the printout but are never flagged. CRPS already scores the whole predictive
+distribution, the 80% interval included, so a width change that miscalibrates shows there. Post hoc on 11-03..12 (K = 4)
+its critical values ran 2.82-2.95, it refused 1 of 60 null pairings, and it refused RC46 on 20 m win Brier -- chosen
+after seeing that data, so it is confirmed or not on games after 11-12, pre-registered (main e990f0bac). Its power is
+set by GAMES, not sims: it refused RC46 on ~20% of 150-game subsets and ~56% of 300-game ones.
+
+ANY RULE BUT THE DEFAULT (`rule_id`: `percell-k1` today) writes its receipt as `...__rule-<rule id>.json`, and
+`check_receipt` re-derives the rule from the receipt's own fields and refuses any rule but the default. Before this, an
+opt-in run wrote the default's file name: on 2026-11-13 22:58Z the STEP 3k validation overwrote the live receipts with
+family-rule verdicts that would have cleared RC46 (restored by hand; no preflight ran in between).
+
 THE RECEIPT. `<main tree>/.syndicate/deploy/outcome_gate/<league>__<candidate12>__<current12>.json`, keyed on the
 sha256 of the canonical JSON of each value, so it names the exact TRANSITION. `deploy_preflight.py` reads it (through
 `check_receipt` below -- one source for the predicate, the same file on both sides) and returns OUTCOME_GATE when a
-changed key has no fresh receipt, too few games, or WORSE cells not explicitly accepted.
+changed key has no fresh receipt, too few games, a rule other than the default, or WORSE cells not explicitly
+accepted.
 
 Run it ON THE FLEET (WSL), at nice 19, from a worktree at origin/main with the fleet's venv:
 
@@ -115,6 +129,15 @@ DEFAULT_CURRENT_SALTS = 1  # K = 4 + the family rule was FALSIFIED as a default 
 CURRENT_SALT_BASE = 1000
 FAMILY_ALPHA = 0.05
 FAMILY_DRAWS = 2000
+# The cells the family rule's max-T runs over (`--family-cells`). "smooth" leaves out the two folded |coverage - 0.80|
+# metrics: they are still scored, printed and stored with their z, but never flagged (lane gate-smooth-family; why in
+# THE FLAG RULE).
+FAMILY_CELLS: dict[str, tuple[str, ...]] = {
+    "all": METRICS,
+    "smooth": ("margin_crps", "total_crps", "win_brier", "win_logloss"),
+}
+DEFAULT_FLAG_RULE = "per-cell"
+DEFAULT_FAMILY_CELLS = "all"
 _KEY_RE = re.compile(r"^SYNDICATE_([A-Z0-9]+)_LIVE_MECHANISMS$")
 
 
@@ -142,9 +165,33 @@ def league_of_key(key: str) -> Optional[str]:
     return match.group(1).lower() if match else None
 
 
-def receipt_name(league: str, candidate_hash: str, current_hash: str, seed_salt: int = 0) -> str:
-    """The gate's name for one transition. A salted (noise-check) run gets its own name, so preflight never reads it."""
+def rule_id(flag_rule: str = DEFAULT_FLAG_RULE, current_salts: int = DEFAULT_CURRENT_SALTS,
+            family_cells: str = DEFAULT_FAMILY_CELLS, alpha: float = FAMILY_ALPHA) -> str:
+    """The flag rule as one string: `percell-k1` (K = current-arm draws), `family-smooth-k4-a0.05`, ..."""
+    k = max(1, int(current_salts))
+    if flag_rule == "per-cell":
+        return f"percell-k{k}"
+    return f"family-{family_cells}-k{k}-a{float(alpha):g}"
+
+
+DEFAULT_RULE_ID = rule_id()
+
+
+def receipt_rule_id(receipt: Mapping[str, Any]) -> str:
+    """The rule a receipt was scored by, DERIVED from its own fields (never from a stored label). A receipt without the
+    fields predates the opt-in rules -- code before 6095654a3 had one rule, one current draw per-cell -- so absent is
+    per-cell K = 1 by construction, not a permissive guess."""
+    fam = receipt.get("family") or {}
+    return rule_id(str(receipt.get("flag_rule") or "per-cell"), len(receipt.get("current_salts") or [0]),
+                   str(receipt.get("family_cells") or "all"), float(fam.get("alpha") or FAMILY_ALPHA))
+
+
+def receipt_name(league: str, candidate_hash: str, current_hash: str, seed_salt: int = 0, rule: str = "") -> str:
+    """The gate's name for one transition. A salted (noise-check) run and a run scored by any rule other than the
+    default each get their own name, so neither can overwrite the default receipt or be read by preflight."""
     suffix = f"__salt{int(seed_salt)}" if int(seed_salt or 0) else ""
+    if rule and rule != DEFAULT_RULE_ID:
+        suffix += f"__rule-{rule}"
     return f"{league}__{candidate_hash[:12]}__{current_hash[:12]}{suffix}.json"
 
 
@@ -213,8 +260,9 @@ def check_receipt(directory: Path, league: str, candidate_hash: str, current_has
     """(problem or None, detail) for one changed key. Pure apart from reading the one file it names.
 
     Refuses on: no receipt for this exact transition; unreadable; a hash inside that does not match (a renamed
-    file); older than MAX_RECEIPT_AGE_SECONDS or stamped in the future; fewer than MIN_GAMES scored; WORSE cells
-    without `accept_regression`. Each refusal names its remedy."""
+    file); a seed-salted noise check; scored by a rule other than DEFAULT_RULE_ID (read from the receipt's own fields,
+    so a renamed opt-in receipt refuses too); older than MAX_RECEIPT_AGE_SECONDS or stamped in the future; fewer than
+    MIN_GAMES scored; WORSE cells without `accept_regression`. Each refusal names its remedy."""
     path = Path(directory) / receipt_name(league, candidate_hash, current_hash)
     detail: dict[str, Any] = {"receipt": str(path), "league": league,
                               "candidate_hash": candidate_hash[:12], "current_hash": current_hash[:12]}
@@ -233,6 +281,12 @@ def check_receipt(directory: Path, league: str, candidate_hash: str, current_has
     if int(receipt.get("seed_salt") or 0):
         return (f"outcome-gate receipt {path.name} is a seed-salted noise check (salt {receipt.get('seed_salt')}), "
                 f"not a gate reading: run the gate without --seed-salt"), detail
+    rule = receipt_rule_id(receipt)
+    detail["rule"] = rule
+    if rule != DEFAULT_RULE_ID:
+        return (f"outcome-gate receipt {path.name} was scored by the opt-in rule {rule}, not the default "
+                f"{DEFAULT_RULE_ID}; preflight takes only the default rule's verdict: re-run the gate without "
+                f"--flag-rule / --current-salts / --family-cells / --family-alpha"), detail
     written = receipt.get("written_at")
     age = (now - float(written)) if isinstance(written, (int, float)) else None
     detail.update(written_at_iso=receipt.get("written_at_iso"), games=receipt.get("games"),
@@ -397,19 +451,28 @@ def pair(current: Mapping[str, Mapping[str, Mapping[str, float]]],
 
 
 def family_flags(paired: Mapping[str, Mapping[str, Mapping[str, Mapping[str, float]]]], checkpoints: Iterable[str],
-                 alpha: float = FAMILY_ALPHA, draws: int = FAMILY_DRAWS, seed: int = 17) -> dict[str, Any]:
+                 alpha: float = FAMILY_ALPHA, draws: int = FAMILY_DRAWS, seed: int = 17,
+                 metrics: Optional[Iterable[str]] = None) -> dict[str, Any]:
     """WORSE / BETTER against a family-wise max-T critical value, one-sided each way.
 
     ONE joint bootstrap over games: a game drawn once counts at every checkpoint it has, so the cells' draws are
     correlated the way the cells are. Per cell z = diff / sd(boot). The WORSE critical value is the (1 - alpha)
-    quantile over draws of max over cells of (boot - diff) / sd, so a null change crosses it in ANY cell with
-    probability about alpha. BETTER is the mirror. A cell whose draws do not vary (identical arms) is never flagged."""
+    quantile over draws of max over the FAMILY's cells of (boot - diff) / sd, so a null change crosses it in ANY family
+    cell with probability about alpha. BETTER is the mirror. A cell whose draws do not vary (identical arms) is never
+    flagged. `metrics` (default: all of METRICS) names the family; every other metric still gets its z, listed under
+    `report_only`, and is never flagged. The bootstrap does not depend on the family, so a cell's z is the same
+    whichever family it is scored in."""
     import numpy as np
 
     cps = list(checkpoints)
+    family = tuple(metrics) if metrics is not None else METRICS
+    unknown = [m for m in family if m not in METRICS]
+    if unknown or not family:
+        raise ValueError(f"family metrics must be a non-empty subset of {METRICS}: {unknown or 'empty'}")
     games = sorted({g for g, by_cp in paired.items() for cp in cps
                     if cp in by_cp and {"current", "candidate"} <= set(by_cp[cp])})
-    result: dict[str, Any] = {"rule": f"max-T family-wise one-sided alpha {alpha}", "alpha": alpha, "draws": draws,
+    result: dict[str, Any] = {"rule": f"max-T family-wise one-sided alpha {alpha} over {len(family)} metrics",
+                              "alpha": alpha, "draws": draws, "metrics": list(family), "report_only": [],
                               "worse": [], "better": [], "z": {}, "critical_worse": None, "critical_better": None,
                               "n_cells": 0, "games": len(games)}
     if not games:
@@ -451,13 +514,16 @@ def family_flags(paired: Mapping[str, Mapping[str, Mapping[str, Mapping[str, flo
     safe_sd = np.where(ok, sd, 1.0)
     z = np.where(ok, point_arr / safe_sd, 0.0)
     t = np.where(ok[:, None], (boot_arr - point_arr[:, None]) / safe_sd[:, None], 0.0)
-    crit_w = float(np.quantile(t.max(axis=0), 1 - alpha))
-    crit_b = float(np.quantile((-t).max(axis=0), 1 - alpha))
+    in_family = np.array([lab.split(":", 1)[1] in family for lab in labels])
+    tf = t[in_family]
+    crit_w = float(np.quantile(tf.max(axis=0), 1 - alpha))
+    crit_b = float(np.quantile((-tf).max(axis=0), 1 - alpha))
     result.update(
-        n_cells=len(labels), critical_worse=crit_w, critical_better=crit_b,
+        n_cells=int(in_family.sum()), critical_worse=crit_w, critical_better=crit_b,
         z={lab: float(v) for lab, v in zip(labels, z)},
-        worse=[lab for lab, v, o in zip(labels, z, ok) if o and v > crit_w],
-        better=[lab for lab, v, o in zip(labels, z, ok) if o and -v > crit_b],
+        report_only=[lab for lab, f in zip(labels, in_family) if not f],
+        worse=[lab for lab, v, o, f in zip(labels, z, ok, in_family) if f and o and v > crit_w],
+        better=[lab for lab, v, o, f in zip(labels, z, ok, in_family) if f and o and -v > crit_b],
     )
     return result
 
@@ -466,7 +532,7 @@ def write_receipt(directory: Path, payload: Mapping[str, Any]) -> Path:
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / receipt_name(payload["league"], payload["candidate_hash"], payload["current_hash"],
-                                    int(payload.get("seed_salt") or 0))
+                                    int(payload.get("seed_salt") or 0), receipt_rule_id(payload))
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     os.replace(tmp, path)
@@ -722,13 +788,14 @@ def _print_candidate(label: str, cps: list, cells: Mapping, fam: Mapping, flag_r
                      if "current_coverage" in m else "")
             z = fam.get("z", {}).get(cell)
             zs = f"  z {z:+.2f}" if z is not None else ""
+            report_only = "  (reported, not flagged)" if flag_rule == "family" and cell in fam.get("report_only", ()) else ""
             print(f"  {metric:16s} {m['current']:.4f} -> {m['candidate']:.4f}  diff {m['diff']:+.4f} +- {m['se196']:.4f}"
-                  f"{zs}{extra}{tag}")
+                  f"{zs}{extra}{tag}{report_only}")
     if fam.get("critical_worse") is None:
         print(f"\n{label}: no cell scored")
     elif flag_rule == "family":
         print(f"\n{label}: family rule, critical z {fam['critical_worse']:+.2f} (worse) / {fam['critical_better']:+.2f} "
-              f"(better), alpha {fam['alpha']} over {fam['n_cells']} cells")
+              f"(better), alpha {fam['alpha']} over {fam['n_cells']} cells ({', '.join(fam.get('metrics', []))})")
     else:
         print(f"\n{label}: per-cell rule (1.96 x SE per cell; the pre-2026-11-13 rule)")
     print(f"{label}: WORSE {worse or 'none'} | better {better or 'none'}")
@@ -762,9 +829,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--current-salts", type=int, default=DEFAULT_CURRENT_SALTS,
                     help=f"the current arm is the mean of this many seed-salted draws (default {DEFAULT_CURRENT_SALTS}: "
                          "one draw, production's seeds)")
-    ap.add_argument("--flag-rule", choices=("family", "per-cell"), default="per-cell",
+    ap.add_argument("--flag-rule", choices=("family", "per-cell"), default=DEFAULT_FLAG_RULE,
                     help="per-cell = 1.96 x SE per cell (default); family = max-T family-wise (opt-in: it did not "
                          "refuse RC46 on 2026-11-13, see THE FLAG RULE)")
+    ap.add_argument("--family-cells", choices=tuple(FAMILY_CELLS), default=DEFAULT_FAMILY_CELLS,
+                    help="the family rule's cells: all 30, or the 20 smooth ones (coverage reported, never flagged; "
+                         "opt-in, under confirmation in lane gate-smooth-family)")
     ap.add_argument("--family-alpha", type=float, default=FAMILY_ALPHA)
     ap.add_argument("--dump-arms", default="", help="write every arm's per-game features (JSON) here")
     args = ap.parse_args(argv)
@@ -849,9 +919,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     dates = expand_dates(args.dates)
     t0 = time.time()
     code = _git_head(REPO)
+    rule = rule_id(args.flag_rule, args.current_salts, args.family_cells, args.family_alpha)
+    opt_in = "" if rule == DEFAULT_RULE_ID else f" (OPT-IN: its receipts are named __rule-{rule} and never clear preflight)"
     print(f"league {league} key {spec['env_key']} dates {dates[0]}..{dates[-1]} ({len(dates)}) sims {args.sims} "
           f"switches {sorted(switches)} code {code[:9]} current arm = mean of {len(cur_salts)} draws {cur_salts} "
-          f"flag rule {args.flag_rule}", flush=True)
+          f"flag rule {args.flag_rule} rule {rule}{opt_in}", flush=True)
     print(f"current   {canonical_value(current) or '(unset)'}", flush=True)
     for label, value, salt in candidates:
         noise = " (NOISE CHECK, not a gate reading)" if canonical_value(value) == canonical_value(current) else ""
@@ -875,7 +947,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     for label, value, salt in candidates:
         paired = pair(current_avg, by_arm[label])
         cells = score_cells(paired, cps)
-        fam = family_flags(paired, cps, alpha=args.family_alpha)
+        fam = family_flags(paired, cps, alpha=args.family_alpha, metrics=FAMILY_CELLS[args.family_cells])
         worse, better = (fam["worse"], fam["better"]) if args.flag_rule == "family" else flag_cells(cells)
         legacy_cells = score_cells(pair(by_arm["current@0"], by_arm[label]), cps)
         lw, lb = flag_cells(legacy_cells)
@@ -892,9 +964,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             "candidate_hash": value_hash(value), "current_hash": value_hash(current),
             "candidate": canonical_value(value), "current": canonical_value(current),
             "dates": dates, "games": games, "sims": args.sims, "checkpoints": spec["checkpoints"], "seed_salt": salt,
-            "current_salts": cur_salts, "flag_rule": args.flag_rule,
+            "current_salts": cur_salts, "flag_rule": args.flag_rule, "family_cells": args.family_cells,
+            "rule_id": rule,
             "family": {k: fam[k] for k in ("rule", "alpha", "draws", "critical_worse", "critical_better", "n_cells",
-                                            "z", "worse", "better")},
+                                            "metrics", "report_only", "z", "worse", "better")},
             "legacy": legacy,
             "switches": {k: bool(str(v).strip()) for k, v in switches.items()},
             "code_commit": code, "data_root": str(data_root),
