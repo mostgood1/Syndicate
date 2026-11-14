@@ -149,3 +149,7 @@ books' fair (realised with its 95% interval):
 
 **Limits:** four nights, 162 games, NCAAB only (WNCAAB has no segment quotes); a first-half spreads realised edge of
 5.3 pp at <= 120 s (interval +0.1..+10.5) is one of eight secondary readings at nominal 95%, not evidence.
+
+## Provenance `[2026-11-14 15:26Z (9:26 AM CST)]`
+
+The registration pinned the grader at a worktree commit (`f771a8c6b`). It reached main rebased, as `9ec4c43b9` (grader) + `faa292b81` (EvidenceIndex fix, grader enumerates once) + `40b580a92` (doc). The blob of `scripts/college_segment_grade.py` on main is `dbcdcce69a22a52672e0ef581fce3814db66598b`, the registered one.
