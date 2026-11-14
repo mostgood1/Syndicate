@@ -906,6 +906,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_engine_experts.py with an off != on test (Herbert vs Herb, a Jr. suffix) that fails on the old key; then the experts runner's stat_progress section re-run read-only on the fleet for 11-11..11-13, before / after counts recorded in the lane
 - Blocked by: none
 
+### nhl-live-puckline-regrade — OPEN — opened 2026-11-14 — session 87074b1f-3325-4c92-871d-b22851478134
+- Goal: Re-grade the NHL live puck line (+-1.5 margin histogram) on today's production engine (end-game, total, overtime and rest-of-period fixes all on) with the 11-11 harness scripts/backtest_nhl_live_puckline.py and its #499 bar, paired against the 11-11 engine (all four off) on the same inputs and seeds, over every completed regular-season game 2026-10-01..11-13; report PASS/FAIL against the pre-registered test below; READ-ONLY, nothing priced or published (pricing stays the user's decision)
+- Files: docs/ai_context/todo.md (#773 section ONLY), .syndicate/findings_2026-11-14_nhl_live_puckline_regrade.md (NEW)
+- Hypothesis: The 11-11 DO NOT PRICE came from the live end-game (a one-goal lead late in P3: P(leader by 2+) model 0.18 / 0.26 vs observed 0.43 / 0.50 at P3 05:00 / 10:00). With the end-game fit (0.38 / 90 s) and the overtime / rest-of-period fixes on, those two cells close and the pooled +-1.5 still passes the bar
+- Falsification test: FAIL if ANY of: (1) the +-1.5 worst powered bucket |gap| > 0.150 (#499 bar, n >= 30); (2) at P3 05:00 or P3 10:00 with a one-goal lead, |model - observed| P(leader wins by 2+) > 0.10; (3) the +-1.5 Brier model - skill-free baseline game-bootstrap 95% upper bound >= 0; (4) the late width ratio (realised RMSE / model sd) at P3 10:00 or P3 05:00 outside [0.90, 1.10]. A PASS on all four is an UPPER BOUND only (the season rate files are leaky: they contain every graded game), so it licenses a same-instant market grade from the v6 recorder, NOT pricing
+- Verification: Replay rows for both arms on the fleet checkout at nice 19, PYTHONHASHSEED=0, production's 200 sims; report.txt per arm and per window (10-01..11-10 = the 11-11 population, and 10-01..11-13); the lead-state table on vs off; findings file; todo #773 bullet; lane closed with the verdict
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
