@@ -298,6 +298,7 @@ Product decisions, not engineering ones. Do not re-take them.
   files. Verified: global-only still blocks, per-session allows own lane,
   per-session naming a different lane still blocks.
 - **Lane LOANS are honoured by all three lane hooks as of 2026-10-08** (`a99d1c1c`). `lane-guard`, `scope-guard` and `lane-postwrite-check` judge a `(LOAN from <lender>` on the borrower's `Files:` line against origin/main + local additions, and only when the lender truly holds the path (`lane_claims_source.honoured_loan`). Verified live in the primary tree: a borrower is allowed, a non-borrower is blocked; a self-granted loan still blocks/warns (tests).
+- **lane-guard and scope-guard apply in DESKTOP-APP WORKTREES as of 2026-11-14** (`25ea482e4`). Until then, `is_exempt` exempted any path with a `.claude` segment, which covered every file under `<repo>/.claude/worktrees/<name>/`. It now judges a path relative to its own tree (`lane_claims.tree_relative`). Verified live, primary hook, 20:53Z: a claimed worktree edit got rc 2, and the ledger and harness got rc 0. A desktop session's marker is read from the PRIMARY `.syndicate/.current-lane.<sid>` (`lane_open.py` writes it there). One marker means one lane, so a session holding several lanes is blocked on the others' files.
 
 ## [shipped-verified] SHIPPED / VERIFIED — current status by item `[2026-08-18; replaces a dozen dated snapshot sections]`
 
