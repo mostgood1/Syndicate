@@ -1808,8 +1808,12 @@ it would be a NEW, unmeasured cell, and the confirmation should test the rule ch
 - Known-answer smoke: the registered flags through the real `main()` (replay mocked with the 11-03..12 arms) into a
   temp dir, then the scorer -> CONFIRMED, 1 of 60 null pairings, critical 2.82-2.92. Names, fields and scorer line up.
 
-**Status.** The runner is written and NOT ARMED: a detached fleet job needs the user's OK. Without it, run
-`run_3l_when_ready.sh` (or its gate line) by hand once `window_3l.py` prints D. Expected D ~11-22..24, run ~3.2 h
+**Status.** The runner is ARMED: started 2026-11-14 19:15Z (1:15 PM CST) on the user's OK, as the user systemd
+unit `gate-3l-wait` (`systemd-run --user`, transient; runner pid 928180). Its first check at 19:15:24Z logged
+snapshot HEAD 058931934 and 55 tasks through 11-13. It re-checks hourly at nice 19, runs the gate once when
+`window_3l.py` prints D, then the scorer into `gate_3l_result.txt`; deadline 12-01. Liveness:
+`systemctl --user is-active gate-3l-wait` and `gate_3l_wait.log`. A WSL restart kills a transient unit (Linger=no):
+re-arm with the same `systemd-run` line; the runner refuses a second run (exit 7). Expected D ~11-22..24, run ~3.2 h
 (8 arms x ~510 games; STEP 3k did 3,660 replays in 2.9 h at 11 procs).
 
 **Follow-ups, not this lane:**
