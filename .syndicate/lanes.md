@@ -888,6 +888,14 @@ death, never life — do not invert it.
 - Verification: MET: >= 3 evening games each with >= 1 priceable full-game row AND evening no_two_sided_market_price share <= day share + 10 pp. Watcher watch801.ps1 -> live801.py (session scratchpad) every 5 min 00:15Z-01:45Z 11-15; THIN at the deadline
 - Blocked by: none
 
+### book-grid-live-first — OPEN — opened 2026-11-14 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: While games are live, refresh-worker's book-grid round reprices the live sports first and every round, and background grid work (today's pre-game sports, next days, yesterday, requested rebuilds) is drained from a queue under a per-round time budget; a restart does not rebuild yesterday when it was already rebuilt after the date rolled; tests incl. off != on; on main; load (refresh-worker restart) is the user's decision (todo #803)
+- Files: scripts/run_refresh_worker.py (_run_book_grid_artifact_tick + new _book_grid_background_* helpers + the previous-date rebuild marker ONLY), tests/test_book_grid_live_first.py (NEW), docs/ai_context/todo.md (#803 section ONLY)
+- Hypothesis: Measured 2026-11-14 19:00-20:13Z (BOOK_GRID_TICK): every long gap between live repricings is a round that also built background work one sport after another -- today's pre-game NBA / NFL / soccer (54-110 s), next days' grids (uncounted in build_seconds; the 20:13Z round spent ~170 s on them), or yesterday's grids after a restart (306 s and 329 s holes). Live work alone takes 20-40 s a round
+- Falsification test: With the change, on the same fleet a live slate still shows gaps between live repricings over 180 s outside a restart, or background grids are no longer rebuilt within 30 min
+- Verification: Unit: live sports built before background in a round; background bounded by the budget and drained over later rounds; nothing dropped; off switch restores the single sequential pass; previous date skipped after a restart when its artifact postdates the rollover. After the user's load: tick gaps and NCAAF/NCAAB overlay gaps on a live slate vs today's 19:00-20:13Z baseline, and background grids' ages
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
