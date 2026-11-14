@@ -353,6 +353,39 @@ def short_name_keys(full_name: str) -> list[str]:
     return out
 
 
+@lru_cache(maxsize=4)
+def roster_identity(season: int) -> tuple[dict[str, str], dict[str, str]]:
+    """({normalized full name: player_id}, {player_id: normalized full name}) from the season's roster snapshot.
+
+    `#804` (lane `nfl-prop-name-roster-first`, 2026-11-14). The odds feed quotes FULL names and the play-by-play
+    knows only short ones, so `resolve_player_id_for_game` guessed through `short_name_keys`, plain key first. The
+    roster snapshot (`roster_<season>_snapshot.csv`, the file `nfl_player_team_index` already reads) carries the
+    nflverse `player_id` beside the full name, which answers the question directly. A name two ids share is left
+    out of the first map: no evidence picks between them. Same normalisation as `nfl_player_team_index`. Empty
+    when the snapshot is absent, and then resolution is exactly what it was.
+    """
+    from syndicate.features.nfl.props import _normalized_player_name
+    from syndicate.features.nfl.sources import nfl_roster_snapshot_path
+
+    by_name: dict[str, set[str]] = {}
+    name_of: dict[str, str] = {}
+    try:
+        path = nfl_roster_snapshot_path(season)
+        if not path.is_file():
+            return {}, {}
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    except (OSError, UnicodeDecodeError):
+        return {}, {}
+    for row in rows:
+        pid = str(row.get("player_id") or "").strip()
+        name = _normalized_player_name(row.get("player_name") or row.get("player_display_name"))
+        if pid and name:
+            by_name.setdefault(name, set()).add(pid)
+            name_of.setdefault(pid, name)
+    return {name: next(iter(ids)) for name, ids in by_name.items() if len(ids) == 1}, name_of
+
+
 def resolve_player_id_for_game(
     season: int,
     week: int,
@@ -374,10 +407,32 @@ def resolve_player_id_for_game(
     REFUSES as before when none or several qualify, or when the game's teams are
     unknown (then it is exactly `resolve_player_id_with_prior`). `canonical` maps
     a team string to the same canonical form as `game_teams`.
+
+    THE ROSTER ANSWERS FIRST (`#804`, 2026-11-14). The plain key is tried first,
+    so a NAMESAKE in the same game won: "Amon-Ra St. Brown" -> `a.brown` -> A.J.
+    Brown, who joined NE and played DET on 11-15, and every St. Brown prop priced
+    off A.J. Brown's 3-game log (3.0 catches against his own 8). Now the roster's
+    exact full name, when it names one id whose team is in this game, is that
+    player (`roster_full_name`); the short-name keys are the fallback, unchanged.
+
+    NOT DONE, ON PURPOSE: refusing a short-name candidate whose roster name is a
+    different full name. It would refuse "Malik Taylor" -> Mason Taylor (NYJ;
+    Malik is not on the preseason snapshot), but replayed over the 11-15 capture
+    it also refused three right answers the books spell differently from the
+    roster -- Joshua / Josh Palmer, Nathan / Nate Carter, Zonovan / Bam Knight,
+    with "Bam Knight" quoted in the same game. Names alone cannot separate those
+    from Malik / Mason.
     """
     teams = {t for t in (game_teams or set()) if t}
     if not teams:
         return resolve_player_id_with_prior(season, full_name)
+    from syndicate.features.nfl.props import _normalized_player_name
+
+    roster_id = roster_identity(season)[0].get(_normalized_player_name(full_name))
+    if roster_id is not None:
+        team, _src = player_team_with_prior(season, week, roster_id)
+        if team and canonical(team) in teams:
+            return roster_id, "roster_full_name"
     ambiguous = False
     for key in short_name_keys(full_name):
         for season_try, label in ((season, "current_season"), (season - 1, "prior_season_fallback")):
