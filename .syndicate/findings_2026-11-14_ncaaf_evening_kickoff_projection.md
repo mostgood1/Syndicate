@@ -2,8 +2,8 @@
 
 - **Found** 2026-11-14 12:55 AM CST, by lane `live-totals-prob-scale`'s #780 reading. Tonight's NCAAF half had 0 rows
   to judge, and the null was checked rather than taken as a quiet night.
-- **Status: FIXED ON MAIN `40d5d6a4a` (2026-11-14 9:43 AM CST, user "Yes, fix it here"), NOT LOADED.** Loading needs a
-  fleet ff and a refresh-worker restart, which is the user's decision. Every fleet read was read-only (nice 19).
+- **Status: LOADED 2026-11-14 19:29:19Z (1:29 PM CST); served grid MET; live-gate reading owed from 00:00Z.** Fixed on
+  main `40d5d6a4a` (9:43 AM CST, user "Yes, fix it here"). Every fleet read was read-only (nice 19). See `## Load`.
 
 ## Measured
 
@@ -105,9 +105,13 @@ The deployed-code replay reproduces the served 11-14 board exactly (853 served, 
 instrument. On 11-13, 4 served rows carried a projection that the deployed replay did not, which is unexplained and
 small. The fix projects them as well.
 
-**Owed after a load:**
-- the served NCAAF grid carries projections on 6 PM CST+ kickoffs;
-- the live ledger shows those games' rows reaching the gate, not `no_two_sided_market_price`.
+## Load (2026-11-14 1:29 PM CST)
+
+- **How:** lane `nba-grid-per-build-lookups` (session f48ddc8c) ran the single load the user chose here ("One load, all three"): fleet ff `fee389971` -> `5ed692ea5` at 19:29:19.539Z and a claimed refresh-worker TERM (pid 820330 -> 936392); #801 rode that ff with the NBA grid fix and the NHL fix `41e94507a` (live-odds-worker, loads at its next restart). Deploy entry: theirs, in deploys.md.
+- **Served grid, MET:** first 11-14 NCAAF grid after the restart (written 19:30:58Z, 92 s after refresh-worker pid 936392 started): evening game rows with a projection 0 of 117 -> 116 of 116 full-game and 0 of 285 -> 285 of 285 segment, evening games 0 -> 18 of 18; day rows unchanged (417/417 full, 1079/1079 segment). Baseline: the served grid of 19:18:36Z. Read-only, nice 19, `C:\tmp\livegrade\load801\served.py`.
+  The replay predicted +120 full-game rows on 11-14; the grid then held 116 evening full-game rows, all projected.
+- **Still owed:** the live ledger shows those games' rows reaching the gate, not `no_two_sided_market_price`
+  (from 00:00Z 11-15 = 6 PM CST 11-14).
 
 ## Fix shape as first proposed (superseded, kept for the record)
 
