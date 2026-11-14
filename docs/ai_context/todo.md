@@ -1,5 +1,17 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#801` — **NCAAF GAMES KICKING OFF AT OR AFTER 00:00Z (6 PM CST) CARRY NO MODEL, PREGAME OR LIVE: `attach_ncaaf_game_projections` skips a row whose UTC `commence_time` date is not the board's Central date, before the ±1-day index lookup that would have matched it. So those games show prices with no Proj / Edge, and their live lines price 0. Every weeknight since DST ended (11-01) priced 0%. TRACED, NOT FIXED (the fix is the user's decision)** `[2026-11-14, found by lane live-totals-prob-scale (#780 reading), session 8062940b]`
+- **Findings:** `.syndicate/findings_2026-11-14_ncaaf_evening_kickoff_projection.md`.
+- **Measured** (fleet, read-only):
+  - Live ledger 11-13: 3 games, 1,438 full-game rows, 0 priceable (1,423 `no_two_sided_market_price`). In-play capture was fine: 1,967-2,849 sportsbook rows per game per market.
+  - Priced share: weeknights 11-03..11-13 0% on all 8 nights; weeknights 10-27 / 10-29 74% / 71%; Saturdays 10-31 54% and 11-07 44%, where the games priced 0 are the ones first seen at 00:14Z or later.
+  - Served board 11-14 (2,000 of 2,962 rows, the server cap): rows kicking off on 11-14 UTC 262 of 262 carry a projection; rows kicking off on 11-15 UTC 0 of 112 (18 of tonight's games, 6 PM CST onward).
+- **Cause:**
+  - `syndicate/features/ncaaf/game_projections.py:701-704`, added by `a81bf816b` (2026-09-03, a counters fix), whose docstring wrongly says the skipped rows "would have failed `index.lookup` on that date anyway".
+  - `board_enrichment.py:2029-2037` passes the Central `selected_date`. With no projection there is no `market_fair_prob_over` (:639), so the live join refuses (`live_gameline_join.py:1434/1726`).
+  - The same filter is in `ncaaf/segment_projections.py:435-437`.
+- **Fix shape:** filter on the date the index matched, not the row's UTC date; the same change in the segment join. Tests: off != on with a 00:05Z kickoff on a Central-date board, the 7-day-gap miss still holds, and no row is attached on two dates. Loads with a fleet ff and a refresh-worker restart.
+
 ### `#797` — **CHEAT-SHEET SECTIONS JUDGED PER SPORT AGAINST THE FAIR AND MATCHED NON-MEMBERS (official 10-15..11-12, game-clustered 95% CIs): ONLY basketball Matchups beats the price beyond noise (+19.7% [+9.0, +30.8], 253 bets / 50 games). Value's bets hit BELOW the fair that makes them value (-4.0 pts [-7.4, -0.5], 871). Hot form one-sided -36.1% [-57, -15]. Picks above +250 -42.1% [-72, -3], 124. Every player-vs-player section within noise or negative, and none uses its history to pick the side. NEW: SmartSim projection vs the main line (side = sim, edge >= 5%), NBA +8.0% [+2.1, +14.0] (1,251 / 122 games, both halves). USER APPROVED ALL SEVEN (11-13): build section rules v2 (stamped per sheet, so past days keep their record), then load** `[2026-11-13, lane cheat-sheet-section-optimization, session 35bdf3a7; user "assess the performance of each section, by each sport ... retiring sections that dont add value while adding new sections"]`
 - **Findings:** `.syndicate/findings_2026-11-13_cheat_sheet_section_assessment.md`. Scripts and data: `C:\tmp\edge-analyses\cheat-sheet-sections\2026-11-13\`.
 - **Approved 11-13 (user, in chat):** picks capped at the featured band (-250..+250); Hot form, one-sided retired; new "Sim vs the line" on every sport with its measured record shown; Value requires the sim to agree; Matchups admit on the same-line vs-opponent record; player-vs-player sections direction-aware, on probation; the daily review reports excess over the fair and lift vs matched non-members.
@@ -347,6 +359,16 @@
   - Tests: `tests/test_live_totals_prob_scale.py`, 36, incl. off != on through the join and the production caller. 7 mutations are caught. 1,453 pass across the 72 test files that drive the join and the ledger.
   - Load: a fleet ff plus a claimed refresh-worker restart.
   - Spreads and moneylines: the next bullet.
+- **THE 11-13 NIGHT READING OF FIX 2 AND 2b: NBA AND NCAAB MET; NCAAF UNMEASURABLE, because of a separate defect (`#801`)** `[2026-11-14 12:55 AM CST, lanes live-totals-prob-scale + live-margin-prob-scale, watcher watch780.sh -> read780.py, user "Arm it"]`
+  - The watcher polled 02:00-06:49Z 11-14 (20 polls) and ended `THIN ncaaf(0 rows/0 games), ncaaf_spreads(0 rows/0 games)` at its deadline. It saw no FALSIFIED reading at any poll. Log: `C:\tmp\livegrade\load780\watch780_1113.log`.
+  - Rows are judged per row: the served (scaled) row against the same row's own unscaled gate, so the cadence and `#790` cannot confound it.
+  - **NBA totals:** 475 of 475 post-load rows v7 at k 2.16 with the unscaled field (9 games). Priced 174 -> 170 (-2.3%; FALSIFIED would be > 10% down). Median priced |edge| 15.2 -> 7.3 pp (x0.48; the replay predicted ~x0.45). Rows >= 20 pp: 44 -> 2.
+  - **NBA spreads:** 428 of 428 v7 at k 2.02 with the unscaled field (9 games). Priced 170 -> 171 (+0.6%). Median |edge| 15.2 -> 7.6 pp (x0.50). Rows >= 20 pp: 33 -> 1.
+  - **NCAAB spreads:** 5,376 rows at k 1.34 (55 games). Priced 2,877 -> 2,860 (-0.6%). Median |edge| 12.4 -> 9.3 pp (x0.75).
+  - **Untouched, as designed:** NCAAB totals (8,041 rows), WNCAAB totals (473) and WNCAAB spreads (289) all at k 1.0 with no unscaled field. Every h2h row has no `prob_scale`.
+  - **NCAAF:** 637 totals and 560 spreads rows were recorded, from 3 games, but 0 reached the gate. 1,423 of 1,438 full-game rows were `no_two_sided_market_price`. The cause is not quiet: NCAAF games kicking off at or after 00:00Z carry no projection, so they have no market price (`#801`).
+    - The NCAAF reading can come from games kicking off before 6 PM CST. Saturday 11-14 has at least 42 of them on the served board (262 of 262 rows projected, in the 2,000 of 2,962 rows the server returns).
+    - It is owed until `#801` is fixed or read on those games.
 - **CANDIDATE FIX 2b, THE LIVE SPREADS PROBABILITY SCALE: LOADED ON THE FLEET 20:18:40Z 11-13 (2:18 PM CST), `273a4a599`; MONEYLINES NOT TEMPERED (measured no gain)** `[2026-11-13, user "Fit them now", then "Load it now", lane live-margin-prob-scale, .syndicate/findings_2026-11-13_live_margin_width_fit.md]`:
   - **Load:** fleet ff `754d5f3e4` -> `273a4a599` 20:18:40.406Z, refresh-worker TERM 465592 -> 469244 20:18:40.732Z, drained first (idle 20:18:21Z), preflight CLEAR 20:18:26Z, undrained after. Under the new worker's environ: spreads NBA 2.02 / NCAAF 1.80 / NCAAB 1.34 / others 1.0, h2h and segments 1.0, no scale env key set. The NBA / NCAAF / NCAAB reading is in tonight's watcher (`read780.py` judges spreads from the restart on; `.syndicate/deploys.md` 2026-11-13 20:18:40Z).
   - Same transform, its own table and switch (`SYNDICATE_LIVE_SPREADS_PROB_SCALE`).

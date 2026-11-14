@@ -59815,3 +59815,20 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **LEGACY's 6.795 at both the P1 (02:22Z) and the P2 read was a coincidence, checked:** re-run at 06:2xZ on the same two states, seeds 7 and 11 (`legacy_coincidence.py`): P1 legacy 6.640 / 6.612 vs default 5.862 / 5.850; P2 legacy 7.027 / 6.992 vs default 6.513 / 6.485. The inputs had moved since (same code; the re-sim reads the slate features as they are now), but at every seed and both vintages the calibrated total sits 0.5-0.8 below LEGACY, and the served totals (5.91, 6.42) sit with the default arm.
 - **live-odds-worker recycled itself overnight:** supervisor `exited code=0 after 23167s -- restarting in 5s`, pid 482349 -> **592079** at ~03:55Z, the role's own ~6 h recycle (its last three lives 20,383 / 20,358 / 21,411 s). Not a deploy; same code. The NHL lanes kept publishing through it.
 - **expect / measured:** `served_ot_state_margin_pm1_total_tied_plus_1` : **MET** (7 OT / shootout reads, 0 exceptions). `served_total_below_legacy_at_P2` : **MET** (6.42 vs 6.795; the default re-sim 6.287).
+
+## 2026-11-14 06:49:16Z (12:49 AM CST) -- READING, no deploy: the 11-13 night reading of todo #780 fix 2 (totals scale, loaded 17:55:57Z, `89e2d2a0c`) and fix 2b (spreads scale, loaded 20:18:40Z, `273a4a599`) -- lanes `live-totals-prob-scale` + `live-margin-prob-scale`, session 8062940b -- **NBA MET, NCAAB MET, NCAAF UNMEASURED (todo #801)**
+- **What was read:** the fleet's live gameline ledgers, read-only at nice 19, every 15 min from 02:00Z to 06:49Z 11-14 (20 polls, watcher `watch780.sh` -> `read780.py` under `C:/tmp/livegrade/load780/`, user "Arm it"). Rows are judged per row: each served (scaled) row against its own unscaled gate, so the cadence and #790 cannot confound it. FALSIFIED if NBA / NCAAF priced share falls > 10% or an untouched row is tempered; MET on >= 300 rows / 3 games per sport. No poll read FALSIFIED. Final verdict `THIN ncaaf(0 rows/0 games), ncaaf_spreads(0 rows/0 games)`.
+- **NBA totals:** 475 of 475 post-load rows v7 at k 2.16 with `model_home_win_prob_unscaled` (9 games). Priced 174 -> 170 (-2.3%). Median priced |edge| 15.2 -> 7.3 pp (x0.48; replay predicted ~x0.45). Rows >= 20 pp: 44 -> 2.
+- **NBA spreads:** 428 of 428 at k 2.02 with the unscaled field (9 games). Priced 170 -> 171 (+0.6%). Median |edge| 15.2 -> 7.6 pp (x0.50).
+- **NCAAB spreads:** 5,376 at k 1.34 (55 games). Priced 2,877 -> 2,860 (-0.6%). Median |edge| 12.4 -> 9.3 pp (x0.75).
+- **Untouched, as designed:** NCAAB totals 8,041 rows, WNCAAB totals 473 and WNCAAB spreads 289, all k 1.0 with no unscaled field. h2h: no `prob_scale` on any row (NBA 136, NCAAB 845, WNCAAB 107, NCAAF 241).
+- **NCAAF:** 637 totals + 560 spreads rows from 3 live games, but 0 reached the gate. 1,423 of 1,438 full-game rows were `no_two_sided_market_price`.
+  - Not a quiet night. NCAAF games kicking off at or after 00:00Z carry no projection, so no market price (todo #801, `.syndicate/findings_2026-11-14_ncaaf_evening_kickoff_projection.md`).
+  - Every weeknight 11-03..11-13 priced 0%. Today's served board has 0 of 112 rows projected for 6 PM CST+ kickoffs, against 262 of 262 for earlier ones.
+- **Fleet state at the read:** HEAD `acb7e47b7`, which does not contain `68fbb8eeb` (the NBA margin anchor is not loaded). live-odds-worker's own ~03:55Z recycle (entry above) changed no code. 0 `anchored=` tick lines.
+- **expect / measured:**
+  - `nba_totals_rows_v7_k2.16_with_unscaled`: **MET** (475 / 475).
+  - `nba_priced_share_within_10pct`: **MET** (-2.3% totals, +0.6% spreads).
+  - `ncaab_totals_untouched`: **MET** (8,041 at k 1.0).
+  - `ncaab_spreads_k1.34`: **MET** (5,376).
+  - `ncaaf_*`: **NOT MEASURED**, blocked by #801. Owed on games kicking off before 6 PM CST (Saturday 11-14's day slate), by re-running `read780.py`.
