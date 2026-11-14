@@ -59753,3 +59753,17 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Not touched by this lane:** web and refresh-worker read `code=273a4a59` (STALE for the 5 files above). Neither produces the NHL live lanes; refresh-worker's pregame sims never pass the flag, so the new `engine.py` on disk leaves them unchanged.
 - **revert:** `SYNDICATE_NHL_LIVE_OVERTIME=off` in `local_production.env` needs a drained full down/up. Faster: revert `acb7e47b7` on main, ff the fleet, then a claimed live-odds-worker TERM (allow up to ~5 min for the pass to drain).
 - **verify:** tonight from 02:05Z, every re-simmed NHL lane carries `liveOvertime` sudden_death / on; if a game reaches OT, its lane's `displayMarginDist` holds only +-1 and `projection.total` equals the tied total + 1.
+
+## 2026-11-14 01:30:47Z (7:30 PM CST 11-13) -- READING, no deploy: the NBA-night overlay reading for todo #790 (lane `book-grid-overlay-starvation`) -- **MET: with NBA live, the NBA overlay builds in a median 12.2 s (falsified > 60 s; 136 s on 11-11), the NCAAB overlay gap median is 98.3 s (goal <= 120 s; 292 s on 11-11), 0 overlay gaps over 360 s, and web merged every live sport fresh (0 stale of 158)**
+- **What was read:** refresh-worker pid 469244 (`273a4a599`, which contains `019b5d15d`, `b681f2891` and `3422cb018`; loaded 20:18:40Z by lane `live-margin-prob-scale`). Fleet HEAD `acb7e47b7`; refresh-worker not restarted since. Window 00:14:42Z (the first NBA in-play overlay, 6:14 PM CST) .. 01:30:47Z (7:30 PM CST), read 01:31:14Z with `C:\tmp\railload\night790.py 2026-11-14T00:14:42` and `ticks790.py`.
+- **Load:** 23 NBA overlay builds, `rows_inplay` median 1,489, max 4,139 (11-11's slow builds had 2,100-2,765), about 2,000 cards each.
+- **verify:**
+  - `INPLAY_OVERLAY sport=nba elapsed_ms`: median **12.2 s**, p90 22.3, max 32.0 s (11-11: median 136 s, max 234 s). `evidence_s` median 4.3 s, max 11.3 s (budget 20 s). **MET** (falsified > 60 s).
+  - NCAAB overlay gap: median **98.3 s**, p90 190.1, max 305.2 s; 0 of 40 over 360 s. **MET** (goal <= 120 s; 292 s on 11-11; 96.3 s pre-tip today). WNCAAB 97.7 s median (max 273.7 s); NCAAF 88.9 s (max 206.3 s).
+  - NBA overlay gap: median 193.5 s, p90 299.1, max 323.3 s; 0 of 22 over 360 s. NBA is built every other tick (option (c)): 11 ticks deferred it.
+  - `BOOK_GRID_TICK` gap: median 72.4 s, p90 144.2, max 247.2 s (11-11 with NBA live: median 307 s).
+  - `build_seconds.nba` while live: n 23, median 50.0 s, p90 80.3, max 123.9 s.
+  - web `INPLAY_OVERLAY_MERGED`: 158 lines; nba / ncaab / wncaab / ncaaf fresh 158, stale 0. NFL stale 158 (age about 74,000 s): last night's overlay, no NFL game in play, expected.
+- **The condition held:** the board loop ran back to back through the window (`BOARD_BUILD_TIMING` wall 163-297 s, cpu about equal to wall, every 5-6 min), so this is the contended worker, not a quiet one.
+- **Reading:** #790's goal is met with NBA live. Headroom left: NBA's own overlay gap reached 323 s against web's 360 s cutoff, because NBA's grid (median 50 s, max 124 s) still shares the GIL with the board loop (lane H3: 135,090 of 137,279 stat-like calls per build are three per-row file lookups; candidate fix not built, the user's call).
+- **Still owed:** a peak re-read at 02:45Z (8:45 PM CST) with more of the slate live (watcher on pid 469244); then the lane closes.
