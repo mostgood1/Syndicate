@@ -61,3 +61,13 @@ rows (2,000 looks like a cap), so no row was lost from the normal level; 60 are 
 Scripts, read-only over the fleet's logs, state files and served board: `C:\tmp\edge-analyses\nfl-shortlist-drop\`
 (`builds_window.py`, `own_key_replay.py`, `own_key_replay_ncaaf.py`, `key_peek.py`, `spike_check.py`,
 `gone_vs_drop.py`).
+## 5. Loaded 11-14 19:55Z; first reading
+
+Fleet `2c230f318`, refresh-worker pid 958200 (deploys.md 2026-11-14 19:54:59Z). The first build with a fresh NFL pull
+on the new code (20:16:22Z drop step, references 64-73 s): 0 NFL rows dropped, 332 kept by the new branch, board 1,246
+-> 1,189. The same shape on the old code at 18:49:53Z (reference 27 s): 418 dropped, 1,105 -> 752.
+
+The 2,000-row NFL builds (19:00:56Z, 20:20:12Z) carry no 11-14 reference and ~2,500 openings against ~7,750: most likely
+the 11-15 board date's build, with two dates in rotation, and so the 70 "spike returns" in section 4. Seen on these
+builds, not traced. Owed: the 11-15 Sunday tally with `builds_window2.py` (which skips the process-list log lines;
+they quote every running command line, this script's own patterns included).
