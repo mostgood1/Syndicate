@@ -947,6 +947,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_ncaaf_segment_skill.py (de-vig, consensus, framing, as-of filter, bridge, a planted-edge positive control); a COUNT-ONLY fleet run before this registration is pushed (no score read); this registration pushed to main BEFORE the grade runs; ONE grade run, its table in the findings file and under #804; registry + producer change with off != on tests; replay on a served NCAAF grid: every segment row from the registry, probabilities identical; after the user's load, a served reading that NCAAF segment rows carry basis measured_market_skill
 - Blocked by: none
 
+### rail-sport-and-filter-fold — OPEN — opened 2026-11-14 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: The games rail has its own sport selector (rail-only, like its live-edge filter: in the URL, never a board-row filter; counts per sport, shown when the rail spans 2+ sports) and the board's filter grid folds away behind a toolbar toggle remembered per viewer (desktop and tablet; the phone sheet is unchanged), so the rail can be the main thing on screen; JS pins; proven to render; on main; load (reload-web) is the user's decision (todo #806)
+- Files: syndicate/templates/intelligence.html (the LIVE RAIL LINES block + renderGameCards' rail filter rows + the railSport state and URL lines + the toolbar fold button and setupFilterFold ONLY), syndicate/static/shared/board_cards.css (the new fold rules ONLY), tests/js/board_rail_sport_and_fold.test.mjs (NEW), tests/js/games_rail_live_lines.test.mjs, docs/ai_context/todo.md (#806 section ONLY)
+- Hypothesis: n/a (a UI request relayed from session 8062940b: 'The rail needs a sport selector. The top section needs an accordian option so we can shrink it so the rail can be the main thing seen if the user chooses')
+- Falsification test: On the served page the rail's sport chips do not narrow the rail, or narrow the board below, or the fold does not hide the filter grid on a desktop width, or the phone filter sheet stops opening
+- Verification: JS harness: sport options and counts, rail-only filtering, URL round trip, fold wiring + storage + CSS scoped to >= 768 px; the page rendered in the built-in browser with both controls working (after the user's load, on the fleet page)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
