@@ -880,6 +880,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_nba_live_prop_grade.py (a planted-edge positive control and a books-vs-books null among them); a count-only fleet run before registering (no outcome read); the registration -- rule, thresholds, counts, the grader's blob hash -- pushed to main before the grade runs; then ONE grade run at nice 19 after the 11-16 games are in player_logs.csv, its table in the findings file and the verdict under #736
 - Blocked by: none
 
+### ncaaf-801-live-reading — OPEN — opened 2026-11-14 — session 354d95e7-309f-4ab6-889f-6fb70e623b79
+- Goal: todo #801's owed live reading: tonight's (11-14) NCAAF evening games (kickoff 6 PM CST or later = 00:00Z+ 11-15) reach the live gate (priceable full-game rows) instead of refusing no_two_sided_market_price; judged by a rule fixed at 1:55 PM CST before any evening row existed; recorded in deploys.md and the #801 section of todo.md (user: Watch the live lines after 6 PM kickoff / Record it in deploys.md / Update #801 in todo.md too). Read-only on the fleet; no code
+- Files: docs/ai_context/todo.md (#801 section only)
+- Hypothesis: With 40d5d6a4a loaded 19:29:19Z the evening rows carry market_fair_prob_over (served grid 115/115 at 19:43:57Z), so their live full-game rows reach the gate like day games (today's day games at 19:49Z: 3,519 of 5,897 priceable, 0 no_two_sided_market_price)
+- Falsification test: >= 200 live evening full-game rows from >= 3 games with 0 priceable, or > 50% of them no_two_sided_market_price
+- Verification: MET: >= 3 evening games each with >= 1 priceable full-game row AND evening no_two_sided_market_price share <= day share + 10 pp. Watcher watch801.ps1 -> live801.py (session scratchpad) every 5 min 00:15Z-01:45Z 11-15; THIN at the deadline
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
