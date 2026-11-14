@@ -898,6 +898,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 at 20:41Z read 2 SAFE of 13 CLOSED; moved `closed-lane-archive-20261114-0839` and `maker-pilot-rejudge` to lanes_closed.md with one pointer each. Other 11 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-14.md.
 
+### prop-expert-name-key — OPEN — opened 2026-11-14 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: The stat-progress expert's book-quote index matches NBA players on the engine's own name key (live_resim.normalize_name, the key the re-sim's own line read uses), so a player the books spell differently (Herb / Herbert Jones, Jr. / III suffixes) gets opinions: on the fleet's 11-11..11-13 NBA nights the expert's no_quotes_for_player_market skips fall from 19,907 to ~0 with 0 prior-reproduction mismatches. Offline expert only; no production change.
+- Files: syndicate/features/shared/engine_experts.py (the PropQuoteIndex player key only), scripts/engine_experts.py (its stat_progress PropQuoteIndex call only), tests/test_engine_experts.py (its PropQuoteIndex tests only), docs/ai_context/engine_experts.md (the stat-progress section only)
+- Hypothesis: measured before the fix (fleet, read-only, 11-14): all 19,907 no_quotes_for_player_market rows on 11-11..11-13 have quotes for the same game + market under a spelling the engine key merges (7 players: Herb Jones, Robert Williams, Paul Reed Jr, Ron Holland, Carlton Carrington, Derrick Jones, Bobby Portis)
+- Falsification test: after the fix, the 11-11..11-13 re-run still skips those players' quoted lines, or the prior reproduction check reports any mismatch, or two different players on one game collapse to one key
+- Verification: pytest tests/test_engine_experts.py with an off != on test (Herbert vs Herb, a Jr. suffix) that fails on the old key; then the experts runner's stat_progress section re-run read-only on the fleet for 11-11..11-13, before / after counts recorded in the lane
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
