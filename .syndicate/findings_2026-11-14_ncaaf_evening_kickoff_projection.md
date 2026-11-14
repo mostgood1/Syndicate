@@ -2,7 +2,8 @@
 
 - **Found** 2026-11-14 12:55 AM CST, by lane `live-totals-prob-scale`'s #780 reading. Tonight's NCAAF half had 0 rows
   to judge, and the null was checked rather than taken as a quiet night.
-- **Status: TRACED, NOT FIXED.** The fix is the user's decision. Read-only throughout (fleet, nice 19).
+- **Status: FIXED ON MAIN `40d5d6a4a` (2026-11-14 9:43 AM CST, user "Yes, fix it here"), NOT LOADED.** Loading needs a
+  fleet ff and a refresh-worker restart, which is the user's decision. Every fleet read was read-only (nice 19).
 
 ## Measured
 
@@ -63,7 +64,52 @@ which is the next UTC date.
   board's model view and every live NCAAF price for those games.
 - **#780:** the NCAAF half of the reading can only come from games kicking off before 6 PM CST until this is fixed.
 
-## Fix shape (not built)
+## Fix (built, on main `40d5d6a4a`)
+
+**The proposed shape below was NOT built.** "The date the index matched" is CFBD's `startDate`, which is UTC too,
+so it keeps the defect. What was built:
+
+1. `game_projections.row_date_scope(row, selected_date)` gives one of three answers:
+   - OWN: the row's Central kickoff day is the pass's date. The row is joined and counted.
+   - CARRY: only its UTC date is. The row is joined but not counted.
+   - None: neither.
+   Both joins use it, the same Central rule `prop_projections._row_date` already followed.
+2. **Why CARRY exists.** Before this change a row was joined on its UTC date's pass. A late game still live past
+   midnight Central relies on that, because `layer2_shortlist._row_kickoff_dates` adds no date before the slate, so
+   the next day's pass is the only one it gets. A pure Central filter would have fixed the evening and broken the
+   carryover. `lookup` keys on the row's own date, so both passes write the same value, and counting only on OWN
+   keeps the 09-03 rule that summed window counters see each row once.
+3. **A second cause, missed by the trace above:** `index.games` and `unratable_games` were counted off CFBD's UTC key.
+   A weeknight whose every game kicks off at 7 PM ET counted 0 games, so `board_enrichment`'s `if not index.games`
+   gate skipped the join outright. Both now count by `sources.ncaaf_game_calendar_date`, the TBD-aware Central day.
+   The gate now asks whether the index holds anything. A Sunday therefore still joins Saturday's late carryover, and
+   the "no projections for this date" reason is kept on such a date.
+4. **The segment test fixture was itself an evening kickoff** (`2099-01-01T00:00:00Z`, which is 6 PM CST on 12-31).
+   It passed only because of the UTC filter, and it now kicks off at noon CST.
+
+**Tests:** 9 new. 8 fail on the pre-fix code at their behavioural assertion (off != on), and the ninth guards the
+out-of-scope case. 478 pass across the projection, Layer 2 window and NCAAF board test files.
+
+**Replay on the fleet's own data**
+- Script: `C:\tmp\livegrade\load780\replay801.py`; outputs: `replay801_{old,new}_<date>.json`.
+- Method: the served `book_grid_<date>.json` artifacts, projections stripped, then the board's own
+  `_attach_projections_by_sport`. "Deployed" is `~/Syndicate` at `fee389971`; "fixed" is this worktree.
+- Safety: the schedule loader was pinned to the existing file, and no bytecode or data was written.
+
+| board | full-game rows with a model | segment rows | games indexed | lost | identical |
+|---|---|---|---|---|---|
+| 11-14 (Sat) | 261 -> 381 (+120: 77 at 00Z, 17 at 02Z, 20 at 03Z, 6 at 04Z; 18 games) | 592 -> 592 | 43 -> 56 | 0 | 853 of 853 |
+| 11-13 (Thu) | 0 -> 41 | 0 -> 90 | 2 -> 3 | 0 | n/a |
+
+The deployed-code replay reproduces the served 11-14 board exactly (853 served, 853 replayed). That validates the
+instrument. On 11-13, 4 served rows carried a projection that the deployed replay did not, which is unexplained and
+small. The fix projects them as well.
+
+**Owed after a load:**
+- the served NCAAF grid carries projections on 6 PM CST+ kickoffs;
+- the live ledger shows those games' rows reaching the gate, not `no_two_sided_market_price`.
+
+## Fix shape as first proposed (superseded, kept for the record)
 
 Filter on the date the INDEX matched rather than the row's UTC date: keep the per-date counter scoping, but let a row
 through when its UTC date is within the index's tolerance and `index.lookup` resolves it to a game on
