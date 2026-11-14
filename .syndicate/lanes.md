@@ -858,6 +858,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 at 18:41Z read 1 SAFE of 10 CLOSED; moved `closed-lane-archive-20261114-0640` to lanes_closed.md with one pointer. Other 9 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-14.md.
 
+### rail-callouts-sim-vs-book — OPEN — opened 2026-11-14 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: The games rail shows sim vs book as INFORMATION on every live line, full game and interval: each green callout names the same line its table row shows, in the card's own units (score points for our projection vs the line, % for the probabilities), interval lines get callouts by the same fresh-quote rule (display only, no board pricing), and the age shown is the age NOW; JS + pytest pins incl. off != on where a switch exists; on main; web load (reload-web) is the user's decision (todo #803)
+- Files: syndicate/templates/intelligence.html (the LIVE RAIL LINES block ONLY), tests/js/games_rail_live_lines.test.mjs, tests/js/games_rail_intervals.test.mjs, tests/test_layer2_live_rail_edges.py, docs/ai_context/todo.md (#803 section ONLY)
+- Hypothesis: User 11-14 1:10 PM CST: the green callouts do not match the card. Measured on the served board 19:16-19:18Z: (1) units -- the callout's +x pts is model probability minus the book's no-vig fair in percentage points, the table is score points; (2) line -- the callout takes the fresh row with the biggest gap (18 of 27 flagged full-game markets name a different line than the table), the table takes the line priced closest to even at ANY age (19 of 82 markets show a line > 120 s old while a <= 120 s quote exists); (3) frame -- OURS is the re-sim's raw projection, the flag's probability is the priced (#780-scaled) one. Interval rows never flag: 0 of 102 carry a priced edge (display only)
+- Falsification test: After the change, on the served board, any flagged market whose callout line differs from its table line, or a callout whose points cannot be recomputed from the OURS and BOOK cells it sits under
+- Verification: JS harness on fixtures shaped like served rows: same-line pin, unit text, interval flag on a display-only row, age-now display; pytest wrapper; a read of the served board after the user's reload-web: callout line == table line for every flagged market, interval callouts present
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
