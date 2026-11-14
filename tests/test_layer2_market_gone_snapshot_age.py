@@ -1,4 +1,4 @@
-"""`market_gone` judges a row's age from the SAME state-file read as the reference. `#801`.
+"""`market_gone` judges a row's age from the SAME state-file read as the reference. `#802`.
 
 Lane `board-market-gone-snapshot-age`, 2026-11-14. The shortlist computes a row's `quote_seen_age_seconds` when it
 builds that sport's grid, early in the board build; `_drop_market_gone_rows` reads the reference from the state file at
