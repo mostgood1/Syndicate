@@ -59999,3 +59999,28 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **On the live page** (built-in browser, http://127.0.0.1:10000/, 23:12:5x-23:14:01Z): `/api/board/live-rail` fetched 3 times in the first 60 s (at 18 / 36 / 49 s after load), 19,937-19,939 B each on the wire (gzip), 51-413 ms; the board's own fetch once (its 60 s poll). At 23:14:01Z the rail's 162 age cells included the newest grid build (23:13:50Z, from the endpoint), 11 s after it was written; 0 console errors. 29 live cards.
 - **revert:** `SYNDICATE_LIVE_RAIL_FAST_POLL=off` in `local_production.env` + a drained full down/up (the page stops polling at its next fetch); or revert `937dc060f`, ff, `reload-web` (no downtime).
 - **verify:** a live page's network log shows `/api/board/live-rail` about every 15 s while a live game is on the rail; the rail's newest `data-rail-built-at` follows the newest overlay within ~15 s.
+
+## 2026-11-14 23:32:08Z (5:32 PM CST) -- FLEET ff 937dc060f -> f73b8a84a + reload-web + claimed, drained refresh-worker TERM: todo #805 NCAAF quarter/half rows rank on the pre-registered per-segment grade instead of a game-level `measured_loss` note that scored 1.0 (lane `ncaaf-segment-skill`, session 386d4115) -- **reachability MET on production code, env and inputs (1,622 rows `measured_loss` at 1.0 -> 1,669 of 1,669 from `measured_market_skill`: totals 0.769, spreads 0.981, h2h 1.0; probabilities identical); served reading MET**
+- **User, in this session's chat:** "Push and load now" (answering "Push cadb5ab1d, and when should it load on the fleet?"; I had recommended after 7:45 PM CST for lane `ncaaf-801-live-reading`'s 00:15-01:45Z window). The restart landed at 23:32Z, before that window.
+- **Commit** `f73b8a84a` (`cadb5ab1d` rebased onto main), pushed ~23:18Z. Tests: 943 passed across every test file touching the changed modules; the new grader + registry tests 12 + 21.
+- **Range `937dc060f..f73b8a84a`, runtime files:** `ncaaf/segment_projections.py`, `shared/measured_market_skill.py`; script `scripts/ncaaf_segment_skill.py` (offline). `ff.sh` refused any other base or file set; 0 of the 14 dirty fleet files in range.
+- **Also loaded by the refresh-worker restart** (pid 1000096 had run `8553a38cc` since 21:06:28Z; the 23:12:34Z ff to `937dc060f` was web-only): `blueprints/intelligence.py`, `live_rail_rows.py`, `intelligence.html` (web; `live_rail_rows` is imported only by that blueprint) and `engine_experts.py` (`b986a98c9`, no runtime importer). So nothing else of runtime effect reached refresh-worker.
+- **Gates:**
+  - Claims web / refresh-worker, holder `ncaaf-segment-skill`, 23:19:02Z (rc 0 each).
+  - Drain refresh-worker from 23:19Z: the in-flight board build (stage `portfolio_commit`) finished, then an odds job and a soccer artifact build; **CLEAR** 23:30:5xZ (second wait).
+  - Baseline 23:31:49Z: `fleet_checkout_head=937dc060f`, `refresh_worker_pid=1000096`, `ncaaf_segment_registry_on_disk=0`, served NCAAF segment rows from `measured_market_skill` 0 (23:16:52Z grid: 1,622 at weight 1.0).
+  - Preflight `--target fleet --target-commit f73b8a84a...` for web and refresh-worker with those baselines: **CLEAR** rc 0 by 23:32:01Z.
+- **Load** (`C:\tmp\ncaaf_seg\load\ff.sh`, `C:\tmp\ncaaf_seg\load\load.sh`):
+  - ff 23:32:08.136Z: HEAD `f73b8a84a`; registry on disk.
+  - reload-web 23:32:15.625Z: HUP master 438, workers [1080100, 1080186] -> [1080384, 1080385] in 2.0 s, 0 failures, healthz 200.
+  - TERM refresh-worker 1000096 at 23:32:17.819Z (no live children) -> **pid 1080447** 23:32:26Z, head `f73b8a84a`; undrained 23:32:34Z (`DRAIN_CLEARED`).
+- **expect / measured:**
+  - `fleet_checkout_head` -> f73b8a84a: **MET**. `web_workers`, `refresh_worker_pid` respawned: **MET**.
+  - `ncaaf_producer_note_on_disk=0`: the grep still counts 1, because the NEW docstring quotes the old note (`{"state": "measured_loss", ...}`). The instrument was wrong, not the code: the reachability replay shows no producer note on any row.
+  - Real tracebacks (`Traceback (most recent call last)`) 23:32:15Z onward and in the 20 min before: 0 / 0 on web and refresh-worker.
+- **Reachability (`off != on`) under refresh-worker's own environ** (`C:\tmp\ncaaf_seg\load\reach_ncaaf.py`: the SERVED NCAAF grid's segment rows, projections stripped and re-attached by the fleet's own `load_ncaaf_segment_inputs` + producer + `attach_projection_skill`):
+  - `937dc060f` (pid 1000096, 23:2xZ, 23:16:52Z grid): 1,622 rows `status measured`, `state measured_loss`, no basis, weight 1.0 -- the served label exactly; probabilities 1,622 of 1,622 identical.
+  - `f73b8a84a` (pid 1080447, 23:3xZ, 23:30:43Z grid): 1,669 of 1,669 from the registry -- totals 646 `loses_to_market` 0.769, spreads 693 `loses_to_market` 0.981, h2h 330 `parity` 1.0; probabilities 1,669 of 1,669 identical (incl. `sim_model_prob_over` on started games).
+- **verify -- served reading:** MET -- the first NCAAF grid built after the restart (23:35:28Z, read 23:36:05Z; `C:/tmp/ncaaf_seg/load/wait_grid.py`): 1,641 of 1,641 segment rows with a projection carry `basis measured_market_skill` (totals 641 `loses_to_market` 0.769, spreads 670 `loses_to_market` 0.981, h2h 330 `parity` 1.0); baseline 0 of 1,622 (23:16:52Z grid).
+- **Revert:** `git revert f73b8a84a`, a fleet ff, a claimed, drained refresh-worker TERM and a reload-web.
+- **Claims:** both released right after this entry.
