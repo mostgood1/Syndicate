@@ -3301,34 +3301,58 @@
     return age !== null && age >= 0 ? age : null;
   }
 
+  // When the board priced this row (ms): the row's own grid build on an
+  // in-play overlay row, else the page's build time. Null when unknown.
+  function liveQuoteBuiltAtMs(item, response) {
+    const own = Date.parse(String((item && item.price_grid_generated_at) || ""));
+    const builtAt = Number.isFinite(own) ? own : boardBuildEpochMs(response);
+    return builtAt === null || builtAt === undefined || !Number.isFinite(builtAt) ? null : builtAt;
+  }
+
   function liveQuoteAgeNowSeconds(item, response, nowMs) {
     const priced = liveQuotePricingAgeSeconds(item);
     if (priced === null) return null;
-    const own = Date.parse(String((item && item.price_grid_generated_at) || ""));
-    const builtAt = Number.isFinite(own) ? own : boardBuildEpochMs(response);
-    if (builtAt === null || builtAt === undefined || !Number.isFinite(builtAt)) return null;
+    const builtAt = liveQuoteBuiltAtMs(item, response);
+    if (builtAt === null) return null;
     const now = Number.isFinite(nowMs) ? nowMs : Date.now();
     return priced + Math.max(0, (now - builtAt) / 1000);
   }
 
-  // The live join's edge for this row, in points, or null. `live_aware` is set
-  // only where the live join ran on the row, so a pregame `model_edge_pct` on a
-  // live row is never read as a live edge.
-  function liveRowEdgePp(item) {
-    if (!item || item.live_aware !== true) return null;
-    return liveRailNum(item.model_edge_pct);
+  // SIM VS BOOK, AS INFORMATION (todo #803, user 2026-11-14: "the rail is to
+  // provide INFORMATION of sim vs book. its not about grading results"). The
+  // gap is our live sim's probability for THIS row's side against the book's
+  // no-vig fair for it, both as served on the row -- so a callout can always be
+  // read off the numbers it shows. Every live line counts, the full game and
+  // each interval alike: an interval row is display-only on the BOARD (its
+  // pricing is a separate decision, #763), but its sim-vs-book comparison is
+  // exactly what the rail is for. A row with no live sim probability falls back
+  // to the live join's priced gap (`live_aware` + `model_edge_pct`; a pregame
+  // `model_edge_pct` on a live row is never read as live).
+  // {gap, model, fair} in points / probabilities, or null.
+  function liveRowGap(item) {
+    if (!item) return null;
+    const quote = item.quote && typeof item.quote === "object" ? item.quote : {};
+    const model = liveRailNum(item.live_model_probability);
+    const fair = liveRailNum(quote.fair_probability) ?? liveRailNum(quote.fair_consensus_prob);
+    if (model !== null && fair !== null && model > 0 && model < 1 && fair > 0 && fair < 1) {
+      return { gap: (model - fair) * 100, model, fair };
+    }
+    if (item.live_aware !== true) return null;
+    const priced = liveRailNum(item.model_edge_pct);
+    return priced === null ? null : { gap: priced, model: null, fair };
   }
 
-  // {edge, priced, ageNow} when this row's live edge counts, else null. See the
-  // block comment: an edge, a fresh quote at pricing, and a price not stale now.
+  // {edge, model, fair, priced, ageNow} when this row's sim-vs-book gap is
+  // flagged, else null. See the block comment: a gap of LIVE_EDGE_MIN_PP or
+  // more, a fresh quote at pricing, and a price not stale now.
   function liveRowFreshEdge(item, response, nowMs) {
-    const edge = liveRowEdgePp(item);
-    if (edge === null || edge < LIVE_EDGE_MIN_PP) return null;
+    const found = liveRowGap(item);
+    if (!found || found.gap < LIVE_EDGE_MIN_PP) return null;
     const priced = liveQuotePricingAgeSeconds(item);
     if (priced === null || priced > LIVE_EDGE_FRESH_QUOTE_SECONDS) return null;
     const ageNow = liveQuoteAgeNowSeconds(item, response, nowMs);
     if (ageNow === null || ageNow > LIVE_PRICE_STALE_AFTER_SECONDS) return null;
-    return { edge, priced, ageNow };
+    return { edge: found.gap, model: found.model, fair: found.fair, priced, ageNow };
   }
 
   function liveRailFairProb(row) {
@@ -3344,8 +3368,16 @@
   // priced closest to even (a de-vigged fair nearest 50%), which is what a
   // book posts as its main number while the alternates sit either side.
   // Moneyline: the side our live number favours.
-  function liveRailMainRow(rows, market) {
+  //
+  // FROM THE FRESH QUOTES when there are any (todo #803). An old quote keeps
+  // the fair it had when it was the main line: measured on the served board
+  // 2026-11-14 19:16Z, 19 of 82 live full-game markets showed a line over
+  // 120 s old while a quote of 120 s or less existed -- GT @ CLE's total read
+  // 41.5 from a quote unchanged for 13 min while the books were at 38.5.
+  function liveRailMainRow(rowsIn, market) {
     const age = (row) => { const a = liveQuotePricingAgeSeconds(row); return a === null ? Infinity : a; };
+    const freshRows = rowsIn.filter((row) => age(row) <= LIVE_EDGE_FRESH_QUOTE_SECONDS);
+    const rows = freshRows.length ? freshRows : rowsIn;
     if (market === "h2h") {
       const rank = (row) => {
         const p = liveRailNum(row.live_model_probability);
@@ -3404,10 +3436,10 @@
   // has a live re-sim block, else the row's own live number (`live_total`, the
   // interval's display-only live total; `live_model_probability`). An interval
   // the chip calls SETTLED is skipped: its market is over, whatever row a board
-  // build still carries. College interval rows carry no priced edge (segment
-  // pricing is off, #763), so they show the comparison and never flag -- the
-  // rule is applied per row, not per segment, so a priced interval (MLB F5)
-  // flags like any line.
+  // build still carries. Interval rows are display-only on the board (segment
+  // pricing is off, #763), but they carry the live sim's probability for their
+  // side, so they get callouts by the same rule as the full game (todo #803:
+  // the rail is information, sim vs book).
   function liveRailSummary(rows, chip, response, nowMs) {
     const iv = chip && chip.intervals && chip.intervals.source === "live_resim" ? chip.intervals : null;
     const out = { markets: [], freshEdges: {}, hasFreshEdge: false };
@@ -3421,7 +3453,17 @@
       const prefix = liveRailSegmentLabel(segment);
       for (const spec of LIVE_RAIL_MARKETS) {
         const marketRows = (rows || []).filter((row) => liveRailMarketKey(row) === spec.key && liveRailSegmentKey(row) === segment);
-        const main = marketRows.length ? liveRailMainRow(marketRows, spec.key) : null;
+        // ONE LINE PER MARKET (todo #803). The callout's line IS the table's
+        // line: when a row is flagged, OURS / BOOK / AGE describe that row.
+        // They used to describe the main line while the callout named the
+        // biggest gap -- 18 of 27 flagged full-game markets named a different
+        // line than the table on the served board 2026-11-14 19:16Z.
+        let best = null;
+        for (const row of marketRows) {
+          const fresh = liveRowFreshEdge(row, response, nowMs);
+          if (fresh && (!best || fresh.edge > best.edge)) best = { ...fresh, row };
+        }
+        const main = best ? best.row : (marketRows.length ? liveRailMainRow(marketRows, spec.key) : null);
         if (!main) continue;
         const team = liveRailTeamLabel(main, chip);
         const line = liveRailNum(main.line);
@@ -3454,11 +3496,6 @@
           }
           book = `${team} ${liveRailAmerican(main.odds)}`;
         }
-        let best = null;
-        for (const row of marketRows) {
-          const fresh = liveRowFreshEdge(row, response, nowMs);
-          if (fresh && (!best || fresh.edge > best.edge)) best = { ...fresh, row };
-        }
         let edge = null;
         if (best) {
           const r = best.row;
@@ -3467,8 +3504,11 @@
             ? `${String(r.side || "").toLowerCase() === "under" ? "u" : "o"}${rLine === null ? "" : rLine}`
             : spec.key === "spreads"
               ? `${liveRailTeamLabel(r, chip)} ${rLine === null ? "" : liveRailSigned(rLine, null)}`
-              : `${liveRailTeamLabel(r, chip)} ML`;
-          edge = { side, edge: best.edge, priced: best.priced, ageNow: best.ageNow };
+              : `${liveRailTeamLabel(r, chip)}`;
+          // OURS in the callout only where it is a score (a total, a margin):
+          // a moneyline's OURS is the same probability the callout already says.
+          const oursScore = spec.key === "h2h" || ours === null || /%/.test(ours) ? null : ours;
+          edge = { side, edge: best.edge, model: best.model, fair: best.fair, ours: oursScore, priced: best.priced, ageNow: best.ageNow };
           out.freshEdges[spec.key] = true;
           out.hasFreshEdge = true;
         }
@@ -3479,6 +3519,7 @@
           ours, book,
           ageNow: liveQuoteAgeNowSeconds(main, response, nowMs),
           pricedAge: liveQuotePricingAgeSeconds(main),
+          builtAt: liveQuoteBuiltAtMs(main, response),
           edge,
         });
       }
@@ -3492,34 +3533,101 @@
     return filter === "any" ? Boolean(summary.hasFreshEdge) : Boolean(summary.freshEdges && summary.freshEdges[filter]);
   }
 
+  // AGE IS THE AGE NOW (todo #803, user 2026-11-14: "by the time I see the edge
+  // its already gone"). It used to show the quote's age when the board priced
+  // it -- so the green number agreed with the flag rule -- but the board and the
+  // page add their own delay on top. Measured on the fleet 2026-11-14 19:21-
+  // 19:41Z (41 callouts that appeared in the window): the book's price was a
+  // median 151 s old when the callout reached the board (46 s our last look ->
+  // pricing, 56 s pricing -> board), the page polls every 60 s on top, and
+  // 10 of 41 had already changed at the book before they showed. A "46s" in
+  // green was usually 2-3 minutes old. Now the cell says how old the quote is
+  // NOW, and keeps counting between page refreshes (`tickLiveRailAges`): green
+  // while it is LIVE_EDGE_FRESH_QUOTE_SECONDS or less, orange past
+  // LIVE_PRICE_STALE_AFTER_SECONDS. A callout shows the same age and fades once
+  // its quote is past the fresh line.
+  function liveRailAgeClass(ageNow) {
+    if (ageNow === null || ageNow === undefined || !Number.isFinite(ageNow)) return "";
+    if (ageNow > LIVE_PRICE_STALE_AFTER_SECONDS) return " is-stale";
+    return ageNow <= LIVE_EDGE_FRESH_QUOTE_SECONDS ? " is-fresh" : "";
+  }
+
+  function liveRailAgeAttrs(m) {
+    return m.pricedAge !== null && m.pricedAge !== undefined && m.builtAt !== null && m.builtAt !== undefined
+      ? ` data-rail-age-priced="${escapeHtml(String(m.pricedAge))}" data-rail-built-at="${escapeHtml(String(m.builtAt))}"`
+      : "";
+  }
+
+  const LIVE_RAIL_AGED_OPACITY = "0.55";
+
   function renderLiveRailLines(summary) {
     if (!summary || !summary.markets || !summary.markets.length) return "";
     const span = (cls, text) => `<span class="game-mini-card__live-${cls}">${escapeHtml(text)}</span>`;
     const head = ["LIVE", "OURS", "BOOK", "AGE"].map((text) => span("label", text)).join("");
     const body = summary.markets.map((m) => {
-      // AGE SHOWS THE CLOCK THE FLAG TESTS: the quote's age when the board
-      // priced it, so the number and its green agree (a "65s" in green, read
-      // on the fleet 2026-11-10, was a 25 s quote served 40 s later). Once the
-      // board itself is stale the age NOW replaces it, in orange: that is the
-      // number that matters then.
-      const stale = m.ageNow !== null && m.ageNow > LIVE_PRICE_STALE_AFTER_SECONDS;
-      const fresh = !stale && m.ageNow !== null && m.pricedAge !== null && m.pricedAge <= LIVE_EDGE_FRESH_QUOTE_SECONDS;
-      const shown = stale ? m.ageNow : m.pricedAge;
+      const shown = m.ageNow !== null ? m.ageNow : m.pricedAge;
       const age = shown === null ? null : formatAge(shown);
-      const ageCls = fresh ? " is-fresh" : stale ? " is-stale" : "";
-      const tip = `Quote ${m.pricedAge === null ? "age unknown" : `${formatAge(m.pricedAge)} old`} when priced; ${m.ageNow === null ? "no board build time" : `≈${formatAge(m.ageNow)} now`}`;
+      const tip = `Quote ${m.pricedAge === null ? "age unknown" : `${formatAge(m.pricedAge)} old`} when the board priced it; ${m.ageNow === null ? "no board build time" : `≈${formatAge(m.ageNow)} now`}`;
       return span("mkt", m.short) + span("ours", m.ours === null ? "–" : m.ours) + span("book", m.book)
-        + `<span class="game-mini-card__live-age${ageCls}" title="${escapeHtml(tip)}">${escapeHtml(age || "?")}</span>`;
+        + `<span class="game-mini-card__live-age${liveRailAgeClass(m.ageNow)}"${liveRailAgeAttrs(m)} title="${escapeHtml(tip)}">${escapeHtml(age || "?")}</span>`;
     }).join("");
-    const title = "Live, full game: OURS is the live re-sim, BOOK the market's main live line (priced closest to even). "
-      + "AGE is how long the book's price had stood unchanged when the board priced it (orange: the board is over 5 min old, shown as the age now). "
-      + `A model-vs-line gap is flagged only when it was priced against a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less (green): `
-      + "graded against finals (#780), gaps on older quotes were the line not having moved yet, and even fresh-quote gaps have realised ~0 -- a disagreement, not a proven edge.";
+    const title = "Live, full game and each interval: OURS is the live re-sim, BOOK the market's live line (priced closest to even among the fresh quotes, or the line called out below). "
+      + `AGE is how long the book's price has stood unchanged, as of now, and keeps counting between refreshes (green: ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s or less; orange: over ${Math.round(LIVE_PRICE_STALE_AFTER_SECONDS / 60)} min). `
+      + `A callout marks a line where our sim's probability for that side is ${LIVE_EDGE_MIN_PP} points or more above the book's no-vig price, priced on a quote ${LIVE_EDGE_FRESH_QUOTE_SECONDS}s old or less; it fades once the quote is older than that. `
+      + "It is information -- the sim against the book -- not a graded bet signal.";
+    const pct = (p) => `${Math.round(p * 100)}%`;
     const edges = summary.markets.filter((m) => m.edge).map((m) => {
-      const tip = `Our live re-sim disagrees with a fresh line: its probability is ${m.edge.edge.toFixed(1)} points above the market's no-vig fair, priced against a quote ${formatAge(m.edge.priced) || "?"} old. Graded against finals, such gaps have realised ~0 so far (#780): not a proven edge.`;
-      return `<div class="game-mini-card__live-edge" title="${escapeHtml(tip)}">≠ ${escapeHtml(m.label)} ${escapeHtml(m.edge.side)}: model +${escapeHtml(m.edge.edge.toFixed(1))} pts vs a ${escapeHtml(formatAge(m.edge.priced) || "?")} line</div>`;
+      // THE CALLOUT IN THE CARD'S OWN UNITS (todo #803). It used to read
+      // "model +31.8 pts": percentage points of PROBABILITY beside a table in
+      // score points (DEP @ ND 11-14: our 155.6 vs the book's 165.5 under is
+      // 9.9 points of score and 31.8 points of probability). Now: our score for
+      // this line (the same cell as the table row above it), both
+      // probabilities as percentages, and the quote's age now.
+      const fair = m.edge.fair;
+      const model = m.edge.model ?? (fair !== null && fair !== undefined ? fair + m.edge.edge / 100 : null);
+      const probs = model !== null && fair !== null && fair !== undefined
+        ? `sim ${pct(model)} vs book ${pct(fair)}`
+        : `sim ${m.edge.edge.toFixed(1)} points above the book's no-vig price`;
+      const ours = m.edge.ours ? `ours ${m.edge.ours} · ` : "";
+      const ageNow = m.ageNow !== null ? m.ageNow : m.edge.ageNow;
+      const aged = ageNow !== null && ageNow !== undefined && ageNow > LIVE_EDGE_FRESH_QUOTE_SECONDS;
+      const tip = `Our live sim gives ${m.edge.side} ${model === null ? "?" : pct(model)}; the book's no-vig price says ${fair === null || fair === undefined ? "?" : pct(fair)}. The book's quote was ${formatAge(m.edge.priced) || "?"} old when the board priced it. Information -- the sim against the book -- not a graded bet signal.`;
+      return `<div class="game-mini-card__live-edge"${liveRailAgeAttrs(m)}${aged ? ` style="opacity:${LIVE_RAIL_AGED_OPACITY}"` : ""} title="${escapeHtml(tip)}">≠ ${escapeHtml(m.label)} ${escapeHtml(m.edge.side)}: ${escapeHtml(ours)}${escapeHtml(probs)} · <span class="game-mini-card__live-edge-age">${escapeHtml(formatAge(ageNow) || "?")} old</span></div>`;
     }).join("");
     return `<div class="game-mini-card__live" title="${escapeHtml(title)}">${head}${body}</div>${edges}`;
+  }
+
+  // The rail's ages count up between page refreshes (the board re-fetches every
+  // 60 s): every LIVE_RAIL_AGE_TICK_MS, each age cell and callout recomputes its
+  // age from the two numbers it was rendered with -- the quote's age when priced
+  // and when the board priced it -- and nothing is fetched. Returns how many
+  // elements it updated.
+  const LIVE_RAIL_AGE_TICK_MS = 5000;
+  function tickLiveRailAges(root, nowMs) {
+    if (!root || typeof root.querySelectorAll !== "function") return 0;
+    const now = Number.isFinite(nowMs) ? nowMs : Date.now();
+    let updated = 0;
+    for (const el of root.querySelectorAll("[data-rail-built-at]")) {
+      const priced = Number(el.getAttribute("data-rail-age-priced"));
+      const built = Number(el.getAttribute("data-rail-built-at"));
+      if (!Number.isFinite(priced) || !Number.isFinite(built)) continue;
+      const ageNow = priced + Math.max(0, (now - built) / 1000);
+      const label = formatAge(ageNow) || "?";
+      if (el.classList.contains("game-mini-card__live-age")) {
+        el.textContent = label;
+        el.classList.toggle("is-fresh", liveRailAgeClass(ageNow) === " is-fresh");
+        el.classList.toggle("is-stale", liveRailAgeClass(ageNow) === " is-stale");
+      } else {
+        const ageSpan = el.querySelector(".game-mini-card__live-edge-age");
+        if (ageSpan) ageSpan.textContent = `${label} old`;
+        el.style.opacity = ageNow > LIVE_EDGE_FRESH_QUOTE_SECONDS ? LIVE_RAIL_AGED_OPACITY : "";
+      }
+      updated += 1;
+    }
+    return updated;
+  }
+  if (typeof window !== "undefined" && typeof document !== "undefined" && typeof window.setInterval === "function") {
+    window.setInterval(() => { tickLiveRailAges(document, Date.now()); }, LIVE_RAIL_AGE_TICK_MS);
   }
   // ===== LIVE RAIL LINES -- END =====
 

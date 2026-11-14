@@ -41,7 +41,7 @@ const api = new Function('escapeHtml', 'trimClubAffixes', `
   ${buildSrc[0]}
   ${block[0]}
   return { liveRailMarketKey, liveRailSegmentKey, liveQuotePricingAgeSeconds, liveQuoteAgeNowSeconds, liveRowFreshEdge, liveRailMainRow,
-           liveRailSummary, liveEdgeFilterMatches, renderLiveRailLines,
+           liveRailSummary, liveEdgeFilterMatches, renderLiveRailLines, tickLiveRailAges, LIVE_RAIL_AGE_TICK_MS,
            LIVE_EDGE_FRESH_QUOTE_SECONDS, LIVE_EDGE_MIN_PP, LIVE_PRICE_STALE_AFTER_SECONDS };
 `)(escapeHtml, trimClubAffixes);
 
@@ -108,13 +108,14 @@ const live = api.liveRailSummary(fresh(), chip, response, NOW);
 check('the full game first, then the interval', live.markets.map((m) => `${m.segment}:${m.key}`).join(','), 'full:spreads,full:totals,full:h2h,h1:totals');
 const out = text(api.renderLiveRailLines(live));
 check('header: LIVE OURS BOOK AGE', /^LIVE OURS BOOK AGE/.test(out), true);
-check('total: our re-sim (the card\'s own Proj final) vs the main line, with the quote age at pricing', /Total 145\.9 147\.5 12s/.test(out), true);
-check('spread: our margin restated for the line\'s team vs the book line', /Sprd FLA −10\.2 FLA −8\.5 40s/.test(out), true);
+check('total: the table row shows the line the callout names (u149), with our re-sim and the quote age NOW (12 s + 20 s since the build)', /Total 145\.9 149 32s/.test(out), true);
+check('spread: our margin restated for the line\'s team vs the book line', /Sprd FLA −10\.2 FLA −8\.5 60s/.test(out), true);
 check('moneyline: our live % vs the book price', /ML FSU 14% FSU \+575 2m/.test(out), true);
-check('fresh-quote gap is flagged as a disagreement with its line, size and quote age', /≠ Total u149: model \+10\.3 pts vs a 12s line/.test(out), true);
+check('the callout reads in the card\'s units: our score for the line, then sim vs book as percentages', /≠ Total u149: ours 145\.9 · sim 66% vs book 56%/.test(out), true);
+check('no callout speaks in "pts" any more (it meant probability points beside a table in score points)', /pts/.test(out), false);
 check('the flag never calls itself an edge', /EDGE|edge/.test(out), false);
-check('interval row: no PROJ block on this chip, so OURS is the row\'s own live total', /1H Total 62\.3 61 5s/.test(out), true);
-check('a display-only interval never flags', /≠ 1H/.test(out), false);
+check('interval row: no PROJ block on this chip, so OURS is the row\'s own live total', /1H Total 62\.3 61 25s/.test(out), true);
+check('a display-only interval gets a callout too: the rail is information, sim vs book (#803)', /≠ 1H Total o61: ours 62\.3 · sim 56% vs book 50%/.test(out), true);
 
 // ---------------------------------------------------------------- intervals against the card's own PROJ box
 const withBox = (periods) => ({ ...chip, intervals: { ...chip.intervals, periods } });
@@ -124,8 +125,8 @@ const collegeBox = withBox([
 ]);
 const h2Row = { ...fresh()[8], segment: 'h2', segment_label: '2nd half', line: 74.5, live_total: 72.0 };
 const boxOut = text(api.renderLiveRailLines(api.liveRailSummary([...fresh(), h2Row], collegeBox, response, NOW)));
-check('1H OURS = the PROJ box\'s 1H (30 + 32.4), not the row', /1H Total 62\.4 61 5s/.test(boxOut), true);
-check('2H follows 1H, OURS = the box\'s 2H (35 + 38)', /1H Total 62\.4 61 5s 2H Total 73\.0 74\.5 5s/.test(boxOut), true);
+check('1H OURS = the PROJ box\'s 1H (30 + 32.4), not the row', /1H Total 62\.4 61 25s/.test(boxOut), true);
+check('2H follows 1H, OURS = the box\'s 2H (35 + 38)', /1H Total 62\.4 61 25s 2H Total 73\.0 74\.5 25s/.test(boxOut), true);
 const settledBox = withBox([
   { key: 'h1', label: '1H', away: 31, home: 29, state: 'settled' },
   { key: 'h2', label: '2H', away: 35, home: 38, state: 'in_progress' },
@@ -149,20 +150,21 @@ check('NBA 1H spread = Q1 + Q2 home margin (5 + 1), named for the line\'s team',
 const pricedH1 = fresh().map((row) => (row.segment === 'h1' ? { ...row, live_aware: true, model_edge_pct: 6.5 } : { ...row, live_aware: undefined }));
 const pricedSummary = api.liveRailSummary(pricedH1, chip, response, NOW);
 check('a priced interval gap on a fresh quote flags', pricedSummary.hasFreshEdge, true);
-check('...named with its interval', /≠ 1H Total o61: model \+6\.5 pts vs a 5s line/.test(text(api.renderLiveRailLines(pricedSummary))), true);
+check('...named with its interval, read off its own numbers', /≠ 1H Total o61: ours 62\.3 · sim 56% vs book 50%/.test(text(api.renderLiveRailLines(pricedSummary))), true);
 check('...and counts toward the Total filter', api.liveEdgeFilterMatches(pricedSummary, 'totals'), true);
 const staleH1 = pricedH1.map((row) => (row.segment === 'h1' ? { ...row, book_age_seconds: 200 } : row));
-check('the same interval gap on a 200 s quote does not', api.liveRailSummary(staleH1, chip, response, NOW).hasFreshEdge, false);
-check('summary: fresh edge in totals only', JSON.stringify(live.freshEdges), '{"totals":true}');
+check('the same interval gap on a 200 s quote does not', api.liveRailSummary(staleH1, chip, response, NOW).markets.find((m) => m.segment === 'h1').edge, null);
+check('summary: fresh gaps in spreads and totals (the spread is sim 68% vs book 50% on a 40 s quote)', JSON.stringify(live.freshEdges), '{"spreads":true,"totals":true}');
 check('card highlight fires on a fresh-quote edge', live.hasFreshEdge, true);
-check('age cell green on a fresh quote, showing the age the flag tested', /game-mini-card__live-age is-fresh" title="Quote 12s old when priced; ≈32s now">12s</.test(api.renderLiveRailLines(live)), true);
-check('a 40 s quote is green too (inside 120 s)', /is-fresh[^>]*>40s</.test(api.renderLiveRailLines(live)), true);
+check('age cell: the age NOW, green while 120 s or less, with the two numbers it ticks from', /game-mini-card__live-age is-fresh" data-rail-age-priced="12" data-rail-built-at="\d+" title="Quote 12s old when the board priced it; ≈32s now">32s</.test(api.renderLiveRailLines(live)), true);
+check('a 40 s quote served 20 s later is green too (60 s now)', /is-fresh[^>]*>60s</.test(api.renderLiveRailLines(live)), true);
+check('a 104.5 s quote served 20 s later is past the fresh line: not green', /game-mini-card__live-age"[^>]*>2m</.test(api.renderLiveRailLines(live)), true);
 
 // ---------------------------------------------------------------- the filter
 check('filter all keeps it', api.liveEdgeFilterMatches(live, 'all'), true);
 check('filter any keeps it', api.liveEdgeFilterMatches(live, 'any'), true);
 check('filter totals keeps it', api.liveEdgeFilterMatches(live, 'totals'), true);
-check('filter spreads drops it (no spread edge)', api.liveEdgeFilterMatches(live, 'spreads'), false);
+check('filter spreads keeps it', api.liveEdgeFilterMatches(live, 'spreads'), true);
 check('filter h2h drops it', api.liveEdgeFilterMatches(live, 'h2h'), false);
 check('a non-live game (no summary) only survives "all"', api.liveEdgeFilterMatches(null, 'all') && !api.liveEdgeFilterMatches(null, 'any'), true);
 
@@ -184,13 +186,20 @@ check('a 153.5 s quote does not (the 11-10 RUTG o147.5 row)', api.liveRowFreshEd
 // Fresh at pricing, but the board has not been rebuilt for 10 minutes: the page already calls that price stale.
 const frozen = fresh().map((row) => ({ ...row, price_grid_generated_at: '2026-11-10T23:35:00Z' }));
 check('fresh at pricing but served 10 min later: NO highlight', api.liveRailSummary(frozen, chip, response, NOW).hasFreshEdge, false);
-check('...and its age cell shows the age NOW, in orange', /is-stale" title="Quote 12s old when priced; ≈10m now">10m</.test(api.renderLiveRailLines(api.liveRailSummary(frozen, chip, response, NOW))), true);
+check('...and its age cell shows the age NOW, in orange', /is-stale"[^>]*title="Quote 12s old when the board priced it; ≈10m now">10m</.test(api.renderLiveRailLines(api.liveRailSummary(frozen, chip, response, NOW))), true);
 
 // A pregame model edge on a live row (no live join) is never a live edge.
-const pregameEdge = fresh().map((row) => ({ ...row, live_aware: undefined }));
-check('model_edge_pct without live_aware: NO highlight', api.liveRailSummary(pregameEdge, chip, response, NOW).hasFreshEdge, false);
+const pregameEdge = fresh().map((row) => ({ ...row, live_aware: undefined, live_model_probability: undefined }));
+check('model_edge_pct without live_aware or a live sim probability: NO highlight', api.liveRailSummary(pregameEdge, chip, response, NOW).hasFreshEdge, false);
+const liveProbOnly = fresh().map((row) => ({ ...row, live_aware: undefined, model_edge_pct: undefined }));
+check('a live sim probability on its own is enough: the comparison is information, priced or not', api.liveRailSummary(liveProbOnly, chip, response, NOW).hasFreshEdge, true);
 // Below the vig.
-const small = fresh().map((row) => (row.model_edge_pct ? { ...row, model_edge_pct: Math.sign(row.model_edge_pct) * 2.0 } : row));
+const small = fresh().map((row) => {
+  const out = row.model_edge_pct ? { ...row, model_edge_pct: Math.sign(row.model_edge_pct) * 2.0 } : { ...row };
+  const fair = (row.quote || {}).fair_probability;
+  if (typeof row.live_model_probability === 'number' && typeof fair === 'number') out.live_model_probability = fair + 0.02;
+  return out;
+});
 check('a 2-point edge is under the 3-point minimum: NO highlight', api.liveRailSummary(small, chip, response, NOW).hasFreshEdge, false);
 // Unknown age is never fresh.
 const noAge = fresh().map((row) => ({ ...row, book_age_seconds: null, quote: { ...row.quote, book_age_seconds: undefined } }));
@@ -210,7 +219,7 @@ check('spread with no live number upstream: OURS is blank, not the chip margin',
 // ---------------------------------------------------------------- no chip block: fall back to the row's own live total
 const noBlock = { ...chip, intervals: { source: 'pregame_pace', final: { total: 150.0 } } };
 check('pace block is not a re-sim: totals OURS comes from the live row',
-  /Total 145\.9 147\.5/.test(text(api.renderLiveRailLines(api.liveRailSummary(fresh(), noBlock, response, NOW)))), true);
+  /Total 145\.9 149/.test(text(api.renderLiveRailLines(api.liveRailSummary(fresh(), noBlock, response, NOW)))), true);
 check('pace block: no margin, so the spread shows the cover probability',
   /Sprd 68% cover FLA −8\.5/.test(text(api.renderLiveRailLines(api.liveRailSummary(fresh(), noBlock, response, NOW)))), true);
 
@@ -224,6 +233,91 @@ check('flipped chip: team and margin follow the canonical keys',
 
 // ---------------------------------------------------------------- no live rows: nothing renders
 check('a live game with no live rows renders no line', api.renderLiveRailLines(api.liveRailSummary([], chip, response, NOW)), '');
+
+// ---------------------------------------------------------------- todo #803: one line per market, the card's units
+// GT @ CLE, the served board 2026-11-14 19:16Z (full-game totals; our live total 34.508). The table used to read the
+// line priced closest to even at any age while the callout named the biggest fresh gap: two different lines.
+const gtCle = [
+  totals(37.5, 'over', 0.5, { book_age_seconds: 108.5, live_model_probability: 0.4118, live_total: 34.508 }),
+  totals(39.5, 'over', 0.511, { book_age_seconds: 305.5, live_model_probability: 0.4118, live_total: 34.508 }),
+  totals(37.5, 'under', 0.5, { book_age_seconds: 305.5, live_model_probability: 0.5881, live_total: 34.508 }),
+  totals(38.5, 'under', 0.499, { book_age_seconds: 64.5, live_model_probability: 0.5881, live_total: 34.508 }),
+  totals(39.5, 'under', 0.488, { book_age_seconds: 351.5, live_model_probability: 0.5881, live_total: 34.508 }),
+].map((row) => ({ ...row, quote: { ...row.quote, book_age_seconds: row.book_age_seconds } }));
+const ncaafChip = { ...chip, sport: 'ncaaf', intervals: { source: 'live_resim', final: { total: 34.5, home_margin: -9.9 } } };
+const gtSummary = api.liveRailSummary(gtCle, ncaafChip, response, NOW);
+const gtTotal = gtSummary.markets.find((m) => m.key === 'totals');
+check('GT @ CLE: the callout is the 64 s under 38.5 (the 305 s under 37.5 is not fresh)', gtTotal.edge && gtTotal.edge.side, 'u38.5');
+check('GT @ CLE: the table row shows that same line', gtTotal.book, '38.5');
+check('GT @ CLE: and its age', gtTotal.pricedAge, 64.5);
+check('GT @ CLE: the callout reads off the cells above it',
+  /≠ Total u38\.5: ours 34\.5 · sim 59% vs book 50%/.test(text(api.renderLiveRailLines(gtSummary))), true);
+
+// With no callout, the table's line comes from the FRESH quotes: an old quote keeps the fair it had when it was the
+// main line (the 41.5 that had stood 13 min while the books were at 38.5).
+const oldMain = [
+  totals(41.5, 'over', 0.5, { book_age_seconds: 780 }),
+  totals(38.5, 'over', 0.52, { book_age_seconds: 30 }),
+  totals(37.5, 'over', 0.56, { book_age_seconds: 30 }),
+];
+check('main line: a fresh quote beats an old one priced closer to even', api.liveRailMainRow(oldMain, 'totals').line, 38.5);
+check('main line: with no fresh quote, the closest to even of what there is', api.liveRailMainRow(oldMain.map((r) => ({ ...r, book_age_seconds: 400, quote: { ...r.quote, book_age_seconds: 400 } })), 'totals').line, 41.5);
+
+// Every flagged market: the callout's line is the table row's line.
+const sameLine = (summary) => summary.markets.filter((m) => m.edge).every((m) => (m.key === 'totals'
+  ? m.edge.side.slice(1) === m.book
+  : m.key === 'spreads' ? m.edge.side === m.book : m.book.startsWith(m.edge.side)));
+check('same line, every flagged market (fixture)', sameLine(live) && live.markets.some((m) => m.edge), true);
+check('same line, every flagged market (GT @ CLE)', sameLine(gtSummary), true);
+
+// A spread callout says our margin for the line's team; a moneyline callout says the probabilities only.
+const spreadOut = text(api.renderLiveRailLines(live));
+check('spread callout: our margin for the line\'s team, then sim vs book', /≠ Spread FLA −8\.5: ours FLA −10\.2 · sim 68% vs book 50%/.test(spreadOut), true);
+const mlRows = [{ ...base, market: 'h2h', side: 'away', team: 'Florida Gators', odds: -383, live_model_probability: 0.8387,
+  book_age_seconds: 13, quote: { fair_probability: 0.779, book_age_seconds: 13 } }];
+const mlOut = text(api.renderLiveRailLines(api.liveRailSummary(mlRows, chip, response, NOW)));
+check('moneyline callout: sim vs book, no OURS repeat', /≠ Moneyline FLA: sim 84% vs book 78%/.test(mlOut), true);
+
+// The gap is against the book's NO-VIG fair only: a row with just a price never flags off its vig-inclusive odds.
+const noFair = [{ ...base, market: 'totals', line: 150.5, side: 'over', odds: -110, live_model_probability: 0.6, book_age_seconds: 10, quote: { book_age_seconds: 10 } }];
+check('no no-vig fair on the row: no callout from the price\'s own (vig) probability', api.liveRailSummary(noFair, chip, response, NOW).hasFreshEdge, false);
+
+// ---------------------------------------------------------------- todo #803: the age NOW, counting between refreshes
+const liveHtml = api.renderLiveRailLines(live);
+check('the callout says how old its quote is now', /≠ Total u149: ours 145\.9 · sim 66% vs book 56% · 32s old/.test(text(liveHtml)), true);
+check('a callout on a quote still inside 120 s is not faded', /class="game-mini-card__live-edge" data-rail-age-priced="12"[^>]* title=/.test(liveHtml), true);
+// Priced on a 100 s quote, served 40 s later: 140 s old now. Still called out (the rule tests the age at pricing
+// and the 300 s stale line), but faded.
+const agedRows = fresh().map((row) => (row.line === 149.0 && row.side === 'under'
+  ? { ...row, book_age_seconds: 100, quote: { ...row.quote, book_age_seconds: 100 }, price_grid_generated_at: '2026-11-10T23:44:20Z' } : row));
+const agedHtml = api.renderLiveRailLines(api.liveRailSummary(agedRows, chip, response, NOW));
+check('aged callout: still shown', /≠ Total u149/.test(text(agedHtml)), true);
+check('aged callout: faded, with its age now', /class="game-mini-card__live-edge"[^>]*style="opacity:0\.55"[^>]*>≠ Total u149[^<]*<span class="game-mini-card__live-edge-age">2m old<\/span>/.test(agedHtml), true);
+
+// The ticker: a fake DOM of one age cell and one callout, rendered at NOW, ticked 60 s later.
+function fakeEl(cls, attrs, text0, child) {
+  const classes = new Set(cls.split(' '));
+  return {
+    textContent: text0, style: { opacity: '' }, attrs,
+    classList: { contains: (c) => classes.has(c), toggle: (c, on) => { if (on) classes.add(c); else classes.delete(c); }, has: (c) => classes.has(c) },
+    getAttribute: (k) => attrs[k], querySelector: () => child || null,
+  };
+}
+const builtMs = String(Date.parse(BUILT));
+const ageCell = fakeEl('game-mini-card__live-age is-fresh', { 'data-rail-age-priced': '12', 'data-rail-built-at': builtMs }, '32s');
+const edgeAge = { textContent: '32s old' };
+const callout = fakeEl('game-mini-card__live-edge', { 'data-rail-age-priced': '12', 'data-rail-built-at': builtMs }, '', edgeAge);
+const root = { querySelectorAll: () => [ageCell, callout] };
+check('the ticker updates both elements', api.tickLiveRailAges(root, NOW + 60000), 2);
+check('...the age cell now reads 92 s (formatAge: 2m), still green', `${ageCell.textContent}|${ageCell.classList.has('is-fresh')}`, '2m|true');
+check('...the callout\'s age follows', edgeAge.textContent, '2m old');
+api.tickLiveRailAges(root, NOW + 120000);
+check('a tick past 120 s (152 s): the age cell leaves green', `${ageCell.textContent}|${ageCell.classList.has('is-fresh')}|${ageCell.classList.has('is-stale')}`, '3m|false|false');
+check('...and the callout fades', callout.style.opacity, '0.55');
+api.tickLiveRailAges(root, NOW + 300000);
+check('a tick past 300 s: orange', ageCell.classList.has('is-stale'), true);
+check('the ticker runs every 5 s and fetches nothing', api.LIVE_RAIL_AGE_TICK_MS === 5000 && !/fetch\(/.test(block[0].split('function tickLiveRailAges')[1] || ''), true);
+check('a row with no build time carries no tick attributes', /data-rail-built-at/.test(api.renderLiveRailLines(api.liveRailSummary(fresh().map((r) => ({ ...r, price_grid_generated_at: undefined })), chip, {}, NOW))), false);
 
 // ---------------------------------------------------------------- wiring in renderGameCards
 const render = html.match(/ {2}function renderGameCards\(items\)[\s\S]*?\n {2}}\n/);
