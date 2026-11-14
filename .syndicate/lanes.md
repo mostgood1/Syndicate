@@ -824,6 +824,14 @@ death, never life — do not invert it.
 - Verification: Unit: a row whose grid age is 1,500 s but whose own key was re-stamped 17 s ago in the judging file is kept (fails with the fix off); a truly unseen row is still dropped. Fleet: over the first NFL pulls after the load, every build whose reference age is under ~150 s logs MARKET_GONE_DROPPED nfl at baseline, with the NFL board row count not falling >25% on that build
 - Blocked by: none
 
+### maker-pilot-rejudge — OPEN — opened 2026-11-14 — session ddc49458-e4ae-4ed8-8860-ca3ab0259614
+- Goal: Run the pre-registered 2026-11-14 re-judge of the Kalshi maker pilot (findings_2026-10-31_maker_pilot_review.md): count posts/fills/timed/settled fills; if >=30 timed fills give PASS/PAUSE per the rule (recommend only), else NOT YET DUE with interim numbers and projected date; FAIR_CANCEL counts since 11-03 17:12:05Z; record in log + state_kalshi. READ-ONLY, no live change.
+- Files: .syndicate/log/2026-11-14.md, .syndicate/state_kalshi.md (section [kalshi-maker-pilot] only)
+- Hypothesis: Timed fills since 10-25 are below 30 (fill rate ~1/15 posts with a $10/day cap), so the re-judge is NOT YET DUE.
+- Falsification test: A count of >=30 fills with a fill-time fair sighting in the ledger + live-odds-worker logs.
+- Verification: 
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
