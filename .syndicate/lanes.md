@@ -896,6 +896,14 @@ death, never life — do not invert it.
 - Verification: Unit: live sports built before background in a round; background bounded by the budget and drained over later rounds; nothing dropped; off switch restores the single sequential pass; previous date skipped after a restart when its artifact postdates the rollover. After the user's load: tick gaps and NCAAF/NCAAB overlay gaps on a live slate vs today's 19:00-20:13Z baseline, and background grids' ages
 - Blocked by: none
 
+### lane-guard-desktop-worktree-exempt — OPEN — opened 2026-11-14 — session c0ae6a5e-677b-4143-ae71-d33224a1a831
+- Goal: lane_claims.is_exempt judges a path relative to the TREE ROOT it lives in (primary, .claude/worktrees/<name>, C:/tmp/syndicate-sessions/<lane>), so lane-guard and scope-guard stop exempting every file in a desktop-app worktree; ledger + harness .claude/** stay exempt
+- Files: `.claude/hooks/lane_claims.py`, `.claude/hooks/lane-guard.py`, `.claude/hooks/scope-guard.py`, `.claude/hooks/test_lane_guard_tree_root.py` (NEW), `.claude/hooks/test_lane_claims_parser.py`
+- Hypothesis: is_exempt's any-segment match (.claude anywhere in the path) swallows <primary>/.claude/worktrees/<name>/**, so lane-guard main() returns 0 before reading a claim for every desktop-worktree edit
+- Falsification test: a mock PreToolUse Edit of a claimed code path from a .claude/worktrees session is BLOCKED (exit 2) on the CURRENT code -- then the exemption is not the cause
+- Verification: new test: 3 tree layouts x {ledger path exempt, claimed code path blocked}; the claimed worktree case exits 0 on the old is_exempt and 2 on the new (off != on); .claude/hooks/test_*.py green; count of OPEN lanes whose sessions work from .claude/worktrees reported before landing
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
