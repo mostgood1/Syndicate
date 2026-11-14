@@ -870,6 +870,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### nba-live-prop-grade — OPEN — opened 2026-11-14 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- STATUS 2026-11-14 20:05Z (2:05 PM CST): **REGISTERED on main before any outcome** (`.syndicate/findings_2026-11-14_nba_live_prop_grade.md`; grader blob `9a73f03f1fa0`, commit `f3d30ac4d` in the worktree, unpushed). Owed: ONE `--grade` run on the fleet on or after 11-17, once `player_logs.csv` lists 11-16's games; then the result under #736 and in the findings file.
 - Goal: A pre-registered grade of the live stat-progress expert's NBA prop opinions (stat_progress/1) against the in-play book prior at the same instant, scored on the official NBA box score (nba_source player_logs.csv), by quote age: rule, population, minimum sample and pass / kill thresholds pushed to main BEFORE any outcome is read; graded once on the fleet's NBA props evidence 2026-11-11..2026-11-16; the verdict recorded under #736 (which market groups, if any, beat fresh books beyond family-wise noise). No production change.
 - Files: scripts/nba_live_prop_grade.py (NEW), tests/test_nba_live_prop_grade.py (NEW), .syndicate/findings_2026-11-14_nba_live_prop_grade.md (NEW), docs/ai_context/todo.md (#736 section only)
 - Hypothesis: written before any outcome is read: as on college halves (lane college-segment-grade), against book prop quotes <= 120 s old the stat-progress expert's Brier is NOT better than the books' de-vigged median in any market group, and its apparent advantage grows with quote age (#780's stale-quote pattern)
