@@ -1799,11 +1799,12 @@ it would be a NEW, unmeasured cell, and the confirmation should test the rule ch
   and absent rule fields read as opt-in). The default is unchanged.
 
 **Frozen before the data** (sha256 prefix):
-- `step3l_compare.py` `1045b3fb60b9c02a`: validity, then N1/N2/C/K/S, then the verdict.
-- `window_3l.py` `f33399c1434281bc`: prints D once the tasks over 11-13..D reach 510.
-- `run_3l_when_ready.sh` `b088492764018a81`: waits hourly, runs the gate once, then the scorer.
+- `step3l_compare.py` `b2f206772c44317d`: validity (incl. code 058931934), then N1/N2/C/K/S, then the verdict.
+- `window_3l.py` `f92d601f9a921c69`: prints D once the tasks over 11-13..D reach 510.
+- `run_3l_when_ready.sh` `d134dbf0fefad223`: waits hourly, runs the gate once, then the scorer; refuses unless the snapshot is at 058931934.
 - `current_3l.json` `c17557fe2cf299d4`: the 7-field value 911f9565fe7f, pinned so a load of SE2 meanwhile cannot change
   the comparison.
+- **The run uses a FROZEN SNAPSHOT worktree:** `C:\tmp\score_effect_load\wt_3l\`, detached at `058931934`, sparse without `data/`. It sits outside the app-managed worktrees, so archiving this session cannot remove it during the wait, and engine changes landing on main meanwhile cannot move the result. A replay of 2026-11-12 from it (outside the window; 24 games, current@0 + aa1) reproduced STEP 3k's arms bit for bit: 1,170 of 1,170 values per arm.
 - Known-answer smoke: the registered flags through the real `main()` (replay mocked with the 11-03..12 arms) into a
   temp dir, then the scorer -> CONFIRMED, 1 of 60 null pairings, critical 2.82-2.92. Names, fields and scorer line up.
 
