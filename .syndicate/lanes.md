@@ -868,6 +868,14 @@ death, never life — do not invert it.
 - Verification: JS harness on fixtures shaped like served rows: same-line pin, unit text, interval flag on a display-only row, age-now display; pytest wrapper; a read of the served board after the user's reload-web: callout line == table line for every flagged market, interval callouts present
 - Blocked by: none
 
+### nba-live-prop-grade — OPEN — opened 2026-11-14 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: A pre-registered grade of the live stat-progress expert's NBA prop opinions (stat_progress/1) against the in-play book prior at the same instant, scored on the official NBA box score (nba_source player_logs.csv), by quote age: rule, population, minimum sample and pass / kill thresholds pushed to main BEFORE any outcome is read; graded once on the fleet's NBA props evidence 2026-11-11..2026-11-16; the verdict recorded under #736 (which market groups, if any, beat fresh books beyond family-wise noise). No production change.
+- Files: scripts/nba_live_prop_grade.py (NEW), tests/test_nba_live_prop_grade.py (NEW), .syndicate/findings_2026-11-14_nba_live_prop_grade.md (NEW), docs/ai_context/todo.md (#736 section only)
+- Hypothesis: written before any outcome is read: as on college halves (lane college-segment-grade), against book prop quotes <= 120 s old the stat-progress expert's Brier is NOT better than the books' de-vigged median in any market group, and its apparent advantage grows with quote age (#780's stale-quote pattern)
+- Falsification test: any registered primary cell (market group x quote-age ceiling) with >= 30 graded games whose engine-minus-books Brier has a family-wise (Bonferroni) game-clustered bootstrap upper bound below 0
+- Verification: pytest tests/test_nba_live_prop_grade.py (a planted-edge positive control and a books-vs-books null among them); a count-only fleet run before registering (no outcome read); the registration -- rule, thresholds, counts, the grader's blob hash -- pushed to main before the grade runs; then ONE grade run at nice 19 after the 11-16 games are in player_logs.csv, its table in the findings file and the verdict under #736
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
