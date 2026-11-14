@@ -798,12 +798,6 @@ death, never life — do not invert it.
 - Verification: tests (off != on on the real engine; pregame and period-start identity); replay on vs off same inputs with keep and end-game re-fit; paired game-clustered grade; reachability under the fleet's code and inputs; load only on the user's yes
 - Blocked by: none
 
-### closed-lane-archive-20261114-0839 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session de7cb1a8-de9b-4f4e-a72b-c0cec3bb8bf5
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 14:40Z (8:40 AM CST) gave 1 SAFE; dry run + apply clean, invariants unchanged vs origin/main baseline.
-- Moved: closed-lane-archive-20261114-0240. Table + 7 waited in .syndicate/log/2026-11-14.md.
-
 ### nba-grid-per-build-lookups — OPEN — opened 2026-11-14 — session 0f519972-4890-45d3-8b52-767c7e0a0389
 - STATUS 2026-11-14 1:4x PM CST (19:4xZ): **LOADED** (deploys.md 2026-11-14 19:29:19Z; handed-off session f48ddc8c continues this lane; user "Yes, load it" then "Yes, load all"). Fleet ff fee389971 -> 5ed692ea5 at 19:29:19.539Z, claimed and drained refresh-worker TERM, new pid 936392. Reachability MET (read 19:37:38Z): `code=5ed692ea`, 0 Tracebacks, 0 BOOK_GRID_TICK_ERROR, 0 INPLAY_OVERLAY_FAILED, `build_seconds.nba` 10.1 s on the first tick. Ride-alongs: #801 (MET at its first grid, its lane's read) and #773 (on disk; live-odds-worker's next restart). Claim released. OWED: the NBA-night reading at 03:00Z (watcher on pid 936392): NBA overlay gaps vs 360 s (prediction 0 over), `build_seconds.nba` vs 11-13's 85.4 s peak median, web stale; then CLOSE.
 - STATUS 2026-11-14 9:5x AM CST (15:5xZ): **DONE IN CODE, ON MAIN `5ed692ea5`, NOT LOADED.** Hypothesis holds in the replay: the falsification test did not fire. Fleet replay of the complete 11-13 NBA shard (5,316 rows): stat-like calls 80,904 -> 806 per build (<= 10,000 required); payload identical apart from minute-age `reason` text that differs as much between same-code runs; bytes identical 4 of 4; beside a busy thread attach_projections 46.1 / 46.5 -> 6.0 / 3.8 s (a third required), write 10.1 / 9.8 -> 0.6 / 0.7 s, total 136.0 / 126.4 -> 98.0 / 64.1 s. 17 tests, 13 of 13 mutations caught, 503 neighbours pass. OWED: the user's load decision (fleet ff + claimed refresh-worker TERM), then `build_seconds.nba` and NBA overlay gaps with NBA live.
@@ -822,15 +816,6 @@ death, never life — do not invert it.
 - Hypothesis: MEASURED BEFORE OPENING (11-14 6:38 AM CST drop, nfl 454): the 11-15 pass captured 12:38:02Z (ODDS_SWEEP_LAUNCHED 12:37:55Z) and was written before the 12:38:20Z drop step (reference 17 s); the next build 12:42Z recovered with the SAME pass (reference 213 s = 12:38:04Z) and no new pull. The NFL writer stamps one captured_at after fetching and writes every shard at once (fetch_nfl_oddsapi_props_local.py:620-641). So the dropped rows HAD been re-looked; the filter judged them on quote_seen_age_seconds from the shortlist's grid read earlier in the same build, against a reference read from the post-pass state file. Fix: judge a row's age from the SAME snapshot as the reference (the row's own key's look in the judging state file)
 - Falsification test: If replaying the fixed classifier on a mid-build-pull case still drops the re-looked rows, or if after the load a build with a pull landing between the NFL grid read and the drop step still logs MARKET_GONE_DROPPED nfl >= 200, the hypothesis or the fix is wrong
 - Verification: Unit: a row whose grid age is 1,500 s but whose own key was re-stamped 17 s ago in the judging file is kept (fails with the fix off); a truly unseen row is still dropped. Fleet: over the first NFL pulls after the load, every build whose reference age is under ~150 s logs MARKET_GONE_DROPPED nfl at baseline, with the NFL board row count not falling >25% on that build
-- Blocked by: none
-
-### maker-pilot-rejudge — CLOSED — opened 2026-11-14 — closed 2026-11-14 — session ddc49458-e4ae-4ed8-8860-ca3ab0259614
-- Goal: Run the pre-registered 2026-11-14 re-judge of the Kalshi maker pilot (findings_2026-10-31_maker_pilot_review.md): count posts/fills/timed/settled fills; if >=30 timed fills give PASS/PAUSE per the rule (recommend only), else NOT YET DUE with interim numbers and projected date; FAIR_CANCEL counts since 11-03 17:12:05Z; record in log + state_kalshi. READ-ONLY, no live change.
-- Files: .syndicate/log/2026-11-14.md, .syndicate/state_kalshi.md (section [kalshi-maker-pilot] only)
-- Hypothesis: Timed fills since 10-25 are below 30 (fill rate ~1/15 posts with a $10/day cap), so the re-judge is NOT YET DUE.
-- Falsification test: A count of >=30 fills with a fill-time fair sighting in the ledger + live-odds-worker logs.
-- Verification: ran 15:41Z 11-14 on the fleet (ledger via the venv python, log window 11-09 21:10Z..11-14 15:28Z, C:/tmp/maker_rejudge/paths5.py + summ.py): 29 fills, 14 timed.
-- **GOAL VERDICT `[2026-11-14 15:41Z]`: GOAL MET -- NOT YET DUE.** Hypothesis CONFIRMED: 14 of 30 timed fills (55 posts / 29 fills / 28 settled). INTERIM pooled edge at fill +0.86pp [-0.03, +1.72]; post-11-03 +1.30pp [+0.13, +2.37] n=7. Fair cancel never fired (0; the 4 non-fills expired at kickoff). Fill 30 is projected ~11-25/26, only if FILL lines are captured before rotation. No live change. Detail: log/2026-11-14.md, state_kalshi [kalshi-maker-pilot].
 - Blocked by: none
 
 ### gate-smooth-family — OPEN — opened 2026-11-14 — session c2fd17f8-7d77-4eed-b025-0830211e05b3
@@ -907,6 +892,11 @@ death, never life — do not invert it.
 - Blocked by: none
 - Result `[2026-11-14 ~3:30 PM CST]`: HYPOTHESIS CONFIRMED. On the current hook, a mock Edit of a claimed path exits 0 from `<primary>/.claude/worktrees/wt-a/`, and 2 from the primary tree and from a session worktree. The fix is commit `207a5a5bd` on branch `claude/sad-jemison-9ac9af`, **NOT ON MAIN, waiting for the user's yes.** `tree_relative()` in lane_claims gives the path relative to its own tree; `is_exempt(path, roots)` and lane-guard's `rel` both use it. New suite 72/72: OFF arm 0 -> ON 2 on the desktop layout, 2 -> 2 elsewhere. 14 hook suites and 175 lane pytest cases green. No change for the other callers: 0 of 370 main claim tokens, and 0 of 40,381 tracked files in the primary and session layouts.
 - Side effects to expect when it lands (census, origin/main c01e5f58d): 28 of 48 OPEN lanes name a desktop-worktree session. 9 such sessions were active in the last 12 h, and 6 of them hold more lanes than their marker names, so they get blocked on 4-17 of their OWN files until they switch the marker. `todo.md` is claimed by 27 OPEN lanes with no section, so an Edit of it is blocked from every desktop session (as it already is in the primary tree). Full table: side-session notes `lane_guard_desktop_worktree_side_effects_2026-11-14.md`.
+
+### closed-lane-archive-20261114-1440 — CLOSED 2026-11-14 (GOAL MET: 2 blocks archived) — opened 2026-11-14 — session d31f2d0f-00c0-4266-b44a-180f8f52f31b
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 20:41Z read 2 SAFE of 13 CLOSED; moved `closed-lane-archive-20261114-0839` and `maker-pilot-rejudge` to lanes_closed.md with one pointer each. Other 11 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-14.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1163,6 +1153,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261114-0240` — CLOSED 2026-11-14 (GOAL MET: 4 blocks archived) — opened 2026-11-14 — session 3c0e43a3-a382-48ae-a8ba-58552183ee1b
 - `closed-lane-archive-20261114-0439` — CLOSED 2026-11-14 (GOAL MET: 3 blocks archived) — opened 2026-11-14 — session 4ffb158e-04c1-4d17-9daa-ade8af6977e3
 - `closed-lane-archive-20261114-0640` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session 03ed32dc-f326-48c3-89f0-0410a900ae8d
+- `closed-lane-archive-20261114-0839` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session de7cb1a8-de9b-4f4e-a72b-c0cec3bb8bf5
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
@@ -1332,6 +1323,7 @@ death, never life — do not invert it.
 - `local-production-first-run` — CLOSED — opened 2026-09-30, closed 2026-09-30 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
 - `local-production-wsl` — CLOSED — opened 2026-09-30, closed 2026-10-01 — session caab6ba2-bf2b-4a1a-8483-cb427005cbba
 - `maker-pilot-fair-cancel` — CLOSED 2026-11-04 (GOAL MET as amended: edge-floor-only cancel live, FAIR_PASS read back on sighted rows, 0 plan_dropped since 17:12:05Z 11-03) — opened 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
+- `maker-pilot-rejudge` — CLOSED — opened 2026-11-14 — closed 2026-11-14 — session ddc49458-e4ae-4ed8-8860-ca3ab0259614
 - `maker-pilot-review` — CLOSED (GOAL MET) — opened 2026-10-31 — closed 2026-10-31 — session 9683e8c4-02ff-45b7-8c47-ae932f103e33
 - `maker-vs-taker-shadow` — CLOSED (GOAL MET) — opened 2026-10-24 — closed 2026-10-26 — session 78880f41-ba0e-410c-aaac-d6cbeb02b884
 - `market-history-index-memo` — CLOSED 2026-09-18 (GOAL: MET) — opened 2026-09-18 — session a1e40980-cceb-493f-adf9-5a5ca879acf6 — body in `lanes_history.md`.

@@ -15805,3 +15805,18 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 12:45Z (6:45 AM CST) gave 1 SAFE; dry run + apply clean, invariants unchanged vs origin/main baseline.
 - Moved: closed-lane-archive-20261114-0040. Table + 7 waited in .syndicate/log/2026-11-14.md.
+
+### closed-lane-archive-20261114-0839 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session de7cb1a8-de9b-4f4e-a72b-c0cec3bb8bf5
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 14:40Z (8:40 AM CST) gave 1 SAFE; dry run + apply clean, invariants unchanged vs origin/main baseline.
+- Moved: closed-lane-archive-20261114-0240. Table + 7 waited in .syndicate/log/2026-11-14.md.
+
+### maker-pilot-rejudge — CLOSED — opened 2026-11-14 — closed 2026-11-14 — session ddc49458-e4ae-4ed8-8860-ca3ab0259614
+- Goal: Run the pre-registered 2026-11-14 re-judge of the Kalshi maker pilot (findings_2026-10-31_maker_pilot_review.md): count posts/fills/timed/settled fills; if >=30 timed fills give PASS/PAUSE per the rule (recommend only), else NOT YET DUE with interim numbers and projected date; FAIR_CANCEL counts since 11-03 17:12:05Z; record in log + state_kalshi. READ-ONLY, no live change.
+- Files: .syndicate/log/2026-11-14.md, .syndicate/state_kalshi.md (section [kalshi-maker-pilot] only)
+- Hypothesis: Timed fills since 10-25 are below 30 (fill rate ~1/15 posts with a $10/day cap), so the re-judge is NOT YET DUE.
+- Falsification test: A count of >=30 fills with a fill-time fair sighting in the ledger + live-odds-worker logs.
+- Verification: ran 15:41Z 11-14 on the fleet (ledger via the venv python, log window 11-09 21:10Z..11-14 15:28Z, C:/tmp/maker_rejudge/paths5.py + summ.py): 29 fills, 14 timed.
+- **GOAL VERDICT `[2026-11-14 15:41Z]`: GOAL MET -- NOT YET DUE.** Hypothesis CONFIRMED: 14 of 30 timed fills (55 posts / 29 fills / 28 settled). INTERIM pooled edge at fill +0.86pp [-0.03, +1.72]; post-11-03 +1.30pp [+0.13, +2.37] n=7. Fair cancel never fired (0; the 4 non-fills expired at kickoff). Fill 30 is projected ~11-25/26, only if FILL lines are captured before rotation. No live change. Detail: log/2026-11-14.md, state_kalshi [kalshi-maker-pilot].
+- Blocked by: none
