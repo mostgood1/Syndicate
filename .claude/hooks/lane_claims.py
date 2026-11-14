@@ -828,7 +828,87 @@ def claim_groups(by_spelling):
     return [(sorted(n), sorted(s)) for n, s in grouped.values()]
 
 
-def is_exempt(path):
+# WHERE A TREE CAN LIVE, by the shape of the path alone (this module does no
+# I/O, so these are lexical). Each names a directory whose CHILD is a tree root:
+#   <repo>/.claude/worktrees/<name>/   -- the Claude desktop app's session worktrees
+#   <...>/syndicate-sessions/<lane>/   -- `scripts/session_worktree.py`'s DEFAULT_ROOT
+# A worktree anywhere else is still judged correctly by `is_exempt`: see the
+# no-tree fallback there.
+_DESKTOP_WORKTREES = (".claude", "worktrees")
+_SESSION_WORKTREES = "syndicate-sessions"
+_ABS_RE = re.compile(r"^(?:[A-Za-z]:/|/)")
+
+
+def _segments(path):
+    return [s for s in path.replace("\\", "/").split("/") if s not in ("", ".")]
+
+
+def _fold(path):
+    """Slash-normalised, case-folded the way this OS compares paths."""
+    return os.path.normcase(path.replace("\\", "/")).replace("\\", "/").rstrip("/")
+
+
+def tree_relative(path, roots=()):
+    """`path` relative to the root of the Syndicate TREE it lives in, or None.
+
+    The tree is, in this order:
+      1. the INNERMOST `.claude/worktrees/<name>/` or `syndicate-sessions/<lane>/`
+         segment pair in the path -- a desktop-app or `session_worktree.py` tree;
+      2. the longest of `roots` (absolute tree roots the caller knows, e.g.
+         `CLAUDE_PROJECT_DIR`) that the path sits under;
+      3. for a RELATIVE path with no `..` escape: the path is already
+         tree-relative, which is how every `lanes.md` claim is written.
+    None when none applies -- an absolute path in a tree the caller did not
+    name, or a `../` escape.
+
+    Rule 1 is lexical ON PURPOSE. A desktop worktree sits INSIDE the primary
+    tree, so "relative to the primary root" gives `.claude/worktrees/<name>/...`
+    for its every file -- the `.claude/` prefix the exemption keys on. And a
+    filesystem walk for the nearest `.syndicate/lanes.md` falls through to the
+    primary tree for a half-removed worktree (`learnings`: worktrees are left
+    as empty dirs), with the same result. The path's own shape cannot be wrong
+    in either way.
+    """
+    segs = _segments(path)
+    folded = [s.lower() for s in segs]
+    for i in range(len(segs) - 1, -1, -1):
+        if (folded[i] == _DESKTOP_WORKTREES[0] and i + 2 < len(segs)
+                and folded[i + 1] == _DESKTOP_WORKTREES[1]):
+            return "/".join(segs[i + 3:])
+        if folded[i] == _SESSION_WORKTREES and i + 1 < len(segs):
+            return "/".join(segs[i + 2:])
+
+    norm = path.replace("\\", "/")
+    if _ABS_RE.match(norm):
+        here = _fold(norm)
+        best = None
+        for root in roots or ():
+            if not root:
+                continue
+            r = _fold(root)
+            if r and (here == r or here.startswith(r + "/")) and (best is None or len(r) > len(best)):
+                best = r
+        if best is None:
+            return None
+        return "/".join(_segments(norm[len(best):]))
+
+    if segs and segs[0] == "..":
+        return None
+    return "/".join(segs)
+
+
+def _exempt_rel(rel):
+    """The exemption, on a TREE-RELATIVE path: `.syndicate/**` and `.claude/**`,
+    but never `.claude/worktrees/**`, which holds other trees' CODE."""
+    r = rel.lower()
+    if r == ".syndicate" or r.startswith(".syndicate/"):
+        return True
+    if r == ".claude" or r.startswith(".claude/"):
+        return not (r == ".claude/worktrees" or r.startswith(".claude/worktrees/"))
+    return False
+
+
+def is_exempt(path, roots=()):
     """True for the ledger and the harness config, which are never lane-guarded.
 
     Same predicate `lane-guard.main()` applies, and it is load-bearing for any
@@ -838,16 +918,33 @@ def is_exempt(path):
     that always fires is one people learn to scroll past -- which is how this
     repo has already lost two guards.
 
-    Checks the PATH ITSELF for a `.syndicate`/`.claude` segment rather than its
-    position relative to a root, so it is true in the primary tree and in any
-    linked worktree alike. That distinction is not cosmetic: it is the exact
-    bug fixed in `lane-guard` on 2026-08-18.
+    JUDGED RELATIVE TO THE TREE THE PATH LIVES IN (`tree_relative`), as of
+    2026-11-14 (lane `lane-guard-desktop-worktree-exempt`). This used to check
+    for a `.syndicate`/`.claude` segment ANYWHERE in the path -- the 2026-08-18
+    fix for `C:/tmp/syndicate-sessions/<lane>/` worktrees, whose root-relative
+    path is a `../..` escape. But the Claude desktop app puts every session
+    worktree at `<repo>/.claude/worktrees/<name>/`, so EVERY file in such a
+    worktree has a `.claude` segment and was exempt. Measured 2026-11-14: an
+    Edit of `scripts/live_totals_width_fit.py`, claimed by 2 OPEN lanes, from a
+    `.claude/worktrees` session exited 0 with no message, while the same edit in
+    the primary tree or a `syndicate-sessions` tree was BLOCKED. `lane-guard`
+    and `scope-guard` were both inert there.
+
+    A path in NO tree this can name (an absolute path under none of `roots`)
+    keeps the old segment rule. That is safe because the one layout where the
+    segment rule is wrong -- a tree living under a `.claude` directory -- is
+    recognised by shape in `tree_relative` rule 1 and never reaches it; and it
+    keeps paths outside every repo (`~/.claude/projects/.../memory/`) exactly
+    as exempt as they were.
     """
-    norm = _norm(path)
-    return any(
-        norm == marker or norm.startswith(marker + "/") or ("/" + marker + "/") in ("/" + norm)
-        for marker in (".syndicate", ".claude")
-    )
+    rel = tree_relative(path, roots)
+    if rel is None:
+        norm = _norm(path)
+        return any(
+            norm == marker or norm.startswith(marker + "/") or ("/" + marker + "/") in ("/" + norm)
+            for marker in (".syndicate", ".claude")
+        )
+    return _exempt_rel(rel)
 
 
 def _loan_entries(text):

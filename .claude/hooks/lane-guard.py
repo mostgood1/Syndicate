@@ -52,6 +52,7 @@ try:
         # Disjoint DECLARED sections of one file. Honours a declaration, does not
         # verify it; a holder without one still blocks.
         sections_are_disjoint_among,
+        tree_relative,
     )
     from lane_marker import current_lane, safe_session_id as safe_session_id_of
 except Exception as exc:  # pragma: no cover - only when the module is missing
@@ -80,8 +81,20 @@ def main():
     if not os.path.exists(lanes_file):
         return 0
 
+    # `rel` IS RELATIVE TO THE TREE THE PATH LIVES IN, not to `root` (lane
+    # `lane-guard-desktop-worktree-exempt`, 2026-11-14). `root` is the PRIMARY
+    # tree, so a desktop-app worktree file was matched as
+    # `.claude/worktrees/<name>/scripts/x.py` and a `session_worktree.py` file as
+    # `../../tmp/syndicate-sessions/<lane>/scripts/x.py`. A file claim still
+    # caught both through `matches`' suffix arm, but a DIRECTORY claim
+    # (`scripts/dir/`, a `startswith`) guarded neither, and the BLOCKED message
+    # named a path nobody had typed. Tree-relative, a worktree edit is judged
+    # exactly like the same edit in the primary tree. A path in no tree this can
+    # name falls back to the old `relpath`, unchanged.
     try:
-        rel = _norm(os.path.relpath(path, root))
+        rel = tree_relative(path, (root,))
+        if rel is None:
+            rel = _norm(os.path.relpath(path, root))
     except Exception:
         return 0
 
@@ -97,10 +110,16 @@ def main():
     # 2026-08-18: this is what let a false claim on `lanes.md` (see the
     # `_claimable_prefix` fix above) block a worktree session from closing its
     # own lane, on a file this guard was never supposed to check at all.
-    # Check the PATH ITSELF for a `.syndicate`/`.claude` segment, not its
-    # position relative to `root` -- true in both the primary tree and any
-    # worktree, since both mirror the same internal layout.
-    if is_exempt(path):
+    # That fix checked the PATH ITSELF for a `.syndicate`/`.claude` segment, and
+    # it over-reached: the Claude desktop app puts every session worktree at
+    # `<repo>/.claude/worktrees/<name>/`, so EVERY file in one carried a
+    # `.claude` segment and this returned 0 before reading a single claim.
+    # Measured 2026-11-14: a claimed file edited from such a worktree went
+    # through silently. `is_exempt` now judges the path relative to the tree it
+    # lives in (`lane_claims.tree_relative`), so `.syndicate/**` and the
+    # harness's own `.claude/**` are exempt in every tree, and a worktree's code
+    # is not.
+    if is_exempt(path, (root,)):
         return 0
 
     # PER-SESSION MARKER, falling back to the global one.

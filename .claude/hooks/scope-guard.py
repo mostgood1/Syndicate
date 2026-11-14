@@ -327,11 +327,13 @@ def main():
     if not path:
         return 0
 
-    # `is_exempt` checks the PATH ITSELF for a `.syndicate`/`.claude` segment
-    # rather than its position under a root, so it holds in the primary tree
-    # and in any linked worktree alike -- the exact bug fixed in `lane-guard`
-    # on 2026-08-18.
-    if is_exempt(path):
+    # `is_exempt` judges the path relative to the TREE IT LIVES IN -- primary,
+    # `.claude/worktrees/<name>`, or `syndicate-sessions/<lane>` -- so the ledger
+    # and the harness's `.claude/**` are exempt in every tree. It used to check
+    # for a `.claude` segment ANYWHERE, which exempted every file in a desktop-app
+    # worktree (`<repo>/.claude/worktrees/<name>/`) and left this guard inert
+    # there (lane `lane-guard-desktop-worktree-exempt`, 2026-11-14).
+    if is_exempt(path, (os.environ.get("CLAUDE_PROJECT_DIR"),)):
         return 0
 
     session_id = safe_session_id(payload.get("session_id"))
