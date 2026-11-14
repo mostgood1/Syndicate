@@ -844,6 +844,9 @@ death, never life — do not invert it.
 - Falsification test: Any of N1, N2, C, K, S fails on the pre-registered run -> the default stays one-draw per-cell; record which failed. A run on other dates, other flags, or a current value other than 911f9565fe7f is not this test.
 - Verification: C:/tmp/score_effect_load/step3l_compare.py scores receipts_3l and arms_3l.json against N1/N2/C/K/S; the result and the decision go to findings PHASE 2 STEP 3l and todo #784; only if all hold: the default flip with tests (off != on through main()) and receipts copied deliberately into the live dir.
 - Blocked by: none (the RUN waits for >= 510 replayable games after 11-12, ~11-22..24)
+- **STATUS `[2026-11-14 16:00Z]`:** BUILT `058931934` (opt-in `--family-cells smooth`; opt-in receipts named `__rule-<id>` and refused by `check_receipt`); default unchanged.
+  - Frozen: `step3l_compare.py` 1045b3fb, `window_3l.py` f33399c1, `run_3l_when_ready.sh` b0884927, `current_3l.json` c17557fe (all in `C:\tmp\score_effect_load\`). Known-answer smoke on 11-03..12: CONFIRMED.
+  - **Runner NOT ARMED** (a detached fleet job needs the user's OK). 11-13 = 55 tasks; D expected ~11-22..24; run ~3.2 h. Findings PHASE 2 STEP 3l.
 
 ### ncaaf-evening-kickoff-projection — OPEN — opened 2026-11-14 — session 8062940b-57fd-454a-8de5-25fdd4804d85
 - STATUS 2026-11-14 9:43 AM CST (15:43Z): **GOAL: NOT MET.** The fix is on main as `40d5d6a4a`, with 9 new tests; 8 of them fail on the pre-fix code. Fleet replay on the 11-14 board: +120 rows (the 18 games kicking off 00:00Z or later), 0 lost, 853 identical. A second cause was fixed with it: `games_indexed` was counted on the UTC date, which blocked the join. NOT loaded: that needs a fleet ff plus a refresh-worker restart, and it is the user's decision. Owed after a load: projections on the served NCAAF grid for kickoffs from 6 PM CST. Detail: findings file, `## Fix`.

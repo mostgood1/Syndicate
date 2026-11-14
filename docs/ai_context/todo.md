@@ -246,6 +246,11 @@
     - The rule in force refuses **17 of 30 null pairings (57%)**.
     - Family over the 20 smooth cells refuses 1 of 60 null pairings, and refuses RC46 on 20 m / 36 m win Brier.
     - Confirm it, pre-registered, on >= 150 games after 11-12 before making it the default. Findings PHASE 2 STEP 3k.
+- **SMOOTH-CELL FAMILY RULE `[2026-11-14 16:00Z]`: built as an OPT-IN (`058931934`), pre-registered (`e990f0bac`); the confirming run WAITS for >= 510 replayable games after 11-12 (~11-22..24). Lane `gate-smooth-family` OPEN.**
+  - `--family-cells smooth`: max-T over the 20 smooth cells; coverage z reported, never flagged. It reproduces STEP 3k's post hoc numbers exactly.
+  - **Any rule but the default now writes `__rule-<id>`, and `check_receipt` refuses it** (derived from the receipt's own fields). That closes the 11-13 22:58Z hazard: every `receipts_3k` receipt now refuses.
+  - **The card's 150 games were too few:** on 11-03..12 the rule refused RC46 on ~20% of 150-game subsets, ~56% at 300, ~79% (parametric) at ~500. Sims are not the lever (sim noise is 21-37% of the paired variance).
+  - Runner `C:\tmp\score_effect_load\run_3l_when_ready.sh` written, NOT armed (a detached fleet job needs the user's OK); scorer frozen. Findings PHASE 2 STEP 3l.
 
 ### `#783` — **KALSHI FRACTIONAL FILLS ARE READ AS ZERO: `kalshi_orders.venue_order_view` and the submit parser truncate `fill_count_fp` with `int(float())`, so a 0.01 fill reads `dead`. 7 live take-profit exits (10-25..11-10) and 10 live entries (10-25..11-08) were dust-filled and recorded as nothing; 1 entry filled 1.06 is recorded 1. DECISION OWED: record dust truthfully without letting a dust fill end the retry** `[2026-11-11, found by lane kalshi-aged-out-grade, session e32fef1a, read-only census]`
 - **UPDATE 2026-11-13 14:20Z (8:20 AM CST):** lane `kalshi-grader-market-exits` CLOSED, GOAL MET (the grader fix is loaded; 0 `both_sides_held` refusals since and the ungraded-fill alarm 0). Lane `kalshi-fractional-fills` still owes its one reading: 0 of 97 fills since the load were fractional (base rate 1.5%).

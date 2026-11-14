@@ -1747,3 +1747,72 @@ What it says:
   - Confirm it on dates NOT used here: >= 150 games after 11-12, about 11-13..11-18. Include two A/A salts and RC46 as the known-bad check.
   - Only then make it the default.
 - **STATUS `[2026-11-13 23:10Z]`: lane CLOSED, goal NOT MET.** The default is the legacy rule, which refuses RC46. The tooling is on main, opt-in. Nothing loaded.
+
+## PHASE 2 STEP 3l (NCAAB, todo #784): the smooth-cell family rule -- built as an opt-in and pre-registered on fresh games; the confirming run WAITS for >= 510 replayable games after 11-12 `[2026-11-14 16:00Z (10:00 AM CST), lane gate-smooth-family, OPEN]`
+
+**What this is.** STEP 3k's post hoc pick, now under test: the current arm is the mean of K = 4 seed-salted draws, and
+WORSE / BETTER are judged against a family-wise one-sided 5% max-T critical value over the 20 SMOOTH cells (margin CRPS,
+total CRPS, win Brier, win log loss at 0/10/20/30/36 m). The 10 coverage cells keep their z and are reported, but never
+flagged. It becomes the gate's default only if a pre-registered run on games after 11-12 passes every check.
+
+**Pre-registered** in the lane block, on main `e990f0bac` (15:34Z 11-14). No date after 11-12 had been replayed: 11-13 has
+55 replayable games, and nothing later is built. The checks:
+- **N1:** aa1 and aa2 each 0 WORSE.
+- **N2:** of the 60 null pairings in the dump (each of the 6 null draws vs the mean of each 3 of the other 5), <= 9
+  refuse. Predicted 1-6.
+- **C:** every comparison's WORSE critical value in [2.4, 3.4]. Predicted 2.7-3.1.
+- **K:** RC46 refused.
+- **S:** SE2 0 WORSE.
+
+**Why the window is 510 games, not the card's 150** (planning on `arms_3k.json`, `C:\tmp\score_effect_load\power_3l.py`; not confirmation data):
+
+| games | RC46 refused, random subsets | parametric (z 3.10 x sqrt(n/366) vs ~2.81) | A/A refused (aa1 / aa2) |
+|---|---|---|---|
+| 150 | 18% | 21% | 2% / 2% |
+| 200 | 36% | 30% | 2% / 2% |
+| 250 | 41% | 40% | 8% / 2% |
+| 300 | 56% | 51% | 2% / 2% |
+| ~500 | -- | ~79% | -- |
+
+- At 150 games the confirmation would most likely have "falsified" a working rule on sample size alone.
+- Sims are not the lever. A/A paired-diff SDs put sim noise at 21-37% of RC46's paired variance (20 m win Brier 29%,
+  36 m 37%, 20 m margin CRPS 21%). Quadrupling sims would buy ~8% in z.
+- K keeps a ~20-25% chance of failing a correct rule, stated in advance. A miss still blocks the default.
+
+**Coverage reported, not flagged -- and not an interval score.** CRPS already scores the whole predictive distribution,
+the central-80% interval included, so a width change that miscalibrates shows in CRPS. The folded `|coverage - 0.80|`
+statistic is what skewed STEP 3k's bootstrap. A smooth central-80% interval score (Gneiting-Raftery) was considered:
+it would be a NEW, unmeasured cell, and the confirmation should test the rule chosen post hoc, not a cousin of it.
+
+**Built `058931934`** (`scripts/live_mechanism_outcome_gate.py` + tests):
+- `--family-cells {all,smooth}`, default `all`. `family_flags(metrics=)` computes the bootstrap for every cell and the
+  max-T over the family only; `report_only` lists the rest.
+- **Any rule but the default writes its receipt as `...__rule-<rule id>.json`** (`percell-k1` is the default;
+  `family-smooth-k4-a0.05` is this run's). `check_receipt` re-derives the rule from the receipt's own fields and
+  refuses anything else. A receipt without the fields predates the opt-ins, so it reads as per-cell K = 1.
+- This closes the 2026-11-13 22:58Z hazard in code. The STEP 3k validation wrote family-rule verdicts under the default
+  names in the live dir, where they would have cleared RC46. Every `receipts_3k` receipt now refuses as opt-in.
+- Verified on `arms_3k.json`: the option reproduces the post hoc numbers exactly (critical 2.82-2.95; RC46 refused on
+  20 m and 36 m win Brier; SE2, ALT1, SE2_ALT and both A/A pass).
+- Live receipts unchanged: SE2 clears; RC46, ALT1 and SE2_ALT refuse.
+- 35 gate tests and 108 preflight tests pass; 6 of 6 mutations caught (incl. a family ignored by the critical value
+  and absent rule fields read as opt-in). The default is unchanged.
+
+**Frozen before the data** (sha256 prefix):
+- `step3l_compare.py` `1045b3fb60b9c02a`: validity, then N1/N2/C/K/S, then the verdict.
+- `window_3l.py` `f33399c1434281bc`: prints D once the tasks over 11-13..D reach 510.
+- `run_3l_when_ready.sh` `b088492764018a81`: waits hourly, runs the gate once, then the scorer.
+- `current_3l.json` `c17557fe2cf299d4`: the 7-field value 911f9565fe7f, pinned so a load of SE2 meanwhile cannot change
+  the comparison.
+- Known-answer smoke: the registered flags through the real `main()` (replay mocked with the 11-03..12 arms) into a
+  temp dir, then the scorer -> CONFIRMED, 1 of 60 null pairings, critical 2.82-2.92. Names, fields and scorer line up.
+
+**Status.** The runner is written and NOT ARMED: a detached fleet job needs the user's OK. Without it, run
+`run_3l_when_ready.sh` (or its gate line) by hand once `window_3l.py` prints D. Expected D ~11-22..24, run ~3.2 h
+(8 arms x ~510 games; STEP 3k did 3,660 replays in 2.9 h at 11 procs).
+
+**Follow-ups, not this lane:**
+- If confirmed, MIN_GAMES = 150 is far too few for the family rule to catch an RC46-size harm (~20%). Raising it to
+  ~500 (~80%) would block early-season gate runs. The user's call.
+- If the default changes, SE2's per-cell receipt stops clearing (a rule mismatch) and needs a re-run under the new
+  default. Its receipt expires 11-20 regardless.
