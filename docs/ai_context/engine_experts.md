@@ -47,6 +47,14 @@ One rule is added in play: a book whose newer side is older than `PROP_QUOTE_MAX
 `book_quotes` appends on a change, so the age is time since the price last moved. Doubles markets are Yes/No with a
 NaN line: Yes is OVER the producer's fixed line (1.5 / 2.5).
 
+The player is matched on the ENGINE's name key on NBA (`prop_player_key` -> `live_resim.normalize_name`, the key the
+re-sim's own line read uses): it drops Jr. / II / III and applies the engine's nickname aliases. Until lane
+`prop-expert-name-key` (2026-11-14) the index used the board's identity fold, which keeps both, while the re-sim
+publishes the engine's spelling. So seven players the books spell differently had no quotes at all on 11-11..11-13:
+all 19,907 `no_quotes_for_player_market` rows (Herb / Herbert Jones, Paul Reed Jr / Paul Reed, Derrick Jones /
+Derrick Jones Jr., Robert Williams / Robert Williams III, Bobby Portis / Bobby Portis Jr., Ron / Ronald Holland II,
+Carlton / Bub Carrington). `PropQuoteIndex.merged` lists every key the books reached under two spellings.
+
 **The `live_segment` prior** is the same rule (`prop_prior`) over `book_quotes` GAME-LINE rows
 (`GameLineQuoteIndex`). A spread quote carries its own side's handicap (`selection` home / away, opposite signs), and
 `canonical_quote_side` puts it in the join's away frame: home at h is "home covers" at L = -h. A sign error here is
@@ -119,7 +127,7 @@ odds fetchers (OddsAPI books, Kalshi direct)
   odds_book_quotes.append_book_quotes
     writes <sport>_source/tracking/book_quotes/<date>.jsonl[.gz]   (append-on-change, per book/market/selection)
 scripts/engine_experts.py stat_progress()  props rows + the date's quote shard + evidence rows (date -1 .. +1)
-  engine_experts.PropQuoteIndex (by team names + folded player + market -> line; streamed, counts population)
+  engine_experts.PropQuoteIndex (by team names + player key + market -> line; streamed, counts population)
   engine_experts.stat_progress_opinions -> stat_progress_expert -> prop_prior
   engine_experts.prior_reproduction    (the board's _fair_value_fields on the same quotes: the gate)
 ```

@@ -166,7 +166,7 @@ def stat_progress(date_str: str, sports: set[str] | None, root: Path | None) -> 
         evidence = [row for d in _days_around(date_str) for row in lel.iter_rows(sport, d, root=root)]
         index = ee.EvidenceIndex(evidence)
         reader = ee.Reader()
-        quotes = ee.PropQuoteIndex(_iter_quote_rows(sport, date_str), reader)
+        quotes = ee.PropQuoteIndex(_iter_quote_rows(sport, date_str), reader, sport=sport)
         kept: list[Any] = []
         ops, skipped = ee.stat_progress_opinions(props_rows, quotes, index, reader, keep_rows=kept)
         opined = [o for o in ops if o.delta_logit is not None]

@@ -405,11 +405,11 @@ def _two_books(**kw):
             _quote("draftkings", "over", -110, **kw), _quote("draftkings", "under", -110, **kw)]
 
 
-def _sp(props, quotes, *, evidence=None, env=None):
+def _sp(props, quotes, *, evidence=None, env=None, sport=None):
     index = ee.EvidenceIndex(evidence if evidence is not None else
                              [_evidence(t=T_TICK, home="Philadelphia 76ers", away="Toronto Raptors")])
     reader = ee.Reader()
-    qi = ee.PropQuoteIndex(quotes, reader)
+    qi = ee.PropQuoteIndex(quotes, reader, sport=sport)
     ops, skipped = ee.stat_progress_opinions([_props_row(props)], qi, index, reader, env=env)
     return ops, skipped, qi, reader
 
@@ -478,6 +478,39 @@ def test_the_player_name_folds_and_the_team_order_does_not_matter():
               for q in _two_books()]
     ops, skipped, _, _ = _sp([_prop()], quotes)
     assert skipped == {} and ops[0].refusal is None
+
+
+@pytest.mark.parametrize("engine, books", [
+    ("Herbert Jones", "Herb Jones"),  # the engine's nickname alias
+    ("Derrick Jones Jr.", "Derrick Jones"),  # a suffix the books leave off
+    ("Paul Reed", "Paul Reed Jr"),  # and one they keep
+    ("Robert Williams III", "Robert Williams"),
+])
+def test_nba_players_match_on_the_engines_name_key(engine, books):
+    """Lane prop-expert-name-key: the re-sim publishes the engine's spelling, the books their own. On NBA the index
+    keys both through the engine's key, so the line opines; with no sport (the old fold) it found no quotes at all."""
+    quotes = _two_books(player=books)
+    on, skipped_on, qi, _ = _sp([_prop(player=engine)], quotes, sport="nba")
+    off, skipped_off, _, _ = _sp([_prop(player=engine)], quotes)
+    assert on[0].refusal is None and on[0].delta_logit is not None and skipped_on == {}
+    assert off == [] and skipped_off == {"no_quotes_for_player_market": 1}
+    rep = ee.prior_reproduction(on, qi)
+    assert rep["checked"] == 1 and rep["prior_mismatched"] == 0 and rep["p_mismatched"] == 0, rep
+
+
+def test_the_index_names_spellings_it_merged_and_keeps_two_players_apart():
+    quotes = (_two_books(player="Derrick Jones")[:2] + _two_books(player="Derrick Jones Jr.")[2:]
+              + _two_books(player="Jalen Williams") + _two_books(player="Jaylin Williams"))
+    qi = ee.PropQuoteIndex(quotes, ee.Reader(), sport="nba")
+    spellings = sorted({ee._fold_player("Derrick Jones"), ee._fold_player("Derrick Jones Jr.")})
+    assert list(qi.merged.values()) == [spellings]
+    jalen, _ = qi.lookup("Philadelphia 76ers", "Toronto Raptors", "Jalen Williams", "player_points", 24.5)
+    jaylin, _ = qi.lookup("Philadelphia 76ers", "Toronto Raptors", "Jaylin Williams", "player_points", 24.5)
+    assert len(jalen) == 4 and len(jaylin) == 4 and jalen is not jaylin
+    both, _ = qi.lookup("Philadelphia 76ers", "Toronto Raptors", "Derrick Jones Jr.", "player_points", 24.5)
+    assert sorted(e[2] for e in both) == ["draftkings", "draftkings", "fanduel", "fanduel"]  # one player, both books
+    assert ee.PropQuoteIndex(quotes, ee.Reader()).merged == {}  # the fold keeps the two spellings apart
+    assert ee.prop_player_key("nhl", "Derrick Jones Jr.") == ee._fold_player("Derrick Jones Jr.")
 
 
 def test_doubles_yes_is_over_the_fixed_line():

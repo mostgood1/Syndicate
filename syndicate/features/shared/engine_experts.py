@@ -612,19 +612,41 @@ def _fold_player(name: Any) -> str:
     return fold_market_identity_term("player_name", name)
 
 
+def prop_player_key(sport: Any, name: Any) -> str:
+    """The key `PropQuoteIndex` files a quote's player under, and looks a published row's player up by.
+
+    NBA: the engine's own key (`live_resim.normalize_name`), the one the re-sim's own line read joins the books on
+    (`live_resim.lines_from_props_csv`). It drops generational suffixes and applies the engine's nickname aliases.
+    The board's identity fold (`_fold_player`) keeps both, and the re-sim publishes the ENGINE's spelling, so a
+    player the books spell differently had no quotes at all. Measured on the fleet's 11-11..11-13 nights (lane
+    `prop-expert-name-key`): all 19,907 `no_quotes_for_player_market` rows were such pairs, seven players (Herb /
+    Herbert Jones, Paul Reed Jr / Paul Reed, Derrick Jones / Derrick Jones Jr., ...). Any other sport, or none, keeps
+    the fold: no other sport logs live props, and its engine's key is not this one."""
+    if str(sport or "").strip().lower() == "nba":
+        from syndicate.features.nba.live_resim import normalize_name
+
+        return normalize_name(name)
+    return _fold_player(name)
+
+
 class PropQuoteIndex:
-    """`book_quotes` PROP rows for one sport-date, by (home, away, folded player, market) -> line -> entries in the
+    """`book_quotes` PROP rows for one sport-date, by (home, away, player key, market) -> line -> entries in the
     order we CAPTURED them. An entry is (captured_at, observed stamp, book, side, price, raw selection). Only those
     scalars are kept, so a busy night's shard (283k prop rows on 11-11) does not sit in memory as dicts.
+
+    `sport` picks the player key (`prop_player_key`); the experts runner passes it. `merged` names every key the books
+    reached under more than one folded spelling, so a run can show that one player's spellings met, not two players.
 
     Every field read goes through `reader` as source `book_quotes`, and the non-null count of each is kept, so the
     input checklist measures population on every row ingested (`populated`)."""
 
     def __init__(self, rows: Iterable[Mapping[str, Any]], reader: Reader | None = None,
-                 expert: str = "stat_progress") -> None:
+                 expert: str = "stat_progress", sport: str | None = None) -> None:
         self.by_key: dict[tuple[str, str, str, str], dict[float, list[tuple]]] = {}
         self.rows = 0
         self.non_null: dict[str, int] = {}
+        self.sport = sport
+        spellings: dict[tuple[str, str, str, str], set[str]] = {}
         reader = reader or Reader()
         for row in rows:
             got = {path: reader.get(expert, "book_quotes", row, path) for path in _QUOTE_PATHS}
@@ -642,18 +664,21 @@ class PropQuoteIndex:
             if side is None or seen is None or price is None or line is None:
                 continue
             stamp = _parse(got["book_updated_at"]) or _parse(got["snapshot_ts"]) or seen
-            key = (team_key(got["home_team"]), team_key(got["away_team"]), _fold_player(got["player_name"]), market)
+            key = (team_key(got["home_team"]), team_key(got["away_team"]),
+                   prop_player_key(sport, got["player_name"]), market)
+            spellings.setdefault(key, set()).add(_fold_player(got["player_name"]))
             self.by_key.setdefault(key, {}).setdefault(float(line), []).append(
                 (seen, stamp, str(got["bookmaker"] or "").lower(), side, int(price), str(got["selection"] or "")))
         for lines in self.by_key.values():
             for entries in lines.values():
                 entries.sort(key=lambda e: e[0])
+        self.merged = {key: sorted(names) for key, names in spellings.items() if len(names) > 1}
 
     def populated(self) -> tuple[int, dict[str, int]]:
         return self.rows, dict(self.non_null)
 
     def lookup(self, home: Any, away: Any, player: Any, market: Any, line: Any) -> tuple[list[tuple] | None, str]:
-        name, mkt = _fold_player(player), str(market or "").lower()
+        name, mkt = prop_player_key(self.sport, player), str(market or "").lower()
         lines = self.by_key.get((team_key(home), team_key(away), name, mkt)) or \
             self.by_key.get((team_key(away), team_key(home), name, mkt))
         if lines is None:
