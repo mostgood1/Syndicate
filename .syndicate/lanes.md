@@ -792,12 +792,6 @@ death, never life — do not invert it.
 - Verification: tests (off != on on the real engine; pregame and period-start identity); replay on vs off same inputs with keep and end-game re-fit; paired game-clustered grade; reachability under the fleet's code and inputs; load only on the user's yes
 - Blocked by: none
 
-### closed-lane-archive-20261114-0439 — CLOSED 2026-11-14 (GOAL MET: 3 blocks archived) — opened 2026-11-14 — session 4ffb158e-04c1-4d17-9daa-ade8af6977e3
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness.py --idle-min 240 at 10:40Z (4:40 AM CST) gave 3 SAFE; dry run + apply clean, invariants unchanged vs origin/main baseline.
-- Moved: nhl-live-total-calibration, nhl-live-overtime, closed-lane-archive-20261113-2240. Table + 7 waited in .syndicate/log/2026-11-14.md.
-
 ### closed-lane-archive-20261114-0640 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session 03ed32dc-f326-48c3-89f0-0410a900ae8d
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -856,6 +850,11 @@ death, never life — do not invert it.
 - Falsification test: a 00:05Z kickoff row on its Central-date board still carries no projection after the fix, or the served board after load still shows 0 projected rows for 6 PM CST+ kickoffs
 - Verification: tests: off != on for a 00:05Z kickoff, 7-day gap still a miss, a row counted on one date only, carryover rows keep their projection; after a fleet load, the served ncaaf book grid shows projected rows for 6 PM CST+ kickoffs
 - Blocked by: none
+
+### closed-lane-archive-20261114-1040 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session c4ad7e58-af48-4ca2-85c8-8dd4f366584b
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 16:41Z read 1 SAFE of 10 CLOSED; moved `closed-lane-archive-20261114-0439` to lanes_closed.md with one pointer. Other 9 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-14.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1110,6 +1109,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261113-2240` — CLOSED 2026-11-13 (GOAL MET: 4 blocks archived) — opened 2026-11-13 — session c9871c88-821b-4ba3-94b6-5561af3f6f82
 - `closed-lane-archive-20261114-0040` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session fa01b905-1782-4229-b72a-fe60bdede361
 - `closed-lane-archive-20261114-0240` — CLOSED 2026-11-14 (GOAL MET: 4 blocks archived) — opened 2026-11-14 — session 3c0e43a3-a382-48ae-a8ba-58552183ee1b
+- `closed-lane-archive-20261114-0439` — CLOSED 2026-11-14 (GOAL MET: 3 blocks archived) — opened 2026-11-14 — session 4ffb158e-04c1-4d17-9daa-ade8af6977e3
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

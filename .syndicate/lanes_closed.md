@@ -15793,3 +15793,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness.py --idle-min 240 at 08:40Z (02:40 AM CST) gave 4 SAFE; dry run + apply clean, invariants unchanged vs origin/main baseline.
 - Moved: live-price-on-pull, college-pbp-blowout-bench, book-grid-overlay-starvation, closed-lane-archive-20261113-2040. Table + 9 waited in .syndicate/log/2026-11-14.md.
+
+### closed-lane-archive-20261114-0439 — CLOSED 2026-11-14 (GOAL MET: 3 blocks archived) — opened 2026-11-14 — session 4ffb158e-04c1-4d17-9daa-ade8af6977e3
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness.py --idle-min 240 at 10:40Z (4:40 AM CST) gave 3 SAFE; dry run + apply clean, invariants unchanged vs origin/main baseline.
+- Moved: nhl-live-total-calibration, nhl-live-overtime, closed-lane-archive-20261113-2240. Table + 7 waited in .syndicate/log/2026-11-14.md.
