@@ -143,3 +143,13 @@ Spreads / full rows in the gate population, each judged by the same precision ga
   - h2h and WNCAAB are unchanged.
 - **Falsified if** a scaled sport's priced share falls by more than 10% (per row, scaled vs unscaled), or an h2h or
   WNCAAB row moves.
+
+## Load readings (2026-11-14)
+
+- **NBA, 11-13 night: MET.** 428 of 428 post-load spreads rows v7 at k 2.02 with the unscaled field; priced
+  170 -> 171 (+0.6%); median priced |edge| 15.2 -> 7.6 pp (x0.50); rows >= 20 pp 33 -> 1.
+- **NCAAB:** 7,373 rows / 84 games at k 1.34; priced 3,861 -> 3,829 (-0.8%); median 12.3 -> 9.2 pp (x0.75).
+- **NCAAF, 11-14 day games: MET.** NCAAF spreads at k 1.80: 5,339 gate rows on 34 games since the 20:18:41Z 11-13 load, every one v7 at k 1.8 with the unscaled field; priced 2,815 -> 2,740 (-2.7%); median |edge| 16.5 -> 9.7 pp (x0.59; replay 18.2 -> 10.3, x0.57); rows >= 20 pp 1,006 -> 153; NCAAF h2h 2,008 rows, every one untouched (prob_scale None).
+- **WNCAAB:** 568 rows, every one k 1.0 with no unscaled field. Every h2h row in every sport untouched.
+- All 34 games kicked off before 6 PM CST: 11-13's evening games never reached the gate (`#801`) and 11-14's had not started. read 2026-11-14 22:54:53Z (4:54 PM CST), `read780.py` at nice 19, read-only, VERDICT MET; output `C:\tmp\livegrade\load780\read780_1114_day.out`.
+- **Not yet shown:** This is the mechanism reading (shape, per-row priced share, edge shrink). Whether the tempered NCAAF numbers beat the market against finals is the post-load grade owed from 11-17.

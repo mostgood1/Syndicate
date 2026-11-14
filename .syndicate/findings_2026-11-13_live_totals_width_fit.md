@@ -103,3 +103,12 @@ market on Brier. That is the honest reading of `#780`.
   - The served NBA / NCAAF totals |edge| median falls by about half.
   - NCAAB is unchanged (`prob_scale` 1.0).
 - **Falsified if** NBA / NCAAF priceable falls by more than 10%, or NCAAB moves at all.
+
+## Load readings (2026-11-14)
+
+- **NBA, 11-13 night: MET.** 475 of 475 post-load rows v7 at k 2.16 with the unscaled field; priced 174 -> 170
+  (-2.3%); median priced |edge| 15.2 -> 7.3 pp (x0.48); rows >= 20 pp 44 -> 2.
+- **NCAAF, 11-14 day games: MET.** NCAAF totals at k 2.48: 5,290 gate rows on 34 games recorded since the 17:55:58Z 11-13 load, every one v7 at k 2.48 with the unscaled field; priced 3,535 -> 3,492 per row (-1.2%; FALSIFIED would be > 10% down); median priced |edge| 18.1 -> 7.6 pp (x0.42; the replay predicted 20.6 -> 8.9, x0.43); rows >= 20 pp 1,478 -> 160.
+- **NCAAB / WNCAAB:** every post-load row k 1.0 with no unscaled field (10,688 / 865 rows).
+- All 34 games kicked off before 6 PM CST: 11-13's evening games never reached the gate (`#801`) and 11-14's had not started. read 2026-11-14 22:54:53Z (4:54 PM CST), `read780.py` at nice 19, read-only, VERDICT MET; output `C:\tmp\livegrade\load780\read780_1114_day.out`.
+- **Not yet shown:** This is the mechanism reading (shape, per-row priced share, edge shrink). Whether the tempered NCAAF numbers beat the market against finals is the post-load grade owed from 11-17.
