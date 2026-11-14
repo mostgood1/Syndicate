@@ -3527,6 +3527,69 @@
     return out;
   }
 
+  // THE RAIL'S OWN REFRESH, every LIVE_RAIL_FAST_POLL_MS (todo #803, lane live-rail-fast-poll; user 2026-11-14
+  // "Yes, build it"). The whole board is re-fetched every 60 s (~5-6 MB); a live price reaches the board every
+  // ~90 s, so the poll alone added ~30 s on average before the rail showed it. `/api/board/live-rail` serves
+  // today's live game-line rows from the in-play overlay, built through the board's own card path (measured on
+  // the fleet 2026-11-14: 346 of 346 rows equal to the board path's at the same instant, 23-41 ms, ~21 KB
+  // compressed). They are swapped into the RAIL only (never the board's rows), by the server merge's own
+  // identity -- game, market, segment, player (`book_grid_artifact.inplay_overlay_identity`) -- and only:
+  //   - for an identity the board already shows (anything new waits for the next whole-board poll), and
+  //   - when the fresh rows are at least as new as the board's (`price_grid_generated_at`), so an older fetch
+  //     never overwrites a newer board.
+  // The whole group of an identity is replaced, as the server merge does, so a moved line leaves no old price.
+  const LIVE_RAIL_FAST_POLL_MS = 15000;
+  let liveRailFresh = null;
+  let liveRailHasLive = false;
+
+  function liveRailIdentity(row) {
+    const norm = (value) => String(value ?? "").trim().toLowerCase();
+    return [
+      norm(row.sport || row.sport_slug),
+      norm(row.event_id || row.game_pk),
+      norm(row.market || row.market_key),
+      norm(row.segment) || "full",
+      norm(row.player_name),
+    ].join("|");
+  }
+
+  function liveRailNewestMs(rows) {
+    let newest = -Infinity;
+    for (const row of rows) {
+      const ms = Date.parse(String((row && row.price_grid_generated_at) || ""));
+      if (Number.isFinite(ms) && ms > newest) newest = ms;
+    }
+    return newest;
+  }
+
+  function mergeLiveRailFresh(items, fresh) {
+    const freshRows = fresh && Array.isArray(fresh.rows) ? fresh.rows : [];
+    if (!freshRows.length) return items;
+    const freshById = new Map();
+    for (const row of freshRows) {
+      if (!row || typeof row !== "object" || !liveRailMarketKey(row)) continue;
+      const id = liveRailIdentity(row);
+      if (!freshById.has(id)) freshById.set(id, []);
+      freshById.get(id).push(row);
+    }
+    const boardById = new Map();
+    for (const item of items) {
+      if (!liveRailMarketKey(item)) continue;
+      const id = liveRailIdentity(item);
+      if (!boardById.has(id)) boardById.set(id, []);
+      boardById.get(id).push(item);
+    }
+    const swap = new Set();
+    for (const [id, rows] of freshById) {
+      const board = boardById.get(id);
+      if (board && liveRailNewestMs(rows) >= liveRailNewestMs(board)) swap.add(id);
+    }
+    if (!swap.size) return items;
+    const out = items.filter((item) => !(liveRailMarketKey(item) && swap.has(liveRailIdentity(item))));
+    for (const id of swap) out.push(...freshById.get(id));
+    return out;
+  }
+
   function liveEdgeFilterMatches(summary, filter) {
     if (!filter || filter === "all") return true;
     if (!summary) return false;
@@ -4318,7 +4381,8 @@
     // see the LIVE RAIL LINES block). Each live game's own live full-game rows,
     // keyed through the #165 merge map exactly as the board's game filter is.
     const liveRowsByGame = new Map();
-    for (const item of items) {
+    // The rail's own 15 s refresh swaps fresher rows in here, and only here (todo #803; mergeLiveRailFresh).
+    for (const item of mergeLiveRailFresh(items, liveRailFresh)) {
       if (!liveRailMarketKey(item)) continue;
       const raw = gameKey(item);
       const key = raw ? (gameKeyMergeMap.get(raw) || raw) : null;
@@ -4333,6 +4397,7 @@
       if (!(chip ? chip.state === "live" : game.hasLive)) continue;
       liveSummaries.set(game.key, liveRailSummary(liveRowsByGame.get(game.key) || [], chip, lastResponseForActions, nowMs));
     }
+    liveRailHasLive = liveSummaries.size > 0;
     const liveFilter = state.liveEdge || "all";
     // The selected game always stays on the rail: hiding the card a reader just
     // picked would strand the board's one-game filter with nothing to un-click.
@@ -6031,6 +6096,51 @@
     },
     { enabled: true, intervalMs: 60000, refreshOnVisible: true, refreshOnFocus: true, skipWhenHidden: true, preventOverlap: true, idleTimeoutMs: 15 * 60 * 1000 }
   );
+
+  // THE RAIL'S LIVE LINES EVERY 15 s (todo #803; see mergeLiveRailFresh). Only while the rail shows a live game,
+  // paused like the board's poll (hidden tab, 15 min idle -- the board's poll owns the paused message), and it
+  // stops for good when the server says it is off (SYNDICATE_LIVE_RAIL_FAST_POLL=off). A fetch that brings
+  // nothing new (same newest overlay) re-renders nothing; the ages tick on their own (tickLiveRailAges). The
+  // re-render keeps the strip's horizontal scroll, which a 15 s refresh would otherwise reset under the reader.
+  let liveRailPoller = null;
+  async function loadLiveRail() {
+    if (!liveRailHasLive) return;
+    let body = null;
+    try {
+      const res = await fetch("/api/board/live-rail", { cache: "no-store" });
+      if (!res.ok) return;
+      body = await res.json();
+    } catch (error) {
+      return;
+    }
+    if (!body || body.enabled === false) {
+      if (liveRailPoller) liveRailPoller.stop();
+      liveRailPoller = null;
+      return;
+    }
+    if (!Array.isArray(body.rows)) return;
+    const previous = liveRailFresh;
+    liveRailFresh = { rows: body.rows, newest: body.newest_written_at || null, fetchedAt: Date.now() };
+    if (previous && previous.newest === liveRailFresh.newest) return;
+    const strip = document.querySelector("#board-game-cards .game-card-strip");
+    const scrollLeft = strip ? strip.scrollLeft : 0;
+    renderGameCards(lastRenderItems.filter(matchesDateFilter));
+    const after = document.querySelector("#board-game-cards .game-card-strip");
+    if (after && scrollLeft) after.scrollLeft = scrollLeft;
+  }
+  if (window.SyndicatePolling && typeof window.SyndicatePolling.start === "function") {
+    liveRailPoller = window.SyndicatePolling.start({
+      intervalMs: LIVE_RAIL_FAST_POLL_MS,
+      onTick: loadLiveRail,
+      skipWhenHidden: true,
+      refreshOnVisible: false,
+      refreshOnFocus: false,
+      preventOverlap: true,
+      idleTimeoutMs: 15 * 60 * 1000,
+      onIdle: () => {},
+      onResume: () => {},
+    });
+  }
 })();
 </script>
 {% endblock %}

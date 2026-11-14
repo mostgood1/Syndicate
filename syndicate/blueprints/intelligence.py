@@ -3461,6 +3461,20 @@ def _game_chip_artifact_max_age_seconds() -> float:
     return 120.0
 
 
+@intelligence_bp.get("/api/board/live-rail")
+def board_live_rail_api():
+    # The games rail's live game-line rows between whole-board polls (todo #803, lane live-rail-fast-poll):
+    # today's in-play overlay, built through the board's own card path and trimmed to the rail's fields, so the
+    # page can refresh the rail every ~15 s without re-fetching the ~5 MB board. Reads the worker's artifacts
+    # only. Off switch SYNDICATE_LIVE_RAIL_FAST_POLL=off (`enabled: false`; the page stops polling).
+    from syndicate.features.shared.live_rail_rows import live_rail_payload
+
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    response = jsonify(live_rail_payload(selected_date))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @intelligence_bp.get("/api/board/game-chips")
 def board_game_chips_api():
     # Shared scoreboard hydration for the Layer 1 and Layer 2 mini game

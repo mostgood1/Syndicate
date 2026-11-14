@@ -42,6 +42,7 @@ const api = new Function('escapeHtml', 'trimClubAffixes', `
   ${block[0]}
   return { liveRailMarketKey, liveRailSegmentKey, liveQuotePricingAgeSeconds, liveQuoteAgeNowSeconds, liveRowFreshEdge, liveRailMainRow,
            liveRailSummary, liveEdgeFilterMatches, renderLiveRailLines, tickLiveRailAges, LIVE_RAIL_AGE_TICK_MS,
+           mergeLiveRailFresh, liveRailIdentity, LIVE_RAIL_FAST_POLL_MS,
            LIVE_EDGE_FRESH_QUOTE_SECONDS, LIVE_EDGE_MIN_PP, LIVE_PRICE_STALE_AFTER_SECONDS };
 `)(escapeHtml, trimClubAffixes);
 
@@ -318,6 +319,56 @@ api.tickLiveRailAges(root, NOW + 300000);
 check('a tick past 300 s: orange', ageCell.classList.has('is-stale'), true);
 check('the ticker runs every 5 s and fetches nothing', api.LIVE_RAIL_AGE_TICK_MS === 5000 && !/fetch\(/.test(block[0].split('function tickLiveRailAges')[1] || ''), true);
 check('a row with no build time carries no tick attributes', /data-rail-built-at/.test(api.renderLiveRailLines(api.liveRailSummary(fresh().map((r) => ({ ...r, price_grid_generated_at: undefined })), chip, {}, NOW))), false);
+
+// ---------------------------------------------------------------- todo #803: the rail's own 15 s refresh
+const OLDER = '2026-11-10T23:44:00Z';
+const NEWER = '2026-11-10T23:44:50Z';
+const boardRows = () => [
+  { ...totals(149.0, 'over', 0.44), sport: 'ncaab', event_id: 'ev1', price_grid_generated_at: OLDER },
+  { ...totals(149.0, 'under', 0.56), sport: 'ncaab', event_id: 'ev1', price_grid_generated_at: OLDER },
+  { ...base, market: 'spreads', side: 'home', line: 8.5, odds: -110, sport: 'ncaab', event_id: 'ev1', price_grid_generated_at: OLDER,
+    quote: { fair_probability: 0.5 } },
+  { kind: 'prop', market: 'player_points', sport: 'ncaab', event_id: 'ev1', line: 18.5, player_name: 'X' },
+];
+// The book moved the total to 150.5: the fresh group for that identity carries only the new line.
+const freshTotals = [
+  { ...totals(150.5, 'over', 0.48), sport: 'ncaab', event_id: 'ev1', price_grid_generated_at: NEWER },
+  { ...totals(150.5, 'under', 0.52), sport: 'ncaab', event_id: 'ev1', price_grid_generated_at: NEWER },
+];
+const freshNewGame = [{ ...totals(130.5, 'over', 0.5), sport: 'ncaab', event_id: 'ev9', price_grid_generated_at: NEWER }];
+check('the rail polls every 15 s', api.LIVE_RAIL_FAST_POLL_MS, 15000);
+check('identity is game, market, segment, player -- not line or side (the server merge\'s)',
+  api.liveRailIdentity(freshTotals[0]) === api.liveRailIdentity(boardRows()[1]), true);
+const merged = api.mergeLiveRailFresh(boardRows(), { rows: [...freshTotals, ...freshNewGame] });
+const mergedTotals = merged.filter((r) => r.market === 'totals');
+check('a moved line replaces the identity\'s whole group: only 150.5 remains', JSON.stringify(mergedTotals.map((r) => `${r.side}${r.line}`).sort()), '["over150.5","under150.5"]');
+check('an identity the fresh poll does not carry is kept (the spread)', merged.some((r) => r.market === 'spreads' && r.line === 8.5), true);
+check('a non-rail row is never touched (the prop)', merged.some((r) => r.kind === 'prop'), true);
+check('an identity the board does not show is not added (waits for the whole-board poll)', merged.some((r) => r.event_id === 'ev9'), false);
+const staleFresh = freshTotals.map((r) => ({ ...r, price_grid_generated_at: '2026-11-10T23:43:00Z' }));
+check('older fresh rows never overwrite newer board rows', JSON.stringify(api.mergeLiveRailFresh(boardRows(), { rows: staleFresh })
+  .filter((r) => r.market === 'totals').map((r) => r.line)), '[149,149]');
+const unchanged = boardRows();
+check('no fresh rows: the board\'s own list, untouched', api.mergeLiveRailFresh(unchanged, null) === unchanged
+  && api.mergeLiveRailFresh(unchanged, { rows: [] }) === unchanged, true);
+// Through the summary: the rail reads the fresh line.
+const railFresh = api.liveRailSummary(api.mergeLiveRailFresh(boardRows().filter((r) => r.kind !== 'prop'), { rows: freshTotals }), null, response, NOW);
+check('the rail\'s total row reads the fresh line', railFresh.markets.find((m) => m.key === 'totals').book, '150.5');
+
+// The page wiring (source checks): renderGameCards merges, the poller is the shared one, the off switch stops it,
+// and the strip keeps its scroll.
+check('renderGameCards builds the rail rows through the merge', /for \(const item of mergeLiveRailFresh\(items, liveRailFresh\)\)/.test(html), true);
+check('renderGameCards records whether the rail shows a live game', /liveRailHasLive = liveSummaries\.size > 0;/.test(html), true);
+const loader = html.match(/ {2}async function loadLiveRail\(\)[\s\S]*?\n {2}}\n/);
+check('loadLiveRail exists', Boolean(loader), true);
+const ld = loader ? loader[0] : '';
+check('it polls only while the rail shows a live game', /if \(!liveRailHasLive\) return;/.test(ld), true);
+check('it reads the light endpoint, uncached', /fetch\("\/api\/board\/live-rail", \{ cache: "no-store" \}\)/.test(ld), true);
+check('the server\'s off switch stops it for good', /body\.enabled === false[\s\S]*liveRailPoller\.stop\(\)/.test(ld), true);
+check('nothing new (same newest overlay): no re-render', /previous\.newest === liveRailFresh\.newest\) return;/.test(ld), true);
+check('the re-render keeps the strip\'s horizontal scroll', /scrollLeft = strip \? strip\.scrollLeft : 0[\s\S]*after\.scrollLeft = scrollLeft/.test(ld), true);
+check('the poller is the shared one, paused when hidden and idle, its own interval',
+  /SyndicatePolling\.start\(\{\s*intervalMs: LIVE_RAIL_FAST_POLL_MS,\s*onTick: loadLiveRail,\s*skipWhenHidden: true,[\s\S]*idleTimeoutMs: 15 \* 60 \* 1000,/.test(html), true);
 
 // ---------------------------------------------------------------- wiring in renderGameCards
 const render = html.match(/ {2}function renderGameCards\(items\)[\s\S]*?\n {2}}\n/);
