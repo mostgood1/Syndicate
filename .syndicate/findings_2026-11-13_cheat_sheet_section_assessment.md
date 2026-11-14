@@ -194,3 +194,49 @@ mismatch on 0.5 lines is real arithmetic but costs nothing measurable, because t
 fair. The NHL header keeps printing that the section has not beaten the price. About 40 cells were read; the few
 intervals that exclude 0 (e.g. NHL SOG rows the filter drops, -24.3% on 50, one of 15 market cells) are treated as noise.
 Scripts and outputs: `C:\tmp\edge-analyses\nhl-sim-chance\` (`replay.py`, `sports.py`, `replay_nhl.txt`, `sports.txt`).
+## 7. Follow-up 11-13: why the 11-12 NFL sheet shrank to 4 rows (user "Trace it here")
+
+The 11-12 NFL sheet (WAS @ NYG, kickoff 7:15 PM CST) had 181 rows / 52 groups at the 11:30 AM build and 4 rows / 2
+groups at the 3:30 PM build, the last pregame build. Thursday's graded record rests on those 4 rows. Two causes, both
+confirmed.
+
+**The builder built on a collapsed read (fixed locally, `fc3e9bd49`, not loaded).** `steady_rows` saw "2 groups vs 52
+on the prior sheet", re-read 3 times over 150 s, and every read was still collapsed. The build went ahead;
+`merge_with_record` replaced every row of the event because the event was still priced, and `sticky_groups` can only
+keep a group the board still serves. `cheat_sheets.log` since 10-20: 16 collapsed reads, 0 recovered by the re-reads (a
+dip outlasts 150 s). Three final sheets stayed thin: NFL 11-12 (52 -> 2 groups), soccer 10-29 (82 -> 19), soccer 11-06
+(115 -> 65). Fix: a read still collapsed after the re-reads writes nothing for that sport, keeps the prior sheet and
+logs `board read still collapsed after re-reads`. Test fails with the guard off and passes with it on; 48/48 builder
+tests pass.
+
+**The board dropped the game's props as "market gone" (`#802`, renumbered from #801; lane board-market-gone-snapshot-age).** `pipeline/layer2_shortlist.py`
+`_drop_market_gone_rows` drops a row when its last look is at least 900 s old and more than 1.5 x the reference pass's
+age + 300 s, and no OTHER line in its group (event, market, player) was seen within 900 s of it (`_classify_stale_row`).
+The reference is the newest pass that re-looked at >= 50% of the keys seen within 14 h (`_sweep_reference_age`, the
+2026-09-16 soccer/MLB repair). NFL pregame sweeps run every 25 min (`PREGAME_CADENCE_DETAIL nfl:interval_s=1500`), so
+rows routinely sit 900-1,500 s from their last look. Whenever a pass covering >= 50% is seconds old but did not re-look
+at a set of rows, those rows read as dead until something re-looks at them.
+
+| when (CST) | NFL board rows | `MARKET_GONE_DROPPED nfl=` | reference pass age |
+|---|---|---|---|
+| 11-12 3:22 PM (before) | 1,506 | 44 | 53 s |
+| 11-12 3:25-3:35 PM, 4 builds | 1,231-1,255 | 312 / 293 / 290 / 291 | 76-128 s |
+| 11-12 3:39 PM (after) | 1,489 | 42 | 47 s |
+| 11-13, 8 drops 2:42 AM-3:31 PM | 1,276-1,343 -> 787-855 | 471-538 (prior build 1-40) | 5-151 s |
+
+The 3:30 PM cheat-sheet build read the board inside the 11-12 window. Over 11-06..11-13 (2,434 NFL builds) there were
+160 drops below 75% of the prior build, about one an hour at every hour, most lasting one build (2-8 min). The
+market-gone filter accounts for 44, including 11 of the last 12; the other 116 (mostly 11-06..11-11) carry no such count
+and were not traced. NCAAF is hit in the same builds (`ncaaf=588` at 21:31Z 11-13). Ruled out on the way: NFL grid
+writes do not line up with the drops (no NFL grid write between the good 21:05Z build and the 21:13Z drop on 11-13;
+recovery at 21:39Z with none either), and the NFL quote reads were flat (108-110k raw rows).
+
+Not established: whether the dropped rows were truly skipped by the fresh pass, or were re-looked at and judged on a
+look age taken from a grid built before that pass. On 11-13 they came back stamped about 52 s after the reference pass.
+On 11-12 the reference was a frequent game-day pass. Catching one drop live and looking up each dropped row's own key in
+the state file separates the two; that is `#802`'s first step. The 23:27:15Z 11-13 pass looked at 72% of 14,735 recent
+keys (9 markets, 12 events) and no drop followed it (next build `nfl=59`).
+
+Scripts (read-only over the fleet's `refresh-worker.log*`, `live-odds-worker.log*` and book-quotes state files):
+`C:\tmp\edge-analyses\nfl-shortlist-drop\` (`health_history.py`, `gone_vs_drop.py`, `nfl_timeline.py`, `window.py`,
+`passes.py`, `collapse_history.py`).
