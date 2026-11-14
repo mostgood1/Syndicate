@@ -46,12 +46,19 @@ which is how the bet actually settles, since a push returns the stake -- and
 silently inflating the favourite. A row whose line can ONLY push (every sim
 lands on it) publishes no probability at all.
 
-SKILL: the same measured loss the full-game module carries. `#555` records this
-model losing to the closing line (margin MAE 15.775 vs 12.212, n=2233) with
-totals 1.67x over-dispersed, and `football/pick_gate.py` is explicit that
-suppressing PICKS "does NOT stop projections being generated, published, or
-displayed". So segments display, carrying `model_skill`, and the measured loss
-acts through ranking rather than through a blank column.
+SKILL: MEASURED PER SEGMENT, AND NOT STAMPED HERE `[2026-11-14, lane
+ncaaf-segment-skill, todo #805]`. This module used to stamp the FULL-GAME loss
+(`{"state": "measured_loss", ...}`) on every view, saying the loss "acts through
+ranking". It did not: the note had no `established_loss_rel`, so
+`projection_skill` served it as `status: measured` and `skill_reliability`
+scored it 1.0 -- 1,617 rows at full weight on the 2026-11-14 board while the
+same model's full-game rows sat at 0.814 / 0.514. A pre-registered grade of
+these probabilities against the pregame close now lives in
+`measured_market_skill` (totals and spreads LOSE, h2h parity; 161 games), and
+`projection_skill.attach_projection_skill`, which runs after this join, reads
+it. `football/pick_gate.py` still holds that suppressing PICKS "does NOT stop
+projections being generated, published, or displayed": segments display, and
+the measured loss acts through ranking.
 """
 
 from __future__ import annotations
@@ -160,25 +167,6 @@ def _segment_block(block: Mapping[str, Any], segment: str) -> Mapping[str, Any] 
     return got if isinstance(got, Mapping) else None
 
 
-def _skill_note() -> dict[str, Any]:
-    """The full-game module's measurement, not a softer one for segments.
-
-    A per-segment skill number does not exist yet. Reporting the game-level
-    loss is honest; inventing a segment-level one, or omitting the caveat
-    because none was measured at this grain, would both read as better news
-    than the evidence supports.
-    """
-    return {
-        "state": "measured_loss",
-        "note": (
-            "smartsim2 is measured LOSING to the closing line at game level "
-            "(margin MAE 15.775 vs 12.212, n=2233; totals 1.67x over-dispersed). "
-            "No per-segment skill measurement exists yet, so the game-level "
-            "figure travels here rather than a segment-level claim"
-        ),
-    }
-
-
 def segment_projection(
     row: Mapping[str, Any],
     *,
@@ -205,7 +193,8 @@ def segment_projection(
         "source": SOURCE,
         "segment": segment,
         "basis": f"smartsim2_{segment}_empirical",
-        "model_skill": _skill_note(),
+        # NO `model_skill` (todo #805): `attach_projection_skill` stamps the measured
+        # per-segment note from `measured_market_skill` after this join runs.
         "sims": sims,
     }
     if seg.get("h2_regulation_only") is not None:

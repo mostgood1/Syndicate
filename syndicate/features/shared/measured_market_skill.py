@@ -618,8 +618,9 @@ MEASURED_MARKET_SKILL: dict[tuple[str, str, str, str], dict[str, Any]] = {
         "admission_checked": "2026-09-14 served shortlist: all 103 batter_hits_runs_rbis rows fair_method=consensus",
     },
     # ---- NCAAF, LIVE --------------------------------------------------------------
-    # NCAAF PREGAME is not here on purpose: `ncaaf.game_projections` attaches its own
-    # note, and a producer's note outranks this table.
+    # NCAAF FULL-GAME PREGAME is not here on purpose: `ncaaf.game_projections` attaches its
+    # own note, and a producer's note outranks this table. Its quarters and halves ARE here
+    # (block below the NFL segments, todo #805): that producer no longer stamps a note.
     ("ncaaf", "totals", "full", PHASE_LIVE): {
         "sample_games": 75,
         "seasons": "2026 weeks 1-2 live",
@@ -783,6 +784,85 @@ for (_market, _segment), _alone in _NFL_SEGMENT_ALONE.items():
         ),
         "verdict_class": _fam["verdict_class"],
         "source": _NFL_SEGMENT_SOURCE,
+    }
+del _market, _segment, _alone, _fam
+
+# ---- NCAAF, PREGAME, QUARTERS AND HALVES `[2026-11-14, lane ncaaf-segment-skill, todo #805]` ----
+# `ncaaf.segment_projections` used to stamp the FULL-GAME module's loss on every quarter/half
+# view as `{"state": "measured_loss"}` with no `established_loss_rel`, so `skill_reliability`
+# scored it 1.0: served 2026-11-14 22:48Z, 1,617 segment rows at full weight while the same
+# model's full-game rows sat at 0.814 / 0.514. Its docstring said the loss "acts through
+# ranking"; it did not, and no segment-level figure existed. These are that figure.
+#
+# PRE-REGISTERED in lanes.md (`eda9dbd3a`) before any outcome was read; graded ONCE
+# (`scripts/ncaaf_segment_skill.py`, blob `8e9fbfdf5076`, seed 804). Method = NFL's above,
+# with production's own NCAAF bridge (resolve_team -> the week CSV's ESPN game id -> its
+# sidecar block) and ONE extra rule: the sidecar's `generated_at` must precede kickoff,
+# because each week's file is rewritten through the week (its last write lands on the
+# Saturday) and SP+ refreshes in season. That rule kept 161 of 362 quoted games (3,485
+# markets refused as written after kickoff), all on weeks 5-10 Saturday-afternoon-and-later
+# slates. Model weight beside the market ~0 in every family; totals carry no information
+# (calibration slope -0.03).
+_NCAAF_SEGMENT_SOURCE = (
+    "scripts/ncaaf_segment_skill.py: fleet ncaaf_source/tracking/book_quotes pregame segment "
+    "quotes 10-01..11-12 vs smartsim2_segment_distributions_2026_wk5-10 written before kickoff "
+    "and ESPN final linescores; .syndicate/findings_2026-11-14_ncaaf_segment_skill.md"
+)
+_NCAAF_SEGMENT_FAMILIES = {
+    "totals": {"n": 964, "games": 161, "brier_model": 0.2725, "brier_market": 0.24949, "diff": 0.02301,
+               "ci95": (0.01152, 0.03486), "verdict_class": VERDICT_LOSES,
+               "slope_model": -0.028, "slope_market": 0.936, "w_model": -0.075},
+    "spreads": {"n": 966, "games": 161, "brier_model": 0.25604, "brier_market": 0.24802, "diff": 0.00802,
+                "ci95": (0.00096, 0.01531), "verdict_class": VERDICT_LOSES,
+                "slope_model": 0.182, "slope_market": 1.362, "w_model": 0.008},
+    "h2h": {"n": 844, "games": 161, "brier_model": 0.22993, "brier_market": 0.22421, "diff": 0.00572,
+            "ci95": (-0.00121, 0.01311), "verdict_class": VERDICT_PARITY,
+            "slope_model": 0.723, "slope_market": 1.094, "w_model": 0.12},
+}
+# (dBrier, CI low, CI high, games) for the segment alone -- descriptive, not the verdict.
+_NCAAF_SEGMENT_ALONE = {
+    ("totals", "h1"): (0.04481, 0.01893, 0.07043, 160),
+    ("totals", "h2"): (0.014, -0.00863, 0.03855, 161),
+    ("totals", "q1"): (0.02192, 0.00309, 0.04028, 161),
+    ("totals", "q2"): (0.02856, 0.00773, 0.0494, 161),
+    ("totals", "q3"): (0.01379, -0.00605, 0.03454, 160),
+    ("totals", "q4"): (0.01505, -0.00356, 0.03287, 161),
+    ("spreads", "h1"): (0.01257, -0.0034, 0.0281, 161),
+    ("spreads", "h2"): (0.00116, -0.01538, 0.0197, 161),
+    ("spreads", "q1"): (0.00872, -0.00403, 0.02162, 161),
+    ("spreads", "q2"): (0.01323, 0.00035, 0.02588, 161),
+    ("spreads", "q3"): (0.00362, -0.00924, 0.01692, 161),
+    ("spreads", "q4"): (0.00882, -0.00401, 0.02236, 161),
+    ("h2h", "h1"): (0.00522, -0.00887, 0.01888, 146),
+    ("h2h", "h2"): (0.0046, -0.01065, 0.0212, 151),
+    ("h2h", "q1"): (0.00848, -0.00459, 0.02241, 136),
+    ("h2h", "q2"): (0.00564, -0.00806, 0.02004, 142),
+    ("h2h", "q3"): (0.00425, -0.00979, 0.01855, 136),
+    ("h2h", "q4"): (0.0063, -0.00639, 0.01966, 133),
+}
+for (_market, _segment), _alone in _NCAAF_SEGMENT_ALONE.items():
+    _fam = _NCAAF_SEGMENT_FAMILIES[_market]
+    MEASURED_MARKET_SKILL[("ncaaf", _market, _segment, PHASE_PREGAME)] = {
+        "sample_games": _fam["games"],
+        "seasons": (
+            f"2026 weeks 5-10 pregame (10-04..11-08 kickoffs, sim file written before kickoff); "
+            f"{_fam['n']} lines over {_fam['games']} games, pooled over h1/h2/q1-q4 as pre-registered; "
+            f"{_segment} alone: dBrier {_alone[0]:+.4f} [{_alone[1]:+.4f}, {_alone[2]:+.4f}], n {_alone[3]}"
+        ),
+        "brier_model": _fam["brier_model"],
+        "brier_market": _fam["brier_market"],
+        "diff": _fam["diff"],
+        "ci95": _fam["ci95"],
+        "segment_alone": _alone,
+        "info_beyond_line": {"w_model": _fam["w_model"], "slope_model": _fam["slope_model"],
+                             "slope_market": _fam["slope_market"]},
+        "verdict": (
+            f"NCAAF quarter/half {_market}: {_NFL_SEGMENT_WORDS[_fam['verdict_class']]} the pregame close, "
+            f"Brier {_fam['diff']:+.4f} [{_fam['ci95'][0]:+.4f}, {_fam['ci95'][1]:+.4f}], "
+            f"{_fam['games']} games; nothing beyond the line"
+        ),
+        "verdict_class": _fam["verdict_class"],
+        "source": _NCAAF_SEGMENT_SOURCE,
     }
 del _market, _segment, _alone, _fam
 

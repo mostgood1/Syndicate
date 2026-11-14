@@ -184,11 +184,13 @@ def test_the_source_names_the_segment_model_not_the_full_game_one():
     assert proj["segment"] == "q1"
 
 
-def test_skill_reports_the_GAME_level_loss_and_says_that_is_what_it_is():
-    proj = sp.segment_projection(_row("h2h"), market="h2h", segment="q1", block=_block(q1=_seg()))
-    skill = proj["model_skill"]
-    assert skill["state"] == "measured_loss"
-    assert "No per-segment skill measurement exists" in skill["note"]
+def test_the_producer_stamps_no_skill_note_so_the_measured_registry_decides():
+    # todo #805: the old game-level `measured_loss` note scored 1.0 in ranking. The
+    # per-segment measurement lives in `measured_market_skill`; see
+    # tests/test_ncaaf_segment_skill.py for what `attach_projection_skill` stamps.
+    for market in ("totals", "spreads", "h2h"):
+        proj = sp.segment_projection(_row(market), market=market, segment="q1", block=_block(q1=_seg()))
+        assert "model_skill" not in proj
 
 
 # --------------------------------------------------------------------------
