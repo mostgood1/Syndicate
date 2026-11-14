@@ -815,6 +815,14 @@ death, never life — do not invert it.
 - Verification: Unit: inside the scope each lookup resolves once per key and returns what the unscoped call returns; the off switch resolves every call (off != on); the scope does not leak across threads or past an exception; build_book_grid_artifact opens it; both writers' bytes equal json.dump's. Fleet replay (read-only, nice 19): stat-like calls and per-stage times alone and with a busy thread, old vs new, payload diff. After the user's load: build_seconds.nba while NBA is live and NBA overlay gaps vs the 360 s cutoff
 - Blocked by: none
 
+### board-market-gone-snapshot-age — OPEN — opened 2026-11-14 — session 35bdf3a7-5afc-483e-98bb-d0d7f4d2ecc3
+- Goal: #801: the board's market-gone filter stops dropping NFL (and NCAAF) props that the odds pull it measures the reference from has already re-looked at; MARKET_GONE_DROPPED nfl on a build where a pull landed mid-build stays at its baseline (<= ~65) instead of 290-580
+- Files: pipeline/layer2_shortlist.py (_drop_market_gone_rows, _classify_stale_row, _report_stale_row_causes, a new own-look index helper ONLY), tests/test_layer2_market_gone_snapshot_age.py (new)
+- Hypothesis: MEASURED BEFORE OPENING (11-14 6:38 AM CST drop, nfl 454): the 11-15 pass captured 12:38:02Z (ODDS_SWEEP_LAUNCHED 12:37:55Z) and was written before the 12:38:20Z drop step (reference 17 s); the next build 12:42Z recovered with the SAME pass (reference 213 s = 12:38:04Z) and no new pull. The NFL writer stamps one captured_at after fetching and writes every shard at once (fetch_nfl_oddsapi_props_local.py:620-641). So the dropped rows HAD been re-looked; the filter judged them on quote_seen_age_seconds from the shortlist's grid read earlier in the same build, against a reference read from the post-pass state file. Fix: judge a row's age from the SAME snapshot as the reference (the row's own key's look in the judging state file)
+- Falsification test: If replaying the fixed classifier on a mid-build-pull case still drops the re-looked rows, or if after the load a build with a pull landing between the NFL grid read and the drop step still logs MARKET_GONE_DROPPED nfl >= 200, the hypothesis or the fix is wrong
+- Verification: Unit: a row whose grid age is 1,500 s but whose own key was re-stamped 17 s ago in the judging file is kept (fails with the fix off); a truly unseen row is still dropped. Fleet: over the first NFL pulls after the load, every build whose reference age is under ~150 s logs MARKET_GONE_DROPPED nfl at baseline, with the NFL board row count not falling >25% on that build
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
