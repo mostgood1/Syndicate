@@ -15820,3 +15820,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Verification: ran 15:41Z 11-14 on the fleet (ledger via the venv python, log window 11-09 21:10Z..11-14 15:28Z, C:/tmp/maker_rejudge/paths5.py + summ.py): 29 fills, 14 timed.
 - **GOAL VERDICT `[2026-11-14 15:41Z]`: GOAL MET -- NOT YET DUE.** Hypothesis CONFIRMED: 14 of 30 timed fills (55 posts / 29 fills / 28 settled). INTERIM pooled edge at fill +0.86pp [-0.03, +1.72]; post-11-03 +1.30pp [+0.13, +2.37] n=7. Fair cancel never fired (0; the 4 non-fills expired at kickoff). Fill 30 is projected ~11-25/26, only if FILL lines are captured before rotation. No live change. Detail: log/2026-11-14.md, state_kalshi [kalshi-maker-pilot].
 - Blocked by: none
+
+### closed-lane-archive-20261114-1040 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session c4ad7e58-af48-4ca2-85c8-8dd4f366584b
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 16:41Z read 1 SAFE of 10 CLOSED; moved `closed-lane-archive-20261114-0439` to lanes_closed.md with one pointer. Other 9 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-14.md.
