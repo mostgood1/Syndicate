@@ -6956,6 +6956,86 @@ def _book_grid_slow_sport_deferred(sport: str, selected_date: str, tick_seq: int
 _book_grid_build_clock = time.perf_counter
 
 
+# LIVE FIRST, BACKGROUND UNDER A BUDGET (todo #803, lane book-grid-live-first; user 2026-11-14: "we need a solve
+# for this", about live callouts already 4-5 min old on the rail).
+#
+# One round built every due grid one after another: the live sports, today's pre-game sports (every 600 s),
+# the next days' grids (every 6x the interval) and yesterday's. The live sports' prices -- the in-play overlay
+# the rail reads -- waited for all of it. Measured on the fleet 2026-11-14 19:00-20:13Z (BOOK_GRID_TICK): live
+# work alone took 20-40 s a round, and every long gap between live repricings was a round that also built
+# background work -- today's pre-game NBA / NFL / soccer 54-110 s (20:08:42Z: soccer 86 s, NFL 17 s), the next
+# days' grids ~170 s on 20:13:00Z (outside `build_seconds`, which counts today only), and yesterday's grids
+# after each restart (5-minute holes at 19:33:58Z and 19:59:55Z). Gaps between rounds reached 221-329 s.
+#
+# So while games are live (the live cadence, or the first round after a start, when liveness is not yet known),
+# a round builds its FOREGROUND first -- today's sports that are live, starting soon, or not yet built today,
+# plus explicitly requested rebuilds -- and puts BACKGROUND work in a queue: today's sports due only because
+# their 600 s elapsed, yesterday, and the next days. After the foreground, the round drains the queue until
+# BACKGROUND_BUDGET_SECONDS is spent, always at least one job, so the queue always moves and nothing is dropped
+# (each pair is queued once; a queued pair the foreground builds leaves the queue). Price-on-pull passes are
+# unchanged and never drain the queue. The queue is cleared when the date rolls.
+#
+# And a restart no longer rebuilds yesterday when every one of yesterday's grids was already written after the
+# date rolled (`_book_grid_previous_rebuilt_on_disk`): the in-memory marker is lost on a restart, the files are
+# not.
+#
+#   SYNDICATE_BOOK_GRID_BACKGROUND_BUDGET_SECONDS  background seconds per round (default 20)
+#   SYNDICATE_BOOK_GRID_LIVE_FIRST=off  one sequential pass of every due grid, and the in-memory yesterday
+#                                       marker only, as before
+_BOOK_GRID_BACKGROUND_BUDGET_SECONDS_DEFAULT = 20.0
+_BOOK_GRID_BACKGROUND_QUEUE: list[tuple[str, str]] = []
+_BOOK_GRID_SPORTS = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer")
+
+
+def _book_grid_live_first_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_LIVE_FIRST") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _book_grid_background_budget_seconds() -> float:
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_BACKGROUND_BUDGET_SECONDS") or "").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return _BOOK_GRID_BACKGROUND_BUDGET_SECONDS_DEFAULT
+    return value if value >= 0 else _BOOK_GRID_BACKGROUND_BUDGET_SECONDS_DEFAULT
+
+
+def _book_grid_is_background_job(build_date: str, selected_date: str, reason: str | None,
+                                 rebuild_only: Mapping[str, Any]) -> bool:
+    """Background: another date (yesterday, the next days) unless explicitly requested, or a today sport due
+    only because its non-live interval elapsed. Everything else is foreground."""
+    if build_date != selected_date:
+        return build_date not in rebuild_only
+    return reason == "nonlive_interval_elapsed"
+
+
+def _book_grid_previous_rebuilt_on_disk(previous_date: str, selected_date: str) -> bool:
+    """Every sport with a quote shard for `previous_date` has a grid written after `selected_date` began
+    (Central midnight): the rebuild the in-memory marker would have recorded. False when unsure."""
+    from zoneinfo import ZoneInfo
+
+    from syndicate.features.shared.book_grid_artifact import book_grid_artifact_path
+    from syndicate.features.shared.odds_book_quotes import book_quotes_path
+
+    try:
+        start = date.fromisoformat(selected_date)
+        rollover = datetime(start.year, start.month, start.day, tzinfo=ZoneInfo("America/Chicago")).timestamp()
+    except (TypeError, ValueError):
+        return False
+    found = False
+    for sport in _BOOK_GRID_SPORTS:
+        try:
+            if not book_quotes_path(sport, previous_date).is_file():
+                continue
+            if book_grid_artifact_path(sport, previous_date).stat().st_mtime < rollover:
+                return False
+        except OSError:
+            return False
+        found = True
+    return found
+
+
 def _book_grid_sports_with_new_live_quotes(selected_date: str, now: float) -> list[str]:
     """Today's sports, LIVE at their last build, whose shard changed after that build read it."""
     if not _book_grid_price_on_pull_enabled():
@@ -7177,6 +7257,11 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     # that periodic worker work is never free.
     previous_date = (date.fromisoformat(selected_date) - timedelta(days=1)).isoformat()
     rebuild_previous = _BOOK_GRID_LAST_RUN.get("previous_date") != previous_date
+    if rebuild_previous and _book_grid_live_first_enabled() and _book_grid_previous_rebuilt_on_disk(previous_date, selected_date):
+        # Already rebuilt after the date rolled, by this worker before a restart (todo #803): the marker was
+        # in memory, the files are on disk.
+        _BOOK_GRID_LAST_RUN["previous_date"] = previous_date
+        rebuild_previous = False
     dates = [selected_date] + ([previous_date] if rebuild_previous else [])
     # Explicitly requested past dates, for the named sports only. See
     # `_book_grid_rebuild_dates`.
@@ -7231,8 +7316,17 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     out_of_window = 0
     # Decided ONCE, from the previous tick, before anything is built (lever 2b).
     live_cadence = _book_grid_live_cadence_active()
+    # LIVE FIRST (todo #803; see `_book_grid_is_background_job`): on the live cadence, or on the first round after
+    # a start (no sport's state for today yet), background work is queued and drained under a budget.
+    live_first = (not on_pull and _book_grid_live_first_enabled()
+                  and (live_cadence or not any(info.get("date") == selected_date for info in _BOOK_GRID_SPORT_STATE.values())))
+    if _BOOK_GRID_LAST_RUN.get("background_date") != selected_date:
+        _BOOK_GRID_BACKGROUND_QUEUE.clear()
+        _BOOK_GRID_LAST_RUN["background_date"] = selected_date
+    foreground: list[tuple[str, str]] = []
+    queued_now: list[str] = []
     for build_date in dates:
-        for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer"):
+        for sport in _BOOK_GRID_SPORTS:
             if on_pull and sport not in on_pull:
                 continue
             if build_date in rebuild_only and sport not in rebuild_only[build_date]:
@@ -7243,8 +7337,9 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
             if not _sport_covers_date(sport, selected_date, build_date):
                 out_of_window += 1
                 continue
+            why: str | None = None
             if build_date == selected_date:
-                due, _why = _book_grid_sport_due_today(sport, selected_date, now, live_cadence=live_cadence)
+                due, why = _book_grid_sport_due_today(sport, selected_date, now, live_cadence=live_cadence)
                 if not due:
                     # Skipped BEFORE the shard reconcile too, the expensive half (lever 2b).
                     skipped_not_live.append(sport)
@@ -7255,125 +7350,155 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     if (_BOOK_GRID_SPORT_STATE.get(sport) or {}).get("live"):
                         any_live_today = True
                     continue
+            if live_first and _book_grid_is_background_job(build_date, selected_date, why, rebuild_only):
+                if (build_date, sport) not in _BOOK_GRID_BACKGROUND_QUEUE:
+                    _BOOK_GRID_BACKGROUND_QUEUE.append((build_date, sport))
+                    queued_now.append(sport if build_date == selected_date else f"{sport}@{build_date}")
+                continue
+            foreground.append((build_date, sport))
+
+    def _build_one(build_date: str, sport: str) -> None:
+        nonlocal any_live_today
+        try:
+            # RECONCILE THE SHARD FIRST (`#331`). This worker is not the
+            # service that captures odds -- live-odds-worker is, and it
+            # publishes the shard to web, which makes WEB canonical. The
+            # existing repair pass only fetches artifacts this worker is
+            # missing OUTRIGHT ("the list is empty once the files exist"),
+            # so once a shard is pulled at date-rollover it is never
+            # refreshed again.
+            #
+            # Measured 2026-08-10: the 2026-08-09 MLB artifact was built
+            # from 7,987 quote rows against web's 478,782 -- 1.7% -- which
+            # is exactly the shard's state at ~06:00Z, the hour it was
+            # first pulled. The board served 807 rows instead of 5,547 and
+            # ZERO segment rows instead of 1,251, which is the user-visible
+            # "we lost the F1/F3/F5 filters" on /market-board/books.
+            #
+            # `pull_streamed_artifact` already tails append-only families by
+            # HTTP Range (`#248`), so steady state is the few KB appended
+            # since the last tick, not a re-fetch. A 416 means we already
+            # hold everything. Failure is deliberately NOT fatal: a stale
+            # shard still builds a board, and the row counts in the artifact
+            # say how stale rather than leaving it to look complete.
+            shard_path = book_quotes_path(sport, build_date)
             try:
-                # RECONCILE THE SHARD FIRST (`#331`). This worker is not the
-                # service that captures odds -- live-odds-worker is, and it
-                # publishes the shard to web, which makes WEB canonical. The
-                # existing repair pass only fetches artifacts this worker is
-                # missing OUTRIGHT ("the list is empty once the files exist"),
-                # so once a shard is pulled at date-rollover it is never
-                # refreshed again.
-                #
-                # Measured 2026-08-10: the 2026-08-09 MLB artifact was built
-                # from 7,987 quote rows against web's 478,782 -- 1.7% -- which
-                # is exactly the shard's state at ~06:00Z, the hour it was
-                # first pulled. The board served 807 rows instead of 5,547 and
-                # ZERO segment rows instead of 1,251, which is the user-visible
-                # "we lost the F1/F3/F5 filters" on /market-board/books.
-                #
-                # `pull_streamed_artifact` already tails append-only families by
-                # HTTP Range (`#248`), so steady state is the few KB appended
-                # since the last tick, not a re-fetch. A 416 means we already
-                # hold everything. Failure is deliberately NOT fatal: a stale
-                # shard still builds a board, and the row counts in the artifact
-                # say how stale rather than leaving it to look complete.
-                shard_path = book_quotes_path(sport, build_date)
+                relative = shard_path.relative_to(data_root()).as_posix()
+            except ValueError:
+                relative = ""
+            if relative:
                 try:
-                    relative = shard_path.relative_to(data_root()).as_posix()
-                except ValueError:
-                    relative = ""
-                if relative:
-                    try:
-                        pull_streamed_artifact(relative, timeout_seconds=300)
-                        # The `.state.json` sidecar too, and it is NOT optional.
-                        # It backs `read_quote_last_seen`, which is the only
-                        # thing separating "this market has not moved" from "we
-                        # stopped looking at it" -- `seen_age_seconds`. A
-                        # reconciled shard with a stale sidecar gives the board
-                        # real prices and wrong ages, which is worse than the
-                        # starvation it replaces because it looks correct.
-                        #
-                        # Whole-file, not tail: this one is rewritten on every
-                        # flush. `_is_append_only` now requires `.jsonl` for
-                        # exactly that reason -- before `#331` it matched this
-                        # path too, and pulling it here would have appended a
-                        # second JSON document onto the first.
-                        pull_streamed_artifact(
-                            relative[: -len(".jsonl")] + ".state.json"
-                            if relative.endswith(".jsonl")
-                            else relative,
-                            timeout_seconds=120,
-                        )
-                    except Exception as exc:
-                        print(
-                            f"[refresh_worker] BOOK_GRID_SHARD_PULL_ERROR sport={sport} "
-                            f"date={build_date} {type(exc).__name__}: {exc}",
-                            flush=True,
-                        )
-                if not shard_path.is_file():
-                    if build_date == selected_date:
-                        skipped.append(sport)
-                    continue
-                # When this build read the shard: price-on-pull compares the shard's next change to this.
-                quotes_read_at = time.time()
-                build_started = _book_grid_build_clock()
-                payload = build_book_grid_artifact(sport, build_date)
-                if not payload:
-                    if build_date == selected_date:
-                        skipped.append(sport)
-                    continue
-                if build_date == selected_date:
-                    # Per sport now, not "stop at the first live row": the next tick's skip
-                    # decision needs every sport's own state (lever 2b).
-                    sport_state = _book_grid_sport_state_from_payload(payload, now)
-                    _BOOK_GRID_SPORT_STATE[sport] = {"date": selected_date, "built_at": now,
-                                                     "quotes_read_at": quotes_read_at, **sport_state,
-                                                     # Which regular tick built it (None on a price-on-pull pass).
-                                                     "built_tick": None if on_pull else tick_seq}
-                    if sport_state["live"]:
-                        any_live_today = True
-                        live_sports.append(sport)
-                path = write_book_grid_artifact(sport, build_date, payload)
-                if build_date == selected_date:
-                    # Grid + in-play overlay (written by `write_book_grid_artifact`): what the next
-                    # tick's slow-sport schedule reads (#790), and what BOOK_GRID_TICK reports.
-                    elapsed = round(_book_grid_build_clock() - build_started, 1)
-                    build_seconds[sport] = elapsed
-                    _BOOK_GRID_SPORT_STATE[sport]["build_seconds"] = elapsed
-                label = f"{sport}:{payload.get('rows_total')}"
-                written.append(label if build_date == selected_date else f"{label}@{build_date}")
-                try:
-                    # Timeout raised from the 10s default ON PURPOSE (`#331`).
-                    # Reconciling the shard grows this artifact by an order of
-                    # magnitude: measured 2026-08-09, a full 5,547-row day with
-                    # `#328`'s enrichment serialises to 15.7MB against the ~2.2MB
-                    # a starved shard produces today. 10 seconds was sized for
-                    # the small file and would start failing on the real one --
-                    # a fix that makes the board correct and then cannot ship it.
+                    pull_streamed_artifact(relative, timeout_seconds=300)
+                    # The `.state.json` sidecar too, and it is NOT optional.
+                    # It backs `read_quote_last_seen`, which is the only
+                    # thing separating "this market has not moved" from "we
+                    # stopped looking at it" -- `seen_age_seconds`. A
+                    # reconciled shard with a stale sidecar gives the board
+                    # real prices and wrong ages, which is worse than the
+                    # starvation it replaces because it looks correct.
                     #
-                    # The result is CHECKED rather than fired and forgotten: the
-                    # sweep that would otherwise repair a missed publish refuses
-                    # this file at `_PUBLISH_MAX_BYTES` (12MB) once it is real, so
-                    # a failure here is not backstopped by anything and must not
-                    # be silent. See `#333`.
-                    if not publish_hot_artifact(path, timeout_seconds=120):
-                        size = path.stat().st_size
-                        # The sweep caveat is TRUE only above the sweep's cap; it
-                        # used to print on 0.02-2MB files and read as an alarm.
-                        caveat = (
-                            " (sweep will NOT repair this above 12MB -- see #333)"
-                            if size > 12 * 1024 * 1024
-                            else " (the hot-artifact sweep retries it)"
-                        )
-                        print(
-                            f"[refresh_worker] BOOK_GRID_PUBLISH_FAILED sport={sport} "
-                            f"date={build_date} bytes={size}{caveat}",
-                            flush=True,
-                        )
+                    # Whole-file, not tail: this one is rewritten on every
+                    # flush. `_is_append_only` now requires `.jsonl` for
+                    # exactly that reason -- before `#331` it matched this
+                    # path too, and pulling it here would have appended a
+                    # second JSON document onto the first.
+                    pull_streamed_artifact(
+                        relative[: -len(".jsonl")] + ".state.json"
+                        if relative.endswith(".jsonl")
+                        else relative,
+                        timeout_seconds=120,
+                    )
                 except Exception as exc:
-                    print(f"[refresh_worker] BOOK_GRID_PUBLISH_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
+                    print(
+                        f"[refresh_worker] BOOK_GRID_SHARD_PULL_ERROR sport={sport} "
+                        f"date={build_date} {type(exc).__name__}: {exc}",
+                        flush=True,
+                    )
+            if not shard_path.is_file():
+                if build_date == selected_date:
+                    skipped.append(sport)
+                return
+            # When this build read the shard: price-on-pull compares the shard's next change to this.
+            quotes_read_at = time.time()
+            build_started = _book_grid_build_clock()
+            payload = build_book_grid_artifact(sport, build_date)
+            if not payload:
+                if build_date == selected_date:
+                    skipped.append(sport)
+                return
+            if build_date == selected_date:
+                # Per sport now, not "stop at the first live row": the next tick's skip
+                # decision needs every sport's own state (lever 2b).
+                sport_state = _book_grid_sport_state_from_payload(payload, now)
+                _BOOK_GRID_SPORT_STATE[sport] = {"date": selected_date, "built_at": now,
+                                                 "quotes_read_at": quotes_read_at, **sport_state,
+                                                 # Which regular tick built it (None on a price-on-pull pass).
+                                                 "built_tick": None if on_pull else tick_seq}
+                if sport_state["live"]:
+                    any_live_today = True
+                    live_sports.append(sport)
+            path = write_book_grid_artifact(sport, build_date, payload)
+            if build_date == selected_date:
+                # Grid + in-play overlay (written by `write_book_grid_artifact`): what the next
+                # tick's slow-sport schedule reads (#790), and what BOOK_GRID_TICK reports.
+                elapsed = round(_book_grid_build_clock() - build_started, 1)
+                build_seconds[sport] = elapsed
+                _BOOK_GRID_SPORT_STATE[sport]["build_seconds"] = elapsed
+            label = f"{sport}:{payload.get('rows_total')}"
+            written.append(label if build_date == selected_date else f"{label}@{build_date}")
+            try:
+                # Timeout raised from the 10s default ON PURPOSE (`#331`).
+                # Reconciling the shard grows this artifact by an order of
+                # magnitude: measured 2026-08-09, a full 5,547-row day with
+                # `#328`'s enrichment serialises to 15.7MB against the ~2.2MB
+                # a starved shard produces today. 10 seconds was sized for
+                # the small file and would start failing on the real one --
+                # a fix that makes the board correct and then cannot ship it.
+                #
+                # The result is CHECKED rather than fired and forgotten: the
+                # sweep that would otherwise repair a missed publish refuses
+                # this file at `_PUBLISH_MAX_BYTES` (12MB) once it is real, so
+                # a failure here is not backstopped by anything and must not
+                # be silent. See `#333`.
+                if not publish_hot_artifact(path, timeout_seconds=120):
+                    size = path.stat().st_size
+                    # The sweep caveat is TRUE only above the sweep's cap; it
+                    # used to print on 0.02-2MB files and read as an alarm.
+                    caveat = (
+                        " (sweep will NOT repair this above 12MB -- see #333)"
+                        if size > 12 * 1024 * 1024
+                        else " (the hot-artifact sweep retries it)"
+                    )
+                    print(
+                        f"[refresh_worker] BOOK_GRID_PUBLISH_FAILED sport={sport} "
+                        f"date={build_date} bytes={size}{caveat}",
+                        flush=True,
+                    )
             except Exception as exc:
-                print(f"[refresh_worker] BOOK_GRID_BUILD_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
+                print(f"[refresh_worker] BOOK_GRID_PUBLISH_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_worker] BOOK_GRID_BUILD_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
+
+    for build_date, sport in foreground:
+        if (build_date, sport) in _BOOK_GRID_BACKGROUND_QUEUE:
+            _BOOK_GRID_BACKGROUND_QUEUE.remove((build_date, sport))  # built now: it leaves the queue
+        _build_one(build_date, sport)
+    # The queue, after the foreground: until the budget is spent, always at least one job (todo #803).
+    background_built: list[str] = []
+    background_seconds = 0.0
+    if live_first and _BOOK_GRID_BACKGROUND_QUEUE:
+        budget = _book_grid_background_budget_seconds()
+        drain_started = _book_grid_build_clock()
+        while _BOOK_GRID_BACKGROUND_QUEUE:
+            # At least one grid BUILT per round: a pair with no shard is popped and skipped, and does not count.
+            if background_built and _book_grid_build_clock() - drain_started >= budget:
+                break
+            build_date, sport = _BOOK_GRID_BACKGROUND_QUEUE.pop(0)
+            before = len(written)
+            _build_one(build_date, sport)
+            if len(written) > before:
+                background_built.append(sport if build_date == selected_date else f"{sport}@{build_date}")
+        background_seconds = round(_book_grid_build_clock() - drain_started, 1)
     # LIVENESS, READ OFF THE GRID WE JUST BUILT rather than probed for.
     #
     # `#328` stamps `game.state` on every row, so the tick already holds the
@@ -7414,7 +7539,7 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
             hit = next((w for w in written if w.startswith(f"{sport}:") and w.endswith(f"@{day}")), None)
             print(f"[refresh_worker] BOOK_GRID_REBUILD_DONE sport={sport} date={day} written={hit}", flush=True)
 
-    if not written and not skipped and not deferred_slow:
+    if not written and not skipped and not deferred_slow and not queued_now:
         return None
     return {
         "date": selected_date,
@@ -7442,6 +7567,13 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         # #790: today's grid + overlay seconds per sport built, and the slow sports this tick skipped.
         "build_seconds": build_seconds,
         "deferred_slow": deferred_slow,
+        # todo #803: background work queued this round, built from the queue this round (and its seconds), and
+        # what is still waiting.
+        "live_first": live_first,
+        "background_queued": queued_now,
+        "background_built": background_built,
+        "background_seconds": background_seconds,
+        "background_pending": len(_BOOK_GRID_BACKGROUND_QUEUE),
     }
 
 
