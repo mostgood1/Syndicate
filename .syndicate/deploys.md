@@ -59832,3 +59832,39 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `ncaab_totals_untouched`: **MET** (8,041 at k 1.0).
   - `ncaab_spreads_k1.34`: **MET** (5,376).
   - `ncaaf_*`: **NOT MEASURED**, blocked by #801. Owed on games kicking off before 6 PM CST (Saturday 11-14's day slate), by re-running `read780.py`.
+
+## 2026-11-14 15:37:44Z (9:37 AM CST) -- FLEET ff acb7e47b7 -> fee389971 + reload-web + claimed, drained refresh-worker TERM + claimed live-odds-worker TERM: todo #752 NFL quarter/half lines get their measured skill note (lane `nfl-segment-skill`, session 386d4115), with #780's NBA live margin anchor (`68fbb8eeb`, lane `nba-live-margin-anchor`) riding by the user's decision -- **reachability MET on production code, env and inputs (46 of 46 served Thursday rows move to `measured_market_skill`, probabilities identical); served readings OWED: NFL from Sunday's segment quotes, the NBA anchor from the 00:10Z tip**
+- **User, in this session's chat:** "Push and load" (answering "Push d64b4e218 and load it on refresh-worker and web?"). Then, asked whether to carry the unloaded NBA margin anchor (any ff past `68fbb8eeb` loads it at live-odds-worker's next ~6-hourly recycle; its lane marks loading as the user's decision): "Load both now (Recommended)".
+- **Commit** `fee389971` (`d64b4e218` rebased twice onto main), pushed 15:2xZ. Targeted tests on the rebased commit: 148 passed (`test_nfl_segment_skill`, `test_measured_market_skill`, `test_projection_skill`).
+- **Range `acb7e47b7..fee389971`, runtime files:**
+  - `measured_market_skill.py`, `nfl_segment_projections.py` (mine);
+  - `nba/live_resim.py` + `live_gameline_join.py` (`68fbb8eeb`: the anchor, and the join's anchored-lane k);
+  - `engine_experts.py` (lane `live-segment-expert`, closed; no runtime importer, only `scripts/engine_experts.py`).
+  - Scripts offline only; vendor/ none. `ff.sh` refused any other base or file set; 0 of the 14 dirty fleet files in range.
+- **Not carried:** `41e94507a` (lane `nhl-live-period-remainder`), which landed on main after `fee389971` and is held for the user's call (`63ebce8a1`). The fleet stops at `fee389971`, so that lane's ff now carries only its own range.
+- **Gates:**
+  - Claims web / refresh-worker / live-odds-worker, holder `nfl-segment-skill`, 15:32:00Z (rc 0 each).
+  - Drain refresh-worker from 15:34Z: its board build finished, then a soccer odds job; **CLEAR** 15:36:38Z.
+  - Baseline 15:37:23Z: `fleet_checkout_head=acb7e47b7`, refresh-worker 469244, live-odds-worker 695806, `nfl_segment_registry_on_disk=0`, `nba_anchor_switch_on_disk=0`, served NFL segment rows with `basis measured_market_skill` 0 (11-13 grid: 46 of 46 `status measured` / `state unmeasured`), `anchored=` tick lines 0.
+  - Preflight `--target fleet --target-commit fee389971...` for all three, with those baselines and the expectations below: **CLEAR** rc 0 by 15:37:29Z, 0 processes enumerated.
+- **Load** (`C:\tmp\nfl_seg\load\ff.sh`, `C:\tmp\nfl_seg\load\load.sh`):
+  - ff 15:37:44.439Z: HEAD `fee389971`; registry and anchor switch on disk.
+  - reload-web 15:37:52.528Z: HUP master 438, workers [816646, 817064] -> [820255, 820256] in 2.0 s, 0 failures, healthz 200.
+  - TERM refresh-worker 469244 at 15:37:54.667Z (no live children) -> **pid 820330** 15:38:06Z, head `fee389971`; undrained (`DRAIN_CLEARED`).
+  - TERM live-odds-worker 695806 at 15:38:06.774Z (1 live child) -> **pid 820546** 15:38:27Z.
+- **expect / measured:**
+  - `fleet_checkout_head` acb7e47b7 -> fee389971: **MET**. `web_workers`, `refresh_worker_pid`, `live_odds_worker_pid` respawned: **MET**.
+  - Under pid 820330's environ: `margin_anchor_enabled()` True; NBA spreads k raw 2.02 / anchored 1.57; NCAAF 1.80 / 1.80; NCAAB 1.34. The raw tables are unchanged. Neither worker's environ holds `SYNDICATE_NBA_LIVE_MARGIN_ANCHOR` or a `*PROB_SCALE*` key.
+  - Real tracebacks (`Traceback (most recent call last)`), 15:37:50-15:39:31Z and the 20 min before: 0 / 0 on all three roles. live-odds-worker `TICK_COMPLETE` 15:38:43Z, every sport True.
+- **Reachability (`off != on`) on production code, env and inputs** (`C:\tmp\nfl_seg\load\reach_nfl.py` under refresh-worker's own environ: the SERVED 11-13 NFL grid, segment projections stripped and re-attached from the fleet's sidecars):
+  - `acb7e47b7` (pid 469244, 15:35Z): 46 rows `status measured`, no basis, reliability 1.0. This is the served label exactly.
+  - `fee389971` (pid 820330, 15:38Z): h2h 6 rows `measured_market_skill` / `loses_to_market` / 0.962; spreads 23 and totals 17 `parity` / 1.0. Probabilities 46 of 46 identical to served.
+- **verify (OWED)** -- `C:\tmp\nfl_seg\load\watch.py` (background in session 386d4115, writes `watch.jsonl`, ends 19:30Z 11-15):
+  - **NFL:** on the first served grid built after 15:38:06Z that carries quarter/half rows, every segment row carries `basis measured_market_skill` (h2h `loses_to_market`, totals/spreads `parity`). **Falsified if** any lacks it.
+    - Sunday's segment quotes start ~6 h before the 18:00Z kicks.
+    - The 11-13 grid (built 06:01Z) serves the old label until it is rebuilt. 11-14 and 11-15 had 0 segment rows at 15:40Z.
+  - **NBA anchor:** from the 00:10Z tip, `NBA_LIVE_RESIM_TICK` lines with `anchored=` > 0, and NBA full-game spreads ledger rows at k 1.57. **Falsified if** live NBA lanes resim with `anchored=0` throughout; `anchor_missing=` names why.
+- **Revert:**
+  - NFL note: `git revert fee389971`, a fleet ff and a claimed refresh-worker TERM.
+  - Anchor: `SYNDICATE_NBA_LIVE_MARGIN_ANCHOR=off` in `local_production.env` + a drained full down/up. Or revert `68fbb8eeb`, ff, and a claimed live-odds-worker TERM. The join's anchored k is inert on raw lanes.
+- **Claims:** all three released right after this entry.
