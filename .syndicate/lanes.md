@@ -963,6 +963,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_execution_exits_fast.py with an off != on prune test (an old entry is archived then dropped, an entry inside the floor is kept, the archive line exists before the save); the built function dry-run read-only on the fleet's stored copy; after the user-approved load, 0 fast-key rejects over 30 min of in-play passes, FAST_EXIT_PASS lines present, FAST_STATE_PRUNED logged, document bytes read back
 - Blocked by: none
 
+### nfl-prop-name-roster-first — OPEN — opened 2026-11-14 — session 35bdf3a7-5afc-483e-98bb-d0d7f4d2ecc3
+- Goal: #804: the NFL prop model resolves a quoted full name through the 2026 roster snapshot's exact full name FIRST, so a namesake who plays in the same game (A.J. Brown for Amon-Ra St. Brown, NE @ DET 11-15) can no longer take the row, and an id whose roster name is a different person (Mason Taylor for Malik Taylor) is refused; loaded on the fleet with the model file rebuilt before the 8:30 AM CST 11-15 kickoff
+- Files: syndicate/features/nfl/player_stats.py, tests/test_nfl_prop_name_roster_first.py
+- Hypothesis: MEASURED BEFORE OPENING: short_name_keys('Amon-Ra St. Brown') tries a.brown first; on the fleet a.brown -> {A.J. Brown 00-0035676, NE}, a.st. brown -> {St. Brown 00-0036963, DET}; resolve_player_id_for_game returns the first key with one in-game candidate, so every St. Brown row in nfl_prop_projections_2026_wk10.json carries A.J. Brown's mean/sd/n/team
+- Falsification test: If the rebuilt artifact's St. Brown rows still equal A.J. Brown's (receptions mean 3.0, n 3, team NE), or if a replay over this week's quoted names moves any player whose resolution was right (same id, roster name matches) onto a different id or a refusal, the fix is wrong
+- Verification: Unit: St. Brown resolves to 00-0036963 with A.J. Brown in the game (fails on the old code); Malik Taylor is refused rather than given Mason Taylor; every other name resolves as before. Replay old vs new over the week's real quoted names on the fleet: only the two known names change. Fleet: the first artifact built after the ff has St. Brown team DET with his own sample, and the same-game identical-inputs scan finds 0 pairs outside anytime TD.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
