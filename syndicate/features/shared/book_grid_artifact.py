@@ -529,7 +529,20 @@ def build_book_grid_artifact(
     Returns None when there is no shard for this sport/date -- an absent shard
     is not an empty grid, and writing an empty artifact would make the two
     indistinguishable to every reader.
+
+    The build runs inside a per-build lookup scope (todo #790,
+    `build_lookup_scope`): lookups the enrichment asks once per row -- the NBA
+    season phase and the NBA game and prop book-blend weights -- are resolved
+    once per build. Measured 2026-11-13: 135,090 of one NBA build's 137,279
+    stat-like calls were those three, each one a GIL hand-off to the board loop.
     """
+    from syndicate.features.shared.build_lookup_scope import lookup_scope
+
+    with lookup_scope():
+        return _build_book_grid_artifact(sport, date_str, max_rows=max_rows)
+
+
+def _build_book_grid_artifact(sport: str, date_str: str, *, max_rows: int) -> dict[str, Any] | None:
     path = book_quotes_path(sport, date_str)
     if not path.is_file():
         return None
@@ -796,12 +809,25 @@ def build_book_grid_artifact(
     }
 
 
+def _write_json_once(path: Path, payload: Any) -> None:
+    """The same bytes `json.dump(payload, handle, ensure_ascii=False, default=str)` writes, in ONE write.
+
+    `json.dump` streams through the pure-Python encoder in small chunks: for the 29.9 MB NBA grid that is about
+    3,600 8 KB writes, each a GIL hand-off to the board loop on refresh-worker. `json.dumps` uses the C encoder
+    and produces the identical text (todo #790; measured 2026-11-13 on the NBA grid: byte-identical, 1.0-4.8 s
+    vs 4.8-5.8 s alone and 1.2 / 3.0 s vs 11.3 / 16.0 s beside a busy thread). The cost is one copy of the text
+    in memory while it is written.
+    """
+    text = json.dumps(payload, ensure_ascii=False, default=str)
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
 def write_book_grid_artifact(sport: str, date_str: str, payload: dict[str, Any]) -> Path:
     path = book_grid_artifact_path(sport, date_str)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
-    with tmp.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, ensure_ascii=False, default=str)
+    _write_json_once(tmp, payload)
     os.replace(tmp, path)
     # Best effort and AFTER the grid is on disk: an overlay failure must never
     # cost the grid, which is what every other reader depends on.
@@ -1083,8 +1109,7 @@ def write_book_grid_inplay_overlay(sport: str, date_str: str, overlay: Mapping[s
     path = book_grid_inplay_artifact_path(sport, date_str)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
-    with tmp.open("w", encoding="utf-8") as handle:
-        json.dump(overlay, handle, ensure_ascii=False, default=str)
+    _write_json_once(tmp, overlay)
     os.replace(tmp, path)
     return path
 

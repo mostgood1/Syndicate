@@ -48,6 +48,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from syndicate.features.shared.build_lookup_scope import scoped_lookup
 from syndicate.features.shared.nba_prop_calibration import served_game_probability
 from syndicate.features.shared.probability_refusal import refuse_published_certainty
 from syndicate.features.shared.prop_projections import _no_vig_over_probability
@@ -125,7 +126,14 @@ def season_phase_for_date(slate_date: str | None) -> str | None:
     date's events disagree -- the caller must treat None as UNKNOWN, never as regular season."""
     if not slate_date:
         return None
-    path = nba_processed_file(f"_espn_cache/nba/scoreboard_{str(slate_date)[:10].replace('-', '')}.json")
+    # Once per build inside a grid build's lookup scope, not once per row (todo #790): finding the file across
+    # the candidate roots and stat'ing it is about 10 GIL-releasing calls, asked once per priced game-line row.
+    ymd = str(slate_date)[:10].replace("-", "")
+    return scoped_lookup("nba_season_phase", ymd, lambda: _season_phase_for_ymd(ymd))
+
+
+def _season_phase_for_ymd(ymd: str) -> str | None:
+    path = nba_processed_file(f"_espn_cache/nba/scoreboard_{ymd}.json")
     if path is None:
         return None
     if not _season_phase_cache_enabled():

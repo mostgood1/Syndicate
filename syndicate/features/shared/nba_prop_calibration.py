@@ -50,6 +50,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
+from syndicate.features.shared.build_lookup_scope import scoped_lookup
+
 FLAG = "SYNDICATE_NBA_PROP_CALIBRATION"
 FACTOR_FILE = "nba_prop_calibration.json"
 HISTORY_FILE = "boxscores_history.csv"
@@ -541,6 +543,13 @@ def book_blend_weights(processed_root: Optional[Path] = None, env: Optional[Mapp
     raw = str((env if env is not None else os.environ).get(flag) or "").strip().lower()
     if raw in {"0", "false", "no", "off"}:
         return None, f"{flag} off"
+    # Once per build inside a grid build's lookup scope, not once per row (todo #790): resolving the root and
+    # stat'ing the file is about 10 GIL-releasing calls, and the NBA grid asked once per priced row.
+    root_key = None if processed_root is None else str(processed_root)
+    return scoped_lookup("nba_book_blend", (filename, root_key), lambda: _resolve_book_blend(processed_root, filename))
+
+
+def _resolve_book_blend(processed_root: Optional[Path], filename: str) -> Tuple[Optional[Dict[str, float]], str]:
     try:
         if processed_root is None:
             from syndicate.features.nba.sources import artifact_processed_root
