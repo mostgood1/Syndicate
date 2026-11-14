@@ -867,12 +867,6 @@ death, never life — do not invert it.
 - Verification: tests (off != on on the real engine; pregame and period-start identity); replay on vs off same inputs with keep and end-game re-fit; paired game-clustered grade; reachability under the fleet's code and inputs; load only on the user's yes
 - Blocked by: none
 
-### closed-lane-archive-20261113-1839 — CLOSED 2026-11-13 (GOAL MET: 3 blocks archived) — opened 2026-11-13 — session 1cfde700-3832-493e-bfa1-5b37d4ad535a
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. 3 CLOSED blocks whose owners were idle >= 240m moved to lanes_closed.md with one pointer each; 17 others waited (owner or block < 240m, or transcript not found). Table in .syndicate/log/2026-11-14.md.
-- Moved: team-logo-canonical-names, wncaab-team-crests, closed-lane-archive-20261113-1239
-
 ### closed-lane-archive-20261113-2040 — CLOSED 2026-11-13 (GOAL MET: 6 blocks archived) — opened 2026-11-13 — session ae8d3d6e-ff96-46ee-b21e-1d066bea31ee
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -882,6 +876,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 4 of 16 CLOSED blocks. Moved: ncaab-margin-width-candidates, ncaab-gate-noise-and-se2, outcome-gate-null-baseline, closed-lane-archive-20261113-1640. The reading and the WAIT reasons are in `.syndicate/log/2026-11-14.md`.
+
+### closed-lane-archive-20261114-0040 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session fa01b905-1782-4229-b72a-fe60bdede361
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 13 CLOSED blocks. Moved: closed-lane-archive-20261113-1839. The reading and the WAIT reasons are in `.syndicate/log/2026-11-14.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1130,6 +1129,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261113-1239` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session 55ea853b-e2bc-4587-909b-39828f95ffb8
 - `closed-lane-archive-20261113-1440` — CLOSED 2026-11-13 (GOAL MET: 2 blocks archived) — opened 2026-11-13 — session 411547c9-ea26-4f27-b313-2b2d937164ef
 - `closed-lane-archive-20261113-1640` — CLOSED 2026-11-13 (GOAL MET: 1 block archived) — opened 2026-11-13 — session a65fa8b2-2351-4268-9726-baaa238a4cdb
+- `closed-lane-archive-20261113-1839` — CLOSED 2026-11-13 (GOAL MET: 3 blocks archived) — opened 2026-11-13 — session 1cfde700-3832-493e-bfa1-5b37d4ad535a
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
