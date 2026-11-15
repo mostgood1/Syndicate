@@ -294,7 +294,7 @@ def main() -> int:
     reading["query"]["board_built_at"] = iso(board_built) if board_built else None
     reading["query"]["board_built_age_s"] = round((now - board_built).total_seconds(), 1) if board_built else None
     flags, false_flags, missed, dark_rows, dark_markets = [], [], [], [], set()
-    priced_ages, ages_now, no_fair, markets_total, markets_no_ours = [], [], [], 0, 0
+    priced_ages, ages_now, seen_ages, no_fair, markets_total, markets_no_ours = [], [], [], [], 0, 0
     for c in live:
         for m in c.get("markets") or []:
             markets_total += 1
@@ -312,6 +312,7 @@ def main() -> int:
             age_now = independent_age_now(r, now, board_built)
             priced = r.get("book_age_seconds")
             priced_ages.append(priced)
+            seen_ages.append(r.get("seen_age_seconds"))
             ages_now.append(age_now)
             if r.get("fair") is None:
                 no_fair.append({"matchup": c["matchup"], "market": r["market"], "segment": r["segment"], "line": r["line"]})
@@ -338,6 +339,8 @@ def main() -> int:
         "live_rows": sum(len(c.get("rows") or []) for c in live), "live_rows_no_fair": len(no_fair),
         "no_fair_sample": no_fair[:6],
         "priced_age": dist(priced_ages), "age_now": dist(ages_now),
+        # Our own lag: when WE last looked at the quote, at pricing (the book's unchanged clock is priced_age).
+        "seen_age_at_pricing": dist(seen_ages),
         "priced_le_120": sum(1 for a in priced_ages if a is not None and float(a) <= FRESH_S),
         "age_now_gt_300": sum(1 for a in ages_now if a is not None and a > STALE_S),
         "flag_list": flags,
@@ -382,7 +385,7 @@ def summary(r):
         "flags": {"shown": lv["flags"], "cards_flagged": lv["live_cards_with_flag"], "false": len(lv["false_flags"]),
                   "missed": len(lv["missed_flags"]), "dark_rows": lv["dark_rows"], "dark_markets": lv["dark_markets"]},
         "live_rows": {"n": lv["live_rows"], "no_fair": lv["live_rows_no_fair"], "priced_age": lv["priced_age"],
-                      "age_now": lv["age_now"], "priced_le_120": lv["priced_le_120"], "age_now_gt_300": lv["age_now_gt_300"],
+                      "age_now": lv["age_now"], "seen_age_at_pricing": lv.get("seen_age_at_pricing"), "priced_le_120": lv["priced_le_120"], "age_now_gt_300": lv["age_now_gt_300"],
                       "markets": lv["live_markets"], "markets_no_ours": lv["live_markets_no_ours"]},
         "teams": {"chips_today": tm["chips_today"], "live_chips": tm["live_chips"],
                   "live_chips_without_live_card": tm["live_chips_without_live_card"],

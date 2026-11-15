@@ -199,3 +199,48 @@ rail code was the 11:08 served copy.
 
 **Teams:** det1 / det2 / det3 0 / 0 / 0; 0 flipped; 0 truncated. The same 2 chip-less NCAAB
 cards. WGA @ UML is live with 0 lines.
+
+## Reading 4 — Sun 11-15 11:45 AM CST (17:45Z)
+
+4 live cards (WNCAAB 3, NCAAB 1). NE @ DET is final; NFL `rows_inplay_last=0`. The served page
+was re-read.
+
+**Load:**
+- `/intelligence` 6.5 s / 20.2 MB.
+- Query 6.9 s / 57.4 MB (10.0 MB gz).
+- Shortlist 0.55 s. Chips 0.31 s. Live-rail 0.016 s, 38 rows (~40 KB).
+
+**Refresh:**
+- Board build 265 s old. Shortlist `written_at` 337 s.
+- Live-rail newest 33 / 43 / 53 s: the same build, read three times.
+- Overlay gaps, last 24 min:
+
+  | sport | builds | gap p50 / p90 / max |
+  |---|---|---|
+  | NCAAB | 16 | 66 / 198 / 205 s |
+  | WNCAAB | 17 | 72 / 195 / 203 s |
+  | NFL | 9 | 130 / 281 / 316 s (game ending) |
+
+- NFL build p50 27.1 s, max 84.8 s. `deferred_slow` nfl on 2 of 27 ticks.
+- Web merges: nfl / ncaab / wncaab fresh 19 / 19 / 19, 0 stale.
+
+**Live recommendations:**
+- **0 flags on 4 live cards; 0 false, 0 missed, 0 dark.**
+- **The quotes went old.** 40 live rows:
+  - priced age p50 265 s, p90 522 s; **only 1 of 40 <= 120 s** (11 of 23 at 11:21);
+  - age now p50 319 s; **29 of 40 > 300 s**.
+  - So no row could have flagged, whatever its gap.
+- **It is partly OUR lag, not only the books.** On the 17:44:48Z overlay rows (38, from
+  `/api/board/live-rail`), `quote_seen_age_seconds` (when we last looked) was median 216 s at
+  pricing (values 187 / 216 / 298 s), against the ~78 s measured after #786's price-on-pull.
+  - NCAAB pull heartbeats 17:35:43 -> 17:45:58Z had gaps of 42 / 65 / 137 / 44 / 38 / **203** /
+    86 s; the 203 s hole is 17:41:09 -> 17:44:32Z.
+  - In-play pulls with changed full-game lines over 25 min (`pull_cadence.py`): WNCAAB 17,
+    median gap 51 s, p90 170 s, max 247 s. NFL 7, median 131 s. **NCAAB 1** (one live game).
+  - Read: one build, during the pre-noon pull burst (about 30 games tip at 12:00).
+    **Not yet a pattern.** The probe now records seen age at pricing on every reading, so this
+    is tracked from here.
+- 0 rows with no fair. 0 of 9 live markets lack OURS.
+
+**Teams:** det1 / det2 / det3 0 / 0 / 0; 0 flipped; 0 truncated; 0 live chips without a live
+card. The same 2 chip-less NCAAB cards.
