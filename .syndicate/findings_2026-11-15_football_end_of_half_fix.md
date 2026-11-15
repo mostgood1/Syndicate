@@ -293,6 +293,42 @@ changes across the window (nflverse 2024-25, Q2+Q4 window):
 - The next smoke run is a functional check only. The FIT read runs whatever it shows.
 - If FIT misses G3, it is a FAIL and is reported as one. No third clock amendment.
 
+### Amendment 3 — 2026-11-15 ~12:00 CST, after Amendment 2's functional check, BEFORE any FIT read. The LAST pre-FIT change of any kind.
+
+**What the functional check showed.**
+- The neutral smoke with Amendment 2 in (`bucket.py`) gives Q2-window snaps 8.9: by bucket 2.50 / 2.09 / 2.24 /
+  2.09 against the league's 2.42 / 2.08 / 2.62 / 3.37.
+- So the last 60 s are still short.
+- Amendment 2's binding stands: the clock table is not changed again.
+
+**What a read-only look found (`fgtiming.py`): a defect in PART 2's rule, not in the clock.**
+- The urgency field goal fires on ANY down once the clock is <= 90 s and the offense is in range.
+- The sim kicks on downs 1-3 at 60-90 s left (0.28 a game) and 30-60 s left (0.16 a game).
+- The league NEVER kicks on downs 1-3 before the last 30 s. Its 139 such Q2-window attempts in 2024-25 came at a
+  median 3 s left, 90th percentile 6 s, maximum 11 s.
+- The league keeps driving and kicks at the end. The sim's drive stops at 1:25, which costs its own remaining
+  snaps and its touchdown chance.
+- Part 2 makes this worse: removing the score gate extends the early kick to every Q2 score.
+
+**Amendment (Q2 only; only with BOTH `q2_urgency_ignores_score` and `end_of_half_clock` ON).**
+- On downs 1-3, the Q2 urgency kick waits until the clock left is <= the time a running-clock play takes in the
+  last bucket: the table's own `delta_by_bucket["run_hurry"][0]` mean, 14.0 s NFL / 14.6 s NCAAF.
+  - The rule a coach without a timeout follows: if one more running play could end the half, kick now.
+  - No new parameter. It is the clock table's measured value.
+- On 4th down, the existing <= 90 s rule is unchanged.
+- **Q4 is unchanged**, though it has the same defect. Q4's urgency rules are out of this change's scope and go
+  to a follow-up.
+- With the clock OFF, part 2 keeps the <= 90 s rule. The timing rule needs the clock's stops to be sane: without
+  them, a drive waiting for 14 s would usually run the clock out.
+
+**Binding.**
+- Nothing else changes before the FIT read.
+- The FIT arms and the re-fit grid run as pre-registered, and every gate is read as written.
+- A FIT miss is a FAIL. Any later candidate needs a new pre-registration, and it is the user's call.
+
+**Known structural gap, stated now:** the league's G3 count includes spikes (0.14 a game in Q2's window), which
+the sim does not model.
+
 ## Results
 
 (none yet)
