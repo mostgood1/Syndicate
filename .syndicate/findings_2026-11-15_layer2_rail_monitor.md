@@ -751,3 +751,21 @@ cards.
 - Seen age p50: NCAAB 37 s, NFL 195 s.
 
 **Teams:** 1 chip-less NCAAB card (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+### Slow-sport rule — what the two grid loads removed (0f519972, deploys.md 2026-11-15 20:01Z, `5b8a97338`; `C:\tmp\railload\grid809_under45.py`)
+
+NBA and NFL builds under 45 s, and NFL slow deferrals, per window:
+
+| window (Z) | code | NBA < 45 s | NFL < 45 s | NFL deferred |
+|---|---|---|---|---|
+| 18:25-18:52 | old read + old pivot | 6 / 8 | 7 / 9 | 2 |
+| 18:55-19:26 | incremental read | 9 / 12 | 3 / 9 | 4 |
+| 19:29-20:00 | + anchor index | **10 / 12** | **3 / 8** | 4 |
+
+- **NBA now mostly fits under the 45 s rule. NFL does not.**
+  - Today's NFL quote file grew 95 -> 147 MB over the afternoon.
+  - The two loads together save ~3 s of NFL pivot (5.9 -> 2.8 s on the same rows) plus part of
+    the read.
+  - Live NFL build median went 50.6 -> 55.4 s anyway.
+- So the NFL cadence decision put to the user (1:4x PM CST) still stands. NBA's half of it is
+  largely settled by the loads, matching reading 13-14's NBA overlay gaps of 126-164 s.
