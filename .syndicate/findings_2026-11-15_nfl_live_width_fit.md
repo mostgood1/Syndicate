@@ -77,3 +77,12 @@ User: "After tonight's games" (to "Run the NFL replay harness on weeks 1-10?"), 
 - **Armed: background job `bkzsy2638` (`C:\tmp\livegrade\nfl780\harness\run_tonight.sh`) waits for 10 PM CST, then until all 13 of tonight's week-10 games are final (cap 3 AM CST), then runs the harness and `nflfit.py` at nice 19, read-only; outputs in `C:\tmp\livegrade\nfl780\harness`.**
 - **Not measured by this:** possession at the break (the harness marginalises it), states inside a quarter,
   and alt lines (the shards' full-game totals / spreads are main lines).
+
+## Precondition: the live player-exit gate
+
+Noted 10:29 AM CST (16:29Z). From the user, relayed verbatim 2026-11-15 by session `local_379fd729` (NCAAF backtesting), which opened lane `live-player-exit-gate` on main `89498a5c6`: "yes, open the lane and tell the NFL lane - we need this across ALL sports" and "NFL live PROPS depend on this info".
+
+- **Precondition:** NFL live totals / spreads pricing (and NFL live prop projections) stays OFF until lane `live-player-exit-gate` has a measured `key_player_out` refusal on a real mid-game exit. This lane only measures k; it opens no gate and loads nothing, and switching pricing on is the user's decision either way.
+- **Files:** No collision: this lane's only repo file is its findings file (its scripts live outside the repo, in `C:\tmp\livegrade\nfl780`); the gate's call sites (`nfl/live_resim.py`, `live_gameline_join.py`, `live_projection_join.py`) are not this lane's.
+- **Already exposed:** The NFL live MONEYLINE already prices with no exit gate (86-144 rows a Sunday under the 600 s ceiling, 11-08 census), so a mid-game QB exit is unguarded there today.
+- **What it means for k:** The k fitted tonight is measured on every replayed game, including any with a mid-game exit; those states price a team that has lost a starter, so k partly absorbs exit-driven misses. Once the gate can label exits, re-fit k on the states it would leave priced: it may be smaller.
