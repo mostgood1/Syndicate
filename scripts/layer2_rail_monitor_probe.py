@@ -138,7 +138,13 @@ def fleet_logs(minutes: int, now: dt.datetime, work_dir: Path) -> dict:
         ts = line.split(" ", 1)[0]
         if "INPLAY_OVERLAY sport=" in line:
             kv = dict(p.split("=", 1) for p in line.split() if "=" in p)
-            overlay.setdefault(kv.get("sport"), []).append((ts, float(kv.get("elapsed_ms", "nan")) / 1000.0, int(kv.get("rows_inplay", 0) or 0)))
+            try:  # a non-numeric value means the line is someone's echoed command text, not a build
+                rec = (ts, float(kv.get("elapsed_ms", "nan")) / 1000.0, int(kv.get("rows_inplay", 0) or 0), int(kv.get("cards", -1)))
+            except ValueError:
+                continue
+            if not ts[:4].isdigit():
+                continue
+            overlay.setdefault(kv.get("sport"), []).append(rec)
         elif "BOOK_GRID_TICK " in line:
             try:
                 ticks.append((ts, json.loads(line.split("BOOK_GRID_TICK ", 1)[1])))
@@ -152,11 +158,13 @@ def fleet_logs(minutes: int, now: dt.datetime, work_dir: Path) -> dict:
             joins[kv.get("sport")] = {"ts": ts, **{k: v for k, v in kv.items() if k != "sport"}}
     over = {}
     for sport, xs in overlay.items():
-        times = [parse_ts(t) for t, _, _ in xs]
+        times = [parse_ts(t) for t, _, _, _ in xs]
         gaps = [(b - a).total_seconds() for a, b in zip(times, times[1:]) if a and b]
         last = times[-1]
         over[sport] = {"builds": len(xs), "gap": dist(gaps), "gaps_over_360": sum(1 for g in gaps if g > 360),
-                       "elapsed": dist([e for _, e, _ in xs]), "rows_inplay_last": xs[-1][2],
+                       "elapsed": dist([e for _, e, _, _ in xs]), "rows_inplay_last": xs[-1][2],
+                       # A build that kept in-play rows but published 0 cards: those games' live lines leave the rail.
+                       "zero_card_builds_with_rows": sum(1 for _, _, r, c in xs if r > 0 and c == 0),
                        "since_last_s": round((now - last).total_seconds(), 1) if last else None}
     build = {}
     deferred = {}
@@ -360,6 +368,8 @@ def main() -> int:
                  for ch in today_chips for s in ("away", "home") if looks_truncated((ch.get(s) or {}).get("abbr"))]
     reading["teams"] = {
         "chips_today": len(today_chips), "live_chips": len(live_chips),
+        # Game clock per live chip (HALF / intermission / Q3 7:24), to join 0-card overlay builds to game state.
+        "live_chip_status": {f"{ch.get('sport')} {ch.get('matchup')}": ch.get("status_token") for ch in live_chips},
         "live_chips_without_live_card": [f"{ch.get('sport')} {ch.get('matchup')}" for ch in live_chips if ch.get("game_key") not in live_card_chips],
         "chipless": rail.get("chipless"), "det1": rail.get("det1"), "det2": rail.get("det2"), "det3": rail.get("det3"),
         "flipped": rail.get("flipped"), "truncated_abbr": truncated,
@@ -389,7 +399,7 @@ def summary(r):
         "live_rows": {"n": lv["live_rows"], "no_fair": lv["live_rows_no_fair"], "priced_age": lv["priced_age"],
                       "age_now": lv["age_now"], "seen_age_at_pricing": lv.get("seen_age_at_pricing"), "priced_le_120": lv["priced_le_120"], "age_now_gt_300": lv["age_now_gt_300"],
                       "markets": lv["live_markets"], "markets_no_ours": lv["live_markets_no_ours"]},
-        "teams": {"chips_today": tm["chips_today"], "live_chips": tm["live_chips"],
+        "teams": {"chips_today": tm["chips_today"], "live_chips": tm["live_chips"], "live_chip_status": tm.get("live_chip_status"),
                   "live_chips_without_live_card": tm["live_chips_without_live_card"],
                   "chipless": [(c["sport"], c["matchup"], c["count"]) for c in tm["chipless"] or []],
                   "det1": len(tm["det1"] or []), "det2": len(tm["det2"] or []), "det3": len(tm["det3"] or []),

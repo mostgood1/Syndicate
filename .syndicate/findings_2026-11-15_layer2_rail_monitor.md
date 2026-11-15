@@ -244,3 +244,91 @@ was re-read.
 
 **Teams:** det1 / det2 / det3 0 / 0 / 0; 0 flipped; 0 truncated; 0 live chips without a live
 card. The same 2 chip-less NCAAB cards.
+
+## Reading 5 — Sun 11-15 12:02 PM CST (18:02Z), right at the noon tips
+
+5 live cards: WNCAAB 4 (2 flags), NCAAB 1. **2 flags, 0 false, 0 missed, 0 dark.**
+- **Our lag is back to normal:** seen age at pricing p50 13.4 s, p90 276 s. Reading 4's 216 s
+  median did not persist.
+- 10 live rows, 6 of them <= 120 s at pricing.
+- Query 24.8 s / 57.7 MB. Shortlist 2.6 s. Board build 465 s old.
+- **The noon round left a hole:**
+  - tick gap max 320.7 s;
+  - NCAAB overlay gap max 327 s, WNCAAB max 332.5 s, against web's 360 s cutoff;
+  - NFL build max 120.3 s, NBA 57.7 s.
+- Web merges:
+  - nfl stale 12 of 12. No live NFL game between NE @ DET's final and the 12:00 kickoffs, so
+    this is expected.
+  - ncaab / wncaab fresh 12 / 12.
+- **`/api/board/live-rail` served 0 / 0 / 11 rows over three reads** with college games in play.
+  The per-sport counts were ncaab 0 / 0 / 0 and wncaab 0 / 0 / 11.
+
+**The 0-row live-rail reads, measured on the role logs:**
+- The college in-play overlay sometimes publishes **`cards=0` while it holds in-play rows**:
+  - WNCAAB: **27 of 60 builds today** (26 of 195 on 11-14);
+  - NCAAB: 9 of 185 (1 of 204);
+  - NHL: 4 of 173 (24 of 140 on 11-14).
+- Example: WNCAAB 17:56:11Z — `LIVE_GAMELINE_BUILD withheld_by_reason={"quote_older_than_live_pricing_ceiling":28}`,
+  then `INPLAY_OVERLAY rows_inplay=13 opportunities=19 cards=0`. The live-rail then has nothing
+  to swap, and those games' rail lines come from the ~10-15 min shortlist build.
+- **H0, "our pulls went stale": falsified for 17:48-17:56Z.** The pull heartbeats covered both
+  live WNCAAB events (EMU @ UK, SAM @ PUR) every 21-85 s through that window. The 3-4 min pull
+  holes (17:55:05 -> 17:58:13 -> 18:02:35Z) came only after it.
+- **H1, "halftime / intermission": supported, n = 3 games.**
+  - The 0-card window matches halftime of the 11:00 tips. At 12:07 PM, EMU @ UK read Q3 4:45,
+    SAM @ PUR Q3 6:41 and QUIN @ CCSU H2 17:51.
+  - The books' full-game prices stand still at the break, so every quote passes the 120 s
+    ceiling and the overlay keeps nothing.
+  - On 11-14, NHL's 24 zero-card builds fit the same shape (intermissions). Not joined yet.
+- Read: **probably by design** (a market at a break is not priceable). But the rail goes blank
+  for that game at the break.
+- The probe now logs `zero_card_builds_with_rows` per sport and each live chip's clock, so the
+  join can be made on more breaks before anyone is asked to change anything.
+
+## Reading 6 — Sun 11-15 12:07 PM CST (18:07Z), 7 minutes into the noon NFL window
+
+**33 live cards** (WNCAAB 18, NCAAB 8, NFL 7) of 133.
+
+**Load:**
+- Query **15.8 s / 61.4 MB** (10.8 MB gz).
+- Shortlist **4.0 s**. Chips 0.83 s.
+- Live-rail 0.17 s, **0.45 MB, 277 / 472 / 488 rows**. The page polls this every 15 s.
+
+**Refresh:**
+- Board build 789 s old; shortlist `written_at` 910 s. The shortlist is lagging; the board was
+  not rebuilt across the noon round.
+- Live-rail newest 41 / 8 / 10 s.
+- `deferred_slow` nfl 1, nba 1.
+- Web merges: nfl stale 7 of 9 (the overlay was rebuilding after kickoff), fresh 2;
+  ncaab / wncaab fresh 9 / 9.
+
+**Live recommendations:**
+- **11 flags on 6 of 33 live cards. 0 false, 0 missed, 1 dark.**
+- By sport: NCAAB 9 (QUIN @ CCSU 3, BOISE @ NEB 3, NORF @ GAST 2, LOU @ MEM 1). WNCAAB 2
+  (EMU @ UK u128.5 +26.1, VAN @ IOWA u152.5 +5.8).
+- Largest gaps: QUIN @ CCSU o143.5 +21.3 and h2 o71.5 +21.2; BOISE @ NEB u164.5 +24.7.
+- Dark: LOU @ MEM moneyline home, +7.1 pp, priced on 68 s, now 355 s.
+- 246 live rows:
+
+  | measure | p50 | p90 | count |
+  |---|---|---|---|
+  | priced age | 132 s | 343 s | 122 of 246 <= 120 s |
+  | seen age at pricing | 38 s | 178 s | — |
+  | age now | 166 s | 406 s | 57 of 246 > 300 s |
+
+  0 rows with no fair.
+- **37 of 61 live markets have no OURS. 33 of the 37 are NFL: every NFL market on all 7
+  games.**
+  - The NFL live chips carry no `intervals` block (`game_chip_intervals ATTACHED ... nfl:none:live=7`).
+  - Cause: **first-tick latency, not a dead re-sim.** `NFL_LIVE_RESIM` ticks every ~6-7 min. The
+    18:01:46Z tick saw 0 games in progress; the first tick on the noon games was **18:09:57Z**:
+    `live_games=7 live_resimmed=3 refused=4 (uninformative_probability) elapsed_seconds=58.0`
+    of a 90 s budget.
+  - So for ~10 min after kickoff the NFL rail has no OURS. Watch the 58 s / 90 s budget with 7
+    games (plus 3-4 more at 3:05 PM).
+- The other 4: WNCAAB h2h 2 of 3, WNCAAB spread 1 of 1, NCAAB h2h 1 of 4.
+- **16 of 33 live cards show no live lines at all:** WNCAAB 12, NCAAB 3, NFL 1. Most tipped
+  minutes earlier. Re-read next time before calling it anything.
+
+**Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 0 live chips without a live
+card. The 2 chip-less NCAAB cards persist (FAMU @ UTEP now 4 rows).
