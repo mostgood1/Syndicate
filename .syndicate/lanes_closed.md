@@ -16026,3 +16026,25 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness --idle-min 240 read SAFE for 4 of 16 CLOSED blocks; all 4 moved to lanes_closed.md with one pointer each: live-totals-prob-scale, live-margin-prob-scale, ncaaf-evening-kickoff-projection, closed-lane-archive-20261114-2240. Table and WAIT reasons in .syndicate/log/2026-11-15.md.
+
+### soccer-live-corners-book-test — CLOSED — opened 2026-09-18 — closed 2026-11-15 — session abacd435-07ac-476c-b6e8-faa7bd1c9a77
+- **GOAL VERDICT (scheduled task soccer-forward-grades-final-1115, 2026-11-15 ~10:15 AM CST (16:15Z)).** Goal, verbatim: "H36 (forward, paper): the published live corners number, priced as so_far + Poisson(remaining) per H35, is scored against the in-play books' de-vigged `alternate_totals_corners` probabilities on the same line at the same moment -- registered before any qualifying capture, with a grader that joins production `book_quotes` to the live projection history and runs on production data. No engine change and no bet placed." **GOAL: MET.** The test was registered and the grader runs on production. **H36's registered verdict is INSUFFICIENT: n=125 matches of the registered 150.** Log-loss ours - book +0.0099 [-0.0053, +0.0268]; registered 180 s subset 121 matches, +0.0098 [-0.0045, +0.0274]; sim - book +0.0269. The hypothesis (our price better calibrated than the book) is NOT shown, and the point estimate leans the other way. n stalled at W44 because the plain soccer `book_quotes` shards 11-01..11-13 now 404 on the fleet (see `log/2026-11-15.md`). No engine change, no bet placed.
+- **GOAL VERDICT (checkpoint 2026-09-18 ~17:52 CT (22:52Z)).** Goal, verbatim: "H36 (forward, paper): the published live corners number, priced as so_far + Poisson(remaining) per H35, is scored against the in-play books' de-vigged `alternate_totals_corners` probabilities on the same line at the same moment -- registered before any qualifying capture, with a grader that joins production `book_quotes` to the live projection history and runs on production data. No engine change and no bet placed." **GOAL: NOT MET.** Registered `ca9e46fc`; join amended to canonical names (`b42c96ea`) and as-of window 180 s -> 600 s (`6bba795f`), both before any outcome. **First production reading 2026-09-18 16:55 CT: 56 items on 5 matches scored, so the Verification's first half is MET**; log-loss ours - book -0.0038 [-0.2415, +0.1895], WATCHING; row age median 72 s, p90 176 s; registered-180 s subset 4 matches. LEFT: H36 at 150 matches or 2026-11-15 (weekly and final grade tasks). BLOCKING: elapsed time.
+- Goal: H36 (forward, paper): the published live corners number, priced as so_far + Poisson(remaining) per H35, is scored against the in-play books' de-vigged `alternate_totals_corners` probabilities on the same line at the same moment -- registered before any qualifying capture, with a grader that joins production `book_quotes` to the live projection history and runs on production data. No engine change and no bet placed.
+- Files:
+  - `scripts/soccer_season_audit/live_corners_book_grade.py` (NEW)
+  - `tests/test_soccer_live_corners_book_grade.py` (NEW)
+- Hypothesis: the pregame-pace live corners price is better calibrated than US books' in-play corners lines, because those books price corners off a slower model (their quotes lag our capture by 66-135 s median) and H29 showed the pregame pace beats a live re-sim.
+- Falsification test: H36 as registered in `log/2026-09-18.md` ~10:54 CT (15:54Z): at >= 150 matches (or 2026-11-15), the match-clustered CI of mean log-loss (ours - book) is not entirely below 0.
+- Verification: the grader's first production run joining at least one in-play capture to a projection-history row and an ESPN final, with the funnel printed; then H36 itself on its registered trigger.
+- Blocked by: none
+
+### closed-lane-archive-20261115-0639 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 3db11340-9b28-41cb-a6ce-99f366b44ecc
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness --idle-min 240 read SAFE for 1 of 13 CLOSED blocks; it moved to lanes_closed.md with one pointer: closed-lane-archive-20261115-0039. Table and WAIT reasons in .syndicate/log/2026-11-15.md.
+
+### closed-lane-archive-20261115-0840 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session c340d9e9-7fab-4dda-b749-629ce7a17822
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 at ~14:41Z (8:41 AM CST): 1 SAFE of 14 CLOSED; moved `closed-lane-archive-20261115-0239`. Table + WAIT reasons in log/2026-11-15.md.
