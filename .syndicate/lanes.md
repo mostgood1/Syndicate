@@ -932,6 +932,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 at 22:40Z read 1 SAFE of 16 CLOSED; moved `closed-lane-archive-20261115-1041` to lanes_closed.md with one pointer. Other 15 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-15.md.
 
+### nfl-prop-projection-atomic-write — OPEN — opened 2026-11-15 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: The NFL prop projections artifact (nfl_source/nfl_prop_projections_<season>_wk<week>.json) is written to a private temp file in its own directory and os.replace'd, so no reader can see it mid-rewrite. Done = on main, on the fleet (ff only: the build runs as a fresh subprocess), and 0 JSONDecodeError on nfl_prop_projections_* in the role logs across the next NFL props rewrites, recorded in deploys.md.
+- Files: syndicate/features/nfl/props.py, tests/test_nfl_prop_projection_atomic_write.py
+- Hypothesis: The 2026-11-15 19:33:51.681Z refresh-worker traceback (prop_evidence football JSONDecodeError at char 229,616, the write finishing 7 ms later) is a reader catching write_nfl_prop_projection_artifact's in-place path.open('w') + json.dump mid-stream.
+- Falsification test: A JSONDecodeError on a nfl_prop_projections_* file after the load, with the build launched from the new code.
+- Verification: Unit test: a reader polling during a slow write only ever sees the old or the new complete payload, and no .tmp file is left behind; bytes identical to json.dumps(payload). On the fleet: grep the role logs for JSONDecodeError on nfl_prop_projections_* after the ff, over at least one props rewrite (SEASON_PROJECTION / wrote ... published=True).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
