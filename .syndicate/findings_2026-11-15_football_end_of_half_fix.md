@@ -613,3 +613,86 @@ play could end the game. Q4's score gate (-9..2) is unchanged.
 | V2-P4 | Q2-window snaps 9.4-10.2. **G3 is more likely to FAIL than pass** under V2-f's limit. Q2-window points 4.4-5.0. |
 | V2-P5 | Total minus `off` between -0.5 and +1.5 before the re-fit; the re-fit's TD multiplier lands in [0.85, 1.0]. |
 | V2-P6 | NCAAF `full2`: Q4 falls toward 13.83 (v1 16.36); H1 > H2. |
+
+### V2 — PRE-REGISTERED 2026-11-15 13:0x CST (this section supersedes the draft above wherever they differ), BEFORE any v2 code or v2 sim run
+
+**Decision.** The user asked for the v2 to be built ("build the v2 in the fix session", relayed by session
+4c32cb26). The scope relayed:
+- Q4 leaders kneel instead of scoring;
+- timeouts and spikes used when a team needs them in the last minute, not at average rates;
+- the same field-goal timing in Q4;
+- a scoring-level lever with more reach.
+Same rules as v1.
+
+**Defaults taken, since no decision came back on them:**
+- G3 stays GATING.
+- The held-out is the 11-03 pull (121 games), read only if FIT passes.
+
+**One design check before this text (`C:\tmp\football_eoh_fix\need.py`, league only, read-only).** In the last
+60 s, after a clock-running hurry play, P(offense timeout | >= 1 left):
+
+| Q2 zone | 1 left | 2 left | 3 left |
+|---|---|---|---|
+| own half | 0.214 | 0.133 | 0.090 |
+| 50-64 | 0.378 | 0.294 | 0.067 |
+| range (>= 65) | 0.386 | 0.287 | 0.041 |
+
+- Q4 runs 0.12-0.32 at 1-2 left, ~0.0-0.03 at 3 left.
+- Spike next (no timeout called): 0.31-0.50 with 0 timeouts left, 0.00-0.02 with >= 1, in every zone.
+
+**What "need" means here, from that check.**
+- FIELD POSITION is the need signal for timeouts.
+- RUNNING OUT of timeouts is the need signal for spikes.
+- **Timeouts left is NOT used as a key for the timeout rate.** The 3-left rows are a selection effect: league teams
+  that still hold 3 at the end of the half are mostly not saving time. The sim's teams arrive with 3 regardless
+  (71% of the time against the league's 16%). That key would import the selection without the behaviour.
+
+**Switches** (declared fields, default OFF, OFF byte-identical to the v1 digests).
+
+1. **`end_of_half_kneel_out` (NEW, = V2-a).**
+   - Applies in Q4 end-game preservation and Q2 halftime preservation, with `end_of_half_clock` ON.
+   - Before the play: if `clock <= 40 * max(0, downs_left - defense_timeouts) + KNEEL_LIVE * downs_left`
+     (`downs_left = 5 - down`), the offense kneels.
+   - A kneel is a GAIN of -1 yard, with no score, turnover or sack.
+   - Its clock comes from the window machinery as a clock-running play: the defense may call a timeout at the
+     measured rate. Otherwise it takes the measured kneel delta (`kneel`, by quarter).
+   - `KNEEL_LIVE` = the league's kneel delta when a timeout follows.
+2. **`end_of_half_clock_by_need` (NEW, = V2-d plus need-based timeouts).** In the window, in hurry mode:
+   - The offense-timeout rate after a clock-running play is keyed on quarter x clock bucket x field-position zone
+     (own < 50 / 50-64 / range >= 65), pooled over timeouts left. It replaces v1's `p_to_off[<q>_hurry]`.
+   - With 0 timeouts left and no timeout called, the offense spikes at the measured P(spike | quarter, zone), in the
+     last 60 s only.
+   - A spike is its own step: an incompletion, 0 yards, a down used. It counts as a snap.
+   - The play before it takes the measured `to_spike` delta, and the spike itself the measured `spike` delta.
+   - Preserve mode and the defense keep v1's rates.
+3. **`q4_kick_waits` (NEW, = V2-e).** In Q4, with `end_of_half_clock` ON, an urgency kick on downs 1-3 waits until
+   the clock is <= the last-bucket running-play delta (Amendment 3's rule). Q4's -9..2 score gate is unchanged.
+4. **`end_of_half_clock`, its table REVISED (= V2-b, V2-c).**
+   - `p_incomplete`, `p_oob`, `delta_by_bucket` `run_*` / `to_*` are keyed `"<q>_<mode>"`.
+   - New `p_sack` and `p_turnover` shares, by `"<q>_<mode>"` x bucket, applied like `p_incomplete`. Every other
+     outcome keeps its relative weight; the TD weight is not set.
+   - v1's own results stay tied to `79dbfb23c`. v1 never shipped, so the revision replaces it.
+
+**Measurement.**
+- Every new cell is measured from nflverse 2024-25 (CFBD 2024-25 for NCAAF) by
+  `scripts/football_end_of_half_clock_rates.py`, before any v2 sim run.
+- The Amendment-2 censoring rule applies to every delta cell.
+- A cell with fewer than 30 observations takes its pooled-over-quarters value, and the table says so.
+
+**Arms (NFL FIT: the same 136 games x 100 seeds, same seeds).**
+- `off2`: production re-run on today's code, which must reproduce v1's `off` exactly.
+- `full2`: v1's three switches + the revised table + the three new switches.
+- `full2_nokneel`: `full2` without `end_of_half_kneel_out`. Reported, for attribution.
+- The re-fit: R1 / R2a / R2b / R3 as in the draft.
+
+**Gates.**
+- G1-G5 as in the draft: G3 GATING, G5 = Q4 last-120 s points in [2.31, 2.96].
+- The held-out is read only if all five pass (2026 wk1-8, 121 games, 1000 seeds, the "shown worse" rule).
+
+**Predictions** are the draft's V2-P1..P6, with V2-P4 sharpened: `end_of_half_clock_by_need` adds +0.1 to +0.6
+Q2-window snaps over `full2_nokneel`'s Q2 count. **G3 is still predicted to FAIL** (Q2-window snaps 9.4-10.2).
+
+**Binding.**
+- One functional smoke run is allowed, for bugs only.
+- Any design change after this point is an amendment, written and landed on main before the FIT read.
+- After the FIT read, nothing changes for this candidate.
