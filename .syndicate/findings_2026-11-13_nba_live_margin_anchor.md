@@ -107,3 +107,17 @@ Either order is safe; each lane gets its own kind's k.
 - an NBA game with a pregame artifact and a close shows `anchor_missing`;
 - an anchored lane's `rawModelHomeWinProb` is not the sim's own;
 - the NBA live moneyline's model - market Brier over the first week is not below the raw replay's +0.016.
+
+## Served reading (2026-11-14, whole slate)
+
+- **Loaded** 15:38:27Z 11-14 (live-odds-worker, the anchor) and 15:38:06Z (refresh-worker, the anchored k), by lane
+  `nfl-segment-skill`'s ff to `fee389971` on the user's "Load both now".
+- **Read:** the whole 11-14 NBA slate, 5 of 5 games (DEN @ NOP 6:11 PM CST to DET @ MIA 7:12 PM CST), everything recorded since 00:00Z 11-15, read 03:10Z (9:10 PM CST) at nice 19, read-only.
+- **Expected on load, all three MET:**
+  - 73 `NBA_LIVE_RESIM_TICK` lines (00:01Z-03:09Z): 232 of 232 re-simmed game-ticks anchored, `anchor_missing=-` on every tick, 0 tick errors.
+  - all 232 `live_resim_history` rows carry `margin_anchor` (10 books, closing consensus + pregame SmartSim), with `appliedOffset` = offset x share of regulation left on 232 of 232 (within 0.011); offsets -5.63 to +1.32 points.
+  - full-game ledger: every spreads row that reached the gate is at the anchored k 1.57 (2,818 rows: spreads 193, spreads_alt 2,625; 0 at the raw 2.02; 466-733 per game), totals at 2.16 (3,435), h2h untouched (67, no scale).
+- **First falsifier, not triggered:** no game showed `anchor_missing` (0 of 5).
+- The 77 alt rows with no `prob_scale` (25 spreads_alt, 52 totals_alt) were all refused before the gate (53 `live_resim_published_no_distribution_for_this_market`, 24 `no_two_sided_market_price`), and a row refused there records no scale by design. That answers the open note on 6 such rows from the first-game reading.
+- Not checked tonight: the lens lane's `rawModelHomeWinProb` equals the sim's own (the findings' second falsifier). Owed from finals: the NBA live moneyline's model - market Brier over the first week below the raw replay's +0.016 (the third falsifier, about 11-21), under #780's finals grade.
+- Output: `C:\tmp\livegrade\anchor1114\slate_0310Z.out` (`slate.py`, `applied.py`).
