@@ -9,10 +9,16 @@ Every fleet read below is read-only, at nice 19. Scripts: `C:\tmp\livegrade\nfl7
   ledger is refused `live_resim_published_no_distribution_for_this_market`: 1,569 on 11-01 and 1,340 of 3,323 rows
   on 11-08 (`census.py`). The refused rows record no model mean (`total_mean` / `home_margin` None; `sigma` 2.0 on
   all 1,340 rows on 11-08, `rows.py`).
-- **The likely cause is already a lead (leads.md, 2026-11-10, `engine-experts`):** the NFL re-sim publishes
-  `margin_dist` / `total_dist` at lane level in snake_case, and the join does not read them there.
-  `live_evidence_log.LANE_DIST_ALIASES` normalises the same keys for the log.
-- **Wiring those keys alone would price NFL at the re-sim's raw width.** Every sport #780 measured needed k 1.34-2.48.
+- **CORRECTED 9:10 AM CST, the same morning: the gate is DELIBERATE, not a key-name bug.** The 11-10 lead
+  (`engine-experts`) is right that the lane carries `margin_dist` / `total_dist` in snake_case (`build_game_lens`
+  spreads `**result` into it) and that the join reads only `marginDist` / `totalRunsDist`. But
+  `nfl/live_resim.py:659-664` withholds the camelCase names on purpose: closed lane `nfl-live-distribution-grade`
+  (2026-09-27, `scripts/backtest_nfl_live_totals.py`) graded NFL live margins a measured FAIL. Its worst powered
+  bucket was 0.4290 against `#499`'s 0.150, and the sim sd was 8.4-8.6 against a residual sd of 13.4-13.7, i.e.
+  ~35-40% too NARROW (k ~1.6). Totals were unmeasurable (1 of 10 buckets powered), and 36 of its 45 rows rested on
+  ratings files written after the games. My first message to the user called this a key-name mismatch; it is not.
+- **Wiring those keys would bypass that gate** and price NFL at the re-sim's raw width. Every sport #780 measured
+  needed k 1.34-2.48.
 - **Only the NFL moneyline prices live:** 86-144 rows on a Sunday, under the 600 s NFL quote ceiling (quotes up to
   396 s old on 11-08).
 
@@ -29,12 +35,31 @@ Every fleet read below is read-only, at nice 19. Scripts: `C:\tmp\livegrade\nfl7
 - The file `live/nfl_live_resim.json` on disk is 45 days old. The live snapshot moved to the shared store, which is
   what the evidence log reads, so this is not a gap.
 
+## The live log keeps only the confident tail (read 8:55 AM CST, NE @ DET)
+
+- `resim_live_game` refuses `uninformative_probability` whenever its P(home) is inside 0.35-0.65
+  (`nfl/live_resim.py:565-572`), AFTER the sim runs, and returns no distribution. The refused lane is stamped
+  `pregame` and the evidence row keeps nothing: no `extra`, no dists, no state (`refrow.py`).
+- NE @ DET, 25 minutes after its 8:30 AM CST kickoff: 4 re-sim updates (8:35, 8:40, 8:45, 8:50 AM CST), all
+  refused with p 0.40-0.50, so 0 recorded states. The in-play quotes are landing (273 totals / 339 spreads rows
+  from 23 books, `today_1455Z.out`).
+- So a fit on the live log is a fit on states with |p - 0.5| > 0.15 only (the harness docstring measured 93.8% of
+  NFL games refused at some point). It is selection-biased toward lopsided games.
+- **The better instrument already exists:** `scripts/backtest_nfl_live_totals.py` replays end-of-Q1/Q2/Q3 states of
+  COMPLETED games through the shipped `resim_live_game` against the real finals, with `--band bypass` to include
+  the refused states (labelled diagnostic). Weeks 1-10 are complete now (~150 games, against ~15 from live
+  recording), but the ratings provenance check matters, as it did on 09-27.
+
 ## Prediction, written before the data (see the lane)
+
+Margins: already measured too narrow on 09-27 (k ~1.6, weeks 1-3, leaky ratings), so this is a re-measurement,
+not a fresh prediction. Totals: still a prediction.
+
 
 k > 1 on both totals and spreads. Falsified if the game-clustered 95% CI includes 1.0 or lies below it on both;
 UNDETERMINED if the CI is wider than 1.0-2.5.
 
 ## Owed
 
-- 8:55 AM and 12:40 PM CST 11-15: confirm today's games land in both halves (`wait_today.sh`).
-- After the Sunday-night final: the fit, on about 15 games.
+- 8:55 AM CST: done (above). 12:40 PM CST: the noon games (`wait_today.sh`, still armed).
+- The fit: the user's choice between the replay harness on weeks 1-10 and the live log's confident tail.
