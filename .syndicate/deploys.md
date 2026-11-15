@@ -60204,3 +60204,7 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Verdict:** MET on the load's stated test and on the lane's verification (the served note's `established_loss_rel` equals its entry's). Probabilities were not re-checked here. Reachability showed them 46 of 46 identical, and this change only moved the note.
 - **Thin on one axis:** one game. The test is per row, and the stamp comes from one lookup keyed by (market, segment), so more games add rows on the same 18 keys, and these 31 rows cover all 18.
 - **Next:** the re-grade when the sample doubles (~3 more weeks of games) stays on todo #752. Lane `nfl-segment-skill` CLOSED.
+
+## 2026-11-15 14:16Z (8:16 AM CST) -- CORRECTION to the 2026-11-15 03:04Z reading of `5ed692ea5` (lane `nba-grid-per-build-lookups`) -- no deploy
+- The 03:04Z reading, and this lane's 14:07Z STATUS, called Saturday's round 2.25x Thursday's (median gap 69.0 -> 155.3 s). That gap was between ANY two grid passes. Thursday interleaved 52 price-on-pull passes among its 68 rounds; Saturday had 11 among 59. The regular round's period was 154.8 -> 176.3 s median (+14%). The reading's mechanism stands: a skip costs a whole extra period, and two Saturday periods (~352 s) sit at web's 360 s cutoff. Its size was overstated.
+- Measured with `C:\tmp\railload\period790.py` on refresh-worker.log.1 (same two windows). The round-cost profile it came from is in todo #790 and the lane STATUS of this time.
