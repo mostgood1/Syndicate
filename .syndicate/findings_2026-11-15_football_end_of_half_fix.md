@@ -244,6 +244,55 @@ The sim's two-minute drill throws about 17% incompletions. The league throws abo
 - Every gate, the re-fit grid, the predictions (P3 is now expected nearer its centre) and the decision rule.
 - The two-minute drill's other boosts (explosive x1.60, TD +0.04) are still reported only.
 
+### Amendment 2 — 2026-11-15 ~11:35 CST, after a second SMOKE run, BEFORE any FIT read. The LAST change to the clock.
+
+**What the smoke run was.** The same neutral-team smoke as Amendment 1, with `p_incomplete` in. Scripts
+`C:\tmp\football_eoh_fix\bucket.py` / `bucket2.py`. No FIT game and no 2026 game was read.
+
+**What it showed.**
+- Q2-window snaps 9.18 against the league's 10.49, counted the same way.
+- The shortfall sits at the end of the window. Snaps a game by clock bucket:
+
+| bucket | league | sim |
+|---|---|---|
+| 90-120 s | 2.42 | 2.95 |
+| 60-90 s | 2.08 | 2.32 |
+| 30-60 s | 2.62 | 2.00 |
+| 0-30 s | 3.37 | 1.92 |
+
+**The cause is a design error in the pre-registered table.** Its pooled cells cannot represent behaviour that
+changes across the window (nflverse 2024-25, Q2+Q4 window):
+
+| cell | 90-120 s | 60-90 s | 30-60 s | 0-30 s |
+|---|---|---|---|---|
+| running-clock hurry, mean seconds | 24.9 | 20.4 | 14.0 | 9.0 (41% censored) |
+| p_incomplete, hurry | 0.203 | 0.231 | 0.255 | 0.331 |
+| p_oob, hurry | 0.162 | 0.188 | 0.241 | 0.255 |
+| offense timeout, Q2 hurry | 0.012 | 0.050 | 0.192 | 0.212 |
+
+- The pre-registered running-clock cell used snaps at >= 45 s only (the censoring floor). It therefore measured
+  the slow part of the window and applied it everywhere: 22.15 s.
+
+**Amendment.** The table keys these cells on a clock bucket as well as their existing key. A step's bucket is
+0-30 / 30-60 / 60-90 / 90-120 s left at its snap (`> 90`, `> 60`, `> 30` boundaries).
+- `run_hurry`, `run_preserve`, `to_off`, `to_def`: (mean, sd) by bucket.
+  - **Censoring rule (replaces the >= 45 s floor):** a bucket whose censored share exceeds 0.15 takes the
+    (mean, sd) of the nearest bucket with more time left whose censored share is <= 0.15.
+  - Applied that way: `run_hurry` 0-30 <- 30-60; `run_preserve` 0-30 and 30-60 <- 60-90; `to_def` 0-30 <- 30-60.
+  - In the sim, a draw longer than the clock left ends the half, which is how the real censoring arises.
+- `p_incomplete`, `p_oob`, `p_to_off`, `p_to_def`: by bucket, with no censoring issue (each is the event after
+  the play).
+  - A cell with no league observation is unreachable under the mode function (Q2 preserve exists only at
+    <= 60 s) and is set to 0.0.
+- Drive-ending cells, `incomplete`, `oob` and `penalty` stay pooled. Their means are flat across buckets
+  (e.g. incompletions 4.8-4.9 s, punts 9.0-9.3 s).
+- NCAAF: the same structure, measured from CFBD, the same rule.
+
+**Binding.**
+- This is the last change to the clock mechanism before the FIT read.
+- The next smoke run is a functional check only. The FIT read runs whatever it shows.
+- If FIT misses G3, it is a FAIL and is reported as one. No third clock amendment.
+
 ## Results
 
 (none yet)
