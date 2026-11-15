@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -305,3 +306,73 @@ def test_exit_tick_is_serialised_by_one_lock():
     assert isinstance(ex.EXIT_STATE_LOCK, type(threading.RLock()))
     with ex.EXIT_STATE_LOCK:  # re-entrant: the fast loop may dispatch while holding nothing else
         assert ex.run_exit_tick.__name__ == "run_exit_tick"
+
+
+OLD = "o" * 24
+
+
+def _stale_doc():
+    """A stored document holding one entry well past the floor (10-15 for TODAY), in all three parts."""
+    return {
+        "version": 1,
+        "passes": {"n": 0, "marks": 0, "quote_errors": 0, "since": None},
+        "marks": {OLD: {"ticker": "KXOLD", "selected_date": "2026-10-10", "commence_time": "2026-10-10T23:30:00Z",
+                        "samples": 9}},
+        "exits": {OLD: {"ticker": "KXOLD", "rule": "take_profit", "at": "2026-10-11T00:10:00Z"}},
+        "live_dispatch": {OLD: {"at": "2026-10-11T00:10:05Z", "status": "ok"}},
+    }
+
+
+def test_prune_reachability_a_stale_entry_is_archived_before_the_save_that_drops_it(monkeypatch):
+    """off != on: the same stored document -- a bare save keeps the stale entry, a loop pass archives and drops it."""
+    monkeypatch.setenv("SYNDICATE_EXIT_FAST_LOOP", "paper")
+    archive = ex._archive_dir() / "fast_2026-10.jsonl"
+    # OFF: what every save did before lane fast-exit-state-size -- the entry stays, nothing is archived.
+    fx.persist_fast_state(_stale_doc())
+    assert OLD in fx.load_fast_state()["marks"] and not archive.exists()
+
+    # ON: one pass of the loop over that stored document.
+    archived_at_save: list = []
+
+    def _persist(state):
+        archived_at_save.append(archive.exists())
+        fx.persist_fast_state(state)
+
+    loop, _ = _loop([_order()], _quotes(), persisted=None)
+    loop.persist = _persist
+    loop.step(now=IN_PLAY)
+    assert archived_at_save == [True], "the archive line must exist before the save that omits the entry"
+    stored = fx.load_fast_state()
+    for part in ("marks", "exits", "live_dispatch"):
+        assert OLD not in stored[part], part
+    assert "b" * 24 in stored["marks"], "the in-play entry is kept"
+    (line,) = archive.read_text(encoding="utf-8").splitlines()
+    row = json.loads(line)
+    assert row["entry_key"] == OLD and row["position_date"] == "2026-10-10" and row["selected_date"] == "2026-10-10"
+    assert row["marks"]["samples"] == 9 and row["exits"]["rule"] == "take_profit"
+    assert row["live_dispatch"]["status"] == "ok"
+
+
+def test_prune_uses_the_slow_floor_keeps_its_day_and_never_drops_an_undated_entry(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_EXIT_LOOKBACK_DAYS", raising=False)
+    assert ex._retention_floor(TODAY) == "2026-10-15"  # lookback 3 + pad 2, the slow document's own floor
+    state = {
+        "marks": {
+            "keep": {"selected_date": "2026-10-15", "commence_time": "2026-10-15T23:00:00Z"},  # ON the floor
+            "drop": {"selected_date": "2026-10-14", "commence_time": "2026-10-14T23:00:00Z"},  # the day before
+            # a forward bet: slate 10-13, game 10-18 -- the GAME's date counts, as in the slow tick
+            "forward": {"selected_date": "2026-10-13", "commence_time": "2026-10-18T17:00:00Z"},
+            "undated": {},
+        },
+        "exits": {"drop": {"at": "2026-10-14T23:30:00Z"}, "orphan": {"at": "2026-10-01T01:00:00Z"}},
+        "live_dispatch": {"recent": {"at": "2026-10-19T01:00:00Z"}},
+    }
+    assert fx.prune_fast_state(state, TODAY) == 2  # drop (by its mark), orphan (no mark: by the trigger's day)
+    assert sorted(state["marks"]) == ["forward", "keep", "undated"]
+    assert state["exits"] == {} and list(state["live_dispatch"]) == ["recent"]
+    assert fx.prune_fast_state(state, TODAY) == 0  # nothing left past the floor
+
+    monkeypatch.setenv("SYNDICATE_EXIT_LOOKBACK_DAYS", "1")  # floor 10-17: the slow tick's lookback drives it
+    assert fx.prune_fast_state(state, TODAY) == 1
+    assert sorted(state["marks"]) == ["forward", "undated"]
+    assert fx.prune_fast_state(state, "not-a-date") == 0

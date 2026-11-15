@@ -22,8 +22,8 @@ position's entry order row(s) to the slow tick's own
 reconcile, the same live switches (`SYNDICATE_EXIT_MODE=live`,
 `SYNDICATE_EXIT_LIVE_ARMED` + the entry arm), the same daily caps
 (`live_exit_daily_caps`, 5 sales / $25) and the same `place_exit`. Both callers
-are serialised by `execution_exits.EXIT_STATE_LOCK`. Its own document is the
-only one it writes.
+are serialised by `execution_exits.EXIT_STATE_LOCK`. Its own document, and
+that document's archive lines, are the only files it writes.
 
 MODE (`SYNDICATE_EXIT_FAST_LOOP`):
   absent / `live` -> FOLLOW the slow tick: dispatch live sales when
@@ -39,6 +39,9 @@ Document: `reports/intelligence/execution_exits_fast.json`
   exits:  per entry -- the FIRST fast trigger (bid, edge, at), and what the slow
           tick's watch said for the same entry at that moment
   passes: running counters (passes, marks, quote errors) for marks/min
+Retention: before each save, entries past the slow document's floor (lookback +
+2 days) move to `execution_exits_archive/fast_<YYYY-MM>.jsonl`
+(`prune_fast_state`), so the document stays under the 8 MB keyvalue cap.
 """
 
 from __future__ import annotations
@@ -51,8 +54,11 @@ from typing import Any, Callable, Mapping, Sequence
 from syndicate.features.shared.execution_exits import (
     KALSHI,
     OpenPosition,
+    _archive,
     _float_env,
     _is_in_play,
+    _position_date,
+    _retention_floor,
     evaluate_exit,
     fair_margin,
     fetch_quotes,
@@ -122,6 +128,74 @@ def persist_fast_state(state: Mapping[str, Any]) -> None:
     from syndicate.features.shared.refresh_state_store import write_json_file
 
     write_json_file(fast_path(), dict(state))
+
+
+# The per-entry parts of the document. Every one is keyed by the ENTRY order's key.
+_ENTRY_PARTS = ("marks", "exits", "live_dispatch")
+
+
+def _entry_date(state: Mapping[str, Any], key: str) -> str:
+    """The position date for `key`: its mark's (`_position_date`, the slow tick's own), else the trigger's day.
+
+    A mark is always written before an exit or a dispatch for the same entry (`mark_pass`), so the fallback only
+    covers a document edited by hand. "" when nothing dates it -- such an entry is KEPT, never dropped unread.
+    """
+    mark = (state.get("marks") or {}).get(key)
+    if isinstance(mark, Mapping):
+        return _position_date(mark)
+    for part in ("exits", "live_dispatch"):
+        row = (state.get(part) or {}).get(key)
+        if isinstance(row, Mapping) and row.get("at"):
+            return str(row["at"])[:10]
+    return ""
+
+
+def prune_fast_state(state: dict[str, Any], today: str) -> int:
+    """Move entries whose position is past the slow document's retention floor to the archive. Returns how many.
+
+    THE DOCUMENT WAS NEVER PRUNED. MEASURED 2026-11-14 (lane `fast-exit-state-size`): the stored copy was 8,388,431
+    bytes compact -- marks 5.24 MB, exits 3.06 MB, 10,801 entries back to 10-18 -- against the 8,388,608-byte
+    keyvalue cap, and every save from 17:00:32Z was refused (1,163 by 22:55Z). Sales were NOT blocked: `step` sends
+    before it saves. But each refusal reloaded the stale copy, so the fast paper record since the last accepted save
+    was lost and the pass summary never printed.
+
+    THE SLOW DOCUMENT'S RULE (`execution_exits._retention_floor`, lookback + 2 days, `506973f97`). A position older
+    than the lookback is never in play again for this loop (`open_positions` drops it), so nothing here reads its
+    mark or its first trigger again. The rows go to `execution_exits_archive/fast_<YYYY-MM>.jsonl`, one line per
+    entry with all its parts, BEFORE the save that omits them; a refused save re-archives them next time, and a
+    reader keeps the newest line per `entry_key`. Dry run on the 11-14 stored copy: 8,388,431 -> 1,220,006 bytes.
+    """
+    floor = _retention_floor(today)
+    if floor is None:
+        return 0
+    keys: set[str] = set()
+    for part in _ENTRY_PARTS:
+        if isinstance(state.get(part), dict):
+            keys.update(state[part])
+    dated = {k: _entry_date(state, k) for k in keys}
+    stale = sorted(k for k, d in dated.items() if d and d < floor)
+    if not stale:
+        return 0
+    rows = []
+    for k in stale:
+        mark = (state.get("marks") or {}).get(k)
+        row: dict[str, Any] = {
+            "entry_key": k,
+            "position_date": dated[k],
+            # `_archive` files a row by its `selected_date` month; the position date stands in when the mark has none.
+            "selected_date": (mark.get("selected_date") if isinstance(mark, Mapping) else None) or dated[k],
+        }
+        for part in _ENTRY_PARTS:
+            if k in (state.get(part) or {}):
+                row[part] = state[part][k]
+        rows.append(row)
+    _archive(rows, prefix="fast")
+    for part in _ENTRY_PARTS:
+        bucket = state.get(part)
+        if isinstance(bucket, dict):
+            for k in stale:
+                bucket.pop(k, None)
+    return len(stale)
 
 
 def in_play_kalshi_positions(
@@ -271,6 +345,14 @@ class FastExitLoop:
         for k in self._window:
             self._window[k] += summary.get(k, 1 if k == "passes" else 0)
         if summary["new_exits"] or self._persist_at is None or t - self._persist_at >= _DEFAULT_PERSIST_SECONDS:
+            today = self.today_fn()
+            pruned = prune_fast_state(self.state, today)
+            if pruned:
+                print(
+                    f"[execution_exits_fast] FAST_STATE_PRUNED entries={pruned} floor={_retention_floor(today)}"
+                    f" kept={len(self.state.get('marks') or {})}",
+                    flush=True,
+                )
             self.persist(self.state)
             self._persist_at, self._dirty = t, False
         if self._summary_at is None or t - self._summary_at >= 60:
