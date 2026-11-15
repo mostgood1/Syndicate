@@ -36,17 +36,16 @@ import statistics
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-try:
-    from _base_url import default_base_url  # noqa: E402
-except Exception:  # pragma: no cover - the fleet default is the fallback anyway
-    def default_base_url(*_a):
-        return "http://127.0.0.1:10000"
+# PRODUCTION IS THE FLEET, ONLY (user 2026-11-15: "we shouldnt be using render for anything anymore").
+# Pinned here rather than taken from scripts/_base_url.py, whose precedence lets an exported
+# SYNDICATE_BASE_URL (or a Render host) pick the target. A non-loopback --base-url is refused.
+FLEET_BASE_URL = "http://127.0.0.1:10000"
 
 CT = ZoneInfo("America/Chicago")
 CHIP_SPORTS = "mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,wncaab,soccer"
@@ -218,13 +217,16 @@ def looks_truncated(abbr: str) -> bool:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base-url", default=default_base_url())
+    ap.add_argument("--base-url", default=FLEET_BASE_URL)
     ap.add_argument("--out-dir", default=r"C:\tmp\railmon\readings")
     ap.add_argument("--log-minutes", type=int, default=30)
     ap.add_argument("--rail-date", default=None, help="default: today, Central (the page's default day)")
     ap.add_argument("--no-page", action="store_true", help="skip the 19 MB page fetch; reuse the last served.html")
     args = ap.parse_args()
     base = args.base_url.rstrip("/")
+    host = urllib.parse.urlsplit(base).hostname or ""
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        sys.exit(f"refusing {base!r}: this probe reads the local fleet only (production is the fleet, not Render)")
     start = utcnow()
     rail_date = args.rail_date or start.astimezone(CT).date().isoformat()
     out_dir = Path(args.out_dir)
