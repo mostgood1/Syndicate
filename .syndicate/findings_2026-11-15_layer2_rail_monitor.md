@@ -849,3 +849,59 @@ LAR @ ARI and SEA @ LV in Q1.
 - Web merges: ncaaf stale 17 of 46. The last NCAAF game is over, so its overlay ages. Expected.
 - **Load:** `/intelligence` 7.4 s / 25.4 MB. Query 7.3 s / 62.6 MB. Live-rail 0.05 s, 589 rows.
 - **Teams:** 1 chip-less NCAAB card (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 19 — Sun 11-15 3:57 PM CST (21:57Z)
+
+27 live chips.
+- **35 flags on 12 cards. 0 false, 0 missed, 0 dark.** NBA 74 flagged rows (2 NBA games live).
+- Rows priced <= 120 s: NBA 322 / 581 (55%, seen age p50 65 s). NCAAB 73 / 213. NFL 10 / 73.
+- Overlay gap max: NFL 230 s, NBA 286 s, college 187-192 s. `deferred_slow` nba 1, nfl 1.
+- Web merges: 0 stale apart from ncaaf 61 / 61 (no NCAAF game live).
+- Query 8.1 s / 69.3 MB. Live-rail 0.61 s, 855-946 rows (0.81 MB): the 15 s poll's payload
+  peaks here.
+- **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## FLAGS GRADED ON OUTCOMES — first pass, 3:5x PM CST (`C:\tmp\railmon\grade_flags.py`)
+
+**Method:**
+- The 347 flag sightings in `flags.jsonl` (readings 1-19) collapse to **326 unique flags**,
+  deduped on (game, market, segment, side incl. line).
+- Each is graded at its FIRST sighting (the price a viewer could act on) against the final chip
+  linescore: NCAAB halves, OT in 2H; quarters elsewhere.
+- 92 are not yet final.
+- A flag is information, not a bet (user 2026-11-14). This is #780's question: does the fresh-quote
+  sim-vs-book gap carry realised value?
+
+**Result, 234 graded flags from 29 games:**
+
+| bucket | decided | W-L-P | hit rate | mean sim p | mean fair p | Brier sim | Brier fair |
+|---|---|---|---|---|---|---|---|
+| ALL | 233 | 117-116-1 | **50.2%** | 0.625 | 0.499 | **0.2705** | **0.2478** |
+| NCAAB | 158 | 72-86-1 | 45.6% | 0.627 | 0.501 | 0.2828 | 0.2472 |
+| WNCAAB | 45 | 26-19 | 57.8% | 0.642 | 0.499 | 0.2483 | 0.2488 |
+| NBA (one game, IND @ PHI) | 22 | 13-9 | 59.1% | 0.566 | 0.456 | 0.2461 | 0.2531 |
+| totals, full | 111 | 54-57 | 48.6% | 0.639 | 0.493 | 0.2820 | 0.2576 |
+| totals, segments | 55 | 26-29-1 | 47.3% | 0.634 | 0.504 | 0.2790 | 0.2373 |
+| spreads, full | 34 | 18-16 | 52.9% | 0.587 | 0.487 | 0.2466 | 0.2480 |
+| spreads, segments | 23 | 13-10 | 56.5% | 0.599 | 0.512 | 0.2646 | 0.2498 |
+| moneyline | 10 | 6-4 | 60.0% | 0.613 | 0.554 | 0.1907 | 0.1921 |
+
+- **The book's no-vig fair was better calibrated than the sim on the flagged lines** (Brier 0.2478
+  vs 0.2705). The flags' average 12.6 pp disagreement realised ~0: hit rate 50.2% against a 49.9%
+  fair.
+- That matches #780's prior (fresh-quote gaps realise ~0). NCAAB totals carry most of the shortfall.
+- **The effective n is 29 games, not 233.** Game level: flags mostly won in 13, mostly lost in 16.
+  Largest clusters: IND @ PHI 13-9, LOU @ MEM 13-6, BOISE @ NEB 5-10, UNH @ BU 5-10.
+- **No optimization is proposed from this.** It was not pre-registered, and slicing it further now
+  would be forking paths.
+
+**PRE-REGISTERED for tonight, written 4:0x PM CST before any outcome after 4 PM is read:**
+- **Population:** flags first shown on the rail at or after 22:00Z (4:00 PM CST) 11-15. Graded at
+  finals by `grade_flags.py` (first sighting), with the readings at the planned cadence.
+- **Measure:** Brier(sim) - Brier(fair) over decided flags. Also the game-level majority share.
+- **Prediction** (from #780 and the 234 above): Brier(sim) >= Brier(fair), and the hit rate within
+  +-5 pp of the mean fair.
+- **Decision rule:**
+  - Only if Brier(sim) < Brier(fair) - 0.01 across >= 20 distinct games: propose a gap-band study
+    to the user, still not a rule change.
+  - Otherwise the flag rule stays as is, and the rail stays information (user 2026-11-14).
