@@ -891,11 +891,14 @@ def _nba_live_refresh_enabled() -> bool:
 
 
 def _nba_live_refresh_interval_seconds() -> int:
+    # 60 s, was 240 (#811, lane `nba-live-pull-60s`, 2026-11-15): only the full-game lines repeat every minute -- the
+    # fetcher's props clock (`SYNDICATE_NBA_IN_PLAY_PROPS_INTERVAL_SECONDS`, 240) keeps props and quarter/half lines
+    # on the old cadence. SYNDICATE_NBA_LIVE_REFRESH_INTERVAL_SECONDS=240 restores the old cadence; the 60 s floor stays.
     raw_value = str(os.environ.get("SYNDICATE_NBA_LIVE_REFRESH_INTERVAL_SECONDS") or "").strip()
     try:
-        value = int(raw_value or 240)
+        value = int(raw_value or 60)
     except ValueError:
-        value = 240
+        value = 60
     return max(60, value)
 
 

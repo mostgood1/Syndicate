@@ -314,7 +314,113 @@ def merge_in_play_rows(existing: pd.DataFrame | None, fresh: pd.DataFrame) -> pd
     return pd.concat([kept, fresh], ignore_index=True, sort=False)
 
 
-def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regions: str, bookmakers: str | None, markets: list[str] | None, in_play_only: bool = False, now: pd.Timestamp | None = None, pregame_last: Mapping[str, str] | None = None) -> pd.DataFrame | None:
+# GAME LINES EVERY PULL, PROPS ON THEIR OWN CLOCK (#811, lane `nba-live-pull-60s`, 2026-11-15; user "now do the same for
+# NBA live pulls" after #810 did it for college). The NBA in-play lane now launches every 60 s (was 240 s). A full in-play
+# pass asks each live game's /markets and /odds for every prop and quarter/half market, ~49 credits a game, so only the
+# props clock below takes that pass. The pulls between make ONE bulk /odds call per sport key with a live game, for the
+# full-game lines alone (h2h,spreads,totals: 3 credits at the league's one-region book list), and merge those rows over
+# the same three markets only (`merge_in_play_game_lines`): props and quarter/half lines keep their last full pass.
+# Measured 11-15 before the change: NBA's any-pull gap ran ~245 s -- the lane was NBA's only live look.
+#
+# The clock sits beside the day's snapshot like the pregame record (one per league and date), and advances only on a
+# full pass that came back with a started game's rows, so a game's first pass after tip is always a full one.
+# `SYNDICATE_<LEAGUE>_IN_PLAY_PROPS_INTERVAL_SECONDS`: absent = 240; 0 = no clock, every in-play pull a full pass (the
+# pre-#811 behaviour). A lane slower than the clock (WNBA's 240 s) is due on every pull, so nothing changes for it.
+IN_PLAY_GAME_LINE_MARKETS = ("h2h", "spreads", "totals")
+_IN_PLAY_PROPS_INTERVAL_DEFAULT_SECONDS = 240.0
+_IN_PLAY_PROPS_CLOCK_SLACK_SECONDS = 20.0      # a 60 s lane's 4th pull can land a few seconds short of 240
+
+
+def _in_play_props_interval_seconds(league: str) -> float:
+    raw = str(os.environ.get(f"SYNDICATE_{str(league).strip().upper()}_IN_PLAY_PROPS_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = float(raw) if raw else _IN_PLAY_PROPS_INTERVAL_DEFAULT_SECONDS
+    except ValueError:
+        value = _IN_PLAY_PROPS_INTERVAL_DEFAULT_SECONDS
+    return max(0.0, value)
+
+
+def _props_clock_path(out_path: Path) -> Path:
+    return out_path.with_name(f"{out_path.stem}.inplay_props_clock.json")
+
+
+def _read_props_clock(out_path: Path) -> pd.Timestamp | None:
+    try:
+        stamp = pd.Timestamp(json.loads(_props_clock_path(out_path).read_text(encoding="utf-8"))["last_full_pass_at"])
+    except Exception:
+        return None                  # never written, or unreadable: due, the pre-#811 behaviour
+    return stamp.tz_localize("UTC") if stamp.tzinfo is None else stamp
+
+
+def _write_props_clock(out_path: Path, moment: pd.Timestamp) -> None:
+    try:
+        _props_clock_path(out_path).write_text(json.dumps({"last_full_pass_at": moment.isoformat()}), encoding="utf-8")
+    except OSError as exc:           # a lost write only makes the next pull a full pass again
+        print(f"IN_PLAY_PROPS_CLOCK_WRITE_FAILED {type(exc).__name__}", flush=True)
+
+
+def in_play_props_due(league: str, out_path: Path, now: pd.Timestamp) -> tuple[bool, float | None]:
+    """(full pass due, seconds since the last one). Unknown, or a clock in the future, is due: a full pass costs credits
+    at the old rate, while skipping on a broken clock would freeze every prop."""
+    interval = _in_play_props_interval_seconds(league)
+    if interval <= 0:
+        return True, None
+    last = _read_props_clock(out_path)
+    if last is None:
+        return True, None
+    elapsed = (now - last).total_seconds()
+    if elapsed < 0:
+        return True, elapsed
+    return elapsed + _IN_PLAY_PROPS_CLOCK_SLACK_SECONDS >= interval, elapsed
+
+
+def _has_started_rows(df: pd.DataFrame, now: pd.Timestamp) -> bool:
+    if df is None or df.empty or "commence_time" not in df.columns:
+        return False
+    starts = pd.to_datetime(df["commence_time"], utc=True, errors="coerce")
+    return bool((starts <= now).any())
+
+
+def merge_in_play_game_lines(existing: pd.DataFrame | None, fresh: pd.DataFrame,
+                             markets: tuple[str, ...] = IN_PLAY_GAME_LINE_MARKETS) -> pd.DataFrame:
+    """The day's snapshot with the fetched events' FULL-GAME LINE rows replaced; their props, quarter/half lines and
+    every other event's rows kept. An event that came back with no rows keeps its old lines, as in `merge_in_play_rows`."""
+    if existing is None or existing.empty or "event_id" not in existing.columns:
+        return fresh
+    fetched = set(fresh["event_id"].astype(str)) if "event_id" in fresh.columns else set()
+    market = existing["market"].astype(str) if "market" in existing.columns else pd.Series("", index=existing.index)
+    replaced = existing["event_id"].astype(str).isin(fetched) & market.isin(set(markets))
+    return pd.concat([existing[~replaced], fresh], ignore_index=True, sort=False)
+
+
+def _fetch_in_play_game_lines(*, api_key: str, live: list[dict], default_sport_key: str, regions: str,
+                              bookmakers: str | None) -> pd.DataFrame:
+    """One bulk /odds call per sport key with a live game, for IN_PLAY_GAME_LINE_MARKETS; rows for the live games only."""
+    wanted: dict[str, set[str]] = {}
+    for event in live:
+        event_id = str(event.get("id") or "").strip()
+        if event_id:
+            wanted.setdefault(str(event.get("sport_key") or default_sport_key), set()).add(event_id)
+    rows: list[dict[str, object]] = []
+    snapshot_ts = pd.Timestamp.utcnow().isoformat()
+    for sport_key, event_ids in wanted.items():
+        params: dict[str, object] = {"apiKey": api_key, "regions": regions,
+                                     "markets": ",".join(IN_PLAY_GAME_LINE_MARKETS), "oddsFormat": "american"}
+        if bookmakers:
+            params["bookmakers"] = bookmakers
+        try:
+            listed = _get(f"{API_BASE}/sports/{sport_key}/odds", params).json()
+        except Exception as exc:     # the status only: an HTTPError's text carries the request URL, apiKey included
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            print(f"IN_PLAY_GAME_LINES_FAILED sport_key={sport_key} {type(exc).__name__} status={status}", flush=True)
+            continue
+        for event_obj in listed if isinstance(listed, list) else []:
+            if isinstance(event_obj, dict) and str(event_obj.get("id") or "") in event_ids:
+                rows.extend(_flatten_bookmakers(event_obj, snapshot_ts))
+    return pd.DataFrame(rows)
+
+
+def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regions: str, bookmakers: str | None, markets: list[str] | None, in_play_only: bool = False, now: pd.Timestamp | None = None, pregame_last: Mapping[str, str] | None = None, lines_only: bool = False) -> pd.DataFrame | None:
     """Returns an empty DataFrame when the fetch itself was inconclusive
     (network/API failure, malformed response) -- the caller may reasonably
     fall back to a recent prior snapshot in that case, same as before.
@@ -382,12 +488,16 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
         now_ts = now if now is not None else pd.Timestamp.now(tz="UTC")
         live = in_play_events(day_events, now_ts)
         # `pregame_last` None = in play only; a mapping (even empty) = also the pregame games that are due.
-        upcoming = upcoming_events_due(day_events, now_ts, pregame_last) if pregame_last is not None else []
+        # #811: a lines-only pull (props clock not due) takes no pregame game -- the next full pass does.
+        upcoming = upcoming_events_due(day_events, now_ts, pregame_last) if (pregame_last is not None and not lines_only) else []
         day_events = live + upcoming
-        print(f"IN_PLAY_ONLY league={league} date={date_str} events_in_play={len(live)} pregame_due={len(upcoming)}",
-              flush=True)
+        print(f"IN_PLAY_ONLY league={league} date={date_str} events_in_play={len(live)} pregame_due={len(upcoming)}"
+              f" pass={'lines' if lines_only else 'full'}", flush=True)
         if not day_events:
             return pd.DataFrame()
+        if lines_only:
+            return _fetch_in_play_game_lines(api_key=api_key, live=live, default_sport_key=sport_keys[0], regions=regions,
+                                             bookmakers=_bookmakers_csv(bookmakers))
 
     rows: list[dict[str, object]] = []
     snapshot_ts = pd.Timestamp.utcnow().isoformat()
@@ -582,6 +692,12 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             pregame_last = {}
     pulled_at = _utc_now()
+    props_due = True
+    if args.in_play_only:
+        props_due, props_since = in_play_props_due(args.league, out_path, pulled_at)
+        print(f"IN_PLAY_PROPS league={args.league} date={args.date} pass={'full' if props_due else 'lines'} "
+              f"since_last_s={'na' if props_since is None else round(props_since)} "
+              f"interval_s={round(_in_play_props_interval_seconds(args.league))}", flush=True)
     df = fetch_player_props_current(
         api_key=api_key,
         league=args.league,
@@ -594,6 +710,7 @@ def main(argv: list[str] | None = None) -> int:
         in_play_only=bool(args.in_play_only),
         now=pulled_at,
         pregame_last=pregame_last,
+        lines_only=not props_due,
     )
 
     if df is None:
@@ -622,11 +739,15 @@ def main(argv: list[str] | None = None) -> int:
             existing = pd.read_csv(out_path) if out_path.exists() else None
         except Exception:
             existing = None
-        merged = merge_in_play_rows(existing, df)
+        merged = merge_in_play_rows(existing, df) if props_due else merge_in_play_game_lines(existing, df)
         atomic_write_csv(out_path, merged)
-        print(f"Wrote {out_path} with {len(merged)} rows ({len(df)} in play, merged).")
+        print(f"Wrote {out_path} with {len(merged)} rows ({len(df)} in play, merged"
+              f"{'' if props_due else ', game lines only'}).")
         _append_basketball_book_quotes(league=str(args.league), date_str=str(args.date), df=df)
-        _record_pregame_pulls(out_path, pregame_last, df, pulled_at)
+        if props_due:
+            _record_pregame_pulls(out_path, pregame_last, df, pulled_at)
+            if _has_started_rows(df, pulled_at):
+                _write_props_clock(out_path, pulled_at)
         return 0
 
     existing_has_rows = False
