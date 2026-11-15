@@ -204,6 +204,46 @@ total.
 - The market test after any load is the segment re-grade: #752 (`scripts/nfl_segment_skill.py`) and #805.
 - If any gate fails, nothing ships. The switches stay in the code, default OFF, and the failure is written up.
 
+### Amendment 1 — 2026-11-15 ~11:10 CST, after the clock table and a SMOKE run, BEFORE any FIT read
+
+**What the smoke run was.**
+- Neutral teams (all ratings 0), the DEFAULT profile, 300-400 seeds, no FIT game.
+- Script `C:\tmp\football_eoh_fix\mix.py` / `smoke.py`.
+- Nothing from the 136 FIT games or 2026 was read.
+
+**What it showed.** `full` puts 8.7 snaps in Q2's last 120 s, against the league's 10.5 counted the same way. The
+clock table itself reproduces the league's per-category times: incompletions 4.8 s in both, punts 8.9 s in both,
+TDs 7.8 / 7.6 s. **The gap is the play mix:**
+
+| Q2's last 120 s, per game | league | sim `full` |
+|---|---|---|
+| incompletions | 2.30 | 1.20 |
+| in-bounds plays (incl. out of bounds and timeouts) | 6.25 | 5.81 |
+| kicks, TDs, turnovers | ~2.0 | ~1.7 |
+
+The sim's two-minute drill throws about 17% incompletions. The league throws about 27% in that window.
+
+**Amendment.** Add one more MEASURED input to the clock table: `p_incomplete[mode]`.
+- Definition: P(incomplete pass | an offensive play in the window), by urgency mode.
+- An offensive play is a run or pass row, sacks, kneels and turnovers included, spikes, kicks and no-play
+  penalties excluded.
+- Measured the same way as the rest of the table (nflverse 2024-25; CFBD 2024-25 for NCAAF), by
+  `football_end_of_half_clock_rates.py`.
+
+**How the sim uses it (only with `end_of_half_clock` ON, only for a snap in the window):**
+- `play_simulator._play_outcome_weights` sets the INCOMPLETE_PASS weight so that its share of the non-penalty
+  outcomes equals `p_incomplete[mode]`.
+- Every other outcome keeps its relative weight, and PENALTY keeps its own weight.
+
+**Why this is a measured input and not a fitted dial.**
+- It is set to the league's observed share. Nothing is chosen to hit the snap count, and G3 stays a check on
+  everything together.
+- It touches `play_simulator.py`, which is on the loan.
+
+**What stays unchanged.**
+- Every gate, the re-fit grid, the predictions (P3 is now expected nearer its centre) and the decision rule.
+- The two-minute drill's other boosts (explosive x1.60, TD +0.04) are still reported only.
+
 ## Results
 
 (none yet)
