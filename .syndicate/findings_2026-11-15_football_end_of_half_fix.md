@@ -344,7 +344,7 @@ the sim does not model.
 - Whether to read it anyway is the user's decision (the calibration lane's precedent: "Validate only if FIT beats
   production").
 
-**Code (branch only, not pushed):** `cfbbb8b91` on `claude/admiring-gould-5c7128`.
+**Code (branch only, not pushed):** `de59ab7e7` (was `cfbbb8b91` before a rebase onto main) on `claude/admiring-gould-5c7128`.
 - The mechanism and its 3 amendments, all default OFF.
 - Tests: `tests/test_football_end_of_half_clock.py`, 22 tests. With the engine suites, 160 passed (Idle, finished 11:12 CST).
 - B: OFF byte-identical. The three pinned sha256 digests (NFL pregame, NCAAF pregame, NFL Q2 resume) equal the
