@@ -332,3 +332,68 @@ card. The same 2 chip-less NCAAB cards.
 
 **Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 0 live chips without a live
 card. The 2 chip-less NCAAB cards persist (FAMU @ UTEP now 4 rows).
+
+## Reading 7 — Sun 11-15 12:21 PM CST (18:21Z), noon slate in Q1 / H1
+
+35 live cards: WNCAAB 18, NCAAB 8, NFL 7, NCAAF 1, NBA 1.
+
+**Load:**
+- Query **29.8 s / 68.6 MB** (12.0 MB gz). The payload grows with live rows: 57 -> 61 -> 69 MB.
+- Shortlist 1.75 s. Chips 1.53 s. Live-rail 0.09 s, 208 rows (0.19 MB).
+
+**Refresh — the noon load, from BOOK_GRID_TICK 18:01-18:21Z:**
+- NFL is repriced every other round:
+
+  | tick (Z) | NFL grid build | next round |
+  |---|---|---|
+  | 18:01:43 | 120.3 s | 18:03:21 `deferred_slow ["nba","nfl"]` |
+  | 18:08:47 | 82.7 s | 18:12:27 deferred |
+  | 18:17:54 | 77.8 s | 18:19:38 deferred |
+
+- **NFL overlay gap 579 s** (18:07:14 -> 18:16:53Z); NBA overlay gap 391 s. Both are over web's
+  360 s cutoff.
+- The NBA overlay took **69.3 s** at 18:15:35Z (cards_ms 64,207, evidence 20.2 s).
+- Web merges: nfl stale 2 of 17, nba stale 1 of 5. College fresh 17 / 17.
+- `nflcontend.py` over 17:55-18:23Z: both NFL builds overlap a Kalshi tick (129 / 125
+  `kalshi_odds` lines). n = 2, so no long/short split is possible yet.
+- **Shortlist `written_at` 1,732 s old**:
+  - `BOARD_WINDOW_QUEUED date=2026-11-15 elapsed_s=1314.5` at 18:18:59Z, then re-queued every
+    ~66 s.
+  - Whether a build completes is not traced.
+  - Board `state_meta` build 273 s old.
+- **Sent to local_208683f1** (owner of the grid-speed lanes) as an interim at ~12:28 PM CST. The
+  formal registered read stays at 1:30 PM.
+
+**Live recommendations:**
+- **22 flags on 13 of 35 live cards. 0 false, 0 missed, 0 dark.**
+  - By sport: NCAAB 17, WNCAAB 5.
+  - By market: totals 19, spreads 3.
+  - By segment: full 14, h1 5, h2 3.
+  - Gap min / median / max: 3.5 / 15.9 / 26.2 pp.
+- `flags.jsonl` now holds 43 rows across readings.
+- 579 live rows:
+
+  | measure | p50 | p90 | count |
+  |---|---|---|---|
+  | priced age | 140 s | 775 s | 188 <= 120 s |
+  | seen age at pricing | 73 s | 536 s | — |
+  | age now | **601 s** | 955 s | **467 of 579 > 300 s** |
+
+  The age-now jump is mostly NFL (1,298 rows in play on an overlay 5+ min old).
+- 0 rows with no fair.
+- **53 of 109 live markets have no OURS** (NFL 32 / 37, NBA 8 / 15, NCAAB 6 / 33, WNCAAB 5 / 14,
+  NCAAF 2 / 10).
+  - NFL after the re-sim ticks (18:09:57Z resimmed 3, elapsed 58.0 s; 18:18:22Z resimmed 5,
+    21.9 s). 5 of 7 NFL chips carry `live_resim` (as of 18:17:59Z), and their full-game totals
+    show OURS.
+  - MIN @ GB and MIA @ IND were refused as `uninformative_probability`, so they have no OURS.
+  - NFL spreads, intervals and the moneyline are blank by the known decisions (#767 (c), margin
+    FAIL, live join withholding).
+- **(c) answered.** 10 of 18 live WNCAAB cards show no lines, and **all 10 have 0 in-play quotes
+  from any book since 18:05Z.** The feed quotes 8 WNCAAB games in play. This is book-side, not
+  ours. Not a defect.
+- **(a) halftime join:** 0 zero-card builds in this window (all sports), and no live game at a
+  break. Still owed.
+
+**Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 0 live chips without a live
+card. The same 2 chip-less NCAAB cards.
