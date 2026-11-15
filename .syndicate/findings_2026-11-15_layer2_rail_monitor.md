@@ -958,3 +958,26 @@ LAR @ ARI and SEA @ LV in Q1.
   - `/intelligence` 10.3 s / 24.1 MB. Query 9.5 s / 68.6 MB.
   - Live-rail 0.17 s, **1,049 rows, 0.99 MB**.
 - **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 23 — Sun 11-15 5:57 PM CST (23:57Z). Evening NBA; pre-load baseline for #811
+
+13 live chips.
+- **5 flags on 2 cards. 0 false, 0 missed, 1 dark.** Flagged rows: NCAAB 4, WNCAAB 2, **NBA 0**.
+- **NBA could not flag:** **0 of 719** NBA live rows were priced on a quote <= 120 s. Two clocks
+  compound:
+  - **Our NBA look:** in-play pulls every ~249 s (`NBA_LIVE_AUTORUN_LAUNCHED ... interval_s=240`;
+    5 changed-line pulls in 20 min). Seen age at pricing p50 216 s.
+  - **The NBA overlay:** 4 builds in 23 min, gap p50 292 s, max 343 s. NBA builds p50 70.9 s,
+    max 91.7 s. `deferred_slow` nba 5.
+  - Against that: NFL pulls every 55 s and college every ~41 s (since #810).
+- **This is #811's pre-load baseline** (NBA live game lines 240 -> 60 s, on main `b2ae202d4`, NOT
+  loaded, the user's call). Sent to local_1f10ce63.
+  - Caution, already in #811: price-on-pull re-prices per pull, so NBA builds per hour could rise
+    up to 4x. NBA builds are already 64-71 s p50 with the evening slate, past the slow-sport 45 s.
+- Overlay gaps: NFL max 170 s, college max 225-309 s. Web merges: 0 live-sport stale (ncaaf 51 /
+  51, no game).
+- **Probe correction:** the 3 `MALLOC_ARENA_INIT` lines at 23:35:01Z were child processes, not a
+  restart (supervisor.log: no new live-odds-worker pid since 18:53Z, pid 1771964). The probe now
+  reads live-odds-worker restarts from supervisor.log.
+- **Load:** query 8.3 s / 64.6 MB. Live-rail 0.08 s, 774-777 rows.
+- **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.

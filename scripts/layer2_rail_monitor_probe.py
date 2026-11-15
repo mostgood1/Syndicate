@@ -118,7 +118,9 @@ tail -n 60000 web.log | grep -a 'INPLAY_OVERLAY_MERGED' | awk -v c="$1" '$1 >= c
 echo '@@BOOT@@'
 # Restarts inside the window: readings must be split at them (slow-sport state, pull cadence reset).
 tail -n 300000 refresh-worker.log | grep -a -E '\[refresh_worker\] BOOTED' | awk -v c="$1" '$1 >= c' | sed 's/^/refresh-worker /'
-tail -n 300000 live-odds-worker.log | grep -a -E 'MALLOC_ARENA_INIT' | awk -v c="$1" '$1 >= c' | sed 's/^/live-odds-worker /'
+# live-odds-worker: a NEW pid in supervisor.log is a restart. MALLOC_ARENA_INIT in its log also comes from
+# child processes (3 lines at 23:35:01Z 11-15 with no restart), so it is NOT used.
+grep -a -E '\[live-odds-worker\] pid=' supervisor.log | tail -n 3 | sed 's/^/live-odds-worker-supervisor /'
 """
 
 
