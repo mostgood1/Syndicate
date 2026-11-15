@@ -77,6 +77,11 @@ def _second_half_kickoff(state, *, opening_receiver: str | None, rng: Random):
     return replace(state, possession_owner=receiver, field_position=25, down=1, distance=10)
 
 
+def _initial_timeouts(value: int | None) -> int:
+    """A resume's timeouts left (todo #808); None -> 3, a fresh half."""
+    return 3 if value is None else max(0, min(3, int(value)))
+
+
 def simulate_game(
     simulation_input: SmartSim2SimulationInput,
     *,
@@ -104,6 +109,10 @@ def simulate_game(
         clock_remaining=start_clock,
         score_home=simulation_input.initial_score_home,
         score_away=simulation_input.initial_score_away,
+        # todo #808: timeouts exist only under the end-of-half clock; None (not
+        # serialised) otherwise. A resume's real counts come from the input (None = 3).
+        timeouts_home=_initial_timeouts(simulation_input.initial_timeouts_home) if profile.end_of_half_clock else None,
+        timeouts_away=_initial_timeouts(simulation_input.initial_timeouts_away) if profile.end_of_half_clock else None,
     )
 
     # WHO RECEIVED THE OPENING KICKOFF -- known only when the sim starts at it.
@@ -158,6 +167,8 @@ def simulate_game(
             state = advance_quarter(state, quarter_seconds=simulation_input.quarter_seconds)
             if profile.halftime_kickoff and quarter == simulation_input.quarters // 2:
                 state = _second_half_kickoff(state, opening_receiver=opening_receiver, rng=rng)
+            if profile.end_of_half_clock and quarter == simulation_input.quarters // 2:
+                state = replace(state, timeouts_home=3, timeouts_away=3)  # a new half, 3 each
             quarter_start_clock = simulation_input.quarter_seconds
             continue
 

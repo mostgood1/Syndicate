@@ -39,6 +39,11 @@ class PlayState:
     play_index: int = 0
     drive_index: int = 0
     possession_index: int = 0
+    # todo #808: `CalibrationProfile.q2_urgency_ignores_score`, carried here so
+    # `classify_situation` (which sees only the play state) applies the Q2 rule.
+    # Set once per drive by `drive_simulator`; `replace()` keeps it. Not in
+    # `to_dict()`: it is a rule switch, not game state.
+    q2_urgency_ignores_score: bool = False
 
     def to_dict(self) -> dict[str, int | str]:
         return {
@@ -68,7 +73,11 @@ class PlayState:
         return max(0, 100 - self.yardline)
 
 
-def build_play_state_from_possession_state(state: PossessionState) -> PlayState:
+def build_play_state_from_possession_state(
+    state: PossessionState,
+    *,
+    q2_urgency_ignores_score: bool = False,
+) -> PlayState:
     possession_team = state.home_team if state.possession_owner == "home" else state.away_team
     distance = max(1, int(state.distance))
     if state.field_position >= 95:
@@ -83,6 +92,7 @@ def build_play_state_from_possession_state(state: PossessionState) -> PlayState:
         score_differential=_score_differential(state, possession_team),
         drive_index=max(0, int(state.drive_index)),
         possession_index=max(0, int(state.possession_index)),
+        q2_urgency_ignores_score=bool(q2_urgency_ignores_score),
     )
     return apply_situation_context(play_state, classify_situation(play_state))
 

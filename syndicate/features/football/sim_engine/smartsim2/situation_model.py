@@ -29,18 +29,30 @@ URGENCY_STATES = (
 )
 
 
-def classify_urgency(*, quarter: int, seconds_remaining: int, score_differential: int, yardline: int) -> str:
+def classify_urgency(
+    *,
+    quarter: int,
+    seconds_remaining: int,
+    score_differential: int,
+    yardline: int,
+    q2_ignores_score: bool = False,
+) -> str:
     """Classify the offense's urgency state from game context.
 
     Preservation states (kneel/run-out) take precedence, then hurry-up states,
     then the leading four-minute grind, then neutral offense.
+
+    `q2_ignores_score` (todo #808, `CalibrationProfile.q2_urgency_ignores_score`):
+    in Q2 the two-minute drill fires at any score, as the league's end-of-half
+    behaviour does; the `diff <= 7` gate is a Q4 rule. Default False is the
+    original function exactly.
     """
     if quarter >= 4 and seconds_remaining <= 150 and score_differential > 0:
         return URGENCY_END_GAME_PRESERVATION
     if quarter == 2 and seconds_remaining <= 60 and score_differential >= 0 and yardline < 50:
         return URGENCY_HALFTIME_PRESERVATION
     if quarter in {2, 4} or quarter >= 5:
-        if seconds_remaining <= 120 and score_differential <= 7:
+        if seconds_remaining <= 120 and (score_differential <= 7 or (q2_ignores_score and quarter == 2)):
             return URGENCY_TWO_MINUTE
     if quarter >= 4 and seconds_remaining <= 360 and score_differential < 0:
         return URGENCY_TRAILING
@@ -85,6 +97,7 @@ def classify_situation(play_state: PlayState) -> SituationContext:
         seconds_remaining=play_state.seconds_remaining,
         score_differential=play_state.score_differential,
         yardline=play_state.yardline,
+        q2_ignores_score=bool(getattr(play_state, "q2_urgency_ignores_score", False)),
     )
     four_minute_offense = urgency_state == URGENCY_FOUR_MINUTE
     two_minute_drill = urgency_state == URGENCY_TWO_MINUTE
@@ -304,3 +317,175 @@ NON_OFFENSIVE_RATES = {
 def non_offensive_rates(profile_name: str) -> dict:
     """The sport's rates for a profile name (`ncaaf...` -> NCAAF, anything else -> NFL)."""
     return NON_OFFENSIVE_RATES["ncaaf" if str(profile_name).lower().startswith("ncaaf") else "nfl"]
+
+
+# ---------------------------------------------------------------------------
+# MEASURED END-OF-HALF CLOCK -- todo #808, lane `football-end-of-half-fix`
+# (pre-registered in .syndicate/findings_2026-11-15_football_end_of_half_fix.md
+# before measuring). Read by `drive_simulator` ONLY when
+# `CalibrationProfile.end_of_half_clock` is ON, for snaps in regulation Q2 / Q4.
+#
+# Source: `scripts/football_end_of_half_clock_rates.py` -- NFL nflverse pbp 2024-25
+# REG (544 games), NCAAF CFBD plays 2024-25 FBS-vs-FBS REG (1,514 games). WINDOW =
+# a snap with <= 120 s left in the quarter.
+#
+# `delta` is (mean, sd) seconds from a snap to the next snap of the quarter, by what
+# the snap did: the clock stopped (`incomplete`, `oob`, NCAAF `first_down`), a
+# timeout followed (`to_off` / `to_def` -- the live play plus whatever ran before the
+# call), the clock ran (`run_<mode>`, mode from `classify_urgency` with the Q2
+# score-blind rule), a no-play `penalty`, or the drive ended (`td`, `fg_good`,
+# `fg_miss`, `punt`, `turnover`, `tod`, `safety` -- to the NEXT team's first snap, so
+# the kickoff or return is inside it). `censored` is the share with no next snap in
+# the quarter.
+#
+# CLOCK BUCKETS (Amendment 2, before any FIT read): the running-clock and timeout
+# deltas (`delta_by_bucket`) and EVERY probability are keyed on the time left at the
+# snap, [0-30 s, 30-60, 60-90, 90-120] (`end_of_half_bucket`) -- the league's
+# running clock falls from 24.9 s to 9.0 s across the window and its incompletion
+# share rises from 0.20 to 0.33, which a pooled cell cannot carry. A bucket censored
+# above 0.15 takes the nearest bucket with more time left ("<-b" in the comments);
+# in the sim a draw longer than the clock left ends the half, which is how the real
+# censoring arises. Drive-ending cells, `incomplete`, `oob`, `penalty` (and NCAAF
+# `first_down`) are flat across buckets and stay pooled in `delta`.
+#
+# `p_incomplete[mode]` (Amendment 1, written before any FIT read): the incompletion
+# share of the window's offensive plays (runs, passes, sacks, kneels, turnovers; not
+# spikes, kicks or no-play penalties). `play_simulator` sets the INCOMPLETE_PASS
+# weight to it in the window -- a smoke run showed the clock times right and the
+# play mix wrong (1.20 incompletions a game in Q2's window against the league's 2.30).
+# `p_oob[mode]`: out of bounds among runs and completions (not TD / turnover / kneel
+# / spike). `p_to_off["<q>_<mode>"]`: offense timeout right after a clock-running
+# play, given it has one. `p_to_def["<q>_trail|lead"]`: defense timeout after one,
+# given no offense timeout and it has one; `trail` = the defense is behind or tied.
+#
+# NCAAF CAVEATS: CFBD's `clock` is the clock at the END of each play, and some rows
+# sit out of order; deltas outside 0..60 s were dropped (`dropped`). Its "out of
+# bounds" comes from play text and is likely undercounted (0.04 vs the NFL's 0.20).
+# NCAAF has no two-minute warning, and a first down stops the clock in the last two
+# minutes (the 2023 rule) -- `first_down` is its own cell.
+#
+# Values are FIT-season measurements, not fitted dials: nothing here was tuned to a
+# target (findings: "No fitted dial in the clock").
+# ---------------------------------------------------------------------------
+END_OF_HALF_WINDOW_SECONDS = 120
+
+END_OF_HALF_CLOCK_TABLES = {
+    "nfl": {
+        "two_minute_warning": True,
+        "first_down_stop": False,
+        "live_seconds": 4.87,  # an incompletion: the live play alone
+        "delta": {  # POOLED (mean, sd) seconds from this snap to the next snap of the quarter
+            "fg_good": (6.33, 3.27),  # n=256, censored 0.432
+            "fg_miss": (4.61, 1.36),  # n=61, censored 0.413
+            "incomplete": (4.87, 1.65),  # n=1885, censored 0.018
+            "oob": (6.45, 3.3),  # n=929, censored 0.007
+            "penalty": (3.65, 3.54),  # n=658, censored 0.016
+            "punt": (9.14, 2.31),  # n=395, censored 0.025
+            "safety": (5.0, 0.71),  # n=4, censored 0.2
+            "td": (7.37, 3.59),  # n=355, censored 0.03
+            "tod": (5.4, 1.74),  # n=149, censored 0.118
+            "turnover": (7.92, 3.24),  # n=180, censored 0.1
+        },
+        "delta_by_bucket": {  # Amendment 2: [0-30 s, 30-60, 60-90, 90-120] (mean, sd); "<-b" = borrowed
+            "run_hurry": [(14.01, 9.23), (14.01, 9.23), (20.43, 11.54), (24.92, 12.68)],
+            # n=298 cens 0.409 <-1; n=573 cens 0.037; n=798 cens 0.0; n=1045 cens 0.0
+            "run_preserve": [(34.69, 11.48), (34.69, 11.48), (34.69, 11.48), (28.45, 18.91)],
+            # n=71 cens 0.785 <-2; n=208 cens 0.471 <-2; n=192 cens 0.0; n=252 cens 0.0
+            "to_off": [(9.48, 5.19), (14.23, 9.91), (25.66, 14.69), (25.14, 16.52)],
+            # n=147 cens 0.114; n=150 cens 0.038; n=56 cens 0.0; n=22 cens 0.0
+            "to_def": [(14.13, 12.85), (14.13, 12.85), (16.51, 15.0), (19.06, 17.87)],
+            # n=58 cens 0.318 <-1; n=110 cens 0.098; n=134 cens 0.0; n=250 cens 0.0
+        },
+        "p_incomplete": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "hurry": [0.3311, 0.2546, 0.2308, 0.2034],  # n=[1655, 1626, 1651, 1967]
+            "preserve": [0.1383, 0.137, 0.004, 0.0518],  # n=[499, 613, 247, 425]
+        },
+        "p_oob": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "hurry": [0.2546, 0.2413, 0.1881, 0.1622],  # n=[703, 949, 1079, 1313]
+            "preserve": [0.2167, 0.2176, 0.0316, 0.0229],  # n=[180, 239, 95, 306]
+        },
+        "p_to_off": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_hurry": [0.212, 0.1918, 0.0497, 0.0123],  # n=[382, 490, 584, 734]
+            "2_preserve": [0.1124, 0.0414, 0.0, 0.0],  # n=[178, 145, 0, 0]
+            "4_hurry": [0.1525, 0.1304, 0.0323, 0.0139],  # n=[118, 184, 248, 359]
+            "4_preserve": [0.0242, 0.0284, 0.0465, 0.0138],  # n=[124, 282, 215, 362]
+        },
+        "p_to_def": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_lead": [0.0746, 0.0695, 0.1137, 0.0926],  # n=[228, 259, 299, 367]
+            "2_trail": [0.0815, 0.0846, 0.1085, 0.1215],  # n=[233, 272, 258, 354]
+            "4_lead": [0.0909, 0.0588, 0.0695, 0.0678],  # n=[121, 170, 259, 369]
+            "4_trail": [0.1139, 0.2099, 0.1973, 0.2867],  # n=[79, 162, 147, 286]
+        },
+        "league_window_snaps": {"q2": 10.634, "q4": 7.382},  # 544 games; reference only
+    },
+    "ncaaf": {
+        "two_minute_warning": False,
+        "first_down_stop": True,
+        "live_seconds": 6.83,  # an incompletion: the live play alone
+        "delta": {  # POOLED (mean, sd) seconds from this snap to the next snap of the quarter
+            "fg_good": (7.25, 7.24),  # n=465, censored 0.36, dropped 0.007
+            "fg_miss": (5.87, 5.55),  # n=156, censored 0.46, dropped 0.02
+            "first_down": (12.06, 10.44),  # n=4499, censored 0.047, dropped 0.01
+            "incomplete": (6.83, 6.82),  # n=4727, censored 0.023, dropped 0.009
+            "oob": (6.28, 5.49),  # n=534, censored 0.022, dropped 0.004
+            "penalty": (8.57, 8.85),  # n=1680, censored 0.026, dropped 0.013
+            "punt": (7.12, 6.33),  # n=1037, censored 0.038, dropped 0.027
+            "safety": (7.33, 5.31),  # n=12, censored 0.2, dropped 0.0
+            "td": (7.5, 7.73),  # n=1113, censored 0.036, dropped 0.012
+            "tod": (6.88, 8.0),  # n=496, censored 0.103, dropped 0.03
+            "turnover": (8.17, 7.49),  # n=499, censored 0.128, dropped 0.009
+        },
+        "delta_by_bucket": {  # Amendment 2: [0-30 s, 30-60, 60-90, 90-120] (mean, sd); "<-b" = borrowed
+            "run_hurry": [(14.64, 12.17), (14.64, 12.17), (17.34, 13.2), (16.41, 14.53)],
+            # n=631 cens 0.497 <-1; n=934 cens 0.043; n=1338 cens 0.003; n=1938 cens 0.004
+            "run_preserve": [(31.62, 14.73), (31.62, 14.73), (31.62, 14.73), (25.69, 19.63)],
+            # n=122 cens 0.893 <-2; n=532 cens 0.301 <-2; n=332 cens 0.031; n=547 cens 0.02
+            "to_off": [(7.14, 4.84), (13.67, 12.65), (20.16, 17.14), (18.49, 18.24)],
+            # n=569 cens 0.016; n=485 cens 0.004; n=277 cens 0.0; n=417 cens 0.002
+            "to_def": [(7.93, 6.07), (10.96, 10.29), (9.19, 8.59), (10.37, 10.67)],
+            # n=269 cens 0.025; n=357 cens 0.006; n=441 cens 0.004; n=819 cens 0.001
+        },
+        "p_incomplete": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "hurry": [0.2723, 0.2601, 0.2251, 0.2015],  # n=[4815, 3945, 4442, 6051]
+            "preserve": [0.0687, 0.1096, 0.0059, 0.0236],  # n=[1790, 1533, 841, 1397]
+        },
+        "p_oob": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "hurry": [0.0514, 0.0441, 0.0419, 0.0329],  # n=[2470, 2315, 2841, 4108]
+            "preserve": [0.0218, 0.0344, 0.0018, 0.0078],  # n=[1011, 960, 561, 1153]
+        },
+        "p_to_off": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_hurry": [0.2395, 0.2063, 0.0793, 0.0672],  # n=[1236, 1139, 1525, 2218]
+            "2_preserve": [0.1403, 0.1075, 0.0, 0.0],  # n=[449, 428, 0, 0]
+            "4_hurry": [0.1602, 0.1258, 0.0923, 0.0773],  # n=[462, 477, 596, 983]
+            "4_preserve": [0.0123, 0.0434, 0.078, 0.1135],  # n=[569, 461, 577, 925]
+        },
+        "p_to_def": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_lead": [0.1083, 0.1363, 0.1375, 0.1891],  # n=[683, 587, 691, 1005]
+            "2_trail": [0.1085, 0.1314, 0.1285, 0.1592],  # n=[691, 784, 747, 1131]
+            "4_lead": [0.0623, 0.0592, 0.0427, 0.0616],  # n=[401, 473, 539, 941]
+            "4_trail": [0.0379, 0.1085, 0.252, 0.2872],  # n=[554, 387, 508, 888]
+        },
+        "league_window_snaps": {"q2": 10.594, "q4": 7.254},  # 1514 games; reference only
+    },
+}
+
+
+def end_of_half_clock_table(profile_name: str) -> dict:
+    """The sport's clock table for a profile name (`ncaaf...` -> NCAAF, anything else -> NFL)."""
+    return END_OF_HALF_CLOCK_TABLES["ncaaf" if str(profile_name).lower().startswith("ncaaf") else "nfl"]
+
+
+def end_of_half_bucket(seconds_remaining: int) -> int:
+    """The clock table's bucket: 0 = <= 30 s left, 1 = <= 60, 2 = <= 90, 3 = <= 120."""
+    s = int(seconds_remaining)
+    return 3 if s > 90 else 2 if s > 60 else 1 if s > 30 else 0
+
+
+def end_of_half_mode(urgency_state: str) -> str:
+    """`classify_urgency`'s state -> the clock table's mode. `neutral` cannot occur in
+    the window when `q2_urgency_ignores_score` is ON (Q2 is hurry or the halftime
+    kneel; Q4 is hurry or the end-game run-out); with it OFF a Q2 leader by 8+ is
+    neutral, and the table reads it as `hurry`, the only other measured mode."""
+    if urgency_state in (URGENCY_HALFTIME_PRESERVATION, URGENCY_END_GAME_PRESERVATION):
+        return "preserve"
+    return "hurry"

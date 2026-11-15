@@ -363,6 +363,29 @@ class CalibrationProfile:
     # exact no-op.
     home_field_bonus: float = 0.0
 
+    # Q2'S END-OF-HALF DECISIONS IGNORE THE SCORE. todo #808, lane
+    # `football-end-of-half-fix` (pre-registered in
+    # .syndicate/findings_2026-11-15_football_end_of_half_fix.md). OFF: the urgency
+    # field goal fires only at -9 <= diff <= 2 and the two-minute drill only at
+    # diff <= 7 -- Q4 rules (a leader runs out the game) applied to Q2, where the
+    # league kicks at 0.25-0.30 in every score bucket and the sim at 0.04-0.07 when
+    # leading by 3+. ON: in Q2 both ignore the score; Q4 is unchanged and the
+    # halftime kneel still comes first. Default OFF: one part of a three-part
+    # change that ships with its re-fit (`model_engine_standard.md` 4.4).
+    q2_urgency_ignores_score: bool = False
+
+    # THE END-OF-HALF CLOCK. todo #808 (same lane). OFF: the sim has no timeouts and
+    # no two-minute warning, and a snap in the last 120 s of a half burns the same
+    # `expected_clock_seconds x clock_base` it burns anywhere -- 6.7 snaps in Q2's
+    # last 120 s against the league's 10.6, and 4.8 against 7.4 in Q4. ON, in
+    # regulation Q2 and Q4 only: 3 timeouts a team a half (on `PossessionState`), the
+    # NFL two-minute warning, and a snap that starts inside 120 s takes its clock
+    # from `situation_model.END_OF_HALF_CLOCK_TABLES` (measured from 2024-25 play-by-
+    # play): stops on incompletions, out-of-bounds plays and timeouts at the measured
+    # rates, otherwise the measured running-clock time for the offense's urgency.
+    # Default OFF (see `q2_urgency_ignores_score`).
+    end_of_half_clock: bool = False
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -399,6 +422,8 @@ class CalibrationProfile:
             "non_offensive_scoring": self.non_offensive_scoring,
             "possession_aware_priors": self.possession_aware_priors,
             "home_field_bonus": self.home_field_bonus,
+            "q2_urgency_ignores_score": self.q2_urgency_ignores_score,
+            "end_of_half_clock": self.end_of_half_clock,
         }
 
 

@@ -14,12 +14,19 @@ from syndicate.features.football.sim_engine.smartsim2.contracts import SmartSim2
 from syndicate.features.football.sim_engine.smartsim2.drive_priors import build_drive_priors
 from syndicate.features.football.sim_engine.smartsim2.play_simulator import PlayResult
 from syndicate.features.football.sim_engine.smartsim2.play_simulator import simulate_play
+from syndicate.features.football.sim_engine.smartsim2.play_state import PlayState
+from syndicate.features.football.sim_engine.smartsim2.play_state import apply_situation_context
 from syndicate.features.football.sim_engine.smartsim2.play_state import build_play_state_from_possession_state
 from syndicate.features.football.sim_engine.smartsim2.possession_state import advance_possession_clock
+from syndicate.features.football.sim_engine.smartsim2.situation_model import END_OF_HALF_WINDOW_SECONDS
 from syndicate.features.football.sim_engine.smartsim2.situation_model import TRUE_FIELD_GOAL_RANGE_YARDLINE
 from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_TRAILING
 from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_TWO_MINUTE
+from syndicate.features.football.sim_engine.smartsim2.situation_model import classify_situation
 from syndicate.features.football.sim_engine.smartsim2.situation_model import classify_urgency
+from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_bucket
+from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_clock_table
+from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_mode
 from syndicate.features.football.sim_engine.smartsim2.situation_model import fourth_down_buckets
 from syndicate.features.football.sim_engine.smartsim2.situation_model import fourth_down_table
 from syndicate.features.football.sim_engine.smartsim2.situation_model import non_offensive_rates
@@ -27,6 +34,139 @@ from syndicate.features.football.sim_engine.smartsim2.situation_model import non
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
+
+
+# ---------------------------------------------------------------------------
+# THE END-OF-HALF CLOCK -- todo #808, `CalibrationProfile.end_of_half_clock`.
+#
+# Every step below is first simulated exactly as before (same outcome, same rng
+# draws); `_end_of_half_clock` then RE-TIMES it when it sits at the end of a half.
+# OFF it returns its arguments untouched and draws nothing, which is what keeps
+# the OFF stream byte-identical. ON, in regulation Q2 and Q4 only:
+#
+#   * a step that starts above the window and would end inside it stops at the
+#     window (the NFL two-minute warning), or right after its live play when the
+#     play itself crosses 2:00;
+#   * a step that starts inside the window takes its clock from the measured
+#     table: drive-ending steps run to the next team's first snap; an incompletion
+#     or a no-play penalty stops the clock; an in-bounds snap goes out of bounds at
+#     the measured rate, else the offense or the defense may call a timeout (while
+#     it has one), else (NCAAF) a first down stops it, else the clock runs for the
+#     offense's urgency mode.
+# ---------------------------------------------------------------------------
+_END_OF_HALF_DRIVE_END = {
+    PossessionOutcome.TOUCHDOWN: "td",
+    PossessionOutcome.FIELD_GOAL: "fg_good",
+    PossessionOutcome.MISSED_FIELD_GOAL: "fg_miss",
+    PossessionOutcome.PUNT: "punt",
+    PossessionOutcome.TURNOVER: "turnover",
+    PossessionOutcome.TURNOVER_ON_DOWNS: "tod",
+    PossessionOutcome.SAFETY: "safety",
+}
+_END_OF_HALF_OOB_ELIGIBLE = {PossessionOutcome.GAIN, PossessionOutcome.EXPLOSIVE_GAIN}
+
+
+def _clock_draw(rng: Random, mean_sd: tuple[float, float]) -> int:
+    """Whole seconds from a gamma with the cell's measured mean and sd (positive, mean-preserving)."""
+    mean, sd = float(mean_sd[0]), float(mean_sd[1])
+    if sd <= 0.0:
+        return max(1, int(round(mean)))
+    shape = (mean / sd) ** 2
+    return max(1, int(round(rng.gammavariate(shape, mean / shape))))
+
+
+def _end_of_half_clock(
+    start: PossessionState,
+    step: PossessionStepResult,
+    end_state: PossessionState,
+    *,
+    terminal: PossessionOutcome | None,
+    rng: Random,
+    profile: CalibrationProfile,
+    simulation_input: SmartSim2SimulationInput,
+) -> tuple[PossessionStepResult, PossessionState]:
+    if not profile.end_of_half_clock:
+        return step, end_state
+    quarter = int(start.quarter)
+    half_end_quarters = (simulation_input.quarters // 2, simulation_input.quarters)
+    if quarter not in half_end_quarters:
+        return step, end_state
+    table = end_of_half_clock_table(profile.name)
+    window = END_OF_HALF_WINDOW_SECONDS
+    clock = int(start.clock_remaining)
+    natural = int(step.clock_consumed)
+    timeouts_home, timeouts_away = end_state.timeouts_home, end_state.timeouts_away
+
+    if clock > window:
+        if not table["two_minute_warning"] or clock - natural >= window:
+            return step, end_state
+        consumed = min(natural, max(clock - window, int(round(table["live_seconds"]))))
+    else:
+        delta = table["delta"]
+        category = _END_OF_HALF_DRIVE_END.get(terminal) if terminal is not None else None
+        if category is None and step.outcome == PossessionOutcome.PENALTY:
+            category = "penalty"
+        elif category is None and step.outcome == PossessionOutcome.INCOMPLETE_PASS:
+            category = "incomplete"
+        if category is not None:
+            consumed = _clock_draw(rng, delta[category])
+        else:
+            # An in-bounds snap: gain, explosive gain, sack, or a fourth-down conversion.
+            diff = _owner_score_differential(start)
+            mode = end_of_half_mode(classify_urgency(
+                quarter=quarter, seconds_remaining=clock, score_differential=diff,
+                yardline=start.field_position, q2_ignores_score=profile.q2_urgency_ignores_score,
+            ))
+            q_key = "2" if quarter == half_end_quarters[0] else "4"
+            b = end_of_half_bucket(clock)
+            by_bucket = table["delta_by_bucket"]
+            offense_home = start.possession_owner == "home"
+            off_left = (timeouts_home if offense_home else timeouts_away) or 0
+            def_left = (timeouts_away if offense_home else timeouts_home) or 0
+            if step.outcome in _END_OF_HALF_OOB_ELIGIBLE and rng.random() < table["p_oob"][mode][b]:
+                consumed = _clock_draw(rng, delta["oob"])
+            elif off_left >= 1 and rng.random() < table["p_to_off"][f"{q_key}_{mode}"][b]:
+                consumed = _clock_draw(rng, by_bucket["to_off"][b])
+                if offense_home:
+                    timeouts_home = off_left - 1
+                else:
+                    timeouts_away = off_left - 1
+            elif def_left >= 1 and rng.random() < table["p_to_def"][f"{q_key}_{'trail' if diff >= 0 else 'lead'}"][b]:
+                consumed = _clock_draw(rng, by_bucket["to_def"][b])
+                if offense_home:
+                    timeouts_away = def_left - 1
+                else:
+                    timeouts_home = def_left - 1
+            elif table["first_down_stop"] and step.yards_gained >= start.distance:
+                consumed = _clock_draw(rng, delta["first_down"])
+            else:
+                consumed = _clock_draw(rng, by_bucket[f"run_{mode}"][b])
+    consumed = max(0, min(clock, int(consumed)))
+    end_state = replace(end_state, clock_remaining=max(0, clock - consumed),
+                        timeouts_home=timeouts_home, timeouts_away=timeouts_away)
+    return replace(step, clock_consumed=consumed, end_state=end_state), end_state
+
+
+def _q2_kick_waits(state: PossessionState, profile: CalibrationProfile) -> bool:
+    """todo #808 Amendment 3 (both `q2_urgency_ignores_score` and `end_of_half_clock` ON).
+
+    A Q2 urgency field goal on downs 1-3 waits until one more running-clock play
+    could end the half: the clock table's own last-bucket running time (14.0 s NFL).
+    The league never kicks on an early down before the last 30 s (139 attempts in
+    2024-25, median 3 s left, max 11 s); the <= 90 s gate kicked on 1st down at 1:25.
+    4th down and Q4 are unchanged. Draws nothing, so it cannot move the rng stream."""
+    if not (profile.q2_urgency_ignores_score and profile.end_of_half_clock):
+        return False
+    if state.quarter != 2 or state.down >= 4:
+        return False
+    run_hurry_last = end_of_half_clock_table(profile.name)["delta_by_bucket"]["run_hurry"][0][0]
+    return state.clock_remaining > run_hurry_last
+
+
+def _play_state_at(play_state: PlayState, seconds_remaining: int) -> PlayState:
+    """The play state with a re-timed clock and its situation re-read (end-of-half clock only)."""
+    updated = replace(play_state, seconds_remaining=max(0, int(seconds_remaining)))
+    return apply_situation_context(updated, classify_situation(updated))
 
 
 def _play_terminal_outcome(result: PlayResult) -> PossessionOutcome:
@@ -256,7 +396,8 @@ def simulate_drive(
     # which is why the drive-loop scoring rate was unreachable from NCAAF's
     # profile while the rating weights beside it were tunable.
     priors = build_drive_priors(simulation_input, possession_state=state, profile=profile)
-    play_state = build_play_state_from_possession_state(state)
+    q2_blind = bool(profile.q2_urgency_ignores_score)
+    play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
     steps: list[PossessionStepResult] = []
     total_yards = 0
     total_clock = 0
@@ -277,17 +418,23 @@ def simulate_drive(
             seconds_remaining=state.clock_remaining,
             score_differential=score_differential,
             yardline=state.field_position,
+            q2_ignores_score=q2_blind,
         )
 
         # Urgency field goal: take the points before the half or game expires.
+        # The score gate is a Q4 rule; with `q2_urgency_ignores_score` ON it does
+        # not apply in Q2 (todo #808), where the league kicks at any score.
         if (
             state.quarter != 1
             and state.quarter != 3
             and state.clock_remaining <= 90
             and state.field_position >= TRUE_FIELD_GOAL_RANGE_YARDLINE
-            and -9 <= score_differential <= 2
+            and (-9 <= score_differential <= 2 or (q2_blind and state.quarter == 2))
+            and not _q2_kick_waits(state, profile)
         ):
             play_step, end_state, terminal_outcome, points = _execute_field_goal(state, priors, rng, len(steps) + 1, urgency_kick=True, profile=profile)
+            play_step, end_state = _end_of_half_clock(state, play_step, end_state, terminal=terminal_outcome, rng=rng,
+                                                      profile=profile, simulation_input=simulation_input)
             steps.append(play_step)
             total_clock += play_step.clock_consumed
             points_scored += points
@@ -325,11 +472,13 @@ def simulate_drive(
                         points_scored=0,
                         summary=f"{state.possession_owner} converted on fourth down",
                     )
+                    play_step, end_state = _end_of_half_clock(state, play_step, end_state, terminal=None, rng=rng,
+                                                              profile=profile, simulation_input=simulation_input)
                     steps.append(play_step)
                     total_yards += gained
-                    total_clock += clock_consumed
+                    total_clock += play_step.clock_consumed
                     state = end_state
-                    play_state = build_play_state_from_possession_state(state)
+                    play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
                     continue
                 next_spot = _change_of_possession_spot(end_state, 100 - end_state.field_position)
                 end_state = replace(
@@ -351,8 +500,11 @@ def simulate_drive(
                     points_scored=0,
                     summary=f"{state.possession_owner} failed on fourth down",
                 )
+                play_step, end_state = _end_of_half_clock(state, play_step, end_state,
+                                                          terminal=PossessionOutcome.TURNOVER_ON_DOWNS, rng=rng,
+                                                          profile=profile, simulation_input=simulation_input)
                 steps.append(play_step)
-                total_clock += clock_consumed
+                total_clock += play_step.clock_consumed
                 possession_change = True
                 terminal_outcome = PossessionOutcome.TURNOVER_ON_DOWNS
                 state = end_state
@@ -365,6 +517,8 @@ def simulate_drive(
             kick_field_goal = (model_decision == "fg") if model_decision else _field_goal_decision(state, priors, rng, profile)
             if kick_field_goal:
                 play_step, end_state, terminal_outcome, points = _execute_field_goal(state, priors, rng, len(steps) + 1, profile=profile)
+                play_step, end_state = _end_of_half_clock(state, play_step, end_state, terminal=terminal_outcome, rng=rng,
+                                                          profile=profile, simulation_input=simulation_input)
                 steps.append(play_step)
                 total_clock += play_step.clock_consumed
                 points_scored += points
@@ -390,9 +544,11 @@ def simulate_drive(
                         + (" for a touchback" if touchback else f" and netted {net_distance} yards")
                     ),
                 )
+                play_step, end_state = _end_of_half_clock(state, play_step, end_state, terminal=PossessionOutcome.PUNT,
+                                                          rng=rng, profile=profile, simulation_input=simulation_input)
                 steps.append(play_step)
                 # Punt distance is special-teams yardage, not offensive drive yardage.
-                total_clock += clock_consumed
+                total_clock += play_step.clock_consumed
                 possession_change = True
                 terminal_outcome = PossessionOutcome.PUNT
                 state = end_state
@@ -425,11 +581,13 @@ def simulate_drive(
                     points_scored=0,
                     summary=f"{state.possession_owner} converted on fourth down",
                 )
+                play_step, end_state = _end_of_half_clock(state, play_step, end_state, terminal=None, rng=rng,
+                                                          profile=profile, simulation_input=simulation_input)
                 steps.append(play_step)
                 total_yards += gained
-                total_clock += clock_consumed
+                total_clock += play_step.clock_consumed
                 state = end_state
-                play_state = build_play_state_from_possession_state(state)
+                play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
                 continue
             next_spot = _change_of_possession_spot(end_state, 100 - end_state.field_position)
             end_state = replace(
@@ -451,8 +609,11 @@ def simulate_drive(
                 points_scored=0,
                 summary=f"{state.possession_owner} turned the ball over on downs",
             )
+            play_step, end_state = _end_of_half_clock(state, play_step, end_state,
+                                                      terminal=PossessionOutcome.TURNOVER_ON_DOWNS, rng=rng,
+                                                      profile=profile, simulation_input=simulation_input)
             steps.append(play_step)
-            total_clock += clock_consumed
+            total_clock += play_step.clock_consumed
             possession_change = True
             terminal_outcome = PossessionOutcome.TURNOVER_ON_DOWNS
             state = end_state
@@ -475,9 +636,11 @@ def simulate_drive(
                     + (" for a touchback" if touchback else f" and netted {net_distance} yards")
                 ),
             )
+            play_step, end_state = _end_of_half_clock(state, play_step, end_state, terminal=PossessionOutcome.PUNT,
+                                                      rng=rng, profile=profile, simulation_input=simulation_input)
             steps.append(play_step)
             # Punt distance is special-teams yardage, not offensive drive yardage.
-            total_clock += clock_consumed
+            total_clock += play_step.clock_consumed
             possession_change = True
             terminal_outcome = PossessionOutcome.PUNT
             state = end_state
@@ -492,13 +655,15 @@ def simulate_drive(
                 end_state = replace(end_state, possession_owner=_other(state.possession_owner),
                                     field_position=int(rates["free_kick_start"]), down=1, distance=10,
                                     drive_index=state.drive_index + 1, possession_index=state.possession_index + 1)
-                steps.append(PossessionStepResult(
+                play_step, end_state = _end_of_half_clock(state, PossessionStepResult(
                     step_index=len(steps) + 1, start_state=state, end_state=end_state,
                     outcome=PossessionOutcome.SAFETY, yards_gained=-state.field_position,
                     clock_consumed=clock_consumed, points_scored=0,
                     summary=f"{state.possession_owner} was tackled for a safety",
-                ))
-                total_clock += clock_consumed
+                ), end_state, terminal=PossessionOutcome.SAFETY, rng=rng, profile=profile,
+                    simulation_input=simulation_input)
+                steps.append(play_step)
+                total_clock += play_step.clock_consumed
                 possession_change = True
                 terminal_outcome = PossessionOutcome.SAFETY
                 state = end_state
@@ -517,12 +682,16 @@ def simulate_drive(
             points_scored=play_result.points_scored,
             summary=play_result.summary,
         )
+        play_step, state = _end_of_half_clock(state, play_step, play_result.end_possession_state,
+                                              terminal=terminal_outcome, rng=rng, profile=profile,
+                                              simulation_input=simulation_input)
         steps.append(play_step)
         total_yards += play_result.yards_gained
-        total_clock += play_result.clock_consumed
+        total_clock += play_step.clock_consumed
         points_scored += play_result.points_scored
-        state = play_result.end_possession_state
         play_state = play_result.end_state
+        if state.clock_remaining != play_result.end_possession_state.clock_remaining:
+            play_state = _play_state_at(play_state, state.clock_remaining)  # re-timed (end-of-half clock ON only)
 
         if terminal_outcome is not None:
             possession_change = terminal_outcome in {

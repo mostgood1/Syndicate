@@ -16,7 +16,11 @@ from syndicate.features.football.sim_engine.smartsim2.play_outcomes import PlayO
 from syndicate.features.football.sim_engine.smartsim2.play_state import PlayState
 from syndicate.features.football.sim_engine.smartsim2.play_state import advance_play_state
 from syndicate.features.football.sim_engine.smartsim2.play_state import apply_situation_context
+from syndicate.features.football.sim_engine.smartsim2.situation_model import END_OF_HALF_WINDOW_SECONDS
 from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_END_GAME_PRESERVATION
+from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_bucket
+from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_clock_table
+from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_mode
 from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_HALFTIME_PRESERVATION
 from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_TRAILING
 from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_TWO_MINUTE
@@ -218,6 +222,24 @@ def _play_outcome_weights(
     }
     if play_state.down >= 4 and play_state.field_goal_range:
         weights[PlayOutcome.FIELD_GOAL_ATTEMPT] = max(0.01, field_goal_attempt * damping)
+    # THE END-OF-HALF PLAY MIX (todo #808 Amendment 1; `end_of_half_clock` ON only).
+    # In the last 120 s of Q2 / Q4 the incompletion share of the non-penalty outcomes
+    # is set to the league's measured share for the offense's urgency mode; every
+    # other outcome keeps its relative weight. OFF this block is skipped and nothing
+    # in the dict changes.
+    if (
+        profile.end_of_half_clock
+        and play_state.quarter in (2, 4)
+        and play_state.seconds_remaining <= END_OF_HALF_WINDOW_SECONDS
+    ):
+        share = end_of_half_clock_table(profile.name)["p_incomplete"][end_of_half_mode(play_state.urgency_state)][
+            end_of_half_bucket(play_state.seconds_remaining)
+        ]
+        others = sum(
+            weight for outcome, weight in weights.items()
+            if outcome not in (PlayOutcome.INCOMPLETE_PASS, PlayOutcome.PENALTY, PlayOutcome.FIELD_GOAL_ATTEMPT)
+        )
+        weights[PlayOutcome.INCOMPLETE_PASS] = max(0.01, others * share / (1.0 - share))
     total = sum(weights.values())
     return {key: value / total for key, value in weights.items()}
 

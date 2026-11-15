@@ -6,9 +6,20 @@ from typing import Any
 from typing import Mapping
 
 
+# A field carrying this metadata is left OUT of the serialised dict while its value
+# is None. It is how state that only an opt-in mechanism uses (the end-of-half
+# clock's timeouts, todo #808) rides on a contract without changing a byte of the
+# output when that mechanism is OFF.
+OMIT_WHEN_NONE = {"omit_when_none": True}
+
+
 def _serialize(value: Any) -> Any:
     if is_dataclass(value):
-        return {item.name: _serialize(getattr(value, item.name)) for item in fields(value)}
+        return {
+            item.name: _serialize(getattr(value, item.name))
+            for item in fields(value)
+            if not (item.metadata.get("omit_when_none") and getattr(value, item.name) is None)
+        }
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, Mapping):
@@ -54,6 +65,11 @@ class PossessionState:
     score_away: int = 0
     home_team: str = "HOME"
     away_team: str = "AWAY"
+    # Timeouts left this half, per team. None = not tracked: only
+    # `CalibrationProfile.end_of_half_clock` sets them (todo #808), and a None
+    # field is not serialised, so the OFF output is unchanged.
+    timeouts_home: int | None = field(default=None, metadata=OMIT_WHEN_NONE)
+    timeouts_away: int | None = field(default=None, metadata=OMIT_WHEN_NONE)
 
     def to_dict(self) -> dict[str, Any]:
         return _serialize(self)
@@ -142,6 +158,13 @@ class SmartSim2SimulationInput:
     initial_score_home: int = 0
     initial_score_away: int = 0
     feature_generation_payload: dict[str, Any] = field(default_factory=dict)
+    # TIMEOUTS LEFT AT A RESUME (todo #808). Read only with
+    # `CalibrationProfile.end_of_half_clock` ON; None means 3. NOTHING FEEDS THESE
+    # YET: a live re-sim with the clock ON would give both teams 3 timeouts, so the
+    # live producers must pass the real counts before that switch is used live.
+    # Not serialised while None, so every existing caller's output is unchanged.
+    initial_timeouts_home: int | None = field(default=None, metadata=OMIT_WHEN_NONE)
+    initial_timeouts_away: int | None = field(default=None, metadata=OMIT_WHEN_NONE)
 
     def to_dict(self) -> dict[str, Any]:
         return _serialize(self)

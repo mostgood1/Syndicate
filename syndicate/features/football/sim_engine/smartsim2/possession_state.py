@@ -19,6 +19,8 @@ def build_initial_possession_state(
     score_away: int = 0,
     drive_index: int = 0,
     possession_index: int = 0,
+    timeouts_home: int | None = None,
+    timeouts_away: int | None = None,
 ) -> PossessionState:
     return PossessionState(
         possession_owner=str(owner or "home").strip().lower() or "home",
@@ -33,6 +35,9 @@ def build_initial_possession_state(
         away_team=str(away_team or "AWAY").strip() or "AWAY",
         drive_index=max(0, int(drive_index)),
         possession_index=max(0, int(possession_index)),
+        # None unless the end-of-half clock is ON (todo #808); not serialised while None.
+        timeouts_home=None if timeouts_home is None else max(0, min(3, int(timeouts_home))),
+        timeouts_away=None if timeouts_away is None else max(0, min(3, int(timeouts_away))),
     )
 
 
