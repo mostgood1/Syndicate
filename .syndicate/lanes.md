@@ -892,11 +892,6 @@ death, never life — do not invert it.
 - Verification: Pre-registered in .syndicate/findings_2026-11-15_football_end_of_half_fix.md before any sim read: OFF byte-identical (sha256 over seeds), reachability off != on per switch, FIT read (NFL 2024-25 every 4th game, 136 x 100 seeds, same seeds per arm) vs nflverse 2024-25, held-out read on NFL 2026 wk1-8 (121 games, private root pulled 11-03), NCAAF arms via football_scenario_rates._ncaaf_init.
 - Blocked by: none
 
-### closed-lane-archive-20261115-1041 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session e01d3a71-d04f-44a1-9853-345b01791bb2
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main read 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261115-0440`. Table and WAIT reasons in `.syndicate/log/2026-11-15.md`.
-
 ### layer2-rail-monitor — OPEN — opened 2026-11-15 — session d58574cb-c55a-4f1f-aa9a-ab530a5f63e0
 - STATUS 2026-11-15 4:3x PM CST: Goal "A continuous watch of the served Layer 2 Game Rail on the fleet (127.0.0.1:10000): every anomaly -- live MODEL != LINE flags vs their qualifying rows, refresh/build cadence and quote ages, load times and sizes, mismatched/duplicate/flipped/chip-less team cards, stale-live and midnight carryover -- is measured with a denominator, logged in the findings file, and either handed to the owning lane or fixed under its own lane" -- **GOAL: NOT MET (running).** 20 readings + a first flag grade (50.2% on 29 games, no edge), 0 false / 0 missed flags in each; NFL prediction MET in the clean 12:30-12:52 segment, not after; NFL 579 s overlay gap + NBA dark flags (slow-sport cadence) handed to local_208683f1; #810 pre-baseline + halftime confound to local_1f10ce63. Left: 1:30 PM NFL prediction read, halftime zero-card join, evening, flag grade vs finals, daily summary.
 - Goal: A continuous watch of the served Layer 2 Game Rail on the fleet (127.0.0.1:10000): every anomaly -- live MODEL != LINE flags vs their qualifying rows, refresh/build cadence and quote ages, load times and sizes, mismatched/duplicate/flipped/chip-less team cards, stale-live and midnight carryover -- is measured with a denominator, logged in the findings file, and either handed to the owning lane or fixed under its own lane
@@ -931,6 +926,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 at 20:41Z read 3 SAFE of 18 CLOSED; moved `soccer-live-corners-book-test`, `closed-lane-archive-20261115-0639` and `closed-lane-archive-20261115-0840` to lanes_closed.md with one pointer each. Other 15 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-15.md.
+
+### closed-lane-archive-20261115-1640 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 31781218-8e4c-417a-bd3a-2bb5e3383950
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 22:40Z read 1 SAFE of 16 CLOSED; moved `closed-lane-archive-20261115-1041` to lanes_closed.md with one pointer. Other 15 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-15.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1201,6 +1201,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261115-0440` — CLOSED 2026-11-15 (GOAL MET: 4 blocks archived) — opened 2026-11-15 — session 073487bf-510f-40bf-a7cc-07b7039a61ea
 - `closed-lane-archive-20261115-0639` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 3db11340-9b28-41cb-a6ce-99f366b44ecc
 - `closed-lane-archive-20261115-0840` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session c340d9e9-7fab-4dda-b749-629ce7a17822
+- `closed-lane-archive-20261115-1041` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session e01d3a71-d04f-44a1-9853-345b01791bb2
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
