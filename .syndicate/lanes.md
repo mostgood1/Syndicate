@@ -987,6 +987,14 @@ death, never life — do not invert it.
 - Verification: Targeted tests; the #805 reproduce command run before and after the grader change gives the same population, families and engine read; after the load, sim_history/ncaaf/ holds a copy whose generated_at equals the live wk sidecar's, and a repeat of an unchanged write adds no file.
 - Blocked by: none
 
+### book-grid-pull-react — OPEN — opened 2026-11-14 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: While games are live, refresh-worker reprices a live sport soon after its odds pull lands: the main loop looks for new live pulls whenever its thread is free (a reacting sleep, and once after the live re-sims), running price-on-pull passes only, never an extra round; a regular round skips a live sport repriced on pull in the last 45 s (still live for the cadence); tests incl. off != on; on main; load (refresh-worker restart) is the user's decision (todo #803)
+- Files: scripts/run_refresh_worker.py (_run_book_grid_artifact_tick's pull_only + the round's fresh-skip + _book_grid_sport_due_today's fresh-skip + new _book_grid_pull_* / _sleep_reacting_to_live_pulls helpers + the main loop's sleep line and one pull check after the live re-sims ONLY), tests/test_book_grid_pull_react.py (NEW), docs/ai_context/todo.md (#803 section ONLY)
+- Hypothesis: Measured 2026-11-14: a pull waits 38-103 s (median) before it is priced because price-on-pull is looked for once per main-loop pass on a thread 64-75% busy; a what-if replay of reacting whenever the thread is free gives afternoon NCAAF 59 -> 28 s, evening 75 -> 52 s, at +22-25% build time
+- Falsification test: On a live slate after the load, the median pull -> priced delay for NCAAF / NCAAB does not drop at least 20% against the 2026-11-14 windows at a similar load, or rounds slow so that gaps between regular rounds grow past 200 s median
+- Verification: Unit: pull_only never starts a round; the reacting sleep runs a pass when a live shard changes and still ends at its deadline; off switch -> a plain sleep (off != on); the round skips a sport repriced on pull within 45 s and keeps the live cadence; 0 disables the skip. After the user's load: pull_to_price.py and main_thread_budget.py on a live window vs 2026-11-14's
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
