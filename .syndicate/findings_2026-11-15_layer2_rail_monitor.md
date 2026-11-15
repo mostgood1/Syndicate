@@ -810,3 +810,27 @@ after 0f519972's numbers.
   2H 12 / 37. NFL 16 / 68 (seen age p50 141 s).
 - **Teams:** 1 chip-less NCAAB card (FAMU @ UTEP, 5 rows). det1 / det2 / det3 0 / 0 / 0. 0 flipped.
   0 truncated.
+
+## Reading 17 — Sun 11-15 3:10 PM CST (21:10Z). 3:05 PM NFL kickoffs; the noon NFL games in their last minute
+
+39 live chips. NFL: KC @ ATL, HOU @ CLE, MIA @ IND, CAR @ NO and JAX @ TEN in Q4 (0:21-1:56 left);
+LAR @ ARI and SEA @ LV in Q1.
+- **19 flags on 11 cards. 0 false, 0 missed, 0 dark.** Flagged rows: NCAAB 30, WNCAAB 8.
+- **Load:** query 7.2 s / 59.3 MB, shrinking as games end. Shortlist 0.8 s. Live-rail 0.03 s,
+  292 rows.
+- **Refresh:**
+  - NFL overlay 19 builds in 28 min, gap p50 58 s, max 261 s. NFL builds p50 17.8 s, max
+    63.0 s, as the noon games' in-play rows thin out. `deferred_slow` nfl 2.
+  - College gaps max 119-122 s.
+  - Web merges: nfl / college fresh 62 / 62. nba stale 62 / 62: no NBA game live until the
+    3:10 PM tip. Expected.
+- **NFL live re-sim, 3:05 PM games:**
+  - first tick on them **21:09:15Z, ~4 min after kickoff** (noon: ~10 min);
+  - `live_games=7 resimmed=6`, elapsed 8.3 s (noon: 58.0 s).
+  - Both new games carry `live_resim` as of 21:09:03Z.
+  - **The player-exit gate is visible:** `key_player_out` refused 1 game at 20:57:25 and
+    21:03:31Z (lane `live-player-exit-gate`, loaded 12:24 PM).
+- **Rows priced <= 120 s:**
+  - NCAAB 66 / 200, WNCAAB 23 / 49.
+  - NFL 8 / 77: priced age p50 688 s, the end-of-game prices of the noon games standing still.
+- **Teams:** 1 chip-less NCAAB card (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
