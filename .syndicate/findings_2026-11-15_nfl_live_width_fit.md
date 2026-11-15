@@ -86,3 +86,12 @@ Noted 10:29 AM CST (16:29Z). From the user, relayed verbatim 2026-11-15 by sessi
 - **Files:** No collision: this lane's only repo file is its findings file (its scripts live outside the repo, in `C:\tmp\livegrade\nfl780`); the gate's call sites (`nfl/live_resim.py`, `live_gameline_join.py`, `live_projection_join.py`) are not this lane's.
 - **Already exposed:** The NFL live MONEYLINE already prices with no exit gate (86-144 rows a Sunday under the 600 s ceiling, 11-08 census), so a mid-game QB exit is unguarded there today.
 - **What it means for k:** The k fitted tonight is measured on every replayed game, including any with a mid-game exit; those states price a team that has lost a starter, so k partly absorbs exit-driven misses. Once the gate can label exits, re-fit k on the states it would leave priced: it may be smaller.
+
+## Exit labels in tonight's fit (not pre-registered)
+
+Added 12:00 PM CST (18:00Z), from the user, relayed verbatim by session `local_379fd729` (NCAAF backtesting / fleet watcher): "yes, pass the exit labels to the NFL lane".
+
+- **What:** `C:\tmp\livegrade\nfl780\harness\nflfit.py` now labels every replayed quarter break with the gate's own function, `live_player_status.exits_from_espn_summary("nfl", ..., require_in_progress=False)` (copied from origin/main `e0383ee5c`, blob `821c3320b`, into `C:\tmp\livegrade\nfl780\harness\lps`; on main, not on the fleet), run on the ESPN summary cut to what a tick during that break could have seen (plays and injury rulings stamped before the next quarter's first play). It adds, per market, `_gate_priced`, `_gate_priced_band_respected` and `_gate_refused` (diagnostic), plus a verdict on the gate-priced states marked NOT pre-registered; the pre-registered verdict is unchanged. Optional: if the module fails to import, the fit runs as before and says so.
+- **Checked:** checked on today's NE @ DET (401873053, final): end of Q1, Q2 and Q3 all refused on `NE:Drake Maye:injured_in_play:KEY` since 14:41:43Z (8:41 AM CST); non-key exits are listed but do not refuse (Morgan Moses, out at the end of Q1, is back by the end of Q2). Smoke fit (week 9, 2 games) rc 0: 6 states labelled, 0 refused.
+- **Limit:** KEY is decided on the final boxscore's passers, not the passers as of the break; a QB hurt before his first pass would be missed. Production's tick sees the live box, so this can only under-refuse.
+- **Armed job unchanged:** `bkzsy2638` calls `nflfit.py` with the same two arguments; it picks the labels up.
