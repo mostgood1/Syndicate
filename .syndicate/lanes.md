@@ -979,6 +979,7 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read SAFE for 1 of 22 CLOSED blocks; moved: `closed-lane-archive-20261114-1240`. Table and deferrals in `.syndicate/log/2026-11-14.md` (00:4xZ 11-15 entry).
 
 ### ncaaf-sim-write-history — OPEN — opened 2026-11-14 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- STATUS 2026-11-14 7:xx PM CST: **BUILT (a local commit), NOT PUSHED.** `archive_sim_write` + the generator's `keep_sim_write`; `ncaaf_segment_skill.py --archive`. Without `--archive` the #805 grade reproduces exactly (2,774 of 2,774 obs). Live wk11 write kept as 56 KB + 4 KB gzip; a repeat adds nothing. Owed: the user's push + load, then a kept pair after the next daily run. Detail: todo #807.
 - Goal: Every NCAAF weekly sim write (smartsim2 projections CSV + segment sidecar) is kept as a dated, content-deduplicated gzip copy under <SYNDICATE_DATA_ROOT>/sim_history/ncaaf/, and scripts/ncaaf_segment_skill.py --archive grades each game off the last write before its kickoff (weeknight and early-Saturday games become gradable). Done = on main, loaded on refresh-worker, one measured copy on the fleet after the next daily NCAAF run, and the grader reproducing the #805 result unchanged without --archive.
 - Files: syndicate/features/shared/football_segment_distributions.py, scripts/generate_smartsim2_ncaaf_projections.py, scripts/ncaaf_segment_skill.py, tests/test_football_sim_history.py, tests/test_ncaaf_segment_skill.py, docs/ai_context/football_sim_engine_reference.md
 - Hypothesis: n/a

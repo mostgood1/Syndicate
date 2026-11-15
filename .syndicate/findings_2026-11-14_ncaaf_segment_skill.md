@@ -191,7 +191,7 @@ sits at parity, with no segment's point estimate in the model's favour.
   not overwritten. The board serves those games off writes this grade cannot see.
   - A dated copy per write (`..._wk<w>.<generated_at>.json`) would make every NCAAF game
     gradable.
-  - Not done here.
+  - Not done here. **Built in todo #807**: `sim_history/ncaaf/` + `--archive`.
 
 ## Reproduce
 
