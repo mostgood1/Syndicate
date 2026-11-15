@@ -210,12 +210,15 @@ def _can_kneel_out(state: PossessionState, urgency: str, profile: CalibrationPro
     clock even if the defense stops every kneel it can:
     `clock <= 40 * max(0, downs_left - defense_timeouts) + kneel_live * downs_left`,
     `downs_left = 5 - down` (40 s = the play clock, a rule; `kneel_live` = the measured
-    snap-and-down time, Amendment 4). Draws nothing."""
+    snap-and-down time, Amendment 4). v3 `kneel_out_q4_only`: the game's last
+    regulation quarter only. Draws nothing."""
     if not (profile.end_of_half_kneel_out and profile.end_of_half_clock):
         return False
     if urgency not in (URGENCY_END_GAME_PRESERVATION, URGENCY_HALFTIME_PRESERVATION):
         return False
     if int(state.quarter) not in (simulation_input.quarters // 2, simulation_input.quarters):
+        return False
+    if profile.kneel_out_q4_only and int(state.quarter) != simulation_input.quarters:
         return False
     defense_left = (state.timeouts_away if state.possession_owner == "home" else state.timeouts_home) or 0
     downs_left = 5 - int(state.down)

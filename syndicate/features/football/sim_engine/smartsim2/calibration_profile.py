@@ -406,6 +406,16 @@ class CalibrationProfile:
     # gate is unchanged.
     q4_kick_waits: bool = False
 
+    # ---- todo #808 v3 (pre-registered 2026-11-15 `a02911da1`). Needs
+    # `end_of_half_kneel_out` ON; default OFF (byte-identical).
+    #
+    # THE KNEEL-OUT IN Q4 ONLY. ON: the kneel-out fires only in the game's last
+    # regulation quarter. v2's same-seed ablation: the Q2 halftime kneel fires
+    # where the league's leaders keep throwing, and costs Q2's last 120 s 0.80
+    # snaps (10.68 -> 9.88 against the league's 10.63); the Q4 kneel is what fixed
+    # Q4 and H1 > H2.
+    kneel_out_q4_only: bool = False
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -447,6 +457,7 @@ class CalibrationProfile:
             "end_of_half_kneel_out": self.end_of_half_kneel_out,
             "end_of_half_clock_by_need": self.end_of_half_clock_by_need,
             "q4_kick_waits": self.q4_kick_waits,
+            "kneel_out_q4_only": self.kneel_out_q4_only,
         }
 
 

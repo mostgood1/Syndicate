@@ -416,3 +416,45 @@ def test_q4_kick_waits_only_with_its_switch():
     assert _first_step(waits, **q4)["outcome"] not in ("field_goal", "missed_field_goal")
     assert _first_step(waits, **dict(q4, initial_clock_seconds=8))["outcome"] in ("field_goal", "missed_field_goal")
     assert _first_step(waits, **dict(q4, initial_down=4, initial_distance=6))["outcome"] in ("field_goal", "missed_field_goal")
+
+
+# --------------------------------------------------------------------- v3 (pre-registered a02911da1)
+
+FULL3_NFL = replace(FULL2_NFL, kneel_out_q4_only=True)
+FULL3_NCAAF = replace(FULL2_NCAAF, kneel_out_q4_only=True)
+Q2_KNEEL = dict(initial_quarter=2, initial_clock_seconds=40, initial_score_home=10, initial_score_away=7,
+                initial_possession_owner="home", initial_field_position=30)
+
+
+def test_v3_switch_defaults_off_and_round_trips():
+    for prof in (NFL, NCAAF):
+        assert prof.kneel_out_q4_only is False
+    assert profile_with_overrides(NFL, FULL3_NFL.to_dict()).kneel_out_q4_only is True
+
+
+def test_v3_reachability_on_top_of_the_kneel_out():
+    for v2, v3 in ((FULL2_NFL, FULL3_NFL), (FULL2_NCAAF, FULL3_NCAAF)):
+        a = [simulate_game(_inp(s), profile=v2).to_dict() for s in range(1, 61)]
+        b = [simulate_game(_inp(s), profile=v3).to_dict() for s in range(1, 61)]
+        assert a != b, f"kneel_out_q4_only is inert on {v2.name}"
+
+
+def test_v3_switch_is_inert_without_the_kneel_out():
+    no_kneel = replace(FULL2_NFL, end_of_half_kneel_out=False)
+    alone = replace(no_kneel, kneel_out_q4_only=True)
+    for s in range(1, 21):
+        for kw in ({}, Q2_KNEEL):
+            assert simulate_game(_inp(s, **kw), profile=alone).to_dict() == \
+                simulate_game(_inp(s, **kw), profile=no_kneel).to_dict()
+
+
+def test_v3_kneels_in_q4_but_not_at_the_half():
+    # Q2, 0:40, own 30, 1st down, the defense holds 3: 40 * 1 + 4 * kneel_live >= 40 -> v2 kneels at the half
+    assert _first_step(FULL2_NFL, **Q2_KNEEL)["summary"].endswith("took a knee")
+    assert not _first_step(FULL3_NFL, **Q2_KNEEL)["summary"].endswith("took a knee")
+    # Q4 is unchanged: the leader still kneels out the game
+    lead = dict(initial_quarter=4, initial_clock_seconds=60, initial_score_home=24, initial_score_away=17,
+                initial_possession_owner="home", initial_field_position=40, initial_timeouts_away=0)
+    assert _first_step(FULL3_NFL, **lead)["summary"].endswith("took a knee")
+    for seed in range(1, 21):
+        assert simulate_game(_inp(seed, **lead), profile=FULL3_NFL).final_score == {"home": 24, "away": 17}
