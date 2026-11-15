@@ -522,3 +522,31 @@ rows (0.54 MB).
 
 **Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 2 chip-less NCAAB cards
 (FAMU @ UTEP 7 rows, Washington @ Utah 4).
+
+## Reading 10 — Sun 11-15 12:52 PM CST (18:52Z). A refresh-worker restart lands mid-read; still pre-#810
+
+**Split:**
+- refresh-worker `BOOTED` 18:52:23Z. supervisor.log: `CLAIMED_RESTART code=0
+  holder=nba-grid-per-build-lookups`, the NBA grid incremental quote read load (`8deae4ee9`).
+  A deploy drain had held the board build and the MLB tick from 18:51:07Z
+  (`DEFERRED_BOARD_BUILD reason=deploy_drain_requested`).
+- refresh-worker boots so far today: 18:24:37Z (live-player-exit-gate) and 18:52:23Z.
+- live-odds-worker: no boot since 18:25:55Z, so #810 is not loaded yet.
+
+**Readings** (2 min after reading 9, so not independent of it):
+- **27 flags on 13 cards. 0 false, 0 missed, 0 dark.**
+- Live-rail newest 60 / 70 / 80 s: the overlay was held through the drain. Shortlist 400 s.
+- Query 13.1 s / 70.0 MB.
+- **Phase split** (new in the probe, `live_by_sport_phase`), rows priced <= 120 s:
+
+  | sport | at a break | in play | flagged rows (break / play) |
+  |---|---|---|---|
+  | NCAAB | 14 of 77 (18%) | 12 of 44 (27%) | 10 / 8 |
+  | WNCAAB | 6 of 16 | 5 of 11 | 2 / 3 |
+  | NBA | — | 117 of 235 (50%) | 18 |
+  | NFL | — | 27 of 157 (17%) | 0 |
+  | NCAAF | — | 2 of 25 | 1 |
+
+- Builds over the 15 min before the boot: NFL p50 33.2 s, max 44.9 s (under 45). NBA p50 25.1 s,
+  max 43.5 s. `deferred_slow` nba 1, nfl 1. Overlay gaps all <= 303 s. Web merges: nba stale
+  1 of 36, the rest fresh.

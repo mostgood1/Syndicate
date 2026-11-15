@@ -312,6 +312,14 @@ def main() -> int:
     flags, false_flags, missed, dark_rows, dark_markets = [], [], [], [], set()
     priced_ages, ages_now, seen_ages, no_fair, markets_total, markets_no_ours = [], [], [], [], 0, 0
     per_sport = {}  # sport -> priced / seen / age-now lists + flag counts (college vs NFL/NBA controls, todo #810)
+    # Game phase per chip, so a pre/post comparison can match phase (a break freezes the books' full-game prices).
+    _chips_early = json.loads((rdir / "chips.json").read_bytes()).get("chips") or []
+    _clock = {str(ch.get("game_key")): str(ch.get("status_token") or "") for ch in _chips_early}
+
+    def phase_of(card):
+        tok = _clock.get(str((card.get("chip") or {}).get("game_key")), "").upper()
+        return "break" if (tok.startswith("HALF") or tok.startswith("END") or "INT" in tok) else "play"
+    per_phase = {}
     for c in live:
         for m in c.get("markets") or []:
             markets_total += 1
@@ -332,6 +340,10 @@ def main() -> int:
             seen_ages.append(r.get("seen_age_seconds"))
             ages_now.append(age_now)
             ps = per_sport.setdefault(c["sport"], {"priced": [], "seen": [], "now": [], "flags": 0, "false": 0, "missed": 0})
+            pp = per_phase.setdefault(f'{c["sport"]}:{phase_of(c)}', {"rows": 0, "le120": 0, "flags": 0})
+            pp["rows"] += 1
+            pp["le120"] += 1 if (priced is not None and float(priced) <= FRESH_S) else 0
+            pp["flags"] += 1 if r.get("fresh") is not None else 0
             ps["priced"].append(priced); ps["seen"].append(r.get("seen_age_seconds")); ps["now"].append(age_now)
             if r.get("fair") is None:
                 no_fair.append({"matchup": c["matchup"], "market": r["market"], "segment": r["segment"], "line": r["line"]})
@@ -373,6 +385,7 @@ def main() -> int:
                           "priced_age": dist(v["priced"]), "seen_age_at_pricing": dist(v["seen"]), "age_now": dist(v["now"]),
                           "flagged_rows": v["flags"], "false_rows": v["false"], "missed_rows": v["missed"]}
                      for sp, v in sorted(per_sport.items())},
+        "by_sport_phase": dict(sorted(per_phase.items())),
     }
     if flags:
         with open(out_dir / "flags.jsonl", "a", encoding="utf-8") as fh:
@@ -419,6 +432,7 @@ def summary(r):
                       "age_now": lv["age_now"], "seen_age_at_pricing": lv.get("seen_age_at_pricing"), "priced_le_120": lv["priced_le_120"], "age_now_gt_300": lv["age_now_gt_300"],
                       "markets": lv["live_markets"], "markets_no_ours": lv["live_markets_no_ours"]},
         "live_by_sport": lv.get("by_sport"),
+        "live_by_sport_phase": lv.get("by_sport_phase"),
         "teams": {"chips_today": tm["chips_today"], "live_chips": tm["live_chips"], "live_chip_status": tm.get("live_chip_status"),
                   "live_chips_without_live_card": tm["live_chips_without_live_card"],
                   "chipless": [(c["sport"], c["matchup"], c["count"]) for c in tm["chipless"] or []],
