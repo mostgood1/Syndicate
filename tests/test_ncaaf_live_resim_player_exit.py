@@ -36,7 +36,9 @@ def summary():
     return s
 
 
-def _clean(summary):
+def _clean(summary, monkeypatch):
+    """No injury text AND no replacement rule: Surace's snaps would otherwise give Ashenfelder away."""
+    monkeypatch.setattr(lps, "REPLACED_AFTER_SNAPS", 10**6)
     s = copy.deepcopy(summary)
     for drive in s["drives"]["previous"]:
         for play in drive["plays"]:
@@ -82,7 +84,7 @@ def test_off_ne_on_the_switch_reaches_the_refusal(monkeypatch, summary):
 
 
 def test_a_game_with_no_key_exit_is_priced_and_still_publishes_its_exits(monkeypatch, summary):
-    snap, _ = _snapshot(monkeypatch, _clean(summary))
+    snap, _ = _snapshot(monkeypatch, _clean(summary, monkeypatch))
     assert _lane(snap)["source"] == "live_resim"
     assert snap["coverage"]["live_resimmed"] == 1
     assert snap["games"][0]["playersOut"] and not any(p["key"] for p in snap["games"][0]["playersOut"])
@@ -151,7 +153,7 @@ def test_the_LIVE_GAMELINE_index_drops_the_game_through_the_real_join(monkeypatc
                                          analytic_std_err=analytic_std_err_for_sport("ncaaf"),
                                          sport="ncaaf", slate_date="2026-11-14")
 
-    priced, _ = _snapshot(monkeypatch, _clean(summary))
+    priced, _ = _snapshot(monkeypatch, _clean(summary, monkeypatch))
     refused, _ = _snapshot(monkeypatch, summary)
     assert len(index(priced)) >= 1
     assert index(refused) == {}

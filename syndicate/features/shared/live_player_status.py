@@ -95,7 +95,7 @@ class PlayerOut:
     team: str  # team abbreviation as the feed spells it
     player: str  # display name
     player_id: str | None
-    reason: str  # injury | injured_in_play | ejection | foul_out | goalie_change | red_card | keeper_change
+    reason: str  # injury | injured_in_play | replaced | ejection | foul_out | goalie_change | red_card | keeper_change
     key: bool
     source: str  # pbp | injuries | boxscore | keyEvents | rosters
     since: str | None = None  # feed wallclock / injury stamp when known
@@ -294,6 +294,23 @@ _EJECTED_RE = re.compile(r"\b([A-Z]{2,4})-([A-Z]\.[A-Za-z'\.\- ]+?) (?:was|has b
 # College play text names no team: "#15 S.Banner injured on the play" (25 FBS finals of 2026-11-14: 33
 # such clauses, 0 in the NFL form, and 0 entries in `injuries`). The team comes from the boxscore.
 _COLLEGE_INJURED_RE = re.compile(r"#(\d{1,2}) ([A-Z]\.[A-Za-z'\.\- ]+?) injured on the play")
+# The player taking the snap as a passer: "(Shotgun) C.Klubnik pass short ..." (NFL) or
+# "(10:11) Shotgun #10 A.Colandrea pass complete ..." (college). First match in the play only.
+_QB_ACTION_RE = re.compile(
+    r"(?:^|[\s)])(?:#\d{1,2} )?([A-Z]\.[A-Za-z'\.\-]+(?: (?:Jr|Sr|II|III|IV)\.?)?) (?:pass|sacked|scrambles|kneels|spiked)\b"
+)
+# A quarterback who leaves with NO injury line is caught by his replacement: once another passer on his
+# team takes this many QB snaps in a row, the earlier one is out ("replaced"). Measured 2026-11-15, BUF @ NYJ:
+# Geno Smith came back at 20:06:37Z, threw to 20:10:09Z, then C.Klubnik took every snap from 20:18:35Z with no
+# PBP injury text; ESPN's injuries list posted Smith only at ~20:30Z, so the gate refused ~20 min late.
+# Two, not one: a single trick-play or package-QB snap must not refuse a game. A starter who comes back
+# clears himself on his next snap (the `_names_on_field` sweep), so a false "replaced" lasts one tick.
+# Only the team's STARTER (first passer of the game) can be replaced: when Smith came back at 20:06:37Z, his
+# backup going to the bench is not an exit (the first replay of that game marked Klubnik out -- wrong).
+# A team that ROTATES quarterbacks (college does: LT Baker/Kukuk, MSST Swann/Puckett, SJSU Rolovich/Clark on
+# 2026-11-14) would flicker refused/priced all game. Once the starter is back from a backup spell he was NOT
+# hurt for, the team is rotating and the rule is off for it (a hurt starter's return -- Smith -- is not rotation).
+REPLACED_AFTER_SNAPS = 2
 
 
 def _football_plays(summary: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -319,6 +336,7 @@ def _football(sport: str, game_id: str, summary: Mapping[str, Any]) -> list[Play
     abbrev_by_name: dict[tuple[str, str], str] = {}  # (team, normalized display) -> D.Maye
     passers: set[tuple[str, str]] = set()  # (team, normalized display name)
     teams_by_abbrev: dict[str, dict[str, str]] = {}  # D.Maye -> {team: jersey}
+    passer_teams: dict[str, set[str]] = {}  # D.Maye -> the box teams he passed for
     for team, cat_name, _cat, entry in _box_athletes(summary):
         ath = entry.get("athlete") or {}
         ab = _abbrev(ath.get("firstName") or "", ath.get("lastName") or "")
@@ -328,6 +346,8 @@ def _football(sport: str, game_id: str, summary: Mapping[str, Any]) -> list[Play
             teams_by_abbrev.setdefault(ab, {}).setdefault(team, str(ath.get("jersey") or ""))
         if cat_name == "passing":
             passers.add((team, normalize_name(ath.get("displayName"))))
+            if ab:
+                passer_teams.setdefault(ab, set()).add(team)
 
     def college_team(jersey: str, ab: str) -> str:
         """The team of a college "#N X.Last": the one box team with that name (jersey breaks a tie).
@@ -342,12 +362,32 @@ def _football(sport: str, game_id: str, summary: Mapping[str, Any]) -> list[Play
 
     plays = _football_plays(summary)
     out_state: dict[tuple[str, str], tuple[str, str | None]] = {}  # (team, abbrev) -> (reason, since)
+    streak: dict[str, tuple[str, int, str, bool]] = {}  # team -> (passer now, snaps in a row, the one before, starter hurt then)
+    starter: dict[str, str] = {}  # team -> its first passer of the game: the only QB whose replacement is an exit
+    rotating: set[str] = set()  # teams seen alternating QBs while the starter was healthy: the rule is off for them
     for play in plays:
         text = str(play.get("text") or "")
         when = play.get("wallclock")
         for (team, ab), (reason, _since) in list(out_state.items()):
             if reason != "ejection" and _names_on_field(text, ab):
                 del out_state[(team, ab)]
+        qb = _QB_ACTION_RE.search(text)
+        qb_teams = passer_teams.get(qb.group(1).strip(), set()) if qb else set()
+        if len(qb_teams) == 1:
+            ab, team = qb.group(1).strip(), next(iter(qb_teams))
+            first = starter.setdefault(team, ab)
+            cur, n, before, hurt = streak.get(team, ("", 0, "", False))
+            if cur == ab:
+                n += 1
+            else:
+                if ab == first and cur and not hurt:
+                    rotating.add(team)  # the starter is back after a backup spell he was not hurt for
+                hurt = (out_state.get((team, first)) or ("replaced",))[0] != "replaced"
+                cur, n, before = ab, 1, cur
+            streak[team] = (cur, n, before, hurt)
+            if (n == REPLACED_AFTER_SNAPS and before == first and ab != first and team not in rotating
+                    and (team, first) not in out_state):
+                out_state[(team, first)] = ("replaced", when)
         for team, ab in _RETURNED_RE.findall(text):
             out_state.pop((team, ab.strip()), None)
         for team, ab in _INJURED_RE.findall(text):

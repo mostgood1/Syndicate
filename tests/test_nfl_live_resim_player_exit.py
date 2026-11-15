@@ -86,6 +86,7 @@ def test_a_game_with_no_exit_is_unchanged(monkeypatch, summary, no_box):
     for drive in clean["drives"]["previous"]:
         for play in drive["plays"]:
             play["text"] = play["text"].split(" was injured during the play")[0]
+    monkeypatch.setattr(lps, "REPLACED_AFTER_SNAPS", 10**6)  # the backup's snaps would give Maye away too
     snap, _ = _snapshot(monkeypatch, clean, env={})
     monkeypatch.setattr(live_player_box, "_fetch_summary", lambda e: None)
     base = R.build_live_lens_snapshot("2026-11-15", games=GAMES, live_index={"g1": LIVE_ROW},
@@ -131,7 +132,10 @@ def test_the_LIVE_MONEYLINE_index_drops_the_game_through_the_real_join(monkeypat
     for drive in clean["drives"]["previous"]:
         for play in drive["plays"]:
             play["text"] = play["text"].split(" was injured during the play")[0]
+    rule = lps.REPLACED_AFTER_SNAPS
+    monkeypatch.setattr(lps, "REPLACED_AFTER_SNAPS", 10**6)  # truly clean: no replacement rule either
     priced, _ = _snapshot(monkeypatch, clean, env=env_on)
+    monkeypatch.setattr(lps, "REPLACED_AFTER_SNAPS", rule)
     refused, _ = _snapshot(monkeypatch, summary, env=env_on)
     assert priced["games"][0]["gameLens"][0]["ok"] is True  # the clean game really simulates
     priced_idx = index(priced)

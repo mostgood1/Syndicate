@@ -47,7 +47,7 @@ def test_gate_switch_absent_is_on_and_off_is_off():
         assert lps.gate_enabled({lps.ENV_SWITCH: off}) is False
 
 
-def test_off_ne_on_the_real_exit_changes_the_gameline_verdict(nfl):
+def test_off_ne_on_the_real_exit_changes_the_gameline_verdict(nfl, monkeypatch):
     """The same game with and without the exit in its feed must differ."""
     on = lps.exits_from_espn_summary("nfl", nfl)
     stripped = copy.deepcopy(nfl)
@@ -55,6 +55,10 @@ def test_off_ne_on_the_real_exit_changes_the_gameline_verdict(nfl):
     for drive in stripped["drives"]["previous"]:
         for play in drive["plays"]:
             play["text"] = play["text"].replace("NE-D.Maye was injured during the play.", "")
+    # With the injury text gone, the backup's snaps still give him away (the replacement rule) ...
+    assert lps.gameline_refusal(lps.exits_from_espn_summary("nfl", stripped))["players"] == ["NE:Drake Maye:replaced"]
+    # ... so a truly clean game also turns that rule off.
+    monkeypatch.setattr(lps, "REPLACED_AFTER_SNAPS", 10**6)
     off = lps.exits_from_espn_summary("nfl", stripped)
     assert lps.gameline_refusal(on) is not None
     assert lps.gameline_refusal(off) is None

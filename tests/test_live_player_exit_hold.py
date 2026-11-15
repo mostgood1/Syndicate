@@ -75,6 +75,7 @@ def test_off_ne_on_and_the_clean_game_passes(monkeypatch, summary):
     off, off_reads = _hold(snap, env={lps.ENV_SWITCH: "off"})
     assert on.check("nfl", DET, NE)["verdict"] == "fail"
     assert off.check("nfl", DET, NE) == {"verdict": "off"} and off_reads == []  # off costs no read
+    monkeypatch.setattr(lps, "REPLACED_AFTER_SNAPS", 10**6)  # the backup's snaps would give Maye away too
     clean, _ = _hold(_producer_snapshot(monkeypatch, _clean(summary)))
     assert clean.check("nfl", DET, NE)["verdict"] == "pass"
 
