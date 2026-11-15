@@ -951,6 +951,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: pytest tests/test_nba_live_pull_cadence.py + the existing NBA in-play tests; after a load: NBA_LIVE_AUTORUN_LAUNCHED interval_s=60, IN_PLAY_PROPS lines-only vs full in the lane log, OddsAPI nba credits/h, and the phase-matched fresh share of NBA game-line rows on /api/board/layer2 vs pre
 - Blocked by: none
+- STATUS `[2026-11-15 23:19Z, 5:19 PM CST]`: BUILT AND ON MAIN `b2ae202d4` (tests: 14 new + 304 existing passed); NOT LOADED. Headroom read before asking (refresh-worker BOOK_GRID_TICK, 22:19-23:19Z): grid builds 2,533 s = 70% of wall; NBA 25 builds/h (9 on_pull) p50 32.2 s max 90.0 s; NFL 40/h p50 18.0 s; NCAAB 49/h p50 7.0 s. Price-on-pull re-prices a live sport whose shard changed once 30 s have passed since its last build, unless its last build took >= 45 s, so 60 s NBA pulls could take NBA to ~60 builds/h, about +1,100 s/h, near 100% of wall on a 7-game NBA + NFL + NCAAB night. The load waits on the user's call with that reading in front of them.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
