@@ -24,13 +24,16 @@ football (nfl, ncaaf)
   KEY = a quarterback (anyone in the team's boxscore ``passing`` list).
 
 basketball (nba, wnba, ncaab, wncaab)
-  - boxscore athlete ``ejected: true`` -> out (ejection).
+  - a play of type ``ejection`` (the dependable signal: the boxscore ``ejected`` flag stayed
+    false for a real WNBA ejection) or boxscore ``ejected: true`` -> out (ejection).
   - personal fouls >= the league limit (6 NBA/WNBA, 5 college) -> out (foul_out).
   - ``injuries`` stamped after tip with status ``Out`` -> out (injury).
   KEY = a starter (boxscore ``starter: true``).
 
 hockey (nhl)
-  - a team with TWO goalies holding time on ice -> the goaltender changed; every
+  - the live path reads NHL api-web, not ESPN: ``exits_from_nhl_boxscore`` -- the STARTER is
+    out once a non-starter goalie has time on ice (goalie_change), KEY.
+  - on an ESPN payload: a team with TWO goalies holding time on ice -> the goaltender changed; every
     goalie of that team with TOI is marked out (goalie_change), KEY. (An empty-net
     pull does not add a second goalie to the box.)
   - ``injuries`` stamped after puck drop, status ``Out`` -> out; key if a goalie.
@@ -399,6 +402,25 @@ def _basketball(sport: str, game_id: str, summary: Mapping[str, Any]) -> list[Pl
             fouls = 0
         if fouls >= limit:
             results[k] = PlayerOut(sport, game_id, team, display, _athlete_id(ath), "foul_out", starter, "boxscore")
+    # THE PLAY, NOT THE FLAG: on a real WNBA final (401856991) "Isabelle Harrison ejected" is a play of
+    # type `ejection` while her boxscore entry still says `ejected: false`.
+    by_id = {}
+    for team, _name, _cat, entry in _box_athletes(summary):
+        ath = entry.get("athlete") or {}
+        if _athlete_id(ath):
+            by_id.setdefault(_athlete_id(ath), (team, ath, bool(entry.get("starter"))))
+    for play in summary.get("plays") or []:
+        if str(((play.get("type") or {}).get("text")) or "").strip().lower() != "ejection":
+            continue
+        for part in play.get("participants") or []:
+            hit = by_id.get(str(((part.get("athlete") or {}).get("id")) or ""))
+            if hit is None:
+                continue
+            team, ath, starter = hit
+            display = str(ath.get("displayName") or "")
+            results[(team, normalize_name(display))] = PlayerOut(
+                sport, game_id, team, display, _athlete_id(ath), "ejection", starter, "pbp", play.get("wallclock")
+            )
     for team, ath, _status, stamp in _ingame_injuries(summary, sport):
         display = str(ath.get("displayName") or "")
         k = (team, normalize_name(display))
@@ -471,6 +493,48 @@ def _soccer(sport: str, game_id: str, summary: Mapping[str, Any]) -> list[Player
                 if display and k not in results:
                     results[k] = PlayerOut(sport, game_id, team, display, _athlete_id(ath), "keeper_change", True, "rosters")
     return list(results.values())
+
+
+# --------------------------------------------------------------------------- NHL api-web
+
+_NHL_LIVE_STATES = frozenset({"LIVE", "CRIT"})
+
+
+def exits_from_nhl_boxscore(boxscore: Mapping[str, Any] | None, *, require_in_progress: bool = True) -> GameExitStatus:
+    """The NHL live path reads ``api-web.nhle.com/v1/gamecenter/{id}/boxscore``, not ESPN.
+
+    Each goalie carries ``starter`` and ``toi``. Once a NON-starter goalie has ice time, the starter
+    has left (pulled or hurt): he is out, KEY. An empty-net pull adds no goalie to the box, so it
+    never fires this. Measured on a real final (2025021309): Vejmelka starter 40:00, Vanecek 18:31.
+    """
+    box = boxscore or {}
+    gid = str(box.get("id") or "")
+    live = str(box.get("gameState") or "").upper() in _NHL_LIVE_STATES
+
+    def team_name(side: str) -> str:
+        t = box.get(side) or {}
+        place = str(((t.get("placeName") or {}).get("default")) or "")
+        common = str(((t.get("commonName") or {}).get("default")) or "")
+        return " ".join(x for x in (place, common) if x)
+
+    home, away = team_name("homeTeam"), team_name("awayTeam")
+    if require_in_progress and not live:
+        return GameExitStatus("nhl", gid, live, (), home, away)
+    out: list[PlayerOut] = []
+    stats = box.get("playerByGameStats") or {}
+    for side in ("homeTeam", "awayTeam"):
+        abbr = str(((box.get(side) or {}).get("abbrev")) or "")
+        goalies = list(((stats.get(side) or {}).get("goalies")) or [])
+        relief_played = any(not g.get("starter") and _toi_seconds(g.get("toi")) > 0 for g in goalies)
+        if not relief_played:
+            continue
+        for g in goalies:
+            if g.get("starter"):
+                name = str(((g.get("name") or {}).get("default")) or "")
+                pid = g.get("playerId")
+                out.append(PlayerOut("nhl", gid, abbr, name, str(pid) if pid is not None else None,
+                                     "goalie_change", True, "boxscore"))
+    return GameExitStatus("nhl", gid, True, tuple(sorted(out, key=lambda p: (p.team, p.player))), home, away)
 
 
 _DISPATCH = {}

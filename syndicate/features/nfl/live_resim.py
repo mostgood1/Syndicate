@@ -999,6 +999,78 @@ def _attach_live_player_stats(
     return tally
 
 
+# Wall clock for one tick's player-exit reads (lane `live-player-exit-gate`, 2026-11-15).
+_PLAYER_EXIT_BUDGET_SECONDS = 20.0
+
+
+def _player_exit_statuses(
+    live_rows: list[Any],
+    *,
+    env: Mapping[str, str] | None = None,
+    budget_seconds: float = _PLAYER_EXIT_BUDGET_SECONDS,
+    fetch: Any = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Who has LEFT each in-progress game, from its ESPN summary. -> (by event_id, tally).
+
+    Lane `live-player-exit-gate` (user, 2026-11-15: "we need this across ALL sports"). On 11-15 Drake
+    Maye left NE @ DET at 14:41:43Z and this re-sim -- 4 team ratings plus score, clock and possession,
+    0 player inputs -- kept simulating him. The detector is
+    `shared/live_player_status.exits_from_espn_summary`; this only feeds it the summary each live game
+    already has. A summary that cannot be read gives NO status for that game, and is COUNTED
+    (`unreadable`) -- never a silent "nobody is out".
+
+    One GET per in-progress game per tick, under its own wall clock (`#241`). Never raises.
+    """
+    tally: dict[str, Any] = {"live_games": 0, "read": 0, "unreadable": 0, "no_event_id": 0,
+                             "budget_exhausted": 0, "players_out": 0, "key_players_out": 0}
+    statuses: dict[str, Any] = {}
+    try:
+        from syndicate.features.shared import live_player_status as lps
+    except Exception as exc:  # noqa: BLE001 -- deploy-skew guard
+        tally["error"] = type(exc).__name__
+        return statuses, tally
+    if not lps.gate_enabled(env):
+        tally["enabled"] = False
+        return statuses, tally
+    if fetch is None:
+        from syndicate.features.nfl.live_player_box import _fetch_summary as fetch
+    started = time.monotonic()
+    for live_row in live_rows:
+        if not isinstance(live_row, Mapping):
+            continue
+        if str(live_row.get("state") or "").strip().lower() not in {"in", "live", "in_progress"}:
+            continue
+        tally["live_games"] += 1
+        event_id = str(live_row.get("event_id") or "").strip()
+        if not event_id:
+            tally["no_event_id"] += 1
+            continue
+        if event_id in statuses:
+            continue
+        if time.monotonic() - started >= float(budget_seconds):
+            tally["budget_exhausted"] += 1
+            continue
+        try:
+            summary = fetch(event_id)
+        except Exception:  # noqa: BLE001
+            summary = None
+        if not isinstance(summary, Mapping):
+            tally["unreadable"] += 1
+            continue
+        status = lps.exits_from_espn_summary("nfl", summary, game_id=event_id)
+        statuses[event_id] = status
+        tally["read"] += 1
+        tally["players_out"] += len(status.players_out)
+        tally["key_players_out"] += len(status.key_players_out)
+        for p in status.players_out:
+            print(f"[nfl_live_resim] PLAYER_OUT event={event_id} team={p.team} player={p.player!r} "
+                  f"reason={p.reason} key={p.key} source={p.source} since={p.since}", flush=True)
+    tally["elapsed_seconds"] = round(time.monotonic() - started, 3)
+    if tally["live_games"]:
+        print("[nfl_live_resim] PLAYER_EXIT_TICK " + " ".join(f"{k}={v}" for k, v in tally.items()), flush=True)
+    return statuses, tally
+
+
 def build_live_lens_snapshot(
     date_str: str,
     *,
@@ -1079,13 +1151,28 @@ def build_live_lens_snapshot(
         print("[nfl_live_resim] PROP_CAPTURE_TICK "
               + " ".join(f"{k}={v}" for k, v in sorted(_capture_tally.items())), flush=True)
 
+    # WHO HAS LEFT THE GAME, read before any re-sim (lane `live-player-exit-gate`). A key exit (a
+    # quarterback) refuses the game BY NAME; any exit is published as `playersOut` so the prop join and
+    # the portfolio can refuse that player. The refusal sits AFTER the state refusals (a final game is
+    # `game_final`, not `key_player_out`) and BEFORE the budget, so it costs no sim.
+    from syndicate.features.shared.live_player_status import gameline_refusal
+
+    exit_statuses, exit_tally = _player_exit_statuses([item[3] for item in prepared], env=env)
+
     started = time.monotonic()
     out_games: list[dict[str, Any]] = []
     box_targets: list[tuple[dict[str, Any], Any]] = []
     for _remaining, names, resolved, live_row in prepared:
         state: Any = None
+        exit_status = exit_statuses.get(
+            str((live_row or {}).get("event_id") or "").strip() if isinstance(live_row, Mapping) else ""
+        )
+        exit_refusal = gameline_refusal(exit_status)
         if isinstance(resolved, NflResimRefusal):
             result: Any = resolved
+        elif exit_refusal is not None:
+            state = resolved
+            result = NflResimRefusal("key_player_out", "; ".join(exit_refusal["players"]))
         elif time.monotonic() - started >= budget:
             state = resolved
             result = NflResimRefusal(
@@ -1119,6 +1206,8 @@ def build_live_lens_snapshot(
             "home_code": names["home_team"],
             "gameLens": build_game_lens(state, result, live_state_as_of=generated_at),
         })
+        if exit_status is not None:
+            out_games[-1]["playersOut"] = exit_status.to_dict()["players_out"]
         box_targets.append((out_games[-1], live_row))
 
     coverage = summarise(out_games)
@@ -1131,6 +1220,7 @@ def build_live_lens_snapshot(
     # snapshot. Independent of the re-sim: a refused game (uninformative band, budget, flag off) still
     # has a box. One GET per in-progress game per tick, under its own wall clock. Never raises.
     coverage["live_player_stats"] = _attach_live_player_stats(box_targets)
+    coverage["player_exits"] = exit_tally
     return {
         "sport": "nfl",
         "date": str(date_str or ""),

@@ -249,3 +249,49 @@ def test_to_dict_round_trips_the_published_shape(nfl):
     assert d["game_id"] == "401873053" and d["home_team"] == "Detroit Lions"
     assert {"player", "team", "reason", "key", "source", "since"} <= set(d["players_out"][0])
     json.dumps(d)
+
+
+# --------------------------------------------------------------- feed-survey corrections
+
+
+def test_wnba_ejection_is_read_from_the_play_because_the_box_flag_lies():
+    s = _set_live(_load("wnba_401856991_final_ejection.json.gz"))
+    flags = [a.get("ejected") for t in s["boxscore"]["players"] for a in t["statistics"][0]["athletes"]
+             if a["athlete"]["displayName"] == "Isabelle Harrison"]
+    assert flags == [False]  # the trap: the boxscore flag never flipped
+    st = lps.exits_from_espn_summary("wnba", s)
+    p = st.player_is_out("Isabelle Harrison")
+    assert p is not None and p.reason == "ejection" and p.source == "pbp"
+    s["plays"] = [pl for pl in s["plays"] if pl["type"]["text"].lower() != "ejection"]
+    assert lps.exits_from_espn_summary("wnba", s).player_is_out("Isabelle Harrison") is None
+
+
+def _nhlapi():
+    return _load("nhlapi_2025021309_final_goaliechange.json.gz")
+
+
+def test_nhl_api_starter_pulled_is_a_key_exit():
+    box = _nhlapi()
+    box["gameState"] = "LIVE"
+    st = lps.exits_from_nhl_boxscore(box)
+    assert (st.home_team, st.away_team) == ("Utah Mammoth", "St. Louis Blues")
+    (p,) = st.players_out
+    assert (p.team, p.player, p.reason, p.key) == ("UTA", "K. Vejmelka", "goalie_change", True)
+    assert lps.gameline_refusal(st)["reason"] == lps.REASON_KEY_PLAYER_OUT
+
+
+def test_nhl_api_relief_goalie_without_ice_time_is_no_exit():
+    box = _nhlapi()
+    box["gameState"] = "LIVE"
+    for side in ("homeTeam", "awayTeam"):
+        for g in box["playerByGameStats"][side]["goalies"]:
+            if not g.get("starter"):
+                g["toi"] = "00:00"
+    assert lps.exits_from_nhl_boxscore(box).players_out == ()
+
+
+def test_nhl_api_final_or_pregame_never_refuses():
+    for state in ("OFF", "FINAL", "FUT", "PRE"):
+        box = _nhlapi()
+        box["gameState"] = state
+        assert lps.gameline_refusal(lps.exits_from_nhl_boxscore(box)) is None

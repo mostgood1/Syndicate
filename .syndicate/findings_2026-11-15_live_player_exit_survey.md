@@ -45,6 +45,43 @@ basketball injury signal is unproven. **Basketball injury exits may be invisible
 to this feed until ESPN posts an Out, and that is the open risk for NBA.**
 Ejection and foul-out are explicit.
 
+## 2b. Corrections from the code-side feed survey (2026-11-15 ~11:00 AM CT)
+
+- **The basketball `ejected` box flag is unreliable.** On a real WNBA final
+  (401856991), "Isabelle Harrison ejected" is a play of type `ejection`, but her
+  box entry still says `ejected: false`. The detector reads the play. Fixture and
+  test are added.
+- **NHL's live path is api-web, not ESPN.** It fetches
+  `/v1/gamecenter/{id}/boxscore` every tick (`live_player_actuals`). Goalies
+  carry `starter` and `toi`, and `exits_from_nhl_boxscore` marks the starter out
+  once a non-starter has ice time. Real final 2025021309: Vejmelka (starter)
+  40:00, Vanecek 18:31.
+- **Already modelled, so refusing would discard a priced state (open decision
+  for the user):**
+  - **Basketball foul-outs:** the NBA, WNBA and NCAAB re-sims drop a fouled-out
+    player from the lineup (`basketball_engine/resume.py:28-29,126-128`).
+  - **Soccer red cards:** applied as a team rating penalty
+    (`soccer/features/live_lens.py:79-98`), and props use the on-pitch lineup.
+  - **MLB pitching changes:** the sim always uses the current pitcher.
+
+  The lane goal names foul-out, so the detector refuses a starter's foul-out
+  today.
+- **Cadences, i.e. what "one live tick" means:**
+
+  | sport | re-sim cadence |
+  |---|---|
+  | NFL | 300 s (refresh-worker) |
+  | NCAAF | 75-180 s |
+  | NBA / NCAAB | own thread, 120 s |
+  | NHL / soccer | 60 s loop |
+
+- **MLB:** the statsapi `feed/live` carries `playEvents[].details.eventType` of
+  `injury` (2 in September) and `ejection` (9, managers included), plus
+  `gameStatus`, but nothing reads them on the live path. Off-season until 2027.
+- **No live tick persists a raw payload.** The fixtures here are the only
+  replayable in-game evidence, which is why the fleet measurement must be taken
+  live.
+
 ## 3. Detector built (`syndicate/features/shared/live_player_status.py`)
 
 `exits_from_espn_summary(sport, summary) -> GameExitStatus` is pure, and returns
