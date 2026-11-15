@@ -844,11 +844,6 @@ death, never life — do not invert it.
 - Verification: Unit: pull_only never starts a round; the reacting sleep runs a pass when a live shard changes and still ends at its deadline; off switch -> a plain sleep (off != on); the round skips a sport repriced on pull within 45 s and keeps the live cadence; 0 disables the skip. After the user's load: pull_to_price.py and main_thread_budget.py on a live window vs 2026-11-14's
 - Blocked by: none
 
-### closed-lane-archive-20261115-0440 — CLOSED 2026-11-15 (GOAL MET: 4 blocks archived) — opened 2026-11-15 — session 073487bf-510f-40bf-a7cc-07b7039a61ea
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: MET. owner_liveness --idle-min 240 read SAFE for 4 of 16 CLOSED blocks; all 4 moved to lanes_closed.md with one pointer each: live-totals-prob-scale, live-margin-prob-scale, ncaaf-evening-kickoff-projection, closed-lane-archive-20261114-2240. Table and WAIT reasons in .syndicate/log/2026-11-15.md.
-
 ### closed-lane-archive-20261115-0639 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 3db11340-9b28-41cb-a6ce-99f366b44ecc
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -901,6 +896,11 @@ death, never life — do not invert it.
 - Falsification test: FAIL if, at the best pre-registered re-fit, any FIT gate misses (a quarter's points, Q2 last-120 s points or snaps outside the league 2024-25 95% CI, or H1 <= H2), or if any held-out NFL 2026 full-game Brier delta (ML / total / spread, candidate - production, 1000 seeds) is shown worse: 95% CI lower bound > 0, or point estimate > +0.003.
 - Verification: Pre-registered in .syndicate/findings_2026-11-15_football_end_of_half_fix.md before any sim read: OFF byte-identical (sha256 over seeds), reachability off != on per switch, FIT read (NFL 2024-25 every 4th game, 136 x 100 seeds, same seeds per arm) vs nflverse 2024-25, held-out read on NFL 2026 wk1-8 (121 games, private root pulled 11-03), NCAAF arms via football_scenario_rates._ncaaf_init.
 - Blocked by: none
+
+### closed-lane-archive-20261115-1041 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session e01d3a71-d04f-44a1-9853-345b01791bb2
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main read 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261115-0440`. Table and WAIT reasons in `.syndicate/log/2026-11-15.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1168,6 +1168,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261114-2240` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session bae0317c-6f5d-45f1-b4b8-92c406fd6e8b
 - `closed-lane-archive-20261115-0039` — CLOSED 2026-11-15 (GOAL MET: 3 blocks archived) — opened 2026-11-15 — session b12a6db7-fa70-4e8e-bdf7-57571820b2e1
 - `closed-lane-archive-20261115-0239` — CLOSED 2026-11-15 (GOAL MET: 10 blocks archived) — opened 2026-11-15 — session cf77f272-3956-4bae-bf6f-2c8906a1c52e
+- `closed-lane-archive-20261115-0440` — CLOSED 2026-11-15 (GOAL MET: 4 blocks archived) — opened 2026-11-15 — session 073487bf-510f-40bf-a7cc-07b7039a61ea
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

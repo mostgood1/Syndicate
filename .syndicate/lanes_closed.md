@@ -16021,3 +16021,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Files: none (ledger-only)
 - Verdict: GOAL MET -- owner_liveness --idle-min 240 read 10 SAFE of 24 CLOSED at 08:40Z (2:40 AM CST); invariants FAIL set unchanged vs baseline (1 pre-existing contested file).
 - Moved: nhl-live-period-remainder, rail-callouts-sim-vs-book, ncaaf-801-live-reading, book-grid-live-first, nhl-live-puckline-regrade, live-rail-fast-poll, nhl-live-score-effects, rail-sport-and-filter-fold, nfl-prop-name-roster-first, closed-lane-archive-20261114-2040. Table in .syndicate/log/2026-11-15.md.
+
+### closed-lane-archive-20261115-0440 — CLOSED 2026-11-15 (GOAL MET: 4 blocks archived) — opened 2026-11-15 — session 073487bf-510f-40bf-a7cc-07b7039a61ea
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: MET. owner_liveness --idle-min 240 read SAFE for 4 of 16 CLOSED blocks; all 4 moved to lanes_closed.md with one pointer each: live-totals-prob-scale, live-margin-prob-scale, ncaaf-evening-kickoff-projection, closed-lane-archive-20261114-2240. Table and WAIT reasons in .syndicate/log/2026-11-15.md.
