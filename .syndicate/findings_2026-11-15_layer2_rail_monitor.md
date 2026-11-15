@@ -940,3 +940,21 @@ LAR @ ARI and SEA @ LV in Q1.
   - local_208683f1 is leaving the ~1 MB rail payload as is (~80 KB on the wire, 0.13 s server);
     they raise it with the user only if the page gets slow in use.
 - **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 22 — Sun 11-15 5:34 PM CST (23:34Z). Evening NBA slate starting; no new boot
+
+18 live chips.
+- **38 flags on 8 cards. 0 false, 0 missed, 0 dark.** NBA 154 flagged rows.
+- **NBA is back on every-other-round cadence with more NBA games live:**
+  - NBA builds p50 **64.5 s**, max 90.0 s, on **939 in-play rows** (335 at 3:29 PM, one game).
+  - `deferred_slow` nba 5, nfl 3 in 32 min.
+  - **NBA overlay gap p50 370 s, max 437 s.** NFL gap max 398 s.
+  - Web merges stale: nba 3 of 64, nfl 2 of 64.
+  - **This corrects the 2:1x PM conclusion that NBA was "largely settled" by the grid loads.** That
+    held with ONE NBA game live (10 of 12 builds < 45 s). With several, NBA's builds pass 45 s
+    again. NFL is the same with 3 games.
+- Rows priced <= 120 s: NBA 605 / 939 (64%, seen age p50 47 s). NFL 11 / 54. College tail small.
+- **Load:**
+  - `/intelligence` 10.3 s / 24.1 MB. Query 9.5 s / 68.6 MB.
+  - Live-rail 0.17 s, **1,049 rows, 0.99 MB**.
+- **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
