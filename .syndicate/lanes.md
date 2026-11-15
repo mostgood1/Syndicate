@@ -854,6 +854,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: MET. owner_liveness --idle-min 240 read SAFE for 1 of 13 CLOSED blocks; it moved to lanes_closed.md with one pointer: closed-lane-archive-20261115-0039. Table and WAIT reasons in .syndicate/log/2026-11-15.md.
 
+### football-end-of-half-scoring — OPEN — opened 2026-11-15 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: Name and size the cause of smartsim2's quarter-scoring misallocation (NFL q2 share 0.279 vs league 0.313, q3 0.234 vs 0.205; NCAAF q2 13.6 vs 15.7 actual): a read-only findings file that splits the Q2 deficit and the Q3 surplus between the halftime carry-over (halftime_kickoff OFF) and the end-of-half decision rules, measured on the sim's own drive logs beside nflverse pbp, and hands a pre-registrable fix to lane football-scenario-calibration (which holds the engine files). No engine edit, no deploy.
+- Files: .syndicate/findings_2026-11-15_football_end_of_half_scoring.md (NEW)
+- Hypothesis: Two end-of-half mechanisms, both in production: (a) halftime_kickoff OFF, so the drive alive at 0:00 of Q2 keeps its owner, spot and down and scores in Q3 (game_simulator.py:158-160); (b) the Q2 urgency field goal fires only at -9<=diff<=2 and the Q2 two-minute drill only at diff<=7 (drive_simulator.py urgency FG gate; situation_model.classify_urgency), Q4 rules applied to the half, so a team outside them neither hurries nor kicks before the half. (a) moves points Q2->Q3; (b) removes Q2 points. Prediction: sim points in the last 120 s of Q2 well below the league's; points on carried-over Q3 drives about equal to the Q3 surplus; halftime_kickoff ON removes the Q3 surplus but leaves Q2 short.
+- Falsification test: (b) is false if sim points in the last 120 s of Q2 are within the league's 95% CI, or if the league's end-of-half FG rate does not depend on score less than the sim's does. (a) is not the main Q3 cause if carried-over drives score under a third of the Q3 surplus.
+- Verification: Findings file with: league vs sim points per quarter and in the final 120 s of Q2 (with CIs), the end-of-half FG attempt rate by score bucket, carried-over drives' points, and a same-seed halftime_kickoff ON/OFF and gate-widened replay showing how much of each gap each mechanism closes. Handed to football-scenario-calibration.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
