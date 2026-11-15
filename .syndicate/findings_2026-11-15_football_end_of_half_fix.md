@@ -696,3 +696,24 @@ Q2-window snaps over `full2_nokneel`'s Q2 count. **G3 is still predicted to FAIL
 - One functional smoke run is allowed, for bugs only.
 - Any design change after this point is an amendment, written and landed on main before the FIT read.
 - After the FIT read, nothing changes for this candidate.
+
+### V2 Amendment 4 — 2026-11-15 13:20 CST, after measuring the v2 table, BEFORE any v2 code or v2 sim run
+
+**`KNEEL_LIVE` in the kneel-out formula is the measured `spike` delta, not "the kneel delta when a timeout
+follows".**
+
+**Why the pre-registered definition fails its purpose.** The formula needs the kneel's own length: the clock a kneel
+uses when the defense stops it at once. The registered cell measures something else:
+- 42 NFL kneels followed by a DEFENSE timeout: median 32 s, 25th percentile 5 s, 75th 40 s. Defenses often let the
+  clock run before calling.
+- Taken as `KNEEL_LIVE`, its mean of 26 s would let a team "kneel out" 2:24 against 3 timeouts:
+  40 x 1 + 26 x 4 = 144.
+
+**The replacement.** A spike is the same snap-and-down play, and the table measures it: NFL 1.0 s (n 146);
+NCAAF 4.1 s (CFBD end-of-play clocks, noisier).
+
+**Unchanged.** The kneel's clock in the sim still comes from the window machinery. When the defense calls a
+timeout, the step takes the measured `<q>_to_def` cell, which includes that waiting, as the data shows.
+
+**Also recorded (a build note, decided before any v2 output was seen).** Kneels are left out of the denominators of
+`p_incomplete` / `p_sack` / `p_turnover`, because v2 draws kneels separately.
