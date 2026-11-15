@@ -976,6 +976,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 read SAFE for 1 of 22 CLOSED blocks; moved: `closed-lane-archive-20261114-1240`. Table and deferrals in `.syndicate/log/2026-11-14.md` (00:4xZ 11-15 entry).
 
+### ncaaf-sim-write-history — OPEN — opened 2026-11-14 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: Every NCAAF weekly sim write (smartsim2 projections CSV + segment sidecar) is kept as a dated, content-deduplicated gzip copy under <SYNDICATE_DATA_ROOT>/sim_history/ncaaf/, and scripts/ncaaf_segment_skill.py --archive grades each game off the last write before its kickoff (weeknight and early-Saturday games become gradable). Done = on main, loaded on refresh-worker, one measured copy on the fleet after the next daily NCAAF run, and the grader reproducing the #805 result unchanged without --archive.
+- Files: syndicate/features/shared/football_segment_distributions.py, scripts/generate_smartsim2_ncaaf_projections.py, scripts/ncaaf_segment_skill.py, tests/test_football_sim_history.py, tests/test_ncaaf_segment_skill.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: Targeted tests; the #805 reproduce command run before and after the grader change gives the same population, families and engine read; after the load, sim_history/ncaaf/ holds a copy whose generated_at equals the live wk sidecar's, and a repeat of an unchanged write adds no file.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
