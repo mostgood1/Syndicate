@@ -1511,6 +1511,35 @@ def _load_env() -> None:
     load_dotenv()
 
 
+def keep_sim_write(projections_csv: Path, sidecar: Path, *, season: int, week: int,
+                   history_dir: Path | None = None) -> str:
+    """Keep a dated copy of this write (todo #807); returns the `key=value` line to print.
+
+    The CSV and sidecar are rewritten daily through the week, and a grade needs the
+    write each game was priced off (`football_segment_distributions.archive_sim_write`).
+    This is a grading record only, so it NEVER raises: the publish that follows it in
+    `main` is what the board depends on.
+
+    The import is HERE, not at module top, on purpose: refresh-worker imports this
+    module in-process (`run_refresh_worker.py`, the live re-sim and ratings-cache
+    paths). After a fleet ff and before its restart, an old process holding the old
+    `football_segment_distributions` would fail a top-level import of these names, and
+    take those paths down with it."""
+    try:
+        from syndicate.features.shared.football_segment_distributions import (
+            archive_sim_write,
+            sim_history_dir,
+        )
+
+        kept = archive_sim_write(
+            projections_csv=projections_csv, sidecar=sidecar, season=season, week=week,
+            history_dir=history_dir if history_dir is not None else sim_history_dir(sport="ncaaf"),
+        )
+    except Exception as exc:  # noqa: BLE001 -- see the docstring
+        return f"sim_history_error={type(exc).__name__}: {exc}"
+    return f"sim_history_kept={kept if kept is not None else 'unchanged'}"
+
+
 def main() -> None:
     _load_env()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1719,6 +1748,7 @@ def main() -> None:
         print(f"segment_distributions_path={segment_path}", flush=True)
         print(f"segment_distributions_games={len(segment_blocks)}", flush=True)
         print(f"segment_distributions_bytes={segment_path.stat().st_size}", flush=True)
+        print(keep_sim_write(path, segment_path, season=args.season, week=args.week), flush=True)
     else:
         print("segment_distributions=off", flush=True)
     elapsed = time.time() - start

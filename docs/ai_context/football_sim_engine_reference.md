@@ -213,7 +213,19 @@ same autorun tuple (:2321) -> generate_smartsim2_ncaaf_projections.py
   write_projection_artifact(...)                                      (:306)
    writes: <data_root>/ncaaf_source/data/smartsim2_projections_<season>_wk<week>.csv (:2367)
    read by: syndicate/features/ncaaf/cards.py:34
+  write_segment_distributions_artifact(...)  [SYNDICATE_FOOTBALL_SEGMENT_DISTRIBUTIONS] (generator :1744)
+   writes: <data_root>/ncaaf_source/data/smartsim2_segment_distributions_<season>_wk<week>.json
+   read by: syndicate/features/ncaaf/segment_projections.py:330 (load_ncaaf_segment_inputs)
+  keep_sim_write(...) -> football_segment_distributions.archive_sim_write  (generator :1751, :1514; todo #807)
+   writes: <SYNDICATE_DATA_ROOT>/sim_history/ncaaf/
+           smartsim2_{projections,segment_distributions}_<season>_wk<week>.<YYYYMMDDTHHMMSSZ>.{csv,json}.gz
+           one pair per write whose content changed; outside every sport root on purpose
+   read by: scripts/ncaaf_segment_skill.py --archive (offline grading only; nothing on web)
 ```
+
+Both weekly files are REWRITTEN once a day through the week (fleet log
+2026-11-06..14: one write per day at ~16:00Z), so only `sim_history` holds the write
+a weeknight or early-Saturday game was priced off.
 
 **Note the artifact-root asymmetry**: NFL resolves through
 `nfl_artifact_output_root()`; NCAAF hardcodes `data_root / "ncaaf_source" /

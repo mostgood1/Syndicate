@@ -21,6 +21,22 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 import ncaaf_segment_skill as G  # noqa: E402
 
+@pytest.fixture(autouse=True)
+def _fresh_team_registry():
+    """The bridge resolves names through `oddsapi_lines`' `lru_cache`d registry. A test
+    elsewhere that points SYNDICATE_NCAAF_SOURCE_ROOT at an empty tmp dir leaves an EMPTY
+    map cached (measured: `test_ncaaf_live_resim_wiring.py` first, then every bridge test
+    here refused `team_unresolved`), so each test starts from the real registry."""
+    from syndicate.features.ncaaf import oddsapi_lines
+
+    caches = (oddsapi_lines._alias_map, oddsapi_lines._mascot_tails, oddsapi_lines.fbs_canonical_names)
+    for cached in caches:
+        cached.cache_clear()
+    yield
+    for cached in caches:
+        cached.cache_clear()
+
+
 START = "2026-11-07T20:00:00Z"
 SEG = {"total_points_dist": {"3": 30, "7": 40, "14": 30}, "margin_dist": {"-7": 30, "0": 20, "7": 50},
        "home_points_mean": 5.0, "away_points_mean": 3.0}
@@ -34,11 +50,12 @@ def _q(book, sel, line, price, *, market="totals", segment="q1", start=START, ev
 
 
 def _week(tmp_path, *, week=11, generated_at="2026-11-07T16:30:00+00:00", game_id="401999001",
-          home="Ohio State", away="Michigan"):
+          home="Ohio State", away="Michigan", seg=SEG):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     csv_path = tmp_path / f"smartsim2_projections_2026_wk{week}.csv"
     csv_path.write_text(f"game_id,season,week,home_team,away_team\n{game_id},2026,{week},{home},{away}\n",
                         encoding="utf-8")
-    payload = {"generated_at": generated_at, "games": {game_id: {"sims": 100, "segments": {"q1": SEG, "full": SEG}}}}
+    payload = {"generated_at": generated_at, "games": {game_id: {"sims": 100, "segments": {"q1": seg, "full": seg}}}}
     (tmp_path / f"smartsim2_segment_distributions_2026_wk{week}.json").write_text(json.dumps(payload),
                                                                                     encoding="utf-8")
 
@@ -112,6 +129,77 @@ def test_count_only_reads_no_outcome(tmp_path):
     obs, refused, _ = G.build_observations(G.consensus_markets(_totals_pair()), G.load_weeks(tmp_path),
                                            {"401999001": box})
     assert refused == {"no_segment_score": 1}
+
+
+# ------------------------------------------------- kept dated writes (#807) ----
+SEG_TUE = {**SEG, "total_points_dist": {"3": 80, "14": 20}}  # P(q1 total > 9.5) = 0.2
+SEG_WED = {**SEG, "total_points_dist": {"3": 40, "14": 60}}  # 0.6
+SEG_SAT = {**SEG, "total_points_dist": {"3": 10, "14": 90}}  # 0.9, written AFTER kickoff
+
+
+def _history(tmp_path):
+    """Tue + Wed writes kept; the current (Sat) file was rewritten after the 20:00Z kickoff."""
+    from syndicate.features.shared.football_segment_distributions import archive_sim_write
+
+    history = tmp_path / "history"
+    for name, gen, seg in (("tue", "2026-11-03T16:00:00+00:00", SEG_TUE), ("wed", "2026-11-04T16:00:00+00:00", SEG_WED)):
+        _week(tmp_path / name, generated_at=gen, seg=seg)
+        assert archive_sim_write(projections_csv=tmp_path / name / "smartsim2_projections_2026_wk11.csv",
+                                 sidecar=tmp_path / name / "smartsim2_segment_distributions_2026_wk11.json",
+                                 season=2026, week=11, history_dir=history) is not None
+    _week(tmp_path / "current", generated_at="2026-11-07T21:00:00+00:00", seg=SEG_SAT)
+    return tmp_path / "current", history
+
+
+def test_with_kept_writes_a_game_is_priced_off_its_last_write_before_kickoff(tmp_path):
+    current, history = _history(tmp_path)
+    consensus = G.consensus_markets(_totals_pair())
+    boxes = {"401999001": _box()}
+
+    obs, refused, _ = G.build_observations(consensus, G.load_weeks(current), boxes)
+    assert obs == [] and refused == {"sidecar_written_after_kickoff": 1}  # the #805 refusal
+
+    obs, refused, _ = G.build_observations(consensus, G.load_weeks(current, history), boxes)
+    assert refused == {}
+    (only,) = obs
+    assert only["sidecar_generated_at"] == "2026-11-04T16:00:00+00:00"  # Wed, not Tue, not Sat
+    assert only["p_model"] == pytest.approx(0.6)
+
+
+def test_kept_writes_ride_along_only_with_the_archive(tmp_path):
+    current, history = _history(tmp_path)
+    assert "writes" not in G.load_weeks(current)[(2026, 11)]
+    slot = G.load_weeks(current, history)[(2026, 11)]
+    assert [w["generated_at"] for w in slot["writes"]] == [
+        "2026-11-03T16:00:00+00:00", "2026-11-04T16:00:00+00:00", "2026-11-07T21:00:00+00:00"]
+    assert slot["generated_at"] == "2026-11-07T21:00:00+00:00"  # the current file is still the current file
+
+
+def test_half_a_kept_write_is_ignored(tmp_path):
+    # The sidecar is renamed into place second, so a sidecar without its CSV is a stray.
+    current, history = _history(tmp_path)
+    (history / "smartsim2_projections_2026_wk11.20261104T160000Z.csv.gz").unlink()
+    obs, _, _ = G.build_observations(G.consensus_markets(_totals_pair()), G.load_weeks(current, history),
+                                     {"401999001": _box()})
+    assert obs[0]["sidecar_generated_at"] == "2026-11-03T16:00:00+00:00"
+
+
+def test_the_engine_read_uses_the_kept_write_too(tmp_path):
+    current, history = _history(tmp_path)
+    boxes = {"401999001": _box()}
+    assert G.engine_read(G.load_weeks(current), boxes, reps=50, seed=1)["games"] == 0
+    read = G.engine_read(G.load_weeks(current, history), boxes, reps=50, seed=1)
+    assert read["games"] == 1
+    assert read["q1"]["sim_total_mean"] == pytest.approx(8.0)  # SEG's means, from the Wed block
+
+
+def test_a_game_only_an_earlier_write_held_is_still_bridged(tmp_path):
+    # A game dropped from the current CSV (e.g. moved off the slate) keeps its kept pair.
+    current, history = _history(tmp_path)
+    _week(current, generated_at="2026-11-07T21:00:00+00:00", game_id="401999777", home="Texas", away="Baylor")
+    obs, refused, _ = G.build_observations(G.consensus_markets(_totals_pair()), G.load_weeks(current, history),
+                                           {"401999001": _box()})
+    assert refused == {} and obs[0]["espn_id"] == "401999001"
 
 
 # ---------------------------------------------------------- registered rule ----

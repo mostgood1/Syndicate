@@ -28,7 +28,16 @@ the NCAAF bridge and the as-of rule:
 
     py -3 scripts/ncaaf_segment_skill.py --sidecars C:\\tmp\\ncaaf_seg\\sidecars \\
         --quotes C:\\tmp\\ncaaf_seg\\quotes --linescores C:\\tmp\\ncaaf_seg\\linescores.json \\
-        --out C:\\tmp\\ncaaf_seg\\result.json [--count-only]
+        --out C:\\tmp\\ncaaf_seg\\result.json [--count-only] [--archive DIR]
+
+The #805 grade ran on blob `8e9fbfdf5076` of this file, which had no `--archive`.
+
+`--archive DIR` (todo #807) adds the dated copies the generator keeps of EVERY
+weekly write (`<SYNDICATE_DATA_ROOT>/sim_history/ncaaf/`,
+`football_segment_distributions.archive_sim_write`). Each game then takes the last
+write strictly before its kickoff, which is the file the board was serving, instead of
+being refused because the week's file was rewritten later. Without `--archive` every
+week has one write and the grade is the #805 grade, unchanged.
 """
 
 from __future__ import annotations
@@ -36,6 +45,8 @@ from __future__ import annotations
 import argparse
 import csv
 import glob
+import gzip
+import io
 import json
 import re
 import statistics
@@ -66,30 +77,41 @@ ESPN_SCOREBOARD = (
 )
 _CSV_RE = re.compile(r"smartsim2_projections_(\d{4})_wk(\d+)\.csv$")
 _SIDECAR_RE = re.compile(r"smartsim2_segment_distributions_(\d{4})_wk(\d+)\.json$")
+_KEPT_SIDECAR_RE = re.compile(r"smartsim2_segment_distributions_(\d{4})_wk(\d+)\.(\d{8}T\d{6}Z)\.json\.gz$")
 
 
 # ----------------------------------------------------------------- inputs ----
-def load_weeks(sidecar_dir: Path) -> dict[tuple[int, int], dict[str, Any]]:
+def _pairs_from_csv_text(text: str) -> dict[tuple[str, str], str]:
+    from syndicate.features.ncaaf.game_projections import _norm
+
+    pairs: dict[tuple[str, str], str] = {}
+    for row in csv.DictReader(io.StringIO(text)):
+        home, away = str(row.get("home_team") or "").strip(), str(row.get("away_team") or "").strip()
+        game_id = str(row.get("game_id") or "").strip()
+        if home and away and game_id:
+            pairs[(_norm(home), _norm(away))] = game_id
+    return pairs
+
+
+def load_weeks(sidecar_dir: Path, archive_dir: Path | None = None) -> dict[tuple[int, int], dict[str, Any]]:
     """`{(season, week): {"pairs": {(home, away): game_id}, "blocks": {...}, "generated_at": str}}`.
 
     The pair keys are `_norm` of the CSV's own names -- the map production builds in
     `load_ncaaf_segment_inputs`. A week without a sidecar is kept with no blocks so
-    the refusal is counted rather than invisible."""
-    from syndicate.features.ncaaf.game_projections import _norm
+    the refusal is counted rather than invisible.
 
+    With `archive_dir`, each slot also carries `"writes"`: every kept write of that week
+    plus the current one, oldest first, each `{"generated_at", "pairs", "blocks"}`, and
+    `"pairs"` becomes their union (a later write's id wins). Without it there is no
+    `"writes"` key and every reader falls back to the one current write."""
     weeks: dict[tuple[int, int], dict[str, Any]] = {}
     for path_text in sorted(glob.glob(str(sidecar_dir / "smartsim2_projections_*_wk*.csv"))):
         match = _CSV_RE.search(path_text)
         if not match:
             continue
         key = (int(match.group(1)), int(match.group(2)))
-        pairs: dict[tuple[str, str], str] = {}
         with open(path_text, "r", encoding="utf-8-sig", newline="") as handle:
-            for row in csv.DictReader(handle):
-                home, away = str(row.get("home_team") or "").strip(), str(row.get("away_team") or "").strip()
-                game_id = str(row.get("game_id") or "").strip()
-                if home and away and game_id:
-                    pairs[(_norm(home), _norm(away))] = game_id
+            pairs = _pairs_from_csv_text(handle.read())
         weeks[key] = {"pairs": pairs, "blocks": {}, "generated_at": None}
     for path_text in sorted(glob.glob(str(sidecar_dir / "smartsim2_segment_distributions_*_wk*.json"))):
         match = _SIDECAR_RE.search(path_text)
@@ -100,7 +122,57 @@ def load_weeks(sidecar_dir: Path) -> dict[tuple[int, int], dict[str, Any]]:
         slot = weeks.setdefault(key, {"pairs": {}, "blocks": {}, "generated_at": None})
         slot["blocks"] = {str(g): b for g, b in (payload.get("games") or {}).items()}
         slot["generated_at"] = payload.get("generated_at")
+    if archive_dir is None:
+        return weeks
+
+    from syndicate.features.shared.football_segment_distributions import sim_history_names
+
+    kept: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
+    for path_text in sorted(glob.glob(str(Path(archive_dir) / "smartsim2_segment_distributions_*_wk*.*.json.gz"))):
+        match = _KEPT_SIDECAR_RE.search(path_text)
+        if not match:
+            continue
+        key = (int(match.group(1)), int(match.group(2)))
+        csv_name, _ = sim_history_names(season=key[0], week=key[1], stamp=match.group(3))
+        csv_path = Path(archive_dir) / csv_name
+        if not csv_path.exists():
+            continue  # half a write: the sidecar is renamed into place second, so this is a stray
+        payload = json.loads(gzip.decompress(Path(path_text).read_bytes()).decode("utf-8"))
+        kept[key].append({
+            "generated_at": payload.get("generated_at"),
+            "pairs": _pairs_from_csv_text(gzip.decompress(csv_path.read_bytes()).decode("utf-8-sig")),
+            "blocks": {str(g): b for g, b in (payload.get("games") or {}).items()},
+        })
+    for key in sorted(set(weeks) | set(kept)):
+        slot = weeks.setdefault(key, {"pairs": {}, "blocks": {}, "generated_at": None})
+        writes = {w["generated_at"]: w for w in kept.get(key, []) if w.get("generated_at")}
+        if slot.get("generated_at"):
+            writes[slot["generated_at"]] = {"generated_at": slot["generated_at"], "pairs": slot["pairs"],
+                                            "blocks": slot["blocks"]}
+        ordered = sorted(writes.values(), key=lambda w: _ts(str(w["generated_at"])))
+        slot["writes"] = ordered
+        union: dict[tuple[str, str], str] = {}
+        for write in ordered:
+            union.update(write["pairs"])
+        union.update(slot["pairs"])  # a current CSV with no sidecar still names its games
+        slot["pairs"] = union
+        if not slot.get("generated_at") and ordered:
+            slot["blocks"], slot["generated_at"] = ordered[-1]["blocks"], ordered[-1]["generated_at"]
     return weeks
+
+
+def _writes(slot: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Every write of the week, oldest first; one (the current) without `--archive`."""
+    if "writes" in slot:
+        return list(slot["writes"])
+    return [{"generated_at": slot.get("generated_at"), "blocks": slot.get("blocks") or {}}]
+
+
+def _last_write_before(slot: Mapping[str, Any], game_id: str, moment: datetime) -> Mapping[str, Any] | None:
+    usable = [w for w in _writes(slot)
+              if w.get("generated_at") and isinstance(w["blocks"].get(game_id), Mapping)
+              and _ts(str(w["generated_at"])) < moment]
+    return max(usable, key=lambda w: _ts(str(w["generated_at"]))) if usable else None
 
 
 def fetch_linescores(dates: Iterable[str], cache: Path) -> dict[str, dict[str, Any]]:
@@ -161,12 +233,15 @@ def bridge(c: Mapping[str, Any], weeks: Mapping[tuple[int, int], Mapping[str, An
         return "ambiguous_week", {}
     wk, game_id, box = dated[0]
     slot = weeks[wk]
-    block = slot["blocks"].get(str(game_id))
-    if not isinstance(block, Mapping):
+    # The same two refusals, in the same order, as with one write: no write of the week
+    # holds a block -> no_sim_block; none of those was written before kickoff ->
+    # sidecar_written_after_kickoff. Otherwise the LAST write before kickoff prices it.
+    if not any(isinstance(w["blocks"].get(str(game_id)), Mapping) for w in _writes(slot)):
         return "no_sim_block", {}
-    gen = slot.get("generated_at")
-    if not gen or _ts(str(gen)) >= start:
+    write = _last_write_before(slot, str(game_id), start)
+    if write is None:
         return "sidecar_written_after_kickoff", {}
+    block, gen = write["blocks"][str(game_id)], write["generated_at"]
     if not box.get("final"):
         return "no_final_box", {}
     return None, {"week": wk, "game_id": str(game_id), "block": block, "box": box, "generated_at": gen}
@@ -224,13 +299,21 @@ def engine_read(weeks, boxes, *, reps: int, seed: int) -> dict[str, Any]:
 
     rows = []
     for (season, _wk), slot in sorted(weeks.items()):
-        gen = slot.get("generated_at")
-        if season != 2026 or not gen:
+        if season != 2026:
             continue
-        for game_id, block in slot["blocks"].items():
+        # The current write's games first, in its order (the one-write order), then any
+        # game only an earlier kept write holds.
+        order = list(slot["blocks"])
+        for write in _writes(slot):
+            order.extend(g for g in write["blocks"] if g not in order)
+        for game_id in order:
             box = boxes.get(str(game_id))
-            if not box or not box.get("final") or not box.get("date") or _ts(box["date"]) <= _ts(str(gen)):
+            if not box or not box.get("final") or not box.get("date"):
                 continue
+            write = _last_write_before(slot, str(game_id), _ts(box["date"]))
+            if write is None:
+                continue
+            block = write["blocks"][str(game_id)]
             for seg in ("full", *SEGMENTS):
                 sb = _segment_block(block, seg)
                 if not sb:
@@ -300,9 +383,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", type=int, default=804)
     ap.add_argument("--count-only", action="store_true",
                     help="population counts only; no outcome is read or graded")
+    ap.add_argument("--archive", default=None,
+                    help="the kept dated writes (sim_history/ncaaf); each game takes its last write before kickoff")
     args = ap.parse_args(argv)
 
-    weeks = load_weeks(Path(args.sidecars))
+    weeks = load_weeks(Path(args.sidecars), Path(args.archive) if args.archive else None)
     consensus = consensus_markets(iter_quotes(sorted(glob.glob(str(Path(args.quotes) / "*.jsonl*")))))
     starts = {_ts(str(c["commence_time"])) for c in consensus.values()}
     dates = {d.strftime("%Y-%m-%d") for s in starts for d in (s, s - timedelta(days=1))}
@@ -316,7 +401,9 @@ def main(argv: list[str] | None = None) -> int:
         "eligible_markets": len(eligible),
         "eligible_games": len({k[0] for k in eligible}),
         "weeks": {f"{s}_wk{w}": {"pairs": len(v["pairs"]), "blocks": len(v["blocks"]),
-                                 "generated_at": v["generated_at"]} for (s, w), v in sorted(weeks.items())},
+                                 "generated_at": v["generated_at"],
+                                 **({"writes": len(v["writes"])} if "writes" in v else {})}
+                  for (s, w), v in sorted(weeks.items())},
     }
     if args.count_only:
         by_family: dict[str, set[str]] = defaultdict(set)

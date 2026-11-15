@@ -355,16 +355,135 @@ def read_segment_distributions_artifact(*, season: int, week: int, data_root: Pa
     return {str(game_id): block for game_id, block in games.items()}
 
 
+# SIM WRITE HISTORY -- todo #807, lane `ncaaf-sim-write-history`.
+#
+# WHY. The generator rewrites `smartsim2_projections_<s>_wk<w>.csv` and its
+# sidecar ONCE A DAY through the week (fleet log 11-06..11-14: one write per
+# day at ~16:00Z, both sports), so only the week's LAST write survives. A
+# Tuesday or early-Saturday game was priced off a write that is gone by the
+# time anyone grades it: todo #805's NCAAF segment grade had to refuse 3,485
+# of 6,467 quoted segment markets as `sidecar_written_after_kickoff`, and kept
+# 161 of 362 games. A dated copy of every write lets a grader take, per game,
+# the last write before its kickoff -- the file the board was serving.
+#
+# WHERE. `<SYNDICATE_DATA_ROOT>/sim_history/<sport>/`, OUTSIDE every sport
+# root, on purpose: `artifact_manifests._load_scanned_manifest` rglobs the
+# whole `<sport>_source` tree and files any name containing "projection" or
+# "sim" as a PREDICTION, dated from its name -- a copy stamped 20261114 would
+# read as a 2026-11-14 prediction. The non-recursive weekly globs
+# (`ncaaf/cards.py`, `blueprints/ops.py`, `build_ncaaf_pick_ledger.py`) never
+# see it either, and no `artifact_retention` rule matches it, so it is kept.
+# NOT in `HOT_ARTIFACT_PATTERNS`: nothing on web reads it; it is a grading
+# record read offline from the fleet's disk.
+#
+# WHAT. One write = the CSV and the sidecar, gzipped, under ONE stamp taken
+# from the sidecar's own `generated_at`. The CSV goes first and the sidecar
+# second, each by an atomic rename, so a reader that pairs by stamp never sees
+# half a write. A write whose sidecar `games` and CSV rows (less the per-row
+# `generated_at`) equal the newest kept copy of that week adds nothing: that
+# copy already holds what the board served.
+SIM_HISTORY_DIRNAME = "sim_history"
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def sim_history_dir(*, sport: str, data_root: Path | None = None) -> Path:
+    """`<SYNDICATE_DATA_ROOT>/sim_history/<sport>` (repo `data/` when the env is unset)."""
+    if data_root is None:
+        override = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
+        data_root = Path(override).expanduser() if override else _REPO_ROOT / "data"
+    return Path(data_root) / SIM_HISTORY_DIRNAME / sport
+
+
+def _history_stamp(generated_at: str) -> str:
+    moment = datetime.fromisoformat(str(generated_at).replace("Z", "+00:00"))
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def sim_history_names(*, season: int, week: int, stamp: str) -> tuple[str, str]:
+    """`(csv_name, sidecar_name)` of one kept write."""
+    return (
+        f"smartsim2_projections_{season}_wk{week}.{stamp}.csv.gz",
+        f"smartsim2_segment_distributions_{season}_wk{week}.{stamp}.json.gz",
+    )
+
+
+def _csv_rows_less_stamp(data: bytes) -> list[dict[str, str]]:
+    import csv
+    import io
+
+    rows = list(csv.DictReader(io.StringIO(data.decode("utf-8-sig"))))
+    for row in rows:
+        row.pop("generated_at", None)
+    return rows
+
+
+def _write_gzip_atomic(path: Path, data: bytes) -> None:
+    import gzip
+
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(gzip.compress(data, mtime=0))
+    os.replace(tmp, path)
+
+
+def archive_sim_write(
+    *,
+    projections_csv: Path,
+    sidecar: Path,
+    season: int,
+    week: int,
+    history_dir: Path,
+) -> Path | None:
+    """Keep one dated copy of this week's write. Returns the kept sidecar's path,
+    or None when the newest kept copy of the week already holds the same content."""
+    import gzip
+
+    sidecar_bytes = Path(sidecar).read_bytes()
+    csv_bytes = Path(projections_csv).read_bytes()
+    payload = json.loads(sidecar_bytes.decode("utf-8"))
+    stamp = _history_stamp(payload["generated_at"])
+    csv_name, sidecar_name = sim_history_names(season=season, week=week, stamp=stamp)
+    history_dir = Path(history_dir)
+    history_dir.mkdir(parents=True, exist_ok=True)
+    if (history_dir / sidecar_name).exists():
+        return None  # this exact write is already kept
+    # `..._wk1.` cannot match `..._wk10.`: the dot ends the week number. The
+    # fixed-width stamp sorts as time.
+    prefix = f"smartsim2_segment_distributions_{season}_wk{week}."
+    stamps = sorted(p.name[len(prefix): -len(".json.gz")] for p in history_dir.glob(prefix + "*.json.gz"))
+    if stamps:
+        prior_csv_name, prior_sidecar_name = sim_history_names(season=season, week=week, stamp=stamps[-1])
+        try:
+            prior = json.loads(gzip.decompress((history_dir / prior_sidecar_name).read_bytes()).decode("utf-8"))
+            prior_rows = _csv_rows_less_stamp(gzip.decompress((history_dir / prior_csv_name).read_bytes()))
+        except (OSError, ValueError, EOFError):
+            prior, prior_rows = None, None
+        if (
+            isinstance(prior, Mapping)
+            and prior.get("games") == payload.get("games")
+            and prior_rows == _csv_rows_less_stamp(csv_bytes)
+        ):
+            return None
+    _write_gzip_atomic(history_dir / csv_name, csv_bytes)
+    _write_gzip_atomic(history_dir / sidecar_name, sidecar_bytes)
+    return history_dir / sidecar_name
+
+
 __all__ = [
     "DISTRIBUTION_VERSION",
     "FootballSegmentAccumulator",
     "SEGMENT_DISTRIBUTIONS_ENV",
     "SEGMENT_KEYS",
     "SEGMENT_SOURCE",
+    "SIM_HISTORY_DIRNAME",
+    "archive_sim_write",
     "game_has_overtime",
     "read_segment_distributions_artifact",
     "segment_distributions_artifact_path",
     "segment_distributions_enabled",
     "segment_points",
+    "sim_history_dir",
+    "sim_history_names",
     "write_segment_distributions_artifact",
 ]
