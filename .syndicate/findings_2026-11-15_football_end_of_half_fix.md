@@ -6,7 +6,7 @@ recorded on main `ec6002505`). Diagnosis this builds on: `findings_2026-11-15_fo
 
 Nothing here ships. Code goes on a branch. A push to `main` and any fleet load need the user's OK.
 
-## PRE-REGISTRATION — written 2026-11-15, BEFORE any sim run or league-input measurement in this lane
+## PRE-REGISTRATION — written 2026-11-15 10:32 CST (commit `03d1066c6`), BEFORE any sim run or league-input measurement in this lane
 
 ### The change (ONE change plus a re-fit, `model_engine_standard.md` §4.4)
 
@@ -204,7 +204,7 @@ total.
 - The market test after any load is the segment re-grade: #752 (`scripts/nfl_segment_skill.py`) and #805.
 - If any gate fails, nothing ships. The switches stay in the code, default OFF, and the failure is written up.
 
-### Amendment 1 — 2026-11-15 ~11:10 CST, after the clock table and a SMOKE run, BEFORE any FIT read
+### Amendment 1 — 2026-11-15 10:50 CST (commit `c9ea2e486`), after the clock table and a SMOKE run, BEFORE any FIT read
 
 **What the smoke run was.**
 - Neutral teams (all ratings 0), the DEFAULT profile, 300-400 seeds, no FIT game.
@@ -244,7 +244,7 @@ The sim's two-minute drill throws about 17% incompletions. The league throws abo
 - Every gate, the re-fit grid, the predictions (P3 is now expected nearer its centre) and the decision rule.
 - The two-minute drill's other boosts (explosive x1.60, TD +0.04) are still reported only.
 
-### Amendment 2 — 2026-11-15 ~11:35 CST, after a second SMOKE run, BEFORE any FIT read. The LAST change to the clock.
+### Amendment 2 — 2026-11-15 10:55 CST (commit `f551cdcb0`), after a second SMOKE run, BEFORE any FIT read. The LAST change to the clock.
 
 **What the smoke run was.** The same neutral-team smoke as Amendment 1, with `p_incomplete` in. Scripts
 `C:\tmp\football_eoh_fix\bucket.py` / `bucket2.py`. No FIT game and no 2026 game was read.
@@ -293,7 +293,7 @@ changes across the window (nflverse 2024-25, Q2+Q4 window):
 - The next smoke run is a functional check only. The FIT read runs whatever it shows.
 - If FIT misses G3, it is a FAIL and is reported as one. No third clock amendment.
 
-### Amendment 3 — 2026-11-15 ~12:00 CST, after Amendment 2's functional check, BEFORE any FIT read. The LAST pre-FIT change of any kind.
+### Amendment 3 — 2026-11-15 11:01 CST (commit `afb93d837`), after Amendment 2's functional check, BEFORE any FIT read. The LAST pre-FIT change of any kind.
 
 **What the functional check showed.**
 - The neutral smoke with Amendment 2 in (`bucket.py`) gives Q2-window snaps 8.9: by bucket 2.50 / 2.09 / 2.24 /
@@ -329,6 +329,144 @@ changes across the window (nflverse 2024-25, Q2+Q4 window):
 **Known structural gap, stated now:** the league's G3 count includes spikes (0.14 a game in Q2's window), which
 the sim does not model.
 
-## Results
+## Results — 2026-11-15, FIT arms run ~11:06-12:08 CST (`off` finished 11:11 after 4.6 min; file mtimes), written 12:2x-12:3x CST
 
-(none yet)
+### Verdict: FAIL on FIT. Nothing ships, and the held-out read was NOT run.
+
+**Where it failed.**
+- At every point of the pre-registered re-fit grid, G3 (Q2's last-120 s snaps) and G4 (H1 > H2) fail.
+- At the grid's best point, G1-q2 and G2 fail as well.
+- Per the decision rule, nothing ships. The switches stay in the code, default OFF.
+
+**Why NFL 2026 wk1-8 stayed unread.**
+- The held-out read gates shipping, and this candidate cannot ship.
+- 2026 is the only clean NFL held-out set left. Spending it on a FAIL would leave a fixed v2 nothing to be judged on.
+- Whether to read it anyway is the user's decision (the calibration lane's precedent: "Validate only if FIT beats
+  production").
+
+**Code (branch only, not pushed):** `cfbbb8b91` on `claude/admiring-gould-5c7128`.
+- The mechanism and its 3 amendments, all default OFF.
+- Tests: `tests/test_football_end_of_half_clock.py`, 22 tests. With the engine suites, 160 passed (Idle, finished 11:12 CST).
+- B: OFF byte-identical. The three pinned sha256 digests (NFL pregame, NCAAF pregame, NFL Q2 resume) equal the
+  pre-change engine's.
+- R: each switch alone changes the output.
+
+### FIT read
+
+Setup:
+- NFL, every 4th completed 2024-25 game (136), 100 seeds, the same seeds in every arm.
+- Production's `build_projection` in production's env. Harness `C:\tmp\football_eoh_fix\fit.py`, reader `analyze.py`.
+- **The harness reproduces the diagnosis exactly:** `off` q1-q4 9.68 / 12.54 / 10.52 / 13.10, Q2 last-120 s 3.14
+  points, 6.71 snaps with penalties, the same kick rates by bucket. `ht` gives q3 -0.95 and total -1.05;
+  `ht_gates` gives q2 +0.22.
+
+| arm | q1 | q2 | q3 | q4 | H1 / H2 | total | home margin | Q2 last-120 s pts / snaps | Q4 last-120 s pts / snaps | Q |
+|---|---|---|---|---|---|---|---|---|---|---|
+| league 2024-25 | 8.93 [8.46, 9.40] | 14.02 [13.47, 14.59] | 9.50 [9.01, 10.00] | 13.17 [12.54, 13.84] | 22.95 / 22.67 | 45.62 (reg) | | 4.78 [4.46, 5.10] / 10.63 [10.41, 10.86] | 2.63 [2.31, 2.96] / 7.38 [7.08, 7.68] | |
+| `off` (production) | 9.68 | 12.54 | 10.52 | 13.10 | 22.22 / 23.62 | 45.95 | +1.93 | 3.14 / 6.50 | 2.25 / 4.59 | 52.8 |
+| `ht` | 9.68 | 12.54 | 9.57 | 12.98 | 22.22 / 22.54 | 44.90 | +0.94 | 3.14 / 6.50 | 2.30 / 4.63 | 36.9 |
+| `ht_gates` | 9.68 | 12.76 | 9.46 | 12.99 | 22.44 / 22.45 | 45.02 | +1.01 | 3.36 / 7.05 | 2.31 / 4.63 | 29.4 |
+| `full` | 9.68 | 13.80 | 9.90 | 14.22 | 23.48 / 24.12 | 47.72 | +1.26 | 4.40 / 9.19 | 3.48 / 7.85 | 22.9 |
+| R1 pick `h0.03_t1.0` | 9.76 | 14.05 | 9.98 | 14.30 | 23.80 / 24.27 | 48.19 | +1.98 | 4.47 / 9.22 | 3.49 / 7.83 | 27.0 |
+| **R2 pick `h0.03_t0.875`** | 9.28 | **13.42** | 9.53 | 13.74 | **22.70 / 23.27** | 46.08 | +1.67 | **4.32 / 9.32** | 3.32 / 7.85 | **9.58** |
+
+Snaps exclude penalty steps; with them, `full` has 9.49. Paired against `off`, `full` moves: total +1.76
+[+1.58, +1.95], home margin -0.67 [-0.87, -0.48], q2 +1.26 [+1.19, +1.33], q3 -0.62 [-0.73, -0.51], Q2 last-120 s
+snaps +2.69 [+2.64, +2.74].
+
+**Re-fit, as registered.**
+- R1 (`home_field_bonus`, at TD multiplier 1.0): margins +1.26 / +1.98 / +2.52 / +3.18 / +3.80 / +4.34 for
+  0 / .03 / .06 / .09 / .12 / .15. **0.03 is closest to `off`'s +1.93.**
+- R2 (TD multiplier, at 0.03): Q is 27.0 / 22.1 / 17.2 / 12.9 / 10.1 / **9.6** for 1.0 / .975 / .95 / .925 /
+  .90 / .875. **0.875 wins, at the grid's edge.**
+- **R3 was NOT run (a deviation, stated here).** R2's choice moved the margin -0.26 from `off`, which triggers R3.
+  It could not change the verdict: across all 11 grid points, Q2-window snaps stay at 9.19-9.32 against
+  [10.41, 10.86], and H2 > H1 at every point.
+
+**Gates at the R2 pick.**
+
+| gate | result |
+|---|---|
+| G1 q1 | 9.28 PASS |
+| G1 q2 | 13.42 **FAIL** (< 13.47) |
+| G1 q3 | 9.53 PASS |
+| G1 q4 | 13.74 PASS |
+| G2 | 4.32 **FAIL** (< 4.46) |
+| G3 | 9.32 **FAIL** (< 10.41) |
+| G4 | 22.70 vs 23.27 **FAIL** |
+
+**Predictions.** Held: P1, P2, P4 snaps (7.85), P3's Q2 points (4.40), q3 (9.90) and margin (-0.67), and P5's
+home bonus (0.03). Failed: P3 snaps (9.19 < 9.5) and total (+1.76 > +1.5), P4 Q4 points (3.48 > 3.2), P5's TD
+multiplier (0.875 < 0.90), P6. P7 was not read.
+
+### What the mechanism did and did not fix
+
+Diagnostic after the read, `full` on 34 FIT games x 50 seeds (`diag.py`); it changes nothing registered.
+
+1. **Q2: the shape is mostly fixed.**
+   - Q3's carry-over is gone (q3 9.53-9.90 against 9.50).
+   - Q2's last 120 s gained +1.26 points and +2.7 snaps.
+   - The end-of-half kick is now flat in score (0.16-0.19 a drive across buckets, 0.14-0.29 `off`). It is lower
+     than the league's 0.25-0.30, because the kick now waits until 14 s.
+   - **The remaining snap gap is all in the last 60 s.** Snaps a game by bucket: 0-30 s league 3.37 / sim 2.26;
+     30-60 s 2.62 / 2.26; 60-90 s 2.08 / 2.05; 90-120 s 2.42 / 2.64.
+   - Not modelled: spikes (0.14 a game), and a team in range calling its timeout ON PURPOSE to set up the kick.
+     The sim's timeouts are drawn at the measured average rates, not by need.
+2. **Q4: the clock exposed a pre-existing scoring defect; it did not create one.**
+   - Q4's window gets near the league's snaps (7.85 vs 7.38). But Q4-window points rise to 3.48 (league 2.63
+     [2.31, 2.96]), and Q4 to 14.22, so H2 > H1.
+   - The source: TDs by the LEADING team in end-game preservation, 1.37 points a game.
+   - `URGENCY_END_GAME_PRESERVATION` (Q4, <= 150 s, leading) adds gain weight, cuts incompletions and explosives,
+     and never cuts the TD weight. A team that should kneel keeps scoring.
+   - The clock's defensive timeouts (Q4 trailing defense, 0.20-0.29 a play) give it more snaps to do so.
+   - Q4's last 30 s now carry 2.09 snaps a game against the league's 1.43.
+   - Q4 also keeps the <= 90 s any-down urgency kick, which is out of scope here.
+3. **The scoring-level lever is weak and near the edge of its grid.** About -0.4 total per -0.025, so the level
+   fix lands at 0.875, the grid's edge. Q1 still runs high (9.28-9.68 against 8.93), as the diagnosis found.
+
+### NCAAF arms (descriptive)
+
+Setup:
+- Production's NCAAF `build_projection` via `_ncaaf_init` (profile `ncaaf-goal-line-refit-1`).
+- The 2024 FBS-vs-FBS REG task list, every 4th game: 164 games x 100 seeds, the same seeds per arm
+  (`fit_ncaaf.py`, finished 12:35 CST).
+- The league reference is CFBD 2023-25 (2,627 games; points placed at drive-end clocks), so read it as a level,
+  not a gate.
+- NCAAF ran without a re-fit, as registered: it is descriptive.
+
+| arm | q1 | q2 | q3 | q4 | H1 / H2 | total | home margin | Q2 last-120 s pts / snaps | Q4 last-120 s pts / snaps |
+|---|---|---|---|---|---|---|---|---|---|
+| league CFBD 2023-25 | 11.37 | 16.23 | 11.65 | 13.83 | 27.60 / 25.48 | | | 5.27 [5.07, 5.48] / 10.59 [10.43, 10.76] | 3.07 [2.85, 3.29] / 7.25 [7.06, 7.45] |
+| `off` | 11.37 | 13.78 | 11.71 | 14.36 | 25.15 / 26.07 | 51.33 | +1.58 | 2.86 / 6.34 | 2.47 / 4.55 |
+| `ht` | 11.37 | 13.78 | 10.71 | 14.44 | 25.15 / 25.15 | 50.41 | +0.77 | 2.86 / 6.34 | 2.53 / 4.58 |
+| `ht_gates` | 11.37 | 13.61 | 10.80 | 14.52 | 24.98 / 25.32 | 50.42 | +0.85 | 2.69 / 7.17 | 2.58 / 4.57 |
+| `full` | 11.37 | 15.64 | 11.32 | 16.36 | 27.01 / 27.68 | 54.81 | +0.88 | 4.73 / 9.67 | 4.33 / 8.13 |
+
+Paired against `off`, `full` moves: total +3.48 [+3.29, +3.68], home margin -0.70 [-0.99, -0.42], q2 +1.87
+[+1.79, +1.94], q3 -0.39 [-0.52, -0.25].
+
+**Reading.** The same shape as NFL, more strongly.
+- **Part 1, the halftime kickoff:** q3 -1.00.
+- **Part 2 alone LOWERS NCAAF Q2 by -0.17** (NFL: +0.22). Its kick-rate effect is not NCAAF's lever.
+- **The clock closes most of the Q2 gap.** Q2's last 120 s go from 2.86 to 4.73 points (league 5.27) and from 6.34
+  to 9.67 snaps (league 10.59).
+- **Q4 over-scores more than NFL:** 16.36 against 13.83, Q4-window points 4.33 against 3.07. H2 > H1, against the
+  league's 27.60 / 25.48.
+- **P8 held:** Q2's window points moved toward 5.27, and q3 fell.
+- NCAAF needs the same Q4 fix as NFL ((a) below), plus its own level re-fit. Its held-out seasons are spent
+  (2025, 2026), so any NCAAF promotion needs a new held-out design from the user.
+
+### What a v2 would need (for the user to decide; nothing here is pre-registered)
+
+- **(a) The leader's run-out in Q4.** In end-game preservation, a leader kneels: cut its TD and FG weights, or
+  route it to kneels. That is a mechanism, with the league's leading-team Q4-window points as the measured target.
+- **(b) Clock management by need in the last minute.**
+  - A team in range with a timeout calls it to set up the kick.
+  - A team without one spikes.
+  - The last-minute snaps are the remaining Q2 gap.
+- **(c) The same Amendment-3 kick timing in Q4**, which keeps the <= 90 s any-down kick.
+- **(d) A scoring-level lever with reach.** The TD multiplier needs a wider grid, or a different lever.
+- **(e) Before any live use:** the live producers must pass the real timeouts left (`initial_timeouts_home/away`).
+  Nothing feeds them today.
+
+A v2 is a new pre-registration and a new FIT read. 2026 wk1-8 is still unread for NFL.
