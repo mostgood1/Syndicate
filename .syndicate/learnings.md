@@ -3397,3 +3397,25 @@ I counted "unchanged re-appends" on the NBA and NHL quote shards (NHL: 41% of ro
 - **What was true.** The window 10-20..11-10 straddled `#763` (2026-11-05 22:37:35Z), which first put overtime points in the projected total. 7 of the 8 overtime games came before it. Their rows projected NO overtime at all, so they erred by their whole overtime by construction. The "finding" was a fixed bug, re-measured.
 - **Why it was missed.** The study joined history rows to finals over the whole window, with no column for which code wrote each row. The rows carry `t` (generatedAt) but no code version. deploys.md held the answer, with the exact load time.
 - **RULE:** before splitting a model's error by an event (overtime, a blowout, a refusal reason), list every deploy inside the evaluation window that changed how the model handles THAT event, and split the rows at each load time. If any event-bearing rows sit before one, report them separately or drop them. A segment or field that was added mid-window reads as a real zero on older rows: gate it by the load time (here `H2_CARRIES_OT_SINCE`), never by "the field is present".
+
+## 2026-11-15 — OVERTURNED: "the missing end-of-half snaps x the sim's points per snap = the missing points" — a mechanism that adds snaps multiplies whatever each snap does, including what is wrong `[lane football-end-of-half-fix, session 69e3a2e5]`
+
+**The belief.** The #808 diagnosis sized the clock fix as
+`(10.63 - 7.28 snaps) x 0.46 points per snap = ~1.5 points`. It carried the same accounting into Q4, and called
+Q4's per-snap points "only a little low".
+
+**What the measurement showed.**
+- The measured clock got Q4's window to 7.85 snaps (league 7.38), and Q4-window points to 3.48 (league 2.63
+  [2.31, 2.96]).
+- NCAAF went the same way: 4.33 against 3.07.
+- The extra snaps went largely to LEADING teams in end-game preservation. The engine never lowers their TD weight,
+  so they scored 1.37 points a game where the league kneels.
+- In Q2 the fix landed close to its accounting (+1.26). In Q4 the accounting was wrong in sign: H2 now beats H1.
+
+**Rule.** Before adding a mechanism that changes HOW MANY of something happen (snaps, possessions, attempts),
+measure what the engine does PER UNIT in every state the new units fall into, by mode. A per-unit rate averaged
+over the old states says nothing about the new ones.
+
+**Also from this lane.** A measured table keyed too coarsely is a design error, not a fitted dial.
+- The pooled running-clock cell (22 s, from snaps at >= 45 s) hid a fall from 25 s to 9 s across the window.
+- Key a table on the variable the behaviour moves with BEFORE pre-registering it: here, the clock left.
