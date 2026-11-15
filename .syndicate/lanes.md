@@ -840,12 +840,6 @@ death, never life — do not invert it.
 - Verification: Unit: pull_only never starts a round; the reacting sleep runs a pass when a live shard changes and still ends at its deadline; off switch -> a plain sleep (off != on); the round skips a sport repriced on pull within 45 s and keeps the live cadence; 0 disables the skip. After the user's load: pull_to_price.py and main_thread_budget.py on a live window vs 2026-11-14's
 - Blocked by: none
 
-### closed-lane-archive-20261115-0239 — CLOSED 2026-11-15 (GOAL MET: 10 blocks archived) — opened 2026-11-15 — session cf77f272-3956-4bae-bf6f-2c8906a1c52e
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET -- owner_liveness --idle-min 240 read 10 SAFE of 24 CLOSED at 08:40Z (2:40 AM CST); invariants FAIL set unchanged vs baseline (1 pre-existing contested file).
-- Moved: nhl-live-period-remainder, rail-callouts-sim-vs-book, ncaaf-801-live-reading, book-grid-live-first, nhl-live-puckline-regrade, live-rail-fast-poll, nhl-live-score-effects, rail-sport-and-filter-fold, nfl-prop-name-roster-first, closed-lane-archive-20261114-2040. Table in .syndicate/log/2026-11-15.md.
-
 ### closed-lane-archive-20261115-0440 — CLOSED 2026-11-15 (GOAL MET: 4 blocks archived) — opened 2026-11-15 — session 073487bf-510f-40bf-a7cc-07b7039a61ea
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -872,6 +866,11 @@ death, never life — do not invert it.
 - Falsification test: The game-clustered 95% CI for k includes 1.0 or lies below it on BOTH markets. Too few games to tell (CI wider than 1.0 to 2.5) is reported as UNDETERMINED, not as either
 - Verification: The fit runs after the 11-15 Sunday-night final on every game with both halves (expected: 2 already, plus about 13 today), and k, its CI, the Brier gap and the n are written to todo #780 and the findings file
 - Blocked by: none
+
+### closed-lane-archive-20261115-0840 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session c340d9e9-7fab-4dda-b749-629ce7a17822
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 at ~14:41Z (8:41 AM CST): 1 SAFE of 14 CLOSED; moved `closed-lane-archive-20261115-0239`. Table + WAIT reasons in log/2026-11-15.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1138,6 +1137,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261114-2040` — CLOSED 2026-11-14 (GOAL MET: 2 blocks archived) — opened 2026-11-14 — session 11b3af8d-3f96-440a-a1e7-4c7e4299bfe2
 - `closed-lane-archive-20261114-2240` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session bae0317c-6f5d-45f1-b4b8-92c406fd6e8b
 - `closed-lane-archive-20261115-0039` — CLOSED 2026-11-15 (GOAL MET: 3 blocks archived) — opened 2026-11-15 — session b12a6db7-fa70-4e8e-bdf7-57571820b2e1
+- `closed-lane-archive-20261115-0239` — CLOSED 2026-11-15 (GOAL MET: 10 blocks archived) — opened 2026-11-15 — session cf77f272-3956-4bae-bf6f-2c8906a1c52e
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
