@@ -1078,7 +1078,7 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   - Web refreshes NBA at read time. The NHL/NFL fix is LOADED on web 11-10 15:45:23Z (`fd05acb13`, lane `nhl-nfl-actual-read-time`): web re-reads the box at request time, Actual only. Replay: NFL two-value groups 7 of 43 -> 0. NHL read LIVE 11-11 00:20-00:40Z (3 polls):
     - 0 split groups;
     - 232 of 232 rows equal to the published block, which trails the box by up to ~100 s.
-    NFL not yet read (todo #769 (c)).
+    NFL READ LIVE 11-15 18:30-19:11Z (5 polls, 7 games): 0 split groups; 2,206 of 2,206 rows equal to the published block, 130 of them board-build rows; 0 Live proj. / model edge (deploys.md 2026-11-15 19:11:28Z; todo #769 (c) done, lane closed).
 - **Beside it:** the NHL live game-line name mismatch (snapshot `'Penguins'` vs board `'Pittsburgh Penguins'`) is RESOLVED: lane `nhl-live-resim-slate-root` closed 11-10 with GOAL MET.
 
 ## [layer2-live-display-other-sports] LIVE GAME-LINE ROWS THE JOIN WON'T PRICE SHOW A DISPLAY-ONLY Live proj. IN NCAAB / WNCAAB / NFL / NHL (NBA's #762 pattern) -- LOADED 11-09 (aa5f50ac5), VERIFIED on live slates; NCAAF verified 2026-11-11 `[verified 2026-11-10 02:10Z, lane live-display-other-sports, todo #771]`

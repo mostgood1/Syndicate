@@ -692,7 +692,7 @@
   - **(b) NHL Live proj.** Measured on the fleet's 11-08 features (n=200): resuming at P1 20:00, 0-0 WITHOUT `special_teams_cal` (what `nhl/live_resim` runs) puts per-player SOG +5.7..+7.4%, goals +4.1..+10.5%, assists +6.4..+12.6%, points +5.5..+11.4%, saves +5.1..+7.1% above the pregame prop sim. WITH it, MAD is 0.0000. Two routes, neither taken:
     - pass the cal into the re-sim. This changes the PRICED live moneyline, so it needs the user and the nhl-live-resim owner;
     - run a separate calibrated prop resume (~3 s per game at puck drop).
-  - **(c) Freshness: MEASURED 11-10, a real lag. FIX LOADED on web 11-10 15:45:23Z (`fd05acb13`, lane `nhl-nfl-actual-read-time`); NHL read live 11-11 (0 split groups); NFL reading OWED.**
+  - **(c) Freshness: MEASURED 11-10, a real lag. FIX LOADED on web 11-10 15:45:23Z (`fd05acb13`, lane `nhl-nfl-actual-read-time`, CLOSED 11-15); NHL read live 11-11 (0 split groups); NFL READ LIVE 11-15, MET: 5 polls, 0 split groups, 2,206 of 2,206 rows equal to the published block (130 board-build), 0 Live proj. / model edge (deploys.md 2026-11-15 19:11:28Z). (c) DONE.**
     - At NFL halftime, with the stats frozen:
       - in-play overlay rows (`layer2_inplay_overlay`): 40 of 40 equal the box;
       - board-build rows (`layer2_shortlist`): 13 equal, 14 behind (Allen passing yards 70 vs 122), 1 ahead (rushing yards can go down).

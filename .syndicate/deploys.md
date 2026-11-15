@@ -60297,3 +60297,22 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Prediction 3, rounds + price-on-pull under 83% of the main thread: MET.** A: 75.3% (rounds 53.1 + on pull 22.2). B: 72.2% (44.8 + 27.4). Whole window: 72.0%. The 11-14 night reading after `adf1257a9` was 90%, but that was a different slate (Sunday NFL + college basketball against Saturday-night college football), so this is not like-for-like.
 - **Delay and cadence:** pull -> priced median (whole window) NCAAB 63 s, WNCAAB 64 s, NBA 124 s, NFL 148 s. Gaps between regular rounds: median 178 s in A, 165 s in B (falsification bar 200 s). NCAAF had one live game and was not read.
 - **Seen beside it, not this lane's:** NFL and NBA builds of 45 s or more put both on the slow-sport schedule (#790, lane `book-grid-overlay-starvation`). A slow sport never takes price-on-pull and is built every other round. NFL's in-play overlay gap reached 579 s at 18:07-18:16Z, before this window (lane `layer2-rail-monitor`, which is putting the threshold-vs-contention choice to the user). 0 `BOOK_GRID_BUILD_ERROR`, 0 Traceback in refresh-worker.log since the 14:32Z load.
+
+## 2026-11-15 19:11:28Z (1:11 PM CST) -- READING for the 2026-11-10 15:45:23Z web load: todo #769 (c) NHL/NFL read-time Actual refresh (`fd05acb13`, lane `nhl-nfl-actual-read-time`), NFL half, Sunday early slate -- **MET: 5 served polls, 0 split groups, every row with an Actual equal to the published block (2,206 of 2,206), 0 Live proj., 0 model edge; 130 board-build rows among them**
+- **Watcher:** `C:\tmp\lpa\nfl_sunday_watch.py` (armed 14:12:28Z 11-13 in session 386d4115), one `POST /api/intelligence/query` (the board page's request) every 10 min from 18:30Z; output `C:\tmp\lpa\nfl_sunday_watch.jsonl`. It exits after 3 qualifying polls (>= 30 live NFL props with an Actual from >= 3 games, after 18:50Z); it exited 0 at 19:11:28Z. The two polls before 18:50Z did not count toward the exit, but they are the ones that carry the board-build rows, so they are reported here too.
+- **Slate:** 7 games live (kickoff 18:00Z): HOU @ CLE, JAX @ TEN, CAR @ NO, MIA @ IND, BUF @ NYJ, KC @ ATL, MIN @ GB. The published NFL snapshot covered 7 of 14 games seen (the 3 late games had not started).
+- **Per poll** (NFL live prop rows served / with an Actual / equal to the published block / board-build rows `layer2_shortlist` / split groups / Live proj. / model edge):
+  - 18:30:04Z: 556 / 401 / 401 / **73** / 0 of 235 / 0 / 0
+  - 18:40:25Z: 488 / 405 / 405 / **50** / 0 of 263 / 0 / 0
+  - 18:50:44Z: 513 / 467 / 467 / 0 / 0 of 251 / 0 / 0
+  - 19:01:01Z: 480 / 438 / 438 / 5 / 0 of 271 / 0 / 0
+  - 19:11:28Z: 533 / 495 / 495 / 2 / 0 of 272 / 0 / 0
+  - Total: 2,206 of 2,206 rows with an Actual equal the published block; 0 split groups in 1,292 player/market groups. `model_edge_live_aware` 0 too.
+- **Rows with no Actual** (38-155 a poll) are all `miss_player_absent`: a player not in the box yet. Not a miss.
+- **Against the box fetched at the same poll** (freshness, not the fix's test): 302-455 equal a poll; 12-98 behind, by up to one re-sim tick plus web's 15 s cache (the published block trails the box); 0-29 ahead. The aheads are unexplained here: stats can go down (rushing yards), or the watcher's ESPN fetch was older than refresh-worker's. Web shows exactly the published block either way.
+- **Web log:** `LIVE_ACTUALS_REFRESHED_FROM_BOX sport=nfl` 1 -> 39 lines over the window; it rewrote stale build Actuals (`refreshed=228`, `592`, `281`), and `refused` only `miss_player_absent`.
+- **Lane goal:**
+  - NFL half: **MET** on every clause.
+  - NHL half: read 11-11 (deploys.md 2026-11-11 00:40:24Z). Split groups 0, 232 of 232 equal to the published block, 0 Live proj. Its 16 / 0 / 24 PREGAME model-edge rows were board-build rows served live from puck drop to the next build: a separate defect, lead filed 11-11, not this change.
+  - Lane closed.
+- **Claims:** none; read-only.
