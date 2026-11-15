@@ -115,6 +115,10 @@ cd ~/syndicate-prod/logs || exit 0
 tail -n 120000 refresh-worker.log | grep -a -E 'INPLAY_OVERLAY sport=|BOOK_GRID_TICK |LAYER2_BOARD_HEALTH|LIVE_GAMELINE_JOIN' | awk -v c="$1" '$1 >= c'
 echo '@@WEB@@'
 tail -n 60000 web.log | grep -a 'INPLAY_OVERLAY_MERGED' | awk -v c="$1" '$1 >= c'
+echo '@@BOOT@@'
+# Restarts inside the window: readings must be split at them (slow-sport state, pull cadence reset).
+tail -n 300000 refresh-worker.log | grep -a -E '\[refresh_worker\] BOOTED' | awk -v c="$1" '$1 >= c' | sed 's/^/refresh-worker /'
+tail -n 300000 live-odds-worker.log | grep -a -E 'MALLOC_ARENA_INIT' | awk -v c="$1" '$1 >= c' | sed 's/^/live-odds-worker /'
 """
 
 
@@ -133,6 +137,8 @@ def fleet_logs(minutes: int, now: dt.datetime, work_dir: Path) -> dict:
     except Exception as exc:  # the log half is optional; the HTTP half stands alone
         text = f"__ERR__ {exc}"
     rw, _, web = text.partition("@@WEB@@")
+    web, _, boot_text = web.partition("@@BOOT@@")
+    boots = [" ".join(line.split()[:2]) for line in boot_text.splitlines() if line.strip()]
     overlay, ticks, health, joins = {}, [], {}, {}
     for line in rw.splitlines():
         ts = line.split(" ", 1)[0]
@@ -189,7 +195,7 @@ def fleet_logs(minutes: int, now: dt.datetime, work_dir: Path) -> dict:
             merged[bucket][s] = merged[bucket].get(s, 0) + 1
     return {"window_min": minutes, "overlay": over, "ticks": len(ticks), "tick_gap": dist(tick_gaps),
             "build_seconds": {s: dist(v) for s, v in build.items()}, "deferred_slow": deferred,
-            "web_merge": merged, "health": health, "joins": joins,
+            "web_merge": merged, "health": health, "joins": joins, "boots": boots,
             "log_error": text[:200] if text.startswith("__ERR__") else None}
 
 
@@ -305,6 +311,7 @@ def main() -> int:
     reading["query"]["board_built_age_s"] = round((now - board_built).total_seconds(), 1) if board_built else None
     flags, false_flags, missed, dark_rows, dark_markets = [], [], [], [], set()
     priced_ages, ages_now, seen_ages, no_fair, markets_total, markets_no_ours = [], [], [], [], 0, 0
+    per_sport = {}  # sport -> priced / seen / age-now lists + flag counts (college vs NFL/NBA controls, todo #810)
     for c in live:
         for m in c.get("markets") or []:
             markets_total += 1
@@ -324,6 +331,8 @@ def main() -> int:
             priced_ages.append(priced)
             seen_ages.append(r.get("seen_age_seconds"))
             ages_now.append(age_now)
+            ps = per_sport.setdefault(c["sport"], {"priced": [], "seen": [], "now": [], "flags": 0, "false": 0, "missed": 0})
+            ps["priced"].append(priced); ps["seen"].append(r.get("seen_age_seconds")); ps["now"].append(age_now)
             if r.get("fair") is None:
                 no_fair.append({"matchup": c["matchup"], "market": r["market"], "segment": r["segment"], "line": r["line"]})
             qualifies = (gap is not None and gap >= MIN_PP and priced is not None and float(priced) <= FRESH_S
@@ -332,10 +341,14 @@ def main() -> int:
             tag = {"matchup": c["matchup"], "market": r["market"], "segment": r["segment"], "side": r["side"],
                    "line": r["line"], "gap": None if gap is None else round(gap, 2), "priced": priced,
                    "age_now": None if age_now is None else round(age_now, 1)}
+            if shown:
+                ps["flags"] += 1
             if shown and not qualifies:
                 false_flags.append(tag)
+                ps["false"] += 1
             if qualifies and not shown:
                 missed.append(tag)
+                ps["missed"] += 1
             if (gap is not None and gap >= MIN_PP and priced is not None and float(priced) <= FRESH_S
                     and age_now is not None and age_now > STALE_S):
                 dark_rows.append(tag)
@@ -354,6 +367,12 @@ def main() -> int:
         "priced_le_120": sum(1 for a in priced_ages if a is not None and float(a) <= FRESH_S),
         "age_now_gt_300": sum(1 for a in ages_now if a is not None and a > STALE_S),
         "flag_list": flags,
+        # Per sport, over live rows: rows flagged (a market can hold several rows; "flags" above counts markets).
+        "by_sport": {sp: {"rows": len(v["priced"]),
+                          "priced_le_120": sum(1 for a in v["priced"] if a is not None and float(a) <= FRESH_S),
+                          "priced_age": dist(v["priced"]), "seen_age_at_pricing": dist(v["seen"]), "age_now": dist(v["now"]),
+                          "flagged_rows": v["flags"], "false_rows": v["false"], "missed_rows": v["missed"]}
+                     for sp, v in sorted(per_sport.items())},
     }
     if flags:
         with open(out_dir / "flags.jsonl", "a", encoding="utf-8") as fh:
@@ -399,13 +418,14 @@ def summary(r):
         "live_rows": {"n": lv["live_rows"], "no_fair": lv["live_rows_no_fair"], "priced_age": lv["priced_age"],
                       "age_now": lv["age_now"], "seen_age_at_pricing": lv.get("seen_age_at_pricing"), "priced_le_120": lv["priced_le_120"], "age_now_gt_300": lv["age_now_gt_300"],
                       "markets": lv["live_markets"], "markets_no_ours": lv["live_markets_no_ours"]},
+        "live_by_sport": lv.get("by_sport"),
         "teams": {"chips_today": tm["chips_today"], "live_chips": tm["live_chips"], "live_chip_status": tm.get("live_chip_status"),
                   "live_chips_without_live_card": tm["live_chips_without_live_card"],
                   "chipless": [(c["sport"], c["matchup"], c["count"]) for c in tm["chipless"] or []],
                   "det1": len(tm["det1"] or []), "det2": len(tm["det2"] or []), "det3": len(tm["det3"] or []),
                   "flipped": len(tm["flipped"] or []), "truncated_abbr": tm["truncated_abbr"][:6]},
         "logs": {"overlay": lg["overlay"], "ticks": lg["ticks"], "tick_gap": lg["tick_gap"], "build_seconds": lg["build_seconds"],
-                 "deferred_slow": lg["deferred_slow"], "web_merge": lg["web_merge"], "log_error": lg["log_error"]},
+                 "deferred_slow": lg["deferred_slow"], "web_merge": lg["web_merge"], "boots": lg.get("boots"), "log_error": lg["log_error"]},
     }
 
 
