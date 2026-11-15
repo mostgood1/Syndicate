@@ -1847,6 +1847,7 @@ The four signal-engine / near-miss lanes stay OPEN on purpose: their file claims
   - The worker-thread wiring was refused by this session's permission classifier.
   - **Decision 1a:** run in paper (worker thread + restart, or a standalone fleet process).
   - Recommendation: do NOT take it live as a faster take-profit.
+- **UPDATE 2026-11-14 11:04 PM CST, the fast document's retention (lane `fast-exit-state-size`, CLOSED GOAL MET):** `execution_exits_fast.json` had grown past the keyvalue store's 8,388,608 B cap with no pruning, so every save was refused from 11-14 17:00:32Z (last accepted 11-11 10:29 AM CST; the fast paper record in between is lost; live sales were not blocked). `e0e6c667a` prunes entries past the slow document's retention floor (lookback + 2 days) to `execution_exits_archive/fast_<YYYY-MM>.jsonl` before each save. Loaded on live-odds-worker 05:04:25Z: 9,220 entries archived, 8,388,431 -> 1,269,195 B, 0 rejects over 30 min, a live sale placed 05:31:30Z (deploys.md).
 - **Stage 2:** the NBA live re-sim fair does NOT beat Kalshi's mid. Totals Brier 0.189 vs Kalshi 0.163; 2 games.
   - Pre-registered GO: Brier better than Kalshi's mid (CI) over >=300 states / >=20 games AND markout +300 s CI > 0. Stop 2026-12-31.
   - **Decision 2:** approve the measurement, plus a nightly recorder (a scheduled task).
