@@ -214,6 +214,8 @@ def test_the_build_prints_the_line_exactly_once(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(book_grid_artifact, "read_quote_last_seen", lambda *a, **k: {})
     quotes = [_quote(selection="home", price=-120), _quote(selection="away", price=100)]
     monkeypatch.setattr(book_grid_artifact, "iter_book_quotes", lambda *a, **k: iter(list(quotes)))
+    # These rows reach the build through the ONE-PASS seam; the incremental read (#790) reads the file itself.
+    monkeypatch.setenv("SYNDICATE_BOOK_GRID_INCREMENTAL_READ", "0")
 
     def _stub(value):
         return lambda grid, **kwargs: dict(value)

@@ -408,7 +408,195 @@ def _freshest_per_book_side(rows: Iterable[Mapping[str, Any]]) -> dict[tuple[str
     return freshest
 
 
-def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+class FreshestRowsReducer:
+    """`freshest_rows_for_grid`'s decision, ONE ROW AT A TIME, holding row INDICES rather than rows.
+
+    WHY A CLASS (todo #790, lane nba-grid-per-build-lookups, 2026-11-15). The reduce was one pass
+    over the whole day's shard on EVERY build, and that shard grows all day. Measured 2026-11-14:
+    NCAAF's 775,979-line shard cost 12.1 s of parse+reduce per build at end of day, almost all of
+    it re-deciding lines earlier builds had already decided. `book_grid_quote_read` keeps one of
+    these alive between builds and feeds it only the lines appended since the last one.
+
+    So the rules live HERE, once, and both readers run them: `freshest_rows_for_grid` (one pass,
+    the reference) and the incremental read. A second copy of these rules would be free to drift
+    from the first -- one endpoint, two code paths, the failure this repo keeps paying for.
+
+    It holds no rows. `add` says whether the row it was just given is now kept and which earlier
+    index, if any, that row displaced; the caller decides how to hold kept rows. The one-pass path
+    holds the dicts. The incremental path holds byte spans and re-parses them per build, because
+    NCAAF's 124,344 kept rows are 322 MB parsed (fleet, 2026-11-15) and would outlive the build.
+
+    `intern_keys` folds equal key strings onto one object. Only the long-lived incremental reducer
+    wants it: a one-pass reducer is freed at the end of its build, and interning would only cost
+    it time.
+    """
+
+    __slots__ = (
+        "freshest",
+        "anchors",
+        "anchor_indices",
+        "dropped_direct_feed",
+        "kept_direct_feed",
+        "direct_feed_near_misses",
+        "_interned",
+    )
+
+    def __init__(self, *, intern_keys: bool = False) -> None:
+        # (instance, raw line, book, side) -> (index, observed_at) of its freshest row so far.
+        self.freshest: dict[tuple[Any, ...], tuple[int, str]] = {}
+        # (instance, canonical line) -> index of its FIRST row in file order (see the docstring of
+        # `freshest_rows_for_grid`: the anchor decides which rows count as sides).
+        self.anchors: dict[tuple[Any, ...], int] = {}
+        self.anchor_indices: set[int] = set()
+        self.dropped_direct_feed = 0
+        # `#546`. WHICH SPELLINGS DID NOT MATCH. `is_direct_feed_book` compares
+        # `str(book).strip().lower()` against the frozenset EXACTLY -- no prefix, no
+        # separator folding -- so `polymarket_us`, `kalshi_us` or `Polymarket US`
+        # would sail straight through the filter that exists to stop them.
+        #
+        # Whether the aggregator ever uses such a spelling could not be answered
+        # from this repo: the git-tracked shards are a May/June MLB mirror carrying
+        # five books (draftkings, fanduel, betmgm, fanatics, williamhill_us) and
+        # neither venue at all, and no log line anywhere prints a book key. So this
+        # counts the NEAR MISSES instead of guessing -- a book whose name contains
+        # "kalshi" or "polymarket" that `is_direct_feed_book` nonetheless refused.
+        #
+        # DELIBERATELY A COUNTER, NOT A WIDER MATCH. Making the filter itself
+        # substring-based would silently swallow any future book whose name merely
+        # contains these strings, which is a worse failure than the one it fixes:
+        # it drops real prices with no way to notice. Measure first; widen the
+        # frozenset by NAME once a real spelling is observed.
+        self.direct_feed_near_misses: dict[str, int] = {}
+        # Counted beside the drop so the two are readable as a RATE: a
+        # `dropped` with no `kept` cannot distinguish "no direct rows exist"
+        # from "the provenance stamp never arrived".
+        self.kept_direct_feed = 0
+        self._interned: dict[str, str] | None = {} if intern_keys else None
+
+    def _intern(self, parts: tuple[Any, ...]) -> tuple[Any, ...]:
+        interned = self._interned
+        if interned is None:
+            return parts
+        return tuple(interned.setdefault(part, part) if type(part) is str else part for part in parts)
+
+    def add(self, index: int, row: Mapping[str, Any]) -> tuple[bool, int | None]:
+        """Decide row `index` -- its position among the shard's rows, in FILE order.
+
+        Returns (kept, released). `kept` is True when this row is now a freshest cell or an
+        anchor. `released` is an EARLIER index this row superseded as the freshest cell and that
+        is not an anchor either, so no role keeps it any more; otherwise None. Indices must arrive
+        in increasing order, as the file presents them.
+        """
+        if _price(row.get("price")) is None:
+            return False, None
+        # THE AGGREGATOR'S COPY OF A VENUE WE READ DIRECTLY (`[USER DECISION
+        # 2026-08-25]`). One venue must have ONE price source: the direct feed
+        # writes `bookmaker="kalshi"/"polymarket"` into `best` (and, on a live
+        # row, into `cells` and `consensus`), and an OddsAPI row under the same
+        # name puts a second, different number for the same venue into the same
+        # de-vig. Dropped HERE because this is the single point every shard row
+        # passes through on its way to becoming a grid cell.
+        #
+        # Counted, not silent: whether OddsAPI supplies these two at all was an
+        # open question when this was written, and a zero here answers it.
+        # `drop_from_grid` asks "is this the AGGREGATOR's copy of a venue we read
+        # directly", which is the question the 2026-08-25 one-price-per-venue
+        # rule was always about. It used the bookmaker NAME as a proxy, correct
+        # while the shard carried only the aggregator's copy -- and measured
+        # 2026-09-01 that stopped being true when a second lane began writing
+        # Kalshi's OWN prices into `book_quotes`. Name-only discarded those too,
+        # so Layer 1 and the book-grid saw no exchange at all.
+        #
+        # UNTAGGED ROWS ARE UNCHANGED: absent provenance still drops, so every
+        # existing writer keeps today's behaviour and only a row explicitly
+        # stamped `source=venue_direct` newly survives.
+        if drop_from_grid(row):
+            self.dropped_direct_feed += 1
+            return False, None
+        if is_direct_feed_book(row.get("bookmaker")):
+            self.kept_direct_feed += 1
+        else:
+            # ELSE, not a second unconditional check. The near-miss counter means
+            # "the exact-name filter is MISSING A SPELLING", so it must only see
+            # rows the exact match refused -- which was automatic while
+            # `drop_from_grid` was name-only, because every recognised name hit
+            # the `continue` above.
+            #
+            # Provenance-based dropping broke that: a `venue_direct` row is now
+            # deliberately KEPT, so it fell through to here and was reported as a
+            # spelling bug. Measured in production 2026-09-01, first grid build
+            # after the first real capture:
+            #
+            #     kept_direct=603 near_misses={'kalshi': 603}
+            #
+            # The identical counts are the tell -- one population, counted once
+            # correctly and once as a false alarm. Left alone this reads 603 on a
+            # PERFECTLY WORKING system, permanently, and the standing cost is not
+            # the noise: it trains a reader to ignore `near_misses`, which
+            # disables the real signal for the case it exists to catch -- an
+            # unrecognised POLYMARKET spelling, still unproven at this writing.
+            _book_name = str(row.get("bookmaker") or "").strip().lower()
+            if _book_name and ("kalshi" in _book_name or "polymarket" in _book_name):
+                self.direct_feed_near_misses[_book_name] = self.direct_feed_near_misses.get(_book_name, 0) + 1
+        instance = _instance_key(row)
+        key = self._intern(
+            instance
+            + (
+                str(row.get("line") or ""),
+                str(row.get("bookmaker") or "").strip(),
+                str(row.get("selection") or "").strip(),
+            )
+        )
+        observed = _observed_at(row)
+        kept = False
+        released: int | None = None
+        current = self.freshest.get(key)
+        # `>=`, last-wins on a tie -- the same comparison `_freshest_per_book_side` makes (see
+        # `freshest_rows_for_grid`).
+        if current is None or observed >= current[1]:
+            if self._interned is not None:
+                observed = self._interned.setdefault(observed, observed)
+            self.freshest[key] = (index, observed)
+            kept = True
+            if current is not None and current[0] not in self.anchor_indices:
+                released = current[0]
+        anchor_key = self._intern(instance + (str(_canonical_line(row)),))
+        if anchor_key not in self.anchors:
+            self.anchors[anchor_key] = index
+            self.anchor_indices.add(index)
+            kept = True
+        return kept, released
+
+    def kept_indices(self) -> list[int]:
+        """Every kept index in FILE order: freshest cells and anchors, each once."""
+        kept = {index for index, _ in self.freshest.values()}
+        kept.update(self.anchor_indices)
+        return sorted(kept)
+
+    def report(self) -> None:
+        """The AGGREGATOR_DUPLICATE_DROPPED line, over every row this reducer has seen."""
+        if self.dropped_direct_feed or self.direct_feed_near_misses or self.kept_direct_feed:
+            # print, not logger.info -- CLAUDE.md: logger.info does not reach
+            # Render's collector from this process.
+            #
+            # `near_misses` prints even when empty (whenever the line prints at all),
+            # because "the filter matches every spelling" and "this build never ran"
+            # must not look alike -- the same reason `#541`'s coverage line reports
+            # its zeroes.
+            print(
+                f"[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows={self.dropped_direct_feed} "
+                # A RATE, NOT A COUNT. `dropped` alone cannot distinguish "no direct
+                # rows exist yet" from "the provenance stamp never arrived", and
+                # those demand opposite responses -- wait, versus go and fix the
+                # writer. `kept` is the denominator that separates them.
+                f"kept_direct={self.kept_direct_feed} "
+                f"books={sorted(DIRECT_FEED_BOOKS)} "
+                f"near_misses={dict(sorted(self.direct_feed_near_misses.items()))}",
+                flush=True,
+            )
+
+
+def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]], *, report: bool = True) -> list[dict[str, Any]]:
     """Collapse a change-log stream to only the rows the grid can still use.
 
     WHY (`#331`). `build_book_grid` retains every priced row in `instances`
@@ -456,125 +644,27 @@ def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, 
     silently re-anchors 972 of 5,547 rows. Keeping the first-in-file row per
     (instance, canonical line) as well makes the original anchor available at its
     original position, and the anchor loop then selects exactly what it did before.
+
+    THE RULES LIVE IN `FreshestRowsReducer` (todo #790), which the incremental quote read
+    (`book_grid_quote_read`) also runs. This function is the one-pass reference that read is
+    checked against, and the path every build takes when it is off. `report=False` is that check:
+    the build it runs inside already printed this shard's AGGREGATOR line once.
     """
-    freshest: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
-    anchors: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
-    dropped_direct_feed = 0
-    # `#546`. WHICH SPELLINGS DID NOT MATCH. `is_direct_feed_book` compares
-    # `str(book).strip().lower()` against the frozenset EXACTLY -- no prefix, no
-    # separator folding -- so `polymarket_us`, `kalshi_us` or `Polymarket US`
-    # would sail straight through the filter that exists to stop them.
-    #
-    # Whether the aggregator ever uses such a spelling could not be answered
-    # from this repo: the git-tracked shards are a May/June MLB mirror carrying
-    # five books (draftkings, fanduel, betmgm, fanatics, williamhill_us) and
-    # neither venue at all, and no log line anywhere prints a book key. So this
-    # counts the NEAR MISSES instead of guessing -- a book whose name contains
-    # "kalshi" or "polymarket" that `is_direct_feed_book` nonetheless refused.
-    #
-    # DELIBERATELY A COUNTER, NOT A WIDER MATCH. Making the filter itself
-    # substring-based would silently swallow any future book whose name merely
-    # contains these strings, which is a worse failure than the one it fixes:
-    # it drops real prices with no way to notice. Measure first; widen the
-    # frozenset by NAME once a real spelling is observed.
-    direct_feed_near_misses: dict[str, int] = {}
-    # Counted beside the drop so the two are readable as a RATE: a
-    # `dropped` with no `kept` cannot distinguish "no direct rows exist"
-    # from "the provenance stamp never arrived".
-    kept_direct_feed = 0
+    reducer = FreshestRowsReducer()
+    kept: dict[int, dict[str, Any]] = {}
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
             continue
-        if _price(row.get("price")) is None:
-            continue
-        # THE AGGREGATOR'S COPY OF A VENUE WE READ DIRECTLY (`[USER DECISION
-        # 2026-08-25]`). One venue must have ONE price source: the direct feed
-        # writes `bookmaker="kalshi"/"polymarket"` into `best` (and, on a live
-        # row, into `cells` and `consensus`), and an OddsAPI row under the same
-        # name puts a second, different number for the same venue into the same
-        # de-vig. Dropped HERE because this is the single point every shard row
-        # passes through on its way to becoming a grid cell.
-        #
-        # Counted, not silent: whether OddsAPI supplies these two at all was an
-        # open question when this was written, and a zero here answers it.
-        # `drop_from_grid` asks "is this the AGGREGATOR's copy of a venue we read
-        # directly", which is the question the 2026-08-25 one-price-per-venue
-        # rule was always about. It used the bookmaker NAME as a proxy, correct
-        # while the shard carried only the aggregator's copy -- and measured
-        # 2026-09-01 that stopped being true when a second lane began writing
-        # Kalshi's OWN prices into `book_quotes`. Name-only discarded those too,
-        # so Layer 1 and the book-grid saw no exchange at all.
-        #
-        # UNTAGGED ROWS ARE UNCHANGED: absent provenance still drops, so every
-        # existing writer keeps today's behaviour and only a row explicitly
-        # stamped `source=venue_direct` newly survives.
-        if drop_from_grid(row):
-            dropped_direct_feed += 1
-            continue
-        if is_direct_feed_book(row.get("bookmaker")):
-            kept_direct_feed += 1
-        else:
-            # ELSE, not a second unconditional check. The near-miss counter means
-            # "the exact-name filter is MISSING A SPELLING", so it must only see
-            # rows the exact match refused -- which was automatic while
-            # `drop_from_grid` was name-only, because every recognised name hit
-            # the `continue` above.
-            #
-            # Provenance-based dropping broke that: a `venue_direct` row is now
-            # deliberately KEPT, so it fell through to here and was reported as a
-            # spelling bug. Measured in production 2026-09-01, first grid build
-            # after the first real capture:
-            #
-            #     kept_direct=603 near_misses={'kalshi': 603}
-            #
-            # The identical counts are the tell -- one population, counted once
-            # correctly and once as a false alarm. Left alone this reads 603 on a
-            # PERFECTLY WORKING system, permanently, and the standing cost is not
-            # the noise: it trains a reader to ignore `near_misses`, which
-            # disables the real signal for the case it exists to catch -- an
-            # unrecognised POLYMARKET spelling, still unproven at this writing.
-            _book_name = str(row.get("bookmaker") or "").strip().lower()
-            if _book_name and ("kalshi" in _book_name or "polymarket" in _book_name):
-                direct_feed_near_misses[_book_name] = direct_feed_near_misses.get(_book_name, 0) + 1
-        instance = _instance_key(row)
-        materialised = row if isinstance(row, dict) else dict(row)
-        key = instance + (
-            str(row.get("line") or ""),
-            str(row.get("bookmaker") or "").strip(),
-            str(row.get("selection") or "").strip(),
-        )
-        current = freshest.get(key)
-        if current is None or _observed_at(row) >= _observed_at(current[1]):
-            freshest[key] = (index, materialised)
-        anchor_key = instance + (str(_canonical_line(row)),)
-        if anchor_key not in anchors:
-            anchors[anchor_key] = (index, materialised)
-
-    if dropped_direct_feed or direct_feed_near_misses or kept_direct_feed:
-        # print, not logger.info -- CLAUDE.md: logger.info does not reach
-        # Render's collector from this process.
-        #
-        # `near_misses` prints even when empty (whenever the line prints at all),
-        # because "the filter matches every spelling" and "this build never ran"
-        # must not look alike -- the same reason `#541`'s coverage line reports
-        # its zeroes.
-        print(
-            f"[book_grid] AGGREGATOR_DUPLICATE_DROPPED rows={dropped_direct_feed} "
-            # A RATE, NOT A COUNT. `dropped` alone cannot distinguish "no direct
-            # rows exist yet" from "the provenance stamp never arrived", and
-            # those demand opposite responses -- wait, versus go and fix the
-            # writer. `kept` is the denominator that separates them.
-            f"kept_direct={kept_direct_feed} "
-            f"books={sorted(DIRECT_FEED_BOOKS)} "
-            f"near_misses={dict(sorted(direct_feed_near_misses.items()))}",
-            flush=True,
-        )
-
-    # Union by original position: a row that is both an anchor and a freshest
-    # cell must appear once, not twice, or the grid sees a duplicate quote.
-    kept: dict[int, dict[str, Any]] = {index: row for index, row in freshest.values()}
-    for index, row in anchors.values():
-        kept.setdefault(index, row)
+        is_kept, released = reducer.add(index, row)
+        if is_kept:
+            kept[index] = row if isinstance(row, dict) else dict(row)
+        if released is not None:
+            # Superseded and not an anchor: no role keeps it, so neither does memory.
+            kept.pop(released, None)
+    if report:
+        reducer.report()
+    # In original position, each row once even when it is both an anchor and a freshest cell --
+    # twice would put a duplicate quote in front of the grid.
     return [kept[index] for index in sorted(kept)]
 
 

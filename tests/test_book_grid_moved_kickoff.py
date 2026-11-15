@@ -185,6 +185,8 @@ def test_reachability_through_the_real_builder(monkeypatch, tmp_path, capsys, sw
     by_date = {"2099-10-23": own, "2099-10-24": {quote_key(quotes[0]): "2026-10-20T21:55:59+00:00"}}
     monkeypatch.setattr(book_grid_artifact, "book_quotes_path", lambda *a, **k: shard)
     monkeypatch.setattr(book_grid_artifact, "iter_book_quotes", lambda *a, **k: iter(list(quotes)))
+    # These rows reach the build through the ONE-PASS seam; the incremental read (#790) reads the file itself.
+    monkeypatch.setenv("SYNDICATE_BOOK_GRID_INCREMENTAL_READ", "0")
     monkeypatch.setattr(book_grid_artifact, "read_quote_last_seen", lambda sport, d: by_date.get(d, {}))
     for name in ("attach_game_state", "attach_projections", "attach_margin_model",
                  "attach_live_game_state_from_lens", "attach_live_projections_for_sport",

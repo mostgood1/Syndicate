@@ -103,6 +103,8 @@ def test_board_build_reaches_the_recorder(monkeypatch, tmp_path):
     shard = tmp_path / "book_quotes_2026-08-10.jsonl"
     shard.write_text("{}\n", encoding="utf-8")
     monkeypatch.setattr(book_grid_artifact, "book_quotes_path", lambda *a, **k: shard)
+    # These rows reach the build through the ONE-PASS seam; the incremental read (#790) reads the file itself.
+    monkeypatch.setenv("SYNDICATE_BOOK_GRID_INCREMENTAL_READ", "0")
     monkeypatch.setattr(book_grid_artifact, "read_quote_last_seen", lambda *a, **k: {})
     monkeypatch.setattr(
         book_grid_artifact,
@@ -149,6 +151,8 @@ def test_board_generated_at_is_the_same_instant_the_payload_publishes(monkeypatc
     shard = tmp_path / "book_quotes_2026-08-10.jsonl"
     shard.write_text("{}\n", encoding="utf-8")
     monkeypatch.setattr(book_grid_artifact, "book_quotes_path", lambda *a, **k: shard)
+    # These rows reach the build through the ONE-PASS seam; the incremental read (#790) reads the file itself.
+    monkeypatch.setenv("SYNDICATE_BOOK_GRID_INCREMENTAL_READ", "0")
     monkeypatch.setattr(book_grid_artifact, "read_quote_last_seen", lambda *a, **k: {})
     # A real row: an empty shard makes the builder return None (an absent grid
     # is not an empty one), and the assertion below would then be vacuous.

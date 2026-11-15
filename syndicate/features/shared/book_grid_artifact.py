@@ -59,6 +59,7 @@ from syndicate.features.shared.book_grid import (
     build_book_grid,
     freshest_rows_for_grid,
 )
+from syndicate.features.shared.book_grid_quote_read import incremental_read_enabled, read_grid_quote_rows
 from syndicate.features.shared.odds_book_quotes import (
     book_quotes_path,
     iter_book_quotes,
@@ -568,15 +569,25 @@ def _build_book_grid_artifact(sport: str, date_str: str, *, max_rows: int) -> di
     # check. `build_book_grid` anchors on the first row carrying a given
     # canonical line, so the pivot's output depends on row ORDER -- anything
     # that touches it must be compared grid-to-grid, not by totals.
-    raw_quote_rows = 0
+    #
+    # INCREMENTAL SINCE todo #790 (2026-11-15). That one pass re-read the whole day on every build, and the day
+    # grows: NCAAF's build went 8 s -> 30 s on 11-14 as its shard went 300k -> 776k lines, grid flat at ~5,000
+    # rows. `read_grid_quote_rows` keeps each shard's reduce between builds and parses only the lines appended
+    # since the last one -- the same rows, in the same order, checked against this one-pass read on the same
+    # bytes every half hour. The one-pass read stays here as the off path
+    # (`SYNDICATE_BOOK_GRID_INCREMENTAL_READ=0`) and as the seam the enrichment tests feed rows through.
+    if incremental_read_enabled():
+        rows, raw_quote_rows = read_grid_quote_rows(sport, date_str)
+    else:
+        raw_quote_rows = 0
 
-    def _counted() -> Any:
-        nonlocal raw_quote_rows
-        for row in iter_book_quotes(sport, date_str):
-            raw_quote_rows += 1
-            yield row
+        def _counted() -> Any:
+            nonlocal raw_quote_rows
+            for row in iter_book_quotes(sport, date_str):
+                raw_quote_rows += 1
+                yield row
 
-    rows = freshest_rows_for_grid(_counted())
+        rows = freshest_rows_for_grid(_counted())
     if not rows:
         return None
     try:

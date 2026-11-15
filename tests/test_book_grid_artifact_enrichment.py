@@ -76,6 +76,8 @@ def harness(monkeypatch, tmp_path):
     # `freshest_rows_for_grid` REAL, so these run through the same reduction
     # production does rather than around it.
     monkeypatch.setattr(book_grid_artifact, "iter_book_quotes", lambda *a, **k: iter(list(state.quotes)))
+    # These rows reach the build through the ONE-PASS seam; the incremental read (#790) reads the file itself.
+    monkeypatch.setenv("SYNDICATE_BOOK_GRID_INCREMENTAL_READ", "0")
 
     def _spy(name, coverage):
         def _inner(grid, **kwargs):
