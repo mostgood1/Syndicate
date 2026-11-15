@@ -910,11 +910,6 @@ death, never life — do not invert it.
 - Verification: Unit: endpoint rows == the board path's rows for the same overlay (fields the rail reads), off switch returns enabled false and the page stops polling; JS: identity merge replaces only identities the board shows, keeps the rest, keeps scroll. Fleet replay (read-only): endpoint vs served board rows field-by-field, payload size, handler time. After the user's reload-web: the rail's rows refresh between full polls (network log), no errors
 - Blocked by: none
 
-### closed-lane-archive-20261114-1640 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session b2d15f2c-a56d-4dd7-b491-4a77257d233d
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 read 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261114-1040`. Table and WAIT reasons in log/2026-11-14.md.
-
 ### nhl-live-score-effects — CLOSED 2026-11-14 (GOAL NOT MET: FAIL on pre-registered (3) (4) (5); scale 0 closes the mid-game centre but the priced moneyline gains nothing out of sample and the early margin widens; nothing ships) — opened 2026-11-14 — session 87074b1f-3325-4c92-871d-b22851478134
 - **VERDICT `[2026-11-14 23:4xZ]`:** FAIL. 303 games / 44 dates, 2,424 states per arm, scale 0 / 0.5 / 1.0 on one frozen rate version (22:22:46Z, team_rates md5 3919120c477e), 0 refused. (1) PASS: walk-forward picks 0.0 on 25, 0.5 on 1, 1.0 on 4 of 30 OOS dates. (2) PASS on point estimates: OOS mid-game margin gap +0.199 / +0.267 -> +0.022 / +0.035 goals, trailer gap -0.015 / -0.016; but today's own intervals include 0 ([-0.082, +0.519] / [-0.075, +0.596]), so the bias is ~1.3 SE by game, not established. (3) FAIL: OOS paired moneyline Brier +0.00010 [-0.00097, +0.00122], log loss +0.00219 [-0.00223, +0.00817], no cutoff wholly worse. (4) FAIL: all four puck-line criteria pass at scale 0 (end-game re-fit 0.32 / 90), paired +-1.5 Brier vs production +0.00066 [-0.00038, +0.00178]. (5) FAIL: total CRPS +0.0008 [-0.0026, +0.0042] at keep 0.86 / 420. Mechanism: the score effects also hold the early width (scale 0: P1 20:00 0.906, P2 10:00 0.887 vs 1.024 / 0.962). The headline cell barely responds: P2 10:00 two-goal P(trailer wins) 0.173 at 1.0, 0.152 at 0, observed 0.092. The knob stays OFF main (local branch lane/nhl-live-score-effects-knob). findings_2026-11-14_nhl_live_score_effects.md.
 - Goal: The NHL live re-sim's mid-game trailer comeback bias is removed by a LIVE-ONLY scale on the engine's dynamic score effects, fit walk-forward on the 303-game cutoff replay: the pooled mid-game (P2 20:00, P2 10:00, P3 20:00) leader-oriented remaining-margin gap within +-0.10 goals and the trailer-win gap within +-0.02 for one- and two-goal leads, out of sample, with the priced live moneyline no worse beyond noise at any cutoff (todo #773, user: Yes, fix it)
@@ -994,6 +989,11 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 at ~02:42Z 11-15 (8:42 PM CST 11-14) read 2 SAFE; both moved to lanes_closed.md with one pointer each. Table and deferrals in `.syndicate/log/2026-11-14.md`.
 - Moved: `lane-guard-desktop-worktree-exempt`, `closed-lane-archive-20261114-1440`.
+
+### closed-lane-archive-20261114-2240 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session bae0317c-6f5d-45f1-b4b8-92c406fd6e8b
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved `closed-lane-archive-20261114-1640` (owner b2d15f2c idle 353m, block 356m); 24 others WAIT. Table in `.syndicate/log/2026-11-14.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1254,6 +1254,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261114-1040` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session c4ad7e58-af48-4ca2-85c8-8dd4f366584b
 - `closed-lane-archive-20261114-1240` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session 09301eaf-bdbf-411d-92f9-9d231866be42
 - `closed-lane-archive-20261114-1440` — CLOSED 2026-11-14 (GOAL MET: 2 blocks archived) — opened 2026-11-14 — session d31f2d0f-00c0-4266-b44a-180f8f52f31b
+- `closed-lane-archive-20261114-1640` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session b2d15f2c-a56d-4dd7-b491-4a77257d233d
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
