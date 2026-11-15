@@ -601,3 +601,55 @@ rows (0.54 MB).
 
 **Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. The same 2 chip-less NCAAB
 cards.
+
+## REGISTERED NFL PREDICTION — VERDICT, read 1:30 PM CST (window 12:30-1:30 PM = 18:30-19:30Z)
+
+**The prediction (registered 10:45 AM, reading 1):** at least one NFL in-play overlay gap
+> 360 s, and a web `nfl 'stale_...'` merge, in the window.
+
+**Split at the boots** (refresh-worker 18:52:23Z `CLAIMED_RESTART nba-grid-per-build-lookups`,
+19:26:20Z NCAAF pivot fix; live-odds-worker 18:53:22Z, #810):
+
+| segment | NFL overlay gaps > 360 s | web nfl stale merges | NBA gaps > 360 s | web nba stale |
+|---|---|---|---|---|
+| A: 18:30-18:52Z | **1: 487 s** (18:28:47 -> 18:36:54Z, no boot inside) | **3** (18:35:24-18:35:56Z, 398-430 s) | 2 (465 s, 396 s) | 3 |
+| B: 18:52-19:26Z | 0 (max 343 s) | 0 | 1 (403 s) | 1 (19:00:03Z, 367 s) |
+| C: after the 19:26Z boot | 1 (578 s, spans the restart) | 4 (369-533 s) | — | — |
+
+- **Verdict: MET in segment A**, with no restart inside the gap.
+- **NOT met in segment B**: NFL stayed <= 343 s for 34 min with ~8 NFL games live.
+- Segment C is restart-caused, so it is excluded.
+- So the slow-sport cadence pushes NFL past web's cutoff **sometimes, not always**. NBA crossed it
+  in both clean segments.
+
+**Mechanism** (`grid809_tickrows.py` + `nflcontend.py`, 18:30-19:30Z):
+- **On-pull:** NFL took price-on-pull whenever its last build was < 45 s (18:47:14, 18:50:13,
+  18:51:08, 19:08:51, 19:17:18, 19:18:43Z). It was deferred after builds >= 45 s (18:57:48,
+  19:03:30, 19:13:40, 19:23:04Z).
+- **NFL build length vs other work in the same process,** 17 builds split at the median:
+  - **`kalshi_odds` lines: 46.1 average in the long half vs 0.8 in the short half**;
+  - the two longest builds (98.7 s from 18:35:16, 103.4 s from 18:54:03Z) each overlap a Kalshi
+    tick (139 / 134 lines);
+  - long builds without much Kalshi exist too: 84.9 s (10 lines), and 61.5 s (`portfolio_commit`
+    31 lines);
+  - so the Kalshi tick is the largest single correlate, **not proven the cause**.
+- **The user-facing cost:**
+  - NFL: rail lines up to 8 min old in segment A. NFL never flags anyway (the join withholds).
+  - **NBA flags: 46 dark rows / 12 markets at 12:37 PM.** NBA priced <= 120 s was 1% at 1:06
+    (2 / 208) and 1:30 (1 / 158), against 50-54% when the NBA overlay ran every round (12:37,
+    12:50).
+
+## Reading 12 — Sun 11-15 1:30 PM CST (19:30Z), 4 min after the 19:26 refresh-worker restart
+
+- **23 flags on 14 cards. 0 false, 0 missed, 2 dark.**
+- 58 live chips.
+- Restart effects: shortlist 887 s old; NBA live rows age now p50 ~999 s and priced p50 736 s
+  (1 of 158 <= 120 s). Not representative.
+- College, rows priced <= 120 s, post-#810:
+  - NCAAB 1H 47 / 135 (35%), 2H 25 / 98 (26%), break 0 / 14;
+  - WNCAAB 2H 13 / 45 (29%).
+  - Seen age p50: NCAAB 75 s, WNCAAB 113 s. Higher than 1:06; the restart again.
+- Query 9.2 s / 67.2 MB. Live-rail 0.53 s.
+- Web merges: nfl stale 4 of 39 (all at the restart).
+- **Teams:** Washington @ Utah left the board, so 1 chip-less NCAAB card remains (FAMU @ UTEP).
+  det1 / det2 / det3 0 / 0 / 0; 0 flipped; 0 truncated.
