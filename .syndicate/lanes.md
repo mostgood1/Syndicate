@@ -942,6 +942,14 @@ death, never life — do not invert it.
 - Verification: Unit test: a reader polling during a slow write only ever sees the old or the new complete payload, and no .tmp file is left behind; bytes identical to json.dumps(payload). On the fleet: grep the role logs for JSONDecodeError on nfl_prop_projections_* after the ff, over at least one props rewrite (SEASON_PROJECTION / wrote ... published=True).
 - Blocked by: none
 
+### nba-live-pull-60s — OPEN — opened 2026-11-15 — session b1d2088f-b4a3-474a-99c8-8fd14e19d2c2
+- Goal: While an NBA game is live, the NBA in-play lane pulls full-game lines (h2h/spreads/totals, one 3-credit bulk call) every 60 s (was 240 s) and keeps player props + quarter/half lines on their own 240 s props clock; tests incl. off != on; on main; load (live-odds-worker TERM) is the user's call; then the served rail's NBA in-play GAME-LINE rows priced on a quote <= 120 s, phase-matched, vs the pre-load reading
+- Files: scripts/run_live_odds_refresh_worker.py (_nba_live_refresh_interval_seconds ONLY), scripts/fetch_basketball_oddsapi_props_local.py, tests/test_nba_live_pull_cadence.py (NEW), docs/ai_context/todo.md (#811 entry ONLY)
+- Hypothesis: n/a (build)
+- Falsification test: n/a
+- Verification: pytest tests/test_nba_live_pull_cadence.py + the existing NBA in-play tests; after a load: NBA_LIVE_AUTORUN_LAUNCHED interval_s=60, IN_PLAY_PROPS lines-only vs full in the lane log, OddsAPI nba credits/h, and the phase-matched fresh share of NBA game-line rows on /api/board/layer2 vs pre
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
