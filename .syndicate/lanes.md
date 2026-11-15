@@ -862,6 +862,14 @@ death, never life — do not invert it.
 - Verification: Findings file with: league vs sim points per quarter and in the final 120 s of Q2 (with CIs), the end-of-half FG attempt rate by score bucket, carried-over drives' points, and a same-seed halftime_kickoff ON/OFF and gate-widened replay showing how much of each gap each mechanism closes. Handed to football-scenario-calibration.
 - Blocked by: none
 
+### nfl-live-width-fit — OPEN — opened 2026-11-15 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: NFL live full-game totals and spreads get a MEASURED width scale k (the #780 method, P_k = Phi(Phi^-1(P)/k)), fit on the live evidence log's re-sim distributions joined to the book-quote shards' in-play de-vigged main lines and graded against finals, on every NFL game with both halves from 11-09 on (the 11-15 slate included), with game-clustered 95% CIs, the model-vs-market Brier and the game count stated, recorded in todo #780 and a findings file. Wiring the join's snake_case margin_dist/total_dist keys stays out of this lane and is the user's decision once a k exists
+- Files: .syndicate/findings_2026-11-15_nfl_live_width_fit.md
+- Hypothesis: Like every sport #780 measured (k 1.34-2.48), the NFL live re-sim's total and margin distributions are TOO NARROW against finals: the fitted k is above 1 on both totals and spreads. Stated 2026-11-15 8:20 AM CST, before any 11-15 game and before reading any final for the 11-09 / 11-12 games
+- Falsification test: The game-clustered 95% CI for k includes 1.0 or lies below it on BOTH markets. Too few games to tell (CI wider than 1.0 to 2.5) is reported as UNDETERMINED, not as either
+- Verification: The fit runs after the 11-15 Sunday-night final on every game with both halves (expected: 2 already, plus about 13 today), and k, its CI, the Brier gap and the n are written to todo #780 and the findings file
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
