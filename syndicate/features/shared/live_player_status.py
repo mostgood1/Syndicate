@@ -283,7 +283,7 @@ def _names_on_field(text: str, ab: str) -> bool:
     -- other than as this very play's injured player?"""
     if not re.search(rf"(?<![A-Za-z\.]){re.escape(ab)}(?![A-Za-z])", text):
         return False
-    return not re.search(rf"-{re.escape(ab)} (?:was injured|has returned)", text)
+    return not re.search(rf"(?:-|#\d{{1,2}} ){re.escape(ab)} (?:was injured|has returned|injured on the play)", text)
 
 
 # --------------------------------------------------------------------------- sports
@@ -291,6 +291,9 @@ def _names_on_field(text: str, ab: str) -> bool:
 _INJURED_RE = re.compile(r"\b([A-Z]{2,4})-([A-Z]\.[A-Za-z'\.\- ]+?) was injured during the play")
 _RETURNED_RE = re.compile(r"\b([A-Z]{2,4})-([A-Z]\.[A-Za-z'\.\- ]+?) has returned to the game")
 _EJECTED_RE = re.compile(r"\b([A-Z]{2,4})-([A-Z]\.[A-Za-z'\.\- ]+?) (?:was|has been) ejected")
+# College play text names no team: "#15 S.Banner injured on the play" (25 FBS finals of 2026-11-14: 33
+# such clauses, 0 in the NFL form, and 0 entries in `injuries`). The team comes from the boxscore.
+_COLLEGE_INJURED_RE = re.compile(r"#(\d{1,2}) ([A-Z]\.[A-Za-z'\.\- ]+?) injured on the play")
 
 
 def _football_plays(summary: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -315,14 +318,24 @@ def _football(sport: str, game_id: str, summary: Mapping[str, Any]) -> list[Play
     by_abbrev: dict[tuple[str, str], Mapping[str, Any]] = {}
     abbrev_by_name: dict[tuple[str, str], str] = {}  # (team, normalized display) -> D.Maye
     passers: set[tuple[str, str]] = set()  # (team, normalized display name)
+    teams_by_abbrev: dict[str, dict[str, str]] = {}  # D.Maye -> {team: jersey}
     for team, cat_name, _cat, entry in _box_athletes(summary):
         ath = entry.get("athlete") or {}
         ab = _abbrev(ath.get("firstName") or "", ath.get("lastName") or "")
         if ab:
             by_abbrev.setdefault((team, ab), ath)
             abbrev_by_name.setdefault((team, normalize_name(ath.get("displayName"))), ab)
+            teams_by_abbrev.setdefault(ab, {}).setdefault(team, str(ath.get("jersey") or ""))
         if cat_name == "passing":
             passers.add((team, normalize_name(ath.get("displayName"))))
+
+    def college_team(jersey: str, ab: str) -> str:
+        """The team of a college "#N X.Last": the one box team with that name (jersey breaks a tie).
+        A player in no box category (an offensive lineman) has no team -- and is never KEY."""
+        teams = teams_by_abbrev.get(ab) or {}
+        if len(teams) > 1:
+            teams = {t: j for t, j in teams.items() if j == jersey} or teams
+        return next(iter(teams)) if len(teams) == 1 else ""
 
     def is_key(team: str, display: str) -> bool:
         return (team, normalize_name(display)) in passers
@@ -339,6 +352,8 @@ def _football(sport: str, game_id: str, summary: Mapping[str, Any]) -> list[Play
             out_state.pop((team, ab.strip()), None)
         for team, ab in _INJURED_RE.findall(text):
             out_state[(team, ab.strip())] = ("injured_in_play", when)
+        for jersey, ab in _COLLEGE_INJURED_RE.findall(text):
+            out_state[(college_team(jersey, ab.strip()), ab.strip())] = ("injured_in_play", when)
         for team, ab in _EJECTED_RE.findall(text):
             out_state[(team, ab.strip())] = ("ejection", when)
 

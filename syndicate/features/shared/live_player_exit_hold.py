@@ -24,7 +24,7 @@ from syndicate.features.shared.live_player_status import REASON_KEY_PLAYER_OUT, 
 # sport -> the live snapshot (under data_root()/live) whose games carry `playersOut`. Must equal
 # `board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS[sport]` (tested): a copy here keeps the fast exit
 # thread from importing board_enrichment.
-PUBLISHING_SPORTS: dict[str, str] = {"nfl": "nfl_live_resim.json"}
+PUBLISHING_SPORTS: dict[str, str] = {"nfl": "nfl_live_resim.json", "ncaaf": "ncaaf_live_lens.json"}
 CACHE_S = 30.0
 
 
@@ -39,6 +39,26 @@ def _canon(sport: str, name: Any) -> str:
 
     text = str(name or "").strip()
     return (canonical_team(sport, text) or text).strip().lower() if text else ""
+
+
+def _team_score(sport: str, entry_name: Any, snap_name: Any) -> int:
+    """How well a book name (the entry's) names a snapshot team. 0 = not this team.
+
+    NFL: the canonical names agree. College: the snapshot carries the SCHOOL ("Miami (OH)", "Ohio") and the
+    book adds the mascot ("Miami (OH) RedHawks"), and `canonical_team` has no college vocabulary, so the
+    book name must START with the school; the score is the school's length, so "Ohio State Buckeyes"
+    prefers "Ohio State" over "Ohio" when both are live."""
+    from syndicate.features.shared.live_player_status import normalize_name
+
+    a, b = _canon(sport, entry_name), _canon(sport, snap_name)
+    if not a or not b:
+        return 0
+    if a == b:
+        return 1000
+    na, nb = normalize_name(a), normalize_name(b)
+    if na and nb and (na == nb or na.startswith(nb + " ")):
+        return len(nb)
+    return 0
 
 
 class ExitHold:
@@ -72,23 +92,28 @@ class ExitHold:
         snap = self._snapshot(sport)
         if not isinstance(snap, Mapping) or not isinstance(snap.get("games"), list):
             return {"verdict": "unknown", "why": "snapshot_unreadable"}
-        want = {_canon(sport, home_team), _canon(sport, away_team)}
-        if "" in want:
+        if not _canon(sport, home_team) or not _canon(sport, away_team):
             return {"verdict": "unknown", "why": "entry_has_no_teams"}
+        best, best_score = None, 0
         for game in snap["games"]:
             if not isinstance(game, Mapping):
                 continue
-            names = {_canon(sport, game.get("home_name") or game.get("home_code")),
-                     _canon(sport, game.get("away_name") or game.get("away_code"))}
-            if names != want:
-                continue
+            g_home = game.get("home_name") or game.get("home_code")
+            g_away = game.get("away_name") or game.get("away_code")
+            # BOTH teams must name this game, in either order; the weaker side decides the score.
+            score = max(min(_team_score(sport, home_team, g_home), _team_score(sport, away_team, g_away)),
+                        min(_team_score(sport, home_team, g_away), _team_score(sport, away_team, g_home)))
+            if score > best_score:
+                best, best_score = game, score
+        if best is not None:
+            game = best
             out = game.get("playersOut")
             if not isinstance(out, list):
-                return {"verdict": "unknown", "why": "game_exits_not_read", "snapshot_at": snap.get("generated_at")}
+                return {"verdict": "unknown", "why": "game_exits_not_read", "snapshot_at": (snap.get("generated_at") or snap.get("generatedAt"))}
             key = [f"{p.get('team')}:{p.get('player')}:{p.get('reason')}" for p in out
                    if isinstance(p, Mapping) and p.get("key")]
             if key:
                 return {"verdict": "fail", "reason": REASON_KEY_PLAYER_OUT, "players": key,
-                        "snapshot_at": snap.get("generated_at")}
-            return {"verdict": "pass", "snapshot_at": snap.get("generated_at")}
-        return {"verdict": "unknown", "why": "game_not_in_snapshot", "snapshot_at": snap.get("generated_at")}
+                        "snapshot_at": (snap.get("generated_at") or snap.get("generatedAt"))}
+            return {"verdict": "pass", "snapshot_at": (snap.get("generated_at") or snap.get("generatedAt"))}
+        return {"verdict": "unknown", "why": "game_not_in_snapshot", "snapshot_at": (snap.get("generated_at") or snap.get("generatedAt"))}

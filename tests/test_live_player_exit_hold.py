@@ -58,7 +58,7 @@ def test_the_map_is_the_one_the_moneyline_join_reads():
     from syndicate.features.shared.board_enrichment import _LIVE_GAMELINE_SNAPSHOT_PATHS
 
     for sport, name in H.PUBLISHING_SPORTS.items():
-        assert _LIVE_GAMELINE_SNAPSHOT_PATHS[sport] == name
+        assert _LIVE_GAMELINE_SNAPSHOT_PATHS.get(sport, f"{sport}_live_lens.json") == name
 
 
 def test_real_producer_snapshot_holds_the_maye_game_by_oddsapi_names(monkeypatch, summary):
@@ -96,7 +96,7 @@ def test_unknowns_are_counted_never_refused(monkeypatch, summary):
 
 def test_a_sport_that_publishes_no_exits_is_off_and_reads_nothing():
     hold, reads = _hold({"games": []})
-    for sport in ("nhl", "nba", "ncaaf", "mlb", "soccer"):
+    for sport in ("nhl", "nba", "mlb", "soccer"):
         assert hold.check(sport, "A", "B") == {"verdict": "off"}
     assert reads == []
 

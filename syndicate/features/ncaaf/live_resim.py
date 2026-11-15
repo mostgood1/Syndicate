@@ -1168,6 +1168,7 @@ def build_live_lens_snapshot(
     sims: int | None = None,
     budget_seconds: float | None = None,
     now: Any = None,
+    env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """The published snapshot: one entry per game, one lens lane per entry.
 
@@ -1197,8 +1198,19 @@ def build_live_lens_snapshot(
     budget = float(budget_seconds if budget_seconds is not None else default_budget_seconds())
     generated_at = str(now or datetime.now(timezone.utc).isoformat())
 
+    # KEY PLAYER EXITS (lane live-player-exit-gate, user 2026-11-15 "start wiring NCAAF next"): one ESPN
+    # summary per in-progress game, read before any game is simulated. College play text names an injured
+    # player as "#6 S.Ashenfelder injured on the play" (Rutgers' QB, 11-14 18:26:47Z, never back); a game
+    # whose QB is out is refused `key_player_out` below. Unreadable -> counted, never "nobody is out".
+    from syndicate.features.shared.live_player_exit_tick import collect_exit_statuses
+    from syndicate.features.shared.live_player_status import gameline_refusal
+
+    game_list = [g for g in (games or ()) if isinstance(g, Mapping)]
+    exit_rows = [live_index.get(str(g.get("live_key") or "")) for g in game_list]
+    exit_statuses, exit_tally = collect_exit_statuses("ncaaf", exit_rows, env=env)
+
     prepared: list[tuple[float, dict[str, Any], NcaafLiveGameState | NcaafResimRefusal]] = []
-    for game in games or ():
+    for game in game_list:
         if not isinstance(game, Mapping):
             continue
         away_team = str(game.get("away_team") or "").strip()
@@ -1220,6 +1232,11 @@ def build_live_lens_snapshot(
         preset = game.get("refusal")
         if isinstance(resolved, NcaafLiveGameState) and isinstance(preset, (tuple, list)) and preset:
             resolved = NcaafResimRefusal(str(preset[0]), str(preset[1]) if len(preset) > 1 else "")
+        event_id = str((state_row or {}).get("event_id") or "").strip() if isinstance(state_row, Mapping) else ""
+        exit_status = exit_statuses.get(event_id) if event_id else None
+        exit_refusal = gameline_refusal(exit_status) if exit_status is not None else None
+        if isinstance(resolved, NcaafLiveGameState) and exit_refusal is not None:
+            resolved = NcaafResimRefusal("key_player_out", "; ".join(exit_refusal["players"]))
         # Remaining regulation seconds: the cost proxy, and it is a good one --
         # 154 ms/sim with a full game left, 0.7 ms with 15 seconds left.
         if isinstance(resolved, NcaafLiveGameState):
@@ -1227,6 +1244,8 @@ def build_live_lens_snapshot(
         else:
             remaining = -1.0
         names = {"away_team": away_team, "home_team": home_team}
+        if exit_status is not None:
+            names["players_out"] = exit_status.to_dict()["players_out"]
         provenance = game.get("rating_provenance")
         if isinstance(provenance, Mapping):
             names["provenance"] = dict(provenance)
@@ -1289,6 +1308,8 @@ def build_live_lens_snapshot(
             "home_name": names["home_team"],
             "gameLens": lanes,
         })
+        if "players_out" in names:  # only a game whose summary was READ carries the key
+            out_games[-1]["playersOut"] = names["players_out"]
 
     snapshot = {
         "sport": "ncaaf",
@@ -1300,6 +1321,7 @@ def build_live_lens_snapshot(
         "games": out_games,
     }
     snapshot["coverage"] = summarise(out_games)
+    snapshot["coverage"]["player_exits"] = exit_tally
     return snapshot
 
 

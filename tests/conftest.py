@@ -1306,3 +1306,13 @@ def pytest_sessionfinish(session, exitstatus):
     else:
         print("\n".join(lines))
     session.exitstatus = 1
+
+
+@pytest.fixture(autouse=True)
+def _no_live_player_exit_network(monkeypatch):
+    """Lane live-player-exit-gate: every live producer that calls `live_player_exit_tick.collect_exit_statuses`
+    GETs an ESPN summary per in-progress game with an event_id. Under test that is a live network call, so
+    the default fetch answers "unreadable" (None); a test that wants a payload patches it again."""
+    from syndicate.features.shared import live_player_exit_tick
+
+    monkeypatch.setattr(live_player_exit_tick, "fetch_espn_summary", lambda sport, event_id: None)
