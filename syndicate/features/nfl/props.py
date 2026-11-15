@@ -37,6 +37,7 @@ from syndicate.features.nfl.player_stats import qb_starts_refused
 from syndicate.features.nfl.player_stats import QB_STARTS_ONLY_RATE_STATS, qb_starts_only_rate, qb_starts_only_rate_enabled
 from syndicate.features.nfl.player_stats import resolve_player_id
 from syndicate.features.shared.team_aliases import canonical_team
+from syndicate.features.shared.atomic_artifact_write import atomic_write_text
 from syndicate.features.nfl.player_stats import resolve_player_id_for_game
 from syndicate.features.nfl.player_stats import resolve_player_id_with_prior
 from syndicate.features.nfl.sources import nfl_artifact_output_root
@@ -694,6 +695,13 @@ def write_nfl_prop_projection_artifact(
     `#389`/`#441` record: the root a reader PICKS and the root a writer SHOULD
     USE are different questions, and conflating them is how output lands
     somewhere nothing reads.
+
+    Written to a private temp file and `os.replace`d (`atomic_write_text`), so
+    a reader sees the old artifact or the new one, never a partial one.
+    Measured 2026-11-15 19:33:51.681Z: the old in-place write (`path.open("w")`
+    + `json.dump`) was read 7 ms before it finished -- `prop_evidence` football
+    logged a `JSONDecodeError` at char 229,616 -- and this module's own reader
+    turns any such read into None, which on web means "no projection".
     """
     path = nfl_artifact_output_root() / f"nfl_prop_projections_{season}_wk{week}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -704,8 +712,9 @@ def write_nfl_prop_projection_artifact(
         "sim_rows": sim_rows,
         "row_count": len(sim_rows),
     }
-    with path.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle)
+    # Serialised BEFORE the write: a failure in json.dumps leaves the previous
+    # artifact in place rather than a truncated one.
+    atomic_write_text(path, json.dumps(payload))
     return path
 
 
