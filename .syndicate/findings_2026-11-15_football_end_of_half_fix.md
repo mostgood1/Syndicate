@@ -828,3 +828,91 @@ Setup: 2024 FBS-vs-FBS, every 4th game, 164 x 100 seeds; no re-fit, as registere
 **The caveat, stated now.** A v3 built on this FIT read is fitted to FIT by design. Its realism gates (G1-G5) would
 no longer be independent tests. The held-out Brier read (2026 wk1-8, still unread) is the only independent check
 left, so a v3 should be judged mainly on it.
+
+
+## V3 — PRE-REGISTERED 2026-11-15 17:09 CST, BEFORE any v3 code or v3 sim run
+
+**Decision.** At the v2 close, the session asked "Pre-register and run a v3 with the kneel-out in Q4 only?". The
+user answered "Run the v3" (~17:05 CST). The question named only the Q4-only kneel-out, so that is v3's whole
+scope. The optional Q4 end-game TD share from the v2 write-up is NOT in v3.
+
+### The change (one switch; the re-fit as v2)
+
+**`kneel_out_q4_only` (NEW).**
+- A declared `CalibrationProfile` field, default OFF, round-tripped through `to_dict`.
+- OFF is byte-identical to the v1 digests. It is inert without `end_of_half_kneel_out` (and so without
+  `end_of_half_clock`).
+- ON (with `end_of_half_kneel_out`): the kneel-out fires only in the game's last regulation quarter
+  (`quarter == simulation_input.quarters`). Q2's halftime preservation plays as `full2_nokneel` plays it. Draws
+  nothing.
+- **Everything else is `full2`:** v1's three switches, v2's three switches, and the v2 table, unchanged. No new
+  measurement.
+
+**The design input is already in this file:** the v2 same-seed ablation (`full2` vs `full2_nokneel`).
+- Q2-window snaps were 10.68 without the kneel-out, inside [10.41, 10.86], and 9.88 with it.
+- The Q4 kneel is what moved Q4 (-1.32) and gave H1 > H2.
+
+**Limits, stated now.**
+- Leaders' Q4-window points stay ~1.3 against the league's 0.44: v3 does not touch the leader's TD share before
+  the kneel-out can fire.
+- V2-f's limit (timeouts outside "after a clock-running play") is unchanged.
+
+### Arms (NFL FIT: the same 136 games x 100 seeds, same seeds)
+
+- `full3` = `full2` + `kneel_out_q4_only`, at production's levers (`home_field_bonus` 0, TD multiplier 1.0).
+- `v3h<h>_t<t>` = `full3` + the re-fit levers.
+- Baseline: v1's `off` (v2's `off2` reproduced it on 136 of 136 games, on the code v3 builds on).
+
+### Re-fit (the v2 rules, one grid narrowed)
+
+- **R1** `home_field_bonus` {0.0, 0.03, 0.06} at TD multiplier 1.0. Closest to `off`'s mean home margin (+1.93)
+  wins.
+  - Edge rule: if 0.06 is closest, extend to 0.09 and 0.12.
+  - Narrowed from v2's five values: v3 changes Q2 only, and v2's R1 margins were +1.21 / +1.84 / +2.36 for
+    0 / .03 / .06.
+- **R2a** `touchdown_weight_multiplier` {1.0, 0.95, 0.90, 0.85, 0.80, 0.75} at R1's value. Minimise Q (sum over
+  q1..q4 of ((sim - league) / se)^2).
+- **R2b** +-0.025 around R2a's choice. The final choice is the minimiser across R2a and R2b.
+  - Ties (within 0.25 of Q): take the value closer to 1.0 (v1's rule).
+- **R3** one R1 pass at R2's value if the margin moved > 0.15 from `off`'s, unless it provably cannot change the
+  verdict. Say so either way.
+
+### Gates (exactly v2's)
+
+- **G1:** each quarter inside the league CI.
+- **G2:** Q2 last-120 s points in [4.46, 5.10].
+- **G3** (GATING): Q2 last-120 s snaps in [10.41, 10.86].
+- **G4:** H1 > H2.
+- **G5:** Q4 last-120 s points in [2.31, 2.96].
+- **Held-out:** NFL 2026 wk1-8 (121 games, the 11-03 private pull, still unread), 1000 seeds a game, candidate vs
+  `off`.
+  - HB-ML / HB-TOT / HB-SPR, each with v1's "shown worse" rule (fails only if the CI lower bound > 0 or the point
+    > +0.003).
+  - **Read ONLY if G1-G5 all pass.**
+- **NCAAF:** `full3`, descriptive, as v1 / v2.
+
+**THE CAVEAT, binding on how the verdict is read.**
+- v3 was designed from v2's FIT read, so G1-G5 are no longer independent tests of the design. They stay necessary
+  conditions.
+- **The held-out Brier read is the independent test**, and the verdict is written that way.
+- If any gate fails, nothing ships and v3 is written up. Any v4 needs a fresh user decision.
+
+### Predictions (written before any v3 run; derived from v2's arms)
+
+| # | prediction |
+|---|---|
+| V3-P1 | OFF byte-identical (the v1 digests). `kneel_out_q4_only` is reachable on top of the kneel-out and inert without it. |
+| V3-P2 | `full3` (h0, t1.0), within +-0.1 of `full2_nokneel` in Q2 and of `full2` in Q4: Q2 14.45-14.65, Q2-window snaps 10.6-10.8, Q2-window points 5.1-5.3, Q4 13.7-13.9, Q4-window points 2.95-3.10, H1 - H2 ~ +0.7. |
+| V3-P3 | The re-fit picks `home_field_bonus` 0.03, and a TD multiplier in {0.80, 0.825, 0.85}. |
+| V3-P4 | At the pick, G1, G3 (10.6-10.8) and G4 pass. **G2 is the gate most at risk:** Q2-window points 5.00-5.15 against the upper bound 5.10, about even odds. G5: 2.85-3.00 against 2.96, a lean to pass. |
+| V3-P5 | P(every FIT gate passes) ~ 0.4. A FAIL is most likely G2 by < 0.1, and is a FAIL. |
+| V3-P6 | Held-out (if read): all three Brier deltas inside +-0.003, none shown worse. |
+| V3-P7 | NCAAF `full3`: Q2-window snaps ~10.4 (`full2_nokneel` 10.44; league 10.59), Q4 ~15.5 (`full2`), H1 > H2 by ~0.8. |
+
+### Binding
+
+- One functional smoke run is allowed, for bugs only.
+- Any design change after this point is an amendment, landed on main before the FIT read.
+- After the FIT read, nothing changes for this candidate.
+- **Compute:** FIT ~10 arms x ~4 min. Held-out (only on a FIT pass): `off` + the candidate, 121 x 1000 seeds each,
+  ~35-40 min each. All of it at Idle with `PYTHONHASHSEED=0` and 3 workers.
