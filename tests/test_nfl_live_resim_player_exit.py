@@ -108,3 +108,34 @@ def test_a_final_game_keeps_its_own_refusal(monkeypatch, summary, no_box):
                                       ratings=RATINGS, sims=20, env={})
     assert _reason(snap) == "game_final"
     assert snap["coverage"]["player_exits"]["live_games"] == 0
+
+
+def test_the_LIVE_MONEYLINE_index_drops_the_game_through_the_real_join(monkeypatch, summary, no_box):
+    """NFL live moneylines price TODAY (86-144 rows on a Sunday, 11-08 census) from this snapshot via
+    `live_gameline_join.build_live_gameline_index`. With the re-sim ON, the clean game must index a
+    moneyline projection and the same game with Maye out must not -- off != on at the join itself."""
+    from syndicate.features.shared.live_gameline_join import (
+        analytic_std_err_for_sport,
+        build_live_gameline_index,
+        lens_sources_for_sport,
+    )
+
+    def index(snap):  # exactly the board's call (board_enrichment, the full-game index)
+        return build_live_gameline_index(snap, sources=lens_sources_for_sport("nfl"),
+                                         analytic_std_err=analytic_std_err_for_sport("nfl"),
+                                         sport="nfl", slate_date="2026-11-15")
+
+    env_on = {"SYNDICATE_NFL_LIVE_RESIM": "on"}
+    clean = copy.deepcopy(summary)
+    clean["injuries"] = []
+    for drive in clean["drives"]["previous"]:
+        for play in drive["plays"]:
+            play["text"] = play["text"].split(" was injured during the play")[0]
+    priced, _ = _snapshot(monkeypatch, clean, env=env_on)
+    refused, _ = _snapshot(monkeypatch, summary, env=env_on)
+    assert priced["games"][0]["gameLens"][0]["ok"] is True  # the clean game really simulates
+    priced_idx = index(priced)
+    refused_idx = index(refused)
+    assert len(priced_idx) >= 1
+    assert refused_idx == {}
+    assert refused["coverage"]["refusals_by_reason"] == {"key_player_out": 1}
