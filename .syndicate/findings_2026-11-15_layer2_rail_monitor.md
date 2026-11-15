@@ -703,3 +703,25 @@ cards.
 
 **Teams:** 1 chip-less NCAAB card (FAMU @ UTEP, 5 rows). det1 / det2 / det3 0 / 0 / 0. 0 flipped.
 0 truncated. 0 live chips without a live card.
+
+### Reading 13 addendum — the seen-age lag, corrected (~1:5x PM CST)
+
+- **Premise withdrawn.** local_208683f1 (0f519972; code + the 19:51Z NCAAB state file, `C:\tmp\railload\grid809_seenlag.py`):
+  - A heartbeat's `events` and `books` are independent fetch-level sets (`odds_book_quotes._heartbeat_note`),
+    not (event, book) pairs.
+  - Seen age is per quote key, and `append_book_quotes` restamps it on every observation,
+    unchanged prices included.
+  - So a stale seen age means the book did not return that key.
+  - **My "heartbeat not advancing seen time" inference is wrong.**
+  - Their state-file split: segment markets carry the lag (h1 spreads 78 of 108, h1 totals 79 of
+    110, h2 24 / 24 of 27) against full spreads 3 of 308 and full totals 8 of 345.
+- **But the live-rail rows** (what the rail shows) split differently. At the 19:46:38Z build, the
+  185 stale NCAAB rows are:
+  - **full totals 100** (of 165 on the rail) and **full spreads 20** (of 31);
+  - h2 totals 34, h1 totals 28, h1 spreads 2, h2h 1.
+- **120 full-game keys** were sent for tracing (`C:\tmp\railmon\stale_full_keys.json`; betmgm 32,
+  draftkings 31, fanduel 28, fanatics 15, bovada 11).
+- **Untested guess:** these are alt lines the books stop returning as the in-play ladder moves.
+  If so, the gate acts correctly.
+- Caveat: "no newer capture" reads the change-only capture shard and cannot prove non-return.
+- **Status: OPEN with the grid owner. Not a confirmed defect.**
