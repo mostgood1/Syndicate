@@ -6987,6 +6987,93 @@ _BOOK_GRID_BACKGROUND_QUEUE: list[tuple[str, str]] = []
 _BOOK_GRID_SPORTS = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "wncaab", "soccer")
 
 
+# REACT TO LIVE PULLS WHENEVER THE MAIN THREAD IS FREE (todo #803, lane book-grid-pull-react; user 2026-11-14
+# "Yes, build it").
+#
+# Price-on-pull (above) was looked for once per main-loop pass, at the grid step. The pass also runs the live
+# re-sims (the NCAAF one 25-30 s, synchronous) and then sleeps `poll_seconds` (30 s), so a pull that landed
+# during any of that waited for the next pass. Measured on the fleet 2026-11-14: a pull waited a median 38-59 s
+# (afternoon) and 61-103 s (evening, NBA live) before its prices were in the in-play overlay, price-on-pull fired
+# only 4 times per sport in the evening window, and about half the pulls were overtaken by the next one before any
+# build read them. A replay of reacting whenever the thread is free gave afternoon NCAAF 59 -> 28 s, evening
+# 75 -> 52 s, at +22-25% main-thread build time.
+#
+# So the loop now also looks (a) in its sleep, every PULL_REACT_STEP_SECONDS, and (b) once right after the live
+# re-sims. Each look is a PRICE-ON-PULL PASS ONLY (`_run_book_grid_artifact_tick(pull_only=True)`): it never starts
+# a regular round, and costs a stat() per live sport when nothing landed. The sleep still ends on time, so the
+# loop's other steps keep their pace. The 5 s quiet window and the 30 s per-sport gap of price-on-pull still hold.
+#
+# (b's cost offset) A regular round skips a live sport that a price-on-pull pass rebuilt in the last
+# ROUND_SKIP_FRESH_SECONDS (45): that build already priced its latest pull with the latest live projections.
+# The skipped sport still counts as live, so the round keeps the live cadence.
+#   SYNDICATE_BOOK_GRID_PULL_REACT=off  look once per pass at the grid step, as before
+#   SYNDICATE_BOOK_GRID_ROUND_SKIP_FRESH_SECONDS  (default 45; 0 = never skip)
+_BOOK_GRID_PULL_REACT_STEP_SECONDS = 2.0
+_BOOK_GRID_ROUND_SKIP_FRESH_SECONDS_DEFAULT = 45.0
+
+
+def _book_grid_pull_react_enabled() -> bool:
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_PULL_REACT") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"} and _book_grid_price_on_pull_enabled()
+
+
+def _book_grid_round_skip_fresh_seconds() -> float:
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_ROUND_SKIP_FRESH_SECONDS") or "").strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        return _BOOK_GRID_ROUND_SKIP_FRESH_SECONDS_DEFAULT
+    return value if value >= 0 else _BOOK_GRID_ROUND_SKIP_FRESH_SECONDS_DEFAULT
+
+
+def _book_grid_repriced_on_pull_recently(sport: str, now: float) -> bool:
+    """A price-on-pull pass (not a round: `built_tick` None) rebuilt `sport` less than ROUND_SKIP_FRESH_SECONDS
+    ago. 0 seconds disables the skip."""
+    fresh = _book_grid_round_skip_fresh_seconds()
+    info = _BOOK_GRID_SPORT_STATE.get(sport) or {}
+    if fresh <= 0 or not info or "built_tick" not in info or info.get("built_tick") is not None:
+        return False
+    return now - float(info.get("built_at") or 0.0) < fresh
+
+
+def _book_grid_pull_check(stage: str) -> dict[str, Any] | None:
+    """A price-on-pull pass now, if a live sport's quotes just landed -- never a regular round. Prints its
+    BOOK_GRID_TICK (with `pull_react` naming where the loop looked). Never raises."""
+    if not _book_grid_pull_react_enabled():
+        return None
+    try:
+        meta = _run_book_grid_artifact_tick(pull_only=True)
+    except Exception as exc:
+        print(f"[refresh_worker] BOOK_GRID_TICK_ERROR stage={stage} {type(exc).__name__}: {exc}", flush=True)
+        return None
+    if meta:
+        meta["pull_react"] = stage
+        print(f"[refresh_worker] BOOK_GRID_TICK {json.dumps(meta, sort_keys=True, default=str)}", flush=True)
+    return meta
+
+
+# Module attributes so a test can drive the reacting sleep.
+_pull_react_monotonic = time.monotonic
+_pull_react_sleep = time.sleep
+
+
+def _sleep_reacting_to_live_pulls(seconds: float) -> None:
+    """Sleep `seconds`, looking for a new live pull every PULL_REACT_STEP_SECONDS while games are live. Ends at the
+    same deadline as a plain sleep (a pass run inside it uses up sleep time, it does not add to the loop's pace)."""
+    if not _book_grid_pull_react_enabled() or not _BOOK_GRID_LAST_RUN.get("any_live"):
+        _pull_react_sleep(seconds)
+        return
+    deadline = _pull_react_monotonic() + max(0.0, float(seconds))
+    while True:
+        left = deadline - _pull_react_monotonic()
+        if left <= 0:
+            return
+        _pull_react_sleep(min(_BOOK_GRID_PULL_REACT_STEP_SECONDS, left))
+        if _pull_react_monotonic() >= deadline:
+            return
+        _book_grid_pull_check("sleep")
+
+
 def _book_grid_live_first_enabled() -> bool:
     raw = str(os.environ.get("SYNDICATE_BOOK_GRID_LIVE_FIRST") or "").strip().lower()
     return raw not in {"0", "false", "no", "off"}
@@ -7202,7 +7289,7 @@ def _book_grid_rebuild_dates(selected_date: str) -> dict[str, set[str]]:
     return out
 
 
-def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
+def _run_book_grid_artifact_tick(*, pull_only: bool = False) -> dict[str, Any] | None:
     """#322: pivot the book_quotes shard HERE so web never has to.
 
     Web cannot do this pivot. Measured 2026-08-09: the MLB shard is 207MB and
@@ -7222,7 +7309,9 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     # PRICE ON PULL (see `_book_grid_sports_with_new_live_quotes`): between ticks, rebuild only the live
     # sports whose quotes just landed. The regular clock is not touched by such a pass.
     on_pull: list[str] = []
-    if now - _BOOK_GRID_LAST_RUN.get("all", 0.0) < interval:
+    # `pull_only` (todo #803, `_book_grid_pull_check`): a look between the loop's other steps runs a price-on-pull
+    # pass or nothing -- never the regular round, which stays at the grid step.
+    if pull_only or now - _BOOK_GRID_LAST_RUN.get("all", 0.0) < interval:
         on_pull = _book_grid_sports_with_new_live_quotes(central_today_iso(), now)
         if not on_pull:
             return None
@@ -7310,6 +7399,7 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     skipped: list[str] = []
     skipped_not_live: list[str] = []
     deferred_slow: list[str] = []
+    skipped_fresh: list[str] = []
     build_seconds: dict[str, float] = {}
     live_sports: list[str] = []
     any_live_today = False
@@ -7349,6 +7439,11 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     deferred_slow.append(sport)
                     if (_BOOK_GRID_SPORT_STATE.get(sport) or {}).get("live"):
                         any_live_today = True
+                    continue
+                if not on_pull and why == "live" and _book_grid_repriced_on_pull_recently(sport, now):
+                    # A price-on-pull pass rebuilt it moments ago from its latest pull (todo #803). Still live.
+                    skipped_fresh.append(sport)
+                    any_live_today = True
                     continue
             if live_first and _book_grid_is_background_job(build_date, selected_date, why, rebuild_only):
                 if (build_date, sport) not in _BOOK_GRID_BACKGROUND_QUEUE:
@@ -7539,7 +7634,7 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
             hit = next((w for w in written if w.startswith(f"{sport}:") and w.endswith(f"@{day}")), None)
             print(f"[refresh_worker] BOOK_GRID_REBUILD_DONE sport={sport} date={day} written={hit}", flush=True)
 
-    if not written and not skipped and not deferred_slow and not queued_now:
+    if not written and not skipped and not deferred_slow and not queued_now and not skipped_fresh:
         return None
     return {
         "date": selected_date,
@@ -7574,6 +7669,8 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         "background_built": background_built,
         "background_seconds": background_seconds,
         "background_pending": len(_BOOK_GRID_BACKGROUND_QUEUE),
+        # todo #803: live sports this round skipped because a price-on-pull pass rebuilt them moments ago.
+        "skipped_fresh": skipped_fresh,
     }
 
 
@@ -8412,6 +8509,10 @@ def main() -> int:
         except Exception as exc:
             print(f"[refresh_worker] NFL_LIVE_RESIM_ERROR {type(exc).__name__}: {exc}", flush=True)
 
+        # A pull that landed during the grid round or the live re-sims is priced now, not after the sleep
+        # (todo #803; price-on-pull only, never a round).
+        _book_grid_pull_check("after_live_resims")
+
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):
             refresh_cycle["reclaimed_count"] = 1
@@ -8811,7 +8912,8 @@ def main() -> int:
                 return 0
         except Exception as exc:
             print(f"[refresh_worker] RECYCLE_CHECK_FAILED {type(exc).__name__}: {exc}", flush=True)
-        time.sleep(poll_seconds)
+        # Looks for new live pulls while it sleeps (todo #803; `_sleep_reacting_to_live_pulls`).
+        _sleep_reacting_to_live_pulls(poll_seconds)
 
 
 if __name__ == "__main__":

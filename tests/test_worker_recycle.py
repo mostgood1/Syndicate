@@ -254,7 +254,8 @@ class HookWiringTests(unittest.TestCase):
 
     def test_main_loop_asks_maybe_recycle_before_sleeping(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "scripts" / "run_refresh_worker.py").read_text(encoding="utf-8")
-        sleep_at = source.rfind("time.sleep(poll_seconds)")
+        # The loop's sleep: plain, or the sleep that looks for live pulls (todo #803, lane book-grid-pull-react).
+        sleep_at = max(source.rfind("time.sleep(poll_seconds)"), source.rfind("_sleep_reacting_to_live_pulls(poll_seconds)"))
         ask_at = source.rfind("maybe_recycle(parent_pid=os.getpid())")
         self.assertGreater(ask_at, 0, "run_refresh_worker.py never calls maybe_recycle")
         self.assertLess(ask_at, sleep_at)
