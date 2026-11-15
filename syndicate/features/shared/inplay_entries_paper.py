@@ -329,8 +329,16 @@ class PaperEntryLoop:
         on_book: Callable[[Mapping[str, Any]], Mapping[str, Any] | None] | None = None,
         get_odds: Callable[[str, str], Any] | None = None,
         sports: Sequence[str] = ("nhl",),
+        exit_hold: Any = None,
     ) -> None:
         self.today_fn, self.clock, self.get = today_fn, clock, get
+        # Lane live-player-exit-gate (user loan 2026-11-15): refuse a booking on a game whose key player
+        # has left it, read from the live producer's published `playersOut` (live_player_exit_hold).
+        if exit_hold is None:
+            from syndicate.features.shared.live_player_exit_hold import ExitHold
+
+            exit_hold = ExitHold()
+        self.exit_hold = exit_hold
         # OddsAPI calls are METERED by default. An injected `get` (tests) keeps its own odds path unmetered.
         self.get_odds = get_odds or (_get_odds if get is _get else (lambda url, sport: get(url)))
         self.sports = tuple(s for s in sports if s in SPORTS)
@@ -515,8 +523,13 @@ class PaperEntryLoop:
             self.window["signals"] += 1
             key = f"{day}:{tk}:{d['leg']}"
             refused = None
+            hold = self.exit_hold.check(sport, (ev or {}).get("home_team"), (ev or {}).get("away_team"))
             if key in entries:
                 refused = "already_today"
+            elif hold.get("verdict") == "fail":
+                refused = str(hold.get("reason") or "key_player_out")
+                print(f"[inplay_entries_paper] EXIT_HOLD sport={sport} ticker={tk} leg={d['leg']}"
+                      f" players={hold.get('players')} snapshot_at={hold.get('snapshot_at')}", flush=True)
             elif booked_today >= DAY_BOOKINGS_CAP:
                 refused = "day_bookings_cap"
             if refused is None:

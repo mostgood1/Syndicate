@@ -393,7 +393,7 @@ def test_a_placed_entry_joins_the_ledger_row_by_its_idempotency_key(monkeypatch)
     assert (rec["ask"], rec["leg"], rec["position_key"]) == (0.30, "yes", f"ingame:{ENTRY['ticker']}:yes")
     assert rec["sizing"]["version"] == live.SIZING_VERSION and rec["sizing"]["stake"] == 2.7901
     assert rec["sizing"]["contracts"] == 9 and rec["sizing"]["order_dollars"] == 3.0 and rec["sizing"]["day_cap"] == 50.0
-    assert set(rec["guards"]) == {"band", "min_ask", "cell_gate", "ledger", "axis", "day_budget", "check_order"}
+    assert set(rec["guards"]) == {"player_exit", "band", "min_ask", "cell_gate", "ledger", "axis", "day_budget", "check_order"}
     assert rec["guards"]["min_ask"] == {"verdict": "off"}
     assert rec["guards"]["band"] == {"verdict": "pass", "band": [0.20, 0.75]}
     assert rec["guards"]["cell_gate"] == {"verdict": "off"}

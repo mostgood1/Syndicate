@@ -1,0 +1,94 @@
+"""Hold in-play ENTRIES on a game a key player has left (lane live-player-exit-gate, user loan 2026-11-15).
+
+The in-play entry loops (`inplay_entries_paper` / `inplay_entries_live`) price from BOOK CONSENSUS, not
+from our model, so the live re-sim's `key_player_out` refusal never reached them: on 2026-11-15 they
+could still enter NE @ DET after Drake Maye left it. This reads the SAME published snapshot the live
+moneyline join reads (`live/<sport>_live_resim.json`, the keyvalue store), so an entry and a gameline
+refuse on one source and cannot disagree about who is out.
+
+Only a sport whose live producer PUBLISHES `playersOut` is checked (`PUBLISHING_SPORTS`); every other
+sport answers `off`, which is exactly the behaviour before this module. A game the snapshot cannot speak
+for (snapshot unreadable, game not in it, `playersOut` absent because the summary was unreadable)
+answers `unknown` and is NOT refused: that is the pre-gate behaviour, recorded so it is countable.
+
+Lag: the hold is as fresh as the producer's tick (NFL re-sim: 300 s) plus CACHE_S here.
+"""
+
+from __future__ import annotations
+
+import time
+from typing import Any, Callable, Mapping
+
+from syndicate.features.shared.live_player_status import REASON_KEY_PLAYER_OUT, gate_enabled
+
+# sport -> the live snapshot (under data_root()/live) whose games carry `playersOut`. Must equal
+# `board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS[sport]` (tested): a copy here keeps the fast exit
+# thread from importing board_enrichment.
+PUBLISHING_SPORTS: dict[str, str] = {"nfl": "nfl_live_resim.json"}
+CACHE_S = 30.0
+
+
+def _read_snapshot(sport: str) -> Any:
+    from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+    return read_json_file(data_root() / "live" / PUBLISHING_SPORTS[sport])
+
+
+def _canon(sport: str, name: Any) -> str:
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    text = str(name or "").strip()
+    return (canonical_team(sport, text) or text).strip().lower() if text else ""
+
+
+class ExitHold:
+    """`check(sport, home_team, away_team)` -> {"verdict": off|pass|fail|unknown, ...}. Never raises."""
+
+    def __init__(self, *, read_fn: Callable[[str], Any] | None = None,
+                 clock: Callable[[], float] = time.monotonic, cache_s: float = CACHE_S,
+                 env: Mapping[str, str] | None = None) -> None:
+        self.read_fn = read_fn or _read_snapshot
+        self.clock = clock
+        self.cache_s = cache_s
+        self.env = env
+        self._cache: dict[str, tuple[float, Any]] = {}
+
+    def _snapshot(self, sport: str) -> Any:
+        now = self.clock()
+        hit = self._cache.get(sport)
+        if hit is None or now - hit[0] >= self.cache_s:
+            try:
+                snap = self.read_fn(sport)
+            except Exception as exc:  # noqa: BLE001 -- a read failure is `unknown`, never a crash in the exit thread
+                snap = {"_read_error": f"{type(exc).__name__}: {exc}"[:160]}
+            hit = (now, snap)
+            self._cache[sport] = hit
+        return hit[1]
+
+    def check(self, sport: Any, home_team: Any, away_team: Any) -> dict[str, Any]:
+        sport = str(sport or "").lower()
+        if not gate_enabled(self.env) or sport not in PUBLISHING_SPORTS:
+            return {"verdict": "off"}
+        snap = self._snapshot(sport)
+        if not isinstance(snap, Mapping) or not isinstance(snap.get("games"), list):
+            return {"verdict": "unknown", "why": "snapshot_unreadable"}
+        want = {_canon(sport, home_team), _canon(sport, away_team)}
+        if "" in want:
+            return {"verdict": "unknown", "why": "entry_has_no_teams"}
+        for game in snap["games"]:
+            if not isinstance(game, Mapping):
+                continue
+            names = {_canon(sport, game.get("home_name") or game.get("home_code")),
+                     _canon(sport, game.get("away_name") or game.get("away_code"))}
+            if names != want:
+                continue
+            out = game.get("playersOut")
+            if not isinstance(out, list):
+                return {"verdict": "unknown", "why": "game_exits_not_read", "snapshot_at": snap.get("generated_at")}
+            key = [f"{p.get('team')}:{p.get('player')}:{p.get('reason')}" for p in out
+                   if isinstance(p, Mapping) and p.get("key")]
+            if key:
+                return {"verdict": "fail", "reason": REASON_KEY_PLAYER_OUT, "players": key,
+                        "snapshot_at": snap.get("generated_at")}
+            return {"verdict": "pass", "snapshot_at": snap.get("generated_at")}
+        return {"verdict": "unknown", "why": "game_not_in_snapshot", "snapshot_at": snap.get("generated_at")}

@@ -235,7 +235,13 @@ class LiveEntryPlacer:
         gate_fn: Callable[[], Mapping[str, Any]] | None = None,
         clock: Callable[[], float] = time.monotonic,
         record_fn: Callable[[str, Mapping[str, Any]], None] | None = None,
+        exit_hold: Any = None,
     ) -> None:
+        if exit_hold is None:  # lane live-player-exit-gate (user loan 2026-11-15)
+            from syndicate.features.shared.live_player_exit_hold import ExitHold
+
+            exit_hold = ExitHold()
+        self.exit_hold = exit_hold
         self.today_fn = today_fn
         self.orders_fn = orders_fn or _ledger_orders
         self.place_fn = place_fn or _place_live
@@ -271,9 +277,14 @@ class LiveEntryPlacer:
         band = _price_band()
         floor = inplay_min_ask()
         cell, cell_refusal = self._cell_check(entry)
+        try:
+            exit_verdict = dict(self.exit_hold.check(entry.get("sport"), entry.get("home_team"), entry.get("away_team")))
+        except Exception as exc:  # noqa: BLE001 -- the hold must never stop the guard chain from recording
+            exit_verdict = {"verdict": "unknown", "why": f"{type(exc).__name__}: {exc}"[:160]}
         # EVERY guard's verdict, evaluated independently so the record holds all of them; the order of the
-        # refusals below is unchanged (the first failing guard is the reason).
+        # refusals below is unchanged (the first failing guard is the reason), with the key-player hold first.
         guards: dict[str, dict[str, Any]] = {
+            "player_exit": exit_verdict,
             "band": {"verdict": "off"} if band is None else {
                 "verdict": "pass" if band[0] - 1e-9 <= ask < band[1] - 1e-9 else "fail", "band": [band[0], band[1]]},
             "min_ask": {"verdict": "off"} if floor is None else {
@@ -286,7 +297,10 @@ class LiveEntryPlacer:
             "day_budget": {"verdict": "fail" if spend["dollars"] + stake > cap + 1e-9 else "pass",
                            "spend": spend["dollars"], "stake": stake, "cap": cap},
         }
-        if guards["band"]["verdict"] == "fail":
+        if exit_verdict.get("verdict") == "fail":
+            result = {"placed": False, "reason": str(exit_verdict.get("reason") or "key_player_out"),
+                      "players": exit_verdict.get("players")}
+        elif guards["band"]["verdict"] == "fail":
             result = {"placed": False, "reason": "outside_price_band", "band": f"[{band[0]:.2f},{band[1]:.2f})"}
         elif guards["min_ask"]["verdict"] == "fail":
             result = {"placed": False, "reason": "below_inplay_min_ask", "floor": floor}
