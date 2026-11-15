@@ -47,8 +47,8 @@ Every fleet read below is read-only, at nice 19. Scripts: `C:\tmp\livegrade\nfl7
   NFL games refused at some point). It is selection-biased toward lopsided games.
 - **The better instrument already exists:** `scripts/backtest_nfl_live_totals.py` replays end-of-Q1/Q2/Q3 states of
   COMPLETED games through the shipped `resim_live_game` against the real finals, with `--band bypass` to include
-  the refused states (labelled diagnostic). Weeks 1-10 are complete now (~150 games, against ~15 from live
-  recording), but the ratings provenance check matters, as it did on 09-27.
+  the refused states (labelled diagnostic). CORRECTED below: the gradeable population is weeks 5-10,
+  about 83 games, not ~150 over weeks 1-10.
 
 ## Prediction, written before the data (see the lane)
 
@@ -62,4 +62,18 @@ UNDETERMINED if the CI is wider than 1.0-2.5.
 ## Owed
 
 - 8:55 AM CST: done (above). 12:40 PM CST: the noon games (`wait_today.sh`, still armed).
-- The fit: the user's choice between the replay harness on weeks 1-10 and the live log's confident tail.
+- The fit: the user chose the replay harness, "After tonight's games" (next section).
+
+## The replay run, armed for after tonight's games
+
+User: "After tonight's games" (to "Run the NFL replay harness on weeks 1-10?"), 10:27 AM CST (16:27Z).
+
+- **Population:** weeks 5-10, about 83 games (about 70 in weeks 5-9 plus the 13 of week 10 that finish tonight; MNF 11-16 excluded), not the ~150 over weeks 1-10 I told the user: today is week 10, not 11; the fleet holds no ratings file for weeks 1-3; and week 4 has no earlier file to grade it point-in-time.
+- **Ratings provenance:** each `smartsim2_ratings_2026_wk<N>.json` is rewritten nightly and last written Sunday night of week N (generated_at Monday 03:56-05:28Z, after that Sunday's games), so the same-week file is LEAKAGE_RISK for every game it grades. Headline: week N graded on the wk(N-1) file, written before week N's first kickoff (POINT_IN_TIME; staler than production's pregame file by MNF N-1 and TNF N, never leaky). The same-week run on weeks 5-9 is kept as a diagnostic only.
+- **Code and flags:** fleet HEAD `05fee7b69`: `nfl/live_resim.py`, the harness, the smartsim2 tree, `live_gameline_join.py` and `prop_projections.py` are blob-identical to origin/main `a380bd283`. Flags: refresh-worker sets `SYNDICATE_NFL_LIVE_RESIM=1`; no role sets `SYNDICATE_FOOTBALL_GOAL_LINE_TOUCHDOWN` or `SYNDICATE_NFL_LIVE_RESIM_SIMS`, so the harness's defaults (120 sims) are production's.
+- **Instrument:** `scripts/backtest_nfl_live_totals.py --band bypass --dump-rows` (end of Q1/Q2/Q3, the shipped
+  `resim_live_game`), then `C:\tmp\livegrade\nfl780\harness\nflfit.py`. lines: the in-play full-game totals / spreads quotes captured during that quarter break (ESPN summary wallclocks: end of quarter to the next quarter's first play), each book's latest, with book_updated_at after the last score and no earlier than 5 min before the break; de-vigged per book, averaged over books. Model P is the join's own `price_distribution_market` (Agresti-Coull at 120 sims). One row per (game, cutoff, line); k by log-loss as #780 (P_k = Phi(Phi^-1(P)/k)), 95% CI by resampling games, walk-forward by week; subsets: all states (band bypassed), the states production would publish (P(home) outside 0.35-0.65), and the main line.
+- **Smoke, week 9, 2 games: harness 10 s; 6 of 6 states matched quotes in their break (19 totals + 19 spreads rows), so the whole run should take minutes.**
+- **Armed: background job `bkzsy2638` (`C:\tmp\livegrade\nfl780\harness\run_tonight.sh`) waits for 10 PM CST, then until all 13 of tonight's week-10 games are final (cap 3 AM CST), then runs the harness and `nflfit.py` at nice 19, read-only; outputs in `C:\tmp\livegrade\nfl780\harness`.**
+- **Not measured by this:** possession at the break (the harness marginalises it), states inside a quarter,
+  and alt lines (the shards' full-game totals / spreads are main lines).
