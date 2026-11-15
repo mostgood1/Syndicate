@@ -905,3 +905,23 @@ LAR @ ARI and SEA @ LV in Q1.
   - Only if Brier(sim) < Brier(fair) - 0.01 across >= 20 distinct games: propose a gap-band study
     to the user, still not a rule change.
   - Otherwise the flag rule stays as is, and the rail stays information (user 2026-11-14).
+
+## Reading 20 — Sun 11-15 4:30 PM CST (22:30Z). First reading inside tonight's pre-registered population (flags first shown >= 22:00Z)
+
+22 live chips.
+- **37 flags on 11 cards. 0 false, 0 missed, 0 dark.** Flagged rows: NBA 102, NCAAB 16,
+  WNCAAB 2, NFL 0.
+- **Cadence:**
+  - **0 `deferred_slow` in 33 min.**
+  - Overlay gap max: NFL 171 s, NBA 204 s, NCAAB 109 s, WNCAAB 146 s.
+  - Builds: NFL p50 19.7 s, max 52.0 s. NBA p50 22.8 s, max 41.8 s.
+  - Web merges: 0 stale apart from ncaaf 66 / 66 (no NCAAF game live).
+  - 1 WNCAAB zero-card build with rows.
+- **Rows priced <= 120 s:** NBA 428 / 831 (52%, seen age p50 23 s). NCAAB 36 / 106. NFL 19 / 76.
+  WNCAAB 8 / 25.
+- **Load:**
+  - `/intelligence` 8.2 s / **31.1 MB** (5.5 MB gz), the largest page today.
+  - Query 6.6 s / 71.2 MB.
+  - **Live-rail 0.13 s, 1,003-1,031 rows, 0.94 MB.** The 15 s rail poll now moves ~1 MB
+    uncompressed, ~80 KB on the wire. It was ~20 KB at its 11-14 design reading.
+- **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
