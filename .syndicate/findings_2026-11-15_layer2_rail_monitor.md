@@ -155,3 +155,47 @@ NCAAB 1. The 11:00 college tips are live.
 **Teams:**
 - det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 0 live chips without a live card.
 - Chip-less NCAAB cards unchanged: 2 of 38 (FAMU @ UTEP, Washington @ Utah; reading 1).
+
+## Reading 3 — Sun 11-15 11:21 AM CST (17:21Z)
+
+5 live cards (NFL 1, WNCAAB 3, NCAAB 1) of 133. The page fetch was skipped (`--no-page`); the
+rail code was the 11:08 served copy.
+
+**Load:** query 13.4 s / 59.3 MB (10.4 MB gz). Shortlist 0.75 s. Chips 0.70 s. Live-rail
+0.016 s, 9-12 rows.
+
+**Refresh:**
+- Board build 57 s old.
+- Live-rail newest 68 / 6 / 16 s.
+- Overlay gaps, last 15 min:
+
+  | sport | builds | gap p50 / p90 / max |
+  |---|---|---|
+  | NFL | 10 | 62 / 113 / **271** s |
+  | NCAAB | 11 | 76 / 134 / 141 s |
+  | WNCAAB | 9 | 102 / 143 / 196 s |
+
+- NFL build p50 32.8 s, max 70.2 s. `deferred_slow` nfl on 1 of 21 ticks. Tick gap p50 43 s,
+  max 92 s.
+- Web merges: nfl / ncaab / wncaab fresh 19 / 19 / 19, 0 stale.
+
+**Live recommendations:**
+- **2 flags shown, on 2 of 5 live cards. 0 false, 0 missed, 0 dark.**
+  - WNCAAB EMU @ UK, **u140.5**: ours 127.3, sim 82.4% vs fair 50.0%, **+32.4 pp**. Priced on a
+    49 s quote, 105 s old now.
+  - WNCAAB SAM @ PUR, **u138.5**: ours 131.2, sim 63.2% vs 49.1%, **+14.1 pp**. Priced on 65 s,
+    122 s old now.
+- The 11:08 flag (QUIN @ CCSU o137.5) is gone, **with the line unchanged at 137.5**. OURS moved
+  151.7 -> 144.6 in 13 min, which put the gap under 3 pp. So the live sim's total moved 7.1
+  points in 13 min of game time while the book's did not. This goes to the outcome grade,
+  together with #780's prior.
+- 23 live rows. Priced p50 131 s, p90 327 s; **11 of 23 <= 120 s** (5 of 25 at 11:08). Age now
+  p50 190 s, p90 415 s; 6 of 23 > 300 s. 0 rows with no fair.
+- **4 of 11 live markets have no OURS**, all NFL and all known:
+  - Spread: blank by decision.
+  - 2H Spread, 2H ML, Q4 Spread: there are no live period blocks, #767 (c).
+- `flags.jsonl` holds 3 rows (one per flag per reading). Grading dedupes on
+  (game, market, segment, side).
+
+**Teams:** det1 / det2 / det3 0 / 0 / 0; 0 flipped; 0 truncated. The same 2 chip-less NCAAB
+cards. WGA @ UML is live with 0 lines.
