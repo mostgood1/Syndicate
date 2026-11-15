@@ -28,6 +28,7 @@ this is the microscope.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from typing import Any
@@ -743,6 +744,73 @@ def orient_events_to_latest(rows: list[Mapping[str, Any]]) -> tuple[list[Mapping
     return out, len(events), relabelled, dropped_venue
 
 
+# A line's bucket is round(line * 1e6), so two lines within `market_sides_for_quote`'s 1e-9 tolerance land in the same
+# or a neighbouring bucket. Past 1e9 the product stops being exact enough to promise that; such a line is "wild" and
+# offered to every anchor, which is safe because offering a row only lets `market_sides_for_quote` judge it.
+_LINE_BUCKET_SCALE = 1e6
+_LINE_BUCKET_MAX = 1e9
+
+_LineIndex = tuple[dict[int | None, list[int]], list[int]]
+
+
+def _line_candidate_index(group: list[Mapping[str, Any]]) -> _LineIndex:
+    """One pass over an instance's rows: each row's position, bucketed by its line (`_line_value`).
+
+    WHY (lane ncaaf-grid-build-speed, 2026-11-15). The anchor loop asks `market_sides_for_quote` for the sides of every
+    distinct line in a group, and that function walks the WHOLE group each time, re-folding every row's identity.
+    Live spreads and totals add a line at every move, so the cost is anchors x group. Measured on the fleet's 11-14
+    NCAAF shard: 124,344 kept rows, 13,703 anchors, 3,398,922 rows walked (27 per row; spreads and totals 97% of it),
+    and `market_sides_for_quote` was 76% of the pivot's time under cProfile.
+
+    Returns (buckets, wild): `buckets[None]` holds the line-less rows, `buckets[round(line * 1e6)]` the rest, and
+    `wild` the rows whose line is not finite or past `_LINE_BUCKET_MAX`. Positions are ascending in each list.
+    """
+    buckets: dict[int | None, list[int]] = {}
+    wild: list[int] = []
+    for position, row in enumerate(group):
+        value = _line_value(row)
+        if value is None:
+            buckets.setdefault(None, []).append(position)
+        elif math.isfinite(value) and abs(value) <= _LINE_BUCKET_MAX:
+            buckets.setdefault(round(value * _LINE_BUCKET_SCALE), []).append(position)
+        else:
+            wild.append(position)
+    return buckets, wild
+
+
+def _side_candidates(
+    group: list[Mapping[str, Any]], index: _LineIndex, anchor: Mapping[str, Any]
+) -> list[Mapping[str, Any]]:
+    """The rows of `group` that `market_sides_for_quote(group, anchor)` could keep, in `group`'s order.
+
+    A SUPERSET, never a guess. `market_sides_for_quote` judges every row on its own (price present, same identity, and
+    the line the row's side must sit on: the anchor's line, or its negation for the mirrored home/away pair, within
+    1e-9) and keeps the survivors in input order. So handing it any ordered sub-list of the group that contains every
+    survivor returns exactly the list it returns for the whole group. The anchor's own rule still decides; this only
+    skips rows on lines it would refuse anyway:
+      * a line-less anchor keeps only line-less rows, so it is offered `buckets[None]`;
+      * a finite anchor line L keeps only rows within 1e-9 of L or -L, so it is offered the buckets round(+-L * 1e6)
+        and their neighbours (a 1e-9 difference moves the product by 0.001, at most one bucket across a rounding
+        edge), plus every wild row;
+      * an anchor whose own line is not finite or past `_LINE_BUCKET_MAX` gets the whole group: comparisons against
+        it do not follow the arithmetic above, so nothing is skipped.
+    Positions are merged and sorted, so the order is the group's: `_freshest_per_book_side` breaks same-timestamp
+    ties last-wins, and the order is what decides them.
+    """
+    buckets, wild = index
+    chosen = _line_value(anchor)
+    if chosen is None:
+        return [group[position] for position in buckets.get(None, ())]
+    if not math.isfinite(chosen) or abs(chosen) > _LINE_BUCKET_MAX:
+        return group
+    positions: set[int] = set(wild)
+    for expected in (chosen, -chosen):
+        bucket = round(expected * _LINE_BUCKET_SCALE)
+        for key in (bucket - 1, bucket, bucket + 1):
+            positions.update(buckets.get(key, ()))
+    return [group[position] for position in sorted(positions)]
+
+
 def build_book_grid(
     rows: Iterable[Mapping[str, Any]],
     *,
@@ -802,7 +870,8 @@ def build_book_grid(
         display_player = _instance_display_name(group)
         # Within an instance, distinct line values can still be different market
         # instances (alternate lines). Anchor on each distinct line and let the
-        # shared rule gather its sides.
+        # shared rule gather its sides -- from the rows on that line or its mirror only (`_line_candidate_index`).
+        line_index = _line_candidate_index(group)
         seen_anchors: set[float | None] = set()
         for anchor in group:
             anchor_key = _canonical_line(anchor)
@@ -810,7 +879,7 @@ def build_book_grid(
                 continue
             seen_anchors.add(anchor_key)
 
-            sides_rows = market_sides_for_quote(group, anchor)
+            sides_rows = market_sides_for_quote(_side_candidates(group, line_index, anchor), anchor)
             if not sides_rows:
                 continue
             freshest = _freshest_per_book_side(sides_rows)
