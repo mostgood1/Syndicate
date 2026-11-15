@@ -550,3 +550,54 @@ rows (0.54 MB).
 - Builds over the 15 min before the boot: NFL p50 33.2 s, max 44.9 s (under 45). NBA p50 25.1 s,
   max 43.5 s. `deferred_slow` nba 1, nfl 1. Overlay gaps all <= 303 s. Web merges: nba stale
   1 of 36, the rest fresh.
+
+## Reading 11 — Sun 11-15 1:06 PM CST (19:06Z). FIRST POST-#810 READ (college 60 s pulls)
+
+**Splits:**
+- live-odds-worker started 18:53:22Z (pid 1771964), the #810 load: fleet ff to `295ccfa6c` at
+  18:50:59Z per local_1f10ce63.
+- refresh-worker unchanged since 18:52:23Z.
+
+**Load:**
+- `/intelligence` 9.8 s / 27.9 MB.
+- Query 8.8 s / 67.0 MB. Shortlist 1.0 s. Live-rail 0.06 s, 497 rows.
+- The shortlist is fresh (44 s).
+
+**Refresh:**
+- Overlay gap p50 / max:
+
+  | sport | p50 | max | note |
+  |---|---|---|---|
+  | NCAAB | 47 s | 149 s | pre 69-78 / 303-308 s |
+  | WNCAAB | 52 s | 151 s | |
+  | NCAAF | 67 s | 131 s | |
+  | NFL | 293 s | 343 s | |
+  | **NBA** | 166 s | **402 s** | |
+
+- Builds: NFL p50 50.6 s, max 103.4 s. NBA p50 32.2 s, max 73.0 s. NCAAB 9.2 s (pre 12.2 s).
+  WNCAAB 1.8 s.
+- `deferred_slow` nfl 2, nba 1. Web merges: nba stale 1 of 13.
+
+**Live recommendations:**
+- **24 flags on 14 cards. 0 false, 0 missed, 3 dark.**
+- Flagged rows: NCAAB 1H 26, NCAAB 2H 13, WNCAAB 5, NCAAF 1, NBA 0, NFL 0.
+- **Our-look age at pricing** (what #810 changes; halftime cannot move it), p50 / p90:
+
+  | sport | post | pre |
+  |---|---|---|
+  | NCAAB | **10 / 160 s** | 37 / 291 (12:37), 51 / 247 (12:50) |
+  | WNCAAB | **17 / 173 s** | 88 / 144, 52 / 248 |
+  | NFL (control) | 94 / 236 s | — |
+  | NBA (control) | 190 / 190 s | — (cadence) |
+
+- Rows priced <= 120 s, phase-matched (pre 12:21 / 12:37 / 12:50 -> post):
+  - NCAAB 1H 61% / 44% / 11% -> **59%** (69 / 116).
+  - NCAAB 2H 79% / 46% / 25% -> **57%** (28 / 49).
+  - WNCAAB 2H -> 72% (13 / 18).
+  - Break rows 4 / 44 and 0 / 9: frozen, as expected.
+  - NFL control 37%. **NBA control 1% (2 / 208)**: its overlay ran 402 s; the cadence again.
+- One read. Single reads swing 11-82% within a phase, so pool before judging. Reported to
+  local_1f10ce63, who owns the #810 verdict.
+
+**Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. The same 2 chip-less NCAAB
+cards.
