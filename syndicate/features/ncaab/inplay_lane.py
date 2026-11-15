@@ -66,12 +66,23 @@ def ncaab_live_refresh_enabled(league: str = "ncaab") -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
+# 60 s, NOT 240 s `[2026-11-15, #810, lane college-live-pull-60s; user "fix the stale quote problem so flags
+# can fire"]`. Once the pregame sweeps stop at tip, this lane is the ONLY OddsAPI look at a live college game,
+# and the board re-prices the same quote every ~70 s in between, so at 240 s most served live rows were priced
+# on a quote past the rail's 120 s MODEL != LINE rule (11-15 17:45Z: 1 of 40 rows <= 120 s; 11 of 23 at 17:21Z,
+# while the pregame sweep still looked every 40-90 s). The extra pulls are cheap because only the bulk
+# full-game call (3 credits, every event) repeats every 60 s: the per-game half / quarter markets keep their own
+# 240 s clock (`refresh_ncaab_odds_history._in_play_segments_due`). A forced lane run took 9-12 s on the fleet,
+# so a 60 s cadence does not queue behind itself. The env key still wins (240 = the old cadence).
+_LIVE_REFRESH_INTERVAL_DEFAULT_SECONDS = 60
+
+
 def ncaab_live_refresh_interval_seconds(league: str = "ncaab") -> int:
     raw = str(os.environ.get(f"SYNDICATE_{league.upper()}_LIVE_REFRESH_INTERVAL_SECONDS") or "").strip()
     try:
-        value = int(raw or 240)
+        value = int(raw or _LIVE_REFRESH_INTERVAL_DEFAULT_SECONDS)
     except ValueError:
-        value = 240
+        value = _LIVE_REFRESH_INTERVAL_DEFAULT_SECONDS
     return max(60, value)
 
 

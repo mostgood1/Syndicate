@@ -511,7 +511,79 @@ def _fetch_current_rows(*, adapter, date_iso: str, markets: str, bookmakers: str
     return rows
 
 
-def _fetch_in_play_rows(*, adapter, markets: str, bookmakers: str | None, now: dt.datetime | None = None, league: str = "ncaab") -> list[dict]:
+# THE SEGMENT CLOCK `[2026-11-15, #810, lane college-live-pull-60s; user "fix the stale quote problem so flags
+# can fire"]`. The in-play lane now pulls every 60 s (`ncaab/inplay_lane.py`), because a live college game is
+# looked at by nothing else once the pregame sweeps stop, and at 240 s most served live rows were priced on a
+# quote past the rail's 120 s MODEL != LINE rule. Only the bulk full-game call needs that cadence: it is 3
+# credits for EVERY event, and it is all the flag reads (college segment rows never flag, #763). The per-game
+# half / quarter calls (~2-4 credits per started game) keep the old 240 s cadence on this clock, so the extra
+# cost is ~3 credits a minute per league while a game is live, not ~3 x the per-game bill.
+#
+# `SYNDICATE_<LEAGUE>_IN_PLAY_SEGMENT_INTERVAL_SECONDS`: absent = 240; 0 = no clock (every pull asks segments,
+# the behaviour before #810). The clock lives in the refresh-state store (keyvalue on the fleet), one key per
+# league, and advances only after a segment pass that had a started game to ask about. The slack lets a pull
+# that lands a few seconds early on a 60 s cadence still count (240 s, not 300 s, between segment passes).
+_IN_PLAY_SEGMENT_INTERVAL_DEFAULT_SECONDS = 240.0
+_IN_PLAY_SEGMENT_CLOCK_SLACK_SECONDS = 20.0
+
+
+def _in_play_segment_interval_seconds(league: str) -> float:
+    raw = str(os.environ.get(f"SYNDICATE_{league.upper()}_IN_PLAY_SEGMENT_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = float(raw) if raw else _IN_PLAY_SEGMENT_INTERVAL_DEFAULT_SECONDS
+    except ValueError:
+        value = _IN_PLAY_SEGMENT_INTERVAL_DEFAULT_SECONDS
+    return max(0.0, value)
+
+
+def _segment_clock_path(league: str) -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root() / "refresh_status" / "latest" / f"{league}_inplay_segment_clock.json"
+
+
+def _read_segment_clock(league: str) -> float | None:
+    """Epoch of the league's last in-play segment pass, or None (never, or unreadable)."""
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        payload = read_json_file(_segment_clock_path(league))
+        value = payload.get("last_segment_pull_epoch") if isinstance(payload, dict) else None
+        return float(value) if value is not None else None
+    except Exception:  # noqa: BLE001 -- an unreadable clock asks segments, the pre-#810 behaviour
+        return None
+
+
+def _write_segment_clock(league: str, moment: dt.datetime) -> None:
+    try:
+        from syndicate.features.shared.refresh_state_store import write_json_file
+
+        write_json_file(_segment_clock_path(league), {
+            "league": league,
+            "last_segment_pull_epoch": moment.timestamp(),
+            "last_segment_pull_at": moment.astimezone(dt.timezone.utc).isoformat(),
+        })
+    except Exception as exc:  # noqa: BLE001 -- a lost write only means the next pull asks segments again
+        print(f"[ncaab_odds] SEGMENT_CLOCK_WRITE_FAILED league={league} {type(exc).__name__}: {exc}", flush=True)
+
+
+def _in_play_segments_due(league: str, now: dt.datetime) -> tuple[bool, float | None]:
+    """(due, seconds since the last segment pass). Unknown, or a clock in the future, is due: asking costs
+    credits at the old rate, while skipping on a broken clock would freeze every half line."""
+    interval = _in_play_segment_interval_seconds(league)
+    if interval <= 0:
+        return True, None
+    last = _read_segment_clock(league)
+    if last is None:
+        return True, None
+    elapsed = now.timestamp() - last
+    if elapsed < 0:
+        return True, elapsed
+    return elapsed + _IN_PLAY_SEGMENT_CLOCK_SLACK_SECONDS >= interval, elapsed
+
+
+def _fetch_in_play_rows(*, adapter, markets: str, bookmakers: str | None, now: dt.datetime | None = None, league: str = "ncaab",
+                        segment_clock: bool = False) -> list[dict]:
     """The NCAAB IN-PLAY lane's pull: games that have TIPPED and are not long over.
 
     User 2026-11-02: "Live betting NCAAB is the most important part of its
@@ -522,6 +594,10 @@ def _fetch_in_play_rows(*, adapter, markets: str, bookmakers: str | None, now: d
     Rows are kept for started games only -- the shared sweep already records the
     pregame slate, and re-appending every pregame quote every four minutes would
     only grow the quote log.
+
+    `segment_clock` (the lane's run passes True; #810): ask the half / quarter
+    markets only when the league's segment clock is due, so a 60 s lane pays the
+    per-game bill every 240 s. False asks them on every call, as before.
     """
     full, halves = _split_markets(markets)
     moment = now or dt.datetime.now(dt.timezone.utc)
@@ -529,7 +605,15 @@ def _fetch_in_play_rows(*, adapter, markets: str, bookmakers: str | None, now: d
     started = _half_window_events(bulk, now=moment, before_tip_seconds=0)
     rows = [row for row in bulk if str(row.get("event_id") or "").strip() in started]
     if halves:
-        _append_half_lines(rows, started, adapter=adapter, halves=halves, bookmakers=bookmakers, now=moment, league=league)
+        due, since = (True, None) if not segment_clock else _in_play_segments_due(league, moment)
+        if segment_clock:
+            print(f"[ncaab_odds] IN_PLAY_SEGMENTS league={league} started={len(started)} "
+                  f"{'asked' if due else 'skipped'} since_last_s={'na' if since is None else round(since, 1)} "
+                  f"interval_s={_in_play_segment_interval_seconds(league):g}", flush=True)
+        if due:
+            _append_half_lines(rows, started, adapter=adapter, halves=halves, bookmakers=bookmakers, now=moment, league=league)
+            if segment_clock and started:
+                _write_segment_clock(league, moment)
     return rows
 
 
@@ -685,7 +769,8 @@ def main() -> int:
     adapter.league = league
 
     if args.in_play_only:
-        rows = _fetch_in_play_rows(adapter=adapter, markets=str(args.markets or ""), bookmakers=args.bookmakers, league=league)
+        rows = _fetch_in_play_rows(adapter=adapter, markets=str(args.markets or ""), bookmakers=args.bookmakers, league=league,
+                                   segment_clock=True)
         if not rows:
             print(f"No in-play {spec.label} events.")
             return 0
