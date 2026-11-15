@@ -925,3 +925,18 @@ LAR @ ARI and SEA @ LV in Q1.
   - **Live-rail 0.13 s, 1,003-1,031 rows, 0.94 MB.** The 15 s rail poll now moves ~1 MB
     uncompressed, ~80 KB on the wire. It was ~20 KB at its 11-14 design reading.
 - **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 21 — Sun 11-15 5:02 PM CST (23:02Z). No new boot
+
+18 live chips.
+- **25 flags on 9 cards. 0 false, 0 missed, 0 dark.** Flagged rows: NBA 68, NCAAB 8, WNCAAB 7.
+- **Cadence:**
+  - `deferred_slow` nba 2. NBA builds p50 29.0 s, max 60.3 s. NBA overlay gap max 309 s (under
+    360).
+  - NFL gap max 202 s; NFL builds p50 18.0 s. College gaps max 152 s.
+  - Web merges: 0 live-sport stale (ncaaf 72 / 72, no NCAAF game).
+- **Rows priced <= 120 s:** NBA 199 / 541 (37%). NCAAB 37 / 96. WNCAAB 13 / 30. NFL 6 / 37.
+- **Load:** query 8.8 s / 64.5 MB. Shortlist 0.7 s. Live-rail 0.11 s, 693 rows (0.65 MB).
+  - local_208683f1 is leaving the ~1 MB rail payload as is (~80 KB on the wire, 0.13 s server);
+    they raise it with the user only if the page gets slow in use.
+- **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
