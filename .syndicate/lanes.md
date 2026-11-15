@@ -875,6 +875,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 at ~14:41Z (8:41 AM CST): 1 SAFE of 14 CLOSED; moved `closed-lane-archive-20261115-0239`. Table + WAIT reasons in log/2026-11-15.md.
 
+### ncaaf-grid-build-speed — OPEN — opened 2026-11-15 — session 0f519972-4890-45d3-8b52-767c7e0a0389
+- Goal: Cut NCAAF's book-grid build (~30 s live at 776k shard lines on 11-14: parse+reduce 12.1 s + pivot 15.1 s, todo #790 profile) with a byte-identical grid on real shards
+- Files: syndicate/features/shared/book_grid.py (build_book_grid's anchor loop + a new candidate-index helper ONLY), tests/test_book_grid_anchor_index.py (NEW), docs/ai_context/todo.md (this lane's new item ONLY)
+- Hypothesis: The pivot is dominated by market_sides_for_quote rescanning the whole instance group (and re-folding its identity tuple per row) once per anchor line -- O(anchors x group) -- because live spreads/totals add a new anchor at every line move.
+- Falsification test: cProfile of build_book_grid on the 11-14 NCAAF shard (124,344 kept rows) shows market_sides_for_quote plus the fold calls under it below 40% of build_book_grid's time.
+- Verification: Offline on the fleet's 11-14 NCAAF/NBA/NCAAB/NHL shards: old vs new grid JSON byte-identical, and NCAAF pivot seconds before/after; then a live reading of BOOK_GRID_TICK build_seconds.ncaaf after a load (the user's call).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
