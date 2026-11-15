@@ -903,6 +903,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main read 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261115-0440`. Table and WAIT reasons in `.syndicate/log/2026-11-15.md`.
 
+### layer2-rail-monitor — OPEN — opened 2026-11-15 — session d58574cb-c55a-4f1f-aa9a-ab530a5f63e0
+- Goal: A continuous watch of the served Layer 2 Game Rail on the fleet (127.0.0.1:10000): every anomaly -- live MODEL != LINE flags vs their qualifying rows, refresh/build cadence and quote ages, load times and sizes, mismatched/duplicate/flipped/chip-less team cards, stale-live and midnight carryover -- is measured with a denominator, logged in the findings file, and either handed to the owning lane or fixed under its own lane
+- Files: .syndicate/findings_2026-11-15_layer2_rail_monitor.md (NEW), scripts/layer2_rail_monitor_probe.py (NEW, read-only probe), scripts/layer2_rail_monitor_run.mjs (NEW, read-only; runs the served page's own rail code)
+- Hypothesis: n/a (monitor; each anomaly it finds gets its own hypothesis in its own lane before any test)
+- Falsification test: n/a
+- Verification: Findings file carries a dated Central-time block per reading with rates and denominators; each actionable anomaly names its owner lane or a new lane; a daily summary with per-metric trend after the last game settles
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
