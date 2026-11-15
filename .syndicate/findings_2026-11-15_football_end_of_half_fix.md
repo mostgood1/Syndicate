@@ -717,3 +717,114 @@ timeout, the step takes the measured `<q>_to_def` cell, which includes that wait
 
 **Also recorded (a build note, decided before any v2 output was seen).** Kneels are left out of the denominators of
 `p_incomplete` / `p_sack` / `p_turnover`, because v2 draws kneels separately.
+
+## V2 RESULTS — 2026-11-15, FIT arms run ~13:18-14:21 CST and NCAAF to 14:31 (file mtimes), written 14:3x CST
+
+### Verdict: FAIL on FIT, on G3 alone. Every other gate passes at the re-fit pick. Nothing ships, and the held-out stays UNREAD.
+
+**Code:** branch `claude/admiring-gould-5c7128` @ `2bc1984e9` (v1 is `0f50c1bb6`), not pushed.
+- Three new switches, all default OFF, plus the quarter-keyed clock table.
+- B: OFF byte-identical (the v1 digests). R: each switch is reachable on top of the clock and inert without it.
+- 33 tests pass.
+
+**Harness:** `off2` (production on today's code) reproduces v1's `off` on 136 of 136 games.
+
+### FIT read (NFL, 136 games x 100 seeds, same seeds)
+
+| arm | q1 | q2 | q3 | q4 | H1 / H2 | total | margin | Q2 last-120 s pts / snaps | Q4 last-120 s pts (lead / trail) | Q |
+|---|---|---|---|---|---|---|---|---|---|---|
+| league 2024-25 | 8.93 [8.46, 9.40] | 14.02 [13.47, 14.59] | 9.50 [9.01, 10.00] | 13.17 [12.54, 13.84] | 22.95 / 22.67 | 45.62 | | 4.78 [4.46, 5.10] / 10.63 [10.41, 10.86] | 2.63 [2.31, 2.96] (0.44 / 2.11) | |
+| `off` | 9.68 | 12.54 | 10.52 | 13.10 | 22.22 / 23.62 | 45.95 | +1.93 | 3.14 / 6.50 | 2.25 | 52.8 |
+| `full2_nokneel` | 9.68 | 14.55 | 9.76 | 15.12 | 24.23 / 24.88 | 49.22 | +1.20 | 5.19 / **10.68** | 4.25 (2.54 / 1.71) | 48.8 |
+| `full2` | 9.68 | 14.31 | 9.76 | 13.80 | **23.98 / 23.56** | 47.65 | +1.21 | 4.90 / 9.88 | 3.02 (1.37 / 1.65) | 15.4 |
+| R1 pick `v2h0.03_t1.0` | 9.76 | 14.51 | 9.90 | 13.95 | 24.27 / 23.85 | 48.23 | +1.84 | 4.93 / 9.90 | 3.04 (1.36 / 1.68) | 22.9 |
+| R2a best `v2h0.03_t0.85` | 9.25 | 13.70 | 9.56 | 13.31 | 22.95 / 22.87 | 45.93 | +1.69 | 4.82 / 9.93 | 3.01 (1.28 / 1.73) | 3.20 |
+| R2b `v2h0.03_t0.875` | 9.28 | 13.92 | 9.63 | 13.53 | 23.20 / 23.16 | 46.47 | +1.70 | 4.83 / 9.97 | 3.02 (1.28 / 1.74) | 3.74 |
+| **R2 pick `v2h0.03_t0.825`** | **9.17** | **13.64** | **9.45** | **13.17** | **22.80 / 22.63** | 45.56 | +1.77 | **4.82** / 9.95 | **2.95** (1.26 / 1.68) | **2.78** |
+
+**Re-fit, as registered.**
+- R1 (`home_field_bonus`, at TD multiplier 1.0): margins +1.21 / +1.84 / +2.36 / +2.95 / +3.44 for
+  0 / .03 / .06 / .09 / .12. **0.03 is closest to `off`'s +1.93.**
+- R2a (TD multiplier, at 0.03): Q is 22.9 / 14.2 / 6.1 / **3.2** / 3.5 / 8.7 for 1.0 / .95 / .90 / .85 / .80 /
+  .75.
+- R2b (+-0.025): 0.875 gives Q 3.74 and 0.825 gives **2.78**, so **0.825 wins** across R2a and R2b.
+- **R3 was not run.** The registration allows that where R3 provably cannot change the verdict:
+  - R2's choice moved the margin -0.16 (+1.77 vs +1.93), which triggers R3 by 0.01.
+  - Q2-window snaps do not respond to the home bonus (9.88-9.91 across R1's five values), and G3 fails at every
+    grid point.
+
+**Gates at the R2 pick (`v2h0.03_t0.825`).**
+
+| gate | result |
+|---|---|
+| G1 q1 | 9.17 PASS |
+| G1 q2 | 13.64 PASS |
+| G1 q3 | 9.45 PASS |
+| G1 q4 | 13.17 PASS |
+| G2 | 4.82 PASS |
+| G3 | 9.95 **FAIL** (< 10.41) |
+| G4 | 22.80 > 22.63 PASS |
+| G5 | 2.95 PASS (just inside 2.96) |
+
+- G5 is marginal: 2.963 at 0.80, 3.013 at 0.85.
+- **Everything the market-relevant gates measure now passes** (the quarters, Q2's window points, H1 > H2, Q4's
+  window points). The one miss is a mechanism-realism count: Q2's last-2-minute snaps.
+
+**Predictions.**
+- **Held:**
+  - V2-P1;
+  - V2-P3: H1 > H2 at `full2`;
+  - V2-P4: G3 FAIL with snaps 9.88 (in 9.4-10.2), and Q2-window points 4.90 (in 4.4-5.0);
+  - (none further)
+- **Failed:**
+  - V2-P5: the total, +1.70 against `off`, is above the predicted +1.5, and the TD multiplier, 0.825, is below
+    [0.85, 1.0];
+  - V2-P2: Q4 13.80 is inside 13.0-13.9, but Q4-window points (3.02) are just above 3.0, and LEADER points (1.37)
+    are far outside 0.25-0.80.
+
+### What the ablation shows (`full2` vs `full2_nokneel`, same seeds)
+
+- **The kneel-out fixes Q4:** -1.32 points (15.12 -> 13.80), and leader Q4-window points 2.54 -> 1.37.
+- **It also costs Q2 0.80 window snaps (10.68 -> 9.88).** Q2's last-30 s drives fall 1.48 -> 1.36 and plays per
+  drive 2.22 -> 1.94 (league 1.47 / 2.40).
+  - The Q2 *halftime* kneel fires in states where the league's leaders keep playing. Q2's preserve-mode incompletion
+    share at <= 60 s is 0.26-0.27 in the league, so those teams are throwing, not kneeling.
+- **Without the Q2 kneel, timeouts and spikes by need put Q2's window inside the league's CI (10.68).**
+- **Leaders still score 3x the league** (1.28-1.37 vs 0.44). The kneel-out fires only near the end: sim defenses
+  still hold their timeouts at 2:00, so `40 * (downs - timeouts)` is small. Before that, a preserve play keeps its
+  field-position TD weight, at a TD share per play of 0.05-0.08 against the league's ~0.015.
+
+### NCAAF arms (descriptive)
+
+Setup: 2024 FBS-vs-FBS, every 4th game, 164 x 100 seeds; no re-fit, as registered. The reference is CFBD
+2023-25, read as a level.
+
+| arm | q1 | q2 | q3 | q4 | H1 / H2 | total | margin | Q2 last-120 s pts / snaps | Q4 last-120 s pts / snaps |
+|---|---|---|---|---|---|---|---|---|---|
+| league CFBD 2023-25 | 11.37 | 16.23 | 11.65 | 13.83 | 27.60 / 25.48 | | | 5.27 / 10.59 [10.43, 10.76] | 3.07 / 7.25 |
+| `off` | 11.37 | 13.78 | 11.71 | 14.36 | 25.15 / 26.07 | 51.33 | +1.58 | 2.86 / 6.34 | 2.47 / 4.55 |
+| `full` (v1) | 11.37 | 15.64 | 11.32 | 16.36 | 27.01 / 27.68 | 54.81 | +0.88 | 4.73 / 9.67 | 4.33 / 8.13 |
+| `full2_nokneel` | 11.37 | 16.23 | 11.33 | 17.15 | 27.60 / 28.48 | 56.20 | +0.82 | 5.32 / **10.44** | 5.17 / 8.25 |
+| `full2` | 11.37 | 15.95 | 11.26 | 15.50 | **27.32 / 26.76** | 54.19 | +0.94 | 5.03 / 9.61 | 3.50 / 7.46 |
+
+**Reading.** The same shape as NFL.
+- The kneel-out cuts Q4 by 1.65 and gives H1 > H2.
+- The Q2 halftime kneel costs 0.83 window snaps: without it, Q2's window holds 10.44 against the league's 10.59
+  [10.43, 10.76].
+- Q4 is still high (15.50 vs 13.83) without NCAAF's own level re-fit.
+- **V2-P6 held:** Q4 fell from v1's 16.36, and H1 > H2.
+- The leader / trailer split was not recorded for NCAAF. The NCAAF harness lacks that field.
+
+### What a v3 would be (not pre-registered; the user's call)
+
+1. **Kneel-out in Q4 only (the one change that targets G3).**
+   - Q2's halftime preserve state stays as the league plays it.
+   - From the same-seed ablation: Q2-window snaps were 10.68 without any kneel (inside [10.41, 10.86]), and Q4's
+     kneel is what fixed Q4 and G4.
+2. **Optional: the Q4 end-game-preserve TD share set to the league's measured share** (the leader's run-out plays
+   only).
+   - Leaders still score ~3x the league (1.26 vs 0.44). G5 passes at the pick only by 0.01.
+
+**The caveat, stated now.** A v3 built on this FIT read is fitted to FIT by design. Its realism gates (G1-G5) would
+no longer be independent tests. The held-out Brier read (2026 wk1-8, still unread) is the only independent check
+left, so a v3 should be judged mainly on it.
