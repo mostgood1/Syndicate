@@ -834,3 +834,18 @@ LAR @ ARI and SEA @ LV in Q1.
   - NCAAB 66 / 200, WNCAAB 23 / 49.
   - NFL 8 / 77: priced age p50 688 s, the end-of-game prices of the noon games standing still.
 - **Teams:** 1 chip-less NCAAB card (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 18 — Sun 11-15 3:29 PM CST (21:29Z). NBA LAL @ PHX live; NFL LAR @ ARI, SEA @ LV, SF @ DAL in Q1
+
+32 live chips.
+- **24 flags on 9 cards. 0 false, 0 missed, 1 dark.**
+- **NBA flags on a normal cadence:** 64 flagged NBA rows.
+  - NBA rows priced <= 120 s: **216 / 335 (64%)**, seen age p50 6 s.
+  - NBA overlay gap max 137 s; NBA builds p50 20.5 s.
+  - Web nba stale merges cleared after the tip (4 of 46, all before the first overlay).
+- **NFL:** overlay gap p50 73 s, max 235 s. `deferred_slow` nfl 1. NFL builds p50 16.0 s, max
+  55.5 s. Rows priced <= 120 s: 18 / 43.
+- College: NCAAB 50 / 195 (seen age p50 191 s; old lines, see the lead), WNCAAB 13 / 39.
+- Web merges: ncaaf stale 17 of 46. The last NCAAF game is over, so its overlay ages. Expected.
+- **Load:** `/intelligence` 7.4 s / 25.4 MB. Query 7.3 s / 62.6 MB. Live-rail 0.05 s, 589 rows.
+- **Teams:** 1 chip-less NCAAB card (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
