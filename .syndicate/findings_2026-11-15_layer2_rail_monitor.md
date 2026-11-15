@@ -769,3 +769,26 @@ NBA and NFL builds under 45 s, and NFL slow deferrals, per window:
   - Live NFL build median went 50.6 -> 55.4 s anyway.
 - So the NFL cadence decision put to the user (1:4x PM CST) still stands. NBA's half of it is
   largely settled by the loads, matching reading 13-14's NBA overlay gaps of 126-164 s.
+
+## Reading 15 — Sun 11-15 2:20 PM CST (20:20Z). No new boot
+
+56 live chips.
+- **29 flags on 14 cards. 0 false, 0 missed, 0 dark.**
+- Flagged rows: NCAAB 28, NBA 15, WNCAAB 8, NCAAF 1, NFL 0.
+
+**Load:** query 11.5 s / 67.4 MB. Shortlist 0.8 s (89 s old). Live-rail 0.05 s, 543 rows.
+
+**Refresh, a calm window:**
+- Overlay gap max: NFL 242 s, NBA 139 s, NCAAB 177 s, WNCAAB 183 s, NCAAF 168 s. 0 over 360 s.
+- `deferred_slow` nfl 1. NFL builds p50 38.2 s, max 93.6 s. NBA p50 22.0 s, max 26.4 s.
+- Web merges: 0 stale of 29.
+
+**Live rows priced <= 120 s:**
+- NBA 38 / 86 (44%). NCAAB 1H 51 / 181, 2H 45 / 141. WNCAAB 1H 23 / 41, 2H 12 / 33.
+- NFL 14 / 121 (12%): NFL seen age at pricing p50 218 s.
+
+**Teams:** 1 chip-less NCAAB card (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+0 live chips without a live card.
+
+**The slow-sport decision** (NFL cadence) is still open with the user, re-asked at 2:1x PM CST
+after 0f519972's numbers.
