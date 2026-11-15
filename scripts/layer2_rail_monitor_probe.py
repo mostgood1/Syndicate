@@ -199,6 +199,23 @@ def fleet_logs(minutes: int, now: dt.datetime, work_dir: Path) -> dict:
             "log_error": text[:200] if text.startswith("__ERR__") else None}
 
 
+def game_phase(token: str) -> str:
+    """'1H' / '2H' / 'break' / 'play' from a chip status_token. College men play halves (H1 / H2), college
+    women quarters (Q1-Q2 = 1H, Q3-Q4 = 2H); OT counts as 2H. A break (HALF, End of ..., intermission)
+    freezes the books' full-game prices, so it is kept apart (todo #810's like-for-like comparison)."""
+    tok = str(token or "").strip().upper()
+    if not tok:
+        return "play"
+    if tok.startswith("HALF") or tok.startswith("END") or "INT" in tok:
+        return "break"
+    head = tok.split()[0]
+    if head in ("H1", "Q1", "Q2"):
+        return "1H"
+    if head in ("H2", "Q3", "Q4") or head.startswith("OT"):
+        return "2H"
+    return "play"
+
+
 def independent_gap(r):
     lmp, fair = r.get("live_model_probability"), r.get("fair")
     try:
@@ -317,8 +334,7 @@ def main() -> int:
     _clock = {str(ch.get("game_key")): str(ch.get("status_token") or "") for ch in _chips_early}
 
     def phase_of(card):
-        tok = _clock.get(str((card.get("chip") or {}).get("game_key")), "").upper()
-        return "break" if (tok.startswith("HALF") or tok.startswith("END") or "INT" in tok) else "play"
+        return game_phase(_clock.get(str((card.get("chip") or {}).get("game_key")), ""))
     per_phase = {}
     for c in live:
         for m in c.get("markets") or []:
