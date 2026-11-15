@@ -832,11 +832,6 @@ death, never life — do not invert it.
 - Verification: tests: off != on for a 00:05Z kickoff, 7-day gap still a miss, a row counted on one date only, carryover rows keep their projection; after a fleet load, the served ncaaf book grid shows projected rows for 6 PM CST+ kickoffs
 - Blocked by: none
 
-### closed-lane-archive-20261114-1240 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session 09301eaf-bdbf-411d-92f9-9d231866be42
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 at 18:41Z read 1 SAFE of 10 CLOSED; moved `closed-lane-archive-20261114-0640` to lanes_closed.md with one pointer. Other 9 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-14.md.
-
 ### rail-callouts-sim-vs-book — CLOSED 2026-11-14 (GOAL MET: loaded 20:09Z; on the live page every callout names its table row's line, interval callouts show, ages tick; pipeline options and the spread frame left on todo #803) — opened 2026-11-14 — session 0f519972-4890-45d3-8b52-767c7e0a0389
 - STATUS 2026-11-14 2:1x PM CST (20:1xZ): **CLOSED, GOAL MET.** Loaded 20:09:08Z (fleet ff 2c230f318 -> 62faa427f + reload-web; user "Yes, load it"; deploys.md 2026-11-14 20:09:08Z). Served page: new rail code, no old callout. Live page: 19 callouts incl. 7 on intervals, 124 ticking ages, callout line == table line 3 of 3 after a re-fetch. Left on todo #803 (not this lane's goal): the spread callout's frame (raw margin beside the anchored / scaled %), and the pipeline options (light rail endpoint, re-price on pull, faster pulls). Claim released. Files released.
 - STATUS 2026-11-14 2:0x PM CST (20:0xZ): **RAIL FIX ON MAIN `62faa427f`, NOT LOADED** (web: fleet ff + reload-web, the user's decision). Hypothesis HELD on the served board: units, line choice and frame explained the mismatch; replay callout line != table line 8 of 13 -> 0 of 12. Staleness measured (todo #803): the callout's quote a median 151 s old on reaching the board, 10 of 41 already moved at the book. Built: one line per market, card units, intervals included, AGE = age now ticking every 5 s, callout fades past 120 s. JS harness all pass, 9 of 9 mutations caught. OWED: the load + a served check; the pipeline options (light rail endpoint, re-price on pull, faster pulls) are the user's call.
@@ -975,6 +970,11 @@ death, never life — do not invert it.
 - Falsification test: If the rebuilt artifact's St. Brown rows still equal A.J. Brown's (receptions mean 3.0, n 3, team NE), or if a replay over this week's quoted names moves any player whose resolution was right (same id, roster name matches) onto a different id or a refusal, the fix is wrong
 - Verification: Unit: St. Brown resolves to 00-0036963 with A.J. Brown in the game (fails on the old code); Malik Taylor is refused rather than given Mason Taylor; every other name resolves as before. Replay old vs new over the week's real quoted names on the fleet: only the two known names change. Fleet: the first artifact built after the ff has St. Brown team DET with his own sample, and the same-game identical-inputs scan finds 0 pairs outside anytime TD.
 - Blocked by: none
+
+### closed-lane-archive-20261114-1839 — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session b6a54040-aca4-4791-b10a-d3ba2054ac29
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 read SAFE for 1 of 22 CLOSED blocks; moved: `closed-lane-archive-20261114-1240`. Table and deferrals in `.syndicate/log/2026-11-14.md` (00:4xZ 11-15 entry).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1233,6 +1233,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261114-0640` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session 03ed32dc-f326-48c3-89f0-0410a900ae8d
 - `closed-lane-archive-20261114-0839` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session de7cb1a8-de9b-4f4e-a72b-c0cec3bb8bf5
 - `closed-lane-archive-20261114-1040` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session c4ad7e58-af48-4ca2-85c8-8dd4f366584b
+- `closed-lane-archive-20261114-1240` — CLOSED 2026-11-14 (GOAL MET: 1 block archived) — opened 2026-11-14 — session 09301eaf-bdbf-411d-92f9-9d231866be42
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
