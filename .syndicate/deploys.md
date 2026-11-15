@@ -60149,3 +60149,19 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Owed:** the live-window reading 03:28-04:08Z (`C:\tmp\railload\pr_reading.sh`, running), against the baseline above and 2026-11-14 5:50-6:30 PM CST (NCAAF 75 / 184, NCAAB 103 / 172, NHL 86, NBA 121). Prediction: NCAAF / NCAAB median pull -> priced down >= 20%; gaps between regular rounds stay under 200 s median. The window starts 15 min after a restart, so the first board build contends.
 - **revert:** `SYNDICATE_BOOK_GRID_PULL_REACT=off` (and/or `SYNDICATE_BOOK_GRID_ROUND_SKIP_FRESH_SECONDS=0`) in `local_production.env` + a drained full down/up; or `git revert adf1257a9`, ff, claimed refresh-worker TERM.
 - **verify:** BOOK_GRID_TICK lines with `pull_react` set while games are live; `pull_to_price.py` medians on the next live window against the 02:33-03:13Z baseline.
+
+## 2026-11-15 04:12Z (10:12 PM CST 11-14) -- READING, no deploy: pull-triggered repricing (`adf1257a9`, loaded 03:13:31Z; todo #803, lane `book-grid-pull-react`), live window 03:28-04:08Z against the same night's 02:33-03:13Z -- **PARTLY MET: NCAAB pull -> priced median 83 -> 62 s (-25%, MET), NCAAF 94 -> 80 s (-15%, MISSED the -20% bar), NHL 69 -> 58 s; gaps between regular rounds median 175 s (MET, < 200 s); cost: the main thread 69% -> 90% busy**
+- **Instruments:** `C:\tmp\railload\pull_to_price.py`, `main_thread_budget.py`, `markers.py`, `pr_reading.sh` (read 04:08:26Z). Same refresh-worker pid 1213811 throughout; 0 BOOK_GRID_BUILD_ERROR, 0 Tracebacks since the start. The window opens 15 min after the restart, so the first board build may still contend.
+- **Pull (our capture of changed live full-game quotes) -> its prices in the in-play overlay, median / p90, before -> after:**
+  - NCAAF 94 / 188 -> **80 / 174 s** (n 19 -> 28); served by price-on-pull 1 -> 18 of the pulls; overtaken before any build read them 8 -> 8.
+  - NCAAB 83 / 131 -> **62 / 119 s** (n 25 -> 30); price-on-pull 1 -> 21; overtaken 12 -> 12.
+  - NHL 69 / 104 -> **58 / 116 s** (n 22 -> 36); price-on-pull 1 -> 31; overtaken 11 -> 15.
+  - NBA 165 / 330 -> 80 / 358 s (n 8 -> 5: too thin to read).
+  - Overlay writes in 40 min: NCAAF 12 -> 22, NCAAB 14 -> 25, NHL 12 -> 27, NBA 8 -> 8.
+  - Against 2026-11-14 5:50-6:30 PM CST (a different load): NCAAF 75 -> 80, NCAAB 103 -> 62, NHL 86 -> 58, NBA 121 -> 80.
+- **Why NCAAF moved least:** each NCAAF grid build took 25-41 s in a pull pass (once 81 s), so a pull's delay includes a long build plus whatever is building ahead of it.
+- **Regular rounds:** 13 in the window, gaps 347 (spanning the warm-up) / 142 / 163 / 163 / 210 / 94 / 187 / 252 / 94 / 190 / 148 / 208 s, **median 175 s**. The fresh-skip fired on 7 of 13 rounds (11 sport builds skipped), even measured from the pass's start (the defect; fix `e93601b8e` held off main).
+- **Cost, main thread (`main_thread_budget.py`):** grid rounds 55.5% -> 40.0%, price-on-pull 4.9% -> **43.0%** (4 -> 32 passes), NCAAF live re-sim 8.9% -> 6.7% (14 runs both), the rest (sleep + other steps) 30.7% -> **10.3%**. Gaps between once-a-pass markers (`MLB_BETTING_DAY_BACKFILL_TICK`): median 144 -> 144 s, max 222 -> 348 s; a pull pass started near the end of the sleep runs past it (the longest pass was 95 s). NCAAF live re-sims 14 -> 14, gaps median 172 -> 157 s.
+- **Verdict:** NCAAB MET, NCAAF MISSED (-15% against -20%), the round guard MET. Kept loaded: every live sport is repriced from its pull sooner, and no other step lost its pace. Headroom is now 10% of the main thread on a 4-sport night.
+- **Next levers (the user's call):** (1) load `e93601b8e` (the fresh-skip measured from the read; more round builds skipped, the cheapest offset); (2) NCAAF's grid build itself (25-41 s a build is the floor of its delay); (3) move the NCAAF live re-sim off the main loop (another lane's code).
+- **verify:** this entry; the lane stays OPEN on the fix decision.
