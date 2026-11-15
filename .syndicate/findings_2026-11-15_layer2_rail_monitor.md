@@ -653,3 +653,53 @@ cards.
 - Web merges: nfl stale 4 of 39 (all at the restart).
 - **Teams:** Washington @ Utah left the board, so 1 chip-less NCAAB card remains (FAMU @ UTEP).
   det1 / det2 / det3 0 / 0 / 0; 0 flipped; 0 truncated.
+
+## Reading 13 — Sun 11-15 1:46 PM CST (19:46Z). Post-#810, post-19:26 restart; no new boot
+
+59 live chips.
+- **19 flags on 15 cards. 0 false, 0 missed, 0 dark.**
+- **NBA flags are back: 20 flagged rows.** NBA rows priced <= 120 s: 49 of 167 (29%).
+- **Load:** query 11.7 s / 67.8 MB. Shortlist 1.0 s (written 138 s ago). Live-rail 0.23 s, 559-664 rows.
+- **Refresh:**
+  - Overlay gap max: NFL 330 s, NBA 348 s, NCAAB 213 s, WNCAAB 232 s, NCAAF 194 s. 0 over 360 s.
+  - `deferred_slow` nba 2, nfl 2.
+  - Builds: NBA p50 37.5 s, max 132.6 s. NFL p50 43.9 s, max 75.6 s. NCAAB 13.5 s.
+  - Web merges: 0 stale of 23.
+- **Rows priced <= 120 s, by phase:**
+  - NCAAB 1H 39 / 141 (28%), 2H 28 / 146 (19%), break 7 / 25.
+  - WNCAAB 1H 6 / 24, 2H 7 / 33.
+  - NFL 2H 16 / 75. NBA 2H 49 / 167.
+- **Our pulls are on #810's cadence:** in-play full-game pulls with changes over 16 min (`pull_cadence.py`):
+  - NCAAB 25, median gap **40.6 s**, max 63.5 s. WNCAAB 24, median 41.2 s.
+  - NFL 11, median 70 s. NBA 4, median 246 s.
+- **But NCAAB seen age at pricing rose to p50 168 s / p90 241 s** (10 / 160 s at 1:06 PM).
+  WNCAAB 56 / 176 s.
+
+**Seen-age lag vs the pull heartbeats** (`C:\tmp\railmon\lagcheck.py`, book-aware):
+- For each live-rail row: the newest `book_quotes_heartbeat` look listing the row's event AND its
+  book, before the row's grid build, minus the look the row implies (build - seen age).
+
+  | read (CST) | NCAAB rows > 60 s behind | lag p50 / p90 |
+  |---|---|---|
+  | 12:37 | 53 / 142 | -3 / 127 s |
+  | 1:06 | 70 / 193 | -9 / 141 s |
+  | 1:30 | 90 / 234 | -16 / 244 s |
+  | 1:46 | **149 / 268** | **114 / 187 s** |
+
+  WNCAAB at 1:46: 21 / 67, p50 58 s.
+- Of 185 NCAAB rows with seen > 60 s at the 19:46:38Z build (`supersede.py`):
+  - **33** had their book quote the same market at a DIFFERENT line later. These are superseded
+    lines, expected.
+  - **0** had a newer capture of the SAME line.
+  - **152** had no newer capture by their book at all, while a heartbeat listing that event and
+    book was newer.
+- So **either unchanged quotes do not get their seen time advanced from book-level heartbeats, or
+  a heartbeat's `books` lists books that did not answer for that event.**
+- It grows through the afternoon and was present before the 12:52 incremental read.
+- **Cost:** seen age feeds the observation gate (`live_quote_unobserved` > 300 s), so rows can
+  die earlier than our pulls warrant. It also inflates this probe's "our lag" metric.
+- **Handed to local_208683f1** (owner of the grid read and the incremental read) as a question.
+  Not mine to fix.
+
+**Teams:** 1 chip-less NCAAB card (FAMU @ UTEP, 5 rows). det1 / det2 / det3 0 / 0 / 0. 0 flipped.
+0 truncated. 0 live chips without a live card.
