@@ -344,7 +344,7 @@ the sim does not model.
 - Whether to read it anyway is the user's decision (the calibration lane's precedent: "Validate only if FIT beats
   production").
 
-**Code (branch only, not pushed):** `de59ab7e7` (was `cfbbb8b91` before a rebase onto main) on `claude/admiring-gould-5c7128`.
+**Code (branch only, not pushed):** `79dbfb23c` (`cfbbb8b91` / `de59ab7e7` before rebases onto main) on `claude/admiring-gould-5c7128`.
 - The mechanism and its 3 amendments, all default OFF.
 - Tests: `tests/test_football_end_of_half_clock.py`, 22 tests. With the engine suites, 160 passed (Idle, finished 11:12 CST).
 - B: OFF byte-identical. The three pinned sha256 digests (NFL pregame, NCAAF pregame, NFL Q2 resume) equal the
@@ -470,3 +470,146 @@ Paired against `off`, `full` moves: total +3.48 [+3.29, +3.68], home margin -0.7
   Nothing feeds them today.
 
 A v2 is a new pre-registration and a new FIT read. 2026 wk1-8 is still unread for NFL.
+
+---
+
+## V2 — PRE-REGISTRATION DRAFT, written 2026-11-15 13:0x CST, BEFORE any v2 code or v2 sim run
+
+**Status:** DRAFT (user: "Yes, draft the v2"). Nothing below is built. Building and running it is the user's
+next call.
+**Branch:** v1 is at `79dbfb23c` on `claude/admiring-gould-5c7128` (rebased again, onto main `2c9fed5ed`). v2
+builds on it.
+
+### Design inputs, measured AFTER the v1 FIT read and BEFORE this draft
+
+Both are read-only diagnostics (`C:\tmp\football_eoh_fix\diag2.py`, `diag3.py`). They compare v1 `full` on 34 FIT
+games x 50 seeds with nflverse 2024-25. They apply the rule this lane learned: measure what the engine does PER
+SNAP in every state the new snaps fall into, before adding snaps.
+
+**Q4's last 120 s, points a game, by offense.**
+
+| offense | league | v1 sim |
+|---|---|---|
+| LEADING | 0.44 | **1.69** |
+| trailing or tied | 2.11 | 1.83 |
+
+**Leaders' plays (Q4 preserve mode).**
+- 2.16 a game in the league against 3.47 in the sim.
+- TD share per play: league 0.000-0.029, sim 0.050-0.081.
+- Incompletion share at 0-60 s: league 0.006, sim 0.105-0.136.
+  - Cause: v1 POOLED Q2 and Q4 preserve. Q2's "halftime preserve" leaders still throw 0.21-0.27 incompletions;
+    Q4's run-out throws almost none.
+- Sack share in preserve: league ~0.00-0.02, sim 0.06-0.12.
+- The sim's leaders run more plays (more stops) and score on them. Real leaders kneel.
+
+**Q2's last 30 s, the remaining G3 gap.**
+
+| per game | league | v1 sim |
+|---|---|---|
+| drives alive | 1.47 | 1.25 |
+| plays per drive | 2.40 | 1.81 |
+| offense with 3 timeouts left | 16% | 71% |
+| offense with 0 timeouts left | 21% | 0.5% |
+
+**What the timeout data rules out.**
+- The league's offense-timeout rate after a clock-running hurry play FALLS with timeouts left:
+  - 0-30 s: 1 left 0.315, 2 left 0.161, 3 left 0.016;
+  - 30-60 s: 1 left 0.307, 2 left 0.224, 3 left 0.015.
+- Teams still holding 3 at the end are not trying to save time.
+- Keying the sim's timeout rate on timeouts left would therefore CUT its stops, because its teams arrive with 3.
+- The real gap is that the sim never spends timeouts outside "after a clock-running play". The league spends
+  ~2.84 a game in Q2's window, ~1.05 of them there, and more before the window.
+
+**Ruled out:** a censoring fix for the last-30 s running-clock cell. Kaplan-Meier on the league's 504
+censored-or-observed snaps gives a restricted mean of 14.1 s (median 12, S(30) 0.176), the same as the borrowed
+14.0 s.
+
+### The v2 change (one change plus a re-fit; every new switch a declared field, default OFF, byte-identical)
+
+**V2-a. `end_of_half_kneel_out` (NEW; needs `end_of_half_clock` ON for the timeouts).** In Q4 end-game
+preservation and Q2 halftime preservation, before the play is drawn:
+- If the offense can run out the clock by kneeling, it kneels. The condition:
+  `clock <= PLAY_CLOCK * max(0, downs_left - defense_timeouts) + KNEEL_LIVE * downs_left`, with
+  `downs_left = 5 - down`.
+- `PLAY_CLOCK` = 40 s is the rule.
+- `KNEEL_LIVE` is measured: the league's qb_kneel delta when a timeout follows.
+- A kneel is a GAIN of -1 yard and cannot score, turn the ball over or be sacked.
+- Its clock: if the defense has a timeout, it calls one (the formula assumes it does) and the kneel takes
+  `KNEEL_LIVE`. Otherwise it takes the measured kneel delta with no timeout.
+- When the clock cannot be run out, the preserve play is drawn as now.
+
+**V2-b. Window cells keyed by QUARTER as well.**
+- `p_incomplete`, `p_oob`, and `delta_by_bucket` `run_*` / `to_*` become `"<q>_<mode>"`-keyed, like `p_to_off`.
+- Re-measured by the same script, with the same Amendment-2 censoring rule.
+
+**V2-c. The window's non-scoring outcome mix.** Amendment 1's share-setting extends from incompletions to SACKS
+and TURNOVERS:
+- `p_sack` and `p_turnover`, by `"<q>_<mode>"` and bucket, are the league's shares of offensive plays.
+- The other outcomes keep their relative weights, and the TD weight keeps its field-position dependence.
+- Not setting the TD share is deliberate. A flat per-snap TD share would make a TD from the own 20 as likely as one
+  from the opponent's 5.
+
+**V2-d. Spikes.**
+- After a clock-running play in hurry mode that drew no timeout, the offense spikes at the measured rate.
+- The rate is P(spike | Q2/Q4 hurry, bucket, offense timeouts left == 0).
+- A spike is its own step: an incompletion with 0 yards, which uses a down. It counts as a snap (the league count
+  includes spikes).
+- The preceding play then consumes the measured time to the spike (a new cell, `to_spike`).
+
+**V2-e. The Amendment-3 kick timing in Q4 too.** A Q4 urgency kick on downs 1-3 waits until one more running-clock
+play could end the game. Q4's score gate (-9..2) is unchanged.
+
+**V2-f. NOT in v2, stated as a limit.**
+- Timeouts spent outside "after a clock-running play": the offense before the window, and the defense to save time
+  after a punt.
+- These need a decision model, not a rate. G3 may still miss because of them; see the gate note below.
+
+### Re-fit (pre-registered grid, wider than v1)
+
+- **R1** `home_field_bonus` {0.0, 0.03, 0.06, 0.09, 0.12}, at TD multiplier 1.0. Closest to `off`'s mean home
+  margin wins.
+- **R2a** `touchdown_weight_multiplier` {1.0, 0.95, 0.90, 0.85, 0.80, 0.75}, at R1's value. Minimise v1's Q.
+- **R2b** +-0.025 around R2a's choice. The final choice is the minimiser across R2a and R2b.
+- **R3** One R1 pass at R2's value if the margin moved > 0.15. Run it this time unless it provably cannot change
+  the verdict, and say so.
+
+### Gates (FIT: the same 136 games x 100 seeds, same seeds; held-out as v1)
+
+- **G1-G4** exactly as v1.
+- **NEW G5:** Q4 last-120 s points a game inside the league's [2.31, 2.96]. It is the direct target of V2-a and
+  V2-c.
+- **Reported, not gating:**
+  - Q4 last-120 s snaps (7.38 [7.08, 7.68]);
+  - leader / trailer Q4-window points (0.44 / 2.11);
+  - Q2 last-30 s drives and plays per drive;
+  - the kick rate by score bucket.
+- **Multi-gate false-fail note** (learnings 2026-10-05):
+  - G1-G5 are "inside the league CI" checks of a mechanism, not tests of a null.
+  - The sim's own SE over 13,600 game-seeds is < 0.1 points, so a FAIL means the sim's mean is outside the
+    league's CI. It is not noise.
+- **Held-out:** NFL 2026 wk1-8 (121 games, the 11-03 private pull, unread), 1000 seeds a game, HB-ML / HB-TOT /
+  HB-SPR with v1's "shown worse" rule. **Read ONLY if every FIT gate passes**, so the last clean NFL set is not
+  spent on a FAIL.
+- **NCAAF:** the same arms, descriptive. NCAAF's held-out seasons are spent.
+
+### Decisions this draft leaves to the user
+
+1. **Build and run v2 as drafted?** About 2-3 h, mostly Idle sim time.
+2. **G3.** Keep it gating as in v1, or demote it to reported? V2-f's limit makes G3 the gate most likely to miss.
+   - Demoting it would be a CHANGE of the success criterion. It must be decided BEFORE the v2 FIT read and
+     recorded here.
+   - The market-relevant gates are G1 (quarters), G2 (Q2's window points), G4 (H1 > H2) and G5 (Q4's window
+     points). The #752 / #805 segment re-grades are the market test after any load.
+3. **The held-out pull.** Use the 11-03 pull (121 games), or OK a fresh nflverse download (weeks 9-10, ~150
+   games, more power)? The 11-03 pull was ~44 MB for weeks 1-8, from nflverse's GitHub releases.
+
+### Predictions (v2 `full2`, before the re-fit; written before any v2 run)
+
+| # | prediction |
+|---|---|
+| V2-P1 | OFF byte-identical (the v1 digests); each new switch reachable. |
+| V2-P2 | Q4-window LEADER points 0.25-0.80 (v1 1.69, league 0.44); Q4-window points 2.2-3.0 (G5); Q4 13.0-13.9. |
+| V2-P3 | H1 > H2 at `full2` (G4). |
+| V2-P4 | Q2-window snaps 9.4-10.2. **G3 is more likely to FAIL than pass** under V2-f's limit. Q2-window points 4.4-5.0. |
+| V2-P5 | Total minus `off` between -0.5 and +1.5 before the re-fit; the re-fit's TD multiplier lands in [0.85, 1.0]. |
+| V2-P6 | NCAAF `full2`: Q4 falls toward 13.83 (v1 16.36); H1 > H2. |
