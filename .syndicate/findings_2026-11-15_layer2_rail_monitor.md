@@ -397,3 +397,66 @@ card. The 2 chip-less NCAAB cards persist (FAMU @ UTEP now 4 rows).
 
 **Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 0 live chips without a live
 card. The same 2 chip-less NCAAB cards.
+
+## Reading 8 — Sun 11-15 12:37 PM CST (18:37Z). Pre-#810 window; both workers restarted 12:24-12:25 PM
+
+**Splits.** refresh-worker BOOTED 18:24:37Z and live-odds-worker started 18:25:55Z, for lane
+`live-player-exit-gate`'s load (deploys.md 18:24:27Z + 18:25:41Z, fleet
+`05fee7b69 -> f6f1ad93a`). This reading is the PRE window for #810 (college 60 s pulls, load
+expected ~12:50 PM).
+
+36 live cards: WNCAAB, NCAAB, NFL 7, NBA, NCAAF.
+
+**Load:**
+- `/intelligence` **8.6 s / 29.4 MB** (5.3 MB gz). It was 20 MB this morning; the embed grows
+  with live rows.
+- Query 26.3 s / 68.7 MB. Shortlist 1.2 s.
+- Live-rail 0.13 s, 491-513 rows (0.48 MB).
+
+**Refresh:**
+- **(c) answered: the shortlist recovered.** `written_at` 197 s old, against 1,732 s at 12:21.
+  It rebuilt after the 12:24 refresh-worker restart.
+- Live-rail newest 13 / 7 / 4 s.
+- Overlay gaps, last 16 min. These include the restart, so gaps that span it are inflated:
+
+  | sport | gap max |
+  |---|---|
+  | NFL | 487.7 s (1 over 360) |
+  | NBA | 465.3 s (1 over 360) |
+  | NCAAF | 349 s |
+  | NCAAB | 308 s |
+  | WNCAAB | 306 s |
+
+- Build seconds: NBA p50 70.0 s, max 149.5 s. NFL p50 66.4 s, max 98.7 s. NCAAB p50 12.2 s,
+  max 33.2 s. WNCAAB p50 2.6 s.
+- `deferred_slow` nba 1, nfl 1.
+- Web merges: nfl stale 3 of 20, nba stale 2 of 20; college / NCAAF fresh 20 of 20.
+
+**Live recommendations:**
+- **38 flags on 16 of 36 live cards. 0 false, 0 missed.**
+- By sport: NCAAB 30, WNCAAB 7, NCAAF 1, NBA 0, NFL 0.
+- **Dark: 46 rows / 12 markets, ALL NBA, all from the 18:34:30Z NBA grid build.** These are NBA
+  live lines with sim vs fair >= 3 pp on a quote <= 120 s old at pricing. By the read they were
+  > 300 s old, because the NBA overlay is rebuilt every ~465 s (slow-sport rule).
+  - **So the cadence alone hides about 12 NBA flags per reading.**
+  - This is the user-facing cost of the slow-sport rule beside NFL's. NFL has no flags at all
+    because its live join withholds.
+- Per sport, live rows:
+
+  | sport | rows | priced <= 120 s | seen age at pricing p50 / p90 | age now p50 | flagged rows |
+  |---|---|---|---|---|---|
+  | NBA | 270 | 136 (50%) | 60 / 60 s | 369 s | 0 |
+  | NCAAB | 198 | 88 (44%) | 37 / 291 s | 164 s | 45 |
+  | WNCAAB | 46 | 24 (52%) | 88 / 144 s | 99 s | 11 |
+  | NFL | 115 | 23 (20%) | 124 / 276 s | 355 s | 0 |
+  | NCAAF | 22 | 5 (23%) | 538 / 789 s | 993 s | 1 |
+
+  - NCAAF's few live rows are mostly old, priced p50 796 s.
+- 0 rows with no fair. 71 of 152 live markets have no OURS (NFL, NBA intervals, NCAAF; the
+  causes in readings 6-7).
+
+**(a) halftime join:** 0 zero-card builds in this window, and no live chip at HALF / an
+intermission at the read. Still owed. The noon college games reach halftime ~12:40-12:55 PM.
+
+**Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 0 live chips without a live
+card. 2 chip-less NCAAB cards: FAMU @ UTEP now 5 rows, Washington @ Utah 4.
