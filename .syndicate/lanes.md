@@ -883,6 +883,14 @@ death, never life — do not invert it.
 - Verification: Offline on the fleet's 11-14 NCAAF/NBA/NCAAB/NHL shards: old vs new grid JSON byte-identical, and NCAAF pivot seconds before/after; then a live reading of BOOK_GRID_TICK build_seconds.ncaaf after a load (the user's call).
 - Blocked by: none
 
+### live-player-exit-gate — OPEN — opened 2026-11-15 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
+- Goal: In EVERY sport with a live re-sim or live prop projection (NFL, NCAAF, NBA, WNBA, NCAAB, WNCAAB, NHL, MLB, soccer), a key player leaving a live game mid-game (injury, ejection, foul-out) is detected from the live game feed within one live tick, and while that player is out the fleet REFUSES (never prices) that game's live gamelines AND that player's live props, and holds paper/live entries on them, with a logged reason (e.g. key_player_out) -- measured on the fleet on a real mid-game exit per sport. Modelling the replacement player is out of scope (a later lane).
+- Files: NEW module syndicate/features/shared/live_player_status.py + NEW tests/test_live_player_status.py ONLY until each sport's call site is agreed with the lane that owns it (live_gameline_join.py, live_projection_join.py, <sport>/live_resim.py, execution gates are other lanes' files)
+- Hypothesis: n/a (gap measured 2026-11-15: no live re-sim reads player availability; nfl/live_resim.py has 0 player inputs; Drake Maye left NE live on 11-15 and nothing reacted)
+- Falsification test: n/a
+- Verification: per sport: a recorded mid-game exit produces a key_player_out refusal on the served board within one tick for that game's gamelines and the player's props, and the gate lifts when the player returns; off != on reachability test; 0 change to games with no exit
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
