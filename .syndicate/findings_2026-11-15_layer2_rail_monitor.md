@@ -792,3 +792,21 @@ NBA and NFL builds under 45 s, and NFL slow deferrals, per window:
 
 **The slow-sport decision** (NFL cadence) is still open with the user, re-asked at 2:1x PM CST
 after 0f519972's numbers.
+
+## Reading 16 — Sun 11-15 2:42 PM CST (20:42Z). No new boot; the noon NFL games are late in 2H; no NBA game live
+
+53 live chips.
+- **34 flags on 11 cards. 0 false, 0 missed, 0 dark.** Flagged rows: NCAAB 48, WNCAAB 1.
+- **Load:** `/intelligence` 8.5 s / 25.5 MB. Query 10.6 s / 65.0 MB. Shortlist 1.7 s (62 s old).
+  Live-rail 0.49 s, 497 rows.
+- **Refresh:**
+  - **NFL overlay gap max 368 s (1 over 360)**, p50 204 s. `deferred_slow` nfl 3; NFL builds p50
+    39.1 s, max 94.3 s.
+  - College gaps max 167-215 s.
+  - Web merges: 0 NFL stale of 37. The 368 s gap did not catch a merge past the cutoff.
+  - nba stale 11 of 37: the 12:10 PM NBA game is final, so the NBA overlay ages until the 3:10 PM
+    tip. Expected.
+- **Rows priced <= 120 s:** NCAAB 1H 60 / 128, 2H 80 / 197, break 8 / 27. WNCAAB 1H 9 / 40,
+  2H 12 / 37. NFL 16 / 68 (seen age p50 141 s).
+- **Teams:** 1 chip-less NCAAB card (FAMU @ UTEP, 5 rows). det1 / det2 / det3 0 / 0 / 0. 0 flipped.
+  0 truncated.
