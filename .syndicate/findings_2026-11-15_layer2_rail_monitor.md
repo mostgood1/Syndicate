@@ -97,3 +97,61 @@ nhl 5, ncaaf 1). Chips today: 131.
 - So the NFL in-play overlay gap will pass web's 360 s cutoff at least once in that hour, web
   will log `nfl: 'stale_...'`, and live NFL rail rows will fall back to the shortlist.
 - **Falsified if** NFL overlay gaps stay <= 360 s with 0 stale web merges over 12:30-1:30 PM.
+- **Peer note, 11:0x AM** (session 0f519972 / [Layer 2 rail: live edge line](#local_208683f1-10cc-4da1-8a83-c2e1ab44d604),
+  lane `ncaaf-grid-build-speed`). NFL's own grid compute is about 6 s: pivot 3.2 s plus a 1-2 s
+  parse over 41,674 kept rows. The long builds line up with the Kalshi odds tick and paper
+  settlement in the same process, apparently competing for the GIL:
+  - 68 builds between 15:30 and 17:10Z, split at the median build time;
+  - `kalshi_odds` lines logged during a build: 40.1 average in the long half, 0.0 in the short;
+  - this is a correlation, not a proven cause.
+  - **So the 1:30 PM reading also runs `C:\tmp\railload\nflcontend.py 18:30Z 19:30Z`
+    (read-only).** It counts Kalshi / paper-settlement overlap per NFL build, so a stale
+    overlay can be put down to contention or to the slate's size.
+
+## Reading 2 — Sun 11-15 11:08 AM CST (17:08Z)
+
+Slate: 5 live cards on the default rail (133 cards): NFL 1 (NE @ DET, Q4 12:51), WNCAAB 3,
+NCAAB 1. The 11:00 college tips are live.
+
+**Load:**
+- `/intelligence` 11.5 s / 20.7 MB. This is variance against 2.3-5.6 s earlier; one read, so
+  not a trend.
+- Query 8.5 s / 58.4 MB (10.2 MB gz). Shortlist 1.7 s. Chips 0.06 s. Live-rail 0.016 s (~20 KB,
+  16-20 rows).
+
+**Refresh:**
+- Board build 163 s old; shortlist `written_at` 163 s.
+- Live-rail newest 66 / 76 / 3 s over three reads 10 s apart: a new overlay landed between
+  reads 2 and 3.
+- Overlay gaps, last 25 min:
+
+  | sport | builds | gap p50 / p90 / max |
+  |---|---|---|
+  | NFL | 22 | 72.5 / 112.7 / 130.0 s |
+  | WNCAAB | 3 | 111 / 162 s |
+  | NCAAB | 2 | 75 s |
+
+- NFL grid build p50 31.8 s, max 70.2 s, 0 `deferred_slow` in the window. Tick gap p50 64 s,
+  max 150 s.
+- Web merges: nfl 17/17, ncaab 3/3, wncaab 3/3 fresh, 0 stale.
+
+**Live recommendations:**
+- **1 flag shown, on 1 of 5 live cards. 0 false, 0 missed, 0 dark.**
+  - NCAAB Quinnipiac @ Central Connecticut, total **o137.5**: ours 151.7, sim 79.9% vs fair
+    48.3%, **+31.6 pp**. Priced on a 40 s quote, 203 s old at the read, 8 minutes after tip.
+  - Source row: `layer2_shortlist`, not the overlay.
+  - Logged to `flags.jsonl` for grading against the final. #780's prior: early-game live
+    totals' big gaps realised ~0.
+- 25 live rows. Priced age p50 178 s, p90 259 s; **5 of 25 <= 120 s**. Age now p50 263 s,
+  p90 420 s; **9 of 25 > 300 s**. 0 rows with no fair.
+- **4 of 8 live markets have no OURS**, all expected:
+  - NFL spread: blank by decision (lane margins graded FAIL).
+  - NFL 2H Total, Q3 Spread, Q3 Total: the live NFL chip carries `intervals.source=live_resim`
+    with **0 periods** in all three readings so far (Q3 7:24 -> Q4 12:51). This is #767 (c):
+    live re-sims publish the projected final only, and per-period blocks are not built.
+- 1 live card with no lines at all: WNCAAB **WGA @ UML**, chip-seeded, 0 board rows. No odds
+  for the game; not a defect.
+
+**Teams:**
+- det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 0 live chips without a live card.
+- Chip-less NCAAB cards unchanged: 2 of 38 (FAMU @ UTEP, Washington @ Utah; reading 1).
