@@ -460,3 +460,65 @@ intermission at the read. Still owed. The noon college games reach halftime ~12:
 
 **Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 0 live chips without a live
 card. 2 chip-less NCAAB cards: FAMU @ UTEP now 5 rows, Washington @ Utah 4.
+
+## Reading 9 — Sun 11-15 12:50 PM CST (18:50Z). Pre-#810 (no worker boot in 12:35-12:50 PM); 15 college games at HALF
+
+35 live cards. **15 live college chips read HALF** (NCAAB 5, WNCAAB 10).
+
+**Load:** query 13.5 s / 71.3 MB (12.6 MB gz). Shortlist 0.8 s. Live-rail 0.11 s, 580-599
+rows (0.54 MB).
+
+**Refresh:**
+- Board build 81 s old; shortlist 270 s.
+- Overlay gap p50 / max:
+
+  | sport | p50 | max |
+  |---|---|---|
+  | NFL | 111 s | 342 s |
+  | NBA | 109 s | 126 s |
+  | NCAAB | 78 s | 303 s |
+  | WNCAAB | 76 s | 298 s |
+  | NCAAF | 118 s | 174 s |
+
+  0 gaps over 360 s.
+- Builds: NFL p50 36.9 s, max 98.7 s. NBA p50 27.6 s, max 70.0 s. NCAAB 12.2 s. WNCAAB 2.3 s.
+- `deferred_slow` nba 1, nfl 1. Tick gap p50 51 s, max 118 s.
+- Web merges: nfl stale 1 of 36, nba stale 1 of 36; the rest fresh.
+
+**Live recommendations:**
+- **23 flags on 9 cards. 0 false, 0 missed, 0 dark.**
+- **NBA flags reached the rail: 32 flagged rows**, against 0 shown and 46 dark rows at 12:37.
+  The NBA overlay ran a normal cadence this window (gap max 126 s, 1 deferral). This fits
+  reading 8's dark rows being a cadence effect.
+- Per sport, live rows:
+
+  | sport | rows | priced <= 120 s | seen age p50 / p90 | age now p50 | flagged rows |
+  |---|---|---|---|---|---|
+  | NBA | 250 | 136 (54%) | 38 / 282 s | 110 s | 32 |
+  | NFL | 150 | 58 (39%) | 87 / 87 s | 179 s | 0 |
+  | NCAAB | 147 | **28 (19%)** | 51 / 247 s | 242 s | 14 |
+  | WNCAAB | 23 | **4 (17%)** | 52 / 248 s | 216 s | 1 |
+  | NCAAF | 25 | 9 (36%) | 63 / 295 s | 185 s | 4 |
+
+- **Halftime confounds #810.** College priced <= 120 s fell from 44% / 52% (12:37) to 19% /
+  17% with half the college slate at HALF. The books' full-game prices stand still at the
+  break, so their unchanged clock passes 120 s.
+  - The #810 post window (60 s pulls from ~12:50 PM) runs into 2H play. A pre/post comparison
+    must match game phase, not just the clock. Faster pulls cannot shorten a frozen price's
+    book age (#786's verdict).
+  - Sent to local_1f10ce63.
+
+**(a) halftime join — H1 NOT supported per game:**
+- Of the 15 college games at HALF, **9 carry overlay rows on `/api/board/live-rail`**. Of the 11
+  in play, **7** do (60% vs 64%).
+- The games without rows are mostly ones with no in-play book quotes (reading 7: 10 WNCAAB
+  games had none).
+- 0 zero-card builds in the window: a build goes to 0 only when every live game of the sport
+  has nothing.
+- **So the 11:48-12:02 zero-card builds (3 live games, all at the break, every quote
+  `quote_older_than_live_pricing_ceiling`) remain unexplained per game.** Low impact (2-3 games,
+  ~10 min). The overlay logs no per-row drop reason, so it cannot be traced from the log.
+  Parked for the daily summary; not handed off.
+
+**Teams:** det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated. 2 chip-less NCAAB cards
+(FAMU @ UTEP 7 rows, Washington @ Utah 4).
