@@ -150,6 +150,19 @@ def test_a_round_built_sport_is_never_skipped():
     assert worker._book_grid_repriced_on_pull_recently("ncaaf", 110.0) is False
 
 
+def test_the_skip_is_measured_from_when_the_pass_read_the_sport_not_from_the_pass_start():
+    """Fleet 2026-11-15 03:22Z: a pass built NCAAB (56 s), NCAAF (30 s), then NHL, so NHL's quotes were read ~86 s
+    after the pass started (`built_at`). Measured from `built_at`, the next round (~30 s after that read) rebuilt it."""
+    worker._BOOK_GRID_SPORT_STATE.clear()
+    worker._BOOK_GRID_SPORT_STATE["ncaaf"] = {"date": TODAY, "built_at": 100.0, "quotes_read_at": 160.0,
+                                              "built_tick": None, "live": True}
+    assert worker._book_grid_repriced_on_pull_recently("ncaaf", 190.0) is True    # 30 s after its read, 90 s after the start
+    assert worker._book_grid_repriced_on_pull_recently("ncaaf", 210.0) is False   # 50 s after its read
+    del worker._BOOK_GRID_SPORT_STATE["ncaaf"]["quotes_read_at"]                  # older state: falls back to built_at
+    assert worker._book_grid_repriced_on_pull_recently("ncaaf", 140.0) is True
+    assert worker._book_grid_repriced_on_pull_recently("ncaaf", 150.0) is False
+
+
 # ------------------------------------------------------------------ the reacting sleep
 @pytest.fixture()
 def fake_sleep(monkeypatch):

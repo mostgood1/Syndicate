@@ -7027,13 +7027,19 @@ def _book_grid_round_skip_fresh_seconds() -> float:
 
 
 def _book_grid_repriced_on_pull_recently(sport: str, now: float) -> bool:
-    """A price-on-pull pass (not a round: `built_tick` None) rebuilt `sport` less than ROUND_SKIP_FRESH_SECONDS
-    ago. 0 seconds disables the skip."""
+    """A price-on-pull pass (not a round: `built_tick` None) read `sport`'s quotes less than ROUND_SKIP_FRESH_SECONDS
+    ago. 0 seconds disables the skip.
+
+    Measured from `quotes_read_at`, when the build read the shard, not `built_at`. `built_at` is the PASS's start,
+    shared by every sport the pass builds. On the fleet 2026-11-15 03:22Z, a pass built NCAAB (56 s), NCAAF (30 s) and
+    NHL (9 s), so NHL's quotes were read ~86 s after `built_at`. The next round, ~30 s after that read, rebuilt all
+    three, because measured from `built_at` every one of them was past 45 s."""
     fresh = _book_grid_round_skip_fresh_seconds()
     info = _BOOK_GRID_SPORT_STATE.get(sport) or {}
     if fresh <= 0 or not info or "built_tick" not in info or info.get("built_tick") is not None:
         return False
-    return now - float(info.get("built_at") or 0.0) < fresh
+    read_at = info.get("quotes_read_at")
+    return now - float(read_at if read_at is not None else (info.get("built_at") or 0.0)) < fresh
 
 
 def _book_grid_pull_check(stage: str) -> dict[str, Any] | None:
