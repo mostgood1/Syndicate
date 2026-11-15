@@ -60127,3 +60127,7 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - The 77 alt rows with no `prob_scale` (25 spreads_alt, 52 totals_alt) were all refused before the gate (53 `live_resim_published_no_distribution_for_this_market`, 24 `no_two_sided_market_price`), and a row refused there records no scale by design. That answers the open note on 6 such rows from the first-game reading.
 - **Owed:** Not checked tonight: the lens lane's `rawModelHomeWinProb` equals the sim's own (the findings' second falsifier). Owed from finals: the NBA live moneyline's model - market Brier over the first week below the raw replay's +0.016 (the third falsifier, about 11-21), under #780's finals grade.
 - Output: `C:\tmp\livegrade\anchor1114\slate_0310Z.out` (`slate.py`, `applied.py`).
+
+## 2026-11-15 03:15Z (9:15 PM CST 11-14) -- CORRECTION to the 2026-11-15 03:04Z reading of `5ed692ea5` (lane `nba-grid-per-build-lookups`) -- no deploy
+- That entry's Verdict said `book-grid-pull-react` (`adf1257a9`) "may also shorten NBA's gaps, because price-on-pull passes never take the slow-sport skip". **Wrong:** price-on-pull never prices a slow sport at all (`_book_grid_sports_with_new_live_quotes` skips any sport `_book_grid_sport_is_slow`), so while NBA builds take >= 45 s, pull-react does not reach it.
+- The deadline-aware skip it named as the next lever was replayed before any code and FALSIFIED (todo #790, lane STATUS 03:15Z): its projection misses by 77 s median, and any skip rule only moves the over-cutoff gaps between NBA and the college sports.
