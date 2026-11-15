@@ -3419,3 +3419,8 @@ over the old states says nothing about the new ones.
 **Also from this lane.** A measured table keyed too coarsely is a design error, not a fitted dial.
 - The pooled running-clock cell (22 s, from snaps at >= 45 s) hid a fall from 25 s to 9 s across the window.
 - Key a table on the variable the behaviour moves with BEFORE pre-registering it: here, the clock left.
+
+## 2026-11-15 — a pull heartbeat's `events` and `books` are fetch-level SETS, not (event, book) pairs; a stale `quote_seen_age_seconds` means the book stopped returning that key `[lane layer2-rail-monitor; corrected by 0f519972]`
+- I inferred "unchanged quotes are not restamped from heartbeats" from a heartbeat that listed a row's event AND its book while the row's seen age was older. Wrong premise: `odds_book_quotes._heartbeat_note` records the fetch's event set and book set independently, and `append_book_quotes` restamps seen time per quote key on EVERY observation, unchanged prices included.
+- So "heartbeat newer than the row" proves nothing per book. 44 of 120 such NCAAB full-game rows were lines the book had already moved off (in-play main line moved); 35 were skipped-then-returned.
+- **How to apply:** to ask "did book B return key K at time T", read the per-key state file (the writer's own record), never the heartbeat; and check the change-only capture shard can't answer it either.

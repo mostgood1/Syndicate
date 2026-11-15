@@ -725,3 +725,29 @@ cards.
   If so, the gate acts correctly.
 - Caveat: "no newer capture" reads the change-only capture shard and cannot prove non-return.
 - **Status: OPEN with the grid owner. Not a confirmed defect.**
+
+## Reading 14 — Sun 11-15 2:02 PM CST (20:02Z). No new boot since 19:26:20Z
+
+46 live chips. **9 flags on 5 cards. 0 false, 0 missed, 0 dark.**
+
+**Load:**
+- `/intelligence` 12.4 s / 27.5 MB (5.0 MB gz).
+- Query 13.8 s / 67.1 MB. Shortlist 0.9 s (317 s old). Chips 1.3 s.
+- Live-rail 0.44 s, 434-459 rows.
+
+**Refresh:**
+- **NFL back on every-other-round:** 4 overlay builds in 17 min, gap p50 329 s, max 340 s.
+  `deferred_slow` nfl 3 of the window's ticks; NFL builds p50 52.9 s, max 83.5 s.
+- NBA overlay gap max 164 s (8 builds), NBA builds p50 20.0 s.
+- College gaps max 167-185 s.
+- Web merges: 0 stale of 27.
+
+**Live rows priced <= 120 s:**
+- NCAAB 1H 10 / 24, 2H 19 / 68, break 2 / 78.
+- WNCAAB 2H 7 / 22.
+- NFL 2H 25 / 104 (24%).
+- **NBA 0 / 150**: priced age p50 235 s on a normally rebuilt overlay. So it is the books'
+  unchanged clock, not ours (late game). Not chased.
+- Seen age p50: NCAAB 37 s, NFL 195 s.
+
+**Teams:** 1 chip-less NCAAB card (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
