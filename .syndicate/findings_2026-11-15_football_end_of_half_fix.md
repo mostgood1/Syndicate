@@ -697,7 +697,7 @@ Q2-window snaps over `full2_nokneel`'s Q2 count. **G3 is still predicted to FAIL
 - Any design change after this point is an amendment, written and landed on main before the FIT read.
 - After the FIT read, nothing changes for this candidate.
 
-### V2 Amendment 4 — 2026-11-15 13:20 CST, after measuring the v2 table, BEFORE any v2 code or v2 sim run
+### V2 Amendment 4 — 2026-11-15 13:10 CST (landed `fe98d1b87`), after measuring the v2 table, BEFORE any v2 code or v2 sim run
 
 **`KNEEL_LIVE` in the kneel-out formula is the measured `spike` delta, not "the kneel delta when a timeout
 follows".**
