@@ -386,6 +386,26 @@ class CalibrationProfile:
     # Default OFF (see `q2_urgency_ignores_score`).
     end_of_half_clock: bool = False
 
+    # ---- todo #808 v2 (pre-registered 2026-11-15 `9affd0cba`, Amendment 4 `fe98d1b87`).
+    # Each needs `end_of_half_clock` ON and is default OFF (byte-identical).
+    #
+    # THE LEADER KNEELS. v1 measured Q4-window points by the LEADING offense at
+    # 1.69 a game against the league's 0.44: preservation mode never stopped it
+    # scoring. ON: in Q4 end-game / Q2 halftime preservation, when
+    # `clock <= 40 * max(0, downs_left - defense_timeouts) + kneel_live * downs_left`
+    # the offense kneels (-1 yard, no score / turnover / sack).
+    end_of_half_kneel_out: bool = False
+    # TIMEOUTS AND SPIKES BY NEED. ON, in the window in hurry mode: the offense's
+    # timeout rate is keyed on field position (own / 50-64 / range) instead of the
+    # average, and an offense out of timeouts spikes at the measured rate in the
+    # last 60 s (its own step, a snap). Timeouts LEFT is deliberately not a key
+    # (a selection effect: findings ## V2 -- PRE-REGISTERED).
+    end_of_half_clock_by_need: bool = False
+    # Q4 KICK TIMING. ON: a Q4 urgency field goal on downs 1-3 waits until one more
+    # running-clock play could end the game (v1 Amendment 3's Q2 rule). Q4's score
+    # gate is unchanged.
+    q4_kick_waits: bool = False
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -424,6 +444,9 @@ class CalibrationProfile:
             "home_field_bonus": self.home_field_bonus,
             "q2_urgency_ignores_score": self.q2_urgency_ignores_score,
             "end_of_half_clock": self.end_of_half_clock,
+            "end_of_half_kneel_out": self.end_of_half_kneel_out,
+            "end_of_half_clock_by_need": self.end_of_half_clock_by_need,
+            "q4_kick_waits": self.q4_kick_waits,
         }
 
 

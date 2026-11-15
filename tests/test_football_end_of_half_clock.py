@@ -169,10 +169,15 @@ def test_amendment_3_q2_early_down_kick_waits_for_the_last_running_play_with_the
 # --------------------------------------------------------------------- part 3: the clock
 
 def test_tables_have_every_cell_the_engine_reads():
-    pooled = {"td", "fg_good", "fg_miss", "punt", "turnover", "tod", "safety", "penalty", "incomplete", "oob"}
-    bucketed = {"to_off", "to_def", "run_hurry", "run_preserve"}
+    pooled = {"td", "fg_good", "fg_miss", "punt", "turnover", "tod", "safety", "penalty", "incomplete", "oob",
+              "spike", "to_spike", "2_kneel", "4_kneel"}
+    bucketed = {f"{q}_{c}" for q in (2, 4) for c in ("to_off", "to_def", "run_hurry", "run_preserve")}
+    qm = {"2_hurry", "2_preserve", "4_hurry", "4_preserve"}
+    zones = {f"{q}_{z}" for q in (2, 4) for z in ("own", "mid", "range")}
     for sport, table in END_OF_HALF_CLOCK_TABLES.items():
         assert pooled <= set(table["delta"]), sport
+        assert "kneel_live" not in table["delta"]  # Amendment 4: the formula's value is table["kneel_live"]
+        assert 0 < table["kneel_live"] < 10
         if table["first_down_stop"]:
             assert "first_down" in table["delta"]
         for mean, sd in table["delta"].values():
@@ -181,15 +186,15 @@ def test_tables_have_every_cell_the_engine_reads():
         for row in table["delta_by_bucket"].values():
             assert len(row) == 4 and all(mean > 0 and sd >= 0 for mean, sd in row)
         expected = {
-            "p_incomplete": {"hurry", "preserve"},
-            "p_oob": {"hurry", "preserve"},
-            "p_to_off": {"2_hurry", "2_preserve", "4_hurry", "4_preserve"},
+            "p_incomplete": qm, "p_sack": qm, "p_turnover": qm, "p_oob": qm, "p_to_off": qm,
+            "p_to_off_need": zones,
             "p_to_def": {"2_lead", "2_trail", "4_lead", "4_trail"},
         }
         for key, keys in expected.items():
             assert set(table[key]) == keys, (sport, key)
             for row in table[key].values():
                 assert len(row) == 4 and all(0.0 <= p < 1.0 for p in row)
+        assert set(table["p_spike"]) == zones and all(0.0 <= p < 1.0 for p in table["p_spike"].values())
     assert END_OF_HALF_CLOCK_TABLES["nfl"]["two_minute_warning"] is True
     assert END_OF_HALF_CLOCK_TABLES["ncaaf"]["two_minute_warning"] is False
 
@@ -215,13 +220,14 @@ def test_window_incompletion_share_matches_the_table_only_when_on():
     w_on = _play_outcome_weights(ps, priors, on)
     w_off = _play_outcome_weights(ps, priors, replace(NFL, q2_urgency_ignores_score=True))
     non_pen = sum(v for k, v in w_on.items() if k != PlayOutcome.PENALTY)
-    target = END_OF_HALF_CLOCK_TABLES["nfl"]["p_incomplete"]["hurry"][0]
-    assert abs(w_on[PlayOutcome.INCOMPLETE_PASS] / non_pen - target) < 1e-9
+    table = END_OF_HALF_CLOCK_TABLES["nfl"]
+    for outcome, cell in ((PlayOutcome.INCOMPLETE_PASS, "p_incomplete"), (PlayOutcome.SACK, "p_sack"),
+                          (PlayOutcome.TURNOVER, "p_turnover")):
+        assert abs(w_on[outcome] / non_pen - table[cell]["2_hurry"][0]) < 1e-9, cell
     assert w_off[PlayOutcome.INCOMPLETE_PASS] != w_on[PlayOutcome.INCOMPLETE_PASS]
-    # the other outcomes keep their relative weights
-    ratio_on = w_on[PlayOutcome.GAIN] / w_on[PlayOutcome.SACK]
-    ratio_off = w_off[PlayOutcome.GAIN] / w_off[PlayOutcome.SACK]
-    assert abs(ratio_on - ratio_off) < 1e-9
+    # the other outcomes keep their relative weights (the TD weight keeps its field-position dependence)
+    for a, b in ((PlayOutcome.GAIN, PlayOutcome.EXPLOSIVE_GAIN), (PlayOutcome.GAIN, PlayOutcome.TOUCHDOWN)):
+        assert abs(w_on[a] / w_on[b] - w_off[a] / w_off[b]) < 1e-9
 
 
 def test_timeouts_are_tracked_never_negative_never_regained_within_a_half():
@@ -325,3 +331,88 @@ def test_quarters_one_and_three_are_untouched_by_the_clock():
         qa = [x for x in a.quarter_log if x["quarter"] == 3]
         qb = [x for x in b.quarter_log if x["quarter"] == 3]
         assert qa == qb
+
+
+# --------------------------------------------------------------------- v2 (pre-registered 9affd0cba)
+
+V2_FIELDS = ("end_of_half_kneel_out", "end_of_half_clock_by_need", "q4_kick_waits")
+FULL2_NFL = replace(FULL_NFL, **{f: True for f in V2_FIELDS})
+FULL2_NCAAF = replace(FULL_NCAAF, **{f: True for f in V2_FIELDS})
+
+
+def test_v2_switches_default_off_and_round_trip():
+    for prof in (NFL, NCAAF):
+        assert not any(getattr(prof, f) for f in V2_FIELDS)
+    back = profile_with_overrides(NFL, FULL2_NFL.to_dict())
+    assert all(getattr(back, f) for f in V2_FIELDS)
+
+
+@pytest.mark.parametrize("field", V2_FIELDS)
+def test_v2_reachability_each_switch_changes_the_output_on_top_of_the_clock(field):
+    for base in (FULL_NFL, FULL_NCAAF):
+        on = replace(base, **{field: True})
+        a = [simulate_game(_inp(s), profile=base).to_dict() for s in range(1, 61)]
+        b = [simulate_game(_inp(s), profile=on).to_dict() for s in range(1, 61)]
+        assert a != b, f"{field} is inert on {base.name}"
+
+
+@pytest.mark.parametrize("field", V2_FIELDS)
+def test_v2_switches_are_inert_without_the_clock(field):
+    alone = replace(NFL, **{field: True})
+    for s in range(1, 21):
+        assert simulate_game(_inp(s), profile=alone).to_dict() == simulate_game(_inp(s), profile=NFL).to_dict()
+
+
+def test_kneel_out_kneels_when_the_clock_can_be_run_out_and_not_otherwise():
+    kneel = replace(FULL_NFL, end_of_half_kneel_out=True)
+    lead = dict(initial_quarter=4, initial_score_home=24, initial_score_away=17, initial_possession_owner="home",
+                initial_field_position=40)
+    # 1:00 left, 1st down, the defense out of timeouts: 40 * 4 + 4 * kneel_live >= 60 -> kneel
+    step = _first_step(kneel, initial_clock_seconds=60, initial_timeouts_away=0, **lead)
+    assert step["summary"].endswith("took a knee") and step["yards_gained"] == -1 and step["points_scored"] == 0
+    # 1:50 left, 1st down, the defense holds 3: 40 * 1 + 4 * kneel_live < 110 -> no kneel
+    step = _first_step(kneel, initial_clock_seconds=110, initial_timeouts_away=3, **lead)
+    assert not step["summary"].endswith("took a knee")
+    # OFF: never
+    assert not _first_step(FULL_NFL, initial_clock_seconds=60, initial_timeouts_away=0, **lead)["summary"].endswith("took a knee")
+
+
+def test_kneel_out_ends_the_game_without_leader_points():
+    kneel = replace(FULL_NFL, end_of_half_kneel_out=True)
+    for seed in range(1, 31):
+        out = simulate_game(_inp(seed, initial_quarter=4, initial_clock_seconds=60, initial_score_home=24,
+                                 initial_score_away=17, initial_possession_owner="home", initial_field_position=40,
+                                 initial_timeouts_away=0), profile=kneel)
+        assert out.final_score == {"home": 24, "away": 17}
+
+
+def _spikes(profile, n=120, **kw):
+    hits, with_timeouts = 0, 0
+    for seed in range(1, n + 1):
+        for step in _steps(simulate_game(_inp(seed, **kw), profile=profile)):
+            if step["summary"].endswith("spiked the ball"):
+                hits += 1
+                a = step["start_state"]
+                left = a["timeouts_home"] if a["possession_owner"] == "home" else a["timeouts_away"]
+                with_timeouts += left > 0
+                assert int(a["quarter"]) in (2, 4) and int(a["clock_remaining"]) <= 60
+                assert step["clock_consumed"] <= 5 and step["yards_gained"] == 0
+    return hits, with_timeouts
+
+
+def test_spikes_only_by_need():
+    trailing_q4 = dict(initial_quarter=4, initial_clock_seconds=58, initial_score_home=10, initial_score_away=14,
+                       initial_possession_owner="home", initial_field_position=55, initial_timeouts_home=0)
+    hits, with_timeouts = _spikes(replace(FULL_NFL, end_of_half_clock_by_need=True), **trailing_q4)
+    assert hits > 0 and with_timeouts == 0
+    assert _spikes(FULL_NFL, **trailing_q4) == (0, 0)  # by-need OFF: no spikes at all
+
+
+def test_q4_kick_waits_only_with_its_switch():
+    q4 = dict(initial_quarter=4, initial_score_home=10, initial_score_away=10, initial_possession_owner="home",
+              initial_field_position=75, initial_clock_seconds=45)
+    assert _first_step(FULL_NFL, **q4)["outcome"] in ("field_goal", "missed_field_goal")
+    waits = replace(FULL_NFL, q4_kick_waits=True)
+    assert _first_step(waits, **q4)["outcome"] not in ("field_goal", "missed_field_goal")
+    assert _first_step(waits, **dict(q4, initial_clock_seconds=8))["outcome"] in ("field_goal", "missed_field_goal")
+    assert _first_step(waits, **dict(q4, initial_down=4, initial_distance=6))["outcome"] in ("field_goal", "missed_field_goal")

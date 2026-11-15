@@ -366,6 +366,16 @@ def non_offensive_rates(profile_name: str) -> dict:
 #
 # Values are FIT-season measurements, not fitted dials: nothing here was tuned to a
 # target (findings: "No fitted dial in the clock").
+#
+# v2 (pre-registered `9affd0cba`, Amendment 4 `fe98d1b87`; v1's table is commit
+# `79dbfb23c`): every mode-dependent cell is keyed by QUARTER as well ("<q>_<mode>",
+# "<q>_run_<mode>", "<q>_to_off" ...), because v1's pooled preserve cells mixed Q2's
+# halftime leaders (still throwing, 0.21-0.27 incomplete) with Q4's run-out (~0.01).
+# A cell with < 30 observations takes its pooled-over-quarters value ("P"). New:
+# `p_sack` / `p_turnover` shares (applied like `p_incomplete`; kneels are not in
+# their denominators), `p_to_off_need` ("<q>_<zone>", hurry, by field position),
+# `p_spike` ("<q>_<zone>", last 60 s, out of timeouts), `to_spike` / `spike` /
+# "<q>_kneel" deltas, and `kneel_live` (the spike delta; Amendment 4).
 # ---------------------------------------------------------------------------
 END_OF_HALF_WINDOW_SECONDS = 120
 
@@ -374,6 +384,7 @@ END_OF_HALF_CLOCK_TABLES = {
         "two_minute_warning": True,
         "first_down_stop": False,
         "live_seconds": 4.87,  # an incompletion: the live play alone
+        "kneel_live": 1.0,  # v2 Amendment 4: a snap-and-down play = the spike delta
         "delta": {  # POOLED (mean, sd) seconds from this snap to the next snap of the quarter
             "fg_good": (6.33, 3.27),  # n=256, censored 0.432
             "fg_miss": (4.61, 1.36),  # n=61, censored 0.413
@@ -383,32 +394,68 @@ END_OF_HALF_CLOCK_TABLES = {
             "punt": (9.14, 2.31),  # n=395, censored 0.025
             "safety": (5.0, 0.71),  # n=4, censored 0.2
             "td": (7.37, 3.59),  # n=355, censored 0.03
-            "tod": (5.4, 1.74),  # n=149, censored 0.118
+            "to_spike": (14.84, 3.16),  # n=99, censored 0.0
+            "tod": (5.46, 1.72),  # n=145, censored 0.116
             "turnover": (7.92, 3.24),  # n=180, censored 0.1
+            "spike": (1.0, 0.0),  # n=146, censored 0.0
+            "2_kneel": (33.43, 10.28),  # n=271, censored 0.645, pooled over quarters
+            "4_kneel": (33.53, 10.26),  # n=269, censored 0.543
         },
-        "delta_by_bucket": {  # Amendment 2: [0-30 s, 30-60, 60-90, 90-120] (mean, sd); "<-b" = borrowed
-            "run_hurry": [(14.01, 9.23), (14.01, 9.23), (20.43, 11.54), (24.92, 12.68)],
-            # n=298 cens 0.409 <-1; n=573 cens 0.037; n=798 cens 0.0; n=1045 cens 0.0
-            "run_preserve": [(34.69, 11.48), (34.69, 11.48), (34.69, 11.48), (28.45, 18.91)],
-            # n=71 cens 0.785 <-2; n=208 cens 0.471 <-2; n=192 cens 0.0; n=252 cens 0.0
-            "to_off": [(9.48, 5.19), (14.23, 9.91), (25.66, 14.69), (25.14, 16.52)],
-            # n=147 cens 0.114; n=150 cens 0.038; n=56 cens 0.0; n=22 cens 0.0
-            "to_def": [(14.13, 12.85), (14.13, 12.85), (16.51, 15.0), (19.06, 17.87)],
-            # n=58 cens 0.318 <-1; n=110 cens 0.098; n=134 cens 0.0; n=250 cens 0.0
+        "delta_by_bucket": {  # [0-30 s, 30-60, 60-90, 90-120] (mean, sd); "<-b" borrowed, "P" pooled over quarters
+            "2_run_hurry": [(12.41, 8.87), (12.41, 8.87), (19.93, 11.64), (25.43, 13.55)],
+            # n=183 cens 0.187 <-1; n=375 cens 0.008; n=511 cens 0.0; n=652 cens 0.0
+            "4_run_hurry": [(17.04, 9.56), (17.04, 9.56), (21.39, 11.39), (24.1, 11.02)],
+            # n=58 cens 0.528 <-1; n=173 cens 0.094; n=276 cens 0.0; n=389 cens 0.0
+            "2_run_preserve": [(13.16, 8.43), (13.16, 8.43), (30.72, 18.63), (23.87, 20.08)],
+            # n=56 cens 0.434 <-1; n=130 cens 0.023; n=58 cens 0.0 P; n=186 cens 0.0 P
+            "4_run_preserve": [(13.28, 9.66), (13.28, 9.66), (30.72, 18.63), (23.87, 20.08)],
+            # n=59 cens 0.438 <-1 P; n=147 cens 0.039 P; n=58 cens 0.0; n=186 cens 0.0
+            "2_to_off": [(9.1, 4.93), (12.79, 7.51), (20.55, 12.82), (25.14, 16.52)],
+            # n=124 cens 0.095; n=109 cens 0.027; n=31 cens 0.0; n=22 cens 0.0 P
+            "4_to_off": [(9.46, 5.21), (17.11, 13.28), (25.19, 14.94), (25.14, 16.52)],
+            # n=146 cens 0.099 P; n=37 cens 0.075; n=53 cens 0.0 P; n=22 cens 0.0 P
+            "2_to_def": [(12.21, 11.1), (12.21, 11.1), (16.0, 13.48), (15.55, 14.71)],
+            # n=34 cens 0.261 <-1; n=47 cens 0.078; n=68 cens 0.0; n=85 cens 0.0
+            "4_to_def": [(11.29, 11.52), (11.29, 11.52), (14.93, 15.43), (20.18, 18.97)],
+            # n=54 cens 0.26 <-1 P; n=41 cens 0.047; n=59 cens 0.0; n=156 cens 0.0
         },
         "p_incomplete": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
-            "hurry": [0.3311, 0.2546, 0.2308, 0.2034],  # n=[1655, 1626, 1651, 1967]
-            "preserve": [0.1383, 0.137, 0.004, 0.0518],  # n=[499, 613, 247, 425]
+            "2_hurry": [0.3668, 0.2507, 0.2387, 0.1794],  # n=[1047, 1013, 1039, 1176]
+            "2_preserve": [0.2634, 0.2748, 0.0094, 0.0625],  # n=[262, 302, '0->pooled 106', '0->pooled 352']
+            "4_hurry": [0.3313, 0.268, 0.2191, 0.2398],  # n=[495, 597, 607, 788]
+            "4_preserve": [0.25, 0.02, 0.0094, 0.0625],  # n=['14->pooled 276', 50, 106, 352]
+        },
+        "p_sack": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_hurry": [0.0525, 0.0632, 0.0433, 0.0451],  # n=[1047, 1013, 1039, 1176]
+            "2_preserve": [0.0573, 0.053, 0.0, 0.0227],  # n=[262, 302, '0->pooled 106', '0->pooled 352']
+            "4_hurry": [0.0606, 0.0419, 0.0527, 0.0571],  # n=[495, 597, 607, 788]
+            "4_preserve": [0.058, 0.0, 0.0, 0.0227],  # n=['14->pooled 276', 50, 106, 352]
+        },
+        "p_turnover": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_hurry": [0.0201, 0.0247, 0.0164, 0.0213],  # n=[1047, 1013, 1039, 1176]
+            "2_preserve": [0.0191, 0.0397, 0.0, 0.0028],  # n=[262, 302, '0->pooled 106', '0->pooled 352']
+            "4_hurry": [0.0566, 0.0352, 0.028, 0.0203],  # n=[495, 597, 607, 788]
+            "4_preserve": [0.0181, 0.0, 0.0, 0.0028],  # n=['14->pooled 276', 50, 106, 352]
         },
         "p_oob": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
-            "hurry": [0.2546, 0.2413, 0.1881, 0.1622],  # n=[703, 949, 1079, 1313]
-            "preserve": [0.2167, 0.2176, 0.0316, 0.0229],  # n=[180, 239, 95, 306]
+            "2_hurry": [0.2804, 0.2255, 0.1758, 0.1643],  # n=[485, 612, 694, 834]
+            "2_preserve": [0.2281, 0.2708, 0.0316, 0.0229],  # n=[171, 192, '0->pooled 95', '0->pooled 306']
+            "4_hurry": [0.1972, 0.27, 0.2104, 0.1587],  # n=[218, 337, 385, 479]
+            "4_preserve": [0.2167, 0.0, 0.0316, 0.0229],  # n=['9->pooled 180', 47, 95, 306]
         },
         "p_to_off": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
             "2_hurry": [0.212, 0.1918, 0.0497, 0.0123],  # n=[382, 490, 584, 734]
-            "2_preserve": [0.1124, 0.0414, 0.0, 0.0],  # n=[178, 145, 0, 0]
+            "2_preserve": [0.1124, 0.0414, 0.0465, 0.0138],  # n=[178, 145, '0->pooled 215', '0->pooled 362']
             "4_hurry": [0.1525, 0.1304, 0.0323, 0.0139],  # n=[118, 184, 248, 359]
             "4_preserve": [0.0242, 0.0284, 0.0465, 0.0138],  # n=[124, 282, 215, 362]
+        },
+        "p_to_off_need": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_mid": [0.3857, 0.1733, 0.0763, 0.027],  # n=[70, 150, 118, 111]
+            "2_own": [0.1075, 0.1511, 0.0453, 0.0026],  # n=[186, 139, 287, 380]
+            "2_range": [0.2698, 0.2338, 0.0391, 0.0206],  # n=[126, 201, 179, 243]
+            "4_mid": [0.3548, 0.087, 0.0204, 0.0299],  # n=['23->pooled 93', 46, 49, 67]
+            "4_own": [0.025, 0.1404, 0.0192, 0.0059],  # n=[40, 57, 104, 170]
+            "4_range": [0.2, 0.1481, 0.0526, 0.0164],  # n=[55, 81, 95, 122]
         },
         "p_to_def": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
             "2_lead": [0.0746, 0.0695, 0.1137, 0.0926],  # n=[228, 259, 299, 367]
@@ -416,54 +463,107 @@ END_OF_HALF_CLOCK_TABLES = {
             "4_lead": [0.0909, 0.0588, 0.0695, 0.0678],  # n=[121, 170, 259, 369]
             "4_trail": [0.1139, 0.2099, 0.1973, 0.2867],  # n=[79, 162, 147, 286]
         },
+        "p_spike": {  # last 60 s, hurry, out of timeouts, after a clock-running play
+            "2_own": 0.4839,  # n=31
+            "2_mid": 0.325,  # n=13->pooled 40
+            "2_range": 0.4348,  # n=18->pooled 46
+            "4_own": 0.3559,  # n=59
+            "4_mid": 0.325,  # n=27->pooled 40
+            "4_range": 0.4348,  # n=28->pooled 46
+        },
         "league_window_snaps": {"q2": 10.634, "q4": 7.382},  # 544 games; reference only
     },
     "ncaaf": {
         "two_minute_warning": False,
         "first_down_stop": True,
         "live_seconds": 6.83,  # an incompletion: the live play alone
+        "kneel_live": 4.12,  # v2 Amendment 4: a snap-and-down play = the spike delta
         "delta": {  # POOLED (mean, sd) seconds from this snap to the next snap of the quarter
             "fg_good": (7.25, 7.24),  # n=465, censored 0.36, dropped 0.007
             "fg_miss": (5.87, 5.55),  # n=156, censored 0.46, dropped 0.02
-            "first_down": (12.06, 10.44),  # n=4499, censored 0.047, dropped 0.01
+            "first_down": (12.06, 10.43),  # n=4498, censored 0.047, dropped 0.01
             "incomplete": (6.83, 6.82),  # n=4727, censored 0.023, dropped 0.009
             "oob": (6.28, 5.49),  # n=534, censored 0.022, dropped 0.004
-            "penalty": (8.57, 8.85),  # n=1680, censored 0.026, dropped 0.013
+            "penalty": (8.57, 8.85),  # n=1677, censored 0.025, dropped 0.013
             "punt": (7.12, 6.33),  # n=1037, censored 0.038, dropped 0.027
             "safety": (7.33, 5.31),  # n=12, censored 0.2, dropped 0.0
             "td": (7.5, 7.73),  # n=1113, censored 0.036, dropped 0.012
-            "tod": (6.88, 8.0),  # n=496, censored 0.103, dropped 0.03
+            "to_spike": (6.88, 4.9),  # n=16, censored 0.0, dropped 0.0
+            "tod": (6.89, 8.02),  # n=491, censored 0.096, dropped 0.03
             "turnover": (8.17, 7.49),  # n=499, censored 0.128, dropped 0.009
+            "spike": (4.12, 3.47),  # n=64, censored 0.0, dropped 0.015
+            "2_kneel": (30.55, 14.59),  # n=344, censored 0.662, dropped 0.038, pooled over quarters
+            "4_kneel": (30.74, 14.52),  # n=340, censored 0.582, dropped 0.045
         },
-        "delta_by_bucket": {  # Amendment 2: [0-30 s, 30-60, 60-90, 90-120] (mean, sd); "<-b" = borrowed
-            "run_hurry": [(14.64, 12.17), (14.64, 12.17), (17.34, 13.2), (16.41, 14.53)],
-            # n=631 cens 0.497 <-1; n=934 cens 0.043; n=1338 cens 0.003; n=1938 cens 0.004
-            "run_preserve": [(31.62, 14.73), (31.62, 14.73), (31.62, 14.73), (25.69, 19.63)],
-            # n=122 cens 0.893 <-2; n=532 cens 0.301 <-2; n=332 cens 0.031; n=547 cens 0.02
-            "to_off": [(7.14, 4.84), (13.67, 12.65), (20.16, 17.14), (18.49, 18.24)],
-            # n=569 cens 0.016; n=485 cens 0.004; n=277 cens 0.0; n=417 cens 0.002
-            "to_def": [(7.93, 6.07), (10.96, 10.29), (9.19, 8.59), (10.37, 10.67)],
-            # n=269 cens 0.025; n=357 cens 0.006; n=441 cens 0.004; n=819 cens 0.001
+        "delta_by_bucket": {  # [0-30 s, 30-60, 60-90, 90-120] (mean, sd); "<-b" borrowed, "P" pooled over quarters
+            "2_run_hurry": [(13.7, 11.4), (13.7, 11.4), (17.37, 13.42), (16.44, 14.61)],
+            # n=408 cens 0.456 <-1; n=572 cens 0.04; n=895 cens 0.002; n=1257 cens 0.002
+            "4_run_hurry": [(16.14, 13.18), (16.14, 13.18), (17.26, 12.73), (16.39, 14.4)],
+            # n=206 cens 0.451 <-1; n=360 cens 0.037; n=443 cens 0.004; n=680 cens 0.007
+            "2_run_preserve": [(14.2, 12.73), (14.2, 12.73), (30.29, 16.42), (24.62, 19.7)],
+            # n=76 cens 0.738 <-1; n=231 cens 0.094; n=195 cens 0.022 P; n=482 cens 0.014 P
+            "4_run_preserve": [(30.29, 16.42), (30.29, 16.42), (30.29, 16.42), (24.62, 19.7)],
+            # n=30 cens 0.921 <-2; n=179 cens 0.215 <-2; n=195 cens 0.022; n=482 cens 0.014
+            "2_to_off": [(7.14, 4.78), (12.95, 11.76), (17.19, 15.48), (16.45, 16.66)],
+            # n=470 cens 0.015; n=381 cens 0.003; n=159 cens 0.0; n=177 cens 0.0
+            "4_to_off": [(7.13, 5.17), (16.57, 15.18), (23.66, 18.49), (19.99, 19.24)],
+            # n=97 cens 0.02; n=102 cens 0.0; n=114 cens 0.0; n=237 cens 0.004
+            "2_to_def": [(8.13, 6.07), (11.13, 10.22), (9.27, 8.16), (11.16, 10.79)],
+            # n=197 cens 0.02; n=256 cens 0.0; n=244 cens 0.004; n=421 cens 0.0
+            "4_to_def": [(7.45, 5.67), (9.97, 9.0), (9.3, 9.21), (9.44, 10.41)],
+            # n=66 cens 0.043; n=90 cens 0.011; n=189 cens 0.0; n=396 cens 0.003
         },
         "p_incomplete": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
-            "hurry": [0.2723, 0.2601, 0.2251, 0.2015],  # n=[4815, 3945, 4442, 6051]
-            "preserve": [0.0687, 0.1096, 0.0059, 0.0236],  # n=[1790, 1533, 841, 1397]
+            "2_hurry": [0.2742, 0.2593, 0.2205, 0.1854],  # n=[3169, 2549, 2984, 3857]
+            "2_preserve": [0.1553, 0.1957, 0.0077, 0.0252],  # n=[747, 833, '0->pooled 649', '0->pooled 1310']
+            "4_hurry": [0.2896, 0.2628, 0.2346, 0.2297],  # n=[1526, 1389, 1458, 2194]
+            "4_preserve": [0.0129, 0.0123, 0.0077, 0.0252],  # n=[543, 406, 649, 1310]
+        },
+        "p_sack": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_hurry": [0.0483, 0.0455, 0.0379, 0.0342],  # n=[3169, 2549, 2984, 3857]
+            "2_preserve": [0.0482, 0.03, 0.0, 0.0061],  # n=[747, 833, '0->pooled 649', '0->pooled 1310']
+            "4_hurry": [0.0433, 0.0374, 0.0508, 0.0438],  # n=[1526, 1389, 1458, 2194]
+            "4_preserve": [0.0074, 0.0, 0.0, 0.0061],  # n=[543, 406, 649, 1310]
+        },
+        "p_turnover": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_hurry": [0.0297, 0.0243, 0.0231, 0.0158],  # n=[3169, 2549, 2984, 3857]
+            "2_preserve": [0.0268, 0.0132, 0.0139, 0.0061],  # n=[747, 833, '0->pooled 649', '0->pooled 1310']
+            "4_hurry": [0.0564, 0.0403, 0.0309, 0.0237],  # n=[1526, 1389, 1458, 2194]
+            "4_preserve": [0.0037, 0.0074, 0.0139, 0.0061],  # n=[543, 406, 649, 1310]
         },
         "p_oob": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
-            "hurry": [0.0514, 0.0441, 0.0419, 0.0329],  # n=[2470, 2315, 2841, 4108]
-            "preserve": [0.0218, 0.0344, 0.0018, 0.0078],  # n=[1011, 960, 561, 1153]
+            "2_hurry": [0.0532, 0.0474, 0.0405, 0.0337],  # n=[1692, 1518, 1977, 2727]
+            "2_preserve": [0.0378, 0.0499, 0.0018, 0.0078],  # n=[556, 621, '0->pooled 561', '0->pooled 1153']
+            "4_hurry": [0.0476, 0.0376, 0.0451, 0.0311],  # n=[778, 797, 864, 1381]
+            "4_preserve": [0.0022, 0.0059, 0.0018, 0.0078],  # n=[455, 339, 561, 1153]
         },
         "p_to_off": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
             "2_hurry": [0.2395, 0.2063, 0.0793, 0.0672],  # n=[1236, 1139, 1525, 2218]
-            "2_preserve": [0.1403, 0.1075, 0.0, 0.0],  # n=[449, 428, 0, 0]
+            "2_preserve": [0.1403, 0.1075, 0.078, 0.1135],  # n=[449, 428, '0->pooled 577', '0->pooled 925']
             "4_hurry": [0.1602, 0.1258, 0.0923, 0.0773],  # n=[462, 477, 596, 983]
             "4_preserve": [0.0123, 0.0434, 0.078, 0.1135],  # n=[569, 461, 577, 925]
+        },
+        "p_to_off_need": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
+            "2_mid": [0.3151, 0.2119, 0.1003, 0.0573],  # n=[238, 269, 289, 384]
+            "2_own": [0.1111, 0.1189, 0.0602, 0.0598],  # n=[603, 387, 847, 1237]
+            "2_range": [0.3899, 0.2733, 0.1054, 0.0888],  # n=[395, 483, 389, 597]
+            "4_mid": [0.1594, 0.0933, 0.084, 0.0632],  # n=[69, 75, 119, 174]
+            "4_own": [0.1283, 0.1033, 0.0753, 0.0642],  # n=[265, 242, 279, 514]
+            "4_range": [0.2266, 0.175, 0.1212, 0.1085],  # n=[128, 160, 198, 295]
         },
         "p_to_def": {  # by bucket [0-30 s, 30-60, 60-90, 90-120]
             "2_lead": [0.1083, 0.1363, 0.1375, 0.1891],  # n=[683, 587, 691, 1005]
             "2_trail": [0.1085, 0.1314, 0.1285, 0.1592],  # n=[691, 784, 747, 1131]
             "4_lead": [0.0623, 0.0592, 0.0427, 0.0616],  # n=[401, 473, 539, 941]
             "4_trail": [0.0379, 0.1085, 0.252, 0.2872],  # n=[554, 387, 508, 888]
+        },
+        "p_spike": {  # last 60 s, hurry, out of timeouts, after a clock-running play
+            "2_own": 0.0,  # n=77
+            "2_mid": 0.0638,  # n=47
+            "2_range": 0.039,  # n=77
+            "4_own": 0.0515,  # n=97
+            "4_mid": 0.0526,  # n=29->pooled 76
+            "4_range": 0.0,  # n=34
         },
         "league_window_snaps": {"q2": 10.594, "q4": 7.254},  # 1514 games; reference only
     },
@@ -473,6 +573,12 @@ END_OF_HALF_CLOCK_TABLES = {
 def end_of_half_clock_table(profile_name: str) -> dict:
     """The sport's clock table for a profile name (`ncaaf...` -> NCAAF, anything else -> NFL)."""
     return END_OF_HALF_CLOCK_TABLES["ncaaf" if str(profile_name).lower().startswith("ncaaf") else "nfl"]
+
+
+def end_of_half_zone(yardline: int) -> str:
+    """todo #808 v2 need key: own half / 50-64 / scoring range (>= TRUE_FIELD_GOAL_RANGE_YARDLINE)."""
+    y = int(yardline)
+    return "own" if y < 50 else "mid" if y < TRUE_FIELD_GOAL_RANGE_YARDLINE else "range"
 
 
 def end_of_half_bucket(seconds_remaining: int) -> int:

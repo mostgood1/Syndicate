@@ -75,6 +75,12 @@ WINDOW = 120
 # part of the window and applied it everywhere).
 CENSOR_LIMIT = 0.15
 BUCKETED_DELTA = ("run_hurry", "run_preserve", "to_off", "to_def")
+MIN_CELL = 30   # v2: a cell with fewer observations takes its pooled-over-quarters value
+
+
+def zone_of(yardline: int) -> str:
+    """v2 need key: own half / 50-64 / scoring range (>= 65 = TRUE_FIELD_GOAL_RANGE_YARDLINE)."""
+    return "own" if yardline < 50 else "mid" if yardline < 65 else "range"
 
 
 def bucket_of(secs: int) -> int:
@@ -127,82 +133,146 @@ class Acc:
         self.recs.append(rec)
 
     def table(self) -> Dict[str, Any]:
-        """Pooled cells, plus (Amendment 2) the running-clock / timeout deltas and every probability BY CLOCK BUCKET."""
-        pooled = collections.defaultdict(list)
-        bucketed = collections.defaultdict(list)
-        cens = collections.Counter()
-        tot = collections.Counter()
-        dropped = collections.Counter()
-        for r in self.recs:
-            cat = r["cat"]
-            if cat == "run":
-                cat = f"run_{r['mode']}"
-            key = (cat, bucket_of(r["secs"])) if cat in BUCKETED_DELTA else (cat, None)
-            tot[key] += 1
-            if r["delta"] is None:
-                cens[key] += 1
-                continue
-            if self.delta_bounds and not (self.delta_bounds[0] <= r["delta"] <= self.delta_bounds[1]):
-                dropped[key] += 1
-                continue
-            (bucketed if key[1] is not None else pooled)[key].append(r["delta"])
+        """The v2 table (pre-registered 2026-11-15 `9affd0cba`): every mode-dependent cell keyed by QUARTER too.
 
-        def cell(key, xs):
-            out = {"mean": round(statistics.fmean(xs), 2) if xs else None,
-                   "sd": round(statistics.pstdev(xs), 2) if xs else None,
-                   "n": len(xs), "censored": round(cens[key] / max(1, tot[key]), 3)}
+        - delta (pooled over quarters and buckets): drive-ending cells, incomplete, oob, penalty, NCAAF first_down,
+          and the v2 cells `spike` (spike snap -> next snap), `to_spike` (clock-running play -> a spike), `kneel_live`
+          (a kneel followed by a timeout); `<q>_kneel` (a kneel with no timeout) by quarter;
+        - delta_by_bucket `<q>_run_<mode>`, `<q>_to_off`, `<q>_to_def`: by 30 s bucket, Amendment-2 censoring rule;
+        - p_incomplete / p_oob / p_sack / p_turnover / p_to_off `<q>_<mode>`, p_to_off_need `<q>_<zone>` (hurry),
+          p_to_def `<q>_trail|lead`: by bucket;
+        - p_spike `<q>_<zone>`: last 60 s, hurry, offense out of timeouts, after a clock-running play.
+        A cell with fewer than MIN_CELL observations takes its pooled-over-quarters value (flagged `pooled`).
+        """
+        def keep(r):
+            return not (r["delta"] is not None and self.delta_bounds
+                        and not (self.delta_bounds[0] <= r["delta"] <= self.delta_bounds[1]))
+
+        def cell(rows):
+            obs = [r["delta"] for r in rows if r["delta"] is not None and keep(r)]
+            out = {"mean": round(statistics.fmean(obs), 2) if obs else None,
+                   "sd": round(statistics.pstdev(obs), 2) if obs else None, "n": len(obs),
+                   "censored": round(sum(r["delta"] is None for r in rows) / max(1, len(rows)), 3)}
             if self.delta_bounds:
-                out["dropped"] = round(dropped[key] / max(1, tot[key]), 3)
+                out["dropped"] = round(sum(not keep(r) for r in rows) / max(1, len(rows)), 3)
             return out
 
-        cells = {key[0]: cell(key, xs) for key, xs in sorted(pooled.items())}
+        recs = [r for r in self.recs if r["cat"] != "spike"]
+        spikes = [r for r in self.recs if r["cat"] == "spike"]
+
+        def dcat(r):
+            if r.get("kneel"):
+                return "kneel_live" if r["cat"] in ("to_off", "to_def") else "kneel" if r["cat"] == "run" else None
+            if r["cat"] == "run":
+                return "to_spike" if r.get("next_spike") else f"run_{r['mode']}"
+            return r["cat"]
+
+        pooled_cells: Dict[str, Any] = {}
+        groups = collections.defaultdict(list)
+        for r in recs:
+            c = dcat(r)
+            if c is not None and c not in BUCKETED_DELTA and c != "kneel":
+                groups[c].append(r)
+        for c, rows in sorted(groups.items()):
+            pooled_cells[c] = cell(rows)
+        pooled_cells["spike"] = cell(spikes)
+        for q in (2, 4):
+            k = cell([r for r in recs if dcat(r) == "kneel" and r["quarter"] == q])
+            if k["n"] < MIN_CELL:
+                k = dict(cell([r for r in recs if dcat(r) == "kneel"]), pooled=True)
+            pooled_cells[f"{q}_kneel"] = k
+
         by_bucket: Dict[str, List[Dict[str, Any]]] = {}
         for cat in BUCKETED_DELTA:
-            row = [cell((cat, b), bucketed.get((cat, b), [])) for b in range(4)]
-            # CENSORING RULE (Amendment 2): a bucket censored above the limit takes the (mean, sd) of the nearest
-            # bucket with MORE time left whose censored share is within it.
-            for b in range(4):
-                row[b]["from_bucket"] = b
-                if row[b]["censored"] > CENSOR_LIMIT or row[b]["mean"] is None:
-                    for b2 in range(b + 1, 4):
-                        if row[b2]["censored"] <= CENSOR_LIMIT and row[b2]["mean"] is not None:
-                            row[b]["mean"], row[b]["sd"], row[b]["from_bucket"] = row[b2]["mean"], row[b2]["sd"], b2
-                            break
-            if any(c["n"] for c in row):
-                by_bucket[cat] = row
+            for q in (2, 4):
+                row = []
+                for b in range(4):
+                    c = cell([r for r in recs if dcat(r) == cat and r["quarter"] == q and bucket_of(r["secs"]) == b])
+                    if c["n"] < MIN_CELL:
+                        c = dict(cell([r for r in recs if dcat(r) == cat and bucket_of(r["secs"]) == b]), pooled=True)
+                    row.append(c)
+                # CENSORING RULE (Amendment 2): a bucket censored above the limit takes the (mean, sd) of the nearest
+                # bucket with MORE time left whose censored share is within it.
+                for b in range(4):
+                    row[b]["from_bucket"] = b
+                    if row[b]["censored"] > CENSOR_LIMIT or row[b]["mean"] is None:
+                        for b2 in range(b + 1, 4):
+                            if row[b2]["censored"] <= CENSOR_LIMIT and row[b2]["mean"] is not None:
+                                row[b]["mean"], row[b]["sd"], row[b]["from_bucket"] = row[b2]["mean"], row[b2]["sd"], b2
+                                break
+                if any(c["n"] for c in row):
+                    by_bucket[f"{q}_{cat}"] = row
 
-        def rate(rows, key_fn, hit_fn):
+        def rate(rows, key_fn, hit_fn, pool_fn):
+            """By key x bucket; a cell with < MIN_CELL rows takes the same bucket pooled over `pool_fn` (quarters)."""
             num = collections.Counter()
             den = collections.Counter()
+            pnum = collections.Counter()
+            pden = collections.Counter()
             for r in rows:
                 k = key_fn(r)
                 if k is None:
                     continue
-                den[(k, bucket_of(r["secs"]))] += 1
-                num[(k, bucket_of(r["secs"]))] += bool(hit_fn(r))
+                b = bucket_of(r["secs"])
+                den[(k, b)] += 1
+                num[(k, b)] += bool(hit_fn(r))
+                pden[(pool_fn(k), b)] += 1
+                pnum[(pool_fn(k), b)] += bool(hit_fn(r))
             keys = sorted({k for k, _ in den})
-            p = {k: [round(num[(k, b)] / den[(k, b)], 4) if den[(k, b)] else 0.0 for b in range(4)] for k in keys}
-            n = {k: [den[(k, b)] for b in range(4)] for k in keys}
+            p, n = {}, {}
+            for k in keys:
+                row, nrow = [], []
+                for b in range(4):
+                    if den[(k, b)] >= MIN_CELL:
+                        row.append(round(num[(k, b)] / den[(k, b)], 4))
+                        nrow.append(den[(k, b)])
+                    elif pden[(pool_fn(k), b)]:
+                        row.append(round(pnum[(pool_fn(k), b)] / pden[(pool_fn(k), b)], 4))
+                        nrow.append(f"{den[(k, b)]}->pooled {pden[(pool_fn(k), b)]}")
+                    else:
+                        row.append(0.0)
+                        nrow.append(0)
+                p[k], n[k] = row, nrow
             return p, n
 
-        # p_oob: runs / completions that could go out of bounds
-        p_oob, n_oob = rate(self.recs, lambda r: r["mode"] if r["oob_eligible"] else None, lambda r: r["cat"] == "oob")
-        # Amendment 1: the incompletion share of offensive plays (run / pass rows, sacks, kneels and turnovers;
-        # not spikes, kicks or no-play penalties)
-        p_inc, n_inc = rate(self.recs, lambda r: r["mode"] if r.get("off_play") else None,
-                            lambda r: r["cat"] == "incomplete")
-        # timeouts right after a clock-running play (run / to_off / to_def / NCAAF first_down)
-        running = [r for r in self.recs if r["cat"] in ("run", "to_off", "to_def", "first_down")]
-        p_to_off, n_to_off = rate(running, lambda r: f"{r['quarter']}_{r['mode']}" if r["off_to"] >= 1 else None,
-                                  lambda r: r["cat"] == "to_off")
+        def no_q(k):
+            return k.split("_", 1)[1]
+
+        def qm(r):
+            return f"{r['quarter']}_{r['mode']}"
+
+        off = [r for r in recs if r.get("off_play")]
+        p_inc, n_inc = rate(off, qm, lambda r: r["cat"] == "incomplete", no_q)
+        p_sack, n_sack = rate(off, qm, lambda r: r.get("sack"), no_q)
+        p_tov, n_tov = rate(off, qm, lambda r: r["cat"] == "turnover", no_q)
+        p_oob, n_oob = rate([r for r in recs if r["oob_eligible"]], qm, lambda r: r["cat"] == "oob", no_q)
+        running = [r for r in recs if r["cat"] in ("run", "to_off", "to_def", "first_down")]
+        p_to_off, n_to_off = rate([r for r in running if r["off_to"] >= 1], qm, lambda r: r["cat"] == "to_off", no_q)
+        p_need, n_need = rate([r for r in running if r["off_to"] >= 1 and r["mode"] == "hurry"],
+                              lambda r: f"{r['quarter']}_{r['zone']}", lambda r: r["cat"] == "to_off", no_q)
         # the defense trails (or is tied) when the OFFENSE's diff is >= 0
-        p_to_def, n_to_def = rate(
-            [r for r in running if r["cat"] != "to_off"],
-            lambda r: f"{r['quarter']}_{'trail' if r['diff'] >= 0 else 'lead'}" if r["def_to"] >= 1 else None,
-            lambda r: r["cat"] == "to_def")
-        return {"delta": cells, "delta_by_bucket": by_bucket, "p_incomplete": p_inc, "p_oob": p_oob,
-                "p_to_off": p_to_off, "p_to_def": p_to_def,
-                "n": {"p_incomplete_n": n_inc, "p_oob_n": n_oob, "p_to_off_n": n_to_off, "p_to_def_n": n_to_def}}
+        p_to_def, n_to_def = rate([r for r in running if r["cat"] != "to_off" and r["def_to"] >= 1],
+                                  lambda r: f"{r['quarter']}_{'trail' if r['diff'] >= 0 else 'lead'}",
+                                  lambda r: r["cat"] == "to_def", no_q)
+        # spikes: last 60 s, hurry, out of timeouts, a clock-running play with a next snap in the quarter
+        sp_rows = [r for r in recs if r["cat"] == "run" and r["mode"] == "hurry" and r["off_to"] == 0
+                   and r["secs"] <= 60 and r["delta"] is not None and not r.get("kneel")]
+        p_spike, n_spike = {}, {}
+        for q in (2, 4):
+            for z in ("own", "mid", "range"):
+                rows = [r for r in sp_rows if r["quarter"] == q and r["zone"] == z]
+                if len(rows) < MIN_CELL:
+                    rows_p = [r for r in sp_rows if r["zone"] == z]
+                    p_spike[f"{q}_{z}"] = round(sum(bool(r.get("next_spike")) for r in rows_p) / max(1, len(rows_p)), 4)
+                    n_spike[f"{q}_{z}"] = f"{len(rows)}->pooled {len(rows_p)}"
+                else:
+                    p_spike[f"{q}_{z}"] = round(sum(bool(r.get("next_spike")) for r in rows) / len(rows), 4)
+                    n_spike[f"{q}_{z}"] = len(rows)
+        return {"delta": pooled_cells, "delta_by_bucket": by_bucket, "p_incomplete": p_inc, "p_oob": p_oob,
+                "p_sack": p_sack, "p_turnover": p_tov, "p_to_off": p_to_off, "p_to_off_need": p_need,
+                "p_to_def": p_to_def, "p_spike": p_spike,
+                "n": {"p_incomplete_n": n_inc, "p_oob_n": n_oob, "p_sack_n": n_sack, "p_turnover_n": n_tov,
+                      "p_to_off_n": n_to_off, "p_to_off_need_n": n_need, "p_to_def_n": n_to_def, "p_spike_n": n_spike}}
 
     def snaps_ci(self) -> Dict[str, Any]:
         games = sorted(self.snaps_by_game)
@@ -273,9 +343,9 @@ def nfl(acc: Acc) -> None:
                     acc.count(gid, q)
                 if cat == "spike":
                     acc.spikes[q] += 1
-                    continue
                 nxt = seq[k + 1] if k + 1 < len(seq) and seq[k + 1][1] == q else None
                 j_end = nxt[0] if nxt else len(rows)
+                tos = []
                 if cat in ("run",):
                     tos = [x for x in rows[i + 1:j_end] if x.get("timeout") == "1" and _f(x.get("qtr")) == q]
                     if tos:
@@ -284,12 +354,14 @@ def nfl(acc: Acc) -> None:
                 yl = 100 - int(_f(r.get("yardline_100"), 75) or 75)
                 pt = r.get("play_type")
                 acc.add(sport="nfl", game=gid, quarter=q, secs=qs, cat=cat, mode=mode_of(q, qs, diff, yl), diff=diff,
-                        delta=(qs - nxt[2]) if nxt else None,
+                        delta=(qs - nxt[2]) if nxt else None, zone=zone_of(yl),
+                        kneel=pt == "qb_kneel", sack=r.get("sack") == "1",
+                        next_spike=bool(nxt) and cat == "run" and rows[nxt[0]].get("play_type") == "qb_spike",
                         off_to=int(_f(r.get("posteam_timeouts_remaining"), 0) or 0),
                         def_to=int(_f(r.get("defteam_timeouts_remaining"), 0) or 0),
                         oob_eligible=(pt in ("run", "pass") and cat in ("run", "oob", "to_off", "to_def")
                                       and r.get("qb_kneel") != "1" and r.get("sack") != "1"),
-                        off_play=pt in ("run", "pass", "qb_kneel"))
+                        off_play=pt in ("run", "pass") and cat != "spike")   # v2: kneels are drawn separately (kneel-out)
         print(f"nfl {season}: {len(by)} games", flush=True)
 
 
@@ -380,7 +452,6 @@ def ncaaf(acc: Acc) -> None:
                     acc.count(gk, q)
                 if cat == "spike":
                     acc.spikes[q] += 1
-                    continue
                 nxt = seq[k + 1] if k + 1 < len(seq) and seq[k + 1][1] == q else None
                 j_end = nxt[0] if nxt else len(rows)
                 if cat in ("run", "first_down"):
@@ -392,14 +463,17 @@ def ncaaf(acc: Acc) -> None:
                 diff = int(r.get("offenseScore") or 0) - int(r.get("defenseScore") or 0)
                 yl = 100 - int(r.get("yardsToGoal") or 75)
                 pt = r.get("playType")
+                low = str(r.get("playText") or "").lower()
                 acc.add(sport="ncaaf", game=gk, quarter=q, secs=c, cat=cat, mode=mode_of(q, c, diff, yl), diff=diff,
-                        delta=(c - nxt[2]) if nxt else None,
+                        delta=(c - nxt[2]) if nxt else None, zone=zone_of(yl),
+                        kneel="kneel" in low, sack=pt == "Sack",
+                        next_spike=bool(nxt) and cat == "run" and "spike" in str(rows[nxt[0]].get("playText") or "").lower(),
                         off_to=int(r.get("offenseTimeouts") if r.get("offenseTimeouts") is not None else 0),
                         def_to=int(r.get("defenseTimeouts") if r.get("defenseTimeouts") is not None else 0),
                         oob_eligible=(pt in ("Rush", "Pass Reception") and cat in ("run", "oob", "to_off", "to_def",
                                                                                    "first_down")
                                       and "kneel" not in str(r.get("playText") or "").lower()),
-                        off_play=pt in _CFBD_OFFENSIVE_PLAY)
+                        off_play=pt in _CFBD_OFFENSIVE_PLAY and cat != "spike" and "kneel" not in low)   # v2: kneels drawn separately
         print(f"ncaaf {season}: {len(by)} FBS-vs-FBS games with plays (of {len(fbs)})", flush=True)
 
 

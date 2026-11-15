@@ -27,6 +27,9 @@ from syndicate.features.football.sim_engine.smartsim2.situation_model import cla
 from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_bucket
 from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_clock_table
 from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_mode
+from syndicate.features.football.sim_engine.smartsim2.situation_model import end_of_half_zone
+from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_END_GAME_PRESERVATION
+from syndicate.features.football.sim_engine.smartsim2.situation_model import URGENCY_HALFTIME_PRESERVATION
 from syndicate.features.football.sim_engine.smartsim2.situation_model import fourth_down_buckets
 from syndicate.features.football.sim_engine.smartsim2.situation_model import fourth_down_table
 from syndicate.features.football.sim_engine.smartsim2.situation_model import non_offensive_rates
@@ -84,7 +87,19 @@ def _end_of_half_clock(
     rng: Random,
     profile: CalibrationProfile,
     simulation_input: SmartSim2SimulationInput,
+    kneel: bool = False,
+    info: dict | None = None,
 ) -> tuple[PossessionStepResult, PossessionState]:
+    """Re-time one step at the end of a half (see the block comment above).
+
+    v2 (`end_of_half_clock_by_need`, `end_of_half_kneel_out`; pre-registered `9affd0cba`):
+    every cell is keyed by quarter; `kneel=True` times a kneel (no out-of-bounds, no
+    offense timeout; the defense may call one at its measured rate); with the by-need
+    switch the offense's timeout rate in hurry mode is keyed on field position, and an
+    offense out of timeouts in the last 60 s may spike -- the play then takes the
+    measured time to the spike and `info["spike"]` is set for the caller to add the
+    spike step.
+    """
     if not profile.end_of_half_clock:
         return step, end_state
     quarter = int(start.quarter)
@@ -96,13 +111,32 @@ def _end_of_half_clock(
     clock = int(start.clock_remaining)
     natural = int(step.clock_consumed)
     timeouts_home, timeouts_away = end_state.timeouts_home, end_state.timeouts_away
+    q_key = "2" if quarter == half_end_quarters[0] else "4"
+    delta = table["delta"]
+    by_bucket = table["delta_by_bucket"]
+    offense_home = start.possession_owner == "home"
+    off_left = (timeouts_home if offense_home else timeouts_away) or 0
+    def_left = (timeouts_away if offense_home else timeouts_home) or 0
+    diff = _owner_score_differential(start)
+    b = end_of_half_bucket(min(clock, window))
+    trail_key = f"{q_key}_{'trail' if diff >= 0 else 'lead'}"
 
-    if clock > window:
+    if kneel:
+        if def_left >= 1 and rng.random() < table["p_to_def"][trail_key][b]:
+            consumed = _clock_draw(rng, by_bucket[f"{q_key}_to_def"][b])
+            if offense_home:
+                timeouts_away = def_left - 1
+            else:
+                timeouts_home = def_left - 1
+        else:
+            consumed = _clock_draw(rng, delta[f"{q_key}_kneel"])
+        if table["two_minute_warning"] and clock > window and clock - consumed < window:
+            consumed = max(clock - window, int(round(table["kneel_live"])))
+    elif clock > window:
         if not table["two_minute_warning"] or clock - natural >= window:
             return step, end_state
         consumed = min(natural, max(clock - window, int(round(table["live_seconds"]))))
     else:
-        delta = table["delta"]
         category = _END_OF_HALF_DRIVE_END.get(terminal) if terminal is not None else None
         if category is None and step.outcome == PossessionOutcome.PENALTY:
             category = "penalty"
@@ -112,55 +146,81 @@ def _end_of_half_clock(
             consumed = _clock_draw(rng, delta[category])
         else:
             # An in-bounds snap: gain, explosive gain, sack, or a fourth-down conversion.
-            diff = _owner_score_differential(start)
             mode = end_of_half_mode(classify_urgency(
                 quarter=quarter, seconds_remaining=clock, score_differential=diff,
                 yardline=start.field_position, q2_ignores_score=profile.q2_urgency_ignores_score,
             ))
-            q_key = "2" if quarter == half_end_quarters[0] else "4"
-            b = end_of_half_bucket(clock)
-            by_bucket = table["delta_by_bucket"]
-            offense_home = start.possession_owner == "home"
-            off_left = (timeouts_home if offense_home else timeouts_away) or 0
-            def_left = (timeouts_away if offense_home else timeouts_home) or 0
-            if step.outcome in _END_OF_HALF_OOB_ELIGIBLE and rng.random() < table["p_oob"][mode][b]:
+            qm = f"{q_key}_{mode}"
+            by_need = profile.end_of_half_clock_by_need and mode == "hurry"
+            zone = end_of_half_zone(start.field_position)
+            p_off = table["p_to_off_need"][f"{q_key}_{zone}"][b] if by_need else table["p_to_off"][qm][b]
+            if step.outcome in _END_OF_HALF_OOB_ELIGIBLE and rng.random() < table["p_oob"][qm][b]:
                 consumed = _clock_draw(rng, delta["oob"])
-            elif off_left >= 1 and rng.random() < table["p_to_off"][f"{q_key}_{mode}"][b]:
-                consumed = _clock_draw(rng, by_bucket["to_off"][b])
+            elif off_left >= 1 and rng.random() < p_off:
+                consumed = _clock_draw(rng, by_bucket[f"{q_key}_to_off"][b])
                 if offense_home:
                     timeouts_home = off_left - 1
                 else:
                     timeouts_away = off_left - 1
-            elif def_left >= 1 and rng.random() < table["p_to_def"][f"{q_key}_{'trail' if diff >= 0 else 'lead'}"][b]:
-                consumed = _clock_draw(rng, by_bucket["to_def"][b])
+            elif def_left >= 1 and rng.random() < table["p_to_def"][trail_key][b]:
+                consumed = _clock_draw(rng, by_bucket[f"{q_key}_to_def"][b])
                 if offense_home:
                     timeouts_away = def_left - 1
                 else:
                     timeouts_home = def_left - 1
             elif table["first_down_stop"] and step.yards_gained >= start.distance:
                 consumed = _clock_draw(rng, delta["first_down"])
+            elif (by_need and off_left == 0 and b <= 1 and end_state.down <= 3
+                  and rng.random() < table["p_spike"][f"{q_key}_{zone}"]):
+                consumed = _clock_draw(rng, delta["to_spike"])
+                if info is not None:
+                    info["spike"] = True
             else:
-                consumed = _clock_draw(rng, by_bucket[f"run_{mode}"][b])
+                consumed = _clock_draw(rng, by_bucket[f"{q_key}_run_{mode}"][b])
     consumed = max(0, min(clock, int(consumed)))
     end_state = replace(end_state, clock_remaining=max(0, clock - consumed),
                         timeouts_home=timeouts_home, timeouts_away=timeouts_away)
     return replace(step, clock_consumed=consumed, end_state=end_state), end_state
 
 
-def _q2_kick_waits(state: PossessionState, profile: CalibrationProfile) -> bool:
-    """todo #808 Amendment 3 (both `q2_urgency_ignores_score` and `end_of_half_clock` ON).
+def _kick_waits(state: PossessionState, profile: CalibrationProfile) -> bool:
+    """todo #808 v1 Amendment 3 (Q2: `q2_urgency_ignores_score` + `end_of_half_clock`)
+    and v2 `q4_kick_waits` (Q4: + `end_of_half_clock`).
 
-    A Q2 urgency field goal on downs 1-3 waits until one more running-clock play
-    could end the half: the clock table's own last-bucket running time (14.0 s NFL).
-    The league never kicks on an early down before the last 30 s (139 attempts in
+    An urgency field goal on downs 1-3 waits until one more running-clock play could
+    end the half: the clock table's own last-bucket running time for the quarter.
+    The league never kicks on an early down before the last 30 s (139 Q2 attempts in
     2024-25, median 3 s left, max 11 s); the <= 90 s gate kicked on 1st down at 1:25.
-    4th down and Q4 are unchanged. Draws nothing, so it cannot move the rng stream."""
-    if not (profile.q2_urgency_ignores_score and profile.end_of_half_clock):
+    4th down is unchanged. Draws nothing, so it cannot move the rng stream."""
+    if not profile.end_of_half_clock or state.down >= 4:
         return False
-    if state.quarter != 2 or state.down >= 4:
+    if state.quarter == 2 and profile.q2_urgency_ignores_score:
+        key = "2_run_hurry"
+    elif state.quarter == 4 and profile.q4_kick_waits:
+        key = "4_run_hurry"
+    else:
         return False
-    run_hurry_last = end_of_half_clock_table(profile.name)["delta_by_bucket"]["run_hurry"][0][0]
+    run_hurry_last = end_of_half_clock_table(profile.name)["delta_by_bucket"][key][0][0]
     return state.clock_remaining > run_hurry_last
+
+
+def _can_kneel_out(state: PossessionState, urgency: str, profile: CalibrationProfile,
+                   simulation_input: SmartSim2SimulationInput) -> bool:
+    """v2 `end_of_half_kneel_out`: a preservation offense kneels when kneeling runs out the
+    clock even if the defense stops every kneel it can:
+    `clock <= 40 * max(0, downs_left - defense_timeouts) + kneel_live * downs_left`,
+    `downs_left = 5 - down` (40 s = the play clock, a rule; `kneel_live` = the measured
+    snap-and-down time, Amendment 4). Draws nothing."""
+    if not (profile.end_of_half_kneel_out and profile.end_of_half_clock):
+        return False
+    if urgency not in (URGENCY_END_GAME_PRESERVATION, URGENCY_HALFTIME_PRESERVATION):
+        return False
+    if int(state.quarter) not in (simulation_input.quarters // 2, simulation_input.quarters):
+        return False
+    defense_left = (state.timeouts_away if state.possession_owner == "home" else state.timeouts_home) or 0
+    downs_left = 5 - int(state.down)
+    kneel_live = float(end_of_half_clock_table(profile.name)["kneel_live"])
+    return state.clock_remaining <= 40 * max(0, downs_left - defense_left) + kneel_live * downs_left
 
 
 def _play_state_at(play_state: PlayState, seconds_remaining: int) -> PlayState:
@@ -421,6 +481,36 @@ def simulate_drive(
             q2_ignores_score=q2_blind,
         )
 
+        # v2 KNEEL-OUT (todo #808, `end_of_half_kneel_out`): a preservation offense that can
+        # run out the clock kneels -- -1 yard, no score, turnover or sack. A 4th-down kneel
+        # that leaves time on the clock turns the ball over on downs. Draws nothing OFF.
+        if _can_kneel_out(state, urgency, profile, simulation_input):
+            kneel_end = replace(state, field_position=max(1, state.field_position - 1),
+                                down=min(4, state.down + 1), distance=state.distance + 1)
+            play_step = PossessionStepResult(
+                step_index=len(steps) + 1, start_state=state, end_state=kneel_end,
+                outcome=PossessionOutcome.GAIN, yards_gained=-1, clock_consumed=0, points_scored=0,
+                summary=f"{state.possession_owner} took a knee",
+            )
+            play_step, kneel_end = _end_of_half_clock(state, play_step, kneel_end, terminal=None, rng=rng,
+                                                      profile=profile, simulation_input=simulation_input, kneel=True)
+            if state.down >= 4 and kneel_end.clock_remaining > 0:
+                kneel_end = replace(kneel_end, possession_owner=_other(state.possession_owner),
+                                    field_position=_change_of_possession_spot(kneel_end, 100 - kneel_end.field_position),
+                                    down=1, distance=10, drive_index=state.drive_index + 1,
+                                    possession_index=state.possession_index + 1)
+                play_step = replace(play_step, end_state=kneel_end, outcome=PossessionOutcome.TURNOVER_ON_DOWNS)
+                terminal_outcome = PossessionOutcome.TURNOVER_ON_DOWNS
+                possession_change = True
+            steps.append(play_step)
+            total_yards -= 1
+            total_clock += play_step.clock_consumed
+            state = kneel_end
+            if terminal_outcome is not None:
+                break
+            play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
+            continue
+
         # Urgency field goal: take the points before the half or game expires.
         # The score gate is a Q4 rule; with `q2_urgency_ignores_score` ON it does
         # not apply in Q2 (todo #808), where the league kicks at any score.
@@ -430,7 +520,7 @@ def simulate_drive(
             and state.clock_remaining <= 90
             and state.field_position >= TRUE_FIELD_GOAL_RANGE_YARDLINE
             and (-9 <= score_differential <= 2 or (q2_blind and state.quarter == 2))
-            and not _q2_kick_waits(state, profile)
+            and not _kick_waits(state, profile)
         ):
             play_step, end_state, terminal_outcome, points = _execute_field_goal(state, priors, rng, len(steps) + 1, urgency_kick=True, profile=profile)
             play_step, end_state = _end_of_half_clock(state, play_step, end_state, terminal=terminal_outcome, rng=rng,
@@ -682,9 +772,10 @@ def simulate_drive(
             points_scored=play_result.points_scored,
             summary=play_result.summary,
         )
+        clock_info: dict = {}
         play_step, state = _end_of_half_clock(state, play_step, play_result.end_possession_state,
                                               terminal=terminal_outcome, rng=rng, profile=profile,
-                                              simulation_input=simulation_input)
+                                              simulation_input=simulation_input, info=clock_info)
         steps.append(play_step)
         total_yards += play_result.yards_gained
         total_clock += play_step.clock_consumed
@@ -692,6 +783,19 @@ def simulate_drive(
         play_state = play_result.end_state
         if state.clock_remaining != play_result.end_possession_state.clock_remaining:
             play_state = _play_state_at(play_state, state.clock_remaining)  # re-timed (end-of-half clock ON only)
+        if clock_info.get("spike") and terminal_outcome is None and state.clock_remaining > 0:
+            # v2 SPIKE (`end_of_half_clock_by_need`): its own step and snap -- an incompletion
+            # with 0 yards that uses a down, timed by the measured spike delta.
+            spike_clock = max(0, min(state.clock_remaining, _clock_draw(rng, end_of_half_clock_table(profile.name)["delta"]["spike"])))
+            spike_end = replace(state, down=min(4, state.down + 1), clock_remaining=state.clock_remaining - spike_clock)
+            steps.append(PossessionStepResult(
+                step_index=len(steps) + 1, start_state=state, end_state=spike_end,
+                outcome=PossessionOutcome.INCOMPLETE_PASS, yards_gained=0, clock_consumed=spike_clock,
+                points_scored=0, summary=f"{state.possession_owner} spiked the ball",
+            ))
+            total_clock += spike_clock
+            state = spike_end
+            play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
 
         if terminal_outcome is not None:
             possession_change = terminal_outcome in {
