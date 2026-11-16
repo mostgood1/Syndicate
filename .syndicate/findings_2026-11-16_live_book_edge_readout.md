@@ -105,6 +105,18 @@ least 8 such changes inside 11-03..11-16 alone:
 So `--since 2026-11-03` is the last SIZING change (stake band off), not a frozen policy. The user decides which changes restart
 the 800-event count. Until then, the "about 2026-12-02 at the earliest" date holds only under the sizing-only reading.
 
+**DECIDED 2026-11-16 5:50 PM CST (user, verbatim: "Any betting change"; it answered "What should restart the gate's 800-game count?" against the
+other option "Sizing changes only").** Operational reading, mine: the count restarts at any fleet load (code or env) that changes which
+live bets are placed, how they are sized, or how they are held or exited. Display-only, ledger-only and shadow-only changes do not restart it.
+- **Where the clock stands (read 23:50Z):** about zero. The NBA live player-exit gate loaded with live-odds-worker at ~18:15Z 11-16
+  (pid 2834332, up 20,116 s). The college, NHL and soccer exit gates are on the fleet disk and load at that worker's next recycle, which
+  restarts the count again.
+- **What it implies:** 800 events at ~27.5 a day (357 over 11-03..11-15) is ~29 days with NO betting change. On the observed rate (8 in
+  11-03..11-16), that window never forms by itself, so condition 1 can pass only through a deliberate ~30-day pause on live betting
+  changes. That is the user's call whenever they want to start one. The "about 2026-12-02" date is withdrawn.
+- **How to read it:** `python scripts/live_book_edge_readout.py --since <date of the last betting change>`. The script cannot find that
+  date by itself: today it means reading deploys.md.
+
 ## CLV RECONCILED (2026-11-16, same session; user "Yes, reconcile CLV")
 
 The same 2026-11-16 fleet payload was used. Rows: last 30 days, decided (won/lost), with a resolved `closing_mark`:

@@ -792,11 +792,11 @@ death, never life — do not invert it.
 - Verification: targeted tests (byte-identity OFF, reachability ON, row -> state -> engine input); the site scoreboard's live `situation` read at the first live NFL game (MNF 2026-11-16), by the possession-map lane's watcher or this lane's.
 - Blocked by: none for the consumer side; the adapter keys wait on `nfl-live-possession-map`
 
-### portfolio-edge-measurement — OPEN — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+### portfolio-edge-measurement — CLOSED 2026-11-16 (GOAL MET: readout reproduces 11-16; gate adopted, clock = any betting change) — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
 - **GOAL VERDICT `[2026-11-16 4:36 PM CST (22:36Z) checkpoint]`: GOAL: MET.** Goal (verbatim): "A repeatable readout of the LIVE book's edge at the price paid (net of fees, event-clustered SE, same-book CLV beside results), plus a pre-registered scale-up gate the user approves before any live stake/cap increase".
   - Readout: `scripts/live_book_edge_readout.py` (main `38646cce2`, label `39474964d`) reproduces last30 −7.27 ± 2.84% on $3,006.48 from the 11-16 fleet payload; 20 passed with the payload, 19 + 1 skipped without.
   - Gate: user 11-16 "Adopt as drafted" (findings § "Scale-up gate"). At adoption all 4 measurable conditions FAIL. No live stake/cap change was made.
-  - HELD OPEN for ONE owed user answer: which changes restart the 800-event clock ("frozen policy" read strictly has not held: 8 live-rule changes in 11-03..11-16). Close on that answer.
+  - Clock ANSWERED 5:50 PM CST (user: "Any betting change"): the count restarts at any load that changes which live bets are placed, sized, held or exited. ~0 on 11-16; ~29 clean days needed. CLOSED on that answer.
   - Fee-net CLV (`6e952af46`) on fleet disk since 21:17Z, NOT loaded at 21:19Z (refresh-worker pid 2809282); proof of load = `MIN_EV_TUNER ... clv_basis=net`. Narrative: `.syndicate/log/2026-11-16.md`; superseded lines: `lanes_history.md`.
 - Goal: A repeatable readout of the LIVE book's edge at the price paid (net of fees, event-clustered SE, same-book CLV beside results), plus a pre-registered scale-up gate the user approves before any live stake/cap increase
 - Files: scripts/live_book_edge_readout.py (NEW), tests/test_live_book_edge_readout.py (NEW), .syndicate/findings_2026-11-16_live_book_edge_readout.md (NEW), docs/ai_context/todo.md (#815 section only), syndicate/features/shared/order_clv.py, syndicate/features/shared/min_ev_tuner.py, syndicate/features/shared/paper_settlement.py, tests/test_fee_net_clv.py (NEW), tests/test_min_ev_tuner.py (`_order` fixture only)

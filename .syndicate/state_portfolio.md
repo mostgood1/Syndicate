@@ -521,7 +521,8 @@ and none exist yet.**
   bound > 0 and excess wins ≥ 0; (3) fee-net same-book CLV agrees in sign with results, against a close calibrated on our sides (|z| < 2);
   (4) top stake quartile ROI ≥ flat ROI; (5) then raise caps one step at a time, stepping back when the rolling lower bound falls below 0.
   **No live stake, cap or bankroll increase until 1-4 pass on one window.** No code acts on the gate. At adoption, all four FAIL.
-- **OPEN (the user's): what restarts the 800-event clock.** At least 8 changes to how live bets are chosen or held landed in 11-03..11-16
-  (deploys.md), so a strictly frozen window has not existed. 11-03 is the last SIZING change. Under a sizing-only clock, condition 1 can
-  first pass about 2026-12-02 (~27 events/day).
+- **Clock (user 2026-11-16: "Any betting change"):** the 800-event count restarts at any fleet load that changes which live bets are
+  placed, sized, held or exited (display/ledger/shadow changes do not). Read 23:50Z 11-16, it stood at ~0 (NBA exit gate loaded ~18:15Z).
+  At ~27.5 events/day it needs ~29 days with no betting change. At least 8 such changes landed in 11-03..11-16, so that window forms only
+  through a deliberate pause, which is the user's call. Read it with `--since <last betting change>` (deploys.md).
 - Detail: `.syndicate/findings_2026-11-16_live_book_edge_readout.md`; todo #815.
