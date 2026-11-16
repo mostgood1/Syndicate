@@ -1110,3 +1110,37 @@ and live-rail. Pre-game lines of later games move to their own kickoff-date shar
 **Reach:** every NFL night game, every week (SNF, MNF 7:15 PM CST, TNF). **MNF tomorrow (LAC @ BAL,
 11-17 01:15Z) is the next one hit, from 6 PM CST Monday.** No lane or todo holds the writer.
 Proposed to the user as its own session.
+
+## Reading 28 — Sun 11-15 8:22 PM CST (02:22Z 11-16). #811 second post-load read; SNF defect narrowed
+
+15 live chips.
+- **16 flags on 6 cards. 0 false, 0 missed, 1 dark.**
+- **NBA now flags: 45 flagged rows** (main 10, alt 35).
+- NBA main 30 / 87 priced <= 120 s (34%); alt 169 / 529 (32%). Seen age at pricing p50 84 s.
+- NBA builds p50 40.8 s, max 93.7 s. NBA overlay gap p50 96 s, max 441 s. `deferred_slow` nba 2,
+  nfl 2. Web merges stale: nba 2 / 20, nfl 1 / 27.
+- Compared with 7:51 PM (0 NBA flags, 100 dark): the NBA overlay ran a near-normal cadence this
+  window, so the fresh quotes reached the rail.
+- **#811 so far** (2 post-load reads, both noisy):
+  - the share priced <= 120 s depends on where a read falls against the overlay cadence, more than
+    on the pull;
+  - NBA build p50 40.8 s, inside the pre-load range (20-70 s).
+  - Sent to local_1f10ce63.
+
+**SNF narrowed:**
+- At 8:22 PM, SNF's 10 live rows on the 11-15 board carry FRESH sportsbook quotes (18-61 s;
+  bovada, pinnacle, draftkings, fanduel, williamhill_us, betrivers, kalshi). The source is still
+  `layer2_shortlist` (no `price_grid_generated_at`).
+- So the shortlist build reaches SNF's 11-16-shard game lines, probably through a neighbour-date read.
+  The **in-play overlay and `/api/board/live-rail` do not** (0 NFL game-line rows there at 7:51).
+- **Net effect:** SNF's rail lines refresh at shortlist cadence (~5-15 min; 2,136 s stale at 7:51,
+  fresh at 8:22), not at overlay cadence (~1-2 min). The 15 s rail poll cannot refresh them.
+- The defect stands; the session card for the fix carries the evidence.
+
+**Other sports:**
+- NHL: 14 rows, 6 <= 120 s. Overlay gap max 263 s; builds p50 9.9 s.
+- College gaps max 223-253 s.
+
+**Load:** query 11.4 s / 50.7 MB. Live-rail 0.17 s, 672 rows.
+
+**Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
