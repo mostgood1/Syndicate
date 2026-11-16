@@ -1051,3 +1051,62 @@ LAR @ ARI and SEA @ LV in Q1.
 restart. Live-rail 0.09 s, 667 rows.
 
 **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 27 — Sun 11-15 7:51 PM CST (01:51Z 11-16). First read after #811 (NBA 60 s pulls); SNF defect found
+
+**Splits:** live-odds-worker pid **2066024** (01:43:54Z, #811 load by local_1f10ce63; NBA launches
+`interval_s=60` from 01:45:10Z). refresh-worker since 01:28:39Z (live-player-exit-gate).
+
+**NBA after #811, main vs alt** (probe `live_by_sport_family`, new):
+
+| family | rows | priced <= 120 s | seen age at pricing p50 |
+|---|---|---|---|
+| main lines | 74 | 39 (53%) | 40 s |
+| `_alt` lines | 387 | 272 (70%) | 40 s (a full pass had just run) |
+
+- **But 0 NBA flags shown, and 100 dark rows / 28 markets.**
+- The NBA overlay rebuilt only 3 times in 21 min: gap p50 440 s, max 482 s.
+- NBA builds 194.3 s (01:35, cold after the restart), 76.6 s (01:41), **104.4 s (01:49, the only
+  post-#811 build)**, each followed by `deferred_slow`.
+- So the fresher quotes cannot reach the rail before they pass 300 s. The bottleneck is the
+  NBA overlay cadence (slow-sport rule), not the pull. n = 1 post-load build, restart-confounded.
+  Sent to local_1f10ce63.
+- Other flags: 6 on 5 cards (NCAAB, WNCAAB). 0 false, 0 missed.
+
+### DEFECT — NFL game-line quotes are filed by the UTC date of the capture, so a night game loses its live lines from the board after 6 PM CST
+
+**Symptom:**
+- SNF (PIT @ CIN, kickoff 01:22Z = 7:20 PM CST 11-15) is on today's rail with only
+  `layer2_shortlist` rows. They are stale pre-game prices: spread priced 2,136 s ago, 1H total
+  3,110 s.
+- `/api/board/live-rail` served **0 NFL game-line rows**, though its `sports` reports `nfl: 174`.
+  Those are prop cards.
+
+**Measured on the fleet's NFL shards:**
+- **11-15 shard:** SNF game rows end at 23:58:52Z, all pre-game. SNF props keep landing in play
+  (3,375 rows to 01:52:58Z).
+- **11-16 shard:** SNF's in-play game lines are all here (1,470 full-game + 376 interval rows, to
+  01:52:54Z). **Every** NFL event's game rows in it begin at **00:00:17Z** (next week's games too),
+  with `date` = 2026-11-16.
+- refresh-worker builds a separate `INPLAY_OVERLAY sport=nfl date=2026-11-16` (38 in-play rows)
+  that the 11-15 board and live-rail never read.
+
+**Cause** (code read, `scripts/fetch_nfl_team_odds_local.py:_append_nfl_team_book_quotes`, ~:274-295):
+- Its docstring says "Sharded by the UTC date this ran"; it writes `date_str=now.date().isoformat()`.
+- The props writers and NCAAF game lines bucket by Central kickoff date
+  (`odds_book_quotes.kickoff_shard_date` / `bucket_quote_rows_by_kickoff_date`). The NCAAF writer's
+  own comment: a UTC key "is off by one for every kickoff after 7 PM".
+- This writer was never converted.
+
+**Hypothesis** (for whoever fixes it; not tested beyond the above): bucket NFL team-odds rows by
+`kickoff_shard_date(event)`, as `fetch_ncaaf_oddsapi_game_lines.py` does. SNF / MNF / TNF in-play
+game lines would then land in the Central date's shard, reach that date's in-play overlay, board
+and live-rail. Pre-game lines of later games move to their own kickoff-date shards.
+
+**Falsification:** a replay of today's two shards through the fixed bucketing does not put SNF's
+01:22-01:53Z game rows under 11-15. Or the NFL board for a date loses game rows it served before
+(readers expecting today's shard to hold every upcoming game).
+
+**Reach:** every NFL night game, every week (SNF, MNF 7:15 PM CST, TNF). **MNF tomorrow (LAC @ BAL,
+11-17 01:15Z) is the next one hit, from 6 PM CST Monday.** No lane or todo holds the writer.
+Proposed to the user as its own session.
