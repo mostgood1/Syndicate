@@ -1215,3 +1215,116 @@ Proposed to the user as its own session.
 **Load:** query 3.2 s / 29.9 MB. Live-rail 0.03 s, 7 rows.
 
 **Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## DAILY SUMMARY — Sun 11-15, 32 readings, 10:42 AM - 10:24 PM CST (all 11-15 games final by 10:52 PM, except VAN @ VGK at end of regulation)
+
+Raw data:
+- Per-reading trend: `C:\tmp\railmon\daily_trend.json`, built from `readings.jsonl`.
+- Grades: `C:\tmp\railmon\grade_all.json`, `grade_evening.json`.
+
+### 1. Live recommendations (MODEL != LINE flags)
+
+- **0 false and 0 missed flags in all 32 readings.** Each check is an independent re-derivation
+  from the row's own fields against what the SERVED page's own rail code showed.
+- **Shown per reading:** 0-38 flag-markets on 0-16 cards. Peaks: 38 (12:37 PM, 5:34 PM),
+  37 (4:30 PM).
+- **Unique flags (first sightings): 508.** 326 before 4 PM, 182 from 4 PM.
+- **Dark** (qualifying gap and fresh pricing, but > 300 s old by the read):
+  - 0 in 22 of 32 readings;
+  - 12 markets at 12:37 PM, 28 at 7:51 PM — both NBA overlay cadence under the slow-sport rule;
+  - 1-3 otherwise.
+- **Graded on finals** (`scripts/layer2_rail_flag_grade.py`, first sighting, game-clustered
+  bootstrap):
+
+  | population | decided | games | W-L-P | hit vs fair | Brier sim vs fair |
+  |---|---|---|---|---|---|
+  | ALL day | 505 | 66 | 265-240-2 | 52.5% vs 47.5%: **+5.0 pp** [+0.1, +10.1] | 0.2442 vs 0.2380: **+0.0062** [-0.0096, +0.0217] |
+  | **Evening, PRE-REGISTERED** (first shown >= 22:00Z) | 180 | 32 | 95-85-1 | 52.8% vs 45.2%: +7.6 pp [+1.3, +16.1] | 0.2155 vs 0.2216: **-0.0060** [-0.0286, +0.0105] |
+
+  - By sport, all day: NCAAB 141-128-1, NBA 76-82-1, WNCAAB 41-26, NCAAF 6-1, NFL 0-2, NHL 1-1.
+- **Pre-registered verdict:**
+  - Decision rule (Brier(sim) < Brier(fair) - 0.01 across >= 20 games): **NOT MET** (-0.0060).
+    **No change** to the flag rule.
+  - My prediction (Brier(sim) >= Brier(fair), hit within +-5 pp of fair) **failed on both halves**.
+    The evening sim was very slightly better calibrated, and the hit rate ran 7.6 pp above fair.
+- **Read, as information, not a change:**
+  - The flagged side won more often than the book's no-vig price implied (all day +5.0 pp, CI just
+    above 0).
+  - But the sim's own probabilities were too hot: mean 0.597 against a 0.525 hit rate. Its Brier is
+    no better than the book's.
+  - That is direction without calibration. A shrunk sim probability could be the next
+    pre-registered test, for the rail's owner to register before reading another slate.
+  - #780's "realises ~0" was not contradicted by the calibration test. It is weakly contradicted on
+    hit rate.
+
+### 2. Refresh
+
+- **Fresh quotes, live rows priced <= 120 s** (all sports): 0-60% per reading.
+  - Low points: 11:45 AM 1 / 40 (pre-noon pull burst); 5:57 PM 28 / 798 (NBA's 240 s pull);
+    6:43 PM 34 / 670.
+  - NBA saws with its pull: 0 / 719 at 5:57 PM, 605 / 939 at 5:34 PM.
+- **Our-look age at pricing p50:** 7-244 s.
+  - College dropped to 10-17 s right after #810's 60 s pulls (1:06 PM).
+- **Overlay gaps > 360 s:** 19 across the day's windows, all NFL / NBA.
+  - The slow-sport rule (>= 45 s build -> skip the next round, no price-on-pull) put NFL on
+    every-other-round from noon (gap 579 s) and NBA on the evening slate (437-482 s).
+  - **The registered NFL prediction was MET** in the clean 12:30-12:52 PM segment (487 s, 3 web
+    stale merges) and NOT met 12:52-1:26 PM.
+  - `deferred_slow` per window: 0-8.
+- **Web stale merges for live sports:** 0-5 per window, except at restarts and idle gaps:
+  - 59 at 7:29 PM (restart + the NFL idle window before SNF);
+  - 62 at 3:10 PM (no NBA game live).
+- **Shortlist stalled once:** `written_at` 1,732 s at 12:21 PM. It recovered after the 12:24 PM
+  restart. 38-910 s otherwise.
+
+### 3. Load
+
+| request | time | size |
+|---|---|---|
+| `/intelligence` | 2.3-16.0 s (16.0 s during the 7:28 PM restart) | 17.7-31.1 MB; peak 4:30 PM |
+| Page's own board query | 3.2-33.4 s | 29.9-71.3 MB (6-12.6 MB gz); peak 12:50 PM |
+| `/api/board/layer2-shortlist` | 0.19-4.0 s | — |
+| `/api/board/live-rail` | 0.016-0.6 s | up to 1,049 rows / ~1 MB (~80 KB gz) per 15 s poll |
+
+- The rail owner left the live-rail payload as is.
+
+### 4. Teams
+
+- **det1 / det2 / det3 / flipped / truncated abbrs: 0 in all 32 readings.**
+- **Chip-less: 2 NCAAB cards** (FAMU @ UTEP, Washington @ Utah). The odds feed's schedule disagrees
+  with ESPN's (18 h apart / no ESPN game); not a name join. Washington @ Utah left at ~1:30 PM,
+  FAMU @ UTEP at ~9:30 PM.
+- **Lead:** an NHL chip at ESPN "End of 3rd Period" shows as pregame with its start time
+  (VAN @ VGK, 10:52 PM).
+
+### 5. Restarts and loads (each split in the readings)
+
+| time (CST) | role | what |
+|---|---|---|
+| 12:24 PM | refresh-worker + live-odds-worker | live-player-exit-gate |
+| 12:52 PM | refresh-worker | NBA incremental quote read |
+| 12:53 PM | live-odds-worker | #810, college 60 s pulls |
+| 1:26 PM | refresh-worker | NCAAF pivot / anchor index |
+| 7:28 PM | refresh-worker | live-player-exit-gate, 8 min into SNF |
+| ~7:28 PM | live-odds-worker | routine recycle |
+| 7:43 PM | live-odds-worker | #811, NBA 60 s pulls |
+
+### 6. Defects and findings, by owner
+
+| finding | owner | status |
+|---|---|---|
+| Slow-sport rule cadence for NFL and NBA under contention | local_208683f1 (grid lanes) | **User decision owed** |
+| NFL game-line quotes sharded by UTC capture date (`fetch_nfl_team_odds_local`); night games lose live lines from the overlay / live-rail | none | **Session card proposed (task_082379c4). MNF Monday from 6 PM CST is next.** |
+| Superseded in-play main lines linger until SUPERSEDED_SURVIVORS / the 300 s gate | — | lead `2f0211d40` |
+| NHL end-of-regulation chip renders as pregame | — | lead `9c796b708` |
+| College 0-card overlay builds at a break | — | H1 not supported per game; unexplained; parked |
+| Seen-age vs heartbeat inference | — | WITHDRAWN (learnings 2026-11-15) |
+| #810 college 60 s pulls | local_1f10ce63 | Our-look age 37-90 s -> 10-17 s, overlay gap ~305 -> ~150 s; verdict theirs |
+| #811 NBA 60 s pulls | local_1f10ce63 | Main lines only; post-load reads limited by the NBA overlay cadence; verdict theirs |
+| Render retirement | local_fce33969 | On main (`f9ed2ec0f`..`ef50116d0`); D5 / D2' / D3' owed to the user |
+
+### 7. Decisions owed to the user
+
+1. Slow-sport rule for NFL + NBA: chase the contention, or leave it.
+2. Start the NFL shard fix session before MNF.
+3. The Render session's D5 / D2' / D3'.
