@@ -356,6 +356,84 @@ def _lines_from_cards(game: dict[str, Any]) -> dict[tuple[str, str], float]:
     return out
 
 
+# Lane live-player-exit-gate (user 2026-11-16, "start wiring WNBA next"). The board's WNBA gameline index
+# accepts only lanes stamped `live_projection` (`live_gameline_join.lens_sources_for_sport("wnba")`), so a
+# refused lane is RE-STAMPED and never priced; the stamp is distinct so the index's `sources_seen` names it.
+EXIT_REFUSED_LENS_SOURCE = "player_exit_refused"
+REASON_KEY_PLAYER_OUT = "key_player_out"
+
+
+def _game_in_progress(game: dict[str, Any]) -> bool:
+    """The same liveness the lens lane reads (`wnba/cards.py _build_wnba_game_lens`)."""
+    live_state = game.get("live_state") if isinstance(game.get("live_state"), dict) else {}
+    status = game.get("status") if isinstance(game.get("status"), dict) else {}
+    final = bool(live_state.get("final")) or bool(status.get("final"))
+    return (bool(live_state.get("in_progress")) or bool(status.get("in_progress"))) and not final
+
+
+def _apply_player_exits(games: list[dict[str, Any]], *, collect: Any = None) -> dict[str, Any]:
+    """Read who is out of each LIVE game and refuse the games a starter has left.
+
+    The linear lens does not model any exit (ejection, foul-out, in-game injury), so every KEY exit refuses the
+    game's live lanes; any out player's props are refused in `_attach_live_props`. One ESPN summary GET per live
+    game on a small thread pool inside a budget (`live_player_exit_tick.collect_exit_statuses`, the NCAAF
+    producer's path): the captured live box carries no ejection / starter / foul fields to read instead.
+    A game whose summary could not be read gets NO `playersOut` (counted), never an empty "nobody out".
+    Never raises. -> the tick's tally, published as `playerExits`."""
+    try:
+        from syndicate.features.shared import live_player_exit_tick as exit_tick
+    except Exception as exc:  # noqa: BLE001 -- deploy-skew guard
+        return {"error": type(exc).__name__}
+    rows = [{"event_id": str(g.get("event_id") or "").strip(), "in_progress": _game_in_progress(g)}
+            for g in games if isinstance(g, dict)]
+    try:
+        statuses, tally = (collect or exit_tick.collect_exit_statuses)("wnba", rows, log_tag="wnba_live_lens")
+    except Exception as exc:  # noqa: BLE001
+        return {"error": type(exc).__name__}
+    tally["refused_games"] = 0
+    for game in games:
+        status = statuses.get(str(game.get("event_id") or "").strip())
+        if status is None:
+            continue
+        game["playersOut"] = [dict(p.__dict__) for p in status.players_out]
+        key_out = [f"{p.team}:{p.player}:{p.reason}" for p in status.key_players_out]
+        if not key_out:
+            continue
+        detail = "; ".join(key_out)
+        lanes = game.get("gameLens") if isinstance(game.get("gameLens"), list) else []
+        refused: list[Any] = []
+        for lane in lanes:
+            if isinstance(lane, dict):
+                # A COPY: `games` are shallow copies of the cards context, whose lane dicts may be the
+                # process cache's own objects.
+                lane = dict(lane)
+                lane["refusedSource"] = lane.get("source")
+                lane["source"] = EXIT_REFUSED_LENS_SOURCE
+                lane["liveRefusal"] = REASON_KEY_PLAYER_OUT
+                lane["liveRefusalDetail"] = detail
+            refused.append(lane)
+        game["gameLens"] = refused
+        game["liveRefusal"] = REASON_KEY_PLAYER_OUT
+        tally["refused_games"] += 1
+        print(f"[wnba_live_lens] KEY_PLAYER_OUT_REFUSED event={game.get('event_id')} players={detail}", flush=True)
+    return tally
+
+
+def _refuse_out_player_props(game: dict[str, Any], rows: list[dict[str, Any]]) -> int:
+    """Any out player's live props: unpriced (`notPricedReason=player_out`). -> rows refused."""
+    from syndicate.features.shared.wnba_live_prop_rows import normalize_name
+
+    out = {normalize_name(p.get("player")) for p in game.get("playersOut") or () if isinstance(p, dict)}
+    out.discard("")
+    refused = 0
+    for row in rows:
+        if out and normalize_name(row.get("playerName")) in out:
+            row["liveModelProbOver"] = None
+            row["notPricedReason"] = "player_out"
+            refused += 1
+    return refused
+
+
 def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
     """Stamp `liveProps` on each game from the captured live player box."""
     from syndicate.features.shared.refresh_state_store import data_root, read_json_file
@@ -433,6 +511,8 @@ def _attach_live_props(games: list[dict[str, Any]], date_str: str) -> None:
             k: built.get(k) for k in ("players_seen", "players_matched", "rows_projected",
                                       "priced", "unpriced_by_reason", "grid_rows")
         }
+        # Lane live-player-exit-gate: an out player's props are never priced.
+        game["livePropsCoverage"]["player_out_refused"] = _refuse_out_player_props(game, game["liveProps"])
         # THE FUNNEL, END TO END, so a thin row count is attributable without a
         # deploy. `players_unmatched` is the one that names a NAME-JOIN failure
         # -- the producer already collected it and nothing published it, which
@@ -610,6 +690,9 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
             if event_id and line_value is not None:
                 live_line_by_event_id[event_id] = line_value
 
+    # Lane live-player-exit-gate: who is out of each live game, BEFORE the props read it.
+    player_exits = _apply_player_exits(games)
+
     # LIVE PROPS onto each game, for `build_live_prop_index` to read (phase 4).
     # CONSUMES the capture artifact; never fetches. `capture_wnba_live_player_box.py`
     # runs on the loop tick -- a builder that fetched ESPN here would be the
@@ -678,6 +761,7 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
         empty_state=empty_state,
     )
     context["games"] = games
+    context["playerExits"] = player_exits
     context["cards"] = [dict(card) for card in rank_cards]
     context["requested_date"] = resolved_date
     context["lookahead_applied"] = bool(cards_context.get("lookahead_applied", False))

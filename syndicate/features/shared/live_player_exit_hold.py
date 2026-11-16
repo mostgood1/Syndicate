@@ -25,7 +25,7 @@ from syndicate.features.shared.live_player_status import REASON_KEY_PLAYER_OUT, 
 # `board_enrichment._LIVE_GAMELINE_SNAPSHOT_PATHS[sport]` (tested): a copy here keeps the fast exit
 # thread from importing board_enrichment.
 PUBLISHING_SPORTS: dict[str, str] = {"nfl": "nfl_live_resim.json", "ncaaf": "ncaaf_live_lens.json",
-                                     "nba": "nba_live_resim.json"}
+                                     "nba": "nba_live_resim.json", "wnba": "wnba_live_lens.json"}
 CACHE_S = 30.0
 
 
