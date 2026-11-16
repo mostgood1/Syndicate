@@ -1018,3 +1018,36 @@ LAR @ ARI and SEA @ LV in Q1.
 - Web merges: 0 live-sport stale (ncaaf 64 / 64, no game).
 - **Load:** query 9.5 s / 63.7 MB. Live-rail 0.05 s, 665 rows.
 - **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 26 — Sun 11-15 7:29 PM CST (01:29Z 11-16). SNF kickoff + two restarts
+
+**Restarts in the window:**
+- **refresh-worker `BOOTED` 01:28:39Z (7:28 PM CST)**: supervisor `CLAIMED_RESTART
+  holder=live-player-exit-gate`. That lane's load, 8 min after the SNF kickoff (PIT @ CIN, 7:20 PM).
+- **live-odds-worker new pid 2023089**: supervisor "exited code=0 after 21397s", a routine ~6 h
+  recycle, not a load.
+  - NBA pulls still launch with `interval_s=240` (01:28:14Z), so **#811 is not live**.
+
+**Cost of the refresh-worker restart, at the read (~1 min after boot):**
+- `/api/board/live-rail` newest 182-203 s old; shortlist `written_at` 810 s.
+- NBA: 1 / 560 rows priced <= 120 s, age now p50 455 s.
+- Flags: **9 on 6 cards. 0 false, 0 missed, 2 dark.**
+
+**SNF live projection:**
+- `NFL_LIVE_RESIM` 01:24:46Z: `live 1 resimmed 0 refused {uninformative_probability: 1}`. The
+  game was seen, its probability judged uninformative.
+- The next tick fell after the restart, so **no SNF OURS at the read**. Owed next reading.
+
+**Other sports:**
+- NHL (EDM @ PHI END P1, FLA @ DAL, CGY @ ANA): 32 overlay builds, gap max 194 s. NHL builds p50
+  5.3 s. 5 live rows.
+- NBA builds p50 26.3 s, max 136.5 s. `deferred_slow` nba 2, nfl 1. NBA overlay gap max 387 s.
+- Web merges stale:
+  - nfl 59 of 89: the NFL overlay idled between the 3:25 PM games' finals and SNF (gap 2,380 s),
+    then the restart. Expected.
+  - ncaaf 89 / 89 (no game).
+
+**Load:** `/intelligence` **16.0 s** / 25.3 MB, and query 15.2 s / 61.6 MB, both read during the
+restart. Live-rail 0.09 s, 667 rows.
+
+**Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
