@@ -71,3 +71,30 @@ The 2,000-row NFL builds (19:00:56Z, 20:20:12Z) carry no 11-14 reference and ~2,
 the 11-15 board date's build, with two dates in rotation, and so the 70 "spike returns" in section 4. Seen on these
 builds, not traced. Owed: the 11-15 Sunday tally with `builds_window2.py` (which skips the process-list log lines;
 they quote every running command line, this script's own patterns included).
+
+## 6. The Sunday tally (11-15)
+
+Rule registered 2026-11-14 (lanes.md). Verdict: **FALSIFIED -- one clear signature build on the fixed code: 7:34 AM CST 11-15 (pregame), 164 NFL rows dropped on a fresh pull (reference 54 s), `kept=1`, board 1,383 -> 1,221 -> 1,390 next build.**
+
+- **Window** 11-15 12:00 AM .. 11:00 PM CST (06:00Z 11-15 .. 05:00Z 11-16), refresh-worker.log.1 + refresh-worker.log. Read-only, nice 19.
+- **Command:** `wsl -d Ubuntu-24.04 -- nice -n 19 /home/amyn/.venvs/syndicate/bin/python /mnt/c/tmp/edge-analyses/nfl-shortlist-drop/sunday/sunday_tally.py 2026-11-15T06:00 2026-11-16T05:00 --builds > C:\tmp\edge-analyses\nfl-shortlist-drop\sunday\sun1115.txt` (rc 0, 300 builds).
+- **Code check:** fleet checkout `10094eae0`; `git merge-base --is-ancestor 1f54452c6 HEAD` YES; `MARKET_GONE_RELOOKED_KEPT` in `pipeline/layer2_shortlist.py` 1; refresh-worker pid 2053259 (since 01:28:28Z 11-15, 7:28 PM CST 11-14). The kept line is missing on 0 of 300 builds, so every build ran the fix.
+- **Builds by board date:** 11-14 15, 11-15 268, 11-16 11, no NFL reference 6.
+- **Fresh builds** (largest NFL file reference < 150 s): 42 of 300, 22 of them in-play (live_rows > 0; the first NFL game went live ~8:37 AM CST).
+- **Gone on fresh:** median 9, max 276; > 65: 9; > 150: 7. **Kept on fresh:** median 0 (it was in the hundreds on the old-row fresh builds: 390 at 12:36 AM, 362 at 5:48 AM; 102 at 9:39 AM, 87 at 9:08 AM).
+- **Fresh builds with gone > 65** (time CST, board, rows prev -> this -> next, gone, kept, live_rows, ref):
+  - 7:34 AM, 11-15, 1,383 -> 1,221 -> 1,390, gone 164, kept 1, live 0, ref 54 s. **SIGNATURE.** Pregame. The build before (7:31 AM) judged a 1,460 s reference; a pull landed between them -- the #802 shape. Next build gone 0.
+  - 8:08 AM, 11-15, 1,234 -> 1,286 -> 1,250, gone 116, kept 14, live 0, ref 50 s. Inside an 8:01-8:35 AM run of 114-165 dropped on every build (pre-drop 1,419 at 7:58 AM), ending at the first live game's kickoff. Stayed down; listed.
+  - 8:54 AM, 11-15, 1,367 -> 1,196 -> 1,186, gone 146, kept 0, live 54, ref 95 s. In-play; 146-154 dropped for 4 builds, back at 9:08 AM (1,373, kept 87). Listed.
+  - 9:28 AM, 11-15, 1,107 -> 1,148 -> 1,147, gone 187, kept 1, live 45, ref 83 s. In-play run 9:25-9:35 AM (pre-drop 1,351 at 9:22 AM). Stayed down.
+  - 9:31 AM, 11-15, 1,148 -> 1,147 -> 1,143, gone 187, kept 1, live 41, ref 25 s. Same run. Stayed down.
+  - 9:35 AM, 11-15, 1,147 -> 1,143 -> 1,331, gone 187, kept 1, live 39, ref 25 s. Last build of the run; next build back to 98.5% of 1,351. Counts as a signature by the registered rule, but it is the 4th straight build of an in-play drop, which looks more like a suspension lifting than #802. Not decided.
+  - 9:56 AM, 11-15, 1,280 -> 1,119 -> 1,022, gone 276, kept 1, live 31, ref 101 s. In-play run 9:56-10:07 AM. Stayed down.
+  - 9:59 AM, 11-15, 1,119 -> 1,022 -> 1,014, gone 264, kept 2, live 50, ref 67 s. Same run. Stayed down.
+  - 10:04 AM, 11-15, 1,022 -> 1,014 -> 1,012, gone 260, kept 2, live 44, ref 58 s. Same run. Stayed down (back at 10:11 AM, 1,261, after a non-fresh build).
+- **Falls > 25% vs the same board date's previous build:** 6, all on board 11-15 and all with gone 0 (so none is this filter); gone > 150: 0. 3:40 PM 1,080 -> 761 -> 1,070; 4:05 PM 1,018 -> 753 -> 960; 4:15 PM 960 -> 331 -> 946; 5:11 PM 839 -> 401 -> 679; 8:04 PM 411 -> 195 -> 366; 8:24 PM 366 -> 211 -> 370. Each a non-fresh in-play build (references 8,329-22,797 s) with live_rows swinging (441, 410, 19, 59, 4, 20). Not traced.
+- **The script overcounts.** It prints 6 signature builds. Its recovery test compares the next build with the build just before, which inside a run of drops is itself a dropped build. Against the last build before each run, 2 meet the rule: 7:34 AM and 9:35 AM. 9:28, 9:31, 9:59 and 10:04 AM stayed down. The verdict does not change: 7:34 AM alone falsifies.
+- **Old code, Sunday 11-08** (the instrument check, same script): FALSIFIED by 3 signature builds, 4:09 AM (373 dropped, 1,490 -> 1,120 -> 1,502), 5:07 AM (384) and 7:10 AM CST (324), each back next build; one in-play build at 10:05 AM CST dropped 227 and stayed down.
+- **Reading:** the fix cut the pregame signature from 3 builds of 324-384 rows (11-08) to 1 build of 164 (11-15), but did not remove it. The 7:34 AM build's 164 rows were judged on a fresh pull and only 1 was saved by the own-look branch.
+- **Owed (lane stays OPEN):** trace which 164 rows the 7:34 AM build (drop step 13:34:06Z) dropped, and why their own book-and-line look in the 11-15 NFL state file (32,582 keys, newest 19 s) did not keep them. Decide whether 9:35 AM is #802 or an in-play suspension lifting. Fix the tally's recovery test to compare against the last pre-drop build.
+- **No change made:** no code, env, restart or deploy.
