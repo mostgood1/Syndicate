@@ -16081,3 +16081,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: On a live slate after the load, the median pull -> priced delay for NCAAF / NCAAB does not drop at least 20% against the 2026-11-14 windows at a similar load, or rounds slow so that gaps between regular rounds grow past 200 s median
 - Verification: Unit: pull_only never starts a round; the reacting sleep runs a pass when a live shard changes and still ends at its deadline; off switch -> a plain sleep (off != on); the round skips a sport repriced on pull within 45 s and keeps the live cadence; 0 disables the skip. After the user's load: pull_to_price.py and main_thread_budget.py on a live window vs 2026-11-14's
 - Blocked by: none
+
+### closed-lane-archive-20261115-2045 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session d7be6a3b-e462-437f-8870-796f285cc9b3
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 19 CLOSED blocks. Moved: closed-lane-archive-20261115-1640. The reading and the WAIT reasons are in `.syndicate/log/2026-11-15.md`.
