@@ -1174,3 +1174,27 @@ Proposed to the user as its own session.
   kickoff has passed.
 - ESPN has the game Monday 1 PM CST.
 - det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 30 — Sun 11-15 9:37 PM CST (03:37Z). No restart
+
+7 live chips: NBA OKC @ SAC Q3; NFL PIT @ CIN Q3; NHL 3; NCAAB 1; WNCAAB 1.
+
+**Flags:** 7 on 5 cards. 0 false, 0 missed, 0 dark.
+
+**Rows priced <= 120 s:**
+- NBA main 9 / 40; alt 0 / 141, seen age 192 s.
+- NFL 8 / 14. NHL 9 / 10.
+
+**Refresh:**
+- Overlay gap max: NBA 281 s, NFL 319 s, NHL 203 s, college 137 s.
+- Builds: NBA p50 18.8 s, NFL 13.1 s. `deferred_slow` nba 1, nfl 2.
+- WNCAAB: 6 zero-card builds with rows (one game, END Q3 at the read).
+- Web merges: 0 live-sport stale.
+
+**Load:**
+- Query 4.2 s / 36.6 MB. Shortlist 0.19 s (38 s old).
+- Live-rail 0.09 s, 195 rows.
+
+**Teams:**
+- **0 chip-less cards:** FAMU @ UTEP left today's rail.
+- det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
