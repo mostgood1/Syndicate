@@ -3443,3 +3443,8 @@ verdict.
 improvement beats the criterion's own SE. A gate whose sim value sits within the sim's own noise of its bound should
 be pre-registered with a seed budget that resolves it (more seeds at the candidate), or it will report a coin flip
 as a verdict.
+
+## 2026-11-15 -- RULE: a tool with no live caller can still be the only RECOVERY path for something; retiring it turns "needs X" into "no way back" `[lane render-retirement, session 6786c5e2]`
+- **Believed:** `local_production.py import-render-env` was dead weight once Render was suspended: nothing at run time called it, and the user said Render must not be needed, so deleting it (`f9ed2ec0f`) was pure cleanup.
+- **Measured afterwards (fleet, counts/modes only):** it was the ONLY documented recovery for `~/syndicate-prod/render_env/*.json` (88/182/148 live secrets) -- and those files, plus `local_production.env` (78 keys), sit outside `<home>/data`, which is all the nightly backup copies. The delete made a lost WSL disk unrecoverable from anything in the repo. Nothing was lost (the files are intact and the code is in git), but the gap only surfaced because the doctor hint I had just written pointed at "the fleet's own backup", which does not exist.
+- **Rule:** before retiring a tool on "no caller", ask what it RESTORES or RE-CREATES, not only who calls it. If it is a recovery path, either land the replacement first or state the gap in the same commit and put it to the user (here: todo #766 D5). A hint that names a backup must name one that exists -- check the backup's scope (`BACKUP_*`, the copied root) before writing it.

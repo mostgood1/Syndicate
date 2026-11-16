@@ -445,7 +445,7 @@ live-odds-worker **exit 0, 620.2 MB** of 2048. Production run-modes preserved �
 
 ## [local-production-host] PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared disk `[verified 2026-09-30, lane local-production-host, PR #118 f565a435, NO DEPLOY]`
 
-All three Render services are billing-suspended (2026-09-30 06:37:51Z). `py -3 scripts/local_production.py init | import-render-env | doctor | up`
+All three Render services are billing-suspended (2026-09-30 06:37:51Z). `py -3 scripts/local_production.py init | doctor | up` (`import-render-env` was REMOVED 2026-11-15, lane render-retirement, `f9ed2ec0f`)
 runs web + refresh-worker + live-odds-worker + a local Redis, deriving each role's env from `render.yaml` PER SERVICE (then the
 live dashboard env, then `<home>/local_production.env`). This is the PRODUCTION counterpart of `[local-fleet-runner]`, which stays the
 rehearsal harness. Runbook: `docs/ai_context/local_production_runbook.md`.
@@ -461,7 +461,7 @@ rehearsal harness. Runbook: `docs/ai_context/local_production_runbook.md`.
 - **`render.yaml` EDITS ARE INERT ON THE FLEET** `[measured 2026-11-08 on the fleet, lane render-retirement-inventory, findings_2026-11-07_render_dependency_inventory.md §1]`:
   - Layering: `derive_role_env` = `render.yaml` -> `<home>/render_env/<role>.json` (Render snapshot, `fetched_at` 2026-10-01T01:11Z, 88/182/148 keys) -> `local_production.env` -> forced. A later layer wins.
   - Every `render.yaml` value key (48/77/72) is in the snapshot, so 0 are decided by `render.yaml` alone. Editing an existing key changes nothing, a NEW key applies at the next `up`, and a deletion changes nothing.
-  - The snapshot lives outside `<home>/data`, so the nightly backup does not carry it. Its documented recovery (`import-render-env`) needs Render.
+  - The snapshot lives outside `<home>/data`, so the nightly backup does not carry it; nor does it carry `local_production.env` (78 keys, 42 `ROLE__KEY`). Re-read 2026-11-16 02:3xZ (counts/modes only). Since 2026-11-15 there is NO recovery path at all: `import-render-env` was removed (lane render-retirement, `f9ed2ec0f`). A secrets backup is user decision D5 in todo #766.
   - All four `render_env/` files are mode 600 since 2026-11-08 16:54Z. `live-odds-worker.json` had been 644 since a 10-04 rewrite; it was changed by user decision.
 - **THE FLEET TRADES LIVE MONEY since 2026-10-19T16:04:30Z** `[verified 2026-10-19 on all three roles' /proc environ and /api/portfolio/live health.ok=true; re-read after the 21:36Z restart on 854b59ed; session 332cb014]`. `local_production.env` sets `SYNDICATE_EXECUTION_MODE=live`, `_LIVE_ARMED=1`, `_ENABLED=1`, `_VENUE=kalshi,polymarket`. The `SyndicateLocalProduction` task runs `up --allow-live-execution`, so **every task or watchdog restart comes back LIVE**. The task is LogonType=Password: `Set-ScheduledTask` returns Access denied, so edit it in Task Scheduler (the user re-enters the password). It restarts only on FAILURE, so after a clean `down` run `Start-ScheduledTask`. A role-only TERM does NOT re-read the env file; env is built at `up`. **To go back to paper:** the `/portfolio` kill switch (fails closed), or restore `local_production.env.bak-golive-20261019T154604Z` + `C:\SyndicateProd\SyndicateLocalProduction.task.bak-golive-20261019.xml` and restart. Without the flag, `up` forces paper even when the env says live (`local_production.py:456`).
 - Redis keys embed the ABSOLUTE data-root path: pick `SYNDICATE_LOCAL_HOME` once.
