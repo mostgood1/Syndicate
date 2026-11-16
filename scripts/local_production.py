@@ -1658,11 +1658,25 @@ def default_offdisk_dir(local: dict[str, str]) -> Path | None:
     return None
 
 
+def _on_windows_drive(path: Path) -> bool:
+    """True for a WSL path onto a Windows drive (`/mnt/c/...`), which is drvfs/9p."""
+    parts = path.as_posix().split("/")
+    return len(parts) >= 3 and parts[0] == "" and parts[1] == "mnt" and len(parts[2]) == 1
+
+
 def default_offdisk_staging_dir(local: dict[str, str], offdisk: Path) -> Path | None:
     """Where the archive is WRITTEN before it is moved into `offdisk`:
-    `SYNDICATE_LOCAL_BACKUP_OFFDISK_STAGING_DIR`, else -- when `offdisk` is
-    inside a OneDrive folder -- `SyndicateBackup-staging` beside that OneDrive
-    folder, else none (the `.partial` is written in `offdisk` itself).
+    `SYNDICATE_LOCAL_BACKUP_OFFDISK_STAGING_DIR`, else -- on WSL, when `offdisk`
+    is on a Windows drive -- `~/syndicate-prod-backup-staging` on the WSL disk,
+    else -- when `offdisk` is inside a OneDrive folder -- `SyndicateBackup-staging`
+    beside that OneDrive folder, else none (the `.partial` is written in `offdisk`).
+
+    WSL staging (lane backup-offdisk-enomem, 2026-11-16): the gzip stream into
+    /mnt/c failed with `gzip: stdout: Cannot allocate memory` on 10-30, 11-10
+    (attempt 1) and 11-16 (both attempts), a 9p write refused under Windows
+    commit pressure (11-16: 54 of 63 GB committed). Compressing on ext4 keeps the
+    long write off 9p; only a plain copy crosses, and `archive_offdisk` retries
+    that copy without redoing the compress.
 
     A sync client works on a file while it changes, so a `.partial` written
     inside OneDrive is a 7 GB moving target; moved in at the end, the finished
@@ -1674,11 +1688,24 @@ def default_offdisk_staging_dir(local: dict[str, str], offdisk: Path) -> Path | 
     override = _setting(local, "SYNDICATE_LOCAL_BACKUP_OFFDISK_STAGING_DIR")
     if override:
         return Path(override).expanduser()
+    if not IS_WINDOWS and _on_windows_drive(offdisk):
+        return Path.home() / "syndicate-prod-backup-staging"
     parts = offdisk.parts
     for i, part in enumerate(parts):
         if part == "OneDrive" or part.startswith("OneDrive - "):
             return Path(*parts[:i]) / "SyndicateBackup-staging"
     return None
+
+
+def _mem_available_note() -> str:
+    """`MemAvailable=<MB>` from /proc/meminfo, for a failed archive write's log line."""
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+            if line.startswith("MemAvailable:"):
+                return f"MemAvailable={int(line.split()[1]) // 1024}MB"
+    except (OSError, ValueError, IndexError):
+        pass
+    return "MemAvailable=unknown"
 
 
 def archive_offdisk(snapshot: Path, offdisk: Path, keep: int, *, staging: Path | None = None,
@@ -1708,7 +1735,7 @@ def archive_offdisk(snapshot: Path, offdisk: Path, keep: int, *, staging: Path |
         if proc.returncode == 0 and partial.is_file():
             break
         partial.unlink(missing_ok=True)
-        failures.append(f"rc={proc.returncode} {(proc.stderr or '')[-300:].strip()}")
+        failures.append(f"rc={proc.returncode} {(proc.stderr or '')[-300:].strip()} {_mem_available_note()}")
         if len(failures) > retries:
             return {"ok": False, "rc": proc.returncode, "error": (proc.stderr or "")[-300:],
                     "attempts": len(failures), "failures": failures}
@@ -1719,9 +1746,27 @@ def archive_offdisk(snapshot: Path, offdisk: Path, keep: int, *, staging: Path |
     except OSError:
         if work == offdisk:
             raise
-        # staging on another volume: copy in under the .partial name, then rename
+        # staging on another volume: copy in under the .partial name, then rename.
+        # The copy is the only write that crosses into /mnt/c, so it is retried on
+        # its own and a failure never redoes the compress.
         landing = offdisk / partial.name
-        shutil.copyfile(partial, landing)
+        copy_failures: list[str] = []
+        while True:
+            try:
+                shutil.copyfile(partial, landing)
+                break
+            except OSError as exc:
+                landing.unlink(missing_ok=True)
+                copy_failures.append(f"copy {exc!r} {_mem_available_note()}")
+                if len(copy_failures) > retries:
+                    partial.unlink(missing_ok=True)
+                    return {"ok": False, "rc": None, "error": copy_failures[-1],
+                            "attempts": len(failures) + 1, "copy_attempts": len(copy_failures),
+                            "failures": failures + copy_failures}
+                print(f"off-disk archive copy attempt {len(copy_failures)} failed ({copy_failures[-1]}); "
+                      f"retrying in {retry_delay:.0f}s", flush=True)
+                time.sleep(retry_delay)
+        failures.extend(copy_failures)
         partial.unlink(missing_ok=True)
         landing.rename(target)
     archives = sorted(p for p in offdisk.glob("*.tar.gz") if p.is_file())

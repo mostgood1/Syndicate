@@ -81,15 +81,36 @@ def test_backup_cli_retry_flags():
 # --- the staging default ---------------------------------------------------------
 
 
-def test_staging_sits_beside_the_onedrive_folder():
+def test_staging_sits_beside_the_onedrive_folder(monkeypatch):
+    monkeypatch.setattr(lp, "IS_WINDOWS", True)  # the WSL default is tested below
     assert lp.default_offdisk_staging_dir({}, Path("/mnt/c/Users/u/OneDrive/SyndicateBackup")) == Path("/mnt/c/Users/u/SyndicateBackup-staging")
     assert lp.default_offdisk_staging_dir({}, Path("/mnt/c/Users/u/OneDrive - Contoso/Backups")) == Path("/mnt/c/Users/u/SyndicateBackup-staging")
 
 
-def test_no_staging_outside_onedrive_and_override_wins():
+def test_no_staging_outside_onedrive_and_override_wins(monkeypatch):
+    monkeypatch.setattr(lp, "IS_WINDOWS", True)
     assert lp.default_offdisk_staging_dir({}, Path("/mnt/c/SyndicateBackup")) is None
     local = {"SYNDICATE_LOCAL_BACKUP_OFFDISK_STAGING_DIR": "/mnt/c/stage"}
     assert lp.default_offdisk_staging_dir(local, Path("/mnt/c/Users/u/OneDrive/SyndicateBackup")) == Path("/mnt/c/stage")
+
+
+def test_on_wsl_a_windows_drive_target_stages_on_the_wsl_disk(tmp_path, monkeypatch):
+    """2026-11-16: the gzip stream into /mnt/c hit ENOMEM on both attempts; the
+    compress now runs on ext4 and only the finished file crosses into /mnt/c."""
+    monkeypatch.setattr(lp, "IS_WINDOWS", False)
+    monkeypatch.setattr(lp.Path, "home", classmethod(lambda cls: tmp_path / "home"))
+    expected = tmp_path / "home" / "syndicate-prod-backup-staging"
+    assert lp.default_offdisk_staging_dir({}, Path("/mnt/c/Users/u/OneDrive/SyndicateBackup")) == expected
+    assert lp.default_offdisk_staging_dir({}, Path("/mnt/d/SyndicateBackup")) == expected
+    local = {"SYNDICATE_LOCAL_BACKUP_OFFDISK_STAGING_DIR": "/srv/stage"}
+    assert lp.default_offdisk_staging_dir(local, Path("/mnt/c/Users/u/OneDrive/SyndicateBackup")) == Path("/srv/stage")
+    assert lp.default_offdisk_staging_dir({}, Path("/srv/backup")) is None  # not a Windows drive
+
+
+def test_on_windows_drive_matches_only_drive_mounts():
+    assert lp._on_windows_drive(Path("/mnt/c/x"))
+    assert not lp._on_windows_drive(Path("/mnt/wsl/x"))
+    assert not lp._on_windows_drive(Path("/home/u/mnt/c"))
 
 
 # --- archive_offdisk -------------------------------------------------------------
@@ -163,6 +184,70 @@ def test_cross_volume_staging_copies_in_under_the_partial_name(tmp_path, snapsho
     assert [p.name for p in offdisk.iterdir()] == ["20261030T091501Z.tar.gz"]
     assert (offdisk / "20261030T091501Z.tar.gz").read_bytes() == b"archive"
     assert not list(staging.iterdir())
+
+
+def _cross_volume(monkeypatch, staging: Path) -> None:
+    real_rename = Path.rename
+
+    def rename(self, target):
+        if self.parent == staging:
+            raise OSError(18, "Invalid cross-device link")
+        return real_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", rename)
+
+
+def _flaky_copy(monkeypatch, fail_times: int) -> list[Path]:
+    copies: list[Path] = []
+    real_copy = lp.shutil.copyfile
+
+    def copyfile(src, dst):
+        copies.append(Path(dst))
+        if len(copies) <= fail_times:
+            Path(dst).write_bytes(b"ha")  # a failed copy leaves a partial landing
+            raise OSError(12, "Cannot allocate memory")
+        return real_copy(src, dst)
+
+    monkeypatch.setattr(lp.shutil, "copyfile", copyfile)
+    return copies
+
+
+def test_a_failed_copy_is_retried_without_recompressing(tmp_path, snapshot, monkeypatch):
+    calls: list[Path] = []
+    slept: list[float] = []
+    monkeypatch.setattr(lp.subprocess, "run", _fake_tar(calls, [0]))
+    monkeypatch.setattr(lp.time, "sleep", slept.append)
+    offdisk, staging = tmp_path / "OneDrive" / "SyndicateBackup", tmp_path / "stage"
+    _cross_volume(monkeypatch, staging)
+    copies = _flaky_copy(monkeypatch, 1)
+    result = lp.archive_offdisk(snapshot, offdisk, 2, staging=staging, retries=1, retry_delay=300.0)
+    assert result["ok"]
+    assert len(calls) == 1  # one tar, never redone
+    assert len(copies) == 2 and slept == [300.0]
+    assert "Cannot allocate memory" in result["failures"][0] and "MemAvailable=" in result["failures"][0]
+    assert [p.name for p in offdisk.iterdir()] == ["20261030T091501Z.tar.gz"]
+    assert (offdisk / "20261030T091501Z.tar.gz").read_bytes() == b"archive"
+    assert not list(staging.iterdir())
+
+
+def test_copy_gives_up_after_the_retries_and_leaves_nothing(tmp_path, snapshot, monkeypatch):
+    calls: list[Path] = []
+    monkeypatch.setattr(lp.subprocess, "run", _fake_tar(calls, [0]))
+    monkeypatch.setattr(lp.time, "sleep", lambda s: None)
+    offdisk, staging = tmp_path / "OneDrive" / "SyndicateBackup", tmp_path / "stage"
+    _cross_volume(monkeypatch, staging)
+    copies = _flaky_copy(monkeypatch, 5)
+    result = lp.archive_offdisk(snapshot, offdisk, 2, staging=staging, retries=1, retry_delay=0)
+    assert not result["ok"] and result["copy_attempts"] == 2 and len(copies) == 2
+    assert len(calls) == 1
+    assert not list(offdisk.iterdir()) and not list(staging.iterdir())
+
+
+def test_a_failed_compress_logs_mem_available(tmp_path, snapshot, monkeypatch):
+    calls: list[Path] = []
+    monkeypatch.setattr(lp.subprocess, "run", _fake_tar(calls, [2]))
+    result = lp.archive_offdisk(snapshot, tmp_path / "offdisk", 2, retries=0)
+    assert "MemAvailable=" in result["failures"][0]
 
 
 def test_rotation_and_stale_partials_with_staging(tmp_path, snapshot, monkeypatch):
