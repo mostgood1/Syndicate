@@ -72,7 +72,7 @@ implied by the prices paid. The last 30 days are negative at about 95% confidenc
 - Kalshi: $284.98 cash + $10.87 positions. Polymarket: $150.62 buying power.
 - Caps: 5% of capital per order ($14.79 / $7.53) and 50% per day ($147.93 / $75.31). Ceilings: $100/order, $2,000/day.
 
-## Scale-up gate — PROPOSED, NOT APPROVED (the user decides)
+## Scale-up gate — ADOPTED 2026-11-16 (user: "Adopt as drafted")
 
 Every condition is measured FORWARD from a frozen policy (no mid-window changes), at the fill price, net of fees, with event-clustered SE:
 
@@ -82,6 +82,28 @@ Every condition is measured FORWARD from a frozen policy (no mid-window changes)
 3. **Instrument:** same-book CLV and results agree in sign (item 3 above resolved first).
 4. **Sizing earns its keep:** the top stake quartile's ROI is not below the flat-stake ROI.
 5. **Then step, don't jump:** one cap increase at a time, re-measured. Step back the moment the rolling lower bound falls below zero.
+
+**ADOPTED AS DRAFTED, 2026-11-16** (user, verbatim: "Adopt as drafted"; it answered the question "Adopt the scale-up gate as
+drafted?").
+- Condition 3 is the amended one from § "CLV RECONCILED": fee-net same-book CLV agrees in sign with results, against a close
+  that is calibrated on our sides (|z| < 2).
+- `scripts/live_book_edge_readout.py` `gate()` reads conditions 1-4 (`GATE_MIN_EVENTS` 800, `GATE_CLOSE_CALIBRATION_Z` 2.0)
+  and now labels them ADOPTED. Condition 5 is a procedure. No code acts on the gate.
+- What it binds: no live stake, cap or bankroll increase until 1-4 pass together on one window. Then condition 5.
+- Reading at adoption: all four measurable conditions FAIL (§ "Method artefact", since 11-03).
+
+**OPEN at adoption: what resets the clock.** The draft says "measured FORWARD from a frozen policy (no mid-window changes)".
+Read strictly, as any fleet change to how live bets are chosen or held, the clock has not started. `.syndicate/deploys.md` records at
+least 8 such changes inside 11-03..11-16 alone:
+- NCAAB on Kalshi, live 11-03/04.
+- In-game exits off, 11-07.
+- The live lane-age gate default ON, 11-08.
+- In-play entries refuse an ask below 0.55, 11-09.
+- NCAAB live mechanism env, three changes 11-09..11-10.
+- The live player-exit gate, from 11-16.
+
+So `--since 2026-11-03` is the last SIZING change (stake band off), not a frozen policy. The user decides which changes restart
+the 800-event count. Until then, the "about 2026-12-02 at the earliest" date holds only under the sizing-only reading.
 
 ## CLV RECONCILED (2026-11-16, same session; user "Yes, reconcile CLV")
 
@@ -221,7 +243,7 @@ python scripts/live_book_edge_readout.py --since 2026-11-03 # one window from th
 
 - **What it reports:** the formulas above, plus fee-net CLV per scope (`order_clv.fee_net_clv_pct`) and the close's
   calibration on our sides. Also stake quartiles, sizing paths, per-line breakdowns, and the four measurable gate
-  conditions, labelled PROPOSED. Nothing reads them.
+  conditions, labelled PROPOSED (ADOPTED since 2026-11-16; § "Scale-up gate"). Nothing reads them.
 - **Reproduction:** from the saved 11-16 payload, as of 11-15, it matches the pinned numbers exactly:
   - last 30: 1,526 / 641 / $3,006.48 / −$218.64 / −7.27 ± 2.84% / excess −32.5 (z −1.72)
   - last 7: +0.72 ± 4.95%
