@@ -236,3 +236,81 @@ without a live card.
 - Lane `wncaab-overlay-zero-cards` is CLOSED, GOAL MET.
 - The `refused=` token (`146f956cb`) is logging only. It reaches the fleet with the next ff plus a
   refresh-worker restart. Its first fleet reading will be recorded here.
+
+## Reading 7 — Mon 11-16 4:36 PM CST (22:36Z)
+
+### Fleet event: the NFL kickoff-shard fix is LOADED
+
+Fleet ff `db463b5be -> dac4d49f8` at 22:31:26Z (4:31 PM CST; fleet reflog). This is the fix session's
+load target (`ed63c7611`). No restart is needed: the NFL odds fetch runs as a subprocess
+(`refresh_odds_sources.py --sports nfl --phase live`), so the next launch carries the new code.
+
+**Measured on the fleet's shards, rows captured at or after 22:31Z:**
+- `nfl 2026-11-19.jsonl`: 160 rows, all TNF (kickoff 2026-11-20T01:15Z = 11-19 7:15 PM CST).
+- `nfl 2026-11-16.jsonl`: 4 rows, all MNF (kickoff 2026-11-17T01:15Z = 11-16 7:15 PM CST).
+- Under the old UTC-capture basis, all 164 would be in 11-16. So `basis=kickoff_central` ran.
+
+**Gaps:**
+- The `NFL_GAMELINE_QUOTE_SHARD` line is in no file under `~/syndicate-prod/logs`, so the subprocess's
+  stdout is not kept there.
+- The 11-19 shard also holds rows captured 02:43Z 11-16, before the ff. Their origin was not checked:
+  possibly the fix session's own replay or backfill.
+- deploys.md has no entry for this ff on origin/main at 22:34Z. The fix session owns it.
+
+**The registered MNF prediction now takes its "fix loaded" branch.** Expected after 7:15 PM CST:
+- MNF game rows after 00:00Z land in `nfl 2026-11-16.jsonl`;
+- `INPLAY_OVERLAY nfl date=2026-11-16` carries LAC @ BAL;
+- live-rail serves NFL overlay game-line rows.
+
+It is falsified if live-rail serves 0 LAC @ BAL overlay game-line rows after kickoff. Read after
+7:20 PM and ~7:45 PM.
+
+### Readings
+
+**Slate:** 2 live chips, both WNCAAB:
+- Penn State @ Arizona State, Q4 6:43;
+- Lamar @ Texas A&M, Q2 4:55.
+
+**Flags: 1 shown (1 card, 2 qualifying rows, 1 market). 0 false, 0 missed, 0 dark.** The first flag
+of 11-16:
+- WNCAAB Penn State @ Arizona State, full-game total **u139.5**.
+- Model 58.3% vs book no-vig fair 49.1% (gap 9.2 pp); our line 138.5.
+- Priced 24 s before; 60 s old at the read; Q4 6:43.
+- To be graded on the final with the day's flags.
+
+**Live rows:** 14, all WNCAAB main.
+| phase | rows | priced <= 120 s | flags |
+|---|---|---|---|
+| 1H | 8 | 4 | 0 |
+| 2H | 6 | 4 | 2 |
+- Priced age p50 64 s; seen age at pricing p50 45 s, p90 152 s.
+- 1 row older than 300 s now; 2 of 3 markets carry no price of ours.
+- Live-rail: 13 rows on 3 reads.
+
+**WNCAAB overlay (30 min):**
+- 39 builds, gap p50 41 s, p90 66 s, max 86.5 s, 0 over 360 s.
+- **Zero-card builds with rows: 5 of 39**, down from 15 of 21 at 4:08 PM. The second game's lines
+  clear the floor.
+- Builds p50 0.8 s, max 15.1 s.
+
+**Other builds:**
+- NBA p50 12.1 s (pregame, n=2); NFL 19.5 s (n=1); NCAAB 6.1 s; soccer 4.6 s; NHL 0.4 s.
+- 0 `deferred_slow`. Tick gap p50 35 s, max 120 s.
+
+**Web merges:** wncaab fresh 37 / 37; nfl and ncaab stale 37 / 37 (nothing live).
+
+**Load:**
+- **Query 19.0 s** / 59.9 MB (10.7 MB wire), the second sample over 19 s in a row (3-10 s before 4 PM).
+- **Chips 3.1 s** (0.03-0.2 s before). Shortlist 2.4 s. Live-rail 0.03 s.
+- At 16:37 CST the serving gunicorn worker was **59 s old** (a recycle), and host load was 5.27 on
+  12 cores. So the cause is most likely a cold web worker, not host contention. Not proven: the
+  4:08 PM sample's worker age was not read.
+- **Board:** build 511 s old, shortlist written 555 s ago (76-371 s in earlier readings). Query
+  snapshot 2,908 s old.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. No live chip without a
+live card.
+
+**Restarts:**
+- live-odds-worker pid 2834332, unchanged.
+- refresh-worker pid 2809282, up since the 16:29Z 11-16 TERM.
