@@ -916,3 +916,97 @@ scope. The optional Q4 end-game TD share from the v2 write-up is NOT in v3.
 - After the FIT read, nothing changes for this candidate.
 - **Compute:** FIT ~10 arms x ~4 min. Held-out (only on a FIT pass): `off` + the candidate, 121 x 1000 seeds each,
   ~35-40 min each. All of it at Idle with `PYTHONHASHSEED=0` and 3 workers.
+
+
+## V3 RESULTS — 2026-11-15, FIT arms 17:14-18:22 CST and NCAAF to 18:27 (run logs), written 18:29 CST
+
+### Verdict: FAIL on FIT, on G5 alone, at the registered candidate (`home_field_bonus` 0.06, TD multiplier 0.825). Nothing ships, and the held-out stays UNREAD.
+
+**Code:** branch `claude/admiring-gould-5c7128` @ `6d92919c4`, not pushed.
+- After a rebase: v2 is `6ff325891` and v1 `4cb03801c`. main's commits since `2bc1984e9` touch no football code (`git diff --stat` over `syndicate/features/football/` is empty), so v1 / v2's `off` arms stay the baseline.
+- One switch, `kneel_out_q4_only`.
+- B: OFF byte-identical (the v1 digests). R: reachable on top of the kneel-out and inert without it.
+- 37 tests pass.
+
+### FIT read (NFL, 136 games x 100 seeds, same seeds)
+
+| arm | q1 | q2 | q3 | q4 | H1 / H2 | margin | Q2 last-120 s pts / snaps | Q4 last-120 s pts (lead / trail) | Q |
+|---|---|---|---|---|---|---|---|---|---|
+| league 2024-25 | 8.93 [8.46, 9.40] | 14.02 [13.47, 14.59] | 9.50 [9.01, 10.00] | 13.17 [12.54, 13.84] | 22.95 / 22.67 | | 4.78 [4.46, 5.10] / 10.63 [10.41, 10.86] | 2.63 [2.31, 2.96] (0.44 / 2.11) | |
+| `off` | 9.68 | 12.54 | 10.52 | 13.10 | 22.22 / 23.62 | +1.93 | 3.14 / 6.50 | 2.25 | 52.8 |
+| `full3` (h0, t1.0) | 9.68 | 14.55 | 9.76 | 13.89 | 24.23 / 23.64 | +1.07 | 5.15 / 10.68 | 3.01 (1.39 / 1.62) | 18.9 |
+| R1 pick `v3h0.03_t1.0` | 9.76 | 14.77 | 9.90 | 14.04 | 24.52 / 23.94 | +1.70 | 5.19 / 10.69 | 3.06 | 28.1 |
+| R2a best `v3h0.03_t0.8` | 9.06 | 13.76 | 9.34 | 13.26 | 22.81 / 22.60 | +1.61 | 4.98 / 10.71 | 2.97 (1.27 / 1.70) | 1.58 |
+| **R2 pick `v3h0.03_t0.825`** | 9.17 | 13.85 | 9.45 | 13.31 | 23.02 / 22.77 | +1.61 | 5.04 / 10.73 | **2.94** (1.28 / 1.66) | **1.53** |
+| R3 `v3h0.0_t0.825` | 9.07 | 13.72 | 9.39 | 13.17 | 22.79 / 22.56 | +1.07 | 5.01 / 10.71 | 2.91 | 1.61 |
+| **R3 pick = CANDIDATE `v3h0.06_t0.825`** | **9.22** | **13.97** | **9.48** | **13.42** | **23.19 / 22.89** | +2.23 | **5.08 / 10.75** | **3.01** (1.29 / 1.72) | 2.02 |
+
+**Re-fit, as registered.**
+- R1 (TD multiplier 1.0): margins +1.07 / +1.70 / +2.33 for 0 / .03 / .06. **0.03 wins** (0.23 from `off`'s +1.93), not the edge.
+- R2a (at 0.03): Q is 28.14 / 17.79 / 6.61 / 2.29 / **1.58** / 4.24 for 1.0 / .95 / .90 / .85 / .80 / .75.
+- R2b: 0.775 gives Q 2.46 and 0.825 gives **1.53**. **0.825 wins** (the minimiser; the tie rule would pick it too).
+- **R3 was triggered and run.** The margin at R2's pick is +1.61, a move of 0.32 > 0.15, and R3 could change the verdict.
+  - At 0.825: margins +1.07 / +1.61 / +2.23 for 0 / .03 / .06, so **0.06 wins (0.300 vs 0.324)**.
+  - The edge rule ran 0.09 (+2.78) and 0.12 (+3.32), both farther.
+  - **Final: `home_field_bonus` 0.06, TD multiplier 0.825.**
+
+**Gates at the candidate (`v3h0.06_t0.825`).**
+
+| gate | result |
+|---|---|
+| G1 q1 / q2 / q3 / q4 | 9.22 / 13.97 / 9.48 / 13.42, all PASS |
+| G2 | 5.08 PASS |
+| G3 | 10.75 PASS |
+| G4 | 23.19 > 22.89 PASS |
+| G5 | **3.01 FAIL** (> 2.96) |
+
+**What decided the verdict: two margins the size of the sim's own noise.**
+- **R3 chose 0.06 over 0.03 on 0.024 points of mean home margin.** That margin's paired CI against `off` is about +-0.23.
+- **G5's miss is inside the same noise.**
+  - Q4-window points are not monotone in either lever: at TD multiplier 0.825, 2.91 / 2.94 / 3.01 / 3.02 / 2.98 for `home_field_bonus` 0 / .03 / .06 / .09 / .12.
+  - The same Q4 mechanism at the same levers read 2.948 in v2 and 2.939 in v3 (the rng diverges after Q2).
+  - Across the 9 v3 arms at TD multiplier <= 0.85, it ranges 2.91-3.02. So it sits at about 2.97 +- 0.04, on the league CI's upper edge, and the gate at any one point is close to a coin flip.
+- **At the R2 point (hfb 0.03, TD multiplier 0.825) EVERY gate passes, with G5 at 2.94.** The registered rule takes R3's value, so that point is not the candidate.
+- The binding says "After the FIT read, nothing changes for this candidate." **The verdict stays a FAIL.**
+
+**The systematic part behind G5 is not noise: the composition.**
+- Leaders score 1.29 Q4-window points a game, against the league's 0.44. Trailers score 1.72, against 2.11.
+- The total lands near the league only because the two errors offset.
+- No lever in the re-fit reaches the split.
+
+**Predictions.**
+- **Held:**
+  - V3-P1;
+  - V3-P2, every range (H1 - H2 +0.59 vs "~+0.7");
+  - V3-P3 for R1 and R2 (0.03, 0.825);
+  - V3-P4 for G1, G3 (10.75), G4 and G2 (5.08, inside 5.00-5.15, and it passed);
+  - V3-P7.
+- **Failed:**
+  - V3-P3 at the final: R3 moved `home_field_bonus` to 0.06;
+  - V3-P4's G5 "lean to pass": 3.01, outside 2.85-3.00;
+  - V3-P5: the FAIL came on G5, not G2.
+- **Not read:** V3-P6.
+
+### NCAAF arms (descriptive; 2024 FBS-vs-FBS, every 4th game, 164 x 100 seeds, no re-fit)
+
+| arm | q1 | q2 | q3 | q4 | H1 / H2 | total | margin | Q2 last-120 s pts / snaps | Q4 last-120 s pts / snaps |
+|---|---|---|---|---|---|---|---|---|---|
+| league CFBD 2023-25 | 11.37 | 16.23 | 11.65 | 13.83 | 27.60 / 25.48 | | | 5.27 / 10.59 [10.43, 10.76] | 3.07 / 7.25 |
+| `off` | 11.37 | 13.78 | 11.71 | 14.36 | 25.15 / 26.07 | 51.33 | +1.58 | 2.86 / 6.34 | 2.47 / 4.55 |
+| `full2` | 11.37 | 15.95 | 11.26 | 15.50 | 27.32 / 26.76 | 54.19 | +0.94 | 5.03 / 9.61 | 3.50 / 7.46 |
+| **`full3`** | 11.37 | **16.23** | 11.33 | 15.49 | **27.60 / 26.82** | 54.54 | +0.80 | **5.32 / 10.44** | 3.51 / 7.48 |
+
+**Reading.**
+- Q2 matches the league exactly (16.23). Its window is inside the CI (10.44 snaps, against [10.43, 10.76]). H1 > H2.
+- Q4 is still high (15.49 vs 13.83) without NCAAF's own re-fit.
+- **V3-P7 held.**
+
+### What is left (the user's call; nothing here is pre-registered)
+
+1. **Stop at v3.** The switches stay in the code, default OFF, and #808 is recorded as not fixed.
+2. **A logged user OVERRIDE of the R3 rule.** Take the R2 point (hfb 0.03, TD multiplier 0.825), where every gate passes, as the candidate, and read the held-out.
+   - The held-out played no part in choosing that point, so it stays an independent test of it.
+   - The costs: the choice is post-hoc, against this lane's own binding, and it spends the last clean NFL set.
+3. **A v4 for the composition.** The leader's TD share in Q4 preservation AND trailer scoring in the Q4 drill: two mechanisms, the second unmeasured.
+   - It would need its own pre-registration.
+   - FIT's independence is already spent, so the held-out would again be the only real test.
