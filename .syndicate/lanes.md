@@ -749,11 +749,6 @@ death, never life — do not invert it.
 - Verification: git grep for api.render.com / onrender outside data, reports, ledger and render.yaml returns only the deploy-guard's Render-BLOCKING rules and docs that say Render is retired; pytest on every changed module's tests passes; each repointed CLI run once read-only against the fleet and its verdict leaves UNKNOWN; #766 records the user's decisions on markers, env snapshot and the render.yaml guard
 - Blocked by: none
 
-### closed-lane-archive-20261116-0440 — CLOSED 2026-11-16 (GOAL MET: 18 blocks archived) — opened 2026-11-16 — session d8b75461-af46-460a-bbc9-5602287431fa
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 18 of 21 CLOSED blocks; all 18 moved. Slugs, the reading and the WAIT reasons are in `.syndicate/log/2026-11-15.md` (10:40Z 11-16 entry).
-
 ### closed-lane-archive-20261116-0639 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 1c8edcd7-a178-4213-a57f-23a606923abe
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -829,6 +824,11 @@ fl813\out\mnf_reads.jsonl` (7:10 PM CST to the final) and puts the result in its
 - Falsification test: build check: with every weight forced to 0 the learner must reproduce the prior's log loss exactly, and fitted weights must change it (off != on); either failing means the learner is not wired
 - Verification: fleet dry run over 11-09..11-16: graded-opinion coverage per sport x family x phase x clock bucket with its denominator; weights-0 equals the prior; held-out report printed; tests pass; gate registration pushed before its data
 - Blocked by: none
+
+### closed-lane-archive-20261116-1040 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session d9334b85-877c-40a4-b4d8-3a4ab232c91f
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET -- owner_liveness --idle-min 240 on origin/main 512337327 read 1 SAFE of 6 CLOSED; moved `closed-lane-archive-20261116-0440`. Reading and Part B table in `.syndicate/log/2026-11-16.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1108,6 +1108,7 @@ fl813\out\mnf_reads.jsonl` (7:10 PM CST to the final) and puts the result in its
 - `closed-lane-archive-20261115-2300` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 7f79320f-36a1-43e4-bbe5-1f5ab96a089b
 - `closed-lane-archive-20261116-0040` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 5e2408ef-0ee8-42b2-9f3f-728391707307
 - `closed-lane-archive-20261116-0240` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 177cb42a-78ee-459c-a94a-5e9e7bd063da
+- `closed-lane-archive-20261116-0440` — CLOSED 2026-11-16 (GOAL MET: 18 blocks archived) — opened 2026-11-16 — session d8b75461-af46-460a-bbc9-5602287431fa
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
