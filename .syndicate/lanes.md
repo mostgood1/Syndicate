@@ -820,6 +820,14 @@ fl813\out\mnf_reads.jsonl` (7:10 PM CST to the final) and puts the result in its
 - Verification: readout script reproduces the 2026-11-16 numbers from the fleet's /api/portfolio/live (last30 -7.27% +- 2.84 on 3006.48 staked); gate text recorded in the findings file and user-approved before any cap change
 - Blocked by: none
 
+### engine-learner — OPEN — opened 2026-11-16 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: M2 slice 1 (Phase 1B, #736): a shadow learner -- per-expert, per-cell weights with hierarchical partial pooling, fitted on the logged ExpertOpinions against the outcome -- and a held-out report (later dates, game-clustered CI) of p_decision's log loss minus the prior's, per sport family and phase; run read-only on the fleet's 11-09.. data with off != on, and the M2 gate read registered on main before its data
+- Files: syndicate/features/shared/engine_learner.py, scripts/engine_learner.py, tests/test_engine_learner.py, docs/ai_context/engine_learner.md
+- Hypothesis: n/a for the build; the M2 gate (held-out log loss of p_decision below the prior's, CI below 0, per sport family, pregame and live separately) is registered before its data
+- Falsification test: build check: with every weight forced to 0 the learner must reproduce the prior's log loss exactly, and fitted weights must change it (off != on); either failing means the learner is not wired
+- Verification: fleet dry run over 11-09..11-16: graded-opinion coverage per sport x family x phase x clock bucket with its denominator; weights-0 equals the prior; held-out report printed; tests pass; gate registration pushed before its data
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
