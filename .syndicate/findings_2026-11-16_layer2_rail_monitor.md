@@ -314,3 +314,48 @@ live card.
 **Restarts:**
 - live-odds-worker pid 2834332, unchanged.
 - refresh-worker pid 2809282, up since the 16:29Z 11-16 TERM.
+
+## Reading 8 — Mon 11-16 4:58 PM CST (22:58Z), full page
+
+**Slate:**
+- 1 live chip: WNCAAB Lamar @ Texas A&M, at HALF.
+- Penn State @ Arizona State has ended. It carries flag 1 (u139.5), graded tonight with the rest.
+- The 5 PM college wave is not live yet: NCAAB builds 7 in 25 min, pregame.
+
+**Readings:**
+- **0 flags shown.** 0 false, 0 missed, 0 dark.
+- **Live rows:** 6, all WNCAAB main at the break.
+  - 1 priced <= 120 s; priced age p50 164 s; seen age at pricing p50 130 s.
+  - 3 older than 300 s now. 2 of 2 markets carry no price of ours.
+  - Live-rail: 1 row on 3 reads.
+- **WNCAAB overlay (25 min):** 31 builds, gap p50 51 s, max 83 s, 0 over 360 s. Zero-card builds
+  with rows: 1 of 31.
+- **Builds:**
+  - NBA p50 12.1 s (n=3, pregame); NFL 9.0 / 38.6 s (n=2); NCAAB p50 8.2 s, max 22.1 s;
+    NHL 0.8 / 11.1 s; soccer 5.7 / 12.7 s.
+  - 0 `deferred_slow`. Tick gap p50 37 s, max 94 s.
+- **Web merges:** wncaab fresh 23 / 23; nfl and ncaab stale (nothing live).
+- **Load:**
+  - `/intelligence` 4.6 s / 23.2 MB.
+  - **Query 7.8 s** / 64.4 MB (11.6 MB wire), down from 19-20 s at 4:08 and 4:36 PM.
+  - Shortlist 0.7 s; chips 0.17 s; live-rail 0.015 s.
+- **Board:** build 49 s old; shortlist written 78 s ago; query snapshot 542 s.
+
+**Web worker ages:**
+- At 16:58:09 the two gunicorn workers were 322 and 879 s old. During the probe, the 879 s worker
+  was recycled (`WEB_WORKER_MEMORY_RECYCLE` 22:58:14Z, anon 951 MB vs limit 642 MB, hard,
+  15 requests). A new worker booted at 22:58:16Z.
+- Recycles in 22:27-22:58Z: 6 worker boots. Each worker passed its ~640 MB anon limit within 5-15
+  requests and 285-938 s.
+- Recycles by hour:
+  - 22Z 11-16: 14;
+  - earlier 11-16 game hours: 3-17 per hour;
+  - 11-15 game peak: 30-51 per hour.
+- This fits the 19-20 s queries landing on cold workers. **Not proven:** which worker served each
+  read is not logged.
+- The web memory guard is the known, closed mechanism (lane `web-memory-guard`). The
+  5-15-requests-per-worker rate is recorded as a lead in `leads.md`, not followed.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated.
+
+**Restarts:** live-odds-worker pid 2834332 and refresh-worker pid 2809282, both unchanged.
