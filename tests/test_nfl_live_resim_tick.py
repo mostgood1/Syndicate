@@ -170,6 +170,21 @@ def test_the_drive_REACHES_the_engine_and_changes_the_answer():
     assert r_on["total_mean"] > r_off["total_mean"]
 
 
+def test_timeouts_left_are_carried_only_as_ints_0_to_3():
+    """For lane nfl-live-timeouts: the live resume's timeouts left, never a default."""
+    row = normalise_live_row(_live({"possession": "21", "down": 1, "distance": 10, "possessionText": "PHI 35",
+                                    "homeTimeouts": 2, "awayTimeouts": 0}))
+    assert (row["home_timeouts"], row["away_timeouts"]) == (2, 0)
+    for bad in (None, -1, 4, "x", True, 1.5):
+        row = normalise_live_row(_live({"homeTimeouts": bad, "awayTimeouts": bad}))
+        assert (row["home_timeouts"], row["away_timeouts"]) == (None, None), bad
+    assert normalise_live_row(_live({"homeTimeouts": "3"}))["home_timeouts"] == 3
+    # No situation, or a game not live: unknown, not 3.
+    assert normalise_live_row(ESPN_SHAPE)["home_timeouts"] is None
+    final = normalise_live_row({**_live({"homeTimeouts": 2}), "in_progress": False, "final": True})
+    assert final["home_timeouts"] is None
+
+
 def test_the_tally_counts_carried_and_names_the_rest():
     index = {
         "a": normalise_live_row(_live({"possession": "21", "down": 2, "distance": 7,
