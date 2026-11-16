@@ -13,7 +13,7 @@ Precedence, first non-empty wins (a trailing `/` is stripped):
     2. SYNDICATE_BASE_URL
     3. SYNDICATE_OPS_BASE_URL
     4. SYNDICATE_DIAG_BASE_URL
-    5. the LOCAL FLEET, FLEET_BASE_URL -- except on a Render host (below).
+    5. the LOCAL FLEET, FLEET_BASE_URL.
 
 The fallback was Render until 2026-10-06. Measured that day: the Windows task
 `SyndicateSoccerLiveProjectionHarvest` had failed 569 times in a row (HTTP 503,
@@ -22,15 +22,17 @@ want of one exported variable. They were patched from OUTSIDE the repo with a
 wrapper (`~/.claude/scheduled-tasks/_shared/local_fleet_env.py`); this is the
 in-repo fix, so an unflagged script needs no wrapper.
 
-ON A RENDER HOST the fallback stays Render (`RENDER` set, `SYNDICATE_LOCAL_PRODUCTION`
-not): a cron or worker there would otherwise post to its own loopback. The fleet's
-roles set `RENDER=true` as a marker AND `SYNDICATE_LOCAL_PRODUCTION=1`
-(`scripts/local_production.py`), so they get the fleet.
+THERE IS NO RENDER FALLBACK ANY MORE `[2026-11-15, lane render-retirement]`. Until then
+a "Render host" (`RENDER` set, `SYNDICATE_LOCAL_PRODUCTION` unset) fell back to
+`https://syndicate-an21.onrender.com`. Render has been suspended since 2026-09-30 and
+the user said on 2026-11-15 that it should not be used or needed for anything, so the
+only fallback is the fleet. The fleet's roles still carry `RENDER=true` as a MARKER
+(CLAUDE.md); it no longer changes what this resolves to.
 
 A script's own `--base-url` flag still beats all of this: the flag's argparse
 default is what this function returns.
 
-ADMIN TOKEN -- `admin_token(base_url)`. The repo `.env` holds the RENDER token;
+ADMIN TOKEN -- `admin_token(base_url)`. The repo `.env` holds the old RENDER-era token;
 the fleet's is the `ADMIN_TOKEN` line of `~/syndicate-prod/local_production.env`
 inside WSL. Sending `.env`'s token to the fleet gets a 401/403. So for a target
 that IS the fleet (loopback, port 10000) the token is read from that file --
@@ -41,15 +43,8 @@ shell-exported dead `ODDS_API_KEY`). Any other target keeps the old order:
 primary checkout's -- a session worktree has none). THE TOKEN IS NEVER PRINTED;
 callers that report it may report its length only.
 
-DELIBERATELY NOT USED BY `scripts/deploy_preflight.py`. Preflight gates a
-RENDER deploy and compares Render API state with the web service's own
-memory endpoint; letting the generic `SYNDICATE_BASE_URL` repoint half of
-that comparison at another host would make its reading wrong without
-making it fail. It keeps its own `SYNDICATE_DIAG_BASE_URL` override and its
-own `.env` token (`sample_request_path_guard.py` borrows both).
-
-`tests/test_base_url.py` fails if a new hard-coded Render default appears
-anywhere in `scripts/` outside this file.
+`tests/test_base_url.py` fails if a hard-coded Render URL appears as a value anywhere
+in `scripts/`.
 """
 
 from __future__ import annotations
@@ -62,7 +57,6 @@ import urllib.parse
 from collections.abc import Iterable
 from pathlib import Path
 
-RENDER_BASE_URL = "https://syndicate-an21.onrender.com"
 FLEET_BASE_URL = "http://127.0.0.1:10000"
 FLEET_WSL_DISTRO = "Ubuntu-24.04"
 FLEET_ENV_FILE = "~/syndicate-prod/local_production.env"
@@ -77,19 +71,13 @@ _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _on_render_host() -> bool:
-    if str(os.environ.get("SYNDICATE_LOCAL_PRODUCTION") or "").strip() not in ("", "0"):
-        return False
-    return bool(str(os.environ.get("RENDER") or "").strip())
-
-
 def default_base_url(*prefer: str) -> str:
-    """The first set variable among `prefer` then BASE_URL_ENV_VARS, else the fleet (Render on a Render host)."""
+    """The first set variable among `prefer` then BASE_URL_ENV_VARS, else the fleet."""
     for key in (*prefer, *BASE_URL_ENV_VARS):
         value = str(os.environ.get(key) or "").strip()
         if value:
             return value.rstrip("/")
-    return RENDER_BASE_URL if _on_render_host() else FLEET_BASE_URL
+    return FLEET_BASE_URL
 
 
 def is_local_fleet(base_url: str | None) -> bool:
@@ -203,7 +191,7 @@ def admin_token(
 
     Fleet target: the fleet's own token, else an inherited `ADMIN_TOKEN` (e.g.
     a script run inside a fleet role, where the two are the same). Never the
-    repo `.env` -- that is Render's, and a 401 is a worse failure than "no
+    repo `.env` -- that is the Render-era token, and a 401 is a worse failure than "no
     token" because it reads as an auth bug on the fleet.
 
     Any other target: `ADMIN_TOKEN`, `SYNDICATE_ADMIN_TOKEN`, then `.env`.

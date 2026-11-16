@@ -47,7 +47,6 @@ from scripts._pipeline_diag import (  # noqa: E402
     matches,
     oom_events,
     freshness_note,
-    render_owner_id,
     service_commits,
     utcnow,
     web_json,
@@ -71,7 +70,11 @@ def stage_services() -> tuple[Stage, dict[str, str]]:
             "!! SERVICES ARE ON DIFFERENT COMMITS -- a question touching two of them "
             "can get two answers, both authoritative-looking"
         )
-    kills = [(when, kind) for when, kind in oom_events(SERVICES["web"], limit=20) if "OOM" in kind or "unhealthy" in kind]
+    events = oom_events(SERVICES["web"], limit=20)
+    if events is None:
+        stage.notes.append("?? web kill events UNREADABLE on the fleet -- unknown, not 'no kills'")
+        events = []
+    kills = [(when, kind) for when, kind in events if "OOM" in kind or "unhealthy" in kind]
     if kills:
         stage.notes.append(f"!! web: {len(kills)} OOM/unhealthy events in the last 20 (most recent {kills[0][0]})")
         for when, kind in kills[:4]:
@@ -369,18 +372,17 @@ def main() -> int:
     parser.add_argument(
         "--log-limit",
         type=int,
-        default=1000,
-        help="log lines per service (max 1000 -- the API 400s above that). The worker "
-        "is chatty: 400 lines bought only ~3 minutes, too short to contain one "
-        "15-minute board cycle.",
+        default=20000,
+        help="refresh-worker log lines, from the tail of its fleet log. The worker "
+        "is chatty: 400 lines bought only ~3 minutes on Render, too short to contain "
+        "one 15-minute board cycle; the window actually covered is printed.",
     )
     args = parser.parse_args()
 
     date = args.date or utcnow().strftime("%Y-%m-%d")
     sports = (args.sport,) if args.sport else SPORTS
 
-    owner = render_owner_id()
-    worker_logs, log_error = fetch_logs(SERVICES["refresh-worker"], limit=args.log_limit, owner_id=owner)
+    worker_logs, log_error = fetch_logs(SERVICES["refresh-worker"], limit=args.log_limit)
     first, last, minutes = log_window(worker_logs)
 
     services_stage, _ = stage_services()

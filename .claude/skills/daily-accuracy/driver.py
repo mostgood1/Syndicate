@@ -1,8 +1,8 @@
 """Read the published model scorecard back and say what it actually covers.
 
 Lane `daily-accuracy-suite` `[2026-09-20]`. This is a READER. It computes nothing,
-grades nothing and publishes nothing: the daily `model-scorecard` Render cron
-(`30 11 * * *`) does all of that and writes a dated artifact, and this reads that
+grades nothing and publishes nothing: the daily `model-scorecard` job (a Render cron
+until 2026-09-30, now the fleet supervisor's `SCHEDULED_JOBS` entry at 11:30Z) does all of that and writes a dated artifact, and this reads that
 artifact back over HTTP and reports on it.
 
 WHY A READER AND NOT A SECOND GRADER. Re-grading here would produce a second

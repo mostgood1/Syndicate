@@ -402,10 +402,10 @@ def derive_role_env(
         "SYNDICATE_WEB_WORKER_RECYCLE_STAMP": str(settings.run_dir / "web_worker_recycle.stamp"),
     }
     local_web = f"http://127.0.0.1:{settings.port}"
-    # Every worker->web URL points at the local web. With these unset the code
-    # falls back to the PUBLIC onrender host (live_lens_loop.py
-    # _wnba_live_box_base_url, publish_model_scorecard.base_url), which is
-    # suspended -- and would be billed egress if it were not.
+    # Every worker->web URL points at the local web. Until 2026-11-15 an unset
+    # key fell back to the retired Render host (live_lens_loop.py
+    # _wnba_live_box_base_url); every fallback is the fleet now, and these keep
+    # the port in step with `--port`.
     forced["SYNDICATE_INTERNAL_WEB_BASE_URL"] = local_web
     forced["SYNDICATE_WNBA_LIVE_BOX_BASE_URL"] = local_web
     forced["SYNDICATE_BASE_URL"] = local_web

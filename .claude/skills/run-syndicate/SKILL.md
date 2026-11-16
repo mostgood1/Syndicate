@@ -95,9 +95,9 @@ see Gotchas.
   real network call (`_fetch_mlb_feed_live` -> statsapi.mlb.com) with its
   own 5s socket timeout -- a full 15-game slate run sequentially could
   total 70s+ of blocking I/O in one request, past gunicorn's 60s worker
-  timeout in production (`render.yaml`: `GUNICORN_TIMEOUT=60`, only
-  `WEB_CONCURRENCY=2` workers at 1 thread each) -- exactly the shape of
-  "cold Render deploy" trouble: a slow/killed worker on the very requests
+  timeout in production (`GUNICORN_TIMEOUT=60` in the web role's env; the
+  worker and thread counts have changed since, see the fleet runbook) -- exactly the shape of
+  "cold deploy" trouble: a slow/killed worker on the very requests
   that should be proving the deploy healthy. Fixed 2026-07-21: games now
   fetch concurrently (`_mlb_feed_live_states`, one thread per game) with
   a hard 8s wall-clock ceiling regardless of external API behavior --
@@ -118,11 +118,12 @@ see Gotchas.
   application code, but that wasn't confirmed before running out of
   productive diagnostic avenues (a faulthandler/signal-based thread-dump
   attempt failed on Windows subprocess signal handling). **Don't assume
-  this is fully resolved without checking real Render behavior** (worker
-  restart frequency, cold-deploy response times) after this fix ships --
-  that's a different OS and WSGI server (gunicorn on Linux) from this
-  local Werkzeug-on-Windows sandbox, and is the authoritative test bed
-  for whether "Render deploy on cold" is actually resolved.
+  this is fully resolved without checking real production behavior** (the
+  local WSL fleet since 2026-09-30, not Render: worker restart frequency,
+  cold-reload response times) -- that's a different OS and WSGI server
+  (gunicorn on Linux) from this local Werkzeug-on-Windows sandbox, and is
+  the authoritative test bed for whether "slow on a cold deploy" is
+  actually resolved.
 
   For the driver: **don't chain page visits behind a visit to `/`**
   regardless of the above -- `smoke()` gives the home page its own,

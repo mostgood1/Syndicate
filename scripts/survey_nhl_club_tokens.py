@@ -29,7 +29,6 @@ if str(REPO) not in sys.path:
 from syndicate.local_nhl_odds import TEAM_ABBRS, TEAM_NAME_TO_ABBR, _norm_team_name
 
 UA = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
-RENDER_SRV = "srv-d91dpertqb8s73co8lt0"  # live-odds-worker, for ODDS_API_KEY
 
 
 def get_json(url, headers=UA, timeout=40):
@@ -45,22 +44,29 @@ PRIMARY_TREE = primary_tree()
 
 
 def odds_api_key():
-    # `.env` is gitignored, so a session worktree does not carry one; fall back
-    # to the primary tree's copy rather than failing in exactly the place this
-    # script is meant to be run from.
-    env = REPO / ".env"
-    if not env.exists():
-        env = PRIMARY_TREE / ".env"
-    render_key = ""
-    for line in env.read_text(encoding="utf-8").splitlines():
-        if line.startswith("RENDER_API_KEY="):
-            render_key = line.split("=", 1)[1].strip().strip('"').strip("'")
-    body, _ = get_json(
-        f"https://api.render.com/v1/services/{RENDER_SRV}/env-vars/ODDS_API_KEY",
-        headers={"Authorization": f"Bearer {render_key}", "Accept": "application/json"},
-    )
-    key = (body.get("envVar") or body).get("value")
-    assert key, "ODDS_API_KEY came back empty"
+    """ODDS_API_KEY from the repo `.env` -- never printed.
+
+    It used to be fetched from the Render API (live-odds-worker's env-vars), which
+    was retired 2026-11-15 (lane render-retirement). The `.env` key is read BEFORE
+    the environment on purpose: the ODDS_API_KEY exported into session shells has
+    been a deactivated key (measured 2026-10-05), and it would win by precedence.
+    `.env` is gitignored, so a session worktree does not carry one; fall back to the
+    primary tree's copy rather than failing in exactly the place this script is
+    meant to be run from.
+    """
+    for env in (REPO / ".env", PRIMARY_TREE / ".env"):
+        if not env.exists():
+            continue
+        for line in env.read_text(encoding="utf-8-sig").splitlines():
+            name, sep, value = line.strip().partition("=")
+            if sep and name.strip() == "ODDS_API_KEY":
+                key = value.strip().strip('"').strip("'")
+                if key:
+                    return key
+    import os
+
+    key = str(os.environ.get("ODDS_API_KEY") or "").strip()
+    assert key, "ODDS_API_KEY not found in .env (this checkout or the primary tree) or the environment"
     return key
 
 

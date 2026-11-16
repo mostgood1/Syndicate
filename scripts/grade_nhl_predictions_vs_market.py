@@ -57,7 +57,7 @@ REAL DATA SOURCES, NO SYNTHETIC SUBSTITUTION:
   dates) -- per CLAUDE.md, that is a mirror limitation, not evidence the pipeline never ran.
 - Predictions + market odds (`--source production` / `both`): pulled LIVE from the public
   `/nhl/api/cards/dates` + `/nhl/api/cards?date=<date>` routes on production
-  (`--base-url`, default `https://syndicate-an21.onrender.com`), no admin token needed -- these are
+  (`--base-url`, default the local fleet `http://127.0.0.1:10000` via `scripts/_base_url.py`), no admin token needed -- these are
   the same web-tier ROUTES the board itself renders from, hydrating the identical
   `predictions_<date>.csv` row already on Render's disk (confirmed per-game via the payload's own
   `source_path`/`lookahead_applied=False`/`using_sample_data=False` fields -- not assumed). Money-

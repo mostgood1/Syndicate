@@ -17,6 +17,10 @@ Design rules learned the expensive way on 2026-08-09, all encoded here:
   A stale service produces clean, decisive, wrong numbers.
 - **A count needs a denominator.** `rows=155` means nothing without
   `considered=3324`.
+
+PRODUCTION means the local WSL fleet (`http://127.0.0.1:10000`, logs in
+`~/syndicate-prod/logs`) since 2026-09-30. Until 2026-11-15 the logs, commits and
+kill events came from the Render API; that path was retired (lane render-retirement).
 """
 
 from __future__ import annotations
@@ -25,6 +29,7 @@ import json
 import os
 import re
 import ssl
+import subprocess
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -40,37 +45,6 @@ except ImportError:  # run as `python scripts/<name>.py`
     from _base_url import admin_token as resolve_admin_token, default_base_url
 
 WEB_BASE = default_base_url("SYNDICATE_DIAG_BASE_URL")
-RENDER_API = "https://api.render.com/v1"
-
-SERVICES = {
-    "web": "srv-d88ahvrbc2fs73eodu30",
-    "refresh-worker": "srv-d91dpertqb8s73co8ls0",
-    "live-odds-worker": "srv-d91dpertqb8s73co8lt0",
-}
-
-SPORTS = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")
-
-
-def _load_dotenv() -> dict[str, str]:
-    """Read .env without a dependency. Values may be quoted."""
-    out: dict[str, str] = {}
-    path = REPO_ROOT / ".env"
-    if not path.exists():
-        return out
-    for raw in path.read_text(encoding="utf-8", errors="ignore").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        out[key.strip()] = value.strip().strip('"').strip("'")
-    return out
-
-
-_ENV = _load_dotenv()
-
-
-def secret(name: str) -> str:
-    return os.environ.get(name) or _ENV.get(name) or ""
 
 
 def utcnow() -> datetime:
@@ -125,48 +99,84 @@ def web_json(path: str, *, admin: bool = False, timeout: int = 60) -> tuple[Any,
     return http_json(f"{WEB_BASE}{path}", headers=headers, timeout=timeout)
 
 
-def render_json(path: str, *, timeout: int = 60) -> tuple[Any, int | None, str]:
-    key = secret("RENDER_API_KEY")
-    if not key:
-        return None, None, "RENDER_API_KEY not set"
-    return http_json(f"{RENDER_API}{path}", headers={"Authorization": f"Bearer {key}"}, timeout=timeout)
+# PRODUCTION IS THE LOCAL WSL FLEET `[since 2026-09-30; the Render API reads here were
+# retired 2026-11-15, lane render-retirement]`. Logs, live commits, kill events and env
+# flags come from the fleet host -- through `wsl.exe` on Windows, a plain shell on the
+# host itself -- and never from Render, which the user said on 2026-11-15 must not be
+# used or needed for anything.
+FLEET_WSL_DISTRO = os.environ.get("SYNDICATE_FLEET_WSL_DISTRO", "Ubuntu-24.04")
+# A POSIX path on the fleet host; `$HOME` is expanded there, not here.
+FLEET_LOG_DIR = os.environ.get("SYNDICATE_FLEET_LOG_DIR", "$HOME/syndicate-prod/logs")
+
+# Service name -> the fleet role's log name (`<FLEET_LOG_DIR>/<role>.log`). The keys are
+# the names the diagnostics have always used; the values were Render service ids.
+SERVICES = {
+    "web": "web",
+    "refresh-worker": "refresh-worker",
+    "live-odds-worker": "live-odds-worker",
+}
+
+SPORTS = ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer")
+
+# `local_logstamp` prefixes every line a role prints with `2026-10-02T14:36:49.123Z `.
+_STAMPED = re.compile(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?)Z (.*)$")
+_ENV_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
-def render_owner_id() -> str:
-    payload, _, _ = render_json("/owners?limit=1")
-    if isinstance(payload, list) and payload:
-        return str((payload[0].get("owner") or {}).get("id") or "")
-    return ""
+def fleet_shell(command: str, *, timeout: int = 120) -> tuple[str, str]:
+    """(stdout, error) of one `sh -c` on the fleet host. NEVER raises.
 
-
-RENDER_LOG_LIMIT_MAX = 1000
-"""Measured 2026-08-09: `limit=1000` returns 1000 rows, `limit=1500` returns
-HTTP 400 with an EMPTY BODY. Same trap as the env-vars endpoint refusing
-`limit` > 100. Silently fatal for a diagnostic, because an over-limit request
-yields zero logs, which every downstream stage then reports as "the loop may
-not be running" -- a tool defect wearing the costume of a production defect.
-Clamped here so no caller can reproduce it.
-"""
-
-
-def fetch_logs(
-    service_id: str, *, limit: int = 1000, owner_id: str | None = None
-) -> tuple[list[dict[str, Any]], str]:
-    """Returns (logs, error). An EMPTY LIST WITH NO ERROR means the service
-    genuinely emitted nothing; an empty list WITH an error means we failed to
-    ask. Callers must distinguish these -- conflating them is how a broken
-    query becomes a false production finding.
+    A non-zero exit with output is returned WITH its error, so a caller can tell a
+    partial read from an empty one.
     """
-    owner = owner_id or render_owner_id()
-    if not owner:
-        return [], "could not resolve Render ownerId"
-    capped = max(1, min(int(limit), RENDER_LOG_LIMIT_MAX))
-    payload, status, error = render_json(
-        f"/logs?ownerId={owner}&resource={service_id}&limit={capped}", timeout=90
-    )
-    if isinstance(payload, dict):
-        return list(payload.get("logs") or []), ""
-    return [], error or f"log fetch failed (http {status})"
+    argv = ["sh", "-c", command]
+    if os.name == "nt":
+        argv = ["wsl.exe", "-d", FLEET_WSL_DISTRO, "-e", *argv]
+    try:
+        proc = subprocess.run(
+            argv, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return "", f"fleet shell failed: {type(exc).__name__}: {exc}"
+    if proc.returncode != 0:
+        return proc.stdout or "", f"fleet shell rc {proc.returncode}: {(proc.stderr or '').strip()[:200]}"
+    return proc.stdout or "", ""
+
+
+def _parse_log_lines(text: str) -> list[dict[str, Any]]:
+    """`{timestamp, message}` rows, oldest-first. An unstamped line (a traceback, a
+    supervisor line) inherits the previous stamp and is marked `approximate`; one
+    before any stamp is dropped, because a row with no time cannot sit in a window."""
+    out: list[dict[str, Any]] = []
+    last = ""
+    for line in text.splitlines():
+        found = _STAMPED.match(line)
+        if found:
+            last = found.group(1)
+            out.append({"timestamp": last, "message": found.group(2)})
+        elif last and line.strip():
+            out.append({"timestamp": last, "message": line, "approximate": True})
+    return out
+
+
+def fetch_logs(service: str, *, limit: int = 20000) -> tuple[list[dict[str, Any]], str]:
+    """The newest `limit` lines of one fleet role's log. Returns (logs, error).
+
+    An EMPTY LIST WITH NO ERROR means the role genuinely printed nothing; an empty list
+    WITH an error means we failed to ask. Callers must distinguish these -- conflating
+    them is how a broken query becomes a false production finding.
+
+    Only the CURRENT log file is read (`tail`), so the window is at most what that file
+    holds since its last rotation. `log_window()` says what was actually covered.
+    """
+    role = SERVICES.get(service, service)
+    if role not in SERVICES.values():
+        return [], f"unknown service {service!r}"
+    lines = max(1, int(limit))
+    text, error = fleet_shell(f'tail -n {lines} "{FLEET_LOG_DIR}/{role}.log"', timeout=180)
+    if error and not text:
+        return [], error
+    return _parse_log_lines(text), error
 
 
 def log_window(logs: Iterable[dict[str, Any]]) -> tuple[str, str, float]:
@@ -209,57 +219,125 @@ def cadence(hits: list[dict[str, Any]]) -> tuple[float | None, str]:
     return mean, f"{len(stamps)} in window, mean gap {mean:.1f} min (min {min(gaps):.1f}, max {max(gaps):.1f})"
 
 
+def _fleet_status() -> tuple[str, dict[str, dict]]:
+    """`deploy_preflight.fleet_status()`: (checkout HEAD, {role: {pid, up, live_commit}})."""
+    try:
+        from scripts.deploy_preflight import fleet_status
+    except ImportError:  # run as `python scripts/<name>.py`
+        from deploy_preflight import fleet_status
+    return fleet_status()
+
+
 def service_commits() -> dict[str, str]:
-    """Live commit per service, read in one pass.
+    """The commit each fleet role LOADED, read in one pass (`local_production.py status`).
 
-    Read this BEFORE any measurement. Two services on different commits can
-    answer the same question differently and both look authoritative.
-
-    Uses `/deploys`, NOT `/services/<id>` -- the service object carries no
-    commit at all (verified 2026-08-09: `serviceDetails` has plan, disk, env,
-    region and no deploy info). The first version of this function read a
-    field that does not exist and returned "?" for all three services, which
-    is exactly the silent-blindness the whole check exists to prevent: a
-    guard that cannot see is worse than no guard, because it reports.
+    Read this BEFORE any measurement. Two roles on different commits can answer the
+    same question differently and both look authoritative. A role that is down or
+    unreadable reads `?(...)`, never a commit.
     """
+    try:
+        _, status = _fleet_status()
+    except Exception as exc:  # noqa: BLE001 - a diagnostic must survive anything
+        return {name: f"?(fleet status: {type(exc).__name__})" for name in SERVICES}
     out: dict[str, str] = {}
-    for name, service_id in SERVICES.items():
-        payload, _, error = render_json(f"/services/{service_id}/deploys?limit=5")
-        rows = payload if isinstance(payload, list) else []
-        commit = ""
-        for row in rows:
-            deploy = row.get("deploy", row) if isinstance(row, dict) else {}
-            if str(deploy.get("status") or "").lower() == "live":
-                commit = str((deploy.get("commit") or {}).get("id") or "")[:8]
-                break
-        out[name] = commit or (f"?({error})" if error else "?")
+    for name, role in SERVICES.items():
+        row = status.get(role)
+        if row is None:
+            out[name] = "?(not in local_production.py status)"
+        elif not row.get("up"):
+            out[name] = "?(role DOWN)"
+        else:
+            out[name] = str(row.get("live_commit") or "?(no commit stamp)")
     return out
 
 
-def oom_events(service_id: str, *, limit: int = 20) -> list[tuple[str, str]]:
-    """(timestamp, kind) for restarts/OOMs.
+_GUNICORN_KILL = "was sent SIGKILL|WORKER TIMEOUT|Perhaps out of memory"
 
-    Read `details.reason.oomKilled` -- the event TYPE alone says
-    `server_failed` for both a controlled restart and an OOM kill, and
-    calling one the other cost a full evening once.
+
+def oom_events(service: str, *, limit: int = 20) -> list[tuple[str, str]] | None:
+    """(timestamp, kind) for the role's recent kills/restarts, newest first, or None
+    when the fleet keeps NO record for this role (an unknown, not a clean bill).
+
+    - refresh-worker: `role_restarts.jsonl`, which the supervisor appends on every exit
+      with its code, signal and whether a deploy claim covered it. A SIGKILL is the
+      kernel OOM killer or a `kill -9`; the record cannot tell which.
+    - web: gunicorn's own worker-kill lines in `web.log` (`was sent SIGKILL! Perhaps out
+      of memory?`, `WORKER TIMEOUT`), current file only.
+    - live-odds-worker: None. The supervisor records its exits only in unstamped
+      `supervisor.log` lines.
     """
-    payload, _, _ = render_json(f"/services/{service_id}/events?limit={limit}")
-    rows = payload if isinstance(payload, list) else (payload or {}).get("events") or []
+    role = SERVICES.get(service, service)
+    count = max(1, int(limit))
     out: list[tuple[str, str]] = []
-    for row in rows:
-        event = row.get("event", row) if isinstance(row, dict) else {}
-        details = event.get("details") or {}
-        reason = details.get("reason") or {}
-        kind = str(event.get("type") or "")
-        if reason.get("oomKilled"):
-            limit_str = (reason.get("oomKilled") or {}).get("memoryLimit", "?")
-            kind = f"OOM KILLED ({limit_str})"
-        elif reason.get("unhealthy"):
-            kind = f"unhealthy: {reason.get('unhealthy')}"
-        elif reason.get("triggeredByUser"):
-            kind = f"{kind} (user-triggered)"
-        out.append((str(event.get("timestamp") or "")[:19], kind))
-    return out
+    if role == "refresh-worker":
+        text, error = fleet_shell(f'tail -n 2000 "{FLEET_LOG_DIR}/role_restarts.jsonl"')
+        if error and not text:
+            return None
+        for line in text.splitlines():
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            if entry.get("role") != role or entry.get("event") != "exit":
+                continue
+            sig = entry.get("signal")
+            if sig == "SIGKILL":
+                kind = "OOM KILLED? (SIGKILL: the kernel OOM killer or a kill -9)"
+            elif sig:
+                kind = f"exit {sig}"
+            else:
+                kind = f"exit code={entry.get('code')}"
+            kind += " (claimed restart)" if entry.get("claimed") else " (UNCLAIMED)"
+            out.append((str(entry.get("at") or "")[:19], kind))
+        return list(reversed(out))[:count]
+    if role == "web":
+        text, error = fleet_shell(
+            f'grep -E "{_GUNICORN_KILL}" "{FLEET_LOG_DIR}/web.log" | tail -n {count}; exit 0'
+        )
+        if error and not text:
+            return None
+        for row in _parse_log_lines(text) or [{"timestamp": "", "message": line} for line in text.splitlines()]:
+            message = str(row.get("message") or "")
+            if "SIGKILL" in message or "out of memory" in message.lower():
+                kind = "OOM KILLED? (gunicorn worker SIGKILL)"
+            else:
+                kind = "unhealthy: gunicorn WORKER TIMEOUT"
+            out.append((str(row.get("timestamp") or "")[:19], kind))
+        return list(reversed(out))[:count]
+    return None
+
+
+def fleet_role_env(service: str, keys: Iterable[str]) -> tuple[dict[str, str], str]:
+    """The named env keys of one running fleet role, from its `/proc/<pid>/environ`.
+    Returns (values, error).
+
+    ONLY the keys asked for cross the boundary -- a grep on the fleet host, never the
+    whole environ -- and each must be a plain env-var NAME. Ask for flags and intervals,
+    never a credential. A key absent from the role is absent from the result: absent is
+    not off, so callers print `<unset>` and check the code's default.
+    """
+    wanted = sorted({str(key) for key in keys if key})
+    bad = [key for key in wanted if not _ENV_KEY.match(key)]
+    if bad:
+        return {}, f"refusing non-name keys {bad}"
+    if not wanted:
+        return {}, ""
+    role = SERVICES.get(service, service)
+    try:
+        _, status = _fleet_status()
+    except Exception as exc:  # noqa: BLE001
+        return {}, f"fleet status: {type(exc).__name__}: {exc}"
+    pid = str((status.get(role) or {}).get("pid") or "")
+    if not pid.isdigit():
+        return {}, f"no running pid for {role}"
+    pattern = "|".join(wanted)
+    text, error = fleet_shell(f"tr '\\0' '\\n' < /proc/{pid}/environ | grep -E '^({pattern})=' ; exit 0")
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        name, sep, value = line.partition("=")
+        if sep and name in wanted:
+            values[name] = value
+    return values, error
 
 
 @dataclass

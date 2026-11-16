@@ -27,28 +27,18 @@ def _env_first(*names: str) -> str:
     return ""
 
 
+# Production since 2026-09-30: the local WSL fleet (`scripts/local_production.py`).
+_FLEET_BASE_URL = "http://127.0.0.1:10000"
+
+
 def _infer_render_base_url() -> str:
-    explicit = _env_first(
-        "MLB_BETTING_BASE_URL",
-        "BASE_URL",
-        "RENDER_URL",
-        "RENDER_EXTERNAL_URL",
-    )
-    if explicit:
-        return explicit
-    render_yaml_path = (_ROOT / "render.yaml").resolve()
-    try:
-        text = render_yaml_path.read_text(encoding="utf-8")
-    except Exception:
-        return ""
-    for raw_line in text.splitlines():
-        line = str(raw_line or "").strip()
-        if not line.startswith("name:"):
-            continue
-        service_name = str(line.split(":", 1)[1] or "").strip()
-        if service_name:
-            return f"https://{service_name}.onrender.com"
-    return ""
+    """Base URL to smoke-check. The name is historical.
+
+    An explicit env var wins, else the local fleet. Render was retired 2026-11-15
+    (lane render-retirement); the old render.yaml-derived onrender host is gone.
+    """
+    explicit = _env_first("MLB_BETTING_BASE_URL", "BASE_URL", "SYNDICATE_BASE_URL")
+    return explicit or _FLEET_BASE_URL
 
 
 def _normalize_base_url(value: str) -> str:
@@ -211,8 +201,8 @@ def _check_endpoint(
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Smoke-check the Render frontend APIs for metadata consistency and key betting-card/live-lens surfaces.")
-    ap.add_argument("--base-url", default="", help="Override Render base URL (defaults from env vars or render.yaml).")
+    ap = argparse.ArgumentParser(description="Smoke-check the production frontend APIs for metadata consistency and key betting-card/live-lens surfaces.")
+    ap.add_argument("--base-url", default="", help="Override the base URL (defaults to MLB_BETTING_BASE_URL, BASE_URL or SYNDICATE_BASE_URL, else the local fleet).")
     ap.add_argument("--date", default=datetime.now().strftime("%Y-%m-%d"))
     ap.add_argument("--season", type=int, default=datetime.now().year)
     ap.add_argument("--cron-token", default="", help="Optional cron token for /api/cron/config.")
@@ -227,7 +217,7 @@ def main() -> int:
 
     base_url = _normalize_base_url(str(args.base_url or "").strip() or _infer_render_base_url())
     if not base_url:
-        print("Missing Render base URL. Set --base-url or one of MLB_BETTING_BASE_URL/BASE_URL/RENDER_URL/RENDER_EXTERNAL_URL.")
+        print("Missing base URL. Set --base-url or one of MLB_BETTING_BASE_URL/BASE_URL/SYNDICATE_BASE_URL.")
         return 2
 
     cron_token = str(args.cron_token or "").strip() or _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")

@@ -14,27 +14,31 @@ production said 122k rows, the local file had 34k -- and got explained away as
 "today's shard is bigger" rather than "my file is four days old." Discipline
 does not catch that. A table does.
 
-HOW IT READS RENDER SAFELY. It does NOT call `/api/ops/artifacts/export`, which
+HOW IT READS PRODUCTION SAFELY. It does NOT call `/api/ops/artifacts/export`, which
 globs the entire artifact tree before filtering and has OOM-killed the 2Gi web
-service. Instead it reads the refresh-worker's own `PUBLISH_OK` log stream via
-the Render logs API: every artifact the worker writes announces itself there
-with its full path. Costs web nothing.
+service. Production is the local WSL fleet, whose roles share ONE data root, so it
+lists each family's files THERE (one read-only `python3` on the fleet host, file
+NAMES only) and reports the newest date per family. Costs web nothing.
 
-THE LIMIT OF THAT, STATED PLAINLY: the log stream is a WINDOW, not a census. An
-artifact absent from it may simply not have been published inside the window.
-So this tool reports `last seen published`, never `does not exist`, and every
-row carries the window it was measured over. Absence here is not evidence of
-absence -- it is the absence of evidence.
+UNTIL 2026-11-15 it read refresh-worker's `PUBLISH_OK` lines from the Render logs
+API instead (lane render-retirement). That signal does not exist on the fleet:
+publishing onto a shared disk is a no-op, and 0 of the last 20,000 refresh-worker
+log lines carried it when the tool was moved. A log-window column would have read
+"not seen" for every family, for ever.
+
+THE LIMIT, STATED PLAINLY: production's newest date is a date IN A FILE NAME, so a
+family whose names carry no date reads as having none, and an empty production
+cell means "no file matched the pattern", never "the pipeline did not run".
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -42,16 +46,36 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts._pipeline_diag import (  # noqa: E402
     REPO_ROOT,
-    SERVICES,
     banner,
-    fetch_logs,
-    log_window,
-    render_owner_id,
+    fleet_role_env,
     utcnow,
 )
 
 _DATE_RE = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
-_PUBLISH_RE = re.compile(r"PUBLISH_OK path=(\S+)")
+FLEET_DATA_ROOT_DEFAULT = "~/syndicate-prod/data"
+FLEET_PYTHON = os.environ.get("SYNDICATE_FLEET_SYSTEM_PYTHON", "python3")
+FLEET_WSL_DISTRO = os.environ.get("SYNDICATE_FLEET_WSL_DISTRO", "Ubuntu-24.04")
+
+# Runs ON the fleet host. Reads argv[1] as JSON {label: [root, relative_glob]} and prints
+# {label: {"files": n, "dates": [...]}}. File NAMES only; nothing is opened. A `.jsonl`
+# pattern also matches its gzipped `.jsonl.gz` siblings, which the fleet compresses.
+_FLEET_LISTER = r'''
+import glob, json, os, re, sys
+date_re = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
+out = {}
+for label, (root, pattern) in json.loads(sys.argv[1]).items():
+    base = os.path.expanduser(root)
+    paths = glob.glob(os.path.join(base, pattern), recursive=True)
+    if pattern.endswith(".jsonl"):
+        paths += glob.glob(os.path.join(base, pattern + ".gz"), recursive=True)
+    dates = set()
+    for path in paths:
+        found = date_re.search(os.path.basename(path)) or date_re.search(path)
+        if found:
+            dates.add("-".join(found.groups()))
+    out[label] = {"files": len(paths), "dates": sorted(dates)}
+print(json.dumps(out))
+'''
 
 # Families worth tracking, as (label, local glob). Deliberately a short list of
 # the artifacts that analyses actually join across -- the trap `CLAUDE.md`
@@ -104,21 +128,37 @@ def git_dates(pattern: str) -> set[str]:
     return _dates_from_paths(result.stdout.splitlines())
 
 
-def render_published(limit: int, owner: str | None) -> tuple[dict[str, set[str]], str, str, float, str]:
-    """What refresh-worker announced publishing, per family, inside the window."""
-    logs, error = fetch_logs(SERVICES["refresh-worker"], limit=limit, owner_id=owner)
-    first, last, minutes = log_window(logs)
-    published: dict[str, set[str]] = defaultdict(set)
-    for entry in logs:
-        found = _PUBLISH_RE.search(str(entry.get("message") or ""))
-        if not found:
-            continue
-        path = found.group(1)
-        for label, _ in FAMILIES:
-            key = label.split(" ", 1)[-1]
-            if key.replace("_", "") in path.replace("_", "").replace("-", ""):
-                published[label] |= _dates_from_paths([path])
-    return published, first, last, minutes, error
+def production_dates(families: list[tuple[str, str]]) -> tuple[dict[str, dict], str, str]:
+    """({label: {files, dates}}, data_root, error) from the fleet's shared data root.
+
+    The roots are refresh-worker's own `SYNDICATE_DATA_ROOT` / `SYNDICATE_REPORTS_ROOT`
+    (path keys only), so a moved root is followed rather than guessed. An error means
+    production was NOT read: every production cell is then unknown, not empty.
+    """
+    roots, env_error = fleet_role_env("refresh-worker", ["SYNDICATE_DATA_ROOT", "SYNDICATE_REPORTS_ROOT"])
+    data_root = roots.get("SYNDICATE_DATA_ROOT") or FLEET_DATA_ROOT_DEFAULT
+    reports_root = roots.get("SYNDICATE_REPORTS_ROOT") or f"{data_root}/reports"
+    request: dict[str, list[str]] = {}
+    for label, pattern in families:
+        if pattern.startswith("data/"):
+            request[label] = [data_root, pattern[len("data/"):]]
+        elif pattern.startswith("reports/"):
+            request[label] = [reports_root, pattern[len("reports/"):]]
+    argv = [FLEET_PYTHON, "-c", _FLEET_LISTER, json.dumps(request)]
+    if os.name == "nt":
+        argv = ["wsl.exe", "-d", FLEET_WSL_DISTRO, "-e", *argv]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {}, data_root, f"fleet listing failed: {type(exc).__name__}: {exc}"
+    if proc.returncode != 0:
+        return {}, data_root, f"fleet listing rc {proc.returncode}: {(proc.stderr or '').strip()[:200]}"
+    try:
+        listed = json.loads(proc.stdout)
+    except ValueError:
+        return {}, data_root, "fleet listing printed no JSON"
+    shown = f"{data_root} (default: {env_error})" if env_error else data_root
+    return listed, shown, ""
 
 
 def _age_days(newest: str | None) -> float | None:
@@ -137,21 +177,19 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--guard", action="store_true", help="exit 1 if any family is staler than --max-age-days")
     parser.add_argument("--max-age-days", type=float, default=1.0)
-    parser.add_argument("--log-limit", type=int, default=1000, help="worker log lines (API caps at 1000)")
     args = parser.parse_args()
 
-    owner = render_owner_id()
-    published, first, last, minutes, log_error = render_published(args.log_limit, owner)
-
     families = [f for f in FAMILIES if not args.sport or args.sport.lower() in f[0].lower()]
+    production, prod_root, prod_error = production_dates(families)
     rows = []
     for label, pattern in families:
         on_disk = local_dates(pattern)
         tracked = git_dates(pattern)
-        pub = published.get(label, set())
+        prod = production.get(label) or {}
         newest_disk = max(on_disk) if on_disk else None
         newest_git = max(tracked) if tracked else None
-        newest_pub = max(pub) if pub else None
+        prod_dates = list(prod.get("dates") or [])
+        newest_prod = prod_dates[-1] if prod_dates else None
         rows.append(
             {
                 "family": label,
@@ -160,34 +198,40 @@ def main() -> int:
                 "disk_age_days": _age_days(newest_disk),
                 "git_files": len(tracked),
                 "git_newest": newest_git,
-                "published_in_window": sorted(pub),
-                "published_newest": newest_pub,
+                # None = production was not read (see production.error); 0 = read, nothing matched.
+                "production_files": prod.get("files") if not prod_error else None,
+                "production_newest": newest_prod,
+                "production_dates": len(prod_dates),
             }
         )
 
     if args.json:
-        print(json.dumps({"window": {"first": first, "last": last, "minutes": round(minutes, 1)}, "families": rows}, indent=2))
+        print(json.dumps({"production": {"data_root": prod_root, "error": prod_error}, "families": rows}, indent=2))
     else:
-        print(banner(f"ARTIFACT FRESHNESS   (worker publish window {first} -> {last}, {minutes:.0f} min)"))
-        if log_error:
-            print(f"  !! could not read the worker log: {log_error}")
-            print("     the 'published' column below is UNKNOWN, not empty.")
-        print(f"  {'family':22} {'disk':>5} {'disk newest':>12} {'age':>6} {'git':>4} {'git newest':>12}  published in window")
+        print(banner(f"ARTIFACT FRESHNESS   (production = the fleet data root {prod_root})"))
+        if prod_error:
+            print(f"  !! could not read production: {prod_error}")
+            print("     the 'prod' columns below are UNKNOWN, not empty.")
+        print(f"  {'family':22} {'disk':>5} {'disk newest':>12} {'age':>6} {'git':>4} {'git newest':>12} {'prod':>6} {'prod newest':>12}")
         for row in rows:
             age = row["disk_age_days"]
             age_text = f"{age:.1f}d" if age is not None else "-"
             flag = ""
             if age is not None and age > args.max_age_days:
                 flag = "  <-- STALE"
+            if row["production_newest"] and (row["disk_newest"] or "") < row["production_newest"]:
+                flag += "  <-- BEHIND PRODUCTION"
+            prod_files = "?" if row["production_files"] is None else row["production_files"]
             print(
                 f"  {row['family']:22} {row['disk_files']:>5} {str(row['disk_newest'] or '-'):>12} {age_text:>6} "
-                f"{row['git_files']:>4} {str(row['git_newest'] or '-'):>12}  {', '.join(row['published_in_window']) or '-'}{flag}"
+                f"{row['git_files']:>4} {str(row['git_newest'] or '-'):>12} {prod_files:>6} "
+                f"{str(row['production_newest'] or '-'):>12}{flag}"
             )
         print()
         print("  disk = files present locally (tracked OR untracked -- mirror output of unknown vintage)")
         print("  git  = files actually committed; routinely a SMALLER set than disk")
-        print("  published = what refresh-worker announced in THIS window only.")
-        print("  An empty 'published' cell means NOT SEEN IN THE WINDOW -- never 'does not exist'.")
+        print("  prod = files on the fleet's shared data root, newest by the date in the file name")
+        print("  An empty 'prod' cell means no file matched the pattern -- never 'the pipeline did not run'.")
 
     if args.guard:
         stale = [r["family"] for r in rows if (r["disk_age_days"] or 0) > args.max_age_days]

@@ -16,8 +16,13 @@
     a */15 schedule. The window this watches for is 16 MINUTES, so that is a dead
     watcher.
 
-    READ-ONLY toward production. ONE credential, used read-only: ADMIN_TOKEN (env
-    var, else <RepoRoot>\.env), sent as X-Admin-Token because /api/portfolio/live has
+    PRODUCTION IS THE LOCAL WSL FLEET (http://127.0.0.1:10000) since 2026-09-30; the
+    default used to be the Render host, retired 2026-11-15 (lane render-retirement).
+
+    READ-ONLY toward production. ONE credential, used read-only: ADMIN_TOKEN -- for the
+    fleet, the ADMIN_TOKEN line of ~/syndicate-prod/local_production.env read through
+    wsl.exe (the repo .env holds the old Render-era token, which the fleet rejects);
+    else the ADMIN_TOKEN env var, else <RepoRoot>\.env -- sent as X-Admin-Token because /api/portfolio/live has
     required sign-in since the 2026-09-10 portfolio-auth deploy (df60b3e3) -- without
     it every run is a 401 and the watcher sees nothing. The token reaches curl through
     a temp header file deleted straight after the call: never on a command line,
@@ -36,7 +41,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$BaseUrl  = 'https://syndicate-an21.onrender.com/api/portfolio/live?on=all',
+    [string]$BaseUrl  = 'http://127.0.0.1:10000/api/portfolio/live?on=all',
     [string]$RepoRoot = (Split-Path -Parent $PSScriptRoot),
     [int]$RecentWindowMinutes = 60
 )
@@ -70,9 +75,27 @@ function Add-PlainText([string]$path, [string]$text) {
     [System.IO.File]::AppendAllText($path, $text, $enc)
 }
 
-# Environment first, so a caller can inject the token without a file; else the
-# repo's .env, whose values may be quoted.
+# The fleet's own token when the target is the fleet (loopback, port 10000): it is
+# read FIRST because an exported ADMIN_TOKEN or the repo .env may hold the old
+# Render-era token, and the fleet answers that with a 401 (scripts/_base_url.py does
+# the same). Then the environment, so a caller can inject the token without a file;
+# else the repo's .env, whose values may be quoted.
+function Get-FleetAdminToken {
+    try {
+        $out = & wsl.exe -d Ubuntu-24.04 -e sh -c 'grep -m1 "^ADMIN_TOKEN=" "$HOME"/syndicate-prod/local_production.env | cut -d= -f2-' 2>$null
+    } catch {
+        return ''
+    }
+    $v = ([string]($out | Select-Object -First 1)).Trim().Trim([char[]]@('"', "'"))
+    return $v
+}
+
 function Get-AdminToken {
+    $u = [System.Uri]$BaseUrl
+    if ($u.IsLoopback -and $u.Port -eq 10000) {
+        $fleet = Get-FleetAdminToken
+        if (-not [string]::IsNullOrWhiteSpace($fleet)) { return $fleet }
+    }
     $v = [string]$env:ADMIN_TOKEN
     if (-not [string]::IsNullOrWhiteSpace($v)) { return $v.Trim() }
     $envFile = Join-Path $RepoRoot '.env'

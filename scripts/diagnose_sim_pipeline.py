@@ -19,7 +19,7 @@ in production the whole time. A tool that only prints configuration would
 have confirmed both mistakes.
 
 DURATION IS MEASURED FROM THE PROCESS TABLE, NOT FROM LOG MARKERS.
-`STEP_END` never reaches Render's collector (the orchestrator is piped to
+`STEP_END` never reaches the role log (the orchestrator is piped to
 files), so its absence is legitimate and proves nothing. `ALL_PROCESS_MEMORY`
 carries a per-process cmdline list every few seconds, so a sim's lifetime is
 the span over which its process is present -- which is also how concurrency
@@ -43,8 +43,7 @@ from scripts._pipeline_diag import (  # noqa: E402
     fetch_logs,
     log_window,
     matches,
-    render_json,
-    render_owner_id,
+    fleet_role_env,
     service_commits,
 )
 
@@ -71,19 +70,13 @@ SIM_ENV_KEYS = {
 GUARD_PATTERN = r"OVERVIEW_STOPPED_FOR_MEMORY|MEMORY_GUARD_ABORT|SKIPPED_FOR_MEMORY|throttled"
 
 
-def service_env(service_id: str) -> dict[str, str]:
-    """Live env for one service. Paginated deliberately: `limit` > 100 is an
-    HTTP 400 on this endpoint, which returns nothing and reads as 'unset'.
+def service_env(service: str) -> tuple[dict[str, str], str]:
+    """The SIM_ENV_KEYS flags of one running fleet role, read from its own environ
+    (only those keys cross the boundary). It was the Render env-vars API until
+    2026-11-15. Returns (values, error); a key the role does not carry is absent.
     """
-    out: dict[str, str] = {}
-    payload, _, _ = render_json(f"/services/{service_id}/env-vars?limit=100")
-    if isinstance(payload, list):
-        for row in payload:
-            env = row.get("envVar", row) if isinstance(row, dict) else {}
-            key = str(env.get("key") or "")
-            if key:
-                out[key] = str(env.get("value") or "")
-    return out
+    keys = [key for pair in SIM_ENV_KEYS.values() for key in pair if key]
+    return fleet_role_env(service, keys)
 
 
 def process_samples(logs: list[dict]) -> list[tuple[datetime, str]]:
@@ -130,15 +123,14 @@ def runs_for(samples: list[tuple[datetime, str]], pattern: str) -> tuple[list[tu
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--log-limit", type=int, default=1000, help="log lines (max 1000; the API 400s above that)")
+    parser.add_argument("--log-limit", type=int, default=20000, help="refresh-worker log lines, from the tail of its fleet log")
     args = parser.parse_args()
 
-    owner = render_owner_id()
     worker_id = SERVICES["refresh-worker"]
-    logs, log_error = fetch_logs(worker_id, limit=args.log_limit, owner_id=owner)
+    logs, log_error = fetch_logs(worker_id, limit=args.log_limit)
     first, last, minutes = log_window(logs)
     samples = process_samples(logs)
-    env = service_env(worker_id)
+    env, env_error = service_env(worker_id)
     commits = service_commits()
 
     rows = []
@@ -146,8 +138,11 @@ def main() -> int:
         spans, peak = runs_for(samples, pattern)
         durations = [(end - start).total_seconds() for start, end in spans]
         enable_key, interval_key = SIM_ENV_KEYS.get(sport, ("", ""))
-        enabled = env.get(enable_key, "<unset>") if enable_key else "n/a"
-        interval = env.get(interval_key, "<unset>") if interval_key else "n/a"
+        # An unreadable environ is UNKNOWN, never "<unset>": absent is not off, and
+        # unread is not absent.
+        missing = "?(env unreadable)" if env_error and not env else "<unset>"
+        enabled = env.get(enable_key, missing) if enable_key else "n/a"
+        interval = env.get(interval_key, missing) if interval_key else "n/a"
         starts = [{"timestamp": start.isoformat()} for start, _ in spans]
         _, cadence_note = cadence(starts)
         rows.append(
@@ -171,6 +166,7 @@ def main() -> int:
                 {
                     "log_window": {"first": first, "last": last, "minutes": round(minutes, 1)},
                     "log_error": log_error,
+                    "env_error": env_error,
                     "commits": commits,
                     "sports": rows,
                     "guard_events": len(guards),
@@ -183,6 +179,8 @@ def main() -> int:
     print(banner(f"SIM PIPELINE   (refresh-worker log window {first} -> {last}, {minutes:.0f} min)"))
     if log_error:
         print(f"  !! LOG FETCH FAILED: {log_error} -- everything below is UNMEASURED, not zero.")
+    if env_error:
+        print(f"  !! ROLE ENV READ: {env_error} -- the enabled/interval columns may be unknown.")
     print(f"  live commits: " + ", ".join(f"{name}={sha}" for name, sha in commits.items()))
     print(
         f"\n  A {minutes:.0f}-MINUTE WINDOW CANNOT SEE A 4-HOUR CADENCE. Absence of a sport below\n"
@@ -205,7 +203,7 @@ def main() -> int:
     problems = 0
     for row in rows:
         sport = row["sport"]
-        if row["configured_enabled"] == "UNSET" and row["observed_runs"]:
+        if row["configured_enabled"] == "<unset>" and row["observed_runs"]:
             problems += 1
             print(
                 f"    !! {sport}: ran {row['observed_runs']}x with its enable flag UNSET. "

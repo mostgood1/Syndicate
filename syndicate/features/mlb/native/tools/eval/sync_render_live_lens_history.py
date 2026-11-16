@@ -36,23 +36,19 @@ def _env_first(*names: str) -> str:
     return ""
 
 
+# Production since 2026-09-30: the local WSL fleet (`scripts/local_production.py`).
+_FLEET_BASE_URL = "http://127.0.0.1:10000"
+
+
 def _infer_render_base_url() -> str:
-    explicit = _env_first("MLB_BETTING_BASE_URL", "BASE_URL", "RENDER_URL", "RENDER_EXTERNAL_URL")
-    if explicit:
-        return explicit
-    render_yaml = _ROOT / "render.yaml"
-    try:
-        text = render_yaml.read_text(encoding="utf-8")
-    except Exception:
-        return ""
-    for raw_line in text.splitlines():
-        line = str(raw_line or "").strip()
-        if not line.startswith("name:"):
-            continue
-        service_name = str(line.split(":", 1)[1] or "").strip()
-        if service_name:
-            return f"https://{service_name}.onrender.com"
-    return ""
+    """Base URL to sync live-lens history from. The name is historical (it is imported
+    by `tune/export_live_pitcher_projection_dataset.py`).
+
+    An explicit env var wins, else the local fleet. Render was retired 2026-11-15
+    (lane render-retirement); the old render.yaml-derived onrender host is gone.
+    """
+    explicit = _env_first("MLB_BETTING_BASE_URL", "BASE_URL", "SYNDICATE_BASE_URL")
+    return explicit or _FLEET_BASE_URL
 
 
 def _daterange(start: dt.date, end: dt.date) -> List[dt.date]:
@@ -152,8 +148,8 @@ def sync_render_live_lens_history(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Sync historical Render live-lens day payloads into data/live_lens/render_sync")
-    parser.add_argument("--base-url", default="", help="Render base URL; defaults to env or render.yaml service host")
+    parser = argparse.ArgumentParser(description="Sync historical production live-lens day payloads into data/live_lens/render_sync")
+    parser.add_argument("--base-url", default="", help="Base URL; defaults to MLB_BETTING_BASE_URL, BASE_URL or SYNDICATE_BASE_URL, else the local fleet")
     parser.add_argument("--cron-token", default="", help="Cron bearer token; defaults to MLB_BETTING_CRON_TOKEN/MLB_CRON_TOKEN/CRON_TOKEN env")
     parser.add_argument("--start-date", required=True, help="Start date inclusive (YYYY-MM-DD)")
     parser.add_argument("--end-date", required=True, help="End date inclusive (YYYY-MM-DD)")

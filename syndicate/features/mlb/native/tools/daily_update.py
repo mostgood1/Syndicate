@@ -1532,28 +1532,19 @@ def _fetch_live_lens_reports_payload(
     return payload
 
 
+# Production since 2026-09-30: the local WSL fleet (`scripts/local_production.py`).
+_FLEET_BASE_URL = "http://127.0.0.1:10000"
+
+
 def _infer_render_base_url() -> str:
-    explicit = _env_first(
-        "MLB_BETTING_BASE_URL",
-        "BASE_URL",
-        "RENDER_URL",
-        "RENDER_EXTERNAL_URL",
-    )
-    if explicit:
-        return str(explicit)
-    render_yaml_path = (_ROOT_DIR / "render.yaml").resolve()
-    try:
-        text = render_yaml_path.read_text(encoding="utf-8")
-    except Exception:
-        return ""
-    for raw_line in text.splitlines():
-        line = str(raw_line or "").strip()
-        if not line.startswith("name:"):
-            continue
-        service_name = str(line.split(":", 1)[1] or "").strip()
-        if service_name:
-            return f"https://{service_name}.onrender.com"
-    return ""
+    """Base URL for the live-lens sync and the frontend smoke. The name is historical.
+
+    An explicit env var wins, else the local fleet. It used to fall back to
+    `https://<first render.yaml name:>.onrender.com`, which was the keyvalue store's
+    name, not web's, and Render itself was retired 2026-11-15 (lane render-retirement).
+    """
+    explicit = _env_first("MLB_BETTING_BASE_URL", "BASE_URL", "SYNDICATE_BASE_URL")
+    return str(explicit) if explicit else _FLEET_BASE_URL
 
 
 def _normalize_render_base_url(value: str) -> str:
@@ -1614,7 +1605,7 @@ def _prior_day_live_lens_stage(args: argparse.Namespace, date_str: str) -> Dict[
                 stage["error"] = f"{type(exc).__name__}: {exc}"
         else:
             stage["status"] = "skipped"
-            stage["reason"] = "live-lens sync requested but Render base URL or cron token is unavailable"
+            stage["reason"] = "live-lens sync requested but the base URL or cron token is unavailable"
             stage["missing_credentials"] = [
                 name
                 for name, present in (("live_lens_base_url", bool(base_url)), ("live_lens_cron_token", bool(token)))
@@ -1625,7 +1616,7 @@ def _prior_day_live_lens_stage(args: argparse.Namespace, date_str: str) -> Dict[
 
     latest_report = payload.get("latestReport") if isinstance(payload.get("latestReport"), dict) else {}
     registry_summary = payload.get("registrySummary") if isinstance(payload.get("registrySummary"), dict) else {}
-    source_label = "Render live-lens report"
+    source_label = "fleet live-lens report"
 
     if not latest_report:
         latest_report = _load_json_if_exists(local_report_path)
@@ -1715,7 +1706,7 @@ def _refresh_live_pitcher_corrections_stage(args: argparse.Namespace, *, max_dat
 
     if not base_url or not token:
         stage["status"] = "skipped"
-        stage["reason"] = "live pitcher correction refresh requested but Render base URL or cron token is unavailable"
+        stage["reason"] = "live pitcher correction refresh requested but the base URL or cron token is unavailable"
         stage["missing_credentials"] = [
             name
             for name, present in (("live_lens_base_url", bool(base_url)), ("live_lens_cron_token", bool(token)))
@@ -1810,7 +1801,7 @@ def _run_render_frontend_validation_stage(
         or _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
     )
     if not base_url:
-        stage["reason"] = "render validation requested but Render base URL is unavailable"
+        stage["reason"] = "render validation requested but the base URL is unavailable"
         return stage
 
     smoke_py = (_NATIVE_ROOT / "tools" / "smoke" / "smoke_render_frontend.py").resolve()
@@ -5436,12 +5427,12 @@ def main() -> int:
         "--sync-live-lens",
         choices=["on", "off"],
         default="on",
-        help="If on, fetch the prior-day live-lens report summary from Render during --workflow ui-daily and write a compact readout into the ops report.",
+        help="If on, fetch the prior-day live-lens report summary from production (the local fleet) during --workflow ui-daily and write a compact readout into the ops report.",
     )
     ap.add_argument(
         "--live-lens-base-url",
         default="",
-        help="Optional Render base URL override for the prior-day live-lens sync (defaults to MLB_BETTING_BASE_URL, BASE_URL, RENDER_URL, or RENDER_EXTERNAL_URL).",
+        help="Optional base URL override for the prior-day live-lens sync (defaults to MLB_BETTING_BASE_URL, BASE_URL or SYNDICATE_BASE_URL, else the local fleet http://127.0.0.1:10000).",
     )
     ap.add_argument(
         "--live-lens-cron-token",
@@ -5463,7 +5454,7 @@ def main() -> int:
         "--refresh-live-pitcher-corrections",
         choices=["on", "off"],
         default="on",
-        help="If on, refit the Render-backed live pitcher outs/strikeouts correction artifacts for the settled prior-day window during --workflow ui-daily.",
+        help="If on, refit the production-backed live pitcher outs/strikeouts correction artifacts for the settled prior-day window during --workflow ui-daily.",
     )
     ap.add_argument(
         "--refresh-current-oddsapi",
@@ -5535,12 +5526,12 @@ def main() -> int:
         "--validate-render-frontend",
         choices=["on", "off"],
         default="on",
-        help="If on during --workflow ui-daily, run the Render frontend smoke after a successful build/push and fail the workflow if deployed cards/live endpoints do not validate.",
+        help="If on during --workflow ui-daily, run the frontend smoke against production (the local fleet) after a successful build/push and fail the workflow if deployed cards/live endpoints do not validate.",
     )
     ap.add_argument(
         "--render-validation-base-url",
         default="",
-        help="Optional Render base URL override for the post-push frontend smoke (defaults to --live-lens-base-url, MLB_BETTING_BASE_URL, BASE_URL, RENDER_URL, or RENDER_EXTERNAL_URL).",
+        help="Optional base URL override for the post-push frontend smoke (defaults to --live-lens-base-url, MLB_BETTING_BASE_URL, BASE_URL or SYNDICATE_BASE_URL, else the local fleet).",
     )
     ap.add_argument(
         "--render-validation-cron-token",
@@ -5551,7 +5542,7 @@ def main() -> int:
         "--render-validation-timeout-seconds",
         type=int,
         default=45,
-        help="HTTP timeout used by the post-push Render frontend smoke during --workflow ui-daily.",
+        help="HTTP timeout used by the post-push frontend smoke during --workflow ui-daily.",
     )
     ap.add_argument(
         "--build-next-day",

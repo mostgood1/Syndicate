@@ -21,7 +21,13 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import _base_url  # noqa: E402
-from _base_url import FLEET_BASE_URL, RENDER_BASE_URL, admin_token, default_base_url, is_local_fleet  # noqa: E402
+from _base_url import FLEET_BASE_URL, admin_token, default_base_url, is_local_fleet  # noqa: E402
+
+# The retired Render web URL. Render was suspended 2026-09-30 and retired from every
+# tool 2026-11-15 (lane render-retirement); the scan below keeps it from coming back.
+RETIRED_RENDER_URL = "https://syndicate-an21.onrender.com"
+# Any host that is not the fleet, for the token-order tests.
+OTHER_HOST = "https://elsewhere.example"
 
 ENV_VARS = (
     "SYNDICATE_BASE_URL",
@@ -38,8 +44,6 @@ ENV_VARS = (
 
 # Files allowed to carry the literal as live code, each with its reason.
 ALLOWED = {
-    # The resolver itself.
-    "scripts/_base_url.py": "defines RENDER_BASE_URL",
     # Gates a RENDER deploy; must not follow the generic SYNDICATE_BASE_URL.
     "scripts/deploy_preflight.py": "Render-deploy gate, deliberately Render-pinned",
     # PENDING: claimed by another OPEN lane on 2026-10-01 when the resolver
@@ -63,11 +67,12 @@ def test_unset_falls_back_to_the_local_fleet(clean_env):
     assert default_base_url("SCRIPT_SPECIFIC_URL") == FLEET_BASE_URL
 
 
-def test_a_render_host_still_falls_back_to_render(clean_env):
-    """A Render cron/worker must not post to its own loopback."""
+def test_the_render_marker_no_longer_picks_render(clean_env):
+    """Render is retired (2026-11-15): `RENDER` is only a marker the fleet fakes, and
+    with or without `SYNDICATE_LOCAL_PRODUCTION` the fallback is the fleet."""
+    assert not hasattr(_base_url, "RENDER_BASE_URL")
     clean_env.setenv("RENDER", "true")
-    assert default_base_url() == RENDER_BASE_URL
-    # ...but the fleet's roles carry RENDER=true as a marker, with SYNDICATE_LOCAL_PRODUCTION=1.
+    assert default_base_url() == FLEET_BASE_URL
     clean_env.setenv("SYNDICATE_LOCAL_PRODUCTION", "1")
     assert default_base_url() == FLEET_BASE_URL
     clean_env.setenv("SYNDICATE_BASE_URL", "http://explicit")
@@ -81,7 +86,8 @@ def test_a_render_host_still_falls_back_to_render(clean_env):
         ("http://localhost:10000/", True),
         ("http://[::1]:10000/api", True),
         ("http://127.0.0.1:5000", False),  # `py -3 app.py` dev server reads the repo .env
-        (RENDER_BASE_URL, False),
+        (RETIRED_RENDER_URL, False),
+        (OTHER_HOST, False),
         ("", False),
         ("http://127.0.0.1:notaport", False),
     ],
@@ -156,7 +162,7 @@ def test_a_worktree_falls_back_to_the_primary_checkouts_dotenv(clean_env, tmp_pa
     (primary / ".env").write_text("ADMIN_TOKEN=from-primary\n", encoding="utf-8")
     clean_env.setattr(_base_url, "_REPO_ROOT", worktree)
     assert _base_url.dotenv_candidates() == [worktree / ".env", primary / ".env"]
-    assert admin_token(RENDER_BASE_URL) == "from-primary"
+    assert admin_token(OTHER_HOST) == "from-primary"
     assert _base_url.dotenv_candidates([tmp_path / "a", tmp_path / "b"]) == [tmp_path / "a", tmp_path / "b"]
 
 
@@ -171,12 +177,12 @@ def test_non_fleet_target_keeps_env_then_dotenv(clean_env, tmp_path):
     _no_wsl(clean_env)
     dotenv = tmp_path / ".env"
     dotenv.write_text('# c\nADMIN_TOKEN_OLD=x\nADMIN_TOKEN = "dot-tok"\n', encoding="utf-8")
-    assert admin_token(RENDER_BASE_URL, env_file=dotenv) == "dot-tok"
+    assert admin_token(OTHER_HOST, env_file=dotenv) == "dot-tok"
     clean_env.setenv("SYNDICATE_ADMIN_TOKEN", "alias")
-    assert admin_token(RENDER_BASE_URL, env_file=dotenv) == "alias"
+    assert admin_token(OTHER_HOST, env_file=dotenv) == "alias"
     clean_env.setenv("ADMIN_TOKEN", "env-tok")
     assert admin_token("http://127.0.0.1:5000", env_file=dotenv) == "env-tok"
-    assert admin_token(RENDER_BASE_URL, env_file=tmp_path / "absent") == "env-tok"
+    assert admin_token(OTHER_HOST, env_file=tmp_path / "absent") == "env-tok"
 
 
 def test_precedence(clean_env):
@@ -222,7 +228,7 @@ def _hardcoded_sites(path: Path) -> list[int]:
         for node in ast.walk(tree)
         if isinstance(node, ast.Constant)
         and isinstance(node.value, str)
-        and RENDER_BASE_URL in node.value
+        and RETIRED_RENDER_URL in node.value
         and id(node) not in skip
     )
 
@@ -237,8 +243,8 @@ def test_no_new_hardcoded_render_default():
         if lines:
             offenders.append(f"{rel}:{lines}")
     assert not offenders, (
-        "Hard-coded Render base URL outside scripts/_base_url.py -- use "
-        "default_base_url() so SYNDICATE_BASE_URL repoints it:\n  " + "\n  ".join(offenders)
+        "Hard-coded Render base URL in scripts/ -- Render is retired; use "
+        "default_base_url() (the fleet unless SYNDICATE_BASE_URL says otherwise):\n  " + "\n  ".join(offenders)
     )
 
 
@@ -253,7 +259,7 @@ def test_scan_detects_a_planted_default(tmp_path):
     planted.write_text(
         '"""Docstring naming https://syndicate-an21.onrender.com is fine."""\n'
         "# so is a comment: https://syndicate-an21.onrender.com\n"
-        f'BASE = "{_base_url.RENDER_BASE_URL}/api/ops"\n',
+        f'BASE = "{RETIRED_RENDER_URL}/api/ops"\n',
         encoding="utf-8",
     )
     assert _hardcoded_sites(planted) == [3]

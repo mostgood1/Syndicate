@@ -617,8 +617,8 @@ def main() -> int:
     print("SUBSTRATE: Levels 1-3 read the LOCAL MIRROR under data/{wnba,nba}_source/. "
           "Per CLAUDE.md / model_engine_standard.md Sec3b this is a lossy, periodically "
           "refreshed cold-start copy -- NOT production. Every number above is a claim "
-          "about THIS CHECKOUT. Production could not be read live during this run "
-          "(syndicate-an21.onrender.com returned HTTP 502 at time of writing); see the "
+          "about THIS CHECKOUT. This run does not read production (the local fleet, "
+          "http://127.0.0.1:10000, and its data root ~/syndicate-prod/data); see the "
           "reference doc for the last independently-verified production reading "
           "(2026-08-15, lane sim-engine-phase0-census).")
 

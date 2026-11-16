@@ -15,7 +15,7 @@ rather than a name grep:
      the provider does not reach the data.
 
     python scripts/prop_evidence_checklist.py
-    python scripts/prop_evidence_checklist.py --base-url https://syndicate-an21.onrender.com --sports mlb,wnba,nfl,ncaaf --sample 8 --json out.json
+    python scripts/prop_evidence_checklist.py --base-url http://127.0.0.1:10000 --sports mlb,wnba,nfl,ncaaf --sample 8 --json out.json
 
 Exit 0 = pass, 1 = a gate failed, 2 = could not run.
 """

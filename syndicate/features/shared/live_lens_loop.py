@@ -425,11 +425,15 @@ def _wnba_live_box_base_url() -> str:
 	Web serves it; this loop runs on a worker. Configurable because the
 	worker-to-web hostname is an internal one in production and the public one
 	everywhere else -- hardcoding either breaks the other.
+
+	The fleet (`scripts/local_production.py`) sets both keys to its local web. The
+	last resort is that same local web, never the retired Render host (lane
+	render-retirement, 2026-11-15).
 	"""
 	return str(
 		os.environ.get("SYNDICATE_WNBA_LIVE_BOX_BASE_URL")
 		or os.environ.get("SYNDICATE_INTERNAL_WEB_BASE_URL")
-		or "https://syndicate-an21.onrender.com"
+		or "http://127.0.0.1:10000"
 	).strip().rstrip("/")
 
 
