@@ -1144,3 +1144,33 @@ Proposed to the user as its own session.
 **Load:** query 11.4 s / 50.7 MB. Live-rail 0.17 s, 672 rows.
 
 **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 29 — Sun 11-15 8:55 PM CST (02:55Z). No restart since 01:43:54Z
+
+12 live chips:
+- NBA: ATL @ MIL Q4, OKC @ SAC Q2.
+- NFL: PIT @ CIN at HALF.
+- NHL: 5 games.
+
+**Flags:** 7 on 5 cards. 0 false, 0 missed, 0 dark.
+- NBA 1, NFL 1, NHL 1, NCAAB 3, WNCAAB 2.
+
+**NBA, main vs alt:**
+- Main: 10 / 66 priced <= 120 s. Alt: **0 / 343**, seen age 131 s.
+- So the alt lines ride the 240 s full pass, as #811 scopes them.
+- NBA builds p50 29.0 s, max 69.0 s. NBA overlay gap max 353 s. `deferred_slow` nba 3, nfl 1.
+
+**Refresh:**
+- NHL overlay gap max 302 s; builds p50 4.4 s.
+- Web merges: 0 live-sport stale (ncaaf 37 / 37, no game).
+
+**Load, smaller as games end:**
+- `/intelligence` 4.2 s / 17.7 MB.
+- Query 3.4 s / 42.8 MB.
+- Live-rail 0.06 s, 452 rows.
+
+**Teams:** 1 chip-less NCAAB card, FAMU @ UTEP.
+- It is still on today's rail as a pregame card at 8:55 PM, though the odds feed's 7 PM CST
+  kickoff has passed.
+- ESPN has the game Monday 1 PM CST.
+- det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
