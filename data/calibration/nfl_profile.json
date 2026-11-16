@@ -1,0 +1,25 @@
+{
+  "fields": {
+    "end_of_half_clock": true,
+    "end_of_half_clock_by_need": true,
+    "end_of_half_kneel_out": true,
+    "halftime_kickoff": true,
+    "home_field_bonus": 0.03,
+    "kneel_out_q4_only": true,
+    "name": "nfl",
+    "q2_urgency_ignores_score": true,
+    "q4_kick_waits": true,
+    "touchdown_weight_multiplier": 0.825
+  },
+  "fit_from": {
+    "candidate": "v3h0.03_t0.825 = full3 (the seven #808 switches) + home_field_bonus 0.03 + touchdown_weight_multiplier 0.825, on the in-source NFL default",
+    "findings": ".syndicate/findings_2026-11-15_football_end_of_half_fix.md (V3 USER OVERRIDE, V3 HELD-OUT RESULTS)",
+    "fit": "NFL 2024-25, 136 games x 100 seeds: every quarter, Q2's last-120 s points and snaps inside the league's CIs, H1 > H2; as registered v3 is FIT FAIL on G5 at hfb 0.06 (3.01), this R2 point reads 2.94 and passes G1-G5",
+    "held_out": "NFL 2026 wk1-8, 121 games x 1000 seeds, read under the user override of 2026-11-15 19:21 CST: HB-ML -0.0023 [-0.0067, +0.0023], HB-TOT +0.0021 [-0.0027, +0.0066], HB-SPR -0.0027 [-0.0070, +0.0018], none shown worse; |sim total - close total| -0.266 [-0.374, -0.151]",
+    "live_inputs": "end_of_half_clock reads SmartSim2SimulationInput.initial_timeouts_home/away; the NFL live re-sim feeds them only when the tick adapter emits home_timeouts / away_timeouts (lane nfl-live-possession-map); unfed means 3 each",
+    "todo": "#808",
+    "user": "load the NFL profile after the MNF check (2026-11-16, lane nfl-profile-load)"
+  },
+  "generated_at": "2026-11-16T20:18:18Z",
+  "version": "nfl-808-v3h0.03-t0.825"
+}
