@@ -19,6 +19,8 @@
     - Tests: `tests/test_fee_net_clv.py` (16, incl. reachability: same rows, net RAISEs, gross HOLDs).
     - Fleet A/B, read-only (20:21Z, 52,454 orders): the gross arm reproduces tonight's 95 holds. Net changes no cell's action. Three cells lose a gross-only CLV "significance" (band t 5.0–6.9 to 0). The pooled shadow verdict flips one cell to raise (Kalshi NCAAB totals).
     - **Loading: user 11-16 "Ride the next ff" — no dedicated deploy.** It reaches the fleet when another lane's ff carries `6e952af46` AND the refresh-worker restarts (an ff alone does not reload a worker). The reading that proves it is loaded: the next `[min_ev_tuner] MIN_EV_TUNER` line in the refresh-worker log carries `clv_basis=net`. The new marks carry `clv_net_pct`.
+    - **ON DISK 21:17Z 11-16:** another lane's ff took the fleet to `db463b5be`, which contains `6e952af46`.
+    - **NOT LOADED** (read 21:19Z): refresh-worker pid 2809282 has been up since ~16:29Z, before the ff. It loads at that worker's next restart.
   - (2) **DONE 11-16 (user "Yes, build it"): `scripts/live_book_edge_readout.py` on main `38646cce2`.** It reproduces the 11-16 numbers exactly. 20 tests: 19 synthetic plus 1 pinned, which runs only with `SYNDICATE_EDGE_READOUT_PAYLOAD` because the repo is public.
     - Since band-off (`--since 2026-11-03`): ROI −4.59 ± 3.83%, 357 events, fee-net CLV −0.35 ± 0.32 pp. All four measurable gate conditions FAIL. 800 events is about 2026-12-02 at the earliest.
   - **OWED (the lane's last step): the user's decision on the scale-up gate as drafted** (findings § "Scale-up gate", condition 3 as amended). Until it is approved, nothing about live stakes or caps changes.
