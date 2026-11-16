@@ -1001,3 +1001,20 @@ LAR @ ARI and SEA @ LV in Q1.
 (0.80 MB).
 
 **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 25 — Sun 11-15 6:43 PM CST (00:43Z). NHL started; no restart (live-odds-worker pid 1771964)
+
+12 live chips (NHL EDM @ PHI P1 18:23).
+- **7 flags on 5 cards. 0 false, 0 missed, 0 dark.** Flagged rows: NCAAB 9, WNCAAB 2, NBA 0.
+- **NBA at the bottom of its pull saw:** 3 / 577 rows priced <= 120 s, seen age p50 244 s.
+  - NBA overlay gap max 226 s; NBA builds p50 28.5 s, max 69.7 s; `deferred_slow` nba 3.
+  - So a 0-flag NBA read is now the ~249 s pull, not the overlay.
+- **NHL:** 3 live rows, 2 priced <= 120 s. NHL overlay 3 builds, gap max 80 s, builds p50 1.6 s.
+  Web merges nhl fresh 10 / 10.
+- **NFL:**
+  - 9 zero-card overlay builds with in-play rows, between the 3:25 PM games' finals and SNF at
+    7:20 PM. Those are leftover rows of finished games; benign.
+  - `deferred_slow` nfl 2. 4 NFL "live" rows on the rail, aged 376-434 s.
+- Web merges: 0 live-sport stale (ncaaf 64 / 64, no game).
+- **Load:** query 9.5 s / 63.7 MB. Live-rail 0.05 s, 665 rows.
+- **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
