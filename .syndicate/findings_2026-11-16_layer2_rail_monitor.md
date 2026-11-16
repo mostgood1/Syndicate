@@ -1,0 +1,59 @@
+# Layer 2 Games Rail — standing monitor, 2026-11-16 (lane `layer2-rail-monitor`)
+
+Day 2 of the monitor. The user approved it on 11-16 ~7:49 AM CST: "Yes, from noon".
+Method, probe and grader are as on day 1. See `.syndicate/findings_2026-11-15_layer2_rail_monitor.md`
+("How a reading is taken" and the 11-15 DAILY SUMMARY):
+
+- `scripts/layer2_rail_monitor_probe.py` (fleet only) runs the SERVED page's own rail code
+  through `scripts/layer2_rail_monitor_run.mjs`. Flags are re-derived independently.
+- Splits are per sport, main vs `_alt` markets, and 1H / 2H / break.
+- Worker restarts are read from supervisor pids.
+- Flags are graded at first sighting by `scripts/layer2_rail_flag_grade.py`, clustered by game.
+
+Times are Central (CST) unless marked Z.
+
+## Carried in from 11-15
+
+- **NFL game-line quotes are still sharded by UTC capture date.** The writer is
+  `scripts/fetch_nfl_team_odds_local.py:290` (`date_str=now.date().isoformat()`), unchanged on
+  main at noon 11-16. The fix session card (task_082379c4) has not been started.
+  - So from 6 PM CST (00:00Z 11-17) MNF's game lines (LAC @ BAL, 7:15 PM CST) are expected in
+    the 11-17 shard, not in the 11-16 overlay or live-rail.
+  - **Prediction, registered before 6 PM:** from the first in-play pull after 7:15 PM CST,
+    `/api/board/live-rail` serves 0 NFL game-line rows for LAC @ BAL. The 11-17 NFL shard holds
+    its in-play game rows. The rail card's lines come only from the shortlist, priced at its
+    cadence.
+  - **Falsified if** live-rail serves LAC @ BAL overlay game-line rows
+    (`source=layer2_inplay_overlay`) after kickoff.
+- The NFL / NBA slow-sport decision is still with the user.
+- #811 NBA 60 s pulls are live (live-odds-worker pid 2066024 then, recycled since).
+
+## Fleet events before the first reading
+
+- Fleet ff `10094eae0 -> 09925a4b1` at 15:30:37Z (9:30 AM CST), no restart: the NBA live
+  player-exit gate.
+- refresh-worker claimed TERM at 16:29:16Z (10:29 AM CST), fleet `09925a4b1 -> a39058946`: the
+  in-play overlay checks each file once per build (todo #790). Both are in `deploys.md`.
+- live-odds-worker: two routine recycles since last night ("exited code=0 after 19752s" /
+  "19899s"). pid now 2479540.
+
+## Reading 1 — Mon 11-16 11:59 AM CST (17:59Z)
+
+**Slate:**
+- 57 cards on today's rail, **0 live**. The two 10 AM WNCAAB games are over.
+- Next tips: NCAAB 1 PM; WNCAAB 3 PM and 4 PM; the evening wave from 5 PM — ~40 college games,
+  NBA 6:10-8:10 PM, NHL 6:30 / 8:30 PM, MNF 7:15 PM.
+
+**Readings:**
+- **0 flags.** 0 false, 0 missed, 0 dark. No live rows.
+- **Load:**
+  - `/intelligence` 6.8 s / 20.2 MB (3.6 MB gz).
+  - Query 7.4 s / 56.9 MB (9.8 MB gz).
+  - Shortlist 1.4 s. Chips 0.03 s.
+  - Live-rail 0.03 s, 0 rows.
+- **Board:** build 76 s old; shortlist 76 s.
+- WNCAAB overlay: 30 builds in 30 min (gap p50 41 s, max 66 s). 20 of them carried in-play rows
+  but published 0 cards. These are the finished 10 AM games' leftover rows (the 11-15 NFL shape);
+  benign.
+
+**Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
