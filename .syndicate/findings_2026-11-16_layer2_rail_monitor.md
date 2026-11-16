@@ -74,3 +74,26 @@ Times are Central (CST) unless marked Z.
   recycle should have loaded it.
 
 **Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 3 — Mon 11-16 2:00 PM CST (20:00Z)
+
+**Slate:** 1 live chip — **NCAAB Florida A&M @ UTEP, at HALF.**
+- This is the 11-15 chip-less card. The odds feed had it Sunday 7 PM CST (`commence_time`
+  01:00Z 11-16). ESPN had it Monday 1 PM CST (event 401929419).
+- **ESPN was right.** Today it is a normal live card that joins its chip. The 11-15 card was the
+  odds feed's wrong kickoff, not a team-name join.
+
+**Readings:**
+- **0 flags.** 0 false, 0 missed, 0 dark.
+- 5 live rows, all at the break: 0 priced <= 120 s; priced age p50 414 s; seen age at pricing
+  p50 24 s. Our look is fresh; the book's halftime prices stand still.
+- NCAAB overlay: 77 builds in 60 min, gap p50 40 s, max 86 s. NCAAB builds p50 3.4 s.
+  0 `deferred_slow`.
+- Web merges: ncaab fresh 14 / 14. nfl and wncaab stale 14 / 14 (no games live; expected).
+- **Load:**
+  - `/intelligence` 6.1 s / 19.8 MB.
+  - Query 7.1 s / 56.3 MB. Shortlist 0.75 s.
+  - Live-rail 0.02 s, 2 rows.
+
+**Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+**Restarts:** live-odds-worker pid unchanged (2834332).
