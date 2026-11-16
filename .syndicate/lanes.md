@@ -763,6 +763,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. Moved `closed-lane-archive-20261116-0040` to lanes_closed.md (owner_liveness SAFE at 240m). Table and waits: `.syndicate/log/2026-11-16.md`.
 
+### nfl-live-total-underprojection — OPEN — opened 2026-11-16 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: Name the cause of the NFL live re-sim's totals under-projection measured 2026-11-15 (replay of 65 games, weeks 5-10: projected minus final total -3.68 [-5.86, -1.43]; -5.05 / -2.86 / -3.12 from the end of Q1 / Q2 / Q3), split between the 2026 scoring level and the live resume path, with each part sized and its evidence written to a findings file and todo #780; read-only, no engine edit (the smartsim2 files are on LOAN to football-end-of-half-fix)
+- Files: .syndicate/findings_2026-11-16_nfl_live_total_underprojection.md
+- Hypothesis: Two candidates, stated before any new read 2026-11-16 ~8:0x AM CST. H-ENV: 2026 NFL games score more than the 2024-25 level smartsim2 is fitted to (pregame engine read: q4 13.10 vs league 13.17 [12.54, 13.84]), so the engine under-projects remaining points from any state; then the 65 replayed games' actual Q4 is about 3 points above 13.2 and the pregame projections for the same games run low by a similar amount. H-LIVE: the live resume itself loses points relative to the pregame engine (state construction, marginalised possession, a profile or post-sim step the pregame path has and the live path lacks); then actual Q4 sits near 13.2 and the sim's Q4 from the end of Q3 sits near 10
+- Falsification test: H-ENV is false if the 65 games' actual Q4 points are inside the league 2024-25 CI [12.54, 13.84] AND the same games' pregame projected totals miss the finals by less than 1 point on average. H-LIVE is false if the sim's mean Q4 from the end of Q3 is within 1 point of the pregame engine's 13.10 (all of the gap is then the scoring level). Both can hold in part; each part is sized
+- Verification: Per-quarter actual points for the 65 games (ESPN linescores) beside the league 2024-25 table; the live sim's remaining-points mean from each break; the same games' pregame smartsim2 projected total vs final; all written to the findings file and todo #780
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
