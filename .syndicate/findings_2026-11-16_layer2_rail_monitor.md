@@ -57,3 +57,20 @@ Times are Central (CST) unless marked Z.
   benign.
 
 **Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 2 — Mon 11-16 1:00 PM CST (19:00Z)
+
+**Slate:** 0 live chips; the 1 PM NCAAB tip is not live on its chip yet. 57 cards.
+
+**Readings:**
+- **0 flags.** 0 false, 0 missed, 0 dark.
+- **Load:** query 5.3 s / 56.9 MB. Shortlist 1.1 s (104 s old). Live-rail 0 rows.
+- **Builds (last 61 min):** NBA p50 5.5 s, NFL 1.2 s, NCAAB 3.8 s; pregame only. 0 `deferred_slow`.
+
+**Fleet events:**
+- **live-odds-worker pid 2834332:** a routine recycle (supervisor "exited code=0 after 19767s").
+- Fleet ff `a39058946 -> 5963e16f4` at 18:39:51Z (12:39 PM CST), no restart: the NCAAB / WNCAAB
+  live player-exit gate (deploys.md). It reaches live-odds-worker at its recycle; the 12:5x
+  recycle should have loaded it.
+
+**Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
