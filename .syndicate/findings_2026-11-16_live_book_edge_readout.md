@@ -212,7 +212,36 @@ The hypotheses H1-H4 and the falsification test were written into the lane BEFOR
 size does not significantly pick losers. Nothing here is a market or sport switch (learnings line 1056). Scripts:
 session scratch `bigstakes.py`, `bigstakes2.py`, `bigstakes3.py` (formulas above).
 
-## Method artefact
+## Method artefact — PROMOTED 2026-11-16 (user "Yes, build it"): `scripts/live_book_edge_readout.py`, on main `38646cce2`
 
-The analysis script is session scratch for now (`pf_edge.py`). Its formulas are above. Promoting it to
-`scripts/live_book_edge_readout.py` with a test that pins these numbers is this lane's next build step.
+```
+python scripts/live_book_edge_readout.py                    # the fleet now; windows end at the latest decided slate
+python scripts/live_book_edge_readout.py --since 2026-11-03 # one window from the last live-policy change
+```
+
+- **What it reports:** the formulas above, plus fee-net CLV per scope (`order_clv.fee_net_clv_pct`) and the close's
+  calibration on our sides. Also stake quartiles, sizing paths, per-line breakdowns, and the four measurable gate
+  conditions, labelled PROPOSED. Nothing reads them.
+- **Reproduction:** from the saved 11-16 payload, as of 11-15, it matches the pinned numbers exactly:
+  - last 30: 1,526 / 641 / $3,006.48 / −$218.64 / −7.27 ± 2.84% / excess −32.5 (z −1.72)
+  - last 7: +0.72 ± 4.95%
+  - all: −11.02%, z −2.35
+  - Q4: −9.19%, z −2.17
+  - same-book CLV: gross +1.32, fee 1.63, net −0.30
+- **Tests:** `tests/test_live_book_edge_readout.py`, 19 synthetic + 1 pinned. The pinned test runs when
+  `SYNDICATE_EDGE_READOUT_PAYLOAD` names the saved payload; the repo is PUBLIC, so the payload is not committed. 20
+  passed with the payload; 19 passed + 1 skipped without it.
+- **SE estimator (canonical from here):** event-clustered CR0, the same estimator for ROI, CLV and close calibration.
+  The "CLV RECONCILED" section's ad hoc estimator gave net ± 0.19 and calibration z −2.94; the script gives ± 0.23 and
+  z −3.05 on the same rows (546 vs 545: a push is kept in CLV, dropped from calibration). Every conclusion holds.
+
+**Fresh fleet read, 2026-11-16 21:15Z** (2,225 orders; no 11-16 bet decided yet, so as of 11-15): identical windows.
+
+**Since the stake band went off** (`--since 2026-11-03`, 11-03..11-15):
+
+- Results: 833 bets / 357 events, $928.92, −$42.64, **ROI −4.59 ± 3.83%**, win 57.3 vs breakeven 58.0, excess −5.8 (z −0.42).
+- Same-book CLV: gross +1.37, fee 1.72, **net −0.35 ± 0.32 pp**. Close calibration −5.6 pp (z −2.03).
+- Q4 is $1.38-5.68 and 61% of dollars (mostly in-play's fixed $2.40-2.95): −6.04% vs flat −4.59%.
+- **Gate (PROPOSED): all four measurable conditions FAIL.** The one with a date attached is condition 1: 357 of 800
+  events at ~27 events a day is about 16 more days, so the earliest it can pass is about 2026-12-02. That holds only if
+  the live policy stays frozen. The results conditions decide whether it passes at all.
