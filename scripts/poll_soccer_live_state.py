@@ -515,6 +515,15 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
                 "live_player_props": _published_live_props(live_props),
             }
 
+    # A KEY PLAYER GONE (lane live-player-exit-gate): `playersOut` on each in-play match, read off the
+    # summary already fetched above; a keeper change refuses the match, a modelled red card does not.
+    from syndicate.features.soccer import live_player_exits
+
+    exit_tally = live_player_exits.new_tally()
+    for event_id, game in games.items():
+        if isinstance(game, dict):
+            live_player_exits.apply_player_exits(game, summaries.get(event_id), exit_tally)
+
     match_box = _build_match_boxes(league, iso_date, out_path=out_path, summaries=summaries)
 
     # THE PROJECTION HISTORY, carried forward from the file this tick is about to replace.
@@ -556,6 +565,7 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
         # Per-tick rows for every match this date has seen, capped per match. See
         # `features/live_projection_history.py` for why it lives in THIS artifact.
         HISTORY_KEY: projection_history,
+        "playerExits": exit_tally,
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -600,6 +610,9 @@ def poll_active_leagues_for_tick(
     leagues_checked: list[str] = []
     leagues_with_games: list[str] = []
     errors: dict[str, str] = {}
+    from syndicate.features.soccer import live_player_exits
+
+    exit_tally = live_player_exits.new_tally()
     for league in active_leagues_for_date(iso_date):
         leagues_checked.append(league)
         try:
@@ -644,6 +657,11 @@ def poll_active_leagues_for_tick(
             traceback.print_exc(file=sys.stdout)
             sys.stdout.flush()
             continue
+        league_exits = payload.get("playerExits") if isinstance(payload, dict) else None
+        if isinstance(league_exits, dict):
+            for k, v in league_exits.items():
+                if isinstance(v, int) and not isinstance(v, bool):
+                    exit_tally[k] = exit_tally.get(k, 0) + v
         league_games = payload.get("games") if isinstance(payload, dict) else None
         if isinstance(league_games, dict) and league_games:
             leagues_with_games.append(league)
@@ -680,7 +698,15 @@ def poll_active_leagues_for_tick(
         # grows with squad size.
         "finals": _finished_matches(leagues_checked, iso_date, source_root=out_root),
         "errors": errors,
+        "playerExits": _logged_exit_tally(exit_tally),
     }
+
+
+def _logged_exit_tally(tally: dict[str, Any]) -> dict[str, Any]:
+    from syndicate.features.soccer import live_player_exits
+
+    live_player_exits.log_tick(tally)
+    return tally
 
 
 def _finished_matches(leagues, iso_date, *, source_root) -> list[dict[str, Any]]:

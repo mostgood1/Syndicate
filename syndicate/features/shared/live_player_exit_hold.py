@@ -27,7 +27,7 @@ from syndicate.features.shared.live_player_status import REASON_KEY_PLAYER_OUT, 
 PUBLISHING_SPORTS: dict[str, str] = {"nfl": "nfl_live_resim.json", "ncaaf": "ncaaf_live_lens.json",
                                      "nba": "nba_live_resim.json", "wnba": "wnba_live_lens.json",
                                      "ncaab": "ncaab_live_resim.json", "wncaab": "wncaab_live_resim.json",
-                                     "nhl": "nhl_live_lens.json"}
+                                     "nhl": "nhl_live_lens.json", "soccer": "soccer_live_lens.json"}
 CACHE_S = 30.0
 
 
@@ -38,10 +38,18 @@ def _read_snapshot(sport: str) -> Any:
 
 
 def _canon(sport: str, name: Any) -> str:
+    text = str(name or "").strip()
+    if not text:
+        return ""
+    if sport == "soccer":
+        # The soccer gameline join's own names (club forms like "1. FC Union Berlin" / "Union Berlin"),
+        # so an entry and a gameline agree on which match they mean.
+        from syndicate.features.shared.soccer_live_gameline_source import _canonical_pair
+
+        return (_canonical_pair("", text)[1] or text).strip().lower()
     from syndicate.features.shared.team_aliases import canonical_team
 
-    text = str(name or "").strip()
-    return (canonical_team(sport, text) or text).strip().lower() if text else ""
+    return (canonical_team(sport, text) or text).strip().lower()
 
 
 def _team_score(sport: str, entry_name: Any, snap_name: Any) -> int:
@@ -101,8 +109,8 @@ class ExitHold:
         for game in snap["games"]:
             if not isinstance(game, Mapping):
                 continue
-            g_home = game.get("home_name") or game.get("home_code")
-            g_away = game.get("away_name") or game.get("away_code")
+            g_home = game.get("home_name") or game.get("home_code") or game.get("home_team")
+            g_away = game.get("away_name") or game.get("away_code") or game.get("away_team")
             # BOTH teams must name this game, in either order; the weaker side decides the score.
             score = max(min(_team_score(sport, home_team, g_home), _team_score(sport, away_team, g_away)),
                         min(_team_score(sport, home_team, g_away), _team_score(sport, away_team, g_home)))

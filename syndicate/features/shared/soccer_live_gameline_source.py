@@ -325,9 +325,14 @@ def soccer_live_gameline_index(
     diag = diagnostics if isinstance(diagnostics, dict) else {}
     games = soccer_live_games(selected_date, data_root=data_root, diagnostics=diag)
     skips = {"skipped_no_projection": 0, "skipped_no_probability": 0,
-             "skipped_no_team_names": 0, "skipped_ambiguous": 0}
+             "skipped_no_team_names": 0, "skipped_ambiguous": 0, "skipped_key_player_out": 0}
     index = _CanonicalMatchIndex()
     for game in games:
+        if game.get("liveRefusal"):
+            # A KEY PLAYER the sim does not model has left (lane live-player-exit-gate,
+            # `soccer/live_player_exits.py`): the starting keeper. Refused, never priced.
+            skips["skipped_key_player_out"] += 1
+            continue
         projection = game.get("projection")
         if not isinstance(projection, Mapping):
             skips["skipped_no_projection"] += 1
@@ -483,6 +488,7 @@ def soccer_live_prop_index(
         "rows_indexed": 0,
         "skipped_no_live_projection": 0,
         "skipped_no_key": 0,
+        "skipped_player_out": 0,
         "players_at_producer_cap": 0,
         "producer_player_cap": 12,
     }
@@ -502,6 +508,11 @@ def soccer_live_prop_index(
             player = _norm_name(prop.get("player_name"))
             if not player:
                 report["skipped_no_key"] += 1
+                continue
+            if prop.get("notPricedReason"):
+                # An out player the prop sim still gave a remainder (lane live-player-exit-gate).
+                players_seen.add(player)
+                report["skipped_player_out"] += 1
                 continue
             # BEFORE the market loop: presence in the lens is a fact about the
             # PLAYER, and recording it only on a successful index write would
