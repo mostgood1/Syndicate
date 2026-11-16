@@ -1220,6 +1220,65 @@ def _espn_names(summary: Mapping[str, Any]) -> dict[str, str]:
     return out
 
 
+# ------------------------------------------------------------------------------------- the live player-exit gate
+# Lane live-player-exit-gate (user 2026-11-16, "Yes, NCAAB next"). A KEY player (a boxscore starter) gone from a live
+# game -- ejection, in-game injury, or a foul-out the engine state does not carry -- refuses the game
+# `key_player_out`. NBA's rule (`nba/live_resim.py`, user 2026-11-16 "No, keep pricing"): a foul-out whose name
+# maps onto the engine state is MODELLED (the engine drops every lineup holding a player at the league's limit, 5
+# here) and stays priced.
+#
+# THE ROTATION IS WHY THIS IS TWO READS. A game the loop re-sims this tick is read from the summary it already
+# fetched (no extra GET). A game it CARRIES (or never reached) was not fetched, and its carried lane would stay
+# priced after a starter left; so every such game is read once per tick on a small thread pool inside
+# EXIT_READ_BUDGET_SECONDS (`live_player_exit_tick.collect_exit_statuses`, NCAAF's producer path). A carried lane
+# counts a foul-out as modelled only if that lane's own `playersOut` already marked it modelled (the lane was
+# computed after the foul-out); any other key exit replaces it with the refusal.
+REASON_KEY_PLAYER_OUT = "key_player_out"
+EXIT_READ_BUDGET_SECONDS = 15.0
+
+
+def _exit_refusal_row(event_id: str, names: Mapping[str, str], facts: Optional[ResumeFacts], key_out: Sequence[str],
+                      players_out: list[dict[str, Any]]) -> dict[str, Any]:
+    row = _lane_row(event_id, names, facts, NcaabResimRefusal(REASON_KEY_PLAYER_OUT, "; ".join(key_out)))
+    row["playersOut"] = players_out
+    return row
+
+
+def _row_names(row: Mapping[str, Any]) -> dict[str, str]:
+    names = {k: str(row.get(k) or "") for k in ("home", "away", "home_id", "away_id")}
+    names["source"] = str(row.get("nameSource") or "")
+    return names
+
+
+def _gate_published_rows(games: dict[str, dict[str, Any]], ids: Sequence[str], exits_now: Mapping[str, list],
+                         counts: dict[str, int], tally: dict[str, Any]) -> None:
+    """Attach this tick's `playersOut` to every game row it was read for, and refuse a CARRIED lane a key player has
+    left since it was computed. Rows refused or priced this tick already decided their exits."""
+    from syndicate.features.nba.live_resim import _unmodelled_key_exits
+    from syndicate.features.shared.live_player_status import normalize_name
+
+    for event_id in ids:
+        row, players_out = games.get(event_id), exits_now.get(event_id)
+        if row is None or players_out is None:
+            continue
+        if row.get("carriedForward"):
+            prev = {normalize_name(p.get("player")) for p in row.get("playersOut") or ()
+                    if isinstance(p, Mapping) and p.get("modelled")}
+            players_out = [{**p, "modelled": normalize_name(p.get("player")) in prev}
+                           if p.get("reason") == "foul_out" else p for p in players_out]
+            key_out = _unmodelled_key_exits(players_out, ())
+            if key_out:
+                games[event_id] = _exit_refusal_row(event_id, _row_names(row), None, key_out, players_out)
+                counts["carried_forward"] -= 1
+                counts["refused"] += 1
+                tally["refused_games"] = tally.get("refused_games", 0) + 1
+                tally["refused_carried"] = tally.get("refused_carried", 0) + 1
+                continue
+            row["playersOut"] = players_out
+        elif "playersOut" not in row:
+            row["playersOut"] = players_out
+
+
 def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_seconds: float = DEFAULT_BUDGET_SECONDS,
                              fetch_scoreboard: Optional[Callable[..., Any]] = None,
                              fetch_summary: Optional[Callable[..., Any]] = None,
@@ -1234,8 +1293,15 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     from concurrent.futures import FIRST_COMPLETED, wait
 
     from syndicate.features.shared import basketball_pbp as pbp
-    from syndicate.features.nba.live_resim import map_state_names
+    from syndicate.features.nba.live_resim import (
+        MODELLED_EXIT_REASONS,
+        _mark_modelled_foul_outs,
+        _unmodelled_key_exits,
+        map_state_names,
+    )
     from syndicate.features.ncaab import slate
+    from syndicate.features.shared import live_player_exit_tick as exit_tick
+    from syndicate.features.shared import live_player_status as lps
     from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
     refuse_if_compute_in_request_path(f"{league}_live_resim_snapshot")
@@ -1289,6 +1355,11 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     # The next tick starts at the FIRST game in this tick's order that the budget stopped (carried or not reached);
     # with none, one full lap. In the thread that is exactly the cursor the sequential loop always kept.
     stops: list[int] = []
+    # The player-exit gate (see "the live player-exit gate" above): what each game's summary said THIS tick.
+    exit_tally = exit_tick.new_tally()
+    exit_tally["refused_games"] = 0
+    exits_now: dict[str, list[dict[str, Any]]] = {}
+    exit_seen: set[str] = set()
 
     def carry_or_expire(event_id: str) -> dict[str, Any]:
         game = previous[event_id]
@@ -1365,6 +1436,8 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             for later, rest in enumerate(order[pos:], start=pos):
                 budget_stop(later, rest)
             break
+        # ATTEMPTED this tick: the exit pool never fetches it again (a row refused at the resume publishes no number).
+        exit_seen.add(event_id)
         try:
             summary = fetch_summary(league, event_id)
         except Exception as exc:  # noqa: BLE001
@@ -1382,6 +1455,18 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             counts["refused"] += 1
             continue
         _state, gs, facts = resumed
+        exits =exit_tick.status_from_summary(league, summary, event_id, exit_tally, log_tag=f"{league}_live_resim")
+        players_out = [dict(p.__dict__) for p in exits.players_out] if exits is not None else None
+        if players_out is not None:
+            exits_now[event_id] = players_out
+        # An ejection / in-game injury is not modelled: refused before any input build or draw. A foul-out waits
+        # for the name mapping below.
+        key_out = _unmodelled_key_exits(players_out, MODELLED_EXIT_REASONS)
+        if key_out:
+            games[event_id] = _exit_refusal_row(event_id, names, facts, key_out, players_out or [])
+            counts["refused"] += 1
+            exit_tally["refused_games"] += 1
+            continue
         inputs = build_engine_inputs(str(date_str), facts.home_id, facts.away_id, neutral=_neutral(summary),
                                      priors=priors, dirs=dirs, league=league)
         if isinstance(inputs, NcaabResimRefusal):
@@ -1404,6 +1489,14 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
                 counts["refused"] += 1
                 continue
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
+        if players_out:
+            _mark_modelled_foul_outs(players_out, gs, lps.FOUL_LIMIT.get(str(league).lower(), 5))
+            key_out = _unmodelled_key_exits(players_out, ())
+            if key_out:  # a starter's foul-out the engine state does not carry: not modelled, so refused
+                games[event_id] = _exit_refusal_row(event_id, names, facts, key_out, players_out)
+                counts["refused"] += 1
+                exit_tally["refused_games"] += 1
+                continue
         job = {"pos": pos, "event_id": event_id, "names": names, "facts": facts, "anchor": anchor, "match": match,
                "provenance": inputs.get("_provenance")}
         seed = stable_seed(facts.event_id, facts.last_seq, league)
@@ -1432,6 +1525,24 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         _ROTATION_CURSOR[cursor_key] = (start + (min(stops) if stops else len(order))) % len(ids)
     else:
         _ROTATION_CURSOR[cursor_key] = start
+    # The games this tick did not read (carried, never reached, or refused before the resume): one exit read each.
+    unread = [i for i in ids if i in games and i not in exit_seen]
+    if unread:
+        statuses, extra = exit_tick.collect_exit_statuses(
+            league, [{"event_id": i, "state": "in"} for i in unread], fetch=lambda e: fetch_summary(league, e),
+            budget_seconds=EXIT_READ_BUDGET_SECONDS, log_tag=f"{league}_live_resim_unread")
+        for key, value in extra.items():
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and key != "elapsed_seconds":
+                exit_tally[key] = exit_tally.get(key, 0) + value
+            elif key in ("enabled", "error"):
+                exit_tally[key] = value
+        exit_tally["unread_elapsed_seconds"] = extra.get("elapsed_seconds")
+        for event_id, status in statuses.items():
+            exits_now[event_id] = [dict(p.__dict__) for p in status.players_out]
+    _gate_published_rows(games, ids, exits_now, counts, exit_tally)
+    if exit_tally.get("live_games"):
+        print(f"[{league}_live_resim] PLAYER_EXIT_TICK " + " ".join(f"{k}={v}" for k, v in exit_tally.items()),
+              flush=True)
     out_games = [games[i] for i in ids if i in games]
     return {
         "sport": league,
@@ -1451,6 +1562,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
                         "resim_cpu_s": round(timing["resim_cpu_s"], 1), "worker_pids": sorted(worker_pids)},
         "games": out_games,
         "refusalsByReason": _refusals_by_reason(out_games),
+        "playerExits": exit_tally,
     }
 
 

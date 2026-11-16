@@ -97,7 +97,7 @@ def test_unknowns_are_counted_never_refused(monkeypatch, summary):
 
 def test_a_sport_that_publishes_no_exits_is_off_and_reads_nothing():
     hold, reads = _hold({"games": []})
-    for sport in ("nhl", "mlb", "soccer", "ncaab"):
+    for sport in ("nhl", "mlb", "soccer"):
         assert hold.check(sport, "A", "B") == {"verdict": "off"}
     assert reads == []
 
