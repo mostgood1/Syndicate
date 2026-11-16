@@ -416,3 +416,79 @@ live card.
 a live card.
 
 **Restarts:** live-odds-worker pid 2834332 and refresh-worker pid 2809282, both unchanged.
+
+## Reading 10 — Mon 11-16 5:41 PM CST (23:41Z)
+
+**Slate:** 10 live chips.
+- NCAAB 3: Iona @ UMBC H1 0:36; Alcorn State @ Maryland H1 7:31; Prairie View @ Ohio State H1 15:23.
+- WNCAAB 7: Lamar @ Texas A&M Q4; four games in Q2; Yale @ Quinnipiac and Cleveland State @
+  Xavier in Q1.
+
+**Flags: 10 shown on 3 cards (20 qualifying rows, all NCAAB 1H). 0 false, 0 missed, 0 dark.**
+
+| game | market | side | model | fair | gap | our line | priced |
+|---|---|---|---|---|---|---|---|
+| Iona @ UMBC | full spread | UMBC +1 | 61.8% | 51.1% | 10.8 pp | UMBC -1.1 | 53 s |
+| Iona @ UMBC | full total | o134 | 59.8% | 50.0% | 9.8 pp | 142.7 | 76 s |
+| Iona @ UMBC | 2H total | o76.5 | 56.4% | 48.4% | 8.0 pp | 79.8 | 35 s |
+| Alcorn St @ Maryland | full spread | MD -38.5 | 61.5% | 51.1% | 10.4 pp | MD -43.0 | 52 s |
+| Alcorn St @ Maryland | full total | u161.5 | 81.4% | 48.9% | **32.5 pp** | 156.0 | 23 s |
+| Alcorn St @ Maryland | 1H total | u79.5 | 83.8% | 48.8% | **35.0 pp** | 76.7 | 33 s |
+| Alcorn St @ Maryland | 2H total | u80.5 | 62.7% | 49.4% | 13.3 pp | 79.3 | 33 s |
+| Prairie View @ Ohio St | full total | u151.5 | 58.3% | 50.2% | 8.1 pp | 148.1 | 37 s |
+| Prairie View @ Ohio St | 1H total | u71.5 | 57.8% | 51.1% | 6.8 pp | 67.3 | 31 s |
+| Prairie View @ Ohio St | 2H total | u80.5 | 53.9% | 49.4% | 4.5 pp | 80.9 | 31 s |
+
+- **The two largest gaps of the two days**: Alcorn @ Maryland 1H u79.5 at 35.0 pp and full u161.5
+  at 32.5 pp.
+- **Observation, not a finding: our live total moved less than the book's between readings 9 and 10.**
+  | game | book total | our total |
+  |---|---|---|
+  | Alcorn St @ Maryland | 151.5 → 161.5 (+10) | 148.3 → 156.0 (+7.7) |
+  | Iona @ UMBC | 141.5 → 134 (-7.5) | 145.4 → 142.7 (-2.7) |
+  So these flags FADE the book's in-game move.
+- **PRE-REGISTERED for tonight's grade, before any 11-16 final is read:** split the 11-16 totals
+  flags by whether the flag opposes the book's line move since that game's previous reading. Report
+  each half's hit rate, game-clustered. **Totals direction so far: 9 unders, 3 overs.** This
+  changes nothing; it is a reading.
+
+**Live rows:** 79 (NCAAB 77, WNCAAB 2).
+| sport | phase | rows | priced <= 120 s | priced age p50 | seen at pricing p50 / p90 |
+|---|---|---|---|---|---|
+| NCAAB | 1H | 77 | 43 | 109 s | 68 s / 221 s |
+| WNCAAB | 2H (Lamar @ A&M) | 2 | 0 | — | — |
+
+- 14 rows older than 300 s now. 1 of 18 markets carries no price of ours.
+- Live-rail: 66-73 rows on 3 reads.
+
+**WNCAAB: 6 of 7 live games serve 0 live-rail rows.** A read-only replay at 23:41Z
+(`C:\tmp\railmon\wz_replay.py`, refresh-worker environ, nice 19):
+- The 23:41:24Z grid holds **10 in-play rows across all 7 live games**.
+- `build_layer2_rows` gives 20 opportunities. `select_shortlist` chose 2:
+  `rows_below_value_floor` 17, `rows_implausible_book` 1.
+- So most of the gap is the decided floor (user "Keep the floor"), on top of thin in-play quote
+  coverage. Overlay: 19 of 27 builds zero-card with rows.
+
+**Overlay (21 min), all 0 over 360 s:**
+| sport | builds | gap p50 | gap max | zero-card with rows |
+|---|---|---|---|---|
+| NCAAB | 29 | 45 s | 70 s | 0 |
+| WNCAAB | 27 | 46 s | 81 s | 19 |
+
+**Builds:**
+- NCAAB p50 4.4 s, max 25.7 s; WNCAAB 0.8 s.
+- NBA 6.0 / 11.4 s and NFL 9.9 / 13.1 s (pregame); NHL 0.1 s; soccer 2.2 s.
+- 0 `deferred_slow`. Tick gap p50 32 s, max 83 s.
+
+**Web merges:** ncaab and wncaab fresh 32 / 32; nfl stale (pregame).
+
+**Load:**
+- **Query 6.1 s** / 64.8 MB. Gunicorn workers were 260 s and 140 s old at the read. The 140 s
+  worker was recycled during the probe; a new one was 26 s old at 17:41:43.
+- Shortlist 0.45 s; chips 0.06 s; live-rail < 0.01 s.
+- **Board:** build 72 s old; shortlist written 98 s ago.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 10 live chips
+have a live card.
+
+**Restarts:** live-odds-worker pid 2834332 and refresh-worker pid 2809282, both unchanged.
