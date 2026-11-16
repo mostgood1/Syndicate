@@ -114,3 +114,8 @@ yet.
 
 **Teams:** 0 chip-less, all detectors 0.
 **Restarts:** live-odds-worker pid unchanged (2834332).
+
+**User 11-16 ~3:0x PM CST: "start the NFL night-game fix session".** The card was started as session
+"Shard NFL game-line quotes by Central kickoff date" (local_78b841a1). Loading its fix onto the fleet
+still needs the user's yes. The MNF prediction above stands unless that load happens before
+kickoff.
