@@ -60523,3 +60523,10 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify (MET, read 18:19:31Z):** pid 2834332 on head `a39058946`, 0 tracebacks in the last 3,000 log lines, `NBA_LIVE_RESIM_TICK ... games=0 ... written=True` at 18:19:23Z (no live NBA game yet, so there is no PLAYER_EXIT_TICK line yet).
 - **NOT loaded:** the NCAAB/WNCAAB gate (`97af7b9b8`) is not in `a39058946`.
 - **verify (OWED, tonight's NBA slate):** `[nba_live_resim] PLAYER_EXIT_TICK` lines and `playerExits` in `live/nba_live_resim.json` once games are live; a refusal reading needs a real mid-game key exit.
+
+## 2026-11-16 18:39:51Z (12:39 PM CST) -- DEPLOY (ff only, no restart): fleet `a39058946` -> `5963e16f4`, the NCAAB/WNCAAB live player-exit gate (`97af7b9b8`, lane `live-player-exit-gate`, user "Yes, ff now") -- **ff MET; the code reaches live-odds-worker at its self-recycle (~23:44Z, 5:44 PM CST); verification owed after that and on tonight's college slate**
+- **ride-along (a39058946..5963e16f4):** code is only this lane's college change (`syndicate/features/ncaab/live_resim.py`, `shared/live_player_exit_hold.py`, 2 test files) plus a CLAUDE.md note; the rest is ledger/docs.
+- **gates:** claim live-odds-worker 18:39:19Z (holder `live-player-exit-gate`, rc 0). Baseline 18:39:19Z (`lpeg_lowbase.sh`): head a39058946, live-odds-worker pid 2834332 (etimes 1437 s), 0 EXIT_HOLD, 0 tracebacks. Preflight `--target-commit 5963e16f4` from `C:\tmp\syndicate-sessions\lpeg-main` at origin/main `5963e16f4`: **CLEAR**, 0 processes.
+- **ff:** `lpeg_ff_only.sh 5963e16f4 a39058946` -> `ff done 2026-11-16T18:39:51.497Z: HEAD 5963e16f40b6...`, `MODELLED_EXIT_REASONS` on disk (2); pid 2834332 unchanged after (etimes 1469 s). No TERM.
+- **verify (OWED):** after the ~23:44Z recycle, the new pid on head 5963e16f4 (or a descendant) with 0 tracebacks; on the college slate, `[ncaab_live_resim] PLAYER_EXIT_TICK` / `[wncaab_live_resim] PLAYER_EXIT_TICK` lines and `playerExits` in `live/ncaab_live_resim.json`. Refresh-worker and web pick this ff up at their next restarts; neither runs the college re-sim.
+- **claim:** released after this entry.
