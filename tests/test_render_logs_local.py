@@ -1,5 +1,5 @@
-"""render_logs' LOCAL backend: the fleet's own log files, read with the same
-service/text/time filters as the Render API, and never a faked timestamp."""
+"""render_logs reads the fleet's own log files (its only backend since 2026-11-15),
+with service/text/time filters and never a faked timestamp."""
 
 from __future__ import annotations
 
@@ -98,33 +98,23 @@ def test_fetch_window_dispatches_to_local_and_records_source(log_dir: Path, monk
     assert render_logs.LAST_FETCH["source"] == "local" and render_logs.LAST_FETCH["why"] == "explicit"
 
 
-def test_resolve_source_unset_is_local_without_render_call(monkeypatch) -> None:
+def test_resolve_source_is_always_the_fleet(monkeypatch) -> None:
+    """Render's logs API was removed 2026-11-15 (lane render-retirement)."""
     monkeypatch.delenv("SYNDICATE_LOG_SOURCE", raising=False)
-
-    def forbidden(*_a, **_k):
-        raise AssertionError("the default must not touch the Render API")
-
-    monkeypatch.setattr(render_logs, "_api_key", forbidden)
-    monkeypatch.setattr(render_logs, "render_suspended", forbidden)
+    for name in ("_api_key", "_get", "render_suspended", "_fetch_render_window", "SERVICE_IDS"):
+        assert not hasattr(render_logs, name), name
     source, why = render_logs.resolve_source()
     assert source == "local" and why.startswith("default:")
-    assert render_logs.resolve_source("render") == ("render", "explicit")
-
-
-def test_resolve_source_auto(monkeypatch) -> None:
+    assert render_logs.resolve_source("local") == ("local", "explicit")
+    assert render_logs.resolve_source("auto") == ("local", "explicit")
     monkeypatch.setenv("SYNDICATE_LOG_SOURCE", "auto")
-
-    def no_key():
-        raise SystemExit("RENDER_API_KEY not set")
-
-    monkeypatch.setattr(render_logs, "_api_key", no_key)
-    assert render_logs.resolve_source()[0] == "local"
-
-    monkeypatch.setattr(render_logs, "_api_key", lambda: "k")
-    monkeypatch.setattr(render_logs, "render_suspended", lambda key: True)
-    assert render_logs.resolve_source() == ("local", "auto: Render reports the web service suspended")
-    monkeypatch.setattr(render_logs, "render_suspended", lambda key: False)
-    assert render_logs.resolve_source()[0] == "render"
-    assert render_logs.resolve_source("auto")[0] == "render"
-    monkeypatch.setenv("SYNDICATE_LOG_SOURCE", "local")
     assert render_logs.resolve_source() == ("local", "SYNDICATE_LOG_SOURCE")
+
+
+def test_asking_for_render_fails_rather_than_reading_the_fleet(monkeypatch) -> None:
+    monkeypatch.delenv("SYNDICATE_LOG_SOURCE", raising=False)
+    with pytest.raises(SystemExit, match="retired"):
+        render_logs.resolve_source("render")
+    monkeypatch.setenv("SYNDICATE_LOG_SOURCE", "render")
+    with pytest.raises(SystemExit, match="retired"):
+        render_logs.resolve_source()

@@ -96,47 +96,6 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual([p["pid"] for p in jobs], [500])
 
 
-class NewestLogOrderingTests(unittest.TestCase):
-    """The API returns the newest N presented OLDEST-FIRST, with or without
-    `direction=backward` (measured 2026-08-10). Reading rows[0] as "latest"
-    produced a four-hour error in the direction that says "safe to deploy"."""
-
-    def test_newest_is_selected_by_sorting_not_by_position(self) -> None:
-        rows = [
-            {"timestamp": "2026-08-10T15:21:55Z", "message": "ALL_PROCESS_MEMORY {}"},
-            {"timestamp": "2026-08-10T15:56:02Z", "message": "ALL_PROCESS_MEMORY {}"},
-        ]
-        captured = {}
-
-        def fake_get(url, key):
-            captured["url"] = url
-            return {"logs": rows}
-
-        original = deploy_preflight._get
-        deploy_preflight._get = fake_get
-        try:
-            newest = deploy_preflight.newest_log("srv-x", "k", "ALL_PROCESS_MEMORY")
-        finally:
-            deploy_preflight._get = original
-        self.assertEqual(newest[0], "2026-08-10T15:56:02Z", "must sort, not take rows[0] or rows[-1] on faith")
-
-    def test_substring_over_match_is_filtered_out(self) -> None:
-        # The filter is a case-insensitive SUBSTRING match: MALLOC_TRIM also
-        # hits MALLOC_TRIM_INIT, and CONTAINER_MEMORY hits
-        # container_memory_headroom_mb. Non-matching rows must be dropped.
-        rows = [
-            {"timestamp": "2026-08-10T15:00:00Z", "message": 'ALL_PROCESS_MEMORY {"a":1}'},
-            {"timestamp": "2026-08-10T15:59:00Z", "message": 'SOMETHING_ELSE {"container_memory_mb": 1}'},
-        ]
-        original = deploy_preflight._get
-        deploy_preflight._get = lambda url, key: {"logs": rows}
-        try:
-            newest = deploy_preflight.newest_log("srv-x", "k", "ALL_PROCESS_MEMORY")
-        finally:
-            deploy_preflight._get = original
-        self.assertEqual(newest[0], "2026-08-10T15:00:00Z")
-
-
 if __name__ == "__main__":
     unittest.main()
 
@@ -158,43 +117,22 @@ class FleetCommitTests(unittest.TestCase):
         self.assertEqual(len(set(ids)), 3, "a service is double-counted")
 
     def test_every_service_is_reported(self) -> None:
-        calls = []
-
-        def fake_live_deploy(service_id, key):
-            calls.append(service_id)
-            return {"commit": {"id": "abcdef1234567890"}, "finishedAt": "2026-08-15T00:00:00Z"}
-
-        original = deploy_preflight.live_deploy
-        deploy_preflight.live_deploy = fake_live_deploy
-        try:
-            fleet = deploy_preflight.fleet_live_commits("key")
-        finally:
-            deploy_preflight.live_deploy = original
-
+        status = {role: {"pid": "1", "up": True, "live_commit": "abcdef12"} for role in deploy_preflight.FLEET}
+        fleet = deploy_preflight.fleet_live_commits_from(status)
         self.assertEqual(set(fleet), set(deploy_preflight.FLEET))
-        self.assertEqual(len(calls), 3)
         self.assertEqual(fleet["web"]["live_commit"], "abcdef12")
+        self.assertEqual(fleet["web"]["source"], "fleet")
 
     def test_one_unreadable_service_does_not_take_down_the_others(self) -> None:
-        """A throttled or failing read must render as UNREADABLE, never as a
-        commit of `None` indistinguishable from 'never deployed'."""
-
-        def flaky_live_deploy(service_id, key):
-            if service_id == deploy_preflight.SERVICE_IDS["refresh-worker"]:
-                raise RuntimeError("429 throttled")
-            return {"commit": {"id": "0" * 40}, "finishedAt": "2026-08-15T00:00:00Z"}
-
-        original = deploy_preflight.live_deploy
-        deploy_preflight.live_deploy = flaky_live_deploy
-        try:
-            fleet = deploy_preflight.fleet_live_commits("key")
-        finally:
-            deploy_preflight.live_deploy = original
-
+        """A role missing from `local_production.py status`, or down, must render as an
+        error, never as a commit of `None` indistinguishable from 'never deployed'."""
+        status = {"web": {"pid": "1", "up": True, "live_commit": "00000000"},
+                  "live-odds-worker": {"pid": "2", "up": False, "live_commit": "00000000"}}
+        fleet = deploy_preflight.fleet_live_commits_from(status)
         self.assertIn("error", fleet["refresh-worker"])
         self.assertIsNone(fleet["refresh-worker"]["live_commit"])
         self.assertEqual(fleet["web"]["live_commit"], "00000000")
-        self.assertNotIn("error", fleet["live-odds-worker"])
+        self.assertEqual(fleet["live-odds-worker"]["error"], "role DOWN")
 
 
 # --------------------------------------------------------------------------
@@ -262,6 +200,23 @@ def _claim(active=None):
             sys.modules["deploy_claim"] = saved
 
 
+@contextlib.contextmanager
+def _fleet(*, jobs, last_deploy):
+    """Pin the fleet readers `main()` consults: every role up at `f*8`, the worker's
+    `ps` snapshot (`jobs` None = unreadable), its last restart, and an idle board."""
+    status = {role: {"pid": "100", "up": True, "restarts": 0, "live_commit": "f" * 8}
+              for role in deploy_preflight.FLEET}
+
+    def processes(role, now):
+        facts = {"reason": "ps failed"} if jobs is None else {"worker_pid": 100}
+        return jobs, facts, last_deploy
+
+    with mock.patch.object(deploy_preflight, "fleet_status", return_value=("f" * 40, status)), \
+         mock.patch.object(deploy_preflight, "fleet_role_processes", side_effect=processes), \
+         mock.patch.object(deploy_preflight, "read_board_build_state", return_value=(False, {})):
+        yield
+
+
 def _foreign_claim(service="refresh-worker", holder="another-lane"):
     return {"service": service, "holder": holder, "token": "t0",
             "target_commit": "a" * 40, "acquired_at_iso": "2026-09-04T20:00:00Z"}
@@ -316,55 +271,6 @@ class MinDeployIntervalTests(unittest.TestCase):
             self.assertEqual(deploy_preflight.min_deploy_interval_seconds("refresh-worker"), 0)
 
 
-class LastRestartingDeployTests(unittest.TestCase):
-    def _last(self, rows):
-        with mock.patch.object(deploy_preflight, "_get", return_value=rows):
-            return deploy_preflight.last_restarting_deploy("srv-x", "key")
-
-    def test_newest_is_selected_by_SORTING_not_by_position(self) -> None:
-        # This file's own header records that the Render endpoints do not return
-        # what their ordering suggests, and that reading rows[0] as newest
-        # produced a four-hour error in the direction that says "safe to deploy".
-        rows = [
-            _deploy(minutes_ago=90, deploy_id="dep-old"),
-            _deploy(minutes_ago=3, deploy_id="dep-new"),
-            _deploy(minutes_ago=45, deploy_id="dep-mid"),
-        ]
-        self.assertEqual(self._last(rows).get("id"), "dep-new")
-
-    def test_a_failed_build_never_restarted_the_service_so_it_does_not_count(self) -> None:
-        rows = [
-            _deploy(status="build_failed", minutes_ago=1, deploy_id="dep-failed"),
-            _deploy(status="live", minutes_ago=60, deploy_id="dep-live"),
-        ]
-        self.assertEqual(self._last(rows).get("id"), "dep-live")
-
-    def test_a_cancelled_deploy_DOES_count(self) -> None:
-        # This module's header measures it: cancelling after build_ended does not
-        # avoid a restart, it causes one -- a second MALLOC_ARENA_INIT 29 s later
-        # with the child pid namespace reset. Over-counting costs a wait;
-        # under-counting costs the board.
-        rows = [_deploy(status="canceled", minutes_ago=2, deploy_id="dep-cancel")]
-        self.assertEqual(self._last(rows).get("id"), "dep-cancel")
-
-    def test_an_unrecognised_status_counts_rather_than_passes(self) -> None:
-        # Rule 1 of this file: unknown must not land on the permissive branch.
-        rows = [_deploy(status="some_new_render_status", minutes_ago=2, deploy_id="dep-weird")]
-        self.assertEqual(self._last(rows).get("id"), "dep-weird")
-
-    def test_an_in_flight_deploy_is_dated_from_its_start(self) -> None:
-        # It has no finishedAt, and it is the "one build cancelled another" case.
-        rows = [{"deploy": {"id": "dep-flight", "status": "update_in_progress",
-                            "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}}]
-        found = self._last(rows)
-        self.assertEqual(found.get("id"), "dep-flight")
-        self.assertTrue(deploy_preflight._deploy_restart_moment(found))
-
-    def test_nothing_restarting_returns_empty_rather_than_raising(self) -> None:
-        self.assertEqual(self._last([_deploy(status="build_failed")]), {})
-        self.assertEqual(self._last([]), {})
-
-
 class AgeSecondsTests(unittest.TestCase):
     def test_a_negative_age_is_NOT_clamped(self) -> None:
         # The sample-age caller treats a negative as "a receipt nobody should
@@ -417,9 +323,10 @@ class TooSoonVerdictTests(unittest.TestCase):
     while the branch that uses them never fires -- the `off != on` property
     `model_engine_standard.md` requires of anything behind a gate.
 
-    Drives `main()` end to end against a mocked Render API and asserts on the
-    EXIT CODE and the RECEIPT, which are the two things the guard actually
-    reads.
+    Drives `main()` end to end against mocked FLEET readers (`fleet_status`,
+    `fleet_role_processes`, `read_board_build_state`) and asserts on the EXIT CODE
+    and the RECEIPT, which are the two things the guard actually reads. It drove
+    a mocked Render API until 2026-11-15 (lane render-retirement).
     """
 
     def _run(self, argv, *, last_deploy_minutes_ago, jobs=(), env=None, claim=None,
@@ -437,21 +344,11 @@ class TooSoonVerdictTests(unittest.TestCase):
 
         # A CLEAR-shaped world in every respect except the deploy spacing, so a
         # TOO_SOON can only come from the thing under test.
-        sample_now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        processes = [WORKER_SHELL, WORKER_MAIN, *jobs]
-        with mock.patch.object(deploy_preflight, "_api_key", return_value="k"), \
-             mock.patch.object(deploy_preflight, "live_deploy", return_value={"commit": {"id": "f" * 40}}), \
-             mock.patch.object(deploy_preflight, "fleet_live_commits", return_value={}), \
-             mock.patch.object(deploy_preflight, "read_board_build_state", return_value=(False, {})), \
-             mock.patch.object(deploy_preflight, "newest_log",
-                               return_value=(sample_now, "ALL_PROCESS_MEMORY " + __import__("json").dumps(
-                                   {"processes": processes, "process_count": len(processes)}))), \
-             mock.patch.object(deploy_preflight, "last_restarting_deploy",
-                               return_value=(_deploy(minutes_ago=last_deploy_minutes_ago,
-                                                     deploy_id="dep-recent")["deploy"]
-                                             if last_deploy_minutes_ago is not None else {})), \
+        last = (_deploy(minutes_ago=last_deploy_minutes_ago, deploy_id="dep-recent")["deploy"]
+                if last_deploy_minutes_ago is not None else {})
+        with _fleet(jobs=list(jobs), last_deploy=last), \
              mock.patch.object(deploy_preflight, "_write_receipt", side_effect=fake_write_receipt), \
-             mock.patch.object(deploy_preflight.sys, "argv", ["deploy_preflight.py", "--target", "render", *argv]), \
+             mock.patch.object(deploy_preflight.sys, "argv", ["deploy_preflight.py", *argv]), \
              mock.patch.dict(os.environ, env or {}), \
              _claim(claim) as claim_stub:
             code = deploy_preflight.main()
@@ -489,7 +386,7 @@ class TooSoonVerdictTests(unittest.TestCase):
 
     def test_an_unreadable_deploy_history_does_NOT_refuse(self) -> None:
         # The one deliberately permissive unknown in this file. Refusing on a
-        # Render API blip would block every deploy INCLUDING a revert, which is
+        # status-read blip would block every deploy INCLUDING a revert, which is
         # worse than the problem. The unknown is recorded, not swallowed.
         code, receipt = self._run(["--service", "refresh-worker"], last_deploy_minutes_ago=None)
         self.assertEqual(code, deploy_preflight.EXIT_CLEAR)
@@ -507,16 +404,11 @@ class TooSoonVerdictTests(unittest.TestCase):
         # the sample IS stale -- and UNKNOWN would mask TOO_SOON behind a reason
         # that tells the operator to wait for a log line when what they need is
         # to wait 22 more minutes. Both refuse; only one is true.
-        with mock.patch.object(deploy_preflight, "_api_key", return_value="k"), \
-             mock.patch.object(deploy_preflight, "live_deploy", return_value={"commit": {"id": "f" * 40}}), \
-             mock.patch.object(deploy_preflight, "fleet_live_commits", return_value={}), \
-             mock.patch.object(deploy_preflight, "read_board_build_state", return_value=(False, {})), \
-             mock.patch.object(deploy_preflight, "newest_log", return_value=None), \
-             mock.patch.object(deploy_preflight, "last_restarting_deploy",
-                               return_value=_deploy(minutes_ago=2)["deploy"]), \
+        # On the fleet an unreadable `ps` snapshot is the stale sample.
+        with _fleet(jobs=None, last_deploy=_deploy(minutes_ago=2)["deploy"]), \
              mock.patch.object(deploy_preflight, "_write_receipt"), \
              mock.patch.object(deploy_preflight.sys, "argv",
-                               ["deploy_preflight.py", "--target", "render", "--service", "refresh-worker"]), \
+                               ["deploy_preflight.py", "--service", "refresh-worker"]), \
              _claim():
             code = deploy_preflight.main()
         self.assertEqual(code, deploy_preflight.EXIT_TOO_SOON,
@@ -571,7 +463,7 @@ class TooSoonVerdictTests(unittest.TestCase):
 class ExpectationVerdictTests(unittest.TestCase):
     """`NO_EXPECTATION` (exit 6), check 3 from lane `combined-board-state-rows-lost`.
 
-    Driven through `main()` end to end with the same mocked Render API as
+    Driven through `main()` end to end with the same mocked fleet readers as
     `TooSoonVerdictTests`, and asserted on the exit code and the RECEIPT --
     the two things `deploy-guard.py` reads. The world is CLEAR in every other
     respect, so a refusal can only come from the thing under test.
@@ -714,11 +606,3 @@ class WouldItHavePreventedTheIncidentTests(unittest.TestCase):
         # 54-minute publish gap that followed, and the board published nothing
         # for the whole of it.
         self.assertIn(157.0, self._gaps())
-
-    def test_a_cancelled_deploy_in_the_real_timeline_still_starts_the_clock(self) -> None:
-        # 22:08:59 was `canceled` and the deploy 157 s later must still be
-        # refused. If cancels did not count, the tightest burst of the evening
-        # would have passed.
-        statuses = {s for _t, s in self.REAL_TIMELINE}
-        self.assertIn("canceled", statuses)
-        self.assertNotIn("canceled", deploy_preflight.NON_RESTARTING_DEPLOY_STATUSES)

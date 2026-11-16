@@ -93,82 +93,42 @@ def test_the_reader_returns_unknown_rather_than_raising(preflight, monkeypatch):
 
 
 # --- the marker -------------------------------------------------------------------
+#
+# These tests read Render's logs API until 2026-11-15 (lane render-retirement). The
+# fleet's refresh-worker log is now the only source, and the same two properties are
+# pinned on it: the shortlist write is NOT completion, and an idle worker reads idle.
 
 
-def test_completion_is_board_build_timing_not_the_shortlist(safety, monkeypatch):
+def test_completion_is_not_the_shortlist(safety):
     """The shortlist write is mid-build. Reading it as done is what made the
     16:04:54Z window look safe."""
-    asked: list[str] = []
-
-    def fake_logs(key, text, minutes=0):
-        asked.append(text)
-        return [{"timestamp": "2026-09-19T16:00:00Z"}] if text == "BUILD_SPAN_ENTER" else [{"timestamp": "2026-09-19T15:30:00Z"}]
-
-    monkeypatch.setattr(safety, "_load_render_key", lambda: "k")
-    monkeypatch.setattr(safety, "_render_logs", fake_logs)
-    monkeypatch.setattr(safety, "_expected_build_seconds", lambda key: 600.0)
-    in_flight, facts = safety.board_build_state()
-    assert "BOARD_BUILD_TIMING" in asked, "completion must be read from the build's own timing line"
-    assert "LAYER2_SHORTLIST" not in asked
-    assert in_flight is True
-    assert facts["newest_build_complete"] == "2026-09-19T15:30:00Z"
+    lines = [
+        "[intelligence_state] BUILD_SPAN_ENTER stage=pull_hot_artifacts date=2026-09-19",
+        "[intelligence] LAYER2_SHORTLIST rows=120 considered=900",
+    ]
+    in_flight, facts = safety._fleet_board_build_state(lines)
+    assert in_flight is True, "a written shortlist must not read as a finished build"
+    assert facts["newest_build_complete"] == "(none in tail)"
 
 
-def test_a_completed_build_reads_idle(safety, monkeypatch):
-    monkeypatch.setattr(safety, "_load_render_key", lambda: "k")
-    monkeypatch.setattr(safety, "_render_logs", lambda key, text, minutes=0: [
-        {"timestamp": "2026-09-19T16:00:00Z" if text == "BUILD_SPAN_ENTER" else "2026-09-19T16:09:00Z"}])
-    monkeypatch.setattr(safety, "_expected_build_seconds", lambda key: 600.0)
-    in_flight, _ = safety.board_build_state()
+def test_a_completed_build_reads_idle(safety):
+    lines = [
+        "[intelligence_state] BUILD_SPAN_ENTER stage=pull_hot_artifacts date=2026-09-19",
+        "[intelligence] LAYER2_SHORTLIST rows=120 considered=900",
+        "[intelligence_state] BOARD_BUILD_TIMING wall_s=540.0 ok=True",
+        "[intelligence_state] LOOP_ITERATION pending_keys=0",
+    ]
+    in_flight, facts = safety._fleet_board_build_state(lines)
     assert in_flight is False
+    assert facts["typical_build_seconds"] == 540
 
 
-def test_no_render_key_is_unknown(safety, monkeypatch):
-    monkeypatch.setattr(safety, "_load_render_key", lambda: "")
-    in_flight, facts = safety.board_build_state()
-    assert in_flight is None and "RENDER_API_KEY" in str(facts.get("reason"))
-
-
-def test_a_session_worktree_finds_the_key_in_the_main_worktree(safety, monkeypatch, tmp_path):
-    """The protocol runs every deploy from a session worktree, and `.env` is gitignored.
-
-    MEASURED 2026-09-21: from a worktree this loader returned "", `board_build_state()` reported
-    `missing_api_key`, and the HOLD mapped that to "not applicable" on every refresh-worker preflight
-    -- while `render_deploy.py`, which falls back to the main worktree, deployed normally.
-    """
-    main, worktree = tmp_path / "main", tmp_path / "worktree"
-    main.mkdir()
-    worktree.mkdir()
-    (main / ".env").write_text('OTHER=1\nRENDER_API_KEY="rnd_from_main"\n', encoding="utf-8")
-    monkeypatch.delenv("RENDER_API_KEY", raising=False)
-    monkeypatch.setattr(safety, "REPO_ROOT", worktree)
-    monkeypatch.setattr(safety, "_main_worktree_root", lambda: main)
-    assert safety._load_render_key() == "rnd_from_main"
-    # A `.env` beside the script still wins, as in `deploy_preflight._env_files`.
-    (worktree / ".env").write_text("RENDER_API_KEY=rnd_local\n", encoding="utf-8")
-    assert safety._load_render_key() == "rnd_local"
-
-
-def test_this_checkout_resolves_a_main_worktree_that_holds_the_real_env(safety):
-    """Reachability on the machine that deploys: the resolver lands on a tree with a `.env` in it."""
-    root = safety._main_worktree_root()
-    assert (root / ".git").exists(), root
-    if not (root / ".env").exists():
-        pytest.skip("no .env on this machine (CI); the layout test above pins the logic")
-    assert safety._load_render_key(), "the main worktree has a .env but the loader still found no key"
-
-
-def test_no_api_key_is_not_applicable_rather_than_a_block(preflight, safety, monkeypatch):
-    """"Cannot ask" is not "cannot tell".
-
-    Without RENDER_API_KEY this shell cannot read the worker -- and cannot
-    deploy either, since `render_deploy.py` reads the same key. Blocking here
-    would fail offline runs (this tool's own suite among them) while guarding
-    nothing. Every other unreadable state still blocks, which the test above pins.
-    """
-    monkeypatch.setattr(safety, "_load_render_key", lambda: "")
-    in_flight, facts = safety.board_build_state()
-    assert in_flight is None and facts.get("missing_api_key") is True, "the case must be NAMED, not inferred from prose"
-    assert preflight.board_build_verdict("refresh-worker", False, (in_flight, facts)) is None
-    # ... while an unreadable WORKER (key present, logs unhelpful) still blocks.
-    assert preflight.board_build_verdict("refresh-worker", False, (None, {"reason": "no BUILD_SPAN_ENTER in the lookback window"}))[0] == "UNKNOWN"
+def test_a_missing_render_key_no_longer_opens_the_gate(preflight, safety):
+    """Until 2026-11-15 `missing_api_key` (no RENDER_API_KEY in this shell) was "not
+    applicable" rather than a block, because that shell could not deploy to Render
+    either. Every fleet deploy runs from such a shell, so the escape is gone: any
+    unreadable board-build state blocks."""
+    for name in ("_load_render_key", "_render_logs", "_main_worktree_root"):
+        assert not hasattr(safety, name), name
+    verdict = preflight.board_build_verdict("refresh-worker", False, (None, {"missing_api_key": True, "reason": "x"}))
+    assert verdict is not None and verdict[0] == "UNKNOWN"

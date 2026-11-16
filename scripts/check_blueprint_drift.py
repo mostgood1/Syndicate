@@ -56,6 +56,64 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 # apart -- the same reasoning `LIVE_LIMIT_FIELDS` uses in execution_guard.py.
 import deploy_preflight as dp  # noqa: E402
 
+import os  # noqa: E402
+import time  # noqa: E402
+import urllib.error  # noqa: E402
+import urllib.request  # noqa: E402
+
+# THE LAST RENDER API READ IN THE REPO `[2026-11-15, lane render-retirement]`.
+# deploy_preflight's Render helpers were removed with the rest of its Render path,
+# and moved here UNCHANGED, because this script still reads the suspended services'
+# env when someone pushes `render.yaml`: the user decided on 2026-11-08 (todo #766
+# D3) to keep `render.yaml` and this drift check as they are. Whether to retire it
+# too is put back to the user in #766. Until they decide, a `render.yaml` push still
+# needs RENDER_API_KEY here, or `SYNDICATE_ALLOW_BLUEPRINT_DRIFT=1`.
+
+
+def _env_files():
+    """`.env` in THIS tree, then in the main worktree. A `.env` beside the script wins."""
+    seen, out = set(), []
+    for root in (REPO_ROOT, dp._main_worktree_root()):
+        path = (root / ".env").resolve()
+        if path in seen:
+            continue
+        seen.add(path)
+        if path.exists():
+            out.append(path)
+    return out
+
+
+def _env_value(name: str) -> str:
+    for path in _env_files():
+        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            if line.startswith(name):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
+
+
+def _api_key() -> str:
+    value = str(os.environ.get("RENDER_API_KEY") or "").strip()
+    if value:
+        return value
+    value = _env_value("RENDER_API_KEY")
+    if value:
+        return value
+    raise SystemExit("RENDER_API_KEY not set in the environment or .env")
+
+
+def _get(url: str, key: str):
+    request = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}", "Accept": "application/json"})
+    for attempt in range(6):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            # A throttled read must not render as "no drift".
+            if exc.code != 429 or attempt == 5:
+                raise
+            time.sleep(3.0 * (attempt + 1))
+    raise RuntimeError("unreachable")
+
 
 def _live_env(service_id: str, api_key: str) -> dict[str, str]:
     """Every live env var for one service.
@@ -70,7 +128,7 @@ def _live_env(service_id: str, api_key: str) -> dict[str, str]:
         url = f"https://api.render.com/v1/services/{service_id}/env-vars?limit=100"
         if cursor:
             url += f"&cursor={cursor}"
-        page = dp._get(url, api_key)
+        page = _get(url, api_key)
         if not page:
             break
         for row in page:
@@ -117,7 +175,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        api_key = dp._api_key()
+        api_key = _api_key()
     except Exception as exc:  # noqa: BLE001
         print(f"UNKNOWN: cannot read RENDER_API_KEY ({type(exc).__name__}). "
               f"This is NOT a pass -- unknown must not read as safe.", flush=True)

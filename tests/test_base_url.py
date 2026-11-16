@@ -42,14 +42,10 @@ ENV_VARS = (
     "SYNDICATE_FLEET_ENV_FILE",
 )
 
-# Files allowed to carry the literal as live code, each with its reason.
-ALLOWED = {
-    # Gates a RENDER deploy; must not follow the generic SYNDICATE_BASE_URL.
-    "scripts/deploy_preflight.py": "Render-deploy gate, deliberately Render-pinned",
-    # PENDING: claimed by another OPEN lane on 2026-10-01 when the resolver
-    # landed (lane `scripts-base-url-resolver`). Convert each when its lane
-    # closes, and delete its line here -- the test then guards it too.
-}
+# Files allowed to carry the literal as live code, each with its reason. EMPTY since
+# 2026-11-15 (lane render-retirement): deploy_preflight.py, the last entry, lost its
+# Render path, so nothing in scripts/ may hard-code the Render URL any more.
+ALLOWED: dict[str, str] = {}
 
 
 @pytest.fixture

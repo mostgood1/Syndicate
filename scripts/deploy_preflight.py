@@ -113,8 +113,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # says unknown is not clear, `stale` would be permanently True, and every cron
 # preflight would return UNKNOWN (exit 2) forever. A gate that can never clear
 # is a gate that gets removed -- and then the crons are unguarded again, with
-# the tooling now claiming to cover them. `cron_run_in_flight()` answers the
-# same question from the evidence a cron actually produces.
+# the tooling now claiming to cover them. On Render a cron's run EVENTS answered it
+# (`cron_run_in_flight`, retired with Render 2026-11-15). On the fleet these are
+# supervisor SCHEDULED_JOBS that load code when they fire, so a cron preflight reads
+# UNKNOWN by design -- there is nothing to deploy. The ids are kept as LABELS only
+# (receipts and `deploy_claim.py` service names); nothing here calls Render with them.
 CRON_SERVICE_IDS = {
     "sim-input-reports": "crn-dafj4ie7bikc738q9ol0",
     "ci-suite": "crn-dafg4h0u01pc73aavs6g",
@@ -134,7 +137,6 @@ SERVICE_IDS = {
 #: sample. Keyed by name because that is what `--service` takes.
 CRON_SERVICES = frozenset(CRON_SERVICE_IDS)
 
-OWNER_ID = "tea-d2bb5n95pdvs73cje4fg"
 
 # A process sample older than this tells you about a world that may no longer
 # exist. The worker emits ALL_PROCESS_MEMORY every few seconds, so anything
@@ -273,162 +275,20 @@ DEFAULT_MIN_DEPLOY_INTERVAL_SECONDS = {
     "syndicate": 0,
 }
 
-# Deploy statuses that DID NOT restart the service, so they do not start the
-# clock. Everything else does, INCLUDING anything unrecognised -- rule 1 of this
-# file is that unknown must not land on the permissive branch, and a status we
-# cannot classify is exactly that.
-#
-# `canceled` IS COUNTED, and that is not conservatism for its own sake: this
-# file's own header records that cancelling a deploy which has passed
-# `build_ended` does not avoid a restart, it CAUSES one (a second
-# MALLOC_ARENA_INIT 29 s after the cancel, with the child pid namespace reset).
-# A cancel during the BUILD phase is harmless and will be over-counted here.
-# Over-counting costs a wait; under-counting costs the board.
-NON_RESTARTING_DEPLOY_STATUSES = frozenset({
-    "build_failed",
-    "pre_deploy_failed",
-    "build_in_progress",
-    "pre_deploy_in_progress",
-    "created",
-    "queued",
-})
 
-
-def _env_files():
-    """`.env` in THIS tree, then in the main worktree. Order matters, both do.
-
-    `.env` is gitignored, so a session worktree -- which the protocol says is
-    where lane work happens -- does not have one, and both locks died with
-    `RENDER_API_KEY not set` when run from there. A deploy tool that only works
-    in the tree the protocol tells you to leave is a tool people work around.
-    `snapshot_render_env.py` already reaches for the primary tree; this is the
-    same fallback, and it is a FALLBACK: a `.env` beside the script still wins,
-    so a deliberately different key in a worktree is still honoured.
-    """
-    seen, out = set(), []
-    for root in (REPO_ROOT, _main_worktree_root()):
-        path = (root / ".env").resolve()
-        if path in seen:
-            continue
-        seen.add(path)
-        if path.exists():
-            out.append(path)
-    return out
-
-
-def _env_value(name: str) -> str:
-    for path in _env_files():
-        for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            if line.startswith(name):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
-
-
+# RENDER IS RETIRED `[2026-11-15, lane render-retirement]`. This file read the Render
+# API (deploys, events, logs, web's memory endpoint) whenever `--target render` was
+# passed or `auto` resolved away from the fleet; all of that is gone and the fleet is
+# the only production. These two NAMES survive only as refusals, because
+# `tests/test_live_mechanism_outcome_gate.py` -- claimed by OPEN lane
+# `gate-smooth-family` -- patches them to prove the fleet path never calls Render.
+# Delete both once that lane releases the file and drops the two patches.
 def _api_key() -> str:
-    value = str(os.environ.get("RENDER_API_KEY") or "").strip()
-    if value:
-        return value
-    value = _env_value("RENDER_API_KEY")
-    if value:
-        return value
-    raise SystemExit("RENDER_API_KEY not set in the environment or .env")
+    raise SystemExit("the Render API was retired 2026-11-15 (lane render-retirement); production is the fleet")
 
 
 def _get(url: str, key: str):
-    request = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}", "Accept": "application/json"})
-    for attempt in range(6):
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            # Same reasoning as audit_blueprint_drift: a throttled read must not
-            # render as "nothing running".
-            if exc.code != 429 or attempt == 5:
-                raise
-            time.sleep(3.0 * (attempt + 1))
-    raise RuntimeError("unreachable")
-
-
-# Services whose process list is read from their OWN /api/ops/memory endpoint
-# instead of from an ALL_PROCESS_MEMORY log line. See `web_processes` below.
-API_SAMPLED_SERVICES = {"web", "syndicate"}
-WEB_BASE_URL = os.environ.get("SYNDICATE_DIAG_BASE_URL", "https://syndicate-an21.onrender.com")
-
-
-def _admin_token() -> str | None:
-    value = str(os.environ.get("ADMIN_TOKEN") or "").strip()
-    if value:
-        return value
-    return _env_value("ADMIN_TOKEN") or None
-
-
-def web_processes() -> tuple[list[dict], str] | None:
-    """Web's live process list, read from the service itself. `#465`.
-
-    WHY WEB CANNOT USE THE LOG PATH. `deploy_preflight` was built around
-    `ALL_PROCESS_MEMORY`, a stderr line the WORKERS emit every few seconds.
-    **Web has not emitted one since 2026-08-14**, so its sample is permanently
-    stale and the verdict is permanently UNKNOWN -- which the guard treats as
-    HOLD, so every web deploy needed a break-glass grant. A guard that must be
-    broken on every use has stopped being a guard.
-
-    THE CAUSE OF THE SILENCE IS STILL UNKNOWN, and this does not pretend to fix
-    it. FOUR causes have been claimed for it and all four were wrong (broken
-    sampler / missing psutil / deleted emitter / no caller on web -- see
-    `state.md [web-preflight-dead-sample]`). **This fix deliberately does not
-    depend on the answer**: whatever stopped the log line, the endpoint reads
-    the same processes from the same container, live, on request.
-
-    IT IS ALSO WHAT EVERY BREAK-GLASS ALREADY DID BY HAND. The 2026-08-18 and
-    2026-08-19 web grants both substituted exactly this reading -- process list
-    from `/api/ops/memory`, each entry identified by cmdline -- and recorded it
-    in `deploys.md` as the evidence the deploy was safe. This promotes that
-    manual step to the normal path.
-
-    The records carry `pid`, `ppid` and `cmdline`, which is precisely what
-    `classify()` consumes, so no translation is involved and no field is
-    invented. Returns (processes, iso8601_now) or None if unreachable.
-    """
-    token = _admin_token()
-    if not token:
-        return None
-    request = urllib.request.Request(
-        f"{WEB_BASE_URL}/api/ops/memory",
-        headers={"X-Admin-Token": token, "Accept": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except Exception:
-        return None
-    processes = ((payload or {}).get("memory") or {}).get("processes")
-    if not isinstance(processes, list) or not processes:
-        # An empty list is NOT evidence of an idle service -- it is a failed
-        # read. Returning it would turn "I cannot see" into "nothing running",
-        # which is the exact inversion this whole script exists to prevent.
-        return None
-    return processes, datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def newest_log(service_id: str, key: str, text: str, limit: int = 20) -> tuple[str, str] | None:
-    """Newest matching log line, sorted BY US.
-
-    The API presents the newest N oldest-first, so `rows[0]` is the oldest of
-    the page. Measured 2026-08-10 with and without `direction=backward`.
-    """
-    query = urllib.parse.urlencode(
-        {"ownerId": OWNER_ID, "resource": service_id, "limit": str(limit), "text": text}
-    )
-    payload = _get(f"https://api.render.com/v1/logs?{query}", key)
-    rows = (payload or {}).get("logs") or []
-    matching = sorted(
-        (str(row.get("timestamp") or ""), str(row.get("message") or ""))
-        for row in rows
-        # The filter is a case-insensitive SUBSTRING match, so it over-matches
-        # longer tokens (MALLOC_TRIM also hits MALLOC_TRIM_INIT). Re-check.
-        if text.lower() in str(row.get("message") or "").lower()
-    )
-    return matching[-1] if matching else None
+    raise SystemExit("the Render API was retired 2026-11-15 (lane render-retirement); production is the fleet")
 
 
 def _age_seconds(stamp: str, now: datetime) -> float | None:
@@ -448,21 +308,6 @@ def _age_seconds(stamp: str, now: datetime) -> float | None:
         return None
 
 
-def parse_processes(message: str) -> dict | None:
-    start = message.find("{")
-    if start < 0:
-        return None
-    try:
-        return json.loads(message[start:])
-    except Exception:
-        return None
-
-
-# Long-lived processes that ARE the service. Note the asymmetry with the probe
-# list this script exists to replace: an unrecognised process falls through to
-# "job", which BLOCKS. Being wrong about a name here costs a spurious HOLD; the
-# old design's equivalent mistake cost a killed job. Only the fail-safe
-# direction may be a name list.
 INFRASTRUCTURE_CMDLINE_MARKERS = (
     "graceful-shell-command.sh",
     "run_refresh_worker.py",
@@ -532,9 +377,10 @@ def read_board_build_state(base_url: str | None = None) -> tuple[bool | None, di
 # THE FLEET PATH `[2026-10-25, lane preflight-fleet-path]`. All three Render
 # services have been billing-suspended since 2026-09-30 and production runs on
 # the WSL fleet (`local_production.py up`), yet every read below main() went to
-# api.render.com: on 2026-10-24 23:35Z a web preflight died on `/v1/logs` HTTP
+# the Render API: on 2026-10-24 23:35Z a web preflight died on `/v1/logs` HTTP
 # 503 and the deploy was gated by hand instead. A preflight that cannot run is a
-# preflight nobody runs.
+# preflight nobody runs. The Render reads were REMOVED 2026-11-15 (lane
+# render-retirement); the fleet path below is the only one.
 #
 # Each Render instrument has a fleet equivalent, and each keeps its rule:
 #   live commit  -> `local_production.py status` `code=` per role (what the role
@@ -555,19 +401,6 @@ FLEET_HOME_DEFAULT = "~/syndicate-prod"
 FLEET_PYTHON_DEFAULT = "~/.venvs/syndicate/bin/python"
 FLEET_BASE_URL = "http://127.0.0.1:10000"  # any local host routes check_deploy_safety to the fleet readers
 WEB_RELOAD_NOTE = "fleet web loads code by reload-web (rolling gunicorn HUP); nothing in flight is killed"
-
-
-def target_is_fleet(choice: str) -> bool:
-    """Which production this preflight reads. `auto` follows the operator
-    scripts' default base URL (`_base_url.default_base_url`): the fleet unless
-    an env var points elsewhere."""
-    if choice in ("fleet", "render"):
-        return choice == "fleet"
-    try:
-        module = _safety_module()
-        return bool(module._is_fleet_base_url(module.DEFAULT_BASE_URL))
-    except Exception:  # noqa: BLE001 -- Render is suspended; the fleet is the safer guess
-        return True
 
 
 def _fleet_shell(script: str, timeout: int = 120) -> str:
@@ -816,13 +649,6 @@ def board_build_verdict(service: str, allow_mid_build: bool, state: tuple[bool |
     in_flight, facts = state
     if allow_mid_build:
         return None
-    # "CANNOT ASK" IS NOT "CANNOT TELL". Without `RENDER_API_KEY` this shell
-    # cannot read the worker -- but it also cannot deploy, because
-    # `render_deploy.py` reads the same key. Blocking here would only fail
-    # offline runs of this tool (its own test suite among them) while guarding
-    # nothing. Every OTHER unreadable state still blocks, below.
-    if in_flight is None and facts.get("missing_api_key"):
-        return None
     window = (" The natural window is the ~4 min after a `BOARD_BUILD_TIMING` line and before the next"
               " `BUILD_SPAN_ENTER`; `check_deploy_safety.py --drain` is the other way, and it is for quiet"
               " windows because it pauses new builds. For a revert or an outage, --allow-mid-build and say"
@@ -878,15 +704,6 @@ def classify(processes: list[dict]) -> tuple[list[dict], list[dict], list[dict],
     return infra, jobs, defunct, unknown
 
 
-def live_deploy(service_id: str, key: str) -> dict:
-    deploys = _get(f"https://api.render.com/v1/services/{service_id}/deploys?limit=10", key) or []
-    for row in deploys:
-        deploy = row.get("deploy", row)
-        if deploy.get("status") == "live":
-            return deploy
-    return {}
-
-
 def min_deploy_interval_seconds(service: str) -> int:
     """The spacing this service requires, honouring both env overrides.
 
@@ -923,132 +740,7 @@ def _deploy_restart_moment(deploy: dict) -> str:
     return ""
 
 
-def last_restarting_deploy(service_id: str, key: str) -> dict:
-    """The most recent deploy that restarted (or is restarting) this service.
-
-    READ FROM RENDER, NOT FROM A LOCAL LEDGER, and that is the load-bearing
-    choice. The 15 deploys that caused `#563` came from parallel sessions and
-    all carried `trigger=api`; a file in this checkout can only ever see the
-    ones this session wrote. `deploy_claim.py`'s own docstring makes the same
-    argument about cross-session coordination: the only thing that sees every
-    session's deploys is the thing every session deploys THROUGH.
-
-    Returns {} when the list cannot be read or holds nothing restarting. The
-    caller treats {} as "cannot tell" and does NOT refuse on it -- see the call
-    site for why that one unknown is deliberately permissive.
-    """
-    deploys = _get(f"https://api.render.com/v1/services/{service_id}/deploys?limit=20", key) or []
-    best: dict = {}
-    best_moment = ""
-    for row in deploys:
-        deploy = row.get("deploy", row)
-        status = str(deploy.get("status") or "").strip().lower()
-        if status in NON_RESTARTING_DEPLOY_STATUSES:
-            continue
-        moment = _deploy_restart_moment(deploy)
-        if not moment:
-            continue
-        # Lexical comparison on RFC3339 UTC, and sorted here rather than trusted
-        # from the API: this file's own header records that the deploys/logs
-        # endpoints do not return what their ordering suggests, and reading
-        # `rows[0]` as newest produced a four-hour error in the direction that
-        # says "safe to deploy".
-        if moment > best_moment:
-            best, best_moment = deploy, moment
-    return best
-
-
-# The three real services. `SERVICE_IDS` also carries `syndicate` as an alias
-# for `web`, which would double-count the fleet view.
 FLEET = ("web", "refresh-worker", "live-odds-worker")
-
-
-def fleet_live_commits(key: str) -> dict[str, dict]:
-    """Every service's live commit, not just the one being deployed. (D5)
-
-    Deploy drift has now affected FOUR audits. The services are all
-    `branch=main, autoDeploy=no` and yet run off-branch commits on divergent
-    lines, so "what is live" is a per-service question with three different
-    answers -- and a branch cut from the wrong one has already been a ROLLBACK
-    for refresh-worker rather than a deploy. A preflight that reports only the
-    target service cannot show that, which is exactly how the drift kept
-    reaching audits: nobody was looking at the other two.
-
-    A per-service failure degrades to `null` for that row rather than taking
-    down the gate -- this block is context, and it must never be the reason a
-    safe deploy is refused or an unsafe one waved through.
-    """
-    out: dict[str, dict] = {}
-    for name in FLEET:
-        service_id = SERVICE_IDS[name]
-        try:
-            deploy = live_deploy(service_id, key)
-            commit = str((deploy.get("commit") or {}).get("id") or "")
-            out[name] = {
-                "service_id": service_id,
-                "live_commit": commit[:8] or None,
-                "finished_at": deploy.get("finishedAt"),
-            }
-        except Exception as exc:  # noqa: BLE001 - context, never a gate
-            out[name] = {"service_id": service_id, "live_commit": None,
-                         "finished_at": None, "error": f"{type(exc).__name__}: {exc}"}
-    return out
-
-
-def cron_run_in_flight(service_id: str, key: str, *, limit: int = 50) -> tuple[bool | None, dict]:
-    """Is a cron RUN executing right now? True / False / None for "cannot tell".
-
-    THE CRON EQUIVALENT OF THE PROCESS SAMPLE, guarding the same hazard:
-    deploying a cron mid-run kills that run. A cron leaves no resident process
-    to enumerate, but it does leave `cron_job_run_started` / `cron_job_run_ended`
-    events, and those pair by `cronJobRunId`.
-
-    THE EVENT LIST IS SORTED HERE RATHER THAN TRUSTED. Rule 3 of this file was
-    learned on the logs API returning newest-N presented OLDEST-first, which
-    produced a four-hour error in exactly the direction that reads "safe to
-    deploy". The events endpoint has looked newest-first every time it has been
-    read -- which is precisely the sort of incidental ordering not worth
-    depending on -- so the newest `started` is picked by timestamp.
-
-    Returns `None` for an unreadable or run-event-free history rather than
-    False. A truncation cutting between a `started` and its `ended` reports IN
-    FLIGHT, which refuses: a wrong refusal costs a wait, a wrong clearance
-    costs a killed run.
-    """
-    detail: dict = {"source": "api:/v1/services/<id>/events", "limit": int(limit)}
-    try:
-        rows = _get(f"https://api.render.com/v1/services/{service_id}/events?limit={int(limit)}", key)
-    except Exception as exc:  # noqa: BLE001 -- an unreadable history is UNKNOWN, never CLEAR
-        detail["error"] = f"{type(exc).__name__}: {exc}"
-        return None, detail
-    if not isinstance(rows, list) or not rows:
-        detail["error"] = "no events returned"
-        return None, detail
-
-    started: list[tuple[str, str]] = []
-    ended: set[str] = set()
-    for row in rows:
-        event = (row or {}).get("event") or {}
-        info = event.get("details") or {}
-        run_id = str(info.get("cronJobRunId") or "")
-        if not run_id:
-            continue
-        if event.get("type") == "cron_job_run_started":
-            started.append((str(event.get("timestamp") or ""), run_id))
-        elif event.get("type") == "cron_job_run_ended":
-            ended.add(run_id)
-
-    detail["runs_started_seen"] = len(started)
-    detail["runs_ended_seen"] = len(ended)
-    if not started:
-        # Build events but no run events tells us nothing about execution.
-        detail["error"] = f"no cron_job_run_started event in the last {int(limit)} events"
-        return None, detail
-
-    stamp, run_id = max(started)          # by timestamp, not by position
-    detail["newest_run"] = {"id": run_id, "started_at": stamp}
-    detail["in_flight"] = run_id not in ended
-    return (run_id not in ended), detail
 
 
 def is_ancestor(candidate: str, descendant: str) -> bool | None:
@@ -1261,41 +953,35 @@ def main() -> int:
         help="your lane/session name. If another holder owns this service's deploy claim, "
              "preflight returns CLAIMED (exit 3) instead of CLEAR.",
     )
-    parser.add_argument("--target", choices=("auto", "fleet", "render"), default="auto",
-                        help="which production to read. auto = the fleet unless the operator "
-                             "base URL points elsewhere (Render is suspended since 2026-09-30).")
+    # `--target render` was removed 2026-11-15 (lane render-retirement): production is the
+    # fleet, and the user said Render must not be used or needed for anything. `auto` and
+    # `fleet` are kept so existing commands still parse; both read the fleet.
+    parser.add_argument("--target", choices=("auto", "fleet"), default="auto",
+                        help="kept for old commands: production is the local fleet, always.")
     args = parser.parse_args()
 
-    on_fleet = target_is_fleet(args.target)
-    key = "" if on_fleet else _api_key()
     service_id = SERVICE_IDS[args.service]
     now = datetime.now(timezone.utc)
     report: dict = {"service": args.service, "service_id": service_id, "checked_at": now.isoformat(),
-                    "platform": "fleet" if on_fleet else "render"}
+                    "platform": "fleet"}
 
-    fleet_role = FLEET_ROLE.get(args.service) if on_fleet else None
+    fleet_role = FLEET_ROLE.get(args.service)
     fleet_error = ""
-    if on_fleet:
-        # The fleet has no deploy object: "live" is the commit the role LOADED.
-        # An unreadable status leaves live_commit empty, which skips the
-        # redundancy check (as on Render) and never reads as CLEAR by itself --
-        # the job sample below decides, and it has its own UNKNOWN.
-        deploy = {}
-        try:
-            fleet_head, status = fleet_status()
-        except Exception as exc:  # noqa: BLE001
-            fleet_head, status, fleet_error = "", {}, f"{type(exc).__name__}: {exc}"
-        live_commit = str((status.get(fleet_role) or {}).get("live_commit") or "") if fleet_role else ""
-        report["fleet_head"] = fleet_head[:8] or None
-        if fleet_error:
-            report["fleet_status_error"] = fleet_error
-        report["fleet"] = fleet_live_commits_from(status)
-    else:
-        deploy = live_deploy(service_id, key)
-        live_commit = str((deploy.get("commit") or {}).get("id") or "")
-        report["fleet"] = fleet_live_commits(key)
+    # The fleet has no deploy object: "live" is the commit the role LOADED.
+    # An unreadable status leaves live_commit empty, which skips the
+    # redundancy check and never reads as CLEAR by itself -- the job sample
+    # below decides, and it has its own UNKNOWN.
+    try:
+        fleet_head, status = fleet_status()
+    except Exception as exc:  # noqa: BLE001
+        fleet_head, status, fleet_error = "", {}, f"{type(exc).__name__}: {exc}"
+    live_commit = str((status.get(fleet_role) or {}).get("live_commit") or "") if fleet_role else ""
+    report["fleet_head"] = fleet_head[:8] or None
+    if fleet_error:
+        report["fleet_status_error"] = fleet_error
+    report["fleet"] = fleet_live_commits_from(status)
     report["live_commit"] = live_commit[:8]
-    report["live_finished_at"] = deploy.get("finishedAt")
+    report["live_finished_at"] = None
 
     redundant = False
     if args.target_commit and live_commit:
@@ -1325,32 +1011,29 @@ def main() -> int:
         report["target_on_main"] = on_main
         off_main = on_main is not True
 
-    # SERVICE-AWARE SAMPLING (`#465`). Web is read from its own
-    # /api/ops/memory; the workers keep the log path, which demonstrably works
-    # for them (refresh-worker emits every ~17s). The fallback direction matters:
-    # if the endpoint read fails we drop to the log path and, if that is also
-    # empty, the existing staleness gate returns UNKNOWN. There is no branch
-    # here that turns "cannot see" into "nothing running".
+    # SAMPLING ON THE FLEET: web is reloaded by a rolling HUP that kills nothing in
+    # flight; each worker is read from ONE `ps` snapshot of its descendants. There
+    # is no branch here that turns "cannot see" into "nothing running": an
+    # unreadable fleet leaves `sample` empty, and the staleness gate says UNKNOWN.
     sample = parsed = None
-    sample_source = "log:ALL_PROCESS_MEMORY"
+    sample_source = "fleet: unread"
     is_cron = args.service in CRON_SERVICES
-    cron_in_flight: bool | None = None
     fleet_last_deploy: dict = {}
-    if on_fleet and is_cron:
-        # Render cron services are suspended; on the fleet these are supervisor
-        # SCHEDULED_JOBS, which load code from disk when they fire -- there is
-        # nothing here to deploy, and nothing this script can sample. UNKNOWN.
-        report["cron_run"] = {"error": "Render cron services are suspended; on the fleet this is a "
-                                       "local_production.py scheduled job (loads code at its next run)"}
+    if is_cron:
+        # The old Render crons are supervisor SCHEDULED_JOBS on the fleet, which load
+        # code from disk when they fire -- there is nothing here to deploy, and
+        # nothing this script can sample. UNKNOWN.
+        report["cron_run"] = {"error": "on the fleet this is a local_production.py scheduled job "
+                                       "(it loads code at its next run; nothing to deploy)"}
         report["cron_run_in_flight"] = None
         sample_source = "fleet: not applicable to a cron"
-    elif on_fleet and fleet_role == "web":
+    elif fleet_role == "web":
         if fleet_error or not (status.get("web") or {}).get("up"):
             sample_source = "fleet: web role status " + ("unreadable" if fleet_error else "DOWN")
         else:
             sample, parsed = (now.isoformat().replace("+00:00", "Z"), ""), {"processes": []}
             sample_source = "fleet: " + WEB_RELOAD_NOTE
-    elif on_fleet:
+    else:
         try:
             fleet_jobs, fleet_facts, fleet_last_deploy = fleet_role_processes(fleet_role, now)
         except Exception as exc:  # noqa: BLE001 -- unreadable is UNKNOWN below
@@ -1364,27 +1047,6 @@ def main() -> int:
             # excluded by `_worker_children`.
             parsed = {"processes": [], "process_count": len(fleet_jobs)}
             report["_fleet_jobs"] = fleet_jobs
-    elif is_cron:
-        # A cron has no process list to sample. Asking for one would return
-        # nothing and read as UNKNOWN forever; see CRON_SERVICE_IDS above.
-        cron_in_flight, cron_detail = cron_run_in_flight(service_id, key)
-        report["cron_run"] = cron_detail
-        report["cron_run_in_flight"] = cron_in_flight
-        sample_source = "api:cron_job_run events"
-    elif args.service in API_SAMPLED_SERVICES:
-        api = web_processes()
-        if api:
-            processes, _sampled_at = api
-            # Stamp with the run's OWN `now`, not a clock read taken inside the
-            # fetch. Using the latter produced `age -2s` on the first live run:
-            # harmless to the staleness gate, but a receipt that reports a
-            # NEGATIVE age is a receipt nobody should trust the rest of.
-            sample, parsed = (now.isoformat().replace("+00:00", "Z"), ""), {"processes": processes}
-            sample_source = "api:/api/ops/memory"
-    if parsed is None and not is_cron and not on_fleet:
-        sample = newest_log(service_id, key, "ALL_PROCESS_MEMORY")
-        parsed = parse_processes(sample[1]) if sample else None
-        sample_source = "log:ALL_PROCESS_MEMORY"
     age = _age_seconds(sample[0], now) if (sample and parsed) else None
     report["sample_at"] = sample[0] if sample else None
     report["sample_age_seconds"] = round(age, 1) if age is not None else None
@@ -1416,7 +1078,7 @@ def main() -> int:
     # went ahead can be checked against what was in flight when it fired.
     board_build_pair: tuple[bool | None, dict] = (False, {})
     if args.service == BOARD_BUILD_HOLD_SERVICE:
-        board_build_pair = read_board_build_state(FLEET_BASE_URL if on_fleet else None)
+        board_build_pair = read_board_build_state(FLEET_BASE_URL)
     board_build_hold = board_build_verdict(args.service, bool(getattr(args, "allow_mid_build", False)), board_build_pair)
     report["board_build"] = {
         "in_flight": board_build_pair[0],
@@ -1456,7 +1118,7 @@ def main() -> int:
     try:
         # On the fleet: the worker root's start (web: unknown -- a HUP keeps the
         # master, so its age is not the last reload; recorded, not refused).
-        last_deploy = fleet_last_deploy if on_fleet else last_restarting_deploy(service_id, key)
+        last_deploy = fleet_last_deploy
         since_last_deploy = _age_seconds(_deploy_restart_moment(last_deploy), now) if last_deploy else None
     except Exception as exc:  # noqa: BLE001
         report["last_deploy_error"] = f"{type(exc).__name__}: {exc}"
@@ -1480,7 +1142,7 @@ def main() -> int:
     #
     # This is a different question. If the deploys endpoint cannot be read, the
     # process checks below are unaffected and still decide; refusing here as
-    # well would mean a Render API blip blocks every deploy including a revert,
+    # well would mean a status-read blip blocks every deploy including a revert,
     # which is a worse failure than the one being prevented. The unknown is
     # RECORDED (`last_deploy: null`, or `last_deploy_error`) rather than
     # swallowed, so a preflight that could not see the history says so.
@@ -1504,7 +1166,7 @@ def main() -> int:
     # THE OUTCOME GATE (todo #784). Only an env re-inject on a fleet role reads it: that is the path every env
     # change takes (drained down/up), and a TERM / reload-web reuses the old env.
     outcome_issue, outcome_detail = None, {}
-    if on_fleet and fleet_role and args.reinject_env:
+    if fleet_role and args.reinject_env:
         changes, read_error = [], ""
         try:
             running_mech, derived_mech = fleet_mechanism_values(
@@ -1521,7 +1183,7 @@ def main() -> int:
             args.no_outcome_gate, args.accept_outcome_regression)
     report["outcome_gate"] = {**outcome_detail, "problem": outcome_issue} if outcome_detail else None
 
-    stale = (cron_in_flight is None) if is_cron else (age is None or age > args.max_sample_age_seconds)
+    stale = True if is_cron else (age is None or age > args.max_sample_age_seconds)
     if off_main:
         verdict, code = "OFF_MAIN", EXIT_OFF_MAIN
         on_main = report.get("target_on_main")
@@ -1574,17 +1236,10 @@ def main() -> int:
             reason = ("cannot read this cron's run history ("
                       + str((report.get("cron_run") or {}).get("error") or "unknown")
                       + "), so whether a run is executing is unknown")
-        elif on_fleet:
+        else:
             reason = ("cannot read the fleet (" + str(report.get("fleet_status_error")
                       or (report.get("fleet_worker") or {}).get("reason") or sample_source)
                       + "), so whether a job is running is unknown")
-        else:
-            reason = "no ALL_PROCESS_MEMORY sample" if age is None else f"sample is {age:.0f}s old (limit {args.max_sample_age_seconds}s)"
-    elif is_cron and cron_in_flight:
-        verdict, code = "HOLD", EXIT_HOLD
-        newest = (report.get("cron_run") or {}).get("newest_run") or {}
-        reason = (f"cron run {newest.get('id')} started {newest.get('started_at')} and has not "
-                  f"ended; deploying now kills it mid-run")
     elif board_build_hold is not None:
         verdict, code, reason = board_build_hold
     elif jobs:
@@ -1632,13 +1287,10 @@ def main() -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
         return code
 
-    print(f"service        {args.service}  ({'FLEET' if on_fleet else service_id})")
-    if on_fleet:
-        print(f"live commit    {live_commit[:8] or '?'}   (loaded by the role)   "
-              f"fleet HEAD {report.get('fleet_head') or '?'}"
-              + (f"   STATUS UNREADABLE: {fleet_error}" if fleet_error else ""))
-    else:
-        print(f"live commit    {live_commit[:8] or '?'}   finished {deploy.get('finishedAt') or '?'}")
+    print(f"service        {args.service}  (FLEET)")
+    print(f"live commit    {live_commit[:8] or '?'}   (loaded by the role)   "
+          f"fleet HEAD {report.get('fleet_head') or '?'}"
+          + (f"   STATUS UNREADABLE: {fleet_error}" if fleet_error else ""))
     # PRINTED ON EVERY RUN, INCLUDING WHEN THE LIMIT IS OFF. A spacing rule that
     # only appears when it fires is one nobody knows the shape of until it blocks
     # them, and "not rate-limited" needs to be a thing a reader can SEE -- two of

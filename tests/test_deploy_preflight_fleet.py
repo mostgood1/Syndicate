@@ -33,10 +33,6 @@ supervisor pid=523171 since 2026-10-25T15:15:35+00:00 state=redis
 """
 
 
-def _no_render(*_a, **_k):
-    raise AssertionError("the fleet path must not call Render")
-
-
 def _expectation_args():
     stamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     return ["--expect", "x=1", "--baseline", "x=0", "--baseline-read-at", stamp]
@@ -82,9 +78,16 @@ class FleetVerdictTests(unittest.TestCase):
             captured.update(report=report, verdict=verdict, reason=reason)
 
         out = io.StringIO()
-        with mock.patch.object(deploy_preflight, "_api_key", side_effect=_no_render), \
-             mock.patch.object(deploy_preflight, "_get", side_effect=_no_render), \
-             mock.patch.object(deploy_preflight, "fleet_status", side_effect=fake_status), \
+        # The Render readers were removed 2026-11-15 (lane render-retirement): their
+        # absence is what proves no Render call. (`_api_key` / `_get` survive only as
+        # refusals, for another lane's test file; see deploy_preflight.py.)
+        for name in ("live_deploy", "newest_log", "cron_run_in_flight", "target_is_fleet",
+                     "last_restarting_deploy", "web_processes", "WEB_BASE_URL"):
+            assert not hasattr(deploy_preflight, name), name
+        for name in ("_api_key", "_get"):
+            with self.assertRaises(SystemExit):
+                getattr(deploy_preflight, name)(*(("u", "k") if name == "_get" else ()))
+        with mock.patch.object(deploy_preflight, "fleet_status", side_effect=fake_status), \
              mock.patch.object(deploy_preflight, "fleet_role_processes", side_effect=fake_processes), \
              mock.patch.object(deploy_preflight, "read_board_build_state", return_value=board) as board_read, \
              mock.patch.object(deploy_preflight, "is_ancestor", return_value=True), \

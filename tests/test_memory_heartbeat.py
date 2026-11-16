@@ -9,9 +9,11 @@ both measured:
     `oomKilled` that discarded a 14-minute MLB sim -- and there was no memory
     telemetry within minutes of either kill, so "these earlyExits are OOMs" was
     untestable.
-  * `deploy_preflight.py` samples the process list from that same token, so a
-    job running meant HOLD and no job running meant a stale sample and UNKNOWN.
-    80 consecutive polls over 37 minutes: 41 HOLD, 39 UNKNOWN, ZERO CLEAR.
+  * `deploy_preflight.py` sampled the process list from that same token (on
+    Render), so a job running meant HOLD and no job running meant a stale sample
+    and UNKNOWN. 80 consecutive polls over 37 minutes: 41 HOLD, 39 UNKNOWN, ZERO
+    CLEAR. Since 2026-11-15 preflight reads the fleet's `ps` instead (lane
+    render-retirement); `diagnose_sim_pipeline.py` still reads this line.
 
 So the tests that matter are not "does it print". They are: does it print the
 token the EXISTING readers parse, does it survive a failing snapshot, and is it
@@ -113,27 +115,31 @@ def test_a_RAISING_snapshot_does_not_kill_the_thread_and_says_so(monkeypatch, ca
 # the fix is a fix.
 # --------------------------------------------------------------------------
 
-def test_what_it_emits_is_PARSEABLE_BY_DEPLOY_PREFLIGHT(capfd):
-    """Same token, same shape, or half the defect survives.
+def test_what_it_emits_is_READ_BY_THE_SIM_DIAGNOSTIC(capfd):
+    """Same token, same shape, or the readers go blind.
 
-    The OOM blindness and the preflight's permanent HOLD/UNKNOWN are the SAME
-    missing line. Emitting a new token would fix the first and leave the second
-    exactly where it was, so this feeds a real beat to `deploy_preflight`'s own
-    parser rather than asserting on the text.
+    `deploy_preflight`'s own parser was the reader here until 2026-11-15, when its
+    Render path (the only one that read this line) was retired. The remaining
+    reader is `diagnose_sim_pipeline`, which finds each job's lifetime by its
+    cmdline inside these lines, so a real beat is fed through ITS functions rather
+    than asserting on the text.
     """
-    from scripts.deploy_preflight import parse_processes
+    import json
+
+    from scripts.diagnose_sim_pipeline import process_samples, runs_for
 
     payload = mo.log_all_process_memory("standalone_heartbeat", label="unit", pid=1)
     captured = capfd.readouterr().err
     line = [l for l in captured.splitlines() if l.startswith("ALL_PROCESS_MEMORY")]
-    assert line, "the token changed -- deploy_preflight samples ALL_PROCESS_MEMORY"
+    assert line, "the token changed -- diagnose_sim_pipeline reads ALL_PROCESS_MEMORY"
 
-    parsed = parse_processes(line[-1])
-    assert parsed is not None, "deploy_preflight cannot parse the heartbeat's line"
-    assert "processes" in parsed
-    # The process list is what the job check reads; without it a CLEAR is
-    # unreachable no matter how fresh the line is.
-    assert isinstance(parsed["processes"], list)
+    parsed = json.loads(line[-1].split(" ", 1)[1])
+    # The process list is what a job check reads.
+    assert isinstance(parsed.get("processes"), list) and parsed["processes"]
+    samples = process_samples([{"timestamp": "2026-11-15T00:00:00", "message": line[-1]}])
+    assert len(samples) == 1, "the sim diagnostic did not pick the heartbeat's line up"
+    _spans, peak = runs_for(samples, r"python|pytest")
+    assert peak >= 1, "no process cmdline in the line -- a running sim would be invisible"
     assert "container_memory_mb" in payload or "accounted_rss_mb" in payload, (
         "the memory fields the OOM investigation needs are absent"
     )

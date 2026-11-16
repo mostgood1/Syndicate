@@ -1,30 +1,16 @@
-"""Read a bounded window of one Syndicate service's Render logs, correctly.
+"""Read a bounded window of one Syndicate fleet role's log, correctly.
 
-WHY THIS EXISTS RATHER THAN A curl OR A THROWAWAY SNIPPET. `#434`.
-
-**The Render logs API returns the NEWEST `limit` lines inside the window, and
-presents them oldest-first.** `deploy_preflight.newest_log`'s docstring already
-says so, and three sessions in a row have written a pager that ignores it:
-
-    # WRONG -- re-reads the same tail and terminates
-    while True:
-        page = get(startTime=cursor, ...)
-        cursor = newest_timestamp_in(page)
-
-On 2026-08-14 that shape reported `PEAK 606.2 MB ... samples 99` for a
-51-second overview pass while having covered **1.2 seconds** of it. The number
-was plausible, carried a sample count, and was wrong by 200MB. Paging must go
-BACKWARD: lower `endTime` to the oldest line seen until the window is exhausted.
+Production is the local WSL fleet (`scripts/local_production.py`) since 2026-09-30.
+Its roles write `<home>/logs/<service>.log`, rotated to `.log.1` .. `.log.5`; this
+reads them, through `\\wsl.localhost` from Windows. The NAME is historical: it read
+the Render logs API until 2026-10-06 by default, and could until 2026-11-15, when
+the Render path was removed (lane render-retirement, user: "render shouldnt be
+needed"). About fifty ledger entries and scripts call it by this name.
 
 **A window you did not cover is the failure mode, so this tool always prints the
 window it ACTUALLY covered next to the one you asked for.** A sample count does
 not reveal truncation -- 99 samples looks like coverage until you notice they
-span 1.2s of a 51s request.
-
-Also here because the secret must stay out of argv: `RENDER_API_KEY` is read
-from the gitignored `.env` by the same loader `deploy_preflight` uses, so this
-can be permitted as exactly `Bash(python scripts/render_logs.py *)` rather than
-opening up `curl`.
+span 1.2s of a 51s request (measured on Render's pager, 2026-08-14, `#434`).
 
     py -3 scripts/render_logs.py --text OVERVIEW_SPORT_BEGIN --start 2026-08-14T22:56:00Z
     py -3 scripts/render_logs.py --text CONTAINER_MEMORY --start ... --end ... --max-field memory_anon_mb
@@ -39,14 +25,7 @@ import json
 import os
 import re
 import sys
-import tempfile
-import time
-import urllib.parse
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from deploy_preflight import OWNER_ID, SERVICE_IDS, _api_key, _get  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # LOCAL BACKEND `[2026-10-02, lane local-logs-backend]`
@@ -56,11 +35,10 @@ from deploy_preflight import OWNER_ID, SERVICE_IDS, _api_key, _get  # noqa: E402
 # `<home>/logs/<service>.log` (rotated to `.log.1` .. `.log.5`). Every caller of
 # `fetch_window` read NOTHING there -- the lines exist, just not on Render.
 #
-# THE SOURCE IS CHOSEN, AND SAID: `--local` / `--render`, else
-# `SYNDICATE_LOG_SOURCE=local|render|auto`, else LOCAL (since 2026-10-06; it was
-# AUTO, which called the Render API first). AUTO: local when there is no Render
-# key (a fleet checkout) or Render reports the web service suspended (cached 10
-# min). Every result names its source.
+# THE SOURCE IS THE FLEET, AND IS SAID. `--render` and `SYNDICATE_LOG_SOURCE=render`
+# were removed 2026-11-15 (lane render-retirement): asking for Render now FAILS rather
+# than quietly reading the fleet. `--local` and `SYNDICATE_LOG_SOURCE=local|auto` are
+# still accepted and read the fleet. Every result names its source.
 #
 # TIMESTAMPS ARE THE HARD PART, AND ARE NEVER FAKED SILENTLY. Render stamped
 # every line; the supervisor wrote raw stdout until `SYNDICATE_LOCAL_LOG_TIMESTAMPS`
@@ -74,8 +52,6 @@ _LOCAL_SERVICES = ("web", "refresh-worker", "live-odds-worker")
 _PREFIX = re.compile(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z) (.*)$")
 _START = re.compile(r"^==== start (\S+)")
 _APACHE_IN = re.compile(r"\[(\d\d/[A-Z][a-z]{2}/20\d\d:\d\d:\d\d:\d\d [+-]\d{4})\]")
-_SUSPENDED_CACHE = Path(tempfile.gettempdir()) / "syndicate_render_suspended.json"
-_SUSPENDED_TTL = 600
 
 
 def _to_utc(text: str) -> dt.datetime | None:
@@ -122,52 +98,23 @@ def local_log_dir() -> Path | None:
     return None
 
 
-def render_suspended(key: str) -> bool | None:
-    """Whether Render reports the web service suspended; cached; None if unknown."""
-    try:
-        cached = json.loads(_SUSPENDED_CACHE.read_text(encoding="utf-8"))
-        if time.time() - float(cached.get("at", 0)) < _SUSPENDED_TTL:
-            return cached.get("suspended")
-    except (OSError, ValueError):
-        pass
-    try:
-        payload = _get(f"https://api.render.com/v1/services/{SERVICE_IDS['web']}", key)
-        value = str((payload or {}).get("suspended") or "").lower() == "suspended"
-    except Exception:  # noqa: BLE001 -- unknown, not "not suspended"
-        return None
-    try:
-        _SUSPENDED_CACHE.write_text(json.dumps({"at": time.time(), "suspended": value}), encoding="utf-8")
-    except OSError:
-        pass
-    return value
-
-
 def resolve_source(explicit: str | None = None) -> tuple[str, str]:
-    """(source, why). `local` or `render`.
+    """(source, why). Always `local`, the fleet's own logs.
 
-    UNSET MEANS LOCAL, with no Render API call `[2026-10-06, lane scripts-fleet-default]`.
-    Until then unset meant AUTO, which asked the Render API whether Render was
-    suspended on every cold cache -- a network round trip to a billing-suspended
-    platform before reading a file on this machine. AUTO is still there, by name:
-    `SYNDICATE_LOG_SOURCE=auto` (or `explicit="auto"`).
+    The Render logs API was this tool's other backend until 2026-11-15 (lane
+    render-retirement). An explicit request for it -- `render` from a caller or
+    `SYNDICATE_LOG_SOURCE=render` -- now EXITS, because silently answering from a
+    different source than the one asked for is a wrong reading, not a fallback.
     """
     choice = (explicit or os.environ.get("SYNDICATE_LOG_SOURCE") or "").strip().lower()
-    if choice in ("local", "render"):
-        return choice, "explicit" if explicit else "SYNDICATE_LOG_SOURCE"
-    if choice != "auto":
-        return "local", "default: production runs on the local fleet (--render for the Render API)"
-    try:
-        key = _api_key()
-    except (Exception, SystemExit):  # noqa: BLE001 -- _api_key EXITS when absent
-        key = ""
-    if not key:
-        return "local", "auto: no RENDER_API_KEY here"
-    suspended = render_suspended(key)
-    if suspended:
-        return "local", "auto: Render reports the web service suspended"
-    if suspended is None and local_log_dir() is not None:
-        return "local", "auto: Render state unknown, local fleet logs present"
-    return "render", "auto: Render is serving"
+    if choice == "render":
+        raise SystemExit(
+            "the Render logs API was retired 2026-11-15 (lane render-retirement); "
+            "production is the local fleet -- drop --render / SYNDICATE_LOG_SOURCE=render"
+        )
+    if choice in ("local", "auto"):
+        return "local", "explicit" if explicit else "SYNDICATE_LOG_SOURCE"
+    return "local", "default: production runs on the local fleet"
 
 
 def _local_files(log_dir: Path, service: str) -> list[Path]:
@@ -242,15 +189,6 @@ def fetch_local_window(
                 out.append((_iso(stamp) + ("" if exact else "~"), message))
     return out, info
 
-# One page is the API's cap. Paging backward is what makes the window whole;
-# raising this would not.
-_PAGE = 100
-# A backstop, not a budget. 200 pages of 100 lines is far more than any window
-# worth reading interactively, and it stops a pathological loop rather than
-# bounding normal use.
-_MAX_PAGES = 200
-
-
 # What the most recent `fetch_window` read and how: source, files, timestamp
 # quality. The return shape stays (lines, pages) for existing callers.
 LAST_FETCH: dict = {}
@@ -262,79 +200,19 @@ def fetch_window(
     text: str,
     start: str,
     end: str = "",
-    max_pages: int = _MAX_PAGES,
     source: str | None = None,
     exact_only: bool = False,
 ) -> tuple[list[tuple[str, str]], int]:
-    """Every line matching `text` in [start, end], oldest-first, de-duplicated.
+    """Every line matching `text` in [start, end] from the fleet's logs, oldest-first.
 
-    Returns (lines, pages_fetched). Pages BACKWARD -- see the module docstring.
-    With the LOCAL source (`resolve_source`), `pages` is the number of log files
-    read and approximate timestamps end in `~`; `LAST_FETCH` says which ran.
+    Returns (lines, files_read). Approximate timestamps end in `~`; `LAST_FETCH` says
+    what was read and how.
     """
-    chosen, why = resolve_source(source)
-    if chosen == "local":
-        lines, info = fetch_local_window(service=service, text=text, start=start, end=end, exact_only=exact_only)
-        LAST_FETCH.clear()
-        LAST_FETCH.update(info, why=why)
-        return lines, len(info["files"])
+    _, why = resolve_source(source)
+    lines, info = fetch_local_window(service=service, text=text, start=start, end=end, exact_only=exact_only)
     LAST_FETCH.clear()
-    LAST_FETCH.update(source="render", why=why)
-    return _fetch_render_window(service=service, text=text, start=start, end=end, max_pages=max_pages)
-
-
-def _fetch_render_window(
-    *,
-    service: str,
-    text: str,
-    start: str,
-    end: str = "",
-    max_pages: int = _MAX_PAGES,
-) -> tuple[list[tuple[str, str]], int]:
-    service_id = SERVICE_IDS[service]
-    key = _api_key()
-    seen: dict[str, str] = {}
-    cursor_end = end
-    pages = 0
-
-    for _ in range(max_pages):
-        params = {
-            "ownerId": OWNER_ID,
-            "resource": service_id,
-            "limit": str(_PAGE),
-            "text": text,
-            "startTime": start,
-        }
-        if cursor_end:
-            params["endTime"] = cursor_end
-        payload = _get("https://api.render.com/v1/logs?" + urllib.parse.urlencode(params), key)
-        pages += 1
-        rows = (payload or {}).get("logs") or []
-
-        oldest = cursor_end
-        fresh = 0
-        for row in rows:
-            stamp = str(row.get("timestamp") or "")
-            message = str(row.get("message") or "")
-            # The API's filter is a case-insensitive SUBSTRING match and
-            # over-matches longer tokens, so re-check -- same reason
-            # `deploy_preflight.newest_log` does.
-            if text.lower() not in message.lower():
-                continue
-            if stamp not in seen:
-                seen[stamp] = message
-                fresh += 1
-            if not oldest or stamp < oldest:
-                oldest = stamp
-
-        # `fresh == 0` means this page held nothing new; `oldest <= start` means
-        # we have walked back to the requested edge. Either way the window is
-        # done. `oldest == cursor_end` guards the degenerate no-progress case.
-        if fresh == 0 or not oldest or oldest <= start or oldest == cursor_end:
-            break
-        cursor_end = oldest
-
-    return sorted(seen.items()), pages
+    LAST_FETCH.update(info, why=why)
+    return lines, len(info["files"])
 
 
 def _max_numeric_field(lines: list[tuple[str, str]], field: str) -> tuple[str, float] | None:
@@ -355,7 +233,7 @@ def _max_numeric_field(lines: list[tuple[str, str]], field: str) -> tuple[str, f
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--service", default="refresh-worker", choices=sorted(SERVICE_IDS))
+    parser.add_argument("--service", default="refresh-worker", choices=sorted(_LOCAL_SERVICES))
     parser.add_argument("--text", required=True, help="substring to match (case-insensitive)")
     parser.add_argument("--start", required=True, help="ISO8601, e.g. 2026-08-14T22:56:00Z")
     parser.add_argument("--end", default="", help="ISO8601; omit for 'up to now'")
@@ -367,11 +245,8 @@ def main() -> int:
     )
     parser.add_argument("--width", type=int, default=200, help="truncate each message to N chars")
     parser.add_argument("--json", action="store_true")
-    where = parser.add_mutually_exclusive_group()
-    where.add_argument("--local", dest="source", action="store_const", const="local",
-                       help="read the local fleet's log files (the default; see resolve_source)")
-    where.add_argument("--render", dest="source", action="store_const", const="render",
-                       help="read the Render logs API")
+    parser.add_argument("--local", dest="source", action="store_const", const="local",
+                        help="read the local fleet's log files -- the only source; kept so old commands still run")
     parser.add_argument("--exact-only", action="store_true",
                         help="local: drop lines whose time is only approximate (carried forward)")
     args = parser.parse_args()
@@ -408,14 +283,11 @@ def main() -> int:
     # a measurement rather than a sliver. Printed even when it equals the
     # request, because the case that matters is the one nobody looks at.
     print(f"# {args.service}  text={args.text!r}")
-    if info.get("source") == "local":
-        print(f"# SOURCE     local fleet logs {info['log_dir']} ({', '.join(info['files'])}) -- {info['why']}")
-        print(f"# TIMES      {info['exact']} exact, {info['approximate']} APPROXIMATE (suffix ~, a lower bound), "
-              f"{info['unstamped_skipped']} unstamped skipped, {info['approximate_dropped']} dropped by --exact-only")
-    else:
-        print(f"# SOURCE     Render logs API -- {info.get('why')}")
+    print(f"# SOURCE     local fleet logs {info['log_dir']} ({', '.join(info['files'])}) -- {info['why']}")
+    print(f"# TIMES      {info['exact']} exact, {info['approximate']} APPROXIMATE (suffix ~, a lower bound), "
+          f"{info['unstamped_skipped']} unstamped skipped, {info['approximate_dropped']} dropped by --exact-only")
     print(f"# requested  {args.start} .. {args.end or '(now)'}")
-    unit = "file(s)" if info.get("source") == "local" else "pages"
+    unit = "file(s)"
     if lines:
         print(f"# COVERED    {lines[0][0]} .. {lines[-1][0]}   ({len(lines)} matches, {pages} {unit})")
     else:

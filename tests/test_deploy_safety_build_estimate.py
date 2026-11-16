@@ -1,6 +1,6 @@
 """`#427`. The deploy gate's build estimate must not collapse on short-circuits.
 
-MEASURED (refresh-worker, 4h to 2026-08-14 18:0xZ, live `294f9ca9`), n=39
+MEASURED on Render (refresh-worker, 4h to 2026-08-14 18:0xZ, live `294f9ca9`), n=39
 `COLLECT_SPAN_EXIT collect_candidates`:
 
     p50 0.00   p90 146.19   max 209.66
@@ -8,49 +8,40 @@ MEASURED (refresh-worker, 4h to 2026-08-14 18:0xZ, live `294f9ca9`), n=39
     ~77% sub-second, 23.1% >= 60s
 
 The sub-second calls are `collect_candidates` short-circuiting on an empty pool.
-MAX over a MIXED sample is the right statistic and is unchanged; what is added
-is excluding the non-builds first, because the max of twelve zeros is zero.
+MAX over a MIXED sample is the right statistic; what matters is excluding the
+non-builds first, because the max of twelve zeros is zero.
 
-NOT a live failure at the time of writing -- the gate returned `~2.3min` against
-production. `_render_logs(..., limit=12)` returns rows oldest-first regardless
-of direction, so the sampled twelve are not the ranked twelve. These tests pin
-the latent case shut.
+Since 2026-11-15 (lane render-retirement) the only estimator is the FLEET one,
+`_fleet_expected_build_seconds`, over `BOARD_BUILD_TIMING wall_s` in the fleet's
+refresh-worker log. The same cases are pinned on it. One difference is deliberate:
+with no real build in the window it returns None (unknown), and callers floor it,
+where the Render estimator returned a 210 s constant.
 """
 
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
 
 import scripts.check_deploy_safety as gate
 
 
-def _row(elapsed: float) -> dict:
-    return {"message": f"[intelligence] COLLECT_SPAN_EXIT stage=collect_candidates elapsed_s={elapsed}"}
+def _line(wall: float) -> str:
+    return f"[intelligence_state] BOARD_BUILD_TIMING wall_s={wall} cpu_s=1.0 ok=True"
 
 
-class ExpectedBuildSecondsTests(unittest.TestCase):
-    def _expected(self, elapsed_values):
-        with patch.object(gate, "_render_logs", return_value=[_row(v) for v in elapsed_values]):
-            return gate._expected_build_seconds("key")
+class FleetExpectedBuildSecondsTests(unittest.TestCase):
+    def _expected(self, walls, noise=()):
+        return gate._fleet_expected_build_seconds([*noise, *(_line(w) for w in walls)])
 
-    # -- the defect this closes -------------------------------------------
+    # -- the defect `#427` closed -------------------------------------------
 
-    def test_all_short_circuits_does_not_report_a_cheap_build(self) -> None:
-        """The whole point: twelve zeros must not become 'a build takes 0 min'."""
-        result = self._expected([0.0] * 12)
-        self.assertIsNotNone(result)
-        self.assertGreaterEqual(
-            result, 60.0,
-            "an all-short-circuit window reported a sub-minute build, which tells "
-            "an operator there is nothing to protect",
-        )
-        self.assertEqual(result, gate._NO_REAL_BUILD_FALLBACK_SECONDS)
+    def test_all_short_circuits_do_not_report_a_cheap_build(self) -> None:
+        """Twelve zeros must not become 'a build takes 0 min': unknown, which callers floor."""
+        self.assertIsNone(self._expected([0.0] * 12))
 
     def test_the_measured_production_mix(self) -> None:
-        """77% zeros with real builds present -> the real maximum, unchanged."""
-        result = self._expected([0.0] * 9 + [138.3, 146.19, 209.66])
-        self.assertAlmostEqual(result, 209.66, places=2)
+        """77% zeros with real builds present -> the real maximum."""
+        self.assertAlmostEqual(self._expected([0.0] * 9 + [138.3, 146.19, 209.66]), 209.66, places=2)
 
     def test_a_single_real_build_among_zeros_wins(self) -> None:
         self.assertAlmostEqual(self._expected([0.0] * 11 + [187.4]), 187.4, places=2)
@@ -58,32 +49,27 @@ class ExpectedBuildSecondsTests(unittest.TestCase):
     # -- what must NOT change ---------------------------------------------
 
     def test_max_not_median_on_a_mixed_real_sample(self) -> None:
-        """The asymmetry argument in the docstring is load-bearing and stays:
-        over-waiting costs idle minutes, under-waiting destroys a board build."""
+        """Over-waiting costs idle minutes, under-waiting destroys a board build."""
         self.assertAlmostEqual(self._expected([120.0, 200.0, 1372.2, 180.0]), 1372.2, places=1)
 
-    def test_unreadable_logs_still_return_None_not_a_number(self) -> None:
-        """None means UNKNOWN, which callers already treat as a block. It must
-        not be conflated with the no-real-build fallback."""
-        with patch.object(gate, "_render_logs", side_effect=RuntimeError("api down")):
-            self.assertIsNone(gate._expected_build_seconds("key"))
+    def test_only_the_last_twelve_builds_count(self) -> None:
+        self.assertAlmostEqual(self._expected([5000.0] + [150.0] * 12), 150.0, places=1)
 
-    def test_empty_window_returns_None(self) -> None:
-        with patch.object(gate, "_render_logs", return_value=[]):
-            self.assertIsNone(gate._expected_build_seconds("key"))
+    def test_empty_log_returns_None(self) -> None:
+        self.assertIsNone(gate._fleet_expected_build_seconds([]))
 
-    def test_rows_without_an_elapsed_field_are_ignored_not_counted_as_zero(self) -> None:
-        rows = [{"message": "COLLECT_SPAN_EXIT stage=collect_candidates"}, _row(150.0)]
-        with patch.object(gate, "_render_logs", return_value=rows):
-            self.assertAlmostEqual(gate._expected_build_seconds("key"), 150.0, places=1)
+    def test_lines_without_a_wall_field_are_ignored_not_counted_as_zero(self) -> None:
+        noise = ["[intelligence_state] BOARD_BUILD_TIMING ok=True", "MEMORY_WATCHDOG {\"wall_s\": 9999}"]
+        self.assertAlmostEqual(self._expected([150.0], noise=noise), 150.0, places=1)
 
     def test_threshold_sits_below_every_measured_real_build(self) -> None:
         """A guard against someone raising the threshold into the real band."""
         self.assertLess(gate._MIN_REAL_BUILD_SECONDS, 138.3)
         self.assertGreater(gate._MIN_REAL_BUILD_SECONDS, 0.0)
 
-    def test_fallback_is_within_the_measured_band(self) -> None:
-        self.assertGreaterEqual(gate._NO_REAL_BUILD_FALLBACK_SECONDS, 146.19)
+    def test_the_render_estimator_is_gone(self) -> None:
+        for name in ("_expected_build_seconds", "_NO_REAL_BUILD_FALLBACK_SECONDS", "_render_logs"):
+            self.assertFalse(hasattr(gate, name), name)
 
 
 if __name__ == "__main__":

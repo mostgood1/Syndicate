@@ -1,7 +1,8 @@
 """`check_deploy_safety.board_build_state` against the local WSL fleet's log.
 
-Render's logs API sees nothing from the fleet, so the Render path read UNKNOWN
-on every run there. The fleet log has no timestamps; order decides.
+Render's logs API saw nothing from the fleet, so the Render path read UNKNOWN
+on every run there; it was removed 2026-11-15 (lane render-retirement). The
+fleet log has no timestamps; order decides.
 """
 
 from __future__ import annotations
@@ -98,15 +99,19 @@ def test_fleet_detection(url, fleet):
     assert cds._is_fleet_base_url(url) is fleet
 
 
-def test_routing_fleet_reads_log_render_reads_api():
-    """Reachability: the two arms are distinct, and the no-arg call (deploy_preflight's) stays on Render."""
-    with mock.patch.object(cds, "_fleet_log_tail", return_value=COMPLETE_BUILD) as tail, \
-         mock.patch.object(cds, "_load_render_key", return_value="") as key:
+def test_routing_no_arg_reads_the_fleet_and_another_host_is_unknown():
+    """Render's reader is gone: no base URL (deploy_preflight's call) reads the fleet log,
+    and a host that is not the fleet reads UNKNOWN without touching it."""
+    for name in ("_load_render_key", "_render_logs", "_expected_build_seconds", "_newest_timestamp"):
+        assert not hasattr(cds, name), name
+    with mock.patch.object(cds, "_fleet_log_tail", return_value=COMPLETE_BUILD) as tail:
         fleet = cds.board_build_state("http://127.0.0.1:10000")
-        render = cds.board_build_state()
-    assert fleet[0] is False and tail.call_count == 1
-    assert render[1].get("missing_api_key") is True and key.call_count == 1
-    assert fleet != render
+        default = cds.board_build_state()
+        other = cds.board_build_state("https://syndicate-an21.onrender.com")
+        estimate_other = cds.expected_build_seconds("https://syndicate-an21.onrender.com")
+    assert fleet[0] is False and default[0] is False and tail.call_count == 2
+    assert other[0] is None and "is not the fleet" in other[1]["reason"]
+    assert estimate_other is None
 
 
 def test_unreadable_fleet_log_is_unknown():
@@ -134,10 +139,9 @@ def _drain_ttl(base_url, *, fleet_lines, capsys):
          mock.patch.object(deploy_drain, "read_worker_state", return_value=({"in_flight": {}, "acked_drain_at": 9e12}, "idle")), \
          mock.patch.object(cds, "board_build_state", return_value=(False, {})), \
          mock.patch.object(cds, "fleet_worker_children", return_value={}), \
-         mock.patch.object(cds, "_fleet_log_tail", return_value=fleet_lines) as tail, \
-         mock.patch.object(cds, "_expected_build_seconds", return_value=None) as render:
+         mock.patch.object(cds, "_fleet_log_tail", return_value=fleet_lines) as tail:
         assert cds._run_drain(owner="t", wait_seconds=30, base_url=base_url) == 0
-    return request.call_args.kwargs["ttl_seconds"], tail.call_count, render.call_count, capsys.readouterr().out
+    return request.call_args.kwargs["ttl_seconds"], tail.call_count, capsys.readouterr().out
 
 
 def test_drain_ttl_reads_fleet_log_for_a_fleet_url(capsys):
@@ -146,25 +150,25 @@ def test_drain_ttl_reads_fleet_log_for_a_fleet_url(capsys):
 
     long_build = int(_DEFAULT_TTL_SECONDS) // 3 + 1000
     lines = COMPLETE_BUILD[:-1] + [f"[intelligence_state] BOARD_BUILD_TIMING wall_s={long_build}.0 ok=True"]
-    ttl, tail_calls, render_calls, out = _drain_ttl("http://127.0.0.1:10000", fleet_lines=lines, capsys=capsys)
+    ttl, tail_calls, out = _drain_ttl("http://127.0.0.1:10000", fleet_lines=lines, capsys=capsys)
     assert ttl == long_build * 3
-    assert (tail_calls, render_calls) == (1, 0)
+    assert tail_calls == 1
     assert f"longest recent build {long_build}s" in out
 
 
-def test_drain_ttl_render_path_unchanged(capsys):
+def test_drain_ttl_off_the_fleet_is_floored_not_measured(capsys):
     from syndicate.features.shared.deploy_drain import _DEFAULT_TTL_SECONDS
 
-    ttl, tail_calls, render_calls, out = _drain_ttl(None, fleet_lines=COMPLETE_BUILD, capsys=capsys)
+    ttl, tail_calls, out = _drain_ttl("https://elsewhere.example", fleet_lines=COMPLETE_BUILD, capsys=capsys)
     assert ttl == int(_DEFAULT_TTL_SECONDS)
-    assert (tail_calls, render_calls) == (0, 1)
+    assert tail_calls == 0
     assert "unmeasurable" in out
 
 
 def test_drain_ttl_floor_holds_for_a_typical_fleet_build(capsys):
     from syndicate.features.shared.deploy_drain import _DEFAULT_TTL_SECONDS
 
-    ttl, _, _, out = _drain_ttl("http://127.0.0.1:10000", fleet_lines=COMPLETE_BUILD, capsys=capsys)
+    ttl, _, out = _drain_ttl("http://127.0.0.1:10000", fleet_lines=COMPLETE_BUILD, capsys=capsys)
     assert ttl == int(_DEFAULT_TTL_SECONDS)  # 3 x 177.8s is under the floor
     assert "longest recent build 178s" in out
 

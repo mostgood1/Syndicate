@@ -1,13 +1,13 @@
 ---
 name: intelligence-end-to-end
-description: Use this when modifying the intelligence system that backs the live Render intelligence endpoint. Preserve the external endpoint contract rooted at the live intelligence URL while extending the internal pipeline safely.
+description: Use this when modifying the intelligence system that backs the live intelligence endpoint (production is the local WSL fleet). Preserve the external endpoint contract rooted at the live intelligence URL while extending the internal pipeline safely.
 ---
 
 # Purpose
 
 This skill governs end-to-end changes to the intelligence system behind the live intelligence endpoint:
 
-[Live intelligence endpoint](https://syndicate-an21.onrender.com/intelligence)
+[Live intelligence endpoint](http://127.0.0.1:10000/intelligence) -- production is the local WSL fleet since 2026-09-30; the Render host is retired.
 
 The external endpoint behavior is the contract to preserve unless the task explicitly asks to change it.
 

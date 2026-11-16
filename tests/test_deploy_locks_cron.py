@@ -78,100 +78,14 @@ def claim_tool():
 
 
 # --------------------------------------------------------------------------
-# cron_run_in_flight -- the check that replaces the process sample
+# cron_run_in_flight read a Render cron's run EVENTS. It was retired with Render on
+# 2026-11-15 (lane render-retirement): on the fleet these jobs are supervisor
+# SCHEDULED_JOBS, and a cron preflight reads UNKNOWN by design
+# (`test_deploy_preflight_fleet.test_a_cron_service_on_the_fleet_is_UNKNOWN_with_the_reason`).
 # --------------------------------------------------------------------------
 
-def _events(*rows: tuple[str, str, str]) -> list[dict]:
-    """Render's shape: [{"event": {"type", "timestamp", "details": {...}}}]."""
-    return [{"event": {"type": kind, "timestamp": stamp,
-                       "details": {"cronJobRunId": run_id}}}
-            for kind, stamp, run_id in rows]
-
-
-def test_a_started_run_with_no_end_is_in_flight(preflight, monkeypatch):
-    monkeypatch.setattr(preflight, "_get", lambda url, key: _events(
-        ("cron_job_run_started", "2026-09-08T16:43:39Z", "run-2"),
-        ("cron_job_run_ended", "2026-09-08T07:01:56Z", "run-1"),
-        ("cron_job_run_started", "2026-09-08T07:00:13Z", "run-1"),
-    ))
-    state, detail = preflight.cron_run_in_flight(CI_SUITE_ID, "k")
-
-    assert state is True
-    assert detail["newest_run"]["id"] == "run-2"
-
-
-def test_a_completed_run_is_not_in_flight(preflight, monkeypatch):
-    monkeypatch.setattr(preflight, "_get", lambda url, key: _events(
-        ("cron_job_run_ended", "2026-09-08T07:01:56Z", "run-1"),
-        ("cron_job_run_started", "2026-09-08T07:00:13Z", "run-1"),
-    ))
-    state, _ = preflight.cron_run_in_flight(CI_SUITE_ID, "k")
-
-    assert state is False
-
-
-def test_the_newest_run_is_chosen_by_timestamp_not_position(preflight, monkeypatch):
-    """Rule 3 of `deploy_preflight`, applied to a second endpoint.
-
-    The logs API returns newest-N presented OLDEST-first, and reading `rows[0]`
-    as the newest once produced a four-hour error in exactly the direction that
-    says "safe to deploy". The events endpoint has looked newest-first every
-    time -- which is precisely why it must not be depended on. Here the IN
-    FLIGHT run is deliberately LAST in the list.
-    """
-    monkeypatch.setattr(preflight, "_get", lambda url, key: _events(
-        ("cron_job_run_started", "2026-09-01T00:00:00Z", "old"),
-        ("cron_job_run_ended", "2026-09-01T00:05:00Z", "old"),
-        ("cron_job_run_started", "2026-09-08T16:43:39Z", "newest"),
-    ))
-    state, detail = preflight.cron_run_in_flight(CI_SUITE_ID, "k")
-
-    assert state is True
-    assert detail["newest_run"]["id"] == "newest"
-
-
-def test_truncation_between_started_and_ended_refuses(preflight, monkeypatch):
-    """If the window cuts off the `ended`, report IN FLIGHT.
-
-    A wrong refusal costs a wait; a wrong clearance kills a run. The asymmetry
-    decides the direction.
-    """
-    monkeypatch.setattr(preflight, "_get", lambda url, key: _events(
-        ("cron_job_run_started", "2026-09-08T16:43:39Z", "run-9"),
-    ))
-    state, _ = preflight.cron_run_in_flight(CI_SUITE_ID, "k")
-
-    assert state is True
-
-
-@pytest.mark.parametrize("payload,label", [
-    ([], "empty list"),
-    (None, "not a list"),
-    ([{"event": {"type": "build_ended", "timestamp": "2026-09-08T16:14:56Z", "details": {}}}],
-     "build events only, no run events"),
-])
-def test_an_unreadable_history_is_none_not_false(preflight, monkeypatch, payload, label):
-    """UNKNOWN, never CLEAR. This is rule 1 and it is the whole point.
-
-    `False` here would mean "no run in flight" and clear the deploy on evidence
-    that was never obtained.
-    """
-    monkeypatch.setattr(preflight, "_get", lambda url, key: payload)
-    state, detail = preflight.cron_run_in_flight(CI_SUITE_ID, "k")
-
-    assert state is None, label
-    assert detail.get("error"), label
-
-
-def test_an_api_failure_is_none_not_false(preflight, monkeypatch):
-    def boom(url, key):
-        raise RuntimeError("429 from Render")
-
-    monkeypatch.setattr(preflight, "_get", boom)
-    state, detail = preflight.cron_run_in_flight(CI_SUITE_ID, "k")
-
-    assert state is None
-    assert "RuntimeError" in detail["error"]
+def test_the_render_cron_reader_is_gone(preflight):
+    assert not hasattr(preflight, "cron_run_in_flight")
 
 
 # --------------------------------------------------------------------------

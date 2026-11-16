@@ -20,9 +20,10 @@ changed but the denominator. So this tool reports the EVENT COUNT next to any
 rate, and refuses to present a rate as trustworthy below `--min-events`
 (default 5). `learnings.md`: a rate, not a count -- and state the denominator.
 
-The secret stays out of argv: `ADMIN_TOKEN` comes from the gitignored `.env` via
-the same loader `deploy_preflight` uses, so this can be permitted as exactly
-`Bash(python scripts/sample_request_path_guard.py *)`.
+The secret stays out of argv: `ADMIN_TOKEN` comes from `scripts/_base_url.admin_token`
+(for the fleet, its own token through WSL), so this can be permitted as exactly
+`Bash(python scripts/sample_request_path_guard.py *)`. It borrowed deploy_preflight's
+Render-default URL and `.env` token until 2026-11-15 (lane render-retirement).
 
     py -3 scripts/sample_request_path_guard.py --minutes 30
     py -3 scripts/sample_request_path_guard.py --minutes 45 --operation mlb_cards_fetch_current_feed_live
@@ -42,7 +43,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from deploy_preflight import WEB_BASE_URL, _admin_token  # noqa: E402
+from _base_url import admin_token, default_base_url  # noqa: E402
 
 EXIT_OK, EXIT_READER_FAILED = 0, 2
 
@@ -178,14 +179,14 @@ def main() -> int:
     parser.add_argument("--operation", default="", help="one operation key; omit for all warnings")
     parser.add_argument("--min-events", type=int, default=_DEFAULT_MIN_EVENTS,
                         help=f"increase events required before a rate is quotable (default {_DEFAULT_MIN_EVENTS})")
-    parser.add_argument("--base-url", default=WEB_BASE_URL)
+    parser.add_argument("--base-url", default=default_base_url("SYNDICATE_DIAG_BASE_URL"))
     parser.add_argument("--out", default="", help="append raw samples as JSONL here")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    token = _admin_token()
+    token = admin_token(args.base_url)
     if not token:
-        print("# ADMIN_TOKEN not set in the environment or .env -- this is a READER failure, not a null result.")
+        print("# no admin token for this base URL -- this is a READER failure, not a null result.")
         return EXIT_READER_FAILED
 
     deadline = _utc_now() + dt.timedelta(minutes=args.minutes)

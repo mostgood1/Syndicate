@@ -76,99 +76,12 @@ _SIM_MAX_RUNTIME_MINUTES = 90
 # which is why this belongs in the tool rather than in a rule four sessions have
 # to remember.
 #
-# THE PREDICATE: `BUILD_SPAN_ENTER` marks the start of
-# `candidate_collection_with_fallback`; `LAYER2_SHORTLIST` is written only on a
-# completed build. If the newest enter is more recent than the newest
-# completion, a build is running and a restart discards it.
-#
-# THE WAIT IS DERIVED, NOT HARDCODED. `collect_candidates` measured 804s at
-# 19:49 and 1372s at 21:43 on the same worker -- it is GROWING, so any constant
-# is wrong within days. Reading it from recent `COLLECT_SPAN_EXIT elapsed_s`
-# keeps the number honest and makes the growth visible to whoever runs this,
-# which is worth more than the guard itself.
-_REFRESH_WORKER_SERVICE_ID = "srv-d91dpertqb8s73co8ls0"
-_RENDER_OWNER_ID = "tea-d2bb5n95pdvs73cje4fg"
-_BUILD_LOOKBACK_MINUTES = 180
-
-
-def _main_worktree_root() -> Path:
-    """The primary checkout, where the gitignored `.env` lives. Twin of `deploy_preflight._main_worktree_root`."""
-    import subprocess
-
-    for args in (
-        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-        ["git", "rev-parse", "--git-common-dir"],
-    ):
-        try:
-            done = subprocess.run(args, cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=15)
-        except Exception:
-            continue
-        raw = (done.stdout or "").strip() if done.returncode == 0 else ""
-        if not raw:
-            continue
-        common = Path(raw)
-        if not common.is_absolute():
-            common = (REPO_ROOT / common).resolve()
-        if common.name == ".git" and common.parent.is_dir():
-            return common.parent
-    return REPO_ROOT
-
-
-def _load_render_key() -> str:
-    """The environment, then `.env` beside this script, then the MAIN worktree's `.env`.
-
-    THE FALLBACK IS THE WHOLE FIX `[2026-09-21, lane preflight-board-build-hold]`. `.env` is
-    gitignored, so a session worktree -- where the protocol says every deploy is run from -- has
-    none. This loader used to stop at the worktree and return "", while `render_deploy.py` and
-    `deploy_preflight._api_key()` fall back to the main worktree and deploy fine. So the board-build
-    HOLD read `missing_api_key`, mapped it to "not applicable", and said nothing on every refresh-worker
-    preflight from 2026-09-20 to 2026-09-21: a guard that could not ask, beside a deploy that could.
-    Every Render call through this loader sent an empty Bearer and got HTTP 400 with an empty body.
-    Same order as `deploy_preflight._env_files`: a `.env` beside the script still wins.
-    """
-    key = str(os.environ.get("RENDER_API_KEY") or "").strip()
-    if key:
-        return key
-    seen: set[Path] = set()
-    for root in (REPO_ROOT, _main_worktree_root()):
-        env_path = (root / ".env").resolve()
-        if env_path in seen or not env_path.exists():
-            continue
-        seen.add(env_path)
-        for line in env_path.read_text(encoding="utf-8", errors="replace").splitlines():
-            name, _, value = line.partition("=")
-            if name.strip() == "RENDER_API_KEY":
-                return value.strip().strip('"').strip("'")
-    return ""
-
-
-def _render_logs(key: str, text: str, *, minutes: int, limit: int = 20) -> list[dict[str, Any]]:
-    import urllib.parse
-    from datetime import timedelta
-
-    now = datetime.now(timezone.utc)
-    query = urllib.parse.urlencode(
-        {
-            "ownerId": _RENDER_OWNER_ID,
-            "resource": _REFRESH_WORKER_SERVICE_ID,
-            "text": text,
-            "startTime": (now - timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "endTime": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "limit": str(limit),
-            "direction": "backward",
-        }
-    )
-    request = urllib.request.Request(
-        "https://api.render.com/v1/logs?" + query, headers={"Authorization": f"Bearer {key}"}
-    )
-    with urllib.request.urlopen(request, timeout=90) as response:
-        return (json.loads(response.read().decode("utf-8")) or {}).get("logs") or []
-
-
-def _newest_timestamp(rows: list[dict[str, Any]]) -> str:
-    stamps = [str(row.get("timestamp") or "") for row in rows if row.get("timestamp")]
-    return max(stamps) if stamps else ""
-
+# THE PREDICATE AND THE WAIT live in the fleet section below: a build is in flight
+# when the newest `BUILD_SPAN_ENTER` is newer than the newest completion, and the
+# wait is DERIVED from recent builds, never hardcoded (a build measured 804s at
+# 19:49 and 1372s at 21:43 on 2026-08-12, so any constant is wrong within days).
+# Until 2026-11-15 these were read from Render's logs API too (lane
+# render-retirement); production is the fleet, and its log is the only source.
 
 # `#427`. A `collect_candidates` call that returns in under a second did not
 # build anything -- it short-circuited on an empty pool. Measured 2026-08-14:
@@ -179,118 +92,14 @@ def _newest_timestamp(rows: list[dict[str, Any]]) -> str:
 # estimate of zero.
 _MIN_REAL_BUILD_SECONDS = 1.0
 
-# What to report when the window contains no real build. NOT zero and NOT None:
-# None reads as "unknown" (which callers already treat as a block, fine), but a
-# small number reads as "a build is cheap, deploy freely" -- the one answer that
-# is never safe here. 210s is the MAX real build measured in the same 4h window
-# that motivated this, so it is the top of the observed band rather than a
-# guess. It is knowingly LOWER than the historical ~23min figure, which predates
-# `#414`'s 21.5x quote-join fix and describes a board that no longer exists.
-_NO_REAL_BUILD_FALLBACK_SECONDS = 210.0
-
-
-def _expected_build_seconds(key: str) -> float | None:
-    """SLOWEST recent COLLECT_SPAN_EXIT elapsed_s, or None when unreadable.
-
-    MAX, NOT MEDIAN -- BECAUSE THE COST IS ASYMMETRIC. That reason has survived
-    two wrong explanations of the same data, and the history is kept because the
-    next person will otherwise re-run it.
-
-    v1 said the series "grows through the day as the slate fills", from two
-    points (804s at 19:49, 1372s at 21:43).
-    v2 said that was falsified by a third (1080.8s at 22:52) and asserted the
-    series "VARIES with slate size, it does not trend".
-    v3, the truth, from 20 points walked back in 3h chunks 2026-08-13:
-
-        15:25-17:10   186-224s    rows ~297   s/row 0.61-0.81   <- flat baseline
-        18:02          341.5s     rows  631   s/row 0.54        <- rows double
-        19:49          804.4s     rows  511   s/row 1.57
-        21:43         1372.2s     rows  667   s/row 2.06
-        23:54          939.6s     rows  676   s/row 1.39
-        01:29         1508.9s     rows  533   s/row 2.83
-
-    There IS a regime shift -- unit cost roughly TRIPLED (0.7 -> 2.0+ s/row), so
-    slate size does not explain it -- and it is NOT monotonic: it peaks, recedes
-    to ~930s, and returns. A band of roughly 930-1510s since 21:43.
-
-    Both earlier readings sampled a flat stretch and generalised in opposite
-    directions. v1 saw two rising points inside a climb; v2 saw three points
-    inside a plateau. **A measured number is a timestamp, not a fact.**
-
-    Max over the recent window is still right, and now for a better-supported
-    reason: on a band-oscillating series max picks the top of the band, which is
-    what "how long might I wait" needs. It would LAG a monotonic climb -- so if
-    the s/row figure keeps rising, revisit this. Do not replace it with a trend
-    extrapolation on the strength of any two points; that is the mistake this
-    docstring has already recorded twice.
-
-    The asymmetry is unchanged and is the load-bearing part: over-waiting costs
-    idle minutes, under-waiting costs ~23 minutes of destroyed board work. A
-    median over the last dozen returned 13.4min against a real build of 22.9min.
-
-    SEPARATE ISSUE, NOT THIS FUNCTION'S: a 6.7x regression in build time at
-    flat-to-falling row counts is a real defect and is not fixed by estimating it
-    better. See the sim-timing lane's findings.
-    """
-    import re
-
-    try:
-        rows = _render_logs(key, "COLLECT_SPAN_EXIT", minutes=_BUILD_LOOKBACK_MINUTES, limit=12)
-    except Exception:
-        return None
-    values: list[float] = []
-    for row in rows:
-        match = re.search(r"elapsed_s[\"']?\s*[:=]\s*([0-9.]+)", str(row.get("message") or ""))
-        if match:
-            try:
-                values.append(float(match.group(1)))
-            except ValueError:
-                continue
-    if not values:
-        return None
-    # `#427`. EXCLUDE THE NON-BUILDS BEFORE TAKING THE MAX.
-    #
-    # MAX was chosen (see above) because the cost is asymmetric, and against a
-    # MIXED sample that is right -- it picks the top of the band where a median
-    # would sag. It is undefended against a sample that is ENTIRELY
-    # short-circuits, because the max of twelve zeros is zero.
-    #
-    # That population is not rare. Measured on refresh-worker over 4h to
-    # 2026-08-14 18:0xZ (live `294f9ca9`), n=39 `COLLECT_SPAN_EXIT`:
-    #
-    #     p50 0.00   p90 146.19   max 209.66
-    #     >= 1s: n=9, p50 138.30, max 209.66
-    #     ~77% of calls are sub-second; 23.1% are >= 60s
-    #
-    # The sub-second calls are `collect_candidates` returning immediately on an
-    # empty pool (`#387`'s starved overview). **A build that produced nothing is
-    # not a fast build, it is a non-build**, and averaging it in -- by any
-    # statistic, max included -- answers a different question from the one the
-    # caller asks, which is "how long might I have to wait".
-    #
-    # NOT a live failure today, and that distinction is kept deliberately: the
-    # gate returned `~2.3min` when run against production while this was being
-    # written. `_render_logs(..., limit=12)` takes rows OLDEST-FIRST regardless
-    # of direction (a Render API quirk already recorded in `learnings.md`), so
-    # which twelve it sees is not the twelve a ranking would pick. The exposure
-    # is a sample that happens to contain no real build -- likely at 77%, not
-    # certain. This closes it rather than waiting to be surprised by it.
-    #
-    # Fallback is CONSERVATIVE, never ~0: over-waiting costs idle minutes,
-    # under-waiting costs a destroyed board build. Returning a small number here
-    # would tell an operator there is nothing to protect.
-    real_builds = [value for value in values if value >= _MIN_REAL_BUILD_SECONDS]
-    if real_builds:
-        return max(real_builds)
-    return _NO_REAL_BUILD_FALLBACK_SECONDS
-
 
 # --- local fleet board build -----------------------------------------------
 #
-# RENDER IS BILLING-SUSPENDED (2026-09-30) AND ITS LOGS API SEES NOTHING FROM THE
-# LOCAL WSL FLEET, so against http://127.0.0.1:10000 the Render path above read
+# PRODUCTION IS THE LOCAL WSL FLEET (since 2026-09-30). Render's logs API saw
+# nothing from it, so against http://127.0.0.1:10000 the old Render path read
 # "no BUILD_SPAN_ENTER in the lookback window" on EVERY run and this script could
-# never return CLEAR (measured 2026-10-01, lane `deploy-safety-fleet-logs`).
+# never return CLEAR (measured 2026-10-01, lane `deploy-safety-fleet-logs`). That
+# path was removed 2026-11-15 (lane render-retirement); this is the only reader.
 # The fleet's refresh-worker writes the same markers to
 # `<home>/logs/refresh-worker.log` (`scripts/local_production.py`), with two
 # differences that change the predicate:
@@ -354,9 +163,16 @@ def _fleet_log_tail(max_bytes: int = _FLEET_LOG_TAIL_BYTES) -> list[str]:
 def _fleet_expected_build_seconds(lines: list[str]) -> float | None:
     """SLOWEST of the last 12 real `BOARD_BUILD_TIMING wall_s`, or None.
 
-    Same max-not-median rule as `_expected_build_seconds` (the cost is
-    asymmetric), same sub-second exclusion. None -- not a small number -- when
-    nothing qualifies, so callers fall back to their own conservative floor.
+    MAX, NOT MEDIAN, BECAUSE THE COST IS ASYMMETRIC: over-waiting costs idle
+    minutes, under-waiting destroys a board build. Build time has a regime that
+    peaks, recedes and returns (measured 2026-08-13: 186-224s flat, then 804-1509s),
+    so a median sampled inside a quiet stretch under-states the next build. The
+    history is in the Render-era `_expected_build_seconds`, retired 2026-11-15:
+    `git show f9ed2ec0f:scripts/check_deploy_safety.py`.
+
+    Sub-second builds are excluded (`_MIN_REAL_BUILD_SECONDS`). None -- not a small
+    number -- when nothing qualifies, so callers fall back to their own conservative
+    floor.
     """
     import re
 
@@ -371,17 +187,17 @@ def _fleet_expected_build_seconds(lines: list[str]) -> float | None:
 
 
 def expected_build_seconds(base_url: str | None = None) -> float | None:
-    """The build-duration estimate from whichever log source `base_url` implies.
+    """The build-duration estimate from the fleet's refresh-worker log, or None.
 
-    A local base URL reads the fleet log; anything else, including no
-    argument, reads Render's `COLLECT_SPAN_EXIT` exactly as before.
+    No `base_url`, or a local one, means the fleet. Any other host is not
+    production, and None (unknown) is what a reader of it gets.
     """
-    if _is_fleet_base_url(base_url):
-        try:
-            return _fleet_expected_build_seconds(_fleet_log_tail())
-        except Exception:
-            return None
-    return _expected_build_seconds(_load_render_key())
+    if base_url and not _is_fleet_base_url(base_url):
+        return None
+    try:
+        return _fleet_expected_build_seconds(_fleet_log_tail())
+    except Exception:
+        return None
 
 
 def _fleet_board_build_state(lines: list[str]) -> tuple[bool | None, dict[str, Any]]:
@@ -423,8 +239,8 @@ def _fleet_board_build_state(lines: list[str]) -> tuple[bool | None, dict[str, A
         facts["reason"] = f"no BUILD_SPAN_ENTER in the last {_FLEET_LOG_TAIL_BYTES // (1024 * 1024)}MB of the fleet log"
         return None, facts
     in_flight = last_enter > last_done
-    # No log clock, so the fields the Render path fills with times say where in
-    # the log instead -- and never pretend to be a time.
+    # No log clock, so the fields a time-stamped log would fill with times say
+    # where in the log instead -- and never pretend to be a time.
     facts["newest_build_start"] = f"stage={enter_stage}, {len(lines) - 1 - last_enter} log lines ago"
     facts["newest_build_complete"] = (
         f"{len(lines) - 1 - last_done} log lines ago (next LOOP_ITERATION, i.e. persisted)" if last_done >= 0 else "(none in tail)"
@@ -440,68 +256,20 @@ def board_build_state(base_url: str | None = None) -> tuple[bool | None, dict[st
     """(in_flight, facts). None means UNKNOWN, which callers must treat as a
     BLOCK -- an unreadable log is not evidence of a quiet worker.
 
-    `base_url` on a local host reads the WSL fleet's log; anything else,
-    including no argument (`deploy_preflight`'s call), reads Render's logs API.
+    No `base_url`, or a local one, reads the WSL fleet's refresh-worker log. Any
+    other host is not production (Render's logs API was its other source until
+    2026-11-15, lane render-retirement), so it reads UNKNOWN, with the reason.
     """
-    if _is_fleet_base_url(base_url):
-        try:
-            lines = _fleet_log_tail()
-        except Exception as exc:
-            return None, {"log_source": "fleet refresh-worker.log", "reason": f"{type(exc).__name__}: {exc}"}
-        return _fleet_board_build_state(lines)
-    facts: dict[str, Any] = {}
-    key = _load_render_key()
-    if not key:
-        # NAMED, not just described: this is "cannot ask" (no credential in this
-        # shell), which is a different fact from "asked and could not tell".
-        # A caller that blocks on the second may legitimately skip the first --
-        # `render_deploy.py` needs the same key, so a shell without it cannot
-        # deploy at all and has nothing to guard.
-        facts["missing_api_key"] = True
-        facts["reason"] = "RENDER_API_KEY not found in environment or .env"
-        return None, facts
+    if base_url and not _is_fleet_base_url(base_url):
+        return None, {
+            "log_source": "none",
+            "reason": f"{base_url} is not the fleet; the board build is read only from the fleet's refresh-worker log",
+        }
     try:
-        enters = _render_logs(key, "BUILD_SPAN_ENTER", minutes=_BUILD_LOOKBACK_MINUTES)
-        # COMPLETION IS `BOARD_BUILD_TIMING`, NOT `LAYER2_SHORTLIST`, and the
-        # difference is a destroyed build. The shortlist write is NOT the end of
-        # the build: the kalshi join, `portfolio_commit` (~90 s), paper execution
-        # and the publish all run after it. MEASURED 2026-09-19 (lane
-        # `preflight-board-build-hold`): a deploy fired on a CLEAR at 16:04:54Z
-        # landed between that day's shortlist write at 16:05:23Z and its publish,
-        # and the SIGTERM at ~16:09Z threw the build away. Reading the shortlist
-        # line as "done" is what made that window look safe.
-        done = _render_logs(key, "BOARD_BUILD_TIMING", minutes=_BUILD_LOOKBACK_MINUTES)
+        lines = _fleet_log_tail()
     except Exception as exc:
-        facts["reason"] = f"{type(exc).__name__}: {exc}"
-        return None, facts
-
-    newest_enter = _newest_timestamp(enters)
-    newest_done = _newest_timestamp(done)
-    facts["newest_build_start"] = newest_enter or "(none in window)"
-    facts["newest_build_complete"] = newest_done or "(none in window)"
-
-    expected = _expected_build_seconds(key)
-    if expected is not None:
-        facts["typical_build_seconds"] = int(expected)
-        facts["typical_build_minutes"] = round(expected / 60.0, 1)
-
-    if not newest_enter:
-        # No build start seen at all in a 3h window. That is more likely a
-        # log-visibility problem than a genuinely idle worker, so it is UNKNOWN
-        # rather than clear.
-        facts["reason"] = "no BUILD_SPAN_ENTER in the lookback window"
-        return None, facts
-
-    in_flight = (not newest_done) or (newest_enter > newest_done)
-    if in_flight and expected is not None:
-        try:
-            started = datetime.strptime(newest_enter[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-            age = (datetime.now(timezone.utc) - started).total_seconds()
-            facts["build_age_seconds"] = int(age)
-            facts["estimated_seconds_remaining"] = max(0, int(expected - age))
-        except ValueError:
-            pass
-    return in_flight, facts
+        return None, {"log_source": "fleet refresh-worker.log", "reason": f"{type(exc).__name__}: {exc}"}
+    return _fleet_board_build_state(lines)
 
 
 def _run_age_minutes(started_at: Any) -> float | None:
@@ -541,8 +309,8 @@ def _as_dict(value: Any) -> dict[str, Any]:
 # Six 20 s samples (02:59-03:01Z) showed NO permanent children, so "any
 # descendant blocks" cannot wedge the check.
 #
-# Fleet only: on Render the deployer cannot see the worker's process table, so
-# that path is unchanged ("not applicable", never a block).
+# Fleet only: a base URL that is not the fleet has no process table to read here,
+# so that path is "not applicable", never a block.
 #
 # LIVE-ODDS-WORKER TOO (lane `deploy-safety-odds-worker-children`, 2026-10-02).
 # Eight 20 s samples (03:27-03:30Z) of its descendants: no permanent child,
@@ -655,7 +423,7 @@ def fleet_worker_children(
     """{role: (children, facts)} for both fleet workers from ONE `ps` snapshot.
 
     children None = UNKNOWN (callers block); [] = none running. Off the fleet
-    returns {} -- nothing is scanned (Render, `deploy_preflight`'s call).
+    returns {} -- nothing is scanned (a non-local host, or no base URL).
     The worker's own servers (`is_service_child`) are not jobs: they are listed in
     facts["service_children"] and never block.
     """
@@ -696,7 +464,7 @@ def _combined_children(scan: dict[str, tuple[list[dict[str, Any]] | None, dict[s
 def fleet_pid_alive(base_url: str | None, pid: Any) -> bool | None:
     """Is `pid` a live (non-zombie) process on the fleet host? None = cannot tell.
 
-    None off the fleet (Render: no process table to read), for an unparsable
+    None off the fleet (no process table to read), for an unparsable
     pid, or when `ps` fails -- callers treat None as "keep the blocker".
     """
     if not _is_fleet_base_url(base_url):
@@ -809,8 +577,9 @@ def _run_drain(*, owner: str, wait_seconds: int, base_url: str | None = None) ->
     # `#403` already reads, same max-not-median rule, x3 headroom, floored at
     # the module default so a missing measurement can never SHORTEN it.
     # On the local fleet the series is `BOARD_BUILD_TIMING wall_s` from the
-    # fleet log -- Render's logs API sees nothing there, so reading it left the
+    # fleet log -- Render's logs API saw nothing there, so reading it left the
     # TTL silently floored (lane `deploy-safety-drain-fleet-ttl`, 2026-10-01).
+    # That reader was removed 2026-11-15 (lane render-retirement).
     from syndicate.features.shared.deploy_drain import _DEFAULT_TTL_SECONDS
 
     measured = expected_build_seconds(base_url)

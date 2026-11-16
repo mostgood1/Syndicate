@@ -1,7 +1,7 @@
 # Live Intelligence Endpoint Contract
 
 Canonical public surface:
-[Live intelligence endpoint](https://syndicate-an21.onrender.com/intelligence)
+[Live intelligence endpoint](http://127.0.0.1:10000/intelligence) -- the local WSL fleet (production since 2026-09-30; the Render host is retired).
 
 ## Rule
 The public behavior of this endpoint is the contract to preserve unless the task explicitly requires a contract change.
