@@ -132,6 +132,24 @@ def drive_state_from_situation(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _timeouts_left(row: Mapping[str, Any], key: str) -> int | None:
+    """`situation[key]` as an int 0-3, else None (absent, non-integer, a bool, or
+    out of range). Never a default: an unknown count must stay unknown."""
+    situation = row.get("situation")
+    if not isinstance(situation, Mapping):
+        return None
+    value = situation.get(key)
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, float) and not value.is_integer():
+        return None
+    try:
+        count = int(value)
+    except (TypeError, ValueError):
+        return None
+    return count if 0 <= count <= 3 else None
+
+
 def situation_tally(live_index: Mapping[str, Mapping[str, Any]]) -> str:
     """One log line per tick: how many live games carried the drive in progress,
     why the rest did not, and which `yardLine` frame agreed with the text."""
@@ -226,6 +244,14 @@ def normalise_live_row(row: Mapping[str, Any]) -> dict[str, Any]:
         # Diagnostics only (`situation_tally`); `live_state_from_row` ignores them.
         "situation_basis": drive["situation_basis"],
         "yardline_frame": drive["yardline_frame"],
+        # TIMEOUTS LEFT IN THE CURRENT HALF, for lane `nfl-live-timeouts` (#808's
+        # end-of-half clock; `live_resim` passes them only when not None, and is
+        # inert while `end_of_half_clock` is OFF). That lane measured the core
+        # API's final situation equal to 3 minus the play-by-play's second-half
+        # timeouts on 12 of 12 games of 2026-11-15; the SITE scoreboard's live
+        # keys are checked on MNF 11-16. None = unknown (absent / not 0-3).
+        "home_timeouts": _timeouts_left(row, "homeTimeouts") if state == "in" else None,
+        "away_timeouts": _timeouts_left(row, "awayTimeouts") if state == "in" else None,
         # CARRIED THROUGH FOR THE PROP CAPTURE, added 2026-09-27 after it cost a
         # live slate. `live_state_from_row` does not need this, so the adapter
         # dropped it -- and `nfl/live_resim._maybe_capture_prop_snapshot` reads
