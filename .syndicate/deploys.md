@@ -60487,3 +60487,11 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Owed (lane stays OPEN):** trace which 164 rows the 7:34 AM build (drop step 13:34:06Z) dropped, and why their own book-and-line look in the 11-15 NFL state file (32,582 keys, newest 19 s) did not keep them. Decide whether 9:35 AM is #802 or an in-play suspension lifting. Fix the tally's recovery test to compare against the last pre-drop build.
 - **No change made:** no code, env, restart or deploy.
 - **Claims:** none.
+
+## 2026-11-16 15:15Z (9:15 AM CST) -- READING, no deploy: `live-market-fair-cells` pre-registered KILL read, second look (scheduled task `live-market-fair-cells-kill-read-1116`) -- **TRIGGER MET (483 bets; 68 NFL-props games, 135 NCAAF-totals games); pooled flat-unit ROI +6.0% [-4.1, +16.0] game-clustered; upper bound >= 0, so CONTINUE (no re-refusal)**
+- **Rule (lane Falsification line, registered 2026-10-14):** at >= 400 pooled bets and >= 40 games per cell, KILL if the pooled upper 95% bound < 0. The bound is +16.0, so the rule does not kill.
+- **Instrument:** the 11-03 extractor, re-run unchanged on the fleet disk (112 recorder files, clock 10-13 21:03Z, first sighting per side per line, sg=True, live), graded by production's grader at the recorded price. W42-W44 counts reproduce 11-03's exactly. Live sg rows appear in every ISO week W42-W46 in both sports.
+- **Per cell:** NFL props 290 graded / 68 games, +7.1% [-6.8, +20.6]; NCAAF totals 190 / 135, +4.4% [-10.2, +18.7]. Realised vs fair wins: 248 vs 241.7 (z = +0.59).
+- **Secondary (paper ledger archive, in-play, in-cell):** market-fair $2,428.14 staked, -$0.29; sim-edge $1,110.49, -$54.35; all -1.5%.
+- **verify:** `findings_2026-11-16_live_market_fair_cells.md`; `C:\tmp\edge-analyses\live-regrade\kill1116\k3_out.txt`.
+- **No change made:** no code, env, restart or deploy. **Claims:** none. Next: promote read at >= 1,000 bets / >= 150 games (first possible 11-24, projected mid-to-late Dec), not scheduled.
