@@ -859,6 +859,14 @@ fl813\out\mnf_reads.jsonl` (7:10 PM CST to the final) and puts the result in its
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 2 of 7 CLOSED SAFE; both moved to lanes_closed.md with one pointer each; check_lane_invariants shows the same 3 contested files as the origin/main baseline, none new.
 - Moved: nfl-live-total-underprojection, closed-lane-archive-20261116-0840. Table and WAIT reasons: .syndicate/log/2026-11-16.md.
 
+### ncaab-total-overprojection — OPEN — opened 2026-11-16 — session b1d2088f-b4a3-474a-99c8-8fd14e19d2c2
+- Goal: Explain why the model pointed OVER on FAMU @ UTEP NCAAB 11-16 (pregame sim 145.8 vs market ~139.5 at tip; live 137.2 projected at 40-70 vs 125 final) and fix what is systematic: per-state bias of the NCAAB live total (final - model_total_mean, by margin and progress) and of the pregame total calibration (target - close, by raw prior), each against the market's own residual over every graded 11-02..11-16 game; any fix tested off != on, on main, loaded only with the user's OK, then re-measured
+- Files: .syndicate/findings_2026-11-16_ncaab_total_overprojection.md (NEW)
+- Hypothesis: H1 (live): the NCAAB live sim over-projects REMAINING points late in blowouts -- rows with |margin| >= 20 and points scored >= 75% of the model's projected total show mean (final - model_total_mean) <= -3 per game while the market line's residual is within +-1.5. H2 (pregame): the pregame total calibration (target 'close', slope ~0.72 toward a ~151 mean) pulls LOW-total games up -- games whose raw prior total is < 140 show mean (pregame target - close line) >= +3.
+- Falsification test: H1 false if that bucket's model residual is within +-2 per game or no worse than the market's; H2 false if the low-prior bucket's (target - close) is within +-1.5. Either falsified is recorded as EXONERATED for that stage.
+- Verification: per-bucket table (n games, mean residual model vs market) written to the findings file before any code change; after a fix: the same table re-run on post-load games
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
