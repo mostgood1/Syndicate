@@ -3424,3 +3424,22 @@ over the old states says nothing about the new ones.
 - I inferred "unchanged quotes are not restamped from heartbeats" from a heartbeat that listed a row's event AND its book while the row's seen age was older. Wrong premise: `odds_book_quotes._heartbeat_note` records the fetch's event set and book set independently, and `append_book_quotes` restamps seen time per quote key on EVERY observation, unchanged prices included.
 - So "heartbeat newer than the row" proves nothing per book. 44 of 120 such NCAAB full-game rows were lines the book had already moved off (in-play main line moved); 35 were skipped-then-returned.
 - **How to apply:** to ask "did book B return key K at time T", read the per-key state file (the writer's own record), never the heartbeat; and check the change-only capture shard can't answer it either.
+
+## 2026-11-15 — OVERTURNED: "a pre-registered re-fit rule is neutral to the verdict" — a lever-selection step without a noise floor lets seed noise decide a gate that sits on its boundary `[lane football-end-of-half-fix, session 69e3a2e5]`
+
+**The belief.** #808 v3 registered v2's re-fit unchanged. R3 says: if the margin moved > 0.15, redo the home-edge
+pass and take the value closest to production's margin. It was treated as a refinement that could not flip a
+verdict.
+
+**What the measurement showed.**
+- R3 picked `home_field_bonus` 0.06 over 0.03 on 0.024 points of mean home margin. That margin's paired CI is about
+  +-0.23.
+- G5 (Q4-window points <= 2.96) passes at 0.03 (2.94) and fails at 0.06 (3.01).
+- Across 9 arms, G5's value is not monotone in either lever (2.91-3.02). The same Q4 mechanism at the same levers
+  read 2.948 in v2 and 2.939 in v3.
+- So the registered FAIL was decided by noise twice: once in the selection step, once at the gate.
+
+**Rule.** A selection step in a pre-registered re-fit needs a noise floor: move off the earlier value only when the
+improvement beats the criterion's own SE. A gate whose sim value sits within the sim's own noise of its bound should
+be pre-registered with a seed budget that resolves it (more seeds at the candidate), or it will report a coin flip
+as a verdict.
