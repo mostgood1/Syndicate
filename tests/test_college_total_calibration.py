@@ -213,10 +213,12 @@ def test_walk_forward_scores_each_day_on_a_fit_of_the_days_before():
     assert wf["calibrated"] < wf["raw"]
 
 
-def _write_fit(monkeypatch, tmp_path, *, live_games=130.0):
+def _write_fit(monkeypatch, tmp_path, *, live_games=300.0):
     monkeypatch.setattr(tpc, "calibration_path", lambda league, season, as_of: tmp_path / f"total_prob_calibration_{season}_asof_{as_of:%Y%m%d}.json")
-    monkeypatch.setattr(tpc, "pregame_fit_rows", lambda league, day: _synthetic(50, -0.3, 0.0, seed=hash(day) % 97))
-    live = _synthetic(int(live_games / 5), -0.5, 0.2, seed=3)
+    # Seeded by the day's NUMBER, never hash(day): str hashes are randomised per process, which made the walk-forward
+    # gate (rightly) refuse on some seeds and the test order-dependent.
+    monkeypatch.setattr(tpc, "pregame_fit_rows", lambda league, day: _synthetic(150, -0.6, 0.0, seed=int(day[-2:])))
+    live = _synthetic(int(live_games / 5), -0.6, 0.3, seed=3)
     monkeypatch.setattr(tpc, "live_fit_rows", lambda league, day: live)
     return tpc.refresh("ncaab", today=dt.date(2026, 11, 17), floor=dt.date(2026, 11, 11), write=True)
 
