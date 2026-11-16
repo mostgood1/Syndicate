@@ -104,8 +104,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 LOGSTAMP_DIR = REPO_ROOT / "scripts" / "local_logstamp"
 # `python scripts/local_production.py` puts scripts/ on sys.path, not the repo
 # root, and `down` imports syndicate.features.shared.process_liveness.
-# It also broke `import-render-env` (`from scripts.snapshot_render_env`) on the
-# first native-Windows run, 2026-09-30.
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 RENDER_YAML = REPO_ROOT / "render.yaml"
@@ -266,16 +264,10 @@ class Settings:
         return self.home / ENV_FILE_NAME
 
 
-RENDER_SERVICE_IDS = {
-    # scripts/snapshot_render_env.py SERVICES, restated so this file has no
-    # import-time dependency on it.
-    "web": "srv-d88ahvrbc2fs73eodu30",
-    "refresh-worker": "srv-d91dpertqb8s73co8ls0",
-    "live-odds-worker": "srv-d91dpertqb8s73co8lt0",
-}
-
-
 def live_env_path(settings: "Settings", role: str) -> Path:
+    """The fleet's per-role env snapshot. Imported ONCE from Render on 2026-10-01;
+    the import command was retired 2026-11-15 (lane `render-retirement`), so this
+    file is the fleet's own copy now and Render is not a recovery path for it."""
     return settings.home / "render_env" / f"{role}.json"
 
 
@@ -760,9 +752,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     local = parse_env_file(settings.env_file)
     imported = {r: load_live_env(settings, r) for r in ROLE_ORDER}
-    _check(all(imported.values()), "live Render env imported",
+    _check(all(imported.values()), "role env snapshot (<home>/render_env/<role>.json)",
            ", ".join(f"{r}={len(imported[r])} keys" for r in ROLE_ORDER) if all(imported.values())
-           else "no -- run `import-render-env` (needs RENDER_API_KEY) for full parity; blueprint-only until then",
+           else "no -- restore <home>/render_env/ from the fleet's own backup "
+                "(docs/ai_context/local_production_runbook.md); blueprint-only until then",
            warn=True)
     ok &= _check(settings.env_file.is_file(), "secrets file", str(settings.env_file) if settings.env_file.is_file() else "missing -- run `init`")
     for key, why in (
@@ -837,45 +830,6 @@ def cmd_env(args: argparse.Namespace) -> int:
         print(f"{key}={mask(key, env[key]) if not args.unmask else env[key]}")
     print(f"# rewritten paths: {len(audit['rewritten'])}  local: {len(audit['local'])}  unset: {audit['unset']}", file=sys.stderr)
     print(f"# forced: {sorted(audit['forced'])}", file=sys.stderr)
-    return 0
-
-
-def cmd_import_render_env(args: argparse.Namespace) -> int:
-    """Pull each suspended service's LIVE env through the Render API into
-    <home>/render_env/<role>.json. Plaintext, because a production run needs
-    the real values; it lives outside the repo, owner-readable only, and is
-    never printed. Reads only -- this never writes to Render."""
-    settings = settings_from_args(args)
-    from scripts.snapshot_render_env import _api_key, fetch_env
-
-    api_key = _api_key(args.env_file or "")
-    out_dir = settings.home / "render_env"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    for role, service_id in RENDER_SERVICE_IDS.items():
-        try:
-            values, pages = fetch_env(service_id, api_key)
-        except Exception as exc:  # noqa: BLE001
-            print(f"  [{role}] FAILED {type(exc).__name__}: {exc}")
-            continue
-        path = live_env_path(settings, role)
-        path.write_text(
-            json.dumps(
-                {
-                    "service_id": service_id,
-                    "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
-                    "pages": pages,
-                    "values": values,
-                },
-                indent=1,
-                sort_keys=True,
-            ),
-            encoding="utf-8",
-        )
-        try:
-            os.chmod(path, 0o600)
-        except OSError:
-            pass
-        print(f"  [{role}] {len(values)} keys ({pages} page(s)) -> {path}")
     return 0
 
 
@@ -2498,10 +2452,6 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p = sub.add_parser("init", help="create the home dir and the secrets template")
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_init)
-
-    p = sub.add_parser("import-render-env", help="pull the three services' live env via the Render API (read-only)")
-    p.add_argument("--env-file", help=".env holding RENDER_API_KEY (default: environment, then repo .env)")
-    p.set_defaults(func=cmd_import_render_env)
 
     p = sub.add_parser("doctor", help="check everything `up` needs; starts nothing")
     p.set_defaults(func=cmd_doctor)

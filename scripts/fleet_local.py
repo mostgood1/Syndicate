@@ -200,7 +200,8 @@ def load_env_snapshot(path: Path | None) -> tuple[dict[str, dict[str, str]], dic
     if path is None:
         raise SystemExit(
             "no env snapshot. Pass --env-snapshot <file.json>.\n"
-            "Produce one with:  py -3 scripts/snapshot_render_env.py --out <dir>"
+            "Its producer, scripts/snapshot_render_env.py, read the Render API and was retired\n"
+            "2026-11-15 (lane render-retirement; recover it with `git show 66b668952:scripts/snapshot_render_env.py`)."
         )
     if not path.is_file():
         raise SystemExit(f"env snapshot not found: {path}")

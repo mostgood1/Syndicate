@@ -360,7 +360,6 @@ def test_a_script_over_the_size_cap_is_allowed(root):
 
 
 @pytest.mark.parametrize("rel,command", [
-    ("scripts/build_consolidated_graft.py", "py -3 scripts/build_consolidated_graft.py --service web --dry-run"),
     ("scripts/deploy_preflight.py", "py -3 scripts/deploy_preflight.py --service web --holder x"),
     ("tests/test_deploy_guard.py", "py -3 -m pytest -q tests/test_deploy_guard.py"),
 ])
