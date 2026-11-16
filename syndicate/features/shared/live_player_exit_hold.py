@@ -26,7 +26,8 @@ from syndicate.features.shared.live_player_status import REASON_KEY_PLAYER_OUT, 
 # thread from importing board_enrichment.
 PUBLISHING_SPORTS: dict[str, str] = {"nfl": "nfl_live_resim.json", "ncaaf": "ncaaf_live_lens.json",
                                      "nba": "nba_live_resim.json", "wnba": "wnba_live_lens.json",
-                                     "ncaab": "ncaab_live_resim.json", "wncaab": "wncaab_live_resim.json"}
+                                     "ncaab": "ncaab_live_resim.json", "wncaab": "wncaab_live_resim.json",
+                                     "nhl": "nhl_live_lens.json"}
 CACHE_S = 30.0
 
 

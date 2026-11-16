@@ -1111,12 +1111,18 @@ def build_live_lens_snapshot(
 
     # LIVE BOX SCORES, AFTER EVERY RE-SIM, so a slow feed can never spend the
     # budget a priced lane needed. See `_attach_live_player_stats`.
+    boxes: dict[int, Any] = {}
     player_stats_tally = _attach_live_player_stats(
         rows,
         out_games,
         fetch_json=player_stats_fetch_json,
         enabled=score_rows is None or player_stats_fetch_json is not None,
+        boxes=boxes,
     )
+    # A STARTING GOALIE GONE refuses the game (lane live-player-exit-gate). Read from the box the
+    # tick just fetched for `livePlayerStats` -- no second GET. Must run before the coverage block
+    # below, which counts refusals off the final lanes.
+    player_exits = _apply_player_exits(out_games, boxes)
 
     return {
         "sport": "nhl",
@@ -1146,6 +1152,7 @@ def build_live_lens_snapshot(
             "refusalsByReason": _refusals_by_reason(out_games),
             "livePlayerStats": player_stats_tally,
         },
+        "playerExits": player_exits,
     }
 
 
@@ -1165,8 +1172,12 @@ def _attach_live_player_stats(
     fetch_json: Any = None,
     enabled: bool = True,
     budget_seconds: float = _PLAYER_STATS_BUDGET_SECONDS,
+    boxes: dict[int, Any] | None = None,
 ) -> dict[str, Any]:
     """Put each LIVE game's box score on its snapshot entry as `livePlayerStats`.
+
+    `boxes`, when given, receives the RAW api-web box of each game read, keyed by its index in
+    `out_games`, so the player-exit gate (`_apply_player_exits`) reads the same GET.
 
     WHY HERE `[2026-11-09, lane nhl-nfl-live-prop-actuals]`. Live NHL props had no
     Actual on the board (0 of 29 measured 01:31Z), and the board join must not
@@ -1195,7 +1206,7 @@ def _attach_live_player_stats(
         tally["error"] = type(exc).__name__
         return tally
     started = time.monotonic()
-    for row, game in zip(rows, out_games):
+    for idx, (row, game) in enumerate(zip(rows, out_games)):
         state = str(row.get("gameState") or row.get("gameStatus") or "").strip().upper()
         if state not in _LIVE_BOX_STATES:
             continue
@@ -1203,8 +1214,9 @@ def _attach_live_player_stats(
         if time.monotonic() - started >= float(budget_seconds):
             tally["budgetExhausted"] += 1
             continue
+        fetch_one = fetch_json if boxes is None else _box_capturing_fetch(fetch_json, boxes, idx)
         try:
-            block = nhl_live_player_stats(row.get("id") or row.get("gamePk"), fetch_json=fetch_json, game_state=state)
+            block = nhl_live_player_stats(row.get("id") or row.get("gamePk"), fetch_json=fetch_one, game_state=state)
         except Exception:  # noqa: BLE001
             block = None
         if block is None:
@@ -1219,6 +1231,76 @@ def _attach_live_player_stats(
             + " ".join(f"{k}={v}" for k, v in tally.items()),
             flush=True,
         )
+    return tally
+
+
+def _box_capturing_fetch(fetch_json: Any, boxes: dict[int, Any], idx: int) -> Any:
+    """The box read's fetch, keeping the raw `/boxscore` response for the exit gate."""
+    def fetch(url: str) -> Any:
+        if fetch_json is not None:
+            data = fetch_json(url)
+        else:
+            from syndicate.features.shared.bet_status_nhl import _default_fetch_json
+
+            data = _default_fetch_json(url)
+        if str(url).rstrip("/").endswith("/boxscore"):
+            boxes[idx] = data
+        return data
+    return fetch
+
+
+REASON_KEY_PLAYER_OUT = "key_player_out"
+
+
+def _apply_player_exits(out_games: list[dict[str, Any]], boxes: Mapping[int, Any]) -> dict[str, Any]:
+    """Refuse the live lane of a game whose STARTING GOALIE has left (lane live-player-exit-gate).
+
+    The detector is `live_player_status.exits_from_nhl_boxscore`: once a non-starter goalie has time
+    on ice, the starter is out (`goalie_change`, KEY). An empty-net pull adds no goalie to the box, so
+    it never fires. The re-sim has no goalie change in it -- it plays the game out with the strength
+    it started from -- so the lane is replaced by a `key_player_out` refusal, which the board's NHL
+    index (`live_resim` only) drops, and `playersOut` feeds the in-play entry hold.
+
+    A game whose box was not read this tick (budget, feed error, not live) gets NO `playersOut`:
+    the hold answers `unknown` and the lane keeps its number, exactly as before this gate.
+    The re-sim for a refused game has already run (the box is read after every sim, so a slow feed
+    never costs a priced lane its budget); that is the price of reading the box once.
+    NHL live props are display-only (no model price), so there is no prop to refuse here.
+    """
+    from syndicate.features.shared import live_player_status as lps
+
+    tally: dict[str, Any] = {"enabled": lps.gate_enabled(), "read": 0, "players_out": 0,
+                             "key_players_out": 0, "refused_games": 0}
+    if not tally["enabled"]:
+        return tally
+    for idx, game in enumerate(out_games):
+        box = boxes.get(idx)
+        if not isinstance(box, Mapping):
+            continue
+        try:
+            status = lps.exits_from_nhl_boxscore(box)
+        except Exception:  # noqa: BLE001 -- the gate never costs the tick its snapshot
+            continue
+        if not status.in_progress:
+            continue
+        tally["read"] += 1
+        game["playersOut"] = [dict(p.__dict__) for p in status.players_out]
+        tally["players_out"] += len(status.players_out)
+        refusal = lps.gameline_refusal(status)
+        if refusal is None:
+            continue
+        tally["key_players_out"] += len(refusal["players"])
+        lanes = game.get("gameLens") or []
+        as_of = next((str(l.get("liveStateAsOf") or "") for l in lanes if isinstance(l, Mapping)), "")
+        refused = build_game_lens(None, NhlResimRefusal(REASON_KEY_PLAYER_OUT, ",".join(refusal["players"])),
+                                  live_state_as_of=as_of)
+        refused[0]["refusedSource"] = next((l.get("source") for l in lanes if isinstance(l, Mapping)), None)
+        game["gameLens"] = refused
+        tally["refused_games"] += 1
+        print(f"[nhl_live_resim] KEY_PLAYER_OUT_REFUSED game={status.game_id} "
+              f"{game.get('away_name')} @ {game.get('home_name')} players={refusal['players']}", flush=True)
+    if tally["read"]:
+        print("[nhl_live_resim] PLAYER_EXIT_TICK " + " ".join(f"{k}={v}" for k, v in tally.items()), flush=True)
     return tally
 
 
