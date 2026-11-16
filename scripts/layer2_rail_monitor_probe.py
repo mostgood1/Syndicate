@@ -339,6 +339,7 @@ def main() -> int:
     def phase_of(card):
         return game_phase(_clock.get(str((card.get("chip") or {}).get("game_key")), ""))
     per_phase = {}
+    per_family = {}  # sport:main vs sport:alt -- #811's 60 s NBA pull refreshes only the main lines (bulk endpoint, no alternates)
     for c in live:
         for m in c.get("markets") or []:
             markets_total += 1
@@ -359,6 +360,12 @@ def main() -> int:
             seen_ages.append(r.get("seen_age_seconds"))
             ages_now.append(age_now)
             ps = per_sport.setdefault(c["sport"], {"priced": [], "seen": [], "now": [], "flags": 0, "false": 0, "missed": 0})
+            fam = "alt" if str(r.get("market") or "").endswith("_alt") else "main"
+            pf = per_family.setdefault(f'{c["sport"]}:{fam}', {"rows": 0, "le120": 0, "flags": 0, "seen": []})
+            pf["rows"] += 1
+            pf["le120"] += 1 if (priced is not None and float(priced) <= FRESH_S) else 0
+            pf["flags"] += 1 if r.get("fresh") is not None else 0
+            pf["seen"].append(r.get("seen_age_seconds"))
             pp = per_phase.setdefault(f'{c["sport"]}:{phase_of(c)}', {"rows": 0, "le120": 0, "flags": 0})
             pp["rows"] += 1
             pp["le120"] += 1 if (priced is not None and float(priced) <= FRESH_S) else 0
@@ -405,6 +412,8 @@ def main() -> int:
                           "flagged_rows": v["flags"], "false_rows": v["false"], "missed_rows": v["missed"]}
                      for sp, v in sorted(per_sport.items())},
         "by_sport_phase": dict(sorted(per_phase.items())),
+        "by_sport_family": {k: {"rows": v["rows"], "le120": v["le120"], "flags": v["flags"], "seen_age_at_pricing": dist(v["seen"])}
+                            for k, v in sorted(per_family.items())},
     }
     if flags:
         with open(out_dir / "flags.jsonl", "a", encoding="utf-8") as fh:
@@ -452,6 +461,7 @@ def summary(r):
                       "markets": lv["live_markets"], "markets_no_ours": lv["live_markets_no_ours"]},
         "live_by_sport": lv.get("by_sport"),
         "live_by_sport_phase": lv.get("by_sport_phase"),
+        "live_by_sport_family": lv.get("by_sport_family"),
         "teams": {"chips_today": tm["chips_today"], "live_chips": tm["live_chips"], "live_chip_status": tm.get("live_chip_status"),
                   "live_chips_without_live_card": tm["live_chips_without_live_card"],
                   "chipless": [(c["sport"], c["matchup"], c["count"]) for c in tm["chipless"] or []],
