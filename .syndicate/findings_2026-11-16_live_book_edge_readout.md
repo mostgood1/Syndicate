@@ -81,6 +81,47 @@ Every condition is measured FORWARD from a frozen policy (no mid-window changes)
 4. **Sizing earns its keep:** the top stake quartile's ROI is not below the flat-stake ROI.
 5. **Then step, don't jump:** one cap increase at a time, re-measured. Step back the moment the rolling lower bound falls below zero.
 
+## CLV RECONCILED (2026-11-16, same session; user "Yes, reconcile CLV")
+
+The same 2026-11-16 fleet payload was used. Rows: last 30 days, decided (won/lost), with a resolved `closing_mark`:
+545 same-book (Kalshi 430, Polymarket 115) and 404 different-book. CLV is
+`prediction_ledger._clv_pct_from_prices(fill_price, close_price)` = (close implied − fill implied) × 100, in
+probability points. The close is the venue's own last pregame quote-log price (`book_quotes_last_pregame`).
+
+1. **The arithmetic is right.** The control is the 54 same-book bets whose close last changed BEFORE our entry, so the
+   quote never moved. Their CLV is median +0.02 pp and mean +0.37 pp. Units (contract vs American), side and `held_side` map correctly.
+   The fill equals the requested price (mean slippage +0.01 pp, 949 fills).
+2. **CLV is GROSS of the taker fee, and the fee is bigger than the CLV.** The mean fee is 1.63 pp per bet
+   (`fees_dollars` × fill / stake).
+   - Same-book CLV net of fee: **−0.30 ± 0.19 pp**.
+   - Different-book CLV net of fee: −0.26 ± 0.23 pp.
+
+   The "+1.32% CLV" was never an edge. Net of fees, CLV and settled results agree in SIGN: both are negative. The
+   contradiction in `#815` is mostly this.
+3. **The venue close itself overprices the sides we buy, so venue CLV also overstates the SIZE.** On same-book bets,
+   wins were 51.4% against a close implying 58.0%: −6.62 pp per bet, event-clustered z −2.94, 351 events.
+   - Excluding NCAAB: −4.87 pp, z −1.97, 279 events.
+   - Excluding NCAAB and totals: −4.73 pp, z −1.80.
+
+   NCAAB is the largest single piece (92 bets, 33.7% won vs 48.9% close-implied), but the bias does not go away
+   without it. Beating a close that is itself ~5 pp optimistic on our selections is not evidence of edge. The venue
+   close is not a calibrated benchmark for the sides this book picks.
+4. **CLV still ranks bets, weakly.** Win rate by same-book CLV bin: < −2 pp 46.7%, −2..0 49.6%, 0..2 52.5%, 2..5 52.3%,
+   ≥ 5 pp 57.7%. Every bin still wins less than its fill price (z −0.26 to −1.72). The ≥ 5 pp bin wins 57.7%
+   against a close implying 70.1% (z −2.08): large venue "CLV" moves mostly do not show up in outcomes.
+5. **Timing:** median entry 9.7 h before start (p10 77 min). Median close-quote age at start 42 min (p90 10 h).
+
+**Consequences**
+
+- **Scale-up gate, condition 3 changes.** CLV is measured NET OF FEE, and only against a close benchmark that is
+  itself calibrated on our selections: |wins − Σ close-implied| within 2 clustered SE. The venue close fails that today.
+- **The `min_ev_tuner` (shadow) reads gross CLV.** `min_ev_tuner._clv` recomputes from fill and close with no fee term,
+  and its RAISE rule needs ROI AND CLV both significantly NEGATIVE. A fee-gross CLV sits ~1.6 pp high, so a RAISE is
+  structurally hard to reach. That fits its 10-20..10-26 readout (0 moves; the closest cell was a near-RAISE) and the
+  module's own note that same-book CLV was "positive in every band" while ROI was negative. Fee-net CLV is the fix.
+  The tuner is shadow, so nothing live changes today.
+- Any surface or report that shows venue CLV should show it fee-net beside gross.
+
 ## Method artefact
 
 The analysis script is session scratch for now (`pf_edge.py`). Its formulas are above. Promoting it to

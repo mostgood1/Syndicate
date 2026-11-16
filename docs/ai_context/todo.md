@@ -3,8 +3,16 @@
 ### `#815` — **THE LIVE BOOK HAS NO MEASURED EDGE, SO LIVE STAKES DO NOT SCALE YET: the last 30 days are −7.3 ± 2.8% net of fees on $3,006.48 (1,526 bets / 641 events, z −1.72 on excess wins over the fill price), and the "solid week" is +0.7 ± 5.0%; the win rate (57-59%) sits BELOW the breakeven win rate of the prices paid (58-59%). Same-book CLV is +1.32% while the same 546 bets settle z −3.35, so CLV cannot gate a scale-up until reconciled. The biggest-stake quartile carries 63% of dollars and loses −9.2%** `[2026-11-16, lane portfolio-edge-measurement, session 69d80317; user asked "when can we start to increase investments"]`
 - **Evidence:** `.syndicate/findings_2026-11-16_live_book_edge_readout.md`. Source: the fleet's `/api/portfolio/live?on=all`, read 15:50Z 11-16.
 - **Scale-up gate:** PROPOSED in the findings, NOT approved. It needs ≥ 800 forward events at a frozen policy, a 95% lower bound > 0, same-book CLV agreeing with results, and the top stake quartile no worse than flat. The user decides.
+- **CLV RECONCILED 11-16 (user "Yes, reconcile CLV"):**
+  - The arithmetic is right: on the 54 bets whose quote never moved after entry, CLV is median +0.02 pp.
+  - The +1.32 pp is GROSS of a 1.63 pp taker fee. **Fee-net same-book CLV is −0.30 ± 0.19 pp**, the same sign as results.
+  - The venue close itself overprices our sides: wins 51.4% vs a close implying 58.0%, −6.6 pp, event-clustered z −2.94
+    (−4.9 pp, z −1.97 excluding NCAAB). So venue CLV also overstates the size.
+  - Gate condition 3 is now fee-net CLV against a close that is calibrated on our selections.
+  - `min_ev_tuner._clv` is fee-gross, so its RAISE rule (ROI AND CLV both significantly negative) is structurally hard to reach.
+  - Findings § "CLV RECONCILED".
 - **Next, in this lane:**
-  - (1) Reconcile same-book CLV against settled results on venue contracts (side / `held_side` / unit / fee).
+  - (1) DONE 11-16, see above. Owed: a fee-net CLV in `order_clv` / `min_ev_tuner._clv` (shadow, no live effect). User's call.
   - (2) Promote the readout to `scripts/live_book_edge_readout.py` with a test pinning these numbers.
   - (3) Find why stake concentrates in the losing top quartile (stated EV 4-7% realises about −5%; see `#704`).
 - **Per-LINE only:** NCAAB (z −3.45) and totals (z −2.11) are evidence for per-line fixes, never a market switch (learnings line 1056).
