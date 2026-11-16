@@ -886,6 +886,14 @@ death, never life — do not invert it.
 - Verification: Unit: off != on reachability; 7:20 PM CST kickoff captured after 00:00Z lands in the Central date's shard; next-week game lands in its own kickoff shard; null-kickoff events counted, not silently dropped. Offline: replay of fleet 11-15/11-16 shards with counts moved. Fleet (after the user's load): during MNF 11-16 (LAC @ BAL, 01:15Z) NFL game rows with captured_at >= 00:00Z land in 2026-11-16.jsonl, INPLAY_OVERLAY sport=nfl date=2026-11-16 carries MNF in-play rows, /api/board/live-rail serves NFL game-line rows for MNF.
 - Blocked by: none
 
+### wncaab-overlay-zero-cards — OPEN — opened 2026-11-16 — session d58574cb-c55a-4f1f-aa9a-ab530a5f63e0
+- Goal: Name, from fleet data, why the in-play overlay's select_shortlist returns 0 rows for WNCAAB games that have in-play opportunities (11-16 21:04-21:58Z: 68 of 71 builds cards=0 with 6-22 opportunities, some priced), so their live lines never reach the Games Rail; then make the overlay log select_shortlist's refusal counters on INPLAY_OVERLAY (and fix the gate if it is wrong) with an off != on test, on main; any fleet load is the user's call
+- Files: syndicate/features/shared/book_grid_artifact.py (_build_inplay_overlay ONLY), tests/test_inplay_overlay_shortlist_counters.py (NEW), .syndicate/findings_2026-11-16_layer2_rail_monitor.md (shared with layer2-rail-monitor, same session)
+- Hypothesis: select_shortlist's quote-age gate (beyond_quote_age / stale_quote / superseded_line) or its value floor (below_value_floor) refuses every WNCAAB in-play opportunity, because WNCAAB live quotes are pulled slowly and its rows are market-fair only (peer 0f519972's guess, untested)
+- Falsification test: A read-only replay of build_layer2_rows + select_shortlist on a live WNCAAB build's in-play rows returns >= 1 chosen row (then the drop is after select_shortlist), or the refusing counter is something other than quote age / value floor
+- Verification: Replay on the fleet (nice 19, read-only) prints select_shortlist's counters for a WNCAAB build with cards=0; unit test proves INPLAY_OVERLAY carries the counters (off != on); on main; the user decides any load
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
