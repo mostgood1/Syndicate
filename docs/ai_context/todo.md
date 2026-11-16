@@ -69,6 +69,7 @@
     - ESPN's `homeTimeouts` / `awayTimeouts` are timeouts LEFT: 12 of 12 games of 2026-11-15 match the play-by-play.
     - Inert with `end_of_half_clock` OFF (byte-identical, test-pinned). Reachable with it ON: at Q4 1:50 with the leader's ball, total 41.23 vs 43.40 for away 0 vs 3 timeouts.
     - Owed: the MNF read of the site scoreboard's keys; the push; then the profile load. Detail: `.syndicate/findings_2026-11-16_nfl_live_timeouts.md`.
+    - **PUSHED 9:59 AM CST (user "Push it"):** `6f7cb9eb3` on main (`1f723feaa..6f7cb9eb3`, the same change rebased). Inert until the adapter keys land and the clock is ON.
 - **Read-only.** Production's own NFL `build_projection`, 136 games of 2024-25 x 100 seeds, same seeds per arm (patched in the research process only), against nflverse pbp 2024-25 (544 games). Findings: `.syndicate/findings_2026-11-15_football_end_of_half_scoring.md`.
 - **The whole Q2 gap is in its last 120 s:** sim 3.14 points a game against the league's 4.78 [4.46, 5.10]. The regulation total looks right (45.84 vs 45.62) only because the errors cancel.
 - **Cause 1, halftime carry-over (`halftime_kickoff` OFF):** a drive crosses the half in 0.84 of games and scores 2.33 points a game in Q3. Switching it on: q3 -0.95 [-1.07, -0.83] (to 9.57, the league's 9.50), q2 0, total -1.07. That total drop is why the switch failed alone upstream.
