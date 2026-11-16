@@ -771,6 +771,14 @@ death, never life — do not invert it.
 - Verification: Per-quarter actual points for the 65 games (ESPN linescores) beside the league 2024-25 table; the live sim's remaining-points mean from each break; the same games' pregame smartsim2 projected total vs final; all written to the findings file and todo #780
 - Blocked by: none
 
+### nba-overlay-card-cost — OPEN — opened 2026-11-16 — session f48ddc8c-a5b1-4f45-8c93-2f027730c0eb
+- Goal: Name, by measurement, why NBA in-play overlay card time per card rose from ~3.5 ms (11-15 calm: 929 cards, cards_ms 6.6 s, evidence 3.3 s) to ~12 ms at 4-5 games live (23:21:44Z: 2,000 cards, 43.7 s, evidence capped 20 s) and ~36 ms after the 01:28:28Z 11-16 refresh-worker restart (01:40:16Z: 971 cards, 54.9 s, evidence 20.1 s): interpreter-lock contention, per-card cost growing with load, or cold caches; then name the lever (todo #790 residual; user 'Yes, look here')
+- Files: read-only: no repo file until a fix is chosen; scratch scripts C:\tmp\railload\cost790_*
+- Hypothesis: H1 CONTENTION: the overlay is pure-Python and shares refresh-worker's interpreter lock with other CPU-active loops; at peak and after a restart those loops are busier, so the grid thread waits; per-card CPU is unchanged. H2 LOAD: per-card work grows with in-play rows (more props per player, larger ladders, more evidence calls). H3 COLD: after a restart in-process caches are cold and refill slowly.
+- Falsification test: H1 is false if an uncontended single-thread replay of the 23:21:44Z peak grid (fleet code + data, nice 19) spends >= 10 ms of non-evidence card time per card, or if the overlay's cheap rows stage (rows_ms) and other sports' per-row costs did NOT inflate at the same moments. H2 is false if that replay gives <= 5 ms per card. H3 is false if a cold replay is within 1.5x of a warm one.
+- Verification: Per-phase table from the fleet log (rows_ms per row and non-evidence cards_ms per card, every sport) + offline replay cold and warm with thread CPU vs wall; tonight, if NBA plays, per-thread /proc samples of refresh-worker during an NBA overlay build. Recorded in todo #790 and deploys.md (READING, no deploy).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
