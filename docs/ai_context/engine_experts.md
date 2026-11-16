@@ -228,6 +228,33 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
     tests `no_edge`; engine minus books Brier -0.0016..+0.0074). It beats quotes 5-15 minutes old by a wide margin,
     which is the game outrunning the quote (`#780`'s pattern), not a bettable price. College segment pricing (`#763`)
     stays off.
+- **Live refusals** (lane `engine-experts-live-refusals`, 2026-11-16). Three switches in `SYNDICATE_ENGINE_EXPERTS_OFF`
+  (`team_alias`, `fair_over`, `display_margin`; absent = on), plus a certainty rule and two gate corrections. Fleet
+  re-run of the branch's runner, read-only, nice 19, refresh-worker env, slates 11-09..11-14, nhl / ncaaf / nfl,
+  evidence rows from 2026-11-15T20:00Z on dropped unread. OFF reproduces main's refusals exactly. `live_resim`
+  totals, off -> on:
+
+  | sport x family | off | on |
+  |---|---|---|
+  | NCAAF h2h | no_game_match 3,767 | opined 3,767 |
+  | NCAAF spreads | no_game_match 12,436 | opined 9,966; no_prior 2,316; sample_certainty 154 |
+  | NCAAF totals | no_game_match 12,420 | opined 9,887; no_prior 2,374; sample_certainty 159 |
+  | NHL spreads (puck line) | no_prior 1,827 | opined 1,740; no_prior 72; no_display_probability 15 |
+  | NHL totals | no_prior 500 | no_distribution 403; no_prior 97 |
+  | NFL spreads / totals | no_game_match 207; no_prior 149 | evidence_log_starts_after_instant 207; no_prior 103; opined 46 |
+
+  - **Gates, every night:** JOIN 0 mismatched (NCAAF 11-14: 19,227 half-point lines checked, 12,808 differing from
+    the unrounded expert only by the join's 4-dp share rounding, `join_estimate`); h2h 0 differ (NCAAF 3,767, NHL
+    1,691); SEG_JOIN 0 of 13,273 (11-11..11-14); SEG_PRIOR 0 of 14,003; checklist alarms 0; exit 0.
+  - **NCAAF segments:** games matched 0 -> 3 / 2 / 3 / 55 (11-11..11-14), all through the canonical pair, 0
+    ambiguous. The opinions take the odds feed's event id from `book_quotes` (the lanes carry none).
+  - **FALLBACK_FRAME** (opinions no join number checks): NHL puck lines PASS each night, median |p - prior| on far
+    pairs 5.41 / 4.49 / 4.20 / 4.95 pp against 42.19 / 51.29 / 48.40 / 46.65 pp flipped (n_far 61 / 167 / 49 / 208).
+    NFL 11-13 (46 lines on a `market_fair_prob_over` prior) UNJUDGED: 3 far pairs.
+  - **What is left is named:** NCAAF `no_prior` (4,690) is all 11-10..11-13, rows the join withheld
+    `no_two_sided_market_price` (4,584) or for no distribution (106), with neither fair field; NHL `no_prior` (169) is
+    148 rows on ledger v5 nights (11-09 / 11-10, before `market_fair_prob_over` existed) and 21 v6 rows carrying
+    neither field; NHL totals have no histogram; NFL 11-09's five games predate the NFL evidence log.
 - **Readings:** `.syndicate/deploys.md` and the lane block in `lanes.md`.
 
 ## Known gaps (not this slice)
