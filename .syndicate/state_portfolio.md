@@ -448,6 +448,11 @@ and none exist yet.**
   - Verified: a synthetic raise fires it; the real 10-26 artifact does not; the next watchdog run was clean (deploys `1ed8bb4f`).
 - **Evidence base:** settled paper venue orders only (paper:kalshi + paper:polymarket, 1,176 over 10-02..10-18). The 552 live rows
   are `venue_rebuild` rows with no `ev_pct`. Same-book CLV on venue MLB props is near zero (kalshi 49/266, polymarket 1/95).
+- **CLV basis: FEE-NET by default on main (`6e952af46`, 2026-11-16), NOT LOADED (verified 2026-11-16 21:19Z).** `_clv` nets the venue fee
+  off the recomputed gross CLV (`order_clv.fee_net_clv_pct`; an unknown fee drops the row). `SYNDICATE_MIN_EV_TUNER_CLV_BASIS=gross` restores the
+  old basis; absent = net. The code reached the fleet disk with another lane's 21:17Z ff to `db463b5be`, but refresh-worker pid 2809282 predates it.
+  The fleet runs the GROSS basis until its next restart; proof of load = a `MIN_EV_TUNER ... clv_basis=net` line. The read-only A/B on the
+  fleet's orders changed 0 actions (findings_2026-11-16_live_book_edge_readout.md § "FEE-NET CLV BUILT"; todo #815).
 - Detail: `findings_2026-10-19_min_ev_tuner_backtest.md`; deploys.md 2026-10-19 19:06:01Z; todo #701.
 
 ## [live-plan-empty-funnel] THE LIVE PLAN IS EMPTY BECAUSE THE VENUE'S OWN PRICE IS <= 0 EV AFTER THE TAKER FEE -- NOT A CAP, NOT A CHOSEN GATE `[verified on the fleet 2026-10-19 22:15Z and 2026-10-20 12:33Z, read-only, session 6200a74b]`
@@ -498,3 +503,25 @@ and none exist yet.**
 - Detail: `.syndicate/findings_2026-10-22_venue_order_opening_gap.md`; todo #729.
 
 ---
+
+---
+
+## [live-book-edge-scale-gate] THE LIVE BOOK HAS NO MEASURED EDGE AT THE PRICE PAID; THE USER ADOPTED A SCALE-UP GATE AND IT FAILS ALL FOUR MEASURABLE CONDITIONS `[verified on the fleet 2026-11-16 21:15Z (/api/portfolio/live, 2,225 orders); gate adopted by the user 2026-11-16; lane portfolio-edge-measurement]`
+
+- **Instrument:** `python scripts/live_book_edge_readout.py [--since <date of the last live-policy change>]`. It reads the fleet's
+  `/api/portfolio/live?on=all&show=all` and reports ROI net of fees with an EVENT-clustered SE, win rate vs the breakeven of the prices paid,
+  CLV gross AND net of the fee per close scope, the close's calibration on our sides, stake quartiles, and the gate. The `/portfolio` win
+  rate is the wrong instrument: the book buys favourites/alt lines whose breakeven is ~58%.
+- **Readings (as of slate 11-15):**
+  - Last 30 days: 1,526 bets / 641 events, $3,006.48, −$218.64, ROI −7.27 ± 2.84%, excess wins −32.5 (z −1.72).
+  - Since the stake band went off (`--since 2026-11-03`): 833 bets / 357 events, ROI −4.59 ± 3.83%, excess −5.8 (z −0.42).
+  - Same-book CLV is +1.32 pp GROSS but −0.30 pp NET of a 1.63 pp fee; the venue close overprices our sides by 6.6 pp (z −3.05).
+  - About $127 of the last-30 loss is the $5-$10 stake band's ~10x multiplier (ON 10-20 .. OFF 11-02); size itself does not significantly pick losers.
+- **Scale-up gate, ADOPTED 2026-11-16 (user: "Adopt as drafted"):** (1) ≥ 800 events forward from a frozen policy; (2) ROI 95% lower
+  bound > 0 and excess wins ≥ 0; (3) fee-net same-book CLV agrees in sign with results, against a close calibrated on our sides (|z| < 2);
+  (4) top stake quartile ROI ≥ flat ROI; (5) then raise caps one step at a time, stepping back when the rolling lower bound falls below 0.
+  **No live stake, cap or bankroll increase until 1-4 pass on one window.** No code acts on the gate. At adoption, all four FAIL.
+- **OPEN (the user's): what restarts the 800-event clock.** At least 8 changes to how live bets are chosen or held landed in 11-03..11-16
+  (deploys.md), so a strictly frozen window has not existed. 11-03 is the last SIZING change. Under a sizing-only clock, condition 1 can
+  first pass about 2026-12-02 (~27 events/day).
+- Detail: `.syndicate/findings_2026-11-16_live_book_edge_readout.md`; todo #815.

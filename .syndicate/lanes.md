@@ -792,38 +792,17 @@ death, never life — do not invert it.
 - Blocked by: none for the consumer side; the adapter keys wait on `nfl-live-possession-map`
 
 ### portfolio-edge-measurement — OPEN — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- **GOAL VERDICT `[2026-11-16 4:36 PM CST (22:36Z) checkpoint]`: GOAL: MET.** Goal (verbatim): "A repeatable readout of the LIVE book's edge at the price paid (net of fees, event-clustered SE, same-book CLV beside results), plus a pre-registered scale-up gate the user approves before any live stake/cap increase".
+  - Readout: `scripts/live_book_edge_readout.py` (main `38646cce2`, label `39474964d`) reproduces last30 −7.27 ± 2.84% on $3,006.48 from the 11-16 fleet payload; 20 passed with the payload, 19 + 1 skipped without.
+  - Gate: user 11-16 "Adopt as drafted" (findings § "Scale-up gate"). At adoption all 4 measurable conditions FAIL. No live stake/cap change was made.
+  - HELD OPEN for ONE owed user answer: which changes restart the 800-event clock ("frozen policy" read strictly has not held: 8 live-rule changes in 11-03..11-16). Close on that answer.
+  - Fee-net CLV (`6e952af46`) on fleet disk since 21:17Z, NOT loaded at 21:19Z (refresh-worker pid 2809282); proof of load = `MIN_EV_TUNER ... clv_basis=net`. Narrative: `.syndicate/log/2026-11-16.md`; superseded lines: `lanes_history.md`.
 - Goal: A repeatable readout of the LIVE book's edge at the price paid (net of fees, event-clustered SE, same-book CLV beside results), plus a pre-registered scale-up gate the user approves before any live stake/cap increase
 - Files: scripts/live_book_edge_readout.py (NEW), tests/test_live_book_edge_readout.py (NEW), .syndicate/findings_2026-11-16_live_book_edge_readout.md (NEW), docs/ai_context/todo.md (#815 section only), syndicate/features/shared/order_clv.py, syndicate/features/shared/min_ev_tuner.py, syndicate/features/shared/paper_settlement.py, tests/test_fee_net_clv.py (NEW), tests/test_min_ev_tuner.py (`_order` fixture only)
 - Hypothesis: The live book has no measured edge: win rate looks good only because fills are mostly favourites/alt lines whose breakeven is ~58-59%; same-book CLV (+1.3%) disagrees with results (z -3.35) so either CLV is mis-measured on venue contracts or venue closes are not efficient
 - Falsification test: Forward results at the fill price net of fees with a 95% event-clustered lower bound above 0, or a CLV/results reconciliation in which same-book CLV predicts settled excess wins
 - Verification: readout script reproduces the 2026-11-16 numbers from the fleet's /api/portfolio/live (last30 -7.27% +- 2.84 on 3006.48 staked); gate text recorded in the findings file and user-approved before any cap change
 - Blocked by: none
-- RESULT 2026-11-16 (CLV half of the hypothesis): BOTH branches it named are true, one per part.
-  - "Mis-measured" holds for the SIGN: CLV is gross of a 1.63 pp taker fee, and fee-net same-book CLV is −0.30 ± 0.19 pp.
-  - "Venue closes not efficient" holds for the SIZE: the close overprices our sides by 6.6 pp (clustered z −2.94).
-  - The units, sides and arithmetic are EXONERATED (unmoved-quote control: median +0.02 pp).
-  - Findings § "CLV RECONCILED".
-- BUILT 2026-11-16 (user "Yes, add fee-net CLV"): fee-net CLV in `order_clv` rows and aggregates, in new closing marks, and in `min_ev_tuner` (net by default, SHADOW unchanged). 16 new tests, including reachability (net RAISE != gross HOLD); 695 passed in the related suites.
-  - Fleet A/B, read-only: the gross arm = tonight's 95 holds; net changes 0 actions, 3 reasons and 1 pooled-shadow verdict.
-  - On main as `6e952af46` (the ledger commit 399487141's subject names `053d8305a`, its PRE-rebase SHA). NOT loaded on the fleet: user 11-16 "Ride the next ff" (no dedicated deploy). Loaded = the refresh-worker's next `MIN_EV_TUNER` line shows `clv_basis=net`. 102 passed on the rebased tree. Findings § "FEE-NET CLV BUILT".
-- HYPOTHESES 2026-11-16 (user "Dig into big stakes"; written BEFORE testing). The top stake quartile ($2.70-9.84) carries 63% of last-30 dollars at -9.2% (z -2.17). Why do the big stakes lose? Sizing paths in the window: model_edge 969, no sizing record 336, inplay_order_dollars 211, market_fair 10. Since 10-20 the sim adds $0 (#704), so the sim is not the suspect for most of it.
-  - H1 (price): big stakes are high-price favourites, where Kelly gives a larger fraction for the same EV, and those prices lose.
-  - H2 (claimed edge): big stakes carry the largest EV claims, and the claim is overstated, so the biggest claims lose most.
-  - H3 (time/capital): big stakes cluster in dates with more venue capital, which happened to lose. Calendar, not sizing.
-  - H4 (path/segment): big stakes come mostly from one sizing path (in-play, or the no-record rows) or a few lines.
-  - Falsification of "the sizing itself loses": within matched price, EV, date and path, return does NOT fall as stake rises. Then the stake concentration is composition, and the fix is the component, not the sizer.
-- RESULT 2026-11-16 (big stakes):
-  - H1 (price) FALSE, H2 (claimed EV) FALSE.
-  - H3 + H4 TRUE as ONE thing: the live $5-$10 stake band (ON 10-20 14:37Z .. OFF 11-02 18:23Z). It accounts for 85% of top-quartile dollars and multiplied stakes ~10x without choosing bets.
-  - Falsifier: size itself does not significantly lose (matched −2.4 ± 4.2 pp, z −0.57; inside the band −7.0 ± 6.8, z −1.03, a watch item).
-  - About $127 of the last-30 $218.64 loss is the band's multiplier. No fix owed (the band is already off).
-  - Findings § "BIG STAKES EXPLAINED".
-- BUILT 2026-11-16 (user "Yes, build it"): `scripts/live_book_edge_readout.py` + tests on main `38646cce2`.
-  - VERIFICATION (readout half) MET: it reproduces last30 −7.27 ± 2.84% on $3,006.48 from the 11-16 payload, and the fresh fleet read at 21:15Z is identical. 20 passed.
-  - Since band-off: ROI −4.59 ± 3.83%, 357 events. The gate's 4 measurable conditions all FAIL.
-  - OWED for the lane to close: the user's decision on the gate as drafted.
-- GATE ADOPTED 2026-11-16 (user: "Adopt as drafted"). VERIFICATION MET, both halves: the readout reproduces the 11-16 numbers, and the gate text is in the findings and user-approved before any cap change. The script's gate is relabelled ADOPTED.
-  - ONE ANSWER OWED before close: which changes restart the 800-event clock. Strictly read, "frozen policy" has not held: at least 8 changes to how live bets are chosen or held in 11-03..11-16. The lane closes on that answer.
 
 ### engine-learner — OPEN — opened 2026-11-16 — session e32fef1a-01e8-4afe-a284-01acd3728545
 - **SLICE 2 ON MAIN `49dc0b0a6` 2026-11-16 2:09 PM CST** (user "Yes, push it"; shadow only, no fleet ff or restart; built as local `0c085c75c`; learner 31 + experts/college/paper-policy suites 128 passed): every game line's outcome from the board's final-score chips (pregame in all sports, live NHL/NFL/NCAAF/WNBA; events from the DecisionRecords, else the live ledger), the pregame CLOSE as the fast truth (`--truth close`: Pinnacle, else the Shin consensus of >= 2 books; props included), a push as a named refusal (a soft label may be 0.5), and a forward split that holds a game out WHOLE (a slate split had put 127 games on both sides). Fleet dev run 11-09..11-14 (no chip date or quote shard after 11-14 read, no game starting >= 11-15T06:00Z graded): 804 games, train 424 / test 380, shared 0; OFF == prior everywhere. Outcome: every PREGAME game line in every sport applies no weight (d_ll 0); live as slice 1 (NCAAB totals fresh <= 60 s -0.0088 [-0.015, -0.001], the only fresh gain). Close: 22,602 of 32,150 pregame lines labelled (6,869 sharp); every group within 0.0001 nats (NHL props -0.00005, CI excludes 0) -- a soft label makes tiny weights significant, so a close-truth gate needs an effect-size floor. Expert-side gaps found (lane engine-experts, not this lane): live NCAAF `live_resim` all refused `no_game_match` (28,623), live NHL spreads/totals all `no_prior` (2,327). Owed: prop outcomes (NBA grader, lane nba-live-prop-grade); the +300 s mark-out after slice 5; then the gate registered before its data.
