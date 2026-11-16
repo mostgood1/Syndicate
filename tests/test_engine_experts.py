@@ -969,12 +969,14 @@ def test_live_resim_refuses_a_sample_certainty_as_the_join_does():
     prior the expert met them (fleet 11-14: 313 NCAAF rows, a line the game had left behind)."""
     ev = _evidence(margin={"20": 60, "25": 60}, sims=120)
     op = ee.live_resim_expert(_unpriced("spreads", 8.5, over=0.5025), ee.EvidenceIndex([ev]), ee.Reader())
-    assert op.refusal == "sample_certainty" and op.delta_logit is None and (op.inputs["k"], op.inputs["n"]) == (120, 120)
+    assert op.refusal == "sample_certainty" and op.delta_logit is None
+    assert (op.inputs["k"], op.inputs["n"]) == (120, 120)
 
 
 def test_the_join_gate_reads_the_joins_own_rounding_at_n_120_and_still_catches_a_wrong_k():
     """`_dist_prob_over` rounds the share to 4 dp before smoothing: at NCAAF's 120 sims the join's number is up to
-    4.8e-5 from the expert's unrounded one (fleet 11-14: 12,808 of 19,227 half-point lines), at 100 / 200 it is exact."""
+    4.8e-5 from the expert's unrounded one (fleet 11-14: 12,808 of 19,227 half-point lines); at 100 / 200 it is
+    exact."""
     from syndicate.features.shared.live_gameline_join import price_distribution_market
 
     dist = {"30": 52, "60": 68}  # 52 of 120 under 45.5, so 68 over: 68/120 = 0.56667 is not exact at 4 dp

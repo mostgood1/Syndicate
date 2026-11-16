@@ -54,7 +54,7 @@ LIVE REFUSALS (lane `engine-experts-live-refusals`, 2026-11-16). Three fixes to 
   team_alias_pair_key`, the #791 registry, NCAAF only, honouring the join's switch): 55 of 55 meet, 0 ambiguous.
 - THE PRIOR UNDER ITS V6 NAME. A full-game totals / spreads row the join did not price carries no
   `market_fair_prob`, but ledger v6 writes the same de-vigged first side as `market_fair_prob_over` (over / home
-  covers). Measured equal on every row carrying both (fleet 11-12..11-14, ~80k NBA / NCAAB / WNCAAB / NCAAF rows, 0
+  covers). Measured equal on every row carrying both (fleet 11-12..11-14, 77,085 NBA / NCAAB / WNCAAB / NCAAF rows, 0
   differ), so it is read where the first is absent. Every NHL puck-line and total row is such a row.
 - THE NHL PUCK LINE'S NUMBER. NHL's re-sim publishes its margin histogram only as `displayMarginDist` (#773), which
   the evidence log does not keep; the ledger keeps the Live column's number, `display_prob`, which is Agresti-Coull
@@ -581,7 +581,7 @@ def live_resim_expert(ledger_row: Mapping[str, Any], index: EvidenceIndex, reade
     # THE SAME PRIOR UNDER LEDGER V6's NAME. A full-game totals / spreads row the join did not price (an NHL puck line
     # or total: display-only / no distribution) carries no `market_fair_prob`, while `market_fair_prob_over` is the
     # de-vig of the same first side (over / home covers, `live_gameline_ledger._display_fields`). Fleet 11-12..11-14:
-    # equal on every row carrying both (~80k NBA / NCAAB / WNCAAB / NCAAF full-game rows, 0 differ); never set on a
+    # equal on every row carrying both (77,085 NBA / NCAAB / WNCAAB / NCAAF full-game rows, 0 differ); never set on a
     # segment row, where it is therefore not read.
     if p_prior is None and segment == "full" and market in _TOTALS | _SPREADS and FEATURE_FAIR_OVER not in off:
         over = _f(g("market_fair_prob_over"))
@@ -1711,8 +1711,8 @@ EXPECTED_SPARSE: dict[str, str] = {
                                                "then the join's #791 canonical pair)",
     "ncaaf:live_segment:live_evidence:event_id": "NCAAF lanes carry no event id; the opinion takes the odds feed's "
                                                  "from book_quotes (`GameLineQuoteIndex.event_ids`)",
-    "ncaaf:live_resim:out:line": "a night whose NCAAF totals / spreads all lack a two-sided price (weekdays 11-10..11-13: "
-                                 "no_two_sided_market_price on every one) opines only moneylines",
+    "ncaaf:live_resim:out:line": "a night whose NCAAF totals / spreads all lack a two-sided price (weekdays "
+                                 "11-10..11-13: no_two_sided_market_price on every one) opines only moneylines",
     "nhl:live_resim:live_evidence:segments": "NHL lanes emit no segments",
     "nfl:live_resim:live_evidence:segments": "NFL lanes emit no segments",
     "ncaaf:live_resim:live_evidence:segments": "NCAAF lanes emit no segments",
