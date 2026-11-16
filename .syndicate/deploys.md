@@ -60438,3 +60438,14 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **revert:** `git revert b2ae202d4` + a claimed fleet ff + claimed live-odds-worker TERM; or `LIVE_ODDS_WORKER__SYNDICATE_NBA_LIVE_REFRESH_INTERVAL_SECONDS=240` in `local_production.env` + a drained full down/up (`SYNDICATE_NBA_IN_PLAY_PROPS_INTERVAL_SECONDS=0` alone makes every pull a full pass at ~4x the props credits -- not a revert).
 - **verify:** `grep -a NBA_LIVE_AUTORUN_LAUNCHED ~/syndicate-prod/logs/live-odds-worker.log | tail` shows `interval_s=60`; `grep -a 'IN_PLAY_PROPS league=nba' ~/syndicate-prod/data/nba_source/logs/syndicate_refresh_oddsapi_props_<date>.log | tail` shows `pass=full` ~every 250 s with `pass=lines` between; `<snapshot stem>.inplay_props_clock.json` beside the day's raw props snapshot advances with each full pass.
 - **Claims:** live-odds-worker released ~01:49Z (before this entry; nothing else was deployed under it).
+
+## 2026-11-16 02:52:06Z (8:52 PM CST 11-15) -- READING for the 2026-11-16 02:00:09Z load: todo #812, the NFL prop projections artifact written temp file + `os.replace` (lane `nfl-prop-projection-atomic-write`, CLOSED) -- **MET: the first rewrite after the ff installed a NEW inode (the new writer ran), 0 JSONDecodeError, 0 `.tmp` left, the file parses, 0 tracebacks on any role**
+- **Watcher:** `C:\tmp\propsatomic\watch_write.sh` (every 2 min from 02:00Z), then `C:\tmp\propsatomic\after.sh` 30 s after the write was seen.
+- **The write:** `2026-11-16T02:50:22.997Z wrote .../nfl_source/nfl_prop_projections_2026_wk10.json  published=True` (refresh-worker's props build subprocess, launched from the new code on disk).
+- **expect / measured:**
+  - **New writer ran:** wk10's inode 2049307 (written 01:49:33Z by the old writer) -> **2307872**. `os.replace` installs a new file; `path.open("w")` truncates the existing one and keeps its inode. **MET.**
+  - `json_decode_errors_rw` since the ff: **0**. `props_tmp_files`: **0** (no `<name>.<pid>.<uuid>.tmp` left). **MET.**
+  - The file parses (`C:\tmp\propsatomic\parse.sh`): keys `season, week, generated_at, sim_rows, row_count` (same as before), 291 rows = `row_count` 291, `generated_at` 02:50:22.994Z.
+  - Tracebacks since the ff: refresh-worker 0, live-odds-worker 0, web 0; ImportError 0. refresh-worker pid 2053259 unchanged.
+- **What this does not show:** the race itself is rare (1 in a day, 19:33:51Z 11-15), so one clean rewrite does not measure its rate. It shows the mechanism that removes it is the one running: a reader can now only open the old inode or the new one.
+- **Claims:** none (released 02:01Z).
