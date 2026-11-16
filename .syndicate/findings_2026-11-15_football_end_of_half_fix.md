@@ -1010,3 +1010,37 @@ scope. The optional Q4 end-game TD share from the v2 write-up is NOT in v3.
 3. **A v4 for the composition.** The leader's TD share in Q4 preservation AND trailer scoring in the Q4 drill: two mechanisms, the second unmeasured.
    - It would need its own pre-registration.
    - FIT's independence is already spent, so the held-out would again be the only real test.
+
+
+## V3 USER OVERRIDE — 2026-11-15 19:21 CST, logged BEFORE any held-out game is read
+
+**The decision, verbatim.**
+- The session asked: "Read the 2026 held-out at the all-pass point (home bonus 0.03), as a logged override?"
+- The user answered: **"Override, read it"**.
+
+**What it overrides.**
+- R3's choice of `home_field_bonus` 0.06, and so the FIT FAIL verdict above.
+- The candidate for the held-out read becomes **the R2 point, `v3h0.03_t0.825`**: `full3` + `home_field_bonus` 0.03 +
+  `touchdown_weight_multiplier` 0.825. It passes G1-G5 (Q4-window 2.94).
+
+**What stays true, and is reported with any result.**
+- Under the rules as registered, v3's FIT verdict is FAIL (G5, 3.01 at `v3h0.06_t0.825`).
+- The candidate was chosen after the FIT read, so this read is post-hoc as to WHICH point is tested.
+- It is still an independent test OF that point: no 2026 game played any part in choosing it.
+- This read spends the last clean NFL pregame set: weeks 1-8 of 2026, the 11-03 pull.
+
+**The read, unchanged from the registration (v1 ## Gates, `hold.py`).**
+- NFL 2026 wk1-8, the private root `C:\tmp\football_scenarios\nfl_root_2026`, 121 games, 1000 seeds a game.
+- Arms: `off` (production) and `v3h0.03_t0.825`. Paired by game, game bootstrap (2000 reps, seed 3).
+- **HB-ML / HB-TOT / HB-SPR:** each FAILS only if the candidate is SHOWN worse, i.e. the CI lower bound > 0 or the
+  point > +0.003.
+- The prediction is unchanged (V3-P6): all three deltas inside +-0.003, none shown worse.
+- Reported, not gating: margin and total MAE against the result, and |sim - close| for margin and total.
+
+**Decision rule after the read.**
+- **If all three pass:** the candidate's values are recorded and handed to the user, WITH the FIT FAIL-as-registered
+  stated beside them.
+  - Shipping is a profile change plus a fleet load, and the user's call.
+  - The market test after any load is the segment re-grade (#752 / #805).
+- **If any gate fails:** nothing ships, and #808 stays open.
+- **Either way:** no further candidate is read on this set.
