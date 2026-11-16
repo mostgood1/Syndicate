@@ -790,6 +790,14 @@ death, never life — do not invert it.
 - Verification: unit tests (copy retried without recompress; ext4 staging default on WSL; env override wins); one-off re-archive of the 11-16 snapshot with ext4 staging succeeds; next 3 nightly runs log no FAILED
 - Blocked by: none
 
+### nfl-live-possession-map — OPEN — opened 2026-11-16 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: todo #813 part 1: the NFL live re-sim resumes from ESPN's real drive state instead of a marginalised fresh drive at the 25 -- scripts/_nfl_live_resim_tick.normalise_live_row maps situation.possession (team id -> home/away), down / distance (NCAAF's -1 handling) and field position (from ESPN's own possessionText / downDistanceText, independent of the unverified yardLine frame); tests incl. reachability (a row with a situation reaches the engine: possession_marginalised False, and off != on); the mapping checked against tonight's MNF payloads read-only before any load; on main; the fleet load and its before/after reading are the user's call
+- Files: scripts/_nfl_live_resim_tick.py, syndicate/features/nfl/live_game_state.py, scripts/run_refresh_worker.py (one NFL_LIVE_SITUATION tally print after build_live_index ONLY), tests/test_nfl_live_resim_tick.py, tests/test_nfl_live_game_state.py
+- Hypothesis: Stated 2026-11-16 9:32 AM CST (15:32Z) before any NFL situation payload is read: ESPN's NFL scoreboard situation carries possession (a team id), down, distance and a possessionText like 'BAL 35' on most in-progress games; mapped, the live re-sim stops losing ~1.5 Q4 points per resume (probe 7: true state -0.06 vs marginalised -1.47)
+- Falsification test: (a) on tonight's MNF fewer than half the in-progress scoreboard reads carry both possession and a parseable possessionText/downDistanceText; (b) the text-derived field position disagrees with ESPN's own downDistanceText on any read; (c) a test shows the mapped state does not reach resim_live_game (possession_marginalised stays True)
+- Verification: pytest on the touched tests; a read-only MNF watcher (ESPN scoreboard every ~2 min, 7:15-10:30 PM CST) logging each situation block, the mapped state, and which yardLine frame agrees with the text; results in the findings; after a user-approved load, the share of live_resim evidence rows with possession_marginalised False
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
