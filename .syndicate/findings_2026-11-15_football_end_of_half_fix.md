@@ -1044,3 +1044,64 @@ scope. The optional Q4 end-game TD share from the v2 write-up is NOT in v3.
   - The market test after any load is the segment re-grade (#752 / #805).
 - **If any gate fails:** nothing ships, and #808 stays open.
 - **Either way:** no further candidate is read on this set.
+
+
+## V3 HELD-OUT RESULTS (under the user override) — 2026-11-15, arms run 19:21-20:38 CST (run log), written 20:39 CST
+
+### Verdict: PASS. On NFL 2026 wk1-8 the candidate is not shown worse than production on any of the three Brier gates.
+
+**Setup.**
+- Candidate `v3h0.03_t0.825`: `full3` + `home_field_bonus` 0.03 + `touchdown_weight_multiplier` 0.825, the R2 point
+  named by the override above.
+- Production: `off`.
+- 121 games (all real, all with a close), 1000 seeds a game in both arms. Paired by game, game bootstrap (2000 reps,
+  seed 3). Run by `hold.py`.
+
+| gate | cand - prod | 95% CI | n | Brier prod / cand | verdict |
+|---|---|---|---|---|---|
+| HB-ML (home win) | -0.0023 | [-0.0067, +0.0023] | 120 (1 tie dropped) | 0.2378 / 0.2356 | PASS |
+| HB-TOT (P over the close total) | +0.0021 | [-0.0027, +0.0066] | 121 | 0.2996 / 0.3017 | PASS (inside +0.003; the CI straddles 0) |
+| HB-SPR (P home covers the close) | -0.0027 | [-0.0070, +0.0018] | 115 (6 pushes dropped) | 0.2655 / 0.2628 | PASS |
+
+**Reported, not gating** (cand - prod, 95% CI):
+- margin MAE against the result: -0.055 [-0.176, +0.071];
+- total MAE against the result: -0.073 [-0.196, +0.046];
+- |sim margin - close spread|: +0.035 [-0.085, +0.159];
+- **|sim total - close total|: -0.266 [-0.374, -0.151]**. The candidate's total sits closer to the market's close.
+- Mean projections on the set: total 44.12 -> 43.96; home margin +1.33 -> +0.87.
+
+**Reading.**
+- V3-P6 held: every delta is inside +-0.003, and none is shown worse.
+- **Moneyline and spread improve in point estimate; the total is a hair worse. None of the three is significant
+  either way.** At n = 115-121 the read can rule out "worse by more than ~0.007" and no more.
+- The one significant reading is the total's distance to the close (-0.27 points).
+- **Context, not new, outside this change:** both arms score worse than a constant 0.5 on HB-TOT (0.30) and HB-SPR
+  (0.27). Production's disagreements with the closing total and spread lose on this set, and the candidate does not
+  change that by a detectable amount.
+
+### Where #808 stands
+
+- **By the lane's goal text, MET at the override candidate:**
+  - each quarter, and Q2's last-120 s points and snaps, inside the league's CIs, with H1 > H2;
+  - the held-out no worse on ML / total / spread;
+  - the NCAAF arms run;
+  - the mechanism and tests on a branch.
+- **Stated beside it:**
+  - as registered, v3's FIT verdict is FAIL. G5 (added in v2) reads 3.01 at R3's candidate (hfb 0.06); at this
+    candidate it reads 2.94;
+  - the candidate was named after the FIT read, by a logged user override.
+
+**NOT done, and owed before any load (the user's calls):**
+1. **Push the code to main.** All switches are default OFF and byte-identical, so the push changes nothing on the
+   fleet.
+2. **The live input gap (model engine standard: an unfed input).**
+   - `SmartSim2SimulationInput.initial_timeouts_home/away` are fed by NOTHING.
+   - With `end_of_half_clock` ON, every live resume assumes 3 timeouts each, which is wrong late in a half.
+   - Before the profile goes live for in-game sims, the live producers must pass real timeouts left, or the clock
+     must stay pregame-only.
+3. **The profile load.** NFL production profile: the seven switches ON, `home_field_bonus` 0.03,
+   `touchdown_weight_multiplier` 0.825.
+   - A fleet load behind claims and preflight.
+   - The market test after it is the segment re-grade (#752 `scripts/nfl_segment_skill.py`, and #805).
+4. **NCAAF stays OFF.** Its held-out seasons are spent, so switching it on needs its own held-out design.
+5. **The engine files are on LOAN** from `football-scenario-calibration`. Return them, or keep them for items 2-3.
