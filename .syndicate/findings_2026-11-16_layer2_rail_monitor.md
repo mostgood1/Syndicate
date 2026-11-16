@@ -97,3 +97,20 @@ Times are Central (CST) unless marked Z.
 
 **Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
 **Restarts:** live-odds-worker pid unchanged (2834332).
+
+## Reading 4 — Mon 11-16 3:00 PM CST (21:00Z)
+
+1 live chip: FAMU @ UTEP, "END H2" (end of regulation). The 3 PM WNCAAB tip is not live on its chip
+yet.
+
+**Readings:**
+- **0 flags.** 0 false, 0 missed, 0 dark.
+- 3 live rows, all at the break: 0 priced <= 120 s; seen age at pricing p50 52 s.
+- NCAAB overlay: 76 builds in 60 min, gap p50 46 s, max 97 s. 7 zero-card builds with rows, at
+  the game's end.
+- 0 `deferred_slow`.
+- Web merges: ncaab fresh 58 / 58. nfl and wncaab stale (no live games).
+- **Load:** query 10.5 s / 57.5 MB. Shortlist 0.9 s (371 s old).
+
+**Teams:** 0 chip-less, all detectors 0.
+**Restarts:** live-odds-worker pid unchanged (2834332).
