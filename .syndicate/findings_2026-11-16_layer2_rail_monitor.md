@@ -180,3 +180,49 @@ kickoff.
 - **Open question for the user (product):** should the rail's live lines include lines below the
   board's value floor? The overlay also feeds the board's live rows, so it is not only a rail
   change. **Not changed.**
+
+### Instrumentation landed — `146f956cb` on main, NOT loaded (~4:13 PM CST)
+
+- `book_grid_artifact.py` is held by lane `nba-overlay-card-cost`. It lent 3 logging-only regions
+  (LOAN NOTE `4fe82f7b8`; loan taken `270da640a`).
+- `_build_inplay_overlay` now keeps `select_shortlist`'s result. The overlay gains
+  `shortlist_refused`: positive `rows_*` refusal counts. Budgets, sizes, admissions and per-sport
+  dicts are excluded.
+- `INPLAY_OVERLAY` gains one token, `refused={...}`, last on the line: for example
+  `refused={"rows_below_value_floor":5}`. It reads `refused={}` when nothing was refused, so the
+  line also proves the branch ran.
+- Selection is unchanged.
+- Tests: `tests/test_inplay_overlay_shortlist_counters.py`, 13 tests, including:
+  - off != on;
+  - a guard that the real `select_shortlist([])` maps to `{}`;
+  - the lender's `lookups_*` pair staying adjacent.
+  153 passed across the 8 overlay test files.
+- **Load: the user's call.** The lender asks that no refresh-worker restart happen before 05:00Z
+  11-17 (11 PM CST) without telling it: it confounds tonight's NBA reading and per-thread
+  sampler. Until a load, the cause stays known only from the 4:25 PM replay, not from the log.
+
+## Reading 6 — Mon 11-16 4:08 PM CST (22:08Z)
+
+**Slate:** 2 live chips, both WNCAAB:
+- Penn State @ Arizona State, Q3 9:15;
+- Lamar @ Texas A&M, Q1 6:58.
+
+**Readings:**
+- **0 flags.** 0 false, 0 missed, 0 dark.
+- **Live rows:** live-rail serves **13-16 WNCAAB rows**, all main markets, phase 1H in the probe's
+  token parse. Priced age p50 194 s; 2 of 13 priced <= 120 s; 2 aged > 300 s now. Markets with our
+  price: 0 of 2 (the join withheld the model price).
+- **WNCAAB overlay (last 15 min):** 21 builds, gap p50 39 s, max 67 s. **15 of 21 zero-card with
+  rows; 6 carried cards.** So the zero-card overlay is not total: a line whose market EV clears the
+  -2% floor reaches the rail.
+- **Web merges:** wncaab fresh 6 / 6.
+- **Load:**
+  - `/intelligence` 1.5 s / 21.2 MB.
+  - **Query 20.4 s** / 59.3 MB (10.5 MB wire), the slowest today; one sample.
+  - Shortlist 1.1 s; chips 0.2 s; live-rail 0.03 s.
+- **Board:** build 208 s old; shortlist written 249 s ago; query snapshot 1,217 s old.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. No live chip
+without a live card.
+
+**Restarts:** none. live-odds-worker pid 2834332.
