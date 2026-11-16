@@ -1328,3 +1328,5 @@ Raw data:
 1. Slow-sport rule for NFL + NBA: chase the contention, or leave it.
 2. Start the NFL shard fix session before MNF.
 3. The Render session's D5 / D2' / D3'.
+
+Published for the user as an Artifact, "Rail Watch, Sun Nov 15": https://claude.ai/artifact/BJwFByJoeonxBCHPeRTnP7 (private). The monitor loop is stopped for the night, pending the user's call on next-day monitoring.
