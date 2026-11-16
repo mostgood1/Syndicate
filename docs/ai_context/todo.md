@@ -1,5 +1,14 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#815` — **THE LIVE BOOK HAS NO MEASURED EDGE, SO LIVE STAKES DO NOT SCALE YET: the last 30 days are −7.3 ± 2.8% net of fees on $3,006.48 (1,526 bets / 641 events, z −1.72 on excess wins over the fill price), and the "solid week" is +0.7 ± 5.0%; the win rate (57-59%) sits BELOW the breakeven win rate of the prices paid (58-59%). Same-book CLV is +1.32% while the same 546 bets settle z −3.35, so CLV cannot gate a scale-up until reconciled. The biggest-stake quartile carries 63% of dollars and loses −9.2%** `[2026-11-16, lane portfolio-edge-measurement, session 69d80317; user asked "when can we start to increase investments"]`
+- **Evidence:** `.syndicate/findings_2026-11-16_live_book_edge_readout.md`. Source: the fleet's `/api/portfolio/live?on=all`, read 15:50Z 11-16.
+- **Scale-up gate:** PROPOSED in the findings, NOT approved. It needs ≥ 800 forward events at a frozen policy, a 95% lower bound > 0, same-book CLV agreeing with results, and the top stake quartile no worse than flat. The user decides.
+- **Next, in this lane:**
+  - (1) Reconcile same-book CLV against settled results on venue contracts (side / `held_side` / unit / fee).
+  - (2) Promote the readout to `scripts/live_book_edge_readout.py` with a test pinning these numbers.
+  - (3) Find why stake concentrates in the losing top quartile (stated EV 4-7% realises about −5%; see `#704`).
+- **Per-LINE only:** NCAAB (z −3.45) and totals (z −2.11) are evidence for per-line fixes, never a market switch (learnings line 1056).
+
 ### `#814` — **LIVE PLAYER-EXIT GATE: a key player gone mid-game refuses that game's live gamelines and the player's live props, and holds in-play entries, in every live sport** `[2026-11-15, lane live-player-exit-gate, user "Yes, build it"]`
 - **STATUS 11-16 (9:55 AM CST):** built and on main for NFL (`key_player_out` + the replaced-QB rule), NCAAF, NBA (an engine-modelled foul-out stays PRICED, user 11-16 "No, keep pricing") and WNBA (`a35882905`: the linear lens's lanes are re-stamped `player_exit_refused`; out players' props `notPricedReason=player_out`; `wnba` in the entry hold).
 - **Loaded on the fleet:** NFL + NCAAF (refresh-worker since 01:28:28Z 11-16; NCAAF holds on live-odds-worker since 01:44:49Z). NBA: ff to `09925a4b1` 15:30:37Z 11-16, live at live-odds-worker's ~18:15Z self-recycle (watcher running). WNBA: on main only; off-season, so nothing to load until the 2027 opener (an ff carries it harmlessly).
