@@ -68,6 +68,30 @@ def refresh_prior_calibrations(leagues: list[str], now: dt.datetime | None = Non
     return out
 
 
+def refresh_total_calibrations(leagues: list[str], now: dt.datetime | None = None, *, refit: object = None) -> dict[str, str]:
+    """#816: once a day after 11:00Z per league, refit the per-line college TOTALS calibration (pregame + live) on the
+    trailing window, the same rule as the prior's. Never raises: a failed fit leaves the newest file in force."""
+    from syndicate.features.college_basketball import total_prob_calibration as tpc
+    from syndicate.features.ncaab import live_team_model as tm
+
+    moment = now or dt.datetime.now(dt.timezone.utc)
+    if moment.hour < 11:
+        return {league: "before_11z" for league in leagues}
+    today = moment.date()
+    out: dict[str, str] = {}
+    for league in leagues:
+        if tpc.calibration_path(league, tm.espn_season_for(today), today - dt.timedelta(days=1)).exists():
+            out[league] = "already_today"
+            continue
+        try:
+            (refit or tpc.refresh)(league, today=today)  # type: ignore[operator]
+            out[league] = "refitted"
+        except Exception as exc:  # noqa: BLE001 -- one league's failed fit must not stop the sims
+            print(f"[college_total_calibration] FIT_FAILED league={league} {type(exc).__name__}: {exc}"[:300], flush=True)
+            out[league] = "failed"
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     from syndicate.features.college_basketball.pregame_sim import LEAGUES, default_sims, run_pregame_sims
 
@@ -86,6 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         refresh_womens_inputs()
     if args.refresh_inputs:
         refresh_prior_calibrations(leagues)
+        refresh_total_calibrations(leagues)
     deadline = time.monotonic() + max(1.0, float(args.budget_seconds))
     for date_iso in [d.strip() for d in args.dates.split(",") if d.strip()]:
         for league in leagues:

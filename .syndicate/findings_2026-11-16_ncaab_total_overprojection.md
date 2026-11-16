@@ -62,3 +62,30 @@ close on prior is unbiased per bucket, as built.
   holdout Brier / log loss vs the raw model and vs the market before any load.
 - `ncaab-live-edge20-prereg` (the |edge| >= 20 pp cell, rated ~11-25) reads live NCAAB total edges: a load changes its
   population, so a load splits that test at the load time.
+
+## Build (user "Spread + level", 2026-11-16) — todo #816
+
+- **Form:** `logit p = logit p_mkt + a + c (logit p_raw - logit p_mkt)` per college full-game total line, pregame and
+  live; a and c fitted per league x phase on graded games (trailing 21 days, floor 11-11), refit daily after 11:00Z by
+  the pregame child, served only when the phase's walk-forward (>= 40 games) beats the raw model and is no worse than
+  the market. Module `syndicate/features/college_basketball/total_prob_calibration.py`; switch
+  `SYNDICATE_COLLEGE_TOTAL_CALIBRATION=off`.
+- **The module's own fit on the fleet (read-only, as of 11-16):**
+
+  | league / phase | a (level) | c (share) | games | walk-forward Brier market / raw / calibrated (games) |
+  |---|---|---|---|---|
+  | NCAAB live | -0.37 +- 0.14 | 0.23 +- 0.19 | 212 | 0.2295 / 0.2367 / **0.2197** (168) |
+  | NCAAB pregame | -0.39 +- 0.14 | 0 (clamped from -0.05) | 222 | 0.2500 / 0.2804 / **0.2407** (174) |
+  | WNCAAB live | +0.21 +- 0.26 | 0.29 +- 0.38 | 63 | held: walk-forward 20 games < 40 |
+  | WNCAAB pregame | +0.02 +- 0.23 | 0 | 74 | held: walk-forward 29 games < 40 (and 0.2608 > market 0.2500) |
+
+- **FAMU @ UTEP under the fit:** live 2nd-half row (engine 0.70 at 136.5, market 0.497) -> ~0.46, inside its own error:
+  no flag. Pregame at the 142.5 close -> ~0.40 over: an under lean.
+- **Team-level input (user question):** each team's earlier (final - close) this season does not predict its next
+  game's: b = +0.04 +- 0.11 (396 games); with >= 2 prior games each +0.17 +- 0.20 (202); >= 3, -0.15 +- 0.24 (48).
+  FAMU's three earlier games had gone OVER the close (+22.5, +1.5, +7.5), so a team-tendency term would have pushed
+  this game further over. The team model already feeds the prior (raw prior 140 here, the lowest number in play).
+  Re-test at ~8 games a team (~mid-December).
+- **Money paths at load:** pregame execution is live and armed (band 0.40-0.75, cell gate on). Kalshi lists NCAAB
+  moneylines only; Polymarket lists some NCAAB totals, so a calibrated NCAAB under can reach a real Polymarket order
+  through the portfolio's gates. In-game live entries trade NHL spreads only.

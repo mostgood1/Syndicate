@@ -471,6 +471,11 @@ def build_records(
                 # with `prob_scale` None was written before that, one with a value after it). h2h stays None.
                 "prob_scale": lg.get("prob_scale"),
                 "model_home_win_prob_unscaled": lg.get("model_prob_unscaled"),
+                # #816 (lane ncaab-total-overprojection, still v7: a row carries `total_cal` only when one was applied):
+                # the college totals calibration's stamp and the engine's number before it, so `model_home_win_prob`
+                # is the CALIBRATED probability on such a row and the daily refit reads the engine's, never its own.
+                "model_home_win_prob_uncalibrated": lg.get("model_prob_uncalibrated"),
+                "total_cal": lg.get("total_calibration"),
                 "sims_run": lg.get("sims_run"),
                 "live_state_as_of": lg.get("as_of"),
                 "carried_forward": bool(lg.get("carried_forward")),

@@ -1327,6 +1327,30 @@ def full_game_prob_scale(market: Any, segment: Any, sport: Any, *, anchored: boo
     return 1.0
 
 
+# COLLEGE TOTALS, CALIBRATED PER LINE (`#816`, lane ncaab-total-overprojection; user 2026-11-16 "Spread + level").
+# The fitted level and share of the model's disagreement (`college_basketball.total_prob_calibration`, refit daily on
+# graded games) for a college FULL-GAME total row; None for every other sport, market or segment, and when the switch
+# is off or no fit exists, which serves the row exactly as before. Never raises: a broken read prices raw, by name.
+_COLLEGE_TOTAL_SPORTS = frozenset({"ncaab", "wncaab"})
+
+
+def college_live_total_calibration(market: Any, segment: Any, sport: Any, commence_time: Any = None) -> Any:
+    league = str(sport or "").strip().lower()
+    if (league not in _COLLEGE_TOTAL_SPORTS or str(market or "").strip().lower() not in _TOTALS_MARKETS
+            or str(segment or "").strip().lower() not in _FULL_GAME_SEGMENTS):
+        return None
+    try:
+        from syndicate.features.college_basketball import total_prob_calibration as tpc
+        from syndicate.features.shared.timezone import central_date_from_iso
+
+        game_date = (central_date_from_iso(commence_time) if commence_time else None) \
+            or central_date_from_iso(datetime.now(timezone.utc).isoformat())
+        return tpc.calibration_for(league, "live", game_date)
+    except Exception as exc:  # noqa: BLE001 -- pricing must go on
+        print(f"[live_gameline_join] COLLEGE_TOTAL_CALIBRATION_ERROR {type(exc).__name__}: {exc}"[:240], flush=True)
+        return None
+
+
 def scale_prob(probability: float, scale: float) -> float:
     """Phi(Phi^-1(p) / k); p itself when k is 1 or p is not strictly inside (0, 1)."""
     if scale == 1.0 or not (0.0 < probability < 1.0):
@@ -1355,6 +1379,7 @@ def price_distribution_market(
     sigma: float = PRICEABLE_SIGMA,
     sport: Any = None,
     prob_scale: float = 1.0,
+    total_calibration: Any = None,
 ) -> dict[str, Any]:
     """Price a live TOTALS or SPREADS row off the re-sim's own histogram.
 
@@ -1390,6 +1415,9 @@ def price_distribution_market(
         # a refused verdict keeps the priced one's shape.
         "prob_scale": None,
         "model_prob_unscaled": None,
+        # #816 college totals calibration: set only when one was applied (the engine's number, and the fit's stamp).
+        "model_prob_uncalibrated": None,
+        "total_calibration": None,
     }
     if not isinstance(dist, Mapping) or not dist:
         out["withheld_reason"] = REASON_NO_LIVE_DISTRIBUTION
@@ -1466,6 +1494,18 @@ def price_distribution_market(
             out["prob_std_err"] = std_err
             model_prob = scale_prob(float(model_prob), prob_scale)
             out["model_prob"] = model_prob
+    # #816 COLLEGE TOTALS, CALIBRATED PER LINE (`college_live_total_calibration`): after the point estimator and k, the
+    # fitted level plus the fitted share of the model's disagreement with THIS line's market. Its error -- the sim's,
+    # carried through, plus the fit's own -- replaces the sim's for the precision gate below, so a level the data
+    # barely supports cannot clear the gate by itself.
+    if total_calibration is not None and key in _TOTALS_MARKETS:
+        engine_prob = float(model_prob)
+        out["model_prob_uncalibrated"] = engine_prob
+        out["total_calibration"] = total_calibration.stamp()
+        std_err = total_calibration.std_err(engine_prob, market_p, std_err)
+        out["prob_std_err"] = std_err
+        model_prob = total_calibration.apply(engine_prob, market_p)
+        out["model_prob"] = model_prob
     edge = _edge_pp(float(model_prob), market_p)
     out["edge_pp"] = round(edge, 2)
     # THE SAME BAR AS THE MONEYLINE, deliberately. A histogram answers "what is
@@ -2588,6 +2628,8 @@ def attach_live_gamelines(
                     # #780: full-game totals and spreads only, the populations the scales were fitted on.
                     prob_scale=full_game_prob_scale(market_key, segment, sport,
                                                     anchored=bool(hit.get("margin_anchored"))),
+                    # #816: college full-game totals only; None everywhere else.
+                    total_calibration=college_live_total_calibration(market_key, segment, sport, row.get("commence_time")),
                 )
             # A DISPLAY-ONLY HISTOGRAM IS NOT A PRICE (`#773`, NHL puck line). The row keeps the pricer's own
             # no-distribution refusal -- no model probability, so `_apply_verdict` publishes no

@@ -65,10 +65,15 @@ def margin_model_weight() -> float:
         return 0.0
 
 
-def _served(prob: float, row: Mapping[str, Any], market: str) -> tuple[float, dict[str, Any]]:
-    """(served probability, stamp). Margin markets blend toward the de-vigged fair; totals pass through."""
+def _served(prob: float, row: Mapping[str, Any], market: str, *, league: str | None = None,
+            game_date: str | None = None, segment: str = "full") -> tuple[float, dict[str, Any]]:
+    """(served probability, stamp). Margin markets blend toward the de-vigged fair; a FULL-GAME total takes the
+    league's fitted per-line calibration (`#816`, `college_basketball.total_prob_calibration`) when one exists;
+    everything else passes through."""
     meta: dict[str, Any] = {"p_model_raw": round(float(prob), 4)}
     if market not in {"spreads", "h2h"}:
+        if market == "totals" and segment == "full" and league and game_date:
+            return _served_total(prob, row, league, game_date, meta)
         meta["book_blend"] = "not applied: totals served raw"
         return prob, meta
     fair = _no_vig_over_probability(row)
@@ -81,6 +86,34 @@ def _served(prob: float, row: Mapping[str, Any], market: str) -> tuple[float, di
     meta.update(book_blend="applied", book_blend_w=weight, p_book=round(float(fair), 4),
                 book_blend_basis="college margin: prior calibrated daily; no information beyond the close (+0.04, 116 games, 2026-11-03)")
     return blend_with_book(float(prob), float(fair), weight), meta
+
+
+def _served_total(prob: float, row: Mapping[str, Any], league: str, game_date: str,
+                  meta: dict[str, Any]) -> tuple[float, dict[str, Any]]:
+    """#816 (lane ncaab-total-overprojection; user "Spread + level"): a full-game total's P(over) is the line's market
+    probability plus the league's fitted pregame level plus the fitted share of the sim's disagreement with it.
+    Measured 11-02..11-16 (621 NCAAB games): the sim's distance from the close carried no information (slope 0.017 +-
+    0.129) and finals landed 2.2 under the close; walk-forward Brier market 0.2500, raw 0.2798, calibrated 0.2407.
+    No fit, no two-sided price, or the switch off: served raw, by name, as before."""
+    from datetime import date as _date
+
+    from syndicate.features.college_basketball import total_prob_calibration as tpc
+
+    try:
+        cal = tpc.calibration_for(league, "pregame", _date.fromisoformat(str(game_date)))
+    except Exception as exc:  # noqa: BLE001 -- the board must still build
+        meta["book_blend"] = f"not applied: totals served raw (total calibration unreadable: {type(exc).__name__})"
+        return prob, meta
+    if cal is None:
+        meta["book_blend"] = "not applied: totals served raw (no total calibration in force)"
+        return prob, meta
+    fair = _no_vig_over_probability(row)
+    if fair is None or not (0.0 < float(fair) < 1.0):
+        meta["book_blend"] = "not applied: totals served raw (no two-sided book price for this line)"
+        return prob, meta
+    served = cal.apply(float(prob), float(fair))
+    meta.update(book_blend="total_calibration", p_book=round(float(fair), 4), total_calibration=cal.stamp())
+    return served, meta
 
 
 def _segment(value: Any) -> str:
@@ -177,7 +210,7 @@ def _project_row(row: Mapping[str, Any], market: str, segment: str, entry: Colle
         projection.pop("edge_unavailable_reason", None)
         projection.pop("market_fair_prob_over", None)
     if prob is not None:
-        prob, meta = _served(prob, row, market)
+        prob, meta = _served(prob, row, market, league=entry.league, game_date=entry.slate_date, segment=segment)
         projection.update(meta)
         _attach_sim_probability_edge(projection, row=row, model_prob=prob)
     return projection, None
