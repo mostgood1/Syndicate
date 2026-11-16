@@ -359,3 +359,60 @@ live card.
 **Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated.
 
 **Restarts:** live-odds-worker pid 2834332 and refresh-worker pid 2809282, both unchanged.
+
+## Reading 9 — Mon 11-16 5:20 PM CST (23:20Z)
+
+**Slate:** 7 live chips.
+- NCAAB: Iona @ UMBC H1 11:01; Alcorn State @ Maryland H1 13:17.
+- WNCAAB: Lamar @ Texas A&M Q3 1:49, plus four games in Q1 (Arkansas-Pine Bluff @ UL Monroe,
+  NC Central @ VCU, Robert Morris @ Duquesne, Bryant @ Holy Cross).
+
+**Flags: 5 shown on 2 cards (10 qualifying rows, all NCAAB 1H). 0 false, 0 missed, 0 dark.**
+
+| game | market | side | model | fair | gap | our line | priced |
+|---|---|---|---|---|---|---|---|
+| Alcorn St @ Maryland | full total | u151.5 | 60.8% | 49.9% | 10.9 pp | 148.3 | 91 s |
+| Alcorn St @ Maryland | 1H total | u70.5 | 67.2% | 49.2% | 18.0 pp | 67.2 | 62 s |
+| Iona @ UMBC | full total | o141.5 | 60.3% | 50.0% | 10.3 pp | 145.4 | 42 s |
+| Iona @ UMBC | moneyline | UMBC | 38.5% | 29.9% | 8.6 pp | — | 80 s |
+| Iona @ UMBC | 1H total | u68 | 61.3% | 50.0% | 11.3 pp | 67.2 | 63 s |
+
+- Iona @ UMBC carries a full-game OVER and a 1H UNDER together. They are not contradictory: our
+  lines imply ~78 second-half points.
+- All 5 are graded on the finals tonight with flag 1.
+
+**Live rows:** 55 (NCAAB 53, WNCAAB 2), all main markets.
+| sport | phase | rows | priced <= 120 s | priced age p50 | seen at pricing p50 / p90 |
+|---|---|---|---|---|---|
+| NCAAB | 1H | 53 | 24 | 134 s | 87 s / 270 s |
+| WNCAAB | 2H (Lamar @ A&M) | 2 | 1 | — | — |
+
+- 9 rows older than 300 s now. 2 of 12 markets carry no price of ours.
+- Live-rail: 53 rows on 3 reads.
+- **The four Q1 WNCAAB games serve 0 live-rail rows** (WNCAAB `rows_inplay_last` 9; 5 of 29
+  overlay builds zero-card with rows). This fits the decided value floor, or no in-play quote yet
+  this early. Not followed; re-check at the next reading.
+
+**Overlay (22 min), all 0 over 360 s:**
+| sport | builds | gap p50 | gap max | zero-card with rows |
+|---|---|---|---|---|
+| WNCAAB | 29 | 44 s | 76 s | 5 |
+| NCAAB | 24 | 47 s | 75 s | 0 |
+
+**Builds:**
+- NCAAB p50 4.0 s, p90 17.2 s, max 24.9 s; WNCAAB p50 0.7 s.
+- NFL 5.5 / 7.5 s; NBA 4.4 s (pregame); NHL 0.7 s; soccer 4.6 / 11.7 s.
+- 0 `deferred_slow`. Tick gap p50 26 s, max 110 s.
+
+**Web merges:** wncaab fresh 18 / 18; ncaab fresh 16 / 18 (2 stale); nfl stale 18 / 18.
+
+**Load:**
+- **Query 9.2 s** / 63.6 MB. Gunicorn workers were 104 s and 1,315 s old at the read, with no
+  recycle during the probe.
+- Shortlist 0.6 s; chips 0.05 s; live-rail 0.05 s.
+- **Board:** build 62 s old; shortlist written 92 s ago.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 7 live chips have
+a live card.
+
+**Restarts:** live-odds-worker pid 2834332 and refresh-worker pid 2809282, both unchanged.
