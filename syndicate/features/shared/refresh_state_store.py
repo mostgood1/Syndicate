@@ -30,6 +30,7 @@ from urllib.parse import urlsplit
 
 from syndicate.features.shared.timezone import normalize_timestamped_payload
 from syndicate.features.shared.source_roots import repo_root_from
+from syndicate.features.shared.build_lookup_scope import scoped_lookup
 
 
 REPO_ROOT = repo_root_from(__file__)
@@ -506,7 +507,10 @@ def record_refresh_state(step_name: str, input_hash: str, *, outputs: list[str] 
 def data_root() -> Path:
     override = str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip()
     if override:
-        return Path(override).expanduser().resolve()
+        # Once per build inside a per-build lookup scope (todo #790): `resolve()` lstat's every component of the
+        # path, and the in-play overlay's cards ask for the data root ~5,000 times a build (24,280 lstat calls
+        # measured 2026-11-16), each one a GIL hand-off to the board loop. Outside a scope, resolved every call.
+        return scoped_lookup("data_root", override, lambda: Path(override).expanduser().resolve())
     if _strict_hosted_storage_enabled():
         raise RuntimeError("SYNDICATE_DATA_ROOT must be set when hosted storage is required.")
     return REPO_ROOT / "data"

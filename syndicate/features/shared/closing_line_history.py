@@ -30,6 +30,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any, Iterable
 
+from syndicate.features.shared.build_lookup_scope import scoped_stat_signature
 from syndicate.features.shared.prop_evidence.common import data_root
 
 _LOCK = threading.Lock()
@@ -100,11 +101,11 @@ def _parse(path: Path) -> dict[tuple[str, str, str], float | None]:
 
 def _index(day: str) -> dict[tuple[str, str, str], float | None]:
     path = _path(day)
-    try:
-        stat = path.stat()
-    except OSError:
+    # Once per day's file per build inside a per-build lookup scope (todo #790): the in-play overlay asks per
+    # card per past date, 7,664 stats a build measured 2026-11-16. A fresh stat every call outside one.
+    stamp = scoped_stat_signature(path)
+    if stamp is None:
         return {}
-    stamp = (int(stat.st_mtime_ns), int(stat.st_size))
     key = str(path)
     with _LOCK:
         hit = _CACHE.get(key)

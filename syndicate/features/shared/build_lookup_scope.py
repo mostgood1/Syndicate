@@ -22,6 +22,16 @@ next build looks every file up again, so a rewritten blend file or scoreboard is
 as before. Inside a build, every row now sees the same answer; before, a file rewritten mid-build could give
 the rows before and after the rewrite different answers.
 
+THE IN-PLAY OVERLAY TOO (lane nba-overlay-card-cost, 2026-11-16). The overlay is built on the same main thread
+right after the grid is written, outside the grid's scope, so it now opens its own (`build_inplay_overlay`). Its
+card builder checks files once per card or per side rather than once per row: measured offline on the 11-16 NBA
+grid, a warm 2,000-card build made 47,565 stat and 2,376 scandir calls -- the data root's `resolve()` behind the
+calibration profile path (24,280), the closing-line index stat (7,664), the NBA odds root's `resolve()` (6,776),
+the calibration profile's stat signature (4,856), the team-results glob and stat (2,376 + 2,376). Beside one busy
+thread that build took 139.9 s against 3.6 s alone; answering each path once per build took it to 6.1 s, with the
+same cards. `scoped_stat_signature` is the shared once-per-build stat; `scope_counts` reports how many asks a scope
+computed and how many it answered from the memo, which the INPLAY_OVERLAY line prints.
+
 OFF SWITCH: SYNDICATE_BUILD_LOOKUP_SCOPE=off makes `lookup_scope()` a no-op, so every lookup resolves on every
 call, as before.
 """
@@ -36,7 +46,19 @@ T = TypeVar("T")
 
 FLAG = "SYNDICATE_BUILD_LOOKUP_SCOPE"
 
-_SCOPE: ContextVar[dict[tuple[str, Hashable], Any] | None] = ContextVar("build_lookup_scope", default=None)
+
+class _Memo(dict):
+    """A scope's answers, plus how many asks it computed (`misses`) and answered from memory (`hits`)."""
+
+    __slots__ = ("hits", "misses")
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.hits = 0
+        self.misses = 0
+
+
+_SCOPE: ContextVar[_Memo | None] = ContextVar("build_lookup_scope", default=None)
 
 
 def lookup_scope_enabled() -> bool:
@@ -54,11 +76,17 @@ def lookup_scope() -> Iterator[None]:
     if _SCOPE.get() is not None or not lookup_scope_enabled():
         yield
         return
-    token = _SCOPE.set({})
+    token = _SCOPE.set(_Memo())
     try:
         yield
     finally:
         _SCOPE.reset(token)
+
+
+def scope_counts() -> tuple[int, int] | None:
+    """(computed, answered from memory) so far in this thread's scope; None outside one (or when off)."""
+    memo = _SCOPE.get()
+    return None if memo is None else (memo.misses, memo.hits)
 
 
 def scoped_lookup(namespace: str, key: Hashable, compute: Callable[[], T]) -> T:
@@ -68,7 +96,24 @@ def scoped_lookup(namespace: str, key: Hashable, compute: Callable[[], T]) -> T:
         return compute()
     slot = (namespace, key)
     if slot in memo:
+        memo.hits += 1
         return memo[slot]
     value = compute()
     memo[slot] = value
+    memo.misses += 1
     return value
+
+
+def _stat_signature_now(path: str) -> tuple[int, int] | None:
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return None
+    return (int(stat.st_mtime_ns), int(stat.st_size))
+
+
+def scoped_stat_signature(path: Any) -> tuple[int, int] | None:
+    """`(st_mtime_ns, st_size)` of `path`, or None when it cannot be stat'ed (absent counts: an absent file stays
+    absent for the rest of the build). Once per path per build inside a scope; a fresh `os.stat` outside one."""
+    key = os.fspath(path)
+    return scoped_lookup("stat_signature", key, lambda: _stat_signature_now(key))

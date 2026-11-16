@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import functools
 import json
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
+from syndicate.features.shared.build_lookup_scope import scoped_lookup
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import data_root
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -24,6 +26,24 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _once_per_build(resolver: Callable[[str], Path]) -> Callable[[str], Path]:
+    """The sport's odds root, resolved once per build inside a per-build lookup scope (todo #790).
+
+    Every branch of `current_odds_root_for_sport` ends in a `resolve()` that lstat's each path component, and the
+    in-play overlay's NBA cards ask ~1,000 times a build (6,776 lstat calls measured 2026-11-16), each a GIL
+    hand-off to refresh-worker's board loop. Outside a scope, resolved every call, as before; an unsupported
+    sport still raises (an exception is never remembered). `wraps` keeps `inspect.getsource` on the resolver.
+    """
+
+    @functools.wraps(resolver)
+    def once(sport_slug: str) -> Path:
+        slug = str(sport_slug or "").strip().lower()
+        return scoped_lookup("current_odds_root", slug, lambda: resolver(sport_slug))
+
+    return once
+
+
+@_once_per_build
 def current_odds_root_for_sport(sport_slug: str) -> Path:
     slug = str(sport_slug or "").strip().lower()
     if slug == "nba":

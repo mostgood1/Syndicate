@@ -59,6 +59,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
+from syndicate.features.shared.build_lookup_scope import scoped_lookup, scoped_stat_signature
 from syndicate.features.shared.prop_evidence.common import data_root
 
 _WINDOW_DAYS = 120
@@ -286,17 +287,19 @@ def _sources(sport: str) -> tuple[list[Path], Callable[[list[Path]], dict]] | No
 
 
 def _index(sport: str) -> dict[str, list[tuple[str, float, float]]]:
-    spec = _sources(sport)
+    # The source listing and each source's stat once per build inside a per-build lookup scope (todo #790): the
+    # in-play overlay asks per card, 2,376 globs + 2,376 stats a build measured 2026-11-16. Fresh every call
+    # outside one. The listing is copied out of the memo so no caller can change another's answer.
+    spec = scoped_lookup("team_results_sources", sport, lambda: _sources(sport))
     if not spec or not spec[0]:
         return {}
-    paths, builder = spec
+    paths, builder = list(spec[0]), spec[1]
     sig = []
     for p in paths:
-        try:
-            st = os.stat(p)
-        except OSError:
+        stamp = scoped_stat_signature(p)
+        if stamp is None:
             continue
-        sig.append((str(p), st.st_mtime_ns, st.st_size))
+        sig.append((str(p), stamp[0], stamp[1]))
     key = (sport, tuple(sig))
     with _LOCK:
         hit = _CACHE.get(key)

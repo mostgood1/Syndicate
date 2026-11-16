@@ -175,11 +175,11 @@ _PROFILE_CACHE: dict[str, tuple[tuple[int, int] | None, ProbabilityCalibrationPr
 
 
 def _stat_signature(path: Path) -> tuple[int, int] | None:
-    try:
-        stat = path.stat()
-    except OSError:
-        return None
-    return (stat.st_mtime_ns, stat.st_size)
+    # Once per build inside a per-build lookup scope (todo #790): the in-play overlay asks ~4,900 times a build
+    # (measured 2026-11-16), each stat a GIL hand-off to the board loop. A fresh stat every call outside one.
+    from syndicate.features.shared.build_lookup_scope import scoped_stat_signature
+
+    return scoped_stat_signature(path)
 
 
 def cached_profile(

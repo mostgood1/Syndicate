@@ -1054,7 +1054,37 @@ def build_inplay_overlay(
     sport: str, date_str: str, rows: list[Mapping[str, Any]], *, grid_generated_at: Any = None
 ) -> dict[str, Any]:
     """The overlay payload: board cards for these in-play rows, built by the
-    shortlist's own chain. Raises on a card-builder failure; the writer catches."""
+    shortlist's own chain. Raises on a card-builder failure; the writer catches.
+
+    The build runs inside a per-build lookup scope (todo #790, lane
+    nba-overlay-card-cost): the card builder's per-card file checks -- the data
+    root, the NBA odds root, the calibration profile's, the closing-line files'
+    and the team-results sources' stat -- are answered once per build. It runs
+    on refresh-worker's main thread beside the busy board loop, and each check
+    was a GIL hand-off: measured offline 2026-11-16, a warm 2,000-card NBA build
+    made ~50,000 of them and took 139.9 s beside one busy thread (3.6 s alone);
+    once per build, 6.1 s, the same cards. `timings` says which branch ran:
+    `lookups_resolved` / `lookups_reused` inside the scope, `lookup_scope=off`
+    when SYNDICATE_BUILD_LOOKUP_SCOPE is off.
+    """
+    from syndicate.features.shared.build_lookup_scope import lookup_scope, scope_counts
+
+    with lookup_scope():
+        before = scope_counts()
+        overlay = _build_inplay_overlay(sport, date_str, rows, grid_generated_at=grid_generated_at)
+        after = scope_counts()
+    timings = overlay.setdefault("timings", {})
+    if before is None or after is None:
+        timings["lookup_scope"] = "off"
+    else:
+        timings["lookups_resolved"] = after[0] - before[0]
+        timings["lookups_reused"] = after[1] - before[1]
+    return overlay
+
+
+def _build_inplay_overlay(
+    sport: str, date_str: str, rows: list[Mapping[str, Any]], *, grid_generated_at: Any = None
+) -> dict[str, Any]:
     import time as _time
 
     from syndicate.features.shared.layer2_board import (
