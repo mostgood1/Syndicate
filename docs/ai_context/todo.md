@@ -18,7 +18,7 @@
     - The tuner reads net by default (`SYNDICATE_MIN_EV_TUNER_CLV_BASIS`: absent = net, `gross` = the old basis) and reports gross beside it. The tuner is still SHADOW.
     - Tests: `tests/test_fee_net_clv.py` (16, incl. reachability: same rows, net RAISEs, gross HOLDs).
     - Fleet A/B, read-only (20:21Z, 52,454 orders): the gross arm reproduces tonight's 95 holds. Net changes no cell's action. Three cells lose a gross-only CLV "significance" (band t 5.0–6.9 to 0). The pooled shadow verdict flips one cell to raise (Kalshi NCAAB totals).
-    - Owed: a fleet ff plus a refresh-worker load. That is the user's call.
+    - **Loading: user 11-16 "Ride the next ff" — no dedicated deploy.** It reaches the fleet when another lane's ff carries `6e952af46` AND the refresh-worker restarts (an ff alone does not reload a worker). The reading that proves it is loaded: the next `[min_ev_tuner] MIN_EV_TUNER` line in the refresh-worker log carries `clv_basis=net`. The new marks carry `clv_net_pct`.
   - (2) Promote the readout to `scripts/live_book_edge_readout.py` with a test pinning these numbers.
   - (3) Find why stake concentrates in the losing top quartile (stated EV 4-7% realises about −5%; see `#704`).
 - **Per-LINE only:** NCAAB (z −3.45) and totals (z −2.11) are evidence for per-line fixes, never a market switch (learnings line 1056).
