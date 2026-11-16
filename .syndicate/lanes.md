@@ -950,11 +950,6 @@ death, never life — do not invert it.
 - PRE-LOAD BASELINE + CORRECTION `[2026-11-15 23:57Z, 5:57 PM CST; rail monitor reading 23, findings `61290d344`]`: served NBA live rows priced on a quote <= 120 s 0 of 719 (605 of 939 at 5:34 PM, read just after a pull -- the 240 s sawtooth); NBA flags 0; our-look age at pricing p50 216 s; NBA in-play pulls 5 in 20 min, median gap 249 s. Refresh-worker over 23 min: NBA builds p50 70.9 s, max 91.7 s, deferred_slow nba 5, NBA overlay gap p50 292 s, max 343 s. CORRECTION to the STATUS line above: with the evening slate NBA is past the 45 s slow-sport line, and a slow sport is never re-priced on pull, so tonight 60 s pulls would NOT multiply NBA builds; but the ~292 s overlay gap, not the pull, would then cap how fresh a served NBA price can be. The +1,100 s/h estimate applies only while NBA builds stay under 45 s.
 - STATUS `[2026-11-16 02:14Z, 8:14 PM CST]`: LOADED 01:43:54Z (claimed live-odds-worker TERM, no ff: the fleet was already at `db2af02ab`, which contains `b2ae202d4`; user "Load and watch", ride-along `60188bad1` approved "Ship it along"). GOAL: NOT MET as written -- mechanism MET (interval_s=60, 18 lines-only / 7 full passes, 0 errors, no credit or grid-load rise), but NBA main lines priced <= 120 s 46% -> 39.2% and our-look age 93 -> 91.5 s, because NBA's 60-105 s builds keep it a slow sport re-priced every other round. Measurement: deploys.md 2026-11-16 01:43:54Z. Kept loaded pending the user's call; lane stays OPEN for that call.
 
-### closed-lane-archive-20261115-1850 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 79585ed0-a8f1-403a-9ffe-6314d741c996
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 at 00:50Z 11-16 read 1 SAFE of 17 CLOSED; moved `closed-lane-archive-20261115-1439` to lanes_closed.md with one pointer. Other 16 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-15.md.
-
 ### render-retirement — OPEN — opened 2026-11-15 — session 6786c5e2-e5a9-42bb-bd2a-37b0aa02558f
 - **GOAL VERDICT `[2026-11-16 02:5xZ (8:5x PM CST 11-15)]`:** "Nothing in the repo or fleet operations needs Render: every Render-API operator script is deleted or repointed at the fleet, every onrender fallback is repointed at http://127.0.0.1:10000 or retired, the render_env snapshot has a Render-free recovery path (or a recorded user decision), the RENDER_* marker question is put back to the user and recorded in #766, docs/CLAUDE.md say plainly nothing needs Render; tests pass for every changed default; on main" -- **GOAL: NOT MET.** Done and verified: every Render-API operator script deleted or repointed, every onrender fallback on the fleet, preflight/check_deploy_safety/render_logs fleet-only (443 tests; preflight run end to end on the fleet), CLAUDE.md says nothing needs Render (main `f9ed2ec0f` `193df776e` `2aba260b6` `ef50116d0`; nothing loaded). Left: three USER decisions in #766 -- D5 env-snapshot backup (none exists, no re-import), D2' RENDER_* markers, D3' retire `check_blueprint_drift.py` (the last Render read); options + recommendations in `.syndicate/findings_2026-11-15_render_retirement.md`. Close when #766 records the answers (and E1 is built, if chosen).
 - Goal: Nothing in the repo or fleet operations needs Render: every Render-API operator script is deleted or repointed at the fleet, every onrender fallback is repointed at http://127.0.0.1:10000 or retired, the render_env snapshot has a Render-free recovery path (or a recorded user decision), the RENDER_* marker question is put back to the user and recorded in #766, docs/CLAUDE.md say plainly nothing needs Render; tests pass for every changed default; on main
@@ -968,6 +963,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 19 CLOSED blocks. Moved: closed-lane-archive-20261115-1640. The reading and the WAIT reasons are in `.syndicate/log/2026-11-15.md`.
+
+### closed-lane-archive-20261115-2300 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 7f79320f-36a1-43e4-bbe5-1f5ab96a089b
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 21 CLOSED blocks. Moved: closed-lane-archive-20261115-1850. The reading and the WAIT reasons are in `.syndicate/log/2026-11-15.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1241,6 +1241,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261115-1041` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session e01d3a71-d04f-44a1-9853-345b01791bb2
 - `closed-lane-archive-20261115-1439` — CLOSED 2026-11-15 (GOAL MET: 3 blocks archived) — opened 2026-11-15 — session c05705db-575c-4b19-a84b-b6a3438be66c
 - `closed-lane-archive-20261115-1640` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 31781218-8e4c-417a-bd3a-2bb5e3383950
+- `closed-lane-archive-20261115-1850` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 79585ed0-a8f1-403a-9ffe-6314d741c996
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
