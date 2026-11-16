@@ -65,6 +65,10 @@
   - **CODE LANDED 2026-11-16 08:00 CST (user "Push the code"):** `38e237e6d` / `6c5f8633b` / `5ddfdd86e` on main. Every switch is default OFF and byte-identical, so nothing changes on the fleet until a profile load; 263 football engine tests pass. Lane `football-end-of-half-fix` CLOSED, the engine LOAN returned. **Still owed (the user's calls):**
     - wire live timeouts left into the live producers, or keep the clock pregame-only;
     - the NFL profile load (the seven #808 switches ON, `home_field_bonus` 0.03, `touchdown_weight_multiplier` 0.825), then the #752 / #805 segment re-grade.
+  - **LIVE TIMEOUTS WIRED ON A BRANCH 2026-11-16 9:54 AM CST (user "Yes, wire it"; lane `nfl-live-timeouts`):** the consumer side is branch commit `5453cc475`, off main until the user's OK. The adapter keys are on `nfl-live-possession-map`'s branch `6b4bd4d95`. Details:
+    - ESPN's `homeTimeouts` / `awayTimeouts` are timeouts LEFT: 12 of 12 games of 2026-11-15 match the play-by-play.
+    - Inert with `end_of_half_clock` OFF (byte-identical, test-pinned). Reachable with it ON: at Q4 1:50 with the leader's ball, total 41.23 vs 43.40 for away 0 vs 3 timeouts.
+    - Owed: the MNF read of the site scoreboard's keys; the push; then the profile load. Detail: `.syndicate/findings_2026-11-16_nfl_live_timeouts.md`.
 - **Read-only.** Production's own NFL `build_projection`, 136 games of 2024-25 x 100 seeds, same seeds per arm (patched in the research process only), against nflverse pbp 2024-25 (544 games). Findings: `.syndicate/findings_2026-11-15_football_end_of_half_scoring.md`.
 - **The whole Q2 gap is in its last 120 s:** sim 3.14 points a game against the league's 4.78 [4.46, 5.10]. The regulation total looks right (45.84 vs 45.62) only because the errors cancel.
 - **Cause 1, halftime carry-over (`halftime_kickoff` OFF):** a drive crosses the half in 0.84 of games and scores 2.33 points a game in Q3. Switching it on: q3 -0.95 [-1.07, -0.83] (to 9.57, the league's 9.50), q2 0, total -1.07. That total drop is why the switch failed alone upstream.
