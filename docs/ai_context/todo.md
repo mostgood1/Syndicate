@@ -20,7 +20,12 @@
     - Fleet A/B, read-only (20:21Z, 52,454 orders): the gross arm reproduces tonight's 95 holds. Net changes no cell's action. Three cells lose a gross-only CLV "significance" (band t 5.0–6.9 to 0). The pooled shadow verdict flips one cell to raise (Kalshi NCAAB totals).
     - **Loading: user 11-16 "Ride the next ff" — no dedicated deploy.** It reaches the fleet when another lane's ff carries `6e952af46` AND the refresh-worker restarts (an ff alone does not reload a worker). The reading that proves it is loaded: the next `[min_ev_tuner] MIN_EV_TUNER` line in the refresh-worker log carries `clv_basis=net`. The new marks carry `clv_net_pct`.
   - (2) Promote the readout to `scripts/live_book_edge_readout.py` with a test pinning these numbers.
-  - (3) Find why stake concentrates in the losing top quartile (stated EV 4-7% realises about −5%; see `#704`).
+  - (3) **DONE 11-16 (user "Dig into big stakes"):** the top stake quartile is, to 85% of its dollars, the live **$5-$10 stake band** (user decision 10-20; ON 10-20 14:37Z .. OFF 11-02 18:23Z by the user).
+    - It multiplied pregame stakes ~10x (median $5.41 vs $0.58 after) and did not choose bets. Band-on pregame: −10.5 ± 5.2%, 266 bets. Band-off: −2.1 ± 3.6%, 703 bets.
+    - **About $127 of the last-30 loss of $218.64 is that multiplier** (601 bets lost $154.76; at $0.58 each, about $27.67).
+    - Size does not significantly pick losers: matched −2.4 ± 4.2 pp (z −0.57); inside the band −7.0 ± 6.8 pp (z −1.03, a watch item).
+    - Early exits are a wash (−$20 ± $58).
+    - No fix owed: the band is off. The band was a 13-day ~10x scale-up on a book with no edge, which is direct evidence for the gate. Findings § "BIG STAKES EXPLAINED".
 - **Per-LINE only:** NCAAB (z −3.45) and totals (z −2.11) are evidence for per-line fixes, never a market switch (learnings line 1056).
 
 ### `#814` — **LIVE PLAYER-EXIT GATE: a key player gone mid-game refuses that game's live gamelines and the player's live props, and holds in-play entries, in every live sport** `[2026-11-15, lane live-player-exit-gate, user "Yes, build it"]`

@@ -44,7 +44,9 @@ implied by the prices paid. The last 30 days are negative at about 95% confidenc
    - Q3: −2.5%.
    - **Q4 ($2.70-9.84): 63% of all dollars, −9.2%, z −2.17.**
 
-   Scaling makes more bets look like Q4.
+   ~~Scaling makes more bets look like Q4.~~ **CORRECTED same day (§ "BIG STAKES EXPLAINED"):** Q4 is mostly
+   the live $5-$10 stake band (on 10-20..11-02). It multiplied every bet's stake about 10x. It did not pick worse
+   bets: matched on price, EV, date and path, a bigger stake shows no significant difference in results.
    Dollar ROI is also worse than flat ROI in Polymarket (−12.2 vs −2.0) and alt spreads (−5.8 vs +0.3).
 2. **Stated EV does not predict results.** EV 2-4%: −13.6% dollar ROI (−4.4% flat), 339 bets. EV 4-7%: −5.0% (−6.8% flat), 727 bets.
    The book's own +4-7% EV claim realises about −5% (same family as `findings_2026-10-19_ev_overstatement_decomp.md`).
@@ -157,6 +159,58 @@ probability points. The close is the venue's own last pregame quote-log price (`
 - **Reasons:** they change in 3 cells. Kalshi NCAAF spreads, Kalshi NCAAF totals and Polymarket NCAAF totals held as `only_clv_significant` on gross: marginal-band gross CLV +1.5 to +2.2 pp at t 5.0–6.9, while band ROI was −11.0%, −10.7% and +10.3%. Net, that CLV is −0.13 to +0.23 pp at |t| < 0.7. That gross "significance" was the fee.
 - **Pooled (shadow)**, 1 flip: Kalshi NCAAB totals hold → raise. Band 24 events, ROI −33.4% (t −2.00), net CLV −3.52 pp (t −3.39). Its gross CLV was −1.98 (t −1.80).
 - **No money moves:** the tuner and pooling are shadow, and nothing reads them at commit.
+
+## BIG STAKES EXPLAINED (2026-11-16, same session; user "Dig into big stakes")
+
+The hypotheses H1-H4 and the falsification test were written into the lane BEFORE testing. The data is the same
+11-16 fleet payload: last 30 days, 1,526 decided live bets. Quartile cuts are $0.51 / $0.70 / $2.70.
+
+**Answer:** the top stake quartile is, to 85% of its dollars, bets placed while the **live $5-$10 stake band** was on.
+
+- **The band:** user decision 10-20, "Bets should be $5-$10 not under $1", lane `live-stake-band`. It was ON from
+  2026-10-20 14:37Z to 11-02 18:23Z, when the user turned it off (lane `stake-band-off`).
+- **What it did:** it replaced each pregame bet's Kelly-on-capital stake with $5 + $5 × full Kelly / 5%. Its first
+  build turned a $0.54 stake into $5.46. It does NOT choose which bets are placed (`live_stake_band.py` docstring).
+- **How it shows in the data:** stake ÷ `stake_fraction_ev_only` implies a capital of $1,500-5,000 per venue through
+  11-02 and $200-400 from 11-03. The real capital is ~$285 Kalshi and ~$150 Polymarket.
+
+| period, pregame `model_edge` bets | median stake | bets | staked | ROI (event-clustered) | excess wins z |
+|---|---|---|---|---|---|
+| band ON 10-20..11-02 | $5.41 | 266 | $1,359.85 | −10.5 ± 5.2% | −2.13 |
+| band OFF 11-02.. | $0.58 | 703 | $555.55 | −2.1 ± 3.6% | −0.41 |
+
+- **Top-quartile dollars by origin:**
+  - band-on pregame `model_edge`: 68.3%
+  - band-on rows with no sizing record: 14.0%
+  - band-off in-play: 9.0%
+  - band-off pregame: 5.6%
+  - band-on in-play: 2.1%
+  - other: 1.0%
+- **H1 (price) FALSE and H2 (claimed EV) FALSE:** Q4's mean price 0.559 and EV 4.14% match Q2 (0.567 / 4.39%) and
+  Q3 (0.576 / 3.50%).
+- **H3 (time) TRUE, as one specific period:** the band. **H4 (path) TRUE:** band-on pregame.
+- **Falsification of "the sizing itself loses" (registered):** does a bigger stake lose more once the bet is matched?
+  - Matched on path, venue, half-month, price band and EV band, top-half vs bottom-half stake: **−2.4 ± 4.2 pp** excess-win rate (z −0.57, 317 events).
+  - Inside the band, matched on price band: −7.0 ± 6.8 pp (z −1.03, 162 events).
+  - Full-Kelly quintiles (stake rank inside the band) are not monotone: excess-win z −2.16, +0.27, −2.25, +0.30, +0.68.
+  - So there is no significant evidence that size picks losers. The direction inside the band is negative, so it stays a watch item, not a finding.
+- **What the band cost:** the band period's 601 pregame bets staked $1,875.61 and lost $154.76. At the post-band
+  median stake ($0.58) the same bets would have lost about $27.67. **About $127 of the last 30 days' $218.64 loss is
+  the band's ~10x multiplier, applied to a book with no measured edge.**
+  - Per bet, the band period also did worse (flat −10.3% vs −3.5%). The band does not choose bets, though, and the
+    gap is not significant (~z 1.1), so that part is calendar or other changes, not attributed.
+- **This was, in effect, the scale-up the user asked about**, run for 13 days. Raising stakes ~10x on a book with no
+  measured edge multiplied the loss ~10x. That is direct evidence for the gate above: a scale-up multiplies the per-bet
+  result, whatever its sign.
+- **In-play (`inplay_order_dollars`)** is now the largest routine stake: a fixed $2.40-2.95 per order, about 4.5x the
+  pregame median. Band-off: 180 bets, −7.9 ± 6.4%, wins at breakeven (z +0.20). Not significant either way.
+- **Early exits (`exit_applied`, 537 of 1,526 bets, all paths)** are a wash: realised minus hold-to-settle = −$20.06
+  ± $58.47 (z −0.34). They gave up $423.07 on bets that went on to win and saved $403.01 on bets that went on to lose.
+  So excess wins at the fill price (which ignores exits) and ROI tell the same story.
+
+**No fix owed from this.** The band is already off. Since then, pregame stakes follow Kelly on the real capital, and
+size does not significantly pick losers. Nothing here is a market or sport switch (learnings line 1056). Scripts:
+session scratch `bigstakes.py`, `bigstakes2.py`, `bigstakes3.py` (formulas above).
 
 ## Method artefact
 
