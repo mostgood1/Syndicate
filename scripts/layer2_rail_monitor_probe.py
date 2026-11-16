@@ -140,7 +140,8 @@ def fleet_logs(minutes: int, now: dt.datetime, work_dir: Path) -> dict:
         text = f"__ERR__ {exc}"
     rw, _, web = text.partition("@@WEB@@")
     web, _, boot_text = web.partition("@@BOOT@@")
-    boots = [" ".join(line.split()[:2]) for line in boot_text.splitlines() if line.strip()]
+    boots = [(" ".join(line.split()[:3]) if line.startswith("live-odds-worker-supervisor") else " ".join(line.split()[:2]))
+             for line in boot_text.splitlines() if line.strip()]
     overlay, ticks, health, joins = {}, [], {}, {}
     for line in rw.splitlines():
         ts = line.split(" ", 1)[0]

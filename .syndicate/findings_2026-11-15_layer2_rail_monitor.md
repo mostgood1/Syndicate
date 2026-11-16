@@ -981,3 +981,23 @@ LAR @ ARI and SEA @ LV in Q1.
   reads live-odds-worker restarts from supervisor.log.
 - **Load:** query 8.3 s / 64.6 MB. Live-rail 0.08 s, 774-777 rows.
 - **Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 24 — Sun 11-15 6:20 PM CST (00:20Z 11-16). No restart (live-odds-worker pid still 1771964)
+
+14 live chips. **29 flags on 8 cards. 0 false, 0 missed, 0 dark.** Flagged rows: NBA 98, NCAAB 11.
+
+**NBA:**
+- 325 / 762 rows priced <= 120 s (43%), seen age p50 57 s. A pull had just landed: the read
+  saws with the ~249 s pull, 0 / 719 at 5:57.
+- NBA overlay gap p50 360 s, **max 402 s**. NBA builds p50 62.7 s, max 106.4 s. `deferred_slow`
+  nba 3.
+- Web merges: no nba stale this window.
+
+**Other sports:**
+- NFL gap max 213 s (SNF not started). College gaps max 193-288 s.
+- Web merges: ncaaf stale 50 / 50 (no NCAAF game).
+
+**Load:** `/intelligence` 5.0 s / 27.3 MB. Query 10.9 s / 67.2 MB. Live-rail 0.14 s, 839-844 rows
+(0.80 MB).
+
+**Teams:** 1 chip-less (FAMU @ UTEP). det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
