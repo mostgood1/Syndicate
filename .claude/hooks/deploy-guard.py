@@ -60,7 +60,9 @@ WHAT IT GUARDS, and why exactly these three shapes:
      `autoDeploy = no`. Measured 2026-08-08: a `render.yaml` push rewrote env
      vars on two live services and 502'd every route for ~2 minutes with nobody
      having ordered a deploy. Its blast radius is EVERY service, so it requires
-     the claim and the preflight on ALL THREE, not on one.
+     the claim and the preflight on ALL THREE, not on one. SINCE 2026-11-16 it is
+     REFUSED OUTRIGHT unless `SYNDICATE_ALLOW_RENDER_YAML_PUSH` carries a reason
+     (Render is retired, todo #766 D3'); the locks still apply after that.
 
 FAIL OPEN ON IGNORANCE, NEVER ON A READABLE "NO". Unreadable payload, git
 unavailable, an undeterminable target service -- all allow the command, because
@@ -930,29 +932,17 @@ def _grant(root, session_id):
         return None
 
 
-def _blueprint_drift(root):
-    """(exit_code, printable) from scripts/check_blueprint_drift.py.
+RENDER_YAML_PUSH_OVERRIDE = "SYNDICATE_ALLOW_RENDER_YAML_PUSH"
+# Values that say "yes" without saying WHY. The override must carry a reason.
+_BARE_YES = ("1", "true", "yes", "on", "y")
 
-    Returns (0, "") when the checker cannot be run at all -- ALLOWING the push.
-    That looks like the wrong default for a safety check and is the right one
-    HERE: this hook's whole contract is to fail open (`except Exception:
-    sys.exit(0)` at the bottom of the file), and a missing checker must not
-    become a way to wedge every render.yaml push forever. The checker itself
-    fails CLOSED on an unreadable API, which is where that judgement belongs.
-    """
-    if str(os.environ.get("SYNDICATE_ALLOW_BLUEPRINT_DRIFT") or "").strip().lower() in ("1", "true", "yes", "on"):
-        return 0, ""
-    script = os.path.join(root, "scripts", "check_blueprint_drift.py")
-    if not os.path.isfile(script):
-        return 0, ""
-    try:
-        proc = subprocess.run([sys.executable, script],
-                              capture_output=True, timeout=120, cwd=root)
-    except Exception:  # noqa: BLE001 -- a broken checker must not wedge pushes
-        return 0, ""
-    out = (proc.stdout or b"").decode("utf-8", "replace")
-    tail = [ln for ln in out.splitlines() if ln.startswith(("DRIFT:", "UNKNOWN:", "CLEAR:"))]
-    return proc.returncode, chr(10).join(tail[-4:]) or out[-400:]
+
+def _render_yaml_push_reason():
+    """The operator's stated reason for pushing `render.yaml`, or "" (= refuse)."""
+    value = str(os.environ.get(RENDER_YAML_PUSH_OVERRIDE) or "").strip()
+    if value.lower() in ("", "0", "false", "no", "off", *_BARE_YES):
+        return ""
+    return value
 
 
 def _refuse(kind, lane, service_state):
@@ -1071,46 +1061,43 @@ def main():
             % (grant.get("service", "any"), grant.get("note", "no note recorded")))
         return 0
 
-    # BLUEPRINT DRIFT: a `render.yaml` push is refused while the file is behind
-    # LIVE env, and NO CLAIM CAN AUTHORISE IT. This runs BEFORE the lock logic
-    # on purpose -- the locks answer "is it your turn", and no amount of turn
-    # makes deleting 167 production env vars correct.
+    # A `render.yaml` PUSH IS REFUSED OUTRIGHT `[2026-11-16, lane render-retirement,
+    # todo #766 D3', user "Yes, as recommended"]`, and no claim authorises it. This runs
+    # BEFORE the lock logic on purpose: the locks answer "is it your turn", not "should
+    # this happen at all".
     #
-    # MEASURED 2026-09-08: `render.yaml` was 167 keys behind production across
-    # three services. A sync would have deleted `SYNDICATE_EXECUTION_MODE=live`,
-    # `SYNDICATE_EXECUTION_LIVE_ARMED=1`, the spend caps of a live-money
-    # execution system, AND the venue credentials themselves
-    # (`KALSHI_PRIVATE_KEY`, `POLYMARKET_US_PRIVATE_KEY`), while overwriting
-    # `ODDS_API_KEY` on all three. Three locks and a CLEAR preflight would have
-    # let every bit of that through, because none of them looks at env.
+    # WHY NOTHING IS READ FIRST. Production is the WSL fleet, where a `render.yaml` VALUE
+    # edit is inert (the 2026-10-01 env snapshot shadows every declared key; learnings
+    # 2026-11-08). A push's only possible effect is `blueprint_sync` against the SUSPENDED
+    # Render services, if the blueprint is still linked -- and the user said on 2026-11-15
+    # that Render must not be used or needed for anything. Until then this branch ran
+    # `scripts/check_blueprint_drift.py`, which read each service's live env from the Render
+    # API (the last Render read in the repo; it caught `render.yaml` 167 keys behind
+    # production on 2026-09-08, a sync that would have deleted the live-money execution
+    # switches and the venue credentials). It was retired with Render.
     #
-    # THIS FILE'S OWN HEADER PROMISED THIS CHECK AND NOBODY HAD WRITTEN IT: it
-    # advertises "`scripts/deploy_preflight.py`   job liveness + render.yaml
-    # blast radius", and preflight contains no env-var logic at all. This makes
-    # the sentence true.
-    #
-    # SCOPED TO `render.yaml` PUSHES ONLY, so an ordinary service deploy pays
-    # nothing -- no API calls, no latency, no new way to fail. And the module
-    # tail is `except Exception: sys.exit(0)`, so a bug in the checker itself
-    # still fails OPEN, which is this file's standing contract.
+    # THE OVERRIDE MUST SAY WHY: `SYNDICATE_ALLOW_RENDER_YAML_PUSH="<reason>"` in the
+    # environment. A bare "1" / "true" is refused like no override. With a reason, the
+    # push still needs the locks on all three services below.
     if shape == "render.yaml":
-        drift_code, drift_out = _blueprint_drift(root)
-        if drift_code != 0:
+        reason = _render_yaml_push_reason()
+        if not reason:
             sys.stderr.write(
-                "BLOCKED: this push carries `render.yaml`, and the file is BEHIND\n"
-                "live production env. `blueprint_sync` would apply it wholesale.\n\n"
-                "%s\n\n"
-                "No claim authorises this -- the locks order deploys, they do not\n"
-                "make a destructive one safe. Reconcile the live values INTO\n"
-                "render.yaml first, and do NOT copy secrets into a git-tracked\n"
-                "file (ODDS_API_KEY, ADMIN_TOKEN, KALSHI_PRIVATE_KEY and\n"
-                "POLYMARKET_US_PRIVATE_KEY belong to the dashboard; they want\n"
-                "`sync: false`).\n\n"
-                "  py -3 scripts/check_blueprint_drift.py       # the full enumeration\n\n"
-                "Override, and say why in .syndicate/deploys.md:\n"
-                "  SYNDICATE_ALLOW_BLUEPRINT_DRIFT=1\n"
-                % drift_out)
+                "BLOCKED: this push carries `render.yaml`.\n\n"
+                "Render is retired (todo #766): on the fleet a render.yaml VALUE edit\n"
+                "changes nothing (env comes from ~/syndicate-prod/render_env/ and\n"
+                "local_production.env), and the push's only possible effect is\n"
+                "`blueprint_sync` against the suspended Render services. To change fleet\n"
+                "env, edit local_production.env (ROLE__KEY for one role) and do a drained\n"
+                "full down/up instead. Keep render.yaml out of the push:\n"
+                "  git restore --staged render.yaml   (or move the change to another commit)\n\n"
+                "If this push really must carry it, set a REASON (a bare 1/true is refused)\n"
+                "in the environment, take the locks on all three services, and record it\n"
+                "in .syndicate/deploys.md:\n"
+                "  %s=\"<why>\"\n" % RENDER_YAML_PUSH_OVERRIDE)
             return 2
+        sys.stderr.write("RENDER.YAML PUSH OVERRIDE (%s): %s -- the locks below still apply;\n"
+                         "record it in .syndicate/deploys.md.\n" % (RENDER_YAML_PUSH_OVERRIDE, reason))
 
     services = _target_services(cmd + "\n" + script_text, shape)
     if not services:

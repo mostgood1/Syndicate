@@ -9,6 +9,17 @@ on it. No Render API was called, no Render service was touched, `render.yaml` wa
 edited, and nothing was loaded onto the fleet (every change is operator tooling, a
 comment, or a fallback the fleet overrides).
 
+## DECIDED 2026-11-16 — all three decisions recorded, lane CLOSED
+
+- **D5 = E1** (user "Yes, build E1"): `scripts/fleet_secrets_backup.py` built (`c053671a2`), first encrypted
+  backup taken and verified 2026-11-16 17:31:15Z (5 of 5 files same as live). Nightly from the next fleet ff.
+- **D2' = keep the markers** (user "Yes, as recommended"). No code change.
+- **D3' = retire the drift check** (user "Yes, as recommended"): `check_blueprint_drift.py` deleted; the deploy
+  guard refuses every `render.yaml` push outright unless `SYNDICATE_ALLOW_RENDER_YAML_PUSH` carries a reason.
+  **Nothing in the repo reads Render any more.**
+
+The sections below are the state on 2026-11-15, kept as the record the decisions were made on.
+
 ## Where it stands
 
 | inventory item | now |

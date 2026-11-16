@@ -37,6 +37,7 @@ called the Render API and was deleted, the commit that last held it (to read it:
 | `ring_cost_ab.py` | A/B of the diagnostic-ring cut on Render refresh-worker | `41000ce68` | nothing |
 | `verify_nfl_autorun_obligations.py` | closed two 2026-08-13 NFL deploy obligations from Render logs | `06f5fa7f2` | nothing (obligations closed) |
 | `render_cron_enqueue_refresh.py` | Render cron entrypoint that POSTed a refresh enqueue | `dba5b9951` | the fleet supervisor's `SCHEDULED_JOBS` (`local_production.py`) |
+| `check_blueprint_drift.py` (retired 2026-11-16, #766 D3') | the deploy guard's `render.yaml`-push check: diffed `render.yaml` against each service's live env from the Render API; the LAST Render read in the repo | `2aba260b6` | nothing: the guard now refuses every `render.yaml` push outright unless `SYNDICATE_ALLOW_RENDER_YAML_PUSH` carries a reason (then the three-service locks still apply). Its hook test `.claude/hooks/test_deploy_guard_blueprint_drift.py` (`099f298dc`) went with it; the branch is covered by `tests/test_deploy_guard.py` |
 
 Their tests went with them: `test_bandwidth_tripwire.py`, `test_controlled_transfer_{arm2_watch,probe,read}.py`,
 `test_ratchet_sample.py`, `test_render_events.py`, `test_snapshot_render_env.py`,
@@ -60,7 +61,13 @@ every `onrender.com` fallback repointed at `http://127.0.0.1:10000`).
   (CLAUDE.md). They are names, not calls: nothing reaches Render through them.
 - **`render.yaml`.** `local_production.py` still reads it as the lowest env layer and for
   each role's start command. Pushing it may still fire `blueprint_sync` against the
-  suspended services, so it is left untouched (todo #766 D3).
+  suspended services, so it is left untouched, and the deploy guard refuses a push that
+  carries it (todo #766 D3').
 - **`.claude/hooks/deploy-guard.py`** keeps its rules that BLOCK a Render deploy (a POST
-  to the deploys endpoint). Those protect against using Render; they do not need it.
+  to the deploys endpoint) and a `render.yaml` push. Those protect against using Render;
+  they do not need it, and the guard makes no Render call.
+- **`deploy_preflight._api_key` / `_get`** survive only as stubs that REFUSE (SystemExit),
+  because another lane's test file patches those names. Delete them when it drops the patches.
+- **Lists that strip `RENDER_API_KEY`** from child processes (`local_production.py
+  NEVER_CARRY`, `run_ci_suite.py`, `replay_diff_gate.py`, `fleet_local.py`) are protective.
 - **`render_logs.py`** keeps its name (about 50 references): it reads the fleet's own logs.

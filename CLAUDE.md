@@ -38,8 +38,8 @@ Runbook: `docs/ai_context/local_production_runbook.md`. Verified current state:
 `[2026-11-15, user: "render shouldnt be needed"]`. Do not call the Render API, use an
 `onrender.com` URL, or add a Render default; target `http://127.0.0.1:10000`. The
 Render-only scripts were deleted and every fallback was repointed at the fleet
-(`docs/ai_context/render_retirement.md`). The one Render read left is
-`check_blueprint_drift.py`, which runs only on a `render.yaml` push (todo `#766`). The
+(`docs/ai_context/render_retirement.md`). Nothing in the repo reads Render any more
+(the last reader, `check_blueprint_drift.py`, was retired 2026-11-16, todo `#766`). The
 Render account and its suspended services are dormant: leave them alone.
 
 - **Pushing to `main` ships nothing until someone fast-forwards the fleet, and then
@@ -66,10 +66,10 @@ Render account and its suspended services are dormant: leave them alone.
   - To change env, edit `local_production.env` (global, or `ROLE__KEY` for one
     role), then run a drained full `down`/`up`. Env is built only at `up`, and a role
     restart reuses the old env.
-- **A `render.yaml` push is still gated** (claims and preflight on all three
-  services, plus `check_blueprint_drift.py`). If the Render blueprint is still
-  linked, a push can fire `blueprint_sync` against the suspended services. Get an
-  explicit user decision first.
+- **A `render.yaml` push is REFUSED by the deploy guard** `[2026-11-16]`: it changes
+  nothing on the fleet, and its only possible effect is `blueprint_sync` against the
+  suspended services. With a user decision, set `SYNDICATE_ALLOW_RENDER_YAML_PUSH="<reason>"`
+  (a bare `1` is refused); it still needs claims and preflight on all three services.
 - **Absent ≠ off. Check the code's default for any key you add or remove.**
   `_evaluation_settlement_auto_refresh_enabled` treats absent as **False**;
   `_mlb_refresh_tick_owner_here` defaults **True**. The same edit is a no-op in one

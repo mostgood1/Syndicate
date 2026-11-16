@@ -504,6 +504,11 @@ def test_receipt_with_no_target_commit_vouches_for_nothing(root):
     assert b"without --target-commit" in result.stderr
 
 
+# Since 2026-11-16 (lane render-retirement, todo #766 D3') a render.yaml push is
+# refused outright unless the override carries a REASON; the locks still apply after.
+RENDER_YAML_REASON = {"SYNDICATE_ALLOW_RENDER_YAML_PUSH": "test: a deliberate blueprint change"}
+
+
 def test_abbreviated_and_full_sha_are_the_same_commit(root):
     give_claim(root)
     give_receipt(root, target_commit="abc1234def5678901234567890abcdef12345678")
@@ -517,7 +522,7 @@ def test_render_yaml_push_needs_no_commit_binding(git_root):
     for service in ("web", "refresh-worker", "live-odds-worker"):
         give_claim(git_root, service=service)
         give_receipt(git_root, service=service, target_commit=None)
-    assert run_hook(git_root, "git push origin main").returncode == ALLOW
+    assert run_hook(git_root, "git push origin main", **RENDER_YAML_REASON).returncode == ALLOW
 
 
 # --------------------------------------------------------------------------
@@ -567,20 +572,54 @@ def test_push_carrying_render_yaml_is_blocked(git_root):
     assert b"blueprint_sync" in result.stderr
 
 
+def test_render_yaml_push_is_blocked_even_with_all_three_locks(git_root):
+    """The locks order deploys; they do not make a render.yaml push wanted."""
+    _commit(git_root, "render.yaml", "services:\n  - name: web\n")
+    for service in ("web", "refresh-worker", "live-odds-worker"):
+        give_claim(git_root, service=service)
+        give_receipt(git_root, service=service)
+    result = run_hook(git_root, "git push origin main")
+    assert result.returncode == BLOCK
+    assert b"SYNDICATE_ALLOW_RENDER_YAML_PUSH" in result.stderr
+    assert b"local_production.env" in result.stderr, "the refusal must name the fleet's real env path"
+
+
+@pytest.mark.parametrize("bare", ["1", "true", "yes", "on"])
+def test_a_bare_yes_is_not_a_reason(git_root, bare):
+    _commit(git_root, "render.yaml", "services:\n  - name: web\n")
+    for service in ("web", "refresh-worker", "live-odds-worker"):
+        give_claim(git_root, service=service)
+        give_receipt(git_root, service=service)
+    result = run_hook(git_root, "git push origin main", SYNDICATE_ALLOW_RENDER_YAML_PUSH=bare)
+    assert result.returncode == BLOCK
+
+
+def test_the_retired_drift_override_does_nothing(git_root):
+    """`SYNDICATE_ALLOW_BLUEPRINT_DRIFT=1` belonged to the retired Render drift check."""
+    _commit(git_root, "render.yaml", "services:\n  - name: web\n")
+    for service in ("web", "refresh-worker", "live-odds-worker"):
+        give_claim(git_root, service=service)
+        give_receipt(git_root, service=service)
+    assert run_hook(git_root, "git push origin main", SYNDICATE_ALLOW_BLUEPRINT_DRIFT="1").returncode == BLOCK
+
+
 def test_render_yaml_push_requires_all_three_services(git_root):
     """blueprint_sync rewrites env on EVERY service, so one lock is not enough."""
     _commit(git_root, "render.yaml", "services:\n  - name: web\n")
     give_claim(git_root, service="web")
     give_receipt(git_root, service="web")
-    result = run_hook(git_root, "git push origin main")
+    # A reason does not waive the locks.
+    result = run_hook(git_root, "git push origin main", **RENDER_YAML_REASON)
     assert result.returncode == BLOCK
     stderr = result.stderr.decode()
     assert "refresh-worker" in stderr and "live-odds-worker" in stderr
 
 
-def test_render_yaml_push_allowed_when_all_three_are_locked(git_root):
+def test_render_yaml_push_allowed_with_a_reason_and_all_three_locks(git_root):
     _commit(git_root, "render.yaml", "services:\n  - name: web\n")
     for service in ("web", "refresh-worker", "live-odds-worker"):
         give_claim(git_root, service=service)
         give_receipt(git_root, service=service)
-    assert run_hook(git_root, "git push origin main").returncode == ALLOW
+    result = run_hook(git_root, "git push origin main", **RENDER_YAML_REASON)
+    assert result.returncode == ALLOW
+    assert b"a deliberate blueprint change" in result.stderr, "the reason must be echoed for the record"
