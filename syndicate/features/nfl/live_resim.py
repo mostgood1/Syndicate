@@ -221,6 +221,15 @@ class NflLiveGameState:
     # marginalises over both, because picking one is worth roughly a possession
     # of field position on a close game.
     possession_owner: str | None = None
+    # TIMEOUTS LEFT IN THE CURRENT HALF, 0..3, from ESPN `situation.homeTimeouts`
+    # / `awayTimeouts` (todo #808, lane `nfl-live-timeouts`). Checked 2026-11-16
+    # against the 12 games of 2026-11-15: 12 of 12 equal 3 minus the second-half
+    # timeouts in the play-by-play, a lost challenge counting as one. None means
+    # the feed did not say, and is passed to smartsim2 as None (its fresh-half
+    # 3), never guessed. They matter only with the profile's
+    # `end_of_half_clock` ON; with it OFF the engine never reads them.
+    home_timeouts: int | None = None
+    away_timeouts: int | None = None
 
 
 def default_sims() -> int:
@@ -490,6 +499,13 @@ def resim_live_game(
         initial_down=int(state.down),
         initial_distance=int(state.distance),
     )
+    # ONLY WHEN THE FEED SAID. Absent stays absent, so the input is the one this
+    # producer built before the timeouts were wired, and smartsim2 starts the
+    # half at 3 each exactly as it did then.
+    if state.home_timeouts is not None:
+        base["initial_timeouts_home"] = int(state.home_timeouts)
+    if state.away_timeouts is not None:
+        base["initial_timeouts_away"] = int(state.away_timeouts)
 
     # Possession unknown is MARGINALISED, not assumed -- half the seeds with each
     # side at its own 25. Picking a side silently is worth about a possession of
@@ -598,6 +614,10 @@ def resim_live_game(
         # came from the point estimate or from resampled ratings.
         "rating_sd": round(sd, 6),
         "possession_marginalised": state.possession_owner is None,
+        # AUDITABLE the same way: True only when BOTH sides' timeouts left came
+        # from the feed. False means the engine assumed a fresh half (3 each),
+        # which is invisible in the probability itself.
+        "timeouts_fed": state.home_timeouts is not None and state.away_timeouts is not None,
         "elapsed_seconds": round(time.time() - started, 3),
     }
 
@@ -674,6 +694,12 @@ def build_game_lens(
             "home_score": state.home_score,
             "away_score": state.away_score,
         }
+        # Only when the feed said, so an absent key reads as "not reported",
+        # never as a confident 0.
+        if state.home_timeouts is not None:
+            lane["live_state"]["home_timeouts"] = state.home_timeouts
+        if state.away_timeouts is not None:
+            lane["live_state"]["away_timeouts"] = state.away_timeouts
     return [lane]
 
 
@@ -780,6 +806,32 @@ def validate_live_lens_snapshot(snapshot: Any) -> tuple[bool, str]:
     return True, "ok"
 
 
+def _timeouts_left(value: Any) -> int | None:
+    """A timeouts-left value as 0..3, or None when it is not one.
+
+    NOT clamped. A 4 or a -1 is a feed this module has not seen, and clamping it
+    would hand the engine a confident number made from a wrong one; None makes
+    the engine start the half at 3, which is what it did before this was wired.
+    A bool is refused too: `True` is an int to Python and would read as 1.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, float):
+        if not value.is_integer():
+            return None
+        value = int(value)
+    elif isinstance(value, str):
+        # int(), not str.isdigit(): "²" is a digit to isdigit() and an error
+        # to int(), and this runs on the tick, which must never raise.
+        try:
+            value = int(value.strip())
+        except ValueError:
+            return None
+    if not isinstance(value, int) or not 0 <= value <= 3:
+        return None
+    return value
+
+
 def live_state_from_row(
     row: Any, *, away_team: str, home_team: str
 ) -> "NflLiveGameState | NflResimRefusal":
@@ -830,6 +882,10 @@ def live_state_from_row(
         distance=int(row.get("distance") or 10),
         field_position=int(row.get("field_position") or 25),
         possession_owner=owner,
+        # The tick adapter's keys (`scripts/_nfl_live_resim_tick.normalise_live_row`,
+        # from ESPN `situation`); absent until it emits them, which is None here.
+        home_timeouts=_timeouts_left(row.get("home_timeouts")),
+        away_timeouts=_timeouts_left(row.get("away_timeouts")),
     )
 
 
