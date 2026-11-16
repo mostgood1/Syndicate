@@ -7,6 +7,8 @@ from random import Random
 
 from syndicate.features.football.sim_engine.smartsim2.calibration_profile import CalibrationProfile
 from syndicate.features.football.sim_engine.smartsim2.calibration_profile import NFL_CALIBRATION_PROFILE
+from syndicate.features.football.sim_engine.smartsim2.calibration_profile import NFL_CALIBRATION_PROFILE_DEFAULT
+from syndicate.features.football.sim_engine.smartsim2.calibration_profile import NFL_CALIBRATION_PROFILE_METADATA
 from syndicate.features.football.sim_engine.smartsim2.contracts import PossessionOutcome
 from syndicate.features.football.sim_engine.smartsim2.contracts import PossessionState
 from syndicate.features.football.sim_engine.smartsim2.contracts import SmartSim2SimulationInput
@@ -19,11 +21,12 @@ from syndicate.features.football.sim_engine.smartsim2.possession_state import bu
 
 class SmartSim2CalibrationProfileTests(unittest.TestCase):
     def test_nfl_profile_defaults_match_pre_profile_hardcoded_literals(self) -> None:
-        self.assertEqual(NFL_CALIBRATION_PROFILE.red_zone_touchdown_weight_bonus, 0.33)
-        self.assertEqual(NFL_CALIBRATION_PROFILE.red_zone_gain_stiffening, 0.80)
-        self.assertEqual(NFL_CALIBRATION_PROFILE.explosive_play_multiplier, 1.0)
-        self.assertEqual(NFL_CALIBRATION_PROFILE.touchdown_weight_multiplier, 1.0)
-        self.assertEqual(NFL_CALIBRATION_PROFILE.field_goal_make_base, 0.98)
+        # The in-source DEFAULT: production loads data/calibration/nfl_profile.json over it since #808 (2026-11-16).
+        self.assertEqual(NFL_CALIBRATION_PROFILE_DEFAULT.red_zone_touchdown_weight_bonus, 0.33)
+        self.assertEqual(NFL_CALIBRATION_PROFILE_DEFAULT.red_zone_gain_stiffening, 0.80)
+        self.assertEqual(NFL_CALIBRATION_PROFILE_DEFAULT.explosive_play_multiplier, 1.0)
+        self.assertEqual(NFL_CALIBRATION_PROFILE_DEFAULT.touchdown_weight_multiplier, 1.0)
+        self.assertEqual(NFL_CALIBRATION_PROFILE_DEFAULT.field_goal_make_base, 0.98)
 
     def test_ncaaf_profile_shares_exactly_the_documented_fields(self) -> None:
         differing = {
@@ -31,8 +34,17 @@ class SmartSim2CalibrationProfileTests(unittest.TestCase):
             for field in fields(CalibrationProfile)
             if field.name != "name" and getattr(NFL_CALIBRATION_PROFILE, field.name) != getattr(NCAAF_CALIBRATION_PROFILE, field.name)
         }
+        # ADDED BY THE #808 NFL PROFILE LOAD (2026-11-16): `data/calibration/nfl_profile.json`, version
+        # `nfl-808-v3h0.03-t0.825`, turns on the seven end-of-half switches and sets home_field_bonus 0.03
+        # (touchdown_weight_multiplier already differs). NCAAF stays OFF on all of them, so they now differ too.
+        nfl_808 = set()
+        if NFL_CALIBRATION_PROFILE_METADATA.get("source") == "artifact":
+            nfl_808 = {
+                "halftime_kickoff", "q2_urgency_ignores_score", "end_of_half_clock", "end_of_half_kneel_out",
+                "end_of_half_clock_by_need", "q4_kick_waits", "kneel_out_q4_only", "home_field_bonus",
+            }
         self.assertEqual(
-            differing,
+            differing - nfl_808,
             {
                 "explosive_play_multiplier",
                 "explosive_yardage_multiplier",
@@ -57,6 +69,7 @@ class SmartSim2CalibrationProfileTests(unittest.TestCase):
                 "field_goal_attempt_base_probability",
             },
         )
+        self.assertLessEqual(nfl_808, differing)
         # red_zone_gain_stiffening was measured and explicitly left at the
         # shared/NFL default -- confirm it stays that way, not merely unset.
         self.assertEqual(NCAAF_CALIBRATION_PROFILE.red_zone_gain_stiffening, NFL_CALIBRATION_PROFILE.red_zone_gain_stiffening)

@@ -99,7 +99,7 @@ def test_off_is_byte_identical_to_the_pre_change_engine(shape):
 
 
 def test_off_output_carries_no_timeout_keys():
-    out = simulate_game(_inp(3))
+    out = simulate_game(_inp(3), profile=NFL)  # OFF named: production's NFL profile has the clock ON since #808
     assert "timeouts_home" not in out.final_state and "timeouts_away" not in out.final_state
     assert "initial_timeouts_home" not in out.input_state
     assert all("timeouts_home" not in s["start_state"] for s in _steps(out))

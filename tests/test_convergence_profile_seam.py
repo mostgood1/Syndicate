@@ -39,6 +39,12 @@ ENGINES = (
 )
 
 
+def _artifact_on_disk(mod, const) -> bool:
+    """An engine whose artifact was PROMOTED (NFL's #808 profile, 2026-11-16, pinned exactly by
+    tests/test_nfl_calibration_profile_artifact.py) is outside half 1's premise of 'no artifact present'."""
+    return Path(getattr(mod, f"{const}_METADATA")["path"]).is_file()
+
+
 class NoBehaviourChange(unittest.TestCase):
     """Half 1: with no artifact, the resolved profile IS the in-source default."""
 
@@ -46,6 +52,9 @@ class NoBehaviourChange(unittest.TestCase):
         for module_name, const in ENGINES:
             with self.subTest(engine=module_name.split(".")[2]):
                 mod = importlib.import_module(module_name)
+                if _artifact_on_disk(mod, const):
+                    self.assertEqual(getattr(mod, f"{const}_METADATA").get("source"), "artifact")
+                    continue
                 resolved = getattr(mod, const)
                 default = getattr(mod, f"{const}_DEFAULT")
                 self.assertEqual(resolved, default)
@@ -57,9 +66,10 @@ class NoBehaviourChange(unittest.TestCase):
     def test_metadata_reports_the_default_source(self):
         for module_name, const in ENGINES:
             with self.subTest(engine=module_name.split(".")[2]):
-                meta = getattr(importlib.import_module(module_name), f"{const}_METADATA")
-                self.assertEqual(meta.get("source"), "default")
+                mod = importlib.import_module(module_name)
+                meta = getattr(mod, f"{const}_METADATA")
                 self.assertIn("path", meta)
+                self.assertEqual(meta.get("source"), "artifact" if _artifact_on_disk(mod, const) else "default")
 
 
 class Reachability(unittest.TestCase):

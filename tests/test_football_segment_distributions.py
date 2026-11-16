@@ -444,11 +444,13 @@ def test_the_real_engine_produces_overtime_and_it_is_captured() -> None:
     """Guards against the OT residual quietly becoming unreachable. If the
     engine stops producing overtime, this fails loudly instead of the OT limb
     of `h2` going untested forever."""
+    # 240 seeds, not 60: under the #808 production profile (2026-11-16) seeds 1-60 hold no OT game, though the
+    # engine still reaches OT (seeds 74, 98, 141, 198, 200 of 1-240; 13 of 600, against the default's 17).
     accumulator = FootballSegmentAccumulator()
-    for seed in range(1, 61):
+    for seed in range(1, 241):
         assert accumulator.add(_sim(seed)) is True
     block = accumulator.payload()
-    assert block["overtime_sims"] > 0, "engine produced no OT in 60 seeds -- the h2 OT limb is untested"
+    assert block["overtime_sims"] > 0, "engine produced no OT in 240 seeds -- the h2 OT limb is untested"
     # `full` and regulation must differ by exactly the OT points on those sims.
     regulation = sum(
         int(value) * count

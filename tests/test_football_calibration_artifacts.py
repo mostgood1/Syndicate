@@ -127,8 +127,18 @@ def test_NFL_IS_UNTOUCHED():
     """
     assert NFL_CALIBRATION_PROFILE.goal_line_touchdown is False
     assert NFL_CALIBRATION_PROFILE.drive_yardage_multiplier == pytest.approx(1.0)
-    assert NFL_CALIBRATION_PROFILE.touchdown_weight_multiplier == pytest.approx(1.0)
-    assert NFL_CALIBRATION_PROFILE == NFL_CALIBRATION_PROFILE_DEFAULT
+    # NFL has its OWN profile since 2026-11-16: todo #808's end-of-half load (`data/calibration/nfl_profile.json`,
+    # pinned exactly by tests/test_nfl_calibration_profile_artifact.py). What this test guards is that nothing of
+    # NCAAF's re-fit reaches NFL, so every field NFL moved must be one of #808's nine.
+    moved = {
+        f.name for f in dataclasses.fields(NFL_CALIBRATION_PROFILE)
+        if getattr(NFL_CALIBRATION_PROFILE, f.name) != getattr(NFL_CALIBRATION_PROFILE_DEFAULT, f.name)
+    }
+    assert moved <= {
+        "halftime_kickoff", "q2_urgency_ignores_score", "end_of_half_clock", "end_of_half_kneel_out",
+        "end_of_half_clock_by_need", "q4_kick_waits", "kneel_out_q4_only", "home_field_bonus",
+        "touchdown_weight_multiplier",
+    }, moved
 
 
 def test_no_impossible_drives_under_the_promoted_profile():

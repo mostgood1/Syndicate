@@ -388,13 +388,16 @@ def _sd_of(dist):
 
 
 def _resim(sd):
+    # The in-source default profile, named: these tests are about `rating_sd`, and on the #808 production
+    # profile this fixture's rating_sd=0.75 lands at p=0.635, inside the uninformative band, which refuses.
+    from syndicate.features.football.sim_engine.smartsim2.calibration_profile import NFL_CALIBRATION_PROFILE_DEFAULT
     from syndicate.features.nfl import live_resim as lr
     state = lr.NflLiveGameState(away_team="B", home_team="A", period=2,
                                 clock_seconds=900, home_score=7, away_score=0)
     return lr.resim_live_game(state, home_offense=0.30, home_defense=0.10,
                               away_offense=0.05, away_defense=0.05,
                               sims=200, env={"SYNDICATE_NFL_LIVE_RESIM": "1"},
-                              rating_sd=sd)
+                              rating_sd=sd, profile=NFL_CALIBRATION_PROFILE_DEFAULT)
 
 
 def test_it_ships_INERT_and_off_is_bit_identical():
