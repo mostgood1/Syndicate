@@ -812,6 +812,14 @@ fl813\out\mnf_reads.jsonl` (7:10 PM CST to the final) and puts the result in its
 - Verification: targeted tests (byte-identity OFF, reachability ON, row -> state -> engine input); the site scoreboard's live `situation` read at the first live NFL game (MNF 2026-11-16), by the possession-map lane's watcher or this lane's.
 - Blocked by: none for the consumer side; the adapter keys wait on `nfl-live-possession-map`
 
+### portfolio-edge-measurement — OPEN — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: A repeatable readout of the LIVE book's edge at the price paid (net of fees, event-clustered SE, same-book CLV beside results), plus a pre-registered scale-up gate the user approves before any live stake/cap increase
+- Files: scripts/live_book_edge_readout.py (NEW), tests/test_live_book_edge_readout.py (NEW), .syndicate/findings_2026-11-16_live_book_edge_readout.md (NEW), docs/ai_context/todo.md (#815 section only)
+- Hypothesis: The live book has no measured edge: win rate looks good only because fills are mostly favourites/alt lines whose breakeven is ~58-59%; same-book CLV (+1.3%) disagrees with results (z -3.35) so either CLV is mis-measured on venue contracts or venue closes are not efficient
+- Falsification test: Forward results at the fill price net of fees with a 95% event-clustered lower bound above 0, or a CLV/results reconciliation in which same-book CLV predicts settled excess wins
+- Verification: readout script reproduces the 2026-11-16 numbers from the fleet's /api/portfolio/live (last30 -7.27% +- 2.84 on 3006.48 staked); gate text recorded in the findings file and user-approved before any cap change
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
