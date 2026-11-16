@@ -112,8 +112,14 @@ board build -> live_gameline_join prices each live line off the same lane
   live_gameline_ledger.py:251  build_records  ->  :620 append_records
     writes <sport>_source/data/live_gameline_ledger/live_gameline_ledger_<date>.jsonl   (:147; rows only when a value moves)
 scripts/engine_experts.py live()  ledger rows + evidence rows (date -1 .. +1)
-  engine_experts.EvidenceIndex (by team names: the ledger's ids are the odds feed's, the log's are ESPN's)
+  engine_experts.EvidenceIndex(sport=)  (by team names: the ledger's ids are the odds feed's, the log's are ESPN's;
+                                         exact key first, then the join's #791 canonical pair -- NCAAF only)
   engine_experts.live_opinions -> live_resim_expert
+    prior: market_fair_prob, else (full-game totals/spreads) market_fair_prob_over  (ledger v6, the same first side)
+    p:     the evidence row's histogram, else (a display-only spread: NHL) the ledger's display_prob read back as
+           Agresti-Coull at n = sims_run
+  engine_experts.join_reproduction      (the join's own number, same lane state, half-point lines: the gate)
+  engine_experts.fallback_frame_check   (opinions no join number checks: right frame vs flipped, F2's shape: the gate)
 ```
 
 **Live (`stat_progress`).**

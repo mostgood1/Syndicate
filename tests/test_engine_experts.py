@@ -963,6 +963,49 @@ def test_the_segment_expert_finds_an_ncaaf_game_through_the_canonical_pair():
     assert ops_off == [] and stats_off["games_matched"] == 0  # off != on
 
 
+def test_live_resim_refuses_a_sample_certainty_as_the_join_does():
+    """The join records a certainty (`_dist_prob_over` -> None) as no distribution; once `fair_over` gave those rows a
+    prior the expert met them (fleet 11-14: 313 NCAAF rows, a line the game had left behind)."""
+    ev = _evidence(margin={"20": 60, "25": 60}, sims=120)
+    op = ee.live_resim_expert(_unpriced("spreads", 8.5, over=0.5025), ee.EvidenceIndex([ev]), ee.Reader())
+    assert op.refusal == "sample_certainty" and op.delta_logit is None and (op.inputs["k"], op.inputs["n"]) == (120, 120)
+
+
+def test_the_join_gate_reads_the_joins_own_rounding_at_n_120_and_still_catches_a_wrong_k():
+    """`_dist_prob_over` rounds the share to 4 dp before smoothing: at NCAAF's 120 sims the join's number is up to
+    4.8e-5 from the expert's unrounded one (fleet 11-14: 12,808 of 19,227 half-point lines), at 100 / 200 it is exact."""
+    from syndicate.features.shared.live_gameline_join import price_distribution_market
+
+    dist = {"30": 52, "60": 68}  # 52 of 120 under 45.5, so 68 over: 68/120 = 0.56667 is not exact at 4 dp
+    ev = _evidence(total=dist, sims=120)
+    join = price_distribution_market(dist=dist, line=45.5, side="over", market="totals", market_prob=0.5, sims=120)
+    op = ee.live_resim_expert(_ledger("totals", 45.5, join_p=join["model_prob"]), ee.EvidenceIndex([ev]), ee.Reader())
+    assert op.p_expert == pytest.approx(70 / 124, abs=1e-6)  # the expert keeps the unrounded share
+    assert abs(op.p_expert - join["model_prob"]) > 1e-6  # so the old gate would call this a mismatch
+    assert ee.join_estimate(68, 120) == pytest.approx(join["model_prob"], abs=1e-12)
+    rep = ee.join_reproduction([op])
+    assert (rep["checked"], rep["mismatched"], rep["rounding_only"]) == (1, 0, 1)
+    off_by_one = ee.live_resim_expert(_ledger("totals", 45.5, join_p=ee.join_estimate(67, 120)),
+                                      ee.EvidenceIndex([ev]), ee.Reader())
+    assert ee.join_reproduction([off_by_one])["mismatched"] == 1  # one sim is 8e-3: a wrong k still fails
+    seg = {"h1": {"total_dist": dist, "margin_dist": {"-3": 60, "3": 60}, "sims": 120, "settled": False,
+                  "marginAnchored": True}}
+    quotes = [_gq("fanduel", "totals", "over", 45.5, -110, segment="h1"),
+              _gq("fanduel", "totals", "under", 45.5, -110, segment="h1")]
+    ops, _stats, index, *_ = _seg([_seg_evidence(h1=seg["h1"])], quotes)
+    srep = ee.segment_join_reproduction(ops, index)
+    assert (srep["checked"], srep["mismatched"], srep["rounding_only"]) == (1, 0, 1)
+
+
+def test_an_ncaaf_segment_opinion_takes_the_odds_feeds_event_id_when_the_lane_has_none():
+    ev = {**_seg_evidence(sport="ncaaf"), "event_id": None}
+    ops, *_ = _seg([ev], _seg_quotes())
+    assert ops and all(o.event_id == "fc5d" and o.inputs["event_id_source"] == "book_quotes" for o in ops)
+    assert ops[0].line_key.startswith("ncaaf|fc5d|")
+    with_id, *_ = _seg([_seg_evidence()], _seg_quotes())  # NCAAB lanes carry ESPN's id: kept, as before
+    assert all(o.event_id == "401922250" and "event_id_source" not in o.inputs for o in with_id)
+
+
 # ----------------------------------------------------------------------------- shadow: no reader, no order module
 
 

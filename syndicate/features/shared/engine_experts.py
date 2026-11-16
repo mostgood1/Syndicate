@@ -692,8 +692,33 @@ def live_resim_expert(ledger_row: Mapping[str, Any], index: EvidenceIndex, reade
     if n2 <= 0:
         op.refusal = "all_push"
         return op
+    # THE JOIN REFUSES A SAMPLE CERTAINTY (#624; `live_segment` has the same rule): `prop_projections._dist_prob_over`
+    # returns None and the join records it as `live_resim_published_no_distribution_for_this_market`. Rows the join
+    # priced never carry one, so this expert never met it until `fair_over` gave those rows a prior: fleet 11-14, 313
+    # NCAAF rows, every one 0 or 120 of 120 against a line the game had left behind (Iowa State -8.5 at 28-7).
+    if k == 0 or k == n2:
+        op.refusal = "sample_certainty"
+        return op
     p_adj, se = agresti_coull(k, n2)
     return _finish(op, p_adj, sigma_logit_from_se(p_adj, se), "mc_agresti_coull")
+
+
+def join_estimate(k: Any, n: Any) -> float | None:
+    """The live join's own number for k of n two-way sims, by its own two functions: the share rounded to 4 dp
+    (`prop_projections._dist_prob_over`), then add-two smoothed (`live_gameline_join.agresti_coull_point`).
+
+    The expert keeps the UNROUNDED share. At n 200 (NBA, NCAAB) k/n is exact at 4 dp and the two agree to the bit; at
+    NCAAF's n 120 they differ by up to 0.00005 x 120 / 124 = 4.8e-5 (fleet 11-14: 12,808 of 19,227 half-point lines).
+    The reproduction gates compare the join's recorded number with THIS, so a wrong k or frame still shows (one sim at
+    n 120 is 8e-3) while the rounding does not. None on a certainty, which the join refuses."""
+    from syndicate.features.shared.live_gameline_join import agresti_coull_point
+    from syndicate.features.shared.prop_projections import _dist_prob_over
+
+    kf, nf = _f(k), _f(n)
+    if kf is None or nf is None or nf <= 0:
+        return None
+    share = _dist_prob_over({"1": kf, "0": nf - kf}, 0.5)
+    return None if share is None else agresti_coull_point(share, nf)
 
 
 # `display_prob` read back as Agresti-Coull: k = p (n + 4) - 2 must be a whole number of sims. The ledger stores the
@@ -1045,7 +1070,7 @@ def board_fair_over(entries: Sequence[tuple], at: datetime | None, books: set[st
 
 SEGMENT_MARKETS = _TOTALS | _SPREADS
 _GAME_QUOTE_PATHS = ("kind", "market", "segment", "selection", "line", "price", "bookmaker", "home_team", "away_team",
-                     "captured_at", "book_updated_at", "snapshot_ts")
+                     "captured_at", "book_updated_at", "snapshot_ts", "event_id")
 
 
 def canonical_quote_side(market: Any, selection: Any, line: Any) -> tuple[str, float] | None:
@@ -1087,6 +1112,10 @@ class GameLineQuoteIndex:
         # (home key, away key) -> the raw (home, away) names first seen for it: the canonical-pair fallback
         # (`EvidenceIndex.find`) resolves NAMES, and a team key has lost the punctuation some names need ("Hawai'i").
         self.names: dict[tuple[str, str], tuple[Any, Any]] = {}
+        # (home key, away key) -> the odds feed's event id: the game's identity where the evidence row carries none
+        # (NCAAF's lanes have no event id, so a segment opinion keyed on the evidence alone had an EMPTY event id and
+        # the line keys of different games collided -- fleet 11-14, the first night NCAAF segments matched at all).
+        self.event_ids: dict[tuple[str, str], str] = {}
         self.rows = 0
         self.non_null: dict[str, int] = {}
         self.unmapped = 0
@@ -1111,6 +1140,8 @@ class GameLineQuoteIndex:
             segment = str(got["segment"] or "full").strip().lower() or "full"
             key = (team_key(got["home_team"]), team_key(got["away_team"]), market, segment)
             self.names.setdefault(key[:2], (got["home_team"], got["away_team"]))
+            if got["event_id"] and key[:2] not in self.event_ids:
+                self.event_ids[key[:2]] = str(got["event_id"])
             self.by_key.setdefault(key, {}).setdefault(float(line), []).append(
                 (seen, stamp, str(got["bookmaker"] or "").lower(), side, int(price), str(got["selection"] or "")))
         for lines in self.by_key.values():
@@ -1146,7 +1177,8 @@ def line_live_at(entries: Sequence[tuple], at: datetime, max_age_s: float = PROP
 def live_segment_expert(evidence_row: Mapping[str, Any], segment: str, market: str, line: float,
                         entries: Sequence[tuple], reader: Reader, off: frozenset[str] = frozenset(),
                         game_key: tuple[str, str] | None = None,
-                        evidence_game: tuple[str, str] | None = None) -> ExpertOpinion:
+                        evidence_game: tuple[str, str] | None = None,
+                        quote_event_id: str | None = None) -> ExpertOpinion:
     """One segment line at one logged tick -> an opinion on OVER (totals) / HOME COVERS (spreads).
 
     p_expert: the segment block's histogram, two-way (push sims out) and Agresti-Coull smoothed -- the join's
@@ -1156,6 +1188,9 @@ def live_segment_expert(evidence_row: Mapping[str, Any], segment: str, market: s
     e = lambda path: reader.get(name, "live_evidence", evidence_row, path)  # noqa: E731
     sport = str(e("sport") or "").lower()
     event_id = str(e("event_id") or "")
+    event_id_source = "live_evidence"
+    if not event_id and quote_event_id:
+        event_id, event_id_source = str(quote_event_id), "book_quotes"
     t = str(e("t") or "")
     market = str(market or "").lower()
     segment = str(segment or "").lower()
@@ -1178,6 +1213,8 @@ def live_segment_expert(evidence_row: Mapping[str, Any], segment: str, market: s
     if evidence_game is not None and evidence_game != game_key:
         # Found through the canonical pair: the evidence log files this game under its own names.
         op.inputs["evidence_game"] = list(evidence_game)
+    if event_id_source != "live_evidence":
+        op.inputs["event_id_source"] = event_id_source
     if name in off:
         op.refusal = "expert_off"
         return op
@@ -1272,7 +1309,7 @@ def live_segment_opinions(index: EvidenceIndex, quotes: GameLineQuoteIndex, read
                         if not line_live_at(entries, t):
                             continue
                         out.append(live_segment_expert(row, segment, market, line, entries, reader, off, game_key,
-                                                       evidence_game))
+                                                       evidence_game, quotes.event_ids.get(game_key)))
                         used = block_used = True
                 if block_used and keep_blocks is not None:
                     keep_blocks.append(block)
@@ -1318,10 +1355,14 @@ def segment_join_reproduction(opinions: Sequence[ExpertOpinion], index: Evidence
         whole = float(op.line) == math.floor(float(op.line))
         bucket = out["whole_number"] if whole else out
         bucket["checked"] += 1
-        bad = join_p is None or abs(float(join_p) - float(op.p_expert)) > tol
         if whole:
-            bucket["differ"] += int(bad)
+            bucket["differ"] += int(join_p is None or abs(float(join_p) - float(op.p_expert)) > tol)
             continue
+        # The join's number from the expert's own (k, n), through the join's rounding (`join_estimate`).
+        expected = join_estimate(op.inputs.get("k"), op.inputs.get("n"))
+        bad = join_p is None or expected is None or abs(float(join_p) - expected) > tol
+        out["rounding_only"] = int(out.get("rounding_only", 0)) + int(
+            not bad and abs(float(join_p) - float(op.p_expert)) > tol)
         if bad:
             out["mismatched"] += 1
             if len(out["examples"]) < 10:
@@ -1499,10 +1540,16 @@ def join_reproduction(opinions: Sequence[ExpertOpinion], tol: float = 1e-6) -> d
             whole_gaps.append(gap)
             continue
         out["checked"] += 1
-        if abs(gap) > tol:
+        # The join's recorded number against the join's own estimator on the expert's (k, n) (`join_estimate`): equal
+        # to the expert's unrounded number wherever k/n is exact at 4 dp (n 100, 200), within 4.8e-5 of it at n 120.
+        expected = join_estimate(op.inputs.get("k"), op.inputs.get("n")) if not op.inputs.get("push") else None
+        bad = abs(gap) > tol and (expected is None or abs(float(join_p) - expected) > tol)
+        out["rounding_only"] = int(out.get("rounding_only", 0)) + int(abs(gap) > tol and not bad)
+        if bad:
             out["mismatched"] += 1
             if len(out["examples"]) < 10:
                 out["examples"].append({"line_key": op.line_key, "t": op.t, "expert": op.p_expert, "join": join_p,
+                                        "join_from_k_n": expected,
                                         "estimator": op.inputs.get("join_point_estimator"), "k": op.inputs.get("k"),
                                         "n": op.inputs.get("n"), "push": op.inputs.get("push")})
     if whole_gaps:
@@ -1649,6 +1696,20 @@ EXPECTED_SPARSE: dict[str, str] = {
     "nfl:live_resim:live_evidence:event_id": "NFL lanes carry no event id; the expert joins on team names",
     "nfl:live_resim:out:line": "the live join refuses every NFL totals/spreads row (no_distribution: the lane "
                                "publishes its histograms at lane level, snake_case), so only moneylines carry a prior",
+    "live_resim:live_gameline_ledger:market_fair_prob_over": "ledger v6 (2026-11-11): absent from every record written "
+                                                             "before it; read only where market_fair_prob is absent "
+                                                             "on a full-game total / spread, and null where the join "
+                                                             "had no two-sided price (NCAAF 11-11..11-13: every one)",
+    "live_resim:live_gameline_ledger:display_prob": "ledger v6 (2026-11-11): absent before it; read only on a "
+                                                    "display-only spread row (NHL's puck line, #773)",
+    "live_resim:live_gameline_ledger:display_basis": "ledger v6 (2026-11-11): absent before it; read only on a "
+                                                     "display-only spread row (NHL's puck line, #773)",
+    "ncaaf:live_resim:live_evidence:event_id": "NCAAF lanes carry no event id; the expert joins on team names (exact, "
+                                               "then the join's #791 canonical pair)",
+    "ncaaf:live_segment:live_evidence:event_id": "NCAAF lanes carry no event id; the opinion takes the odds feed's "
+                                                 "from book_quotes (`GameLineQuoteIndex.event_ids`)",
+    "ncaaf:live_resim:out:line": "a night whose NCAAF totals / spreads all lack a two-sided price (weekdays 11-10..11-13: "
+                                 "no_two_sided_market_price on every one) opines only moneylines",
     "nhl:live_resim:live_evidence:segments": "NHL lanes emit no segments",
     "nfl:live_resim:live_evidence:segments": "NFL lanes emit no segments",
     "ncaaf:live_resim:live_evidence:segments": "NCAAF lanes emit no segments",

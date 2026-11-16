@@ -283,7 +283,8 @@ def run(args: argparse.Namespace) -> int:
               f"evidence_rows={block['evidence_rows']}")
         _print_coverage(sport, ops)
         j = block["join"]
-        print(f"   JOIN {sport} half_point checked={j['checked']} mismatched={j['mismatched']} | "
+        print(f"   JOIN {sport} half_point checked={j['checked']} mismatched={j['mismatched']} "
+              f"(rounding_only {j.get('rounding_only', 0)}) | "
               f"whole_number checked={j['whole_number']['checked']} differ={j['whole_number']['differ']} "
               f"mean(expert-join)={j['whole_number']['mean_expert_minus_join']} | h2h checked={j['h2h']['checked']} "
               f"differ={j['h2h']['differ']}")
@@ -343,7 +344,8 @@ def run(args: argparse.Namespace) -> int:
             print(f"   UNMATCHED {sport} {len(st['games_unmatched'])}: {st['games_unmatched'][:8]}")
         _print_coverage(sport, ops)
         j, pr, fr = block["join"], block["prior"], block["frame"]
-        print(f"   SEG_JOIN {sport} half_point checked={j['checked']} mismatched={j['mismatched']} | whole_number "
+        print(f"   SEG_JOIN {sport} half_point checked={j['checked']} mismatched={j['mismatched']} "
+              f"(rounding_only {j.get('rounding_only', 0)}) | whole_number "
               f"checked={j['whole_number']['checked']} differ={j['whole_number']['differ']}")
         for ex in j["examples"][:5]:
             print("      MISMATCH", json.dumps(ex, default=str))
