@@ -1096,6 +1096,7 @@ def _build_inplay_overlay(
     slug = str(sport or "").strip().lower()
     cards: list[dict[str, Any]] = []
     opportunities: list[dict[str, Any]] = []
+    refused: dict[str, int] = {}
     # Where a build's time goes, for the INPLAY_OVERLAY line: candidates, shortlist, cards, and the
     # recent-form evidence inside the cards (#790).
     timings: dict[str, Any] = {}
@@ -1109,8 +1110,10 @@ def _build_inplay_overlay(
             if not str(item.get("sport") or "").strip():
                 item["sport"] = slug
         started = _time.perf_counter()
-        chosen = ((select_shortlist(opportunities) or {}).get("rows") or []) if opportunities else []
+        shortlist = (select_shortlist(opportunities) or {}) if opportunities else {}
+        chosen = shortlist.get("rows") or []
         timings["shortlist_ms"] = round((_time.perf_counter() - started) * 1000)
+        refused = inplay_overlay_shortlist_refusals(shortlist)
         started = _time.perf_counter()
         if context is not None and _accepts_row_context(layer2_rows_to_board_cards):
             built = layer2_rows_to_board_cards(chosen, row_context=context)
@@ -1142,8 +1145,38 @@ def _build_inplay_overlay(
         "rows_inplay": len(rows or []),
         "opportunities": len(opportunities),
         "cards": cards,
+        # Why `select_shortlist` dropped opportunities (lane wncaab-overlay-zero-cards).
+        "shortlist_refused": refused,
         "timings": timings,
     }
+
+
+#: `select_shortlist` keys that start with `rows_` but are budgets, sizes or admissions, not refusals.
+_SHORTLIST_NON_REFUSAL_KEYS = frozenset({
+    "rows_total_budget", "rows_per_game", "rows_bytes", "rows_pct_of_keyvalue_max",
+    "rows_admitted_by_blend", "rows_admitted_by_movement", "rows_allocated_by_sport",
+})
+
+
+def inplay_overlay_shortlist_refusals(shortlist: Mapping[str, Any] | None) -> dict[str, int]:
+    """`select_shortlist`'s positive `rows_*` refusal counts, for the INPLAY_OVERLAY line.
+
+    The overlay used to keep only the chosen rows, so a build with opportunities and 0 cards logged
+    no reason. Measured 2026-11-16 (lane wncaab-overlay-zero-cards): every WNCAAB in-play build
+    21:04-21:58Z published 0 cards from 6-22 opportunities. A read-only replay found the cause:
+    `rows_below_value_floor` refused all of them (market EV -6..-10% against the -2% floor; the
+    live join had withheld the model price for quote age). Per-sport, sample and by-reason
+    breakdowns are dicts and are skipped: the overlay is one sport, so the totals say it.
+    """
+    out: dict[str, int] = {}
+    for key, value in (shortlist or {}).items():
+        name = str(key)
+        if not name.startswith("rows_") or name in _SHORTLIST_NON_REFUSAL_KEYS:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+            continue
+        out[name] = int(value)
+    return dict(sorted(out.items()))
 
 
 def write_book_grid_inplay_overlay(sport: str, date_str: str, overlay: Mapping[str, Any]) -> Path:
@@ -1199,7 +1232,10 @@ def _write_inplay_overlay_best_effort(sport: str, date_str: str, payload: Mappin
             f"opportunities={overlay['opportunities']} cards={len(overlay['cards'])} published={published} "
             f"elapsed_ms={(_time.monotonic() - started) * 1000:.0f} "
             # The phases (#790): candidates, shortlist, cards, and the cards' recent-form evidence.
-            + " ".join(f"{name}={value}" for name, value in (overlay.get("timings") or {}).items()),
+            + " ".join(f"{name}={value}" for name, value in (overlay.get("timings") or {}).items())
+            # Why the shortlist dropped opportunities: one space-free token, LAST, so the key=value
+            # readers and the adjacent lookups_* pair are untouched (lane wncaab-overlay-zero-cards).
+            + " refused=" + json.dumps(overlay.get("shortlist_refused") or {}, separators=(",", ":"), sort_keys=True),
             flush=True,
         )
     except Exception as exc:  # noqa: BLE001 -- an overlay must never cost the grid
