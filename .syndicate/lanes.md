@@ -748,11 +748,6 @@ death, never life — do not invert it.
 - Verification: git grep for api.render.com / onrender outside data, reports, ledger and render.yaml returns only the deploy-guard's Render-BLOCKING rules and docs that say Render is retired; pytest on every changed module's tests passes; each repointed CLI run once read-only against the fleet and its verdict leaves UNKNOWN; #766 records the user's decisions on markers, env snapshot and the render.yaml guard
 - Blocked by: none
 
-### closed-lane-archive-20261116-0240 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 177cb42a-78ee-459c-a94a-5e9e7bd063da
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. Moved `closed-lane-archive-20261115-2045` (owner d7be6a3b idle 346m, block lastmod 353m, both >= 240m). 20 other CLOSED blocks WAIT; table in `.syndicate/log/2026-11-15.md`.
-
 ### closed-lane-archive-20261116-0440 — CLOSED 2026-11-16 (GOAL MET: 18 blocks archived) — opened 2026-11-16 — session d8b75461-af46-460a-bbc9-5602287431fa
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -780,6 +775,11 @@ death, never life — do not invert it.
 - Verification: Per-phase table from the fleet log (rows_ms per row and non-evidence cards_ms per card, every sport) + offline replay cold and warm with thread CPU vs wall; tonight, if NBA plays, per-thread /proc samples of refresh-worker during an NBA overlay build. Recorded in todo #790 and deploys.md (READING, no deploy).
 - STATUS 2026-11-16 8:14 AM CST (14:14Z): **OFFLINE RESULT** -- H1 CONFIRMED, MECHANISM = the interpreter lock's CONVOY; H2 FALSE; H3 only through H1. (1) Fleet log, 11-15 night (`cost790_phase.py`): every sport slowed at the same moments, not NBA alone -- at the NBA peak (23:00-00:15Z) NCAAB / NFL / WNCAAB's cheap rows stage ran 1.5-3x its calm us/row; after the 01:28:28Z restart NFL and NHL card work (NHL has no evidence step) rose ~8x with NBA's. (2) refresh-worker sits at the one-core ceiling all day (`cost790_board.py`): process CPU / wall over every BOARD_BUILD_TIMING span 0.94-1.11 cores, calm hours included; the board build (its own thread, back to back) ran 3-5 min calm, 17 min at 23:18Z, 18 min after the restart. The book-grid tick runs on the MAIN thread (`run_refresh_worker.py:8443`). (3) Uncontended replay, fleet code + environ, tonight's pregame NBA grid, nice 19 (`cost790_replay.py`): 2,600 rows -> 2,000 cards cold 13.2 s (3.4 ms/card outside evidence), warm 3.6 s (1.1 ms/card) -- at or below production's CALM 3.5 ms, so per-card cost does not grow with load (H2 false by the stated <= 5 ms bar). (4) THE CONVOY: one competing pure-Python thread in the same process stretched the warm build 3.6 -> 135.7 s (x37; the overlay thread got 7% of the core, cpu/wall 0.07), not the x2 a fair split gives; a thread json.loads-ing a 27 MB file stretched the rows stage x21 (4% of the core). Cause (`cost790_calls.py`): a warm 2,000-card build makes 47,565 stat + 2,376 scandir calls (~24 per card), each releasing the lock for a syscall and waiting up to the 5 ms switch interval to get it back. Top sites: `probability_calibration.profile_path` -> `refresh_state_store.data_root()` (`Path.resolve()` every call) 24,280; `closing_line_history._index` 7,664; `odds_control_plane.current_odds_root_for_sport` (resolve every call) 6,776; `probability_calibration._stat_signature` 4,856; `team_recent_results._sources` glob + `_index` stat 2,376 + 2,376; `player_headshots._nba_current_roster` 847 -- per-call cache validation and path resolution, none of it changing inside a build. Cold adds parses: 67,543 stat + 5,496 scandir, which is why a restart (cold + contended) was worst. (5) LEVERS, same contended warm build (`cost790_lever.py`, cards identical in order and identity in every mode): base 139.9 s (lock share 0.08); `sys.setswitchinterval(0.0005)` 28.1 s (0.37); each path stat'd / listed ONCE per build (emulated by a per-build memo: 66 real calls instead of ~50,000) 6.1 s (0.54) -- x23. NOT YET MEASURED IN PRODUCTION: the main thread's share during a live NBA overlay build. `ptrace_scope` = 1, so py-spy cannot attach without sudo (not taken); a read-only /proc sampler (`cost790_sampler.sh`, 1 s, per-thread jiffies + state) is armed as this session's background task for 23:55Z-04:00Z 11-16/17 (8 NBA games, tips 00:10-02:10Z), analysed by `cost790_analyze.py`. NEXT: the production reading tonight, then the user's choice of lever (code + load are the user's decision).
 - Blocked by: none
+
+### closed-lane-archive-20261116-0840 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session a60661ae-5c55-42b6-b94a-9aebec374382
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main at ~14:41Z (8:41 AM CST) gave 1 SAFE of 6 CLOSED; moved `closed-lane-archive-20261116-0240`. Waits and the dormant-OPEN reading are in log/2026-11-16.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1058,6 +1058,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261115-2045` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session d7be6a3b-e462-437f-8870-796f285cc9b3
 - `closed-lane-archive-20261115-2300` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 7f79320f-36a1-43e4-bbe5-1f5ab96a089b
 - `closed-lane-archive-20261116-0040` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 5e2408ef-0ee8-42b2-9f3f-728391707307
+- `closed-lane-archive-20261116-0240` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 177cb42a-78ee-459c-a94a-5e9e7bd063da
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
