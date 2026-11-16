@@ -2311,6 +2311,9 @@ command. A filter on a guard's output is a way to not see the guard.
 
 - **What happened:** a ledger helper wrote `open(p, "wb").write(fn(s))`. Python evaluates `open()`, which TRUNCATES, before `fn()`. `fn` raised on a failed assert, so `.syndicate/state.md` went to 0 bytes: 744 deleted lines staged, with no error naming the file. It was caught by reading `git diff --cached --numstat` (0 added / 744 deleted), restored from HEAD, and never committed.
 - **The one-line form is the trap:** `open(p, "wb").write(build())` LOOKS like build-then-write. Always build into a variable first, then `with open(p, "wb")`. Check `--numstat` deletions before EVERY ledger commit.
+- **REPEAT 2026-11-16 `[lane layer2-rail-monitor, session d58574cb]`:** the same one-liner in a checkpoint helper, `open(p, "wb").write(nl.join(lines).encode())`, with `nl` bytes and `lines` str. `join` raised a TypeError after `open` had truncated `lanes.md` to 0 bytes (2,342 lines).
+  - Caught by `git diff --stat` before any `git add`, and restored with `git checkout`.
+  - Fixed form, now the template: build `data`, then `assert len(data) > 0.95 * len(raw)`, then write a `.tmp`, then `os.replace`. An in-place rewrite of a ledger file should never shrink it by more than a few percent.
 
 
 ## 2026-10-15 RULE: the null for a ONE-SIDEDNESS claim is the MEASURED directional base rate, never 50/50 `[lane model-edge-ceiling-implied-probability]`
