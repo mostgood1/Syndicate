@@ -101,18 +101,12 @@ python3 scripts/local_production.py init
   - Override with `SYNDICATE_LOCAL_HOME`, and pick it **once**: the Redis keys embed the absolute data-root path.
 - It also writes `<home>/local_production.env`, a template listing every key the blueprint declares without a value, plus the dashboard-only keys the code reads. It generates a fresh `ADMIN_TOKEN`.
 
-**For full parity, import the live env.** The Render API still answers for suspended services, and the blueprint was about 166 keys behind live:
+**The role env snapshot, `<home>/render_env/{web,refresh-worker,live-odds-worker}.json`.** It holds each role's full live env (88 / 182 / 148 keys), imported ONCE from the Render API on 2026-10-01, when the blueprint was about 166 keys behind live. It is the fleet's own copy now: the import command (`import-render-env`) was removed 2026-11-15 with the rest of the Render tooling (lane `render-retirement`; `docs/ai_context/render_retirement.md`), because Render must not be needed for anything.
+- The files hold real values, mode 600, outside the repo. **Never commit them, and never print a value.**
+- Anything in `local_production.env` overrides them. Use it to change a single key (`ROLE__KEY` for one role), such as your own `ADMIN_TOKEN` or turning an autorun off; then a drained full `down`/`up`.
+- **They are NOT in the nightly backup**, and neither is `local_production.env` (below). Losing this WSL disk loses them, and Render is no longer a way back. A Render-free backup is a user decision owed in todo `#766`.
 
-```bash
-RENDER_API_KEY=... python3 scripts/local_production.py import-render-env
-# or: --env-file /path/to/.env   (the repo's gitignored .env on your Windows checkout holds it)
-```
-
-- This writes `<home>/render_env/{web,refresh-worker,live-odds-worker}.json` with real values, mode 600, outside the repo. **Never commit these files.**
-- It is read-only against Render.
-- Anything in `local_production.env` overrides the imported values. Use it to change a single key, such as your own `ADMIN_TOKEN` or turning an autorun off.
-
-Without an import, you must set these yourself in `local_production.env`. `doctor` lists what is absent per role.
+Without the snapshot, you must set these yourself in `local_production.env`. `doctor` lists what is absent per role.
 
 | key | role | note |
 |---|---|---|
@@ -146,7 +140,7 @@ python3 scripts/local_production.py up       # foreground; Ctrl-C stops everythi
 - **Off‑disk archive:** the newest snapshot is `tar | gzip -1`'d into ONE file in `SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR` (default `/mnt/c/SyndicateBackup` on WSL). The newest 2 are kept (`--offdisk-keep`). The WSL disk is one VHDX file, so this archive survives a lost or unregistered distro. It is still the same physical disk, so for disk failure, copy `C:\SyndicateBackup` to a second drive or off the machine.
 - **On the production fleet** `SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR=/mnt/c/Users/tempadmin/OneDrive/SyndicateBackup` since 2026-10-26 (user decision; OneDrive carries the archive off the machine). First run verified: 4.71 GB, rc 0. `deploys.md` 2026-10-26 17:30Z. The old `C:\SyndicateBackup` archives no longer rotate. Since 2026-10-30 the archive is written in `/mnt/c/Users/tempadmin/SyndicateBackup-staging` (beside OneDrive, same volume; `SYNDICATE_LOCAL_BACKUP_OFFDISK_STAGING_DIR` overrides) and moved in only when complete, and a failed write is retried once after 300 s (`--offdisk-retries`, `--offdisk-retry-delay`). The 10-30 09:21Z write had failed with `Cannot allocate memory`; the cause is not established. `deploys.md` 2026-10-30.
 
-**Why not rsync straight onto `/mnt/c`:** WSL mounts it as 9p with `uid=0` and no metadata, so every utime from the WSL user is refused. Measured 2026‑10‑01: 2,946 `failed to set times` errors in 4 minutes, with 2,768 of ~41k files copied. Without mtimes, `--link-dest` never matches. Secrets (`render_env/`, `local_production.env`) are deliberately not in it: re-import them with `import-render-env`.
+**Why not rsync straight onto `/mnt/c`:** WSL mounts it as 9p with `uid=0` and no metadata, so every utime from the WSL user is refused. Measured 2026‑10‑01: 2,946 `failed to set times` errors in 4 minutes, with 2,768 of ~41k files copied. Without mtimes, `--link-dest` never matches. Secrets (`render_env/`, `local_production.env`) are deliberately not in it, and since 2026-11-15 there is no re-import (todo `#766`).
 
 **Log lines and `render_logs.py`.** Every role (and scheduled job) starts with `scripts/local_logstamp` first on `PYTHONPATH`. Its `sitecustomize` prefixes each line the role prints with `2026-10-02T14:36:49.123Z `, the per-line time Render used to add. The prefix is added inside the role, not by piping through the supervisor, so a supervisor crash cannot break a role's stdout. The supervisor builds each role's env once, at `up`, and a role restart reuses it. So the prefix needs a full `down` + `up` of the supervisor; a role restart, including live-odds-worker's 6-hourly exit, is not enough. Off switch: `SYNDICATE_LOCAL_LOG_TIMESTAMPS=0`. `scripts/render_logs.py` reads these files, rotations included, whenever `--local` is given, `SYNDICATE_LOG_SOURCE=local` is set, there is no `RENDER_API_KEY`, or Render reports the web service suspended. From Windows it reads them through `\\wsl.localhost`. A line carrying neither the prefix nor a web access-log stamp gets the time of the nearest earlier stamped line. That time is marked `~` and counted as APPROXIMATE (a lower bound); `--exact-only` drops such lines. Its callers (census scripts, watchers) need no change.
 

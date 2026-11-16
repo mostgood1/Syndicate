@@ -754,8 +754,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     imported = {r: load_live_env(settings, r) for r in ROLE_ORDER}
     _check(all(imported.values()), "role env snapshot (<home>/render_env/<role>.json)",
            ", ".join(f"{r}={len(imported[r])} keys" for r in ROLE_ORDER) if all(imported.values())
-           else "no -- restore <home>/render_env/ from the fleet's own backup "
-                "(docs/ai_context/local_production_runbook.md); blueprint-only until then",
+           else "no -- set the missing keys in local_production.env (there is no Render re-import "
+                "since 2026-11-15, and no secrets backup yet: todo #766); blueprint-only until then",
            warn=True)
     ok &= _check(settings.env_file.is_file(), "secrets file", str(settings.env_file) if settings.env_file.is_file() else "missing -- run `init`")
     for key, why in (

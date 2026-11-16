@@ -966,6 +966,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: git grep for api.render.com / onrender outside data, reports, ledger and render.yaml returns only the deploy-guard's Render-BLOCKING rules and docs that say Render is retired; pytest on every changed module's tests passes; each repointed CLI run once read-only against the fleet and its verdict leaves UNKNOWN; #766 records the user's decisions on markers, env snapshot and the render.yaml guard
 - Blocked by: none
+- **STATUS `[2026-11-16 02:4xZ (8:4x PM CST 11-15)]`: GOAL NOT MET -- the code half is DONE and on main, three user decisions are owed.** On main: `f9ed2ec0f` (21 Render-API scripts + `import-render-env` deleted), `193df776e` (every onrender fallback + the pipeline diagnostics on the fleet), `2aba260b6` (preflight / check_deploy_safety / render_logs fleet-only; 443 tests), plus the docs commit (CLAUDE.md, runbook, #766, findings). Nothing loaded onto the fleet. Owed: D5 env-snapshot backup (none exists, no re-import), D2' RENDER_* markers, D3' retire `check_blueprint_drift.py` -- options and recommendations in `.syndicate/findings_2026-11-15_render_retirement.md`. Close when #766 records the three answers (and E1 is built, if chosen).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

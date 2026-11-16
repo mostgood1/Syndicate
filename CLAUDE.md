@@ -32,8 +32,15 @@ machine's WSL as **the fleet**: `scripts/local_production.py up` supervises web,
 both workers and a local Redis on ONE shared disk (`~/syndicate-prod/data`). **It
 has traded live money since 2026-10-19, and every restart comes back LIVE.**
 Runbook: `docs/ai_context/local_production_runbook.md`. Verified current state:
-`.syndicate/state_worker.md` `[local-production-host]`. Nothing at run time needs
-Render. Leave the Render account and its services alone: they are dormant.
+`.syndicate/state_worker.md` `[local-production-host]`.
+
+**Nothing needs Render: not the fleet, not a deploy, not any tool in this repo**
+`[2026-11-15, user: "render shouldnt be needed"]`. Do not call the Render API, use an
+`onrender.com` URL, or add a Render default; target `http://127.0.0.1:10000`. The
+Render-only scripts were deleted and every fallback was repointed at the fleet
+(`docs/ai_context/render_retirement.md`). The one Render read left is
+`check_blueprint_drift.py`, which runs only on a `render.yaml` push (todo `#766`). The
+Render account and its suspended services are dormant: leave them alone.
 
 - **Pushing to `main` ships nothing until someone fast-forwards the fleet, and then
   it ships ALL of `main`.** The fleet checkout is `~/Syndicate`, and its GitHub
@@ -47,8 +54,10 @@ Render. Leave the Render account and its services alone: they are dormant.
   An ff alone reaches web at its next worker recycle. So land a behaviour change
   only when you are ready to measure it (learnings 2026-10-03).
 - **Fleet env is layered:** `render.yaml` → `~/syndicate-prod/render_env/<role>.json`
-  (a Render snapshot from 2026-10-01) → `~/syndicate-prod/local_production.env` →
-  forced keys. A later layer wins.
+  (imported once from Render on 2026-10-01; now the fleet's own copy, and the import
+  command is gone) → `~/syndicate-prod/local_production.env` → forced keys. A later
+  layer wins. **Neither secrets file is in the nightly backup** (it copies the data
+  root only); see todo `#766` before relying on a restore.
   - **Every key `render.yaml` declares is also in the snapshot, so editing
     `render.yaml` changes NOTHING on the fleet.** Measured 2026-11-08: 0 of 48 / 77 /
     72 keys are decided by `render.yaml` alone.
@@ -71,8 +80,8 @@ Render. Leave the Render account and its services alone: they are dormant.
   - the request-path guard switches off;
   - the two workers count each other's jobs.
 
-  Do not strip them. The full inventory of what still assumes Render is in
-  `.syndicate/findings_2026-11-07_render_dependency_inventory.md`.
+  Do not strip them. They are NAMES, not a dependency: nothing reaches Render through
+  them. Which code reads each one: `.syndicate/findings_2026-11-15_render_retirement.md`.
 
 History (`#284`): on Render, `autoDeploy = no` held for code. But `blueprint_sync`
 applied any pushed `render.yaml` to every service. Measured 2026-08-08: an unordered
@@ -118,7 +127,7 @@ mix git-tracked and untracked on-disk files.
 - Don't diagnose "missing data" from the local checkout. Check production first:
   the fleet's `/api/ops/...` or the per-sport JSON APIs, at `http://127.0.0.1:10000`
   (`scripts/_base_url.py` resolves both the URL and the token). The repo `.env` holds
-  Render's token, which the fleet rejects.
+  the old Render-era token, which the fleet rejects.
 - Fixing thin coverage means refreshing the mirror from production or widening
   `HOT_ARTIFACT_PATTERNS` — not quietly falling back to whatever is on disk.
 
@@ -333,11 +342,11 @@ python scripts/deploy_preflight.py --service <svc> --holder <lane> --target-comm
 Both must pass before `.claude/hooks/deploy-guard.py` will let a deploy
 through: an unexpired claim held by YOUR lane, plus a preflight that returned
 `CLEAR` within 15 minutes **for the exact SHA you are deploying**. Preflight reads
-the fleet by default (`--target auto`, since 2026-10-25): the loaded commit, a `ps`
+only the fleet (its Render path was removed 2026-11-15): the loaded commit, a `ps`
 snapshot of each worker's jobs, and the board build in the fleet log. **Run it from
-a worktree at `origin/main`.** The primary tree's copy predates the fleet path, so
-it reads the suspended Render API and returns UNKNOWN or HTTP 503. For a restart,
-`check_deploy_safety.py` (fleet by default) names what is in flight. Preflight
+a worktree at `origin/main`.** An old checkout's copy may still try the suspended
+Render API and return UNKNOWN or HTTP 503. For a restart,
+`check_deploy_safety.py` (fleet only) names what is in flight. Preflight
 also returns `NO_EXPECTATION` (exit 6) unless the deploy states its prediction
 (`--expect`) and a baseline read within 15 minutes for every field it names
 (`--baseline`, `--baseline-read-at`). A prediction carried from an earlier
