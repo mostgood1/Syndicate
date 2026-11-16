@@ -1198,3 +1198,20 @@ Proposed to the user as its own session.
 **Teams:**
 - **0 chip-less cards:** FAMU @ UTEP left today's rail.
 - det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+## Reading 31 — Sun 11-15 10:24 PM CST (04:24Z). Slate ending; no restart
+
+4 live chips: OKC @ SAC Q4 0.0, PIT @ CIN Q4 1:14, VAN @ VGK P3, NSH @ SJS P3.
+
+**Flags:** 2 on 1 card. 0 false, 0 missed, 0 dark.
+
+**Refresh:**
+- Overlay gap max: NBA 101 s, NHL 212 s, NFL 214 s, college 150-154 s. 0 over 360 s.
+- `deferred_slow` nfl 1.
+- NBA builds p50 13.9 s.
+- WNCAAB 13 zero-card builds with rows, at game ends.
+- Web merges stale: ncaab 13 / 35 (the last NCAAB game ended), ncaaf 35 / 35.
+
+**Load:** query 3.2 s / 29.9 MB. Live-rail 0.03 s, 7 rows.
+
+**Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
