@@ -925,11 +925,6 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_kalshi_quote_history.py tests/test_engine_experts.py (off != on for the Kalshi prior and the NFL read; a planted side flip caught; a stale / wide / one-sided / unseen point refused by name); then a fleet dry run at nice 19 on 11-14 (nba, ncaab, wncaab, ncaaf) and 11-15 (nfl): exit 0, KALSHI_PRIOR 0 mismatched, KALSHI_FRAME per family, NFL opined > 0 with NFL_JOIN 0 mismatched; readings in #736 and engine_experts.md
 - Blocked by: none
 
-### closed-lane-archive-20261115-1640 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 31781218-8e4c-417a-bd3a-2bb5e3383950
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 at 22:40Z read 1 SAFE of 16 CLOSED; moved `closed-lane-archive-20261115-1041` to lanes_closed.md with one pointer. Other 15 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-15.md.
-
 ### nfl-prop-projection-atomic-write — OPEN — opened 2026-11-15 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
 - STATUS 2026-11-16 02:01Z (8:01 PM CST 11-15): **LOADED 02:00:09Z** (fleet ff `db2af02ab` -> `10094eae0`, no restart; user "Ship all three now"; the exit gate and `#811` loaded through their own lanes first). On disk MET, refresh-worker pid unchanged, 0 tracebacks. Claim released. OWED: the next props rewrite (~02:50Z) gives wk10 a new inode, 0 JSONDecodeError, 0 `.tmp` (deploys.md 2026-11-16 02:00:09Z).
 - STATUS 2026-11-16 01:21Z (7:21 PM CST 11-15): **ON MAIN `10094eae0`** (user "Push and load"; the 4 new tests + 63 neighbours re-passed on the rebased tree, Idle). **LOAD HELD, no claim taken:** the ff `6986b543f..10094eae0` carries `#811`'s NBA 60 s pull (`b2ae202d4`, waiting on the user; its fetcher is a fresh subprocess, so it would go live at the next NBA props pull) and lane `live-player-exit-gate`'s unloaded `60188bad1` + `db2af02ab`. Load after those lanes load, or on the user's call. todo `#812`.
@@ -967,6 +962,11 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: git grep for api.render.com / onrender outside data, reports, ledger and render.yaml returns only the deploy-guard's Render-BLOCKING rules and docs that say Render is retired; pytest on every changed module's tests passes; each repointed CLI run once read-only against the fleet and its verdict leaves UNKNOWN; #766 records the user's decisions on markers, env snapshot and the render.yaml guard
 - Blocked by: none
+
+### closed-lane-archive-20261115-2045 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session d7be6a3b-e462-437f-8870-796f285cc9b3
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 19 CLOSED blocks. Moved: closed-lane-archive-20261115-1640. The reading and the WAIT reasons are in `.syndicate/log/2026-11-15.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1239,6 +1239,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261115-0840` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session c340d9e9-7fab-4dda-b749-629ce7a17822
 - `closed-lane-archive-20261115-1041` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session e01d3a71-d04f-44a1-9853-345b01791bb2
 - `closed-lane-archive-20261115-1439` — CLOSED 2026-11-15 (GOAL MET: 3 blocks archived) — opened 2026-11-15 — session c05705db-575c-4b19-a84b-b6a3438be66c
+- `closed-lane-archive-20261115-1640` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 31781218-8e4c-417a-bd3a-2bb5e3383950
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
