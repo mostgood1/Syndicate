@@ -2494,6 +2494,14 @@ def _run_nfl_live_resim_tick() -> dict[str, Any] | None:
         print(f"[refresh_worker] NFL_LIVE_RESIM_STATE_FETCH_FAILED {type(exc).__name__}: {exc}", flush=True)
 
     live_index = build_live_index(state_index, games)
+    # todo #813: how many live games resumed from the drive in progress, and why
+    # the rest fell back to the marginalised fresh drive. Instrumentation only.
+    try:
+        from scripts._nfl_live_resim_tick import situation_tally
+
+        print(f"[refresh_worker] NFL_LIVE_SITUATION {situation_tally(live_index)}", flush=True)
+    except Exception as exc:  # noqa: BLE001 - a log line must not cost the tick
+        print(f"[refresh_worker] NFL_LIVE_SITUATION_FAILED {type(exc).__name__}", flush=True)
     now_utc = datetime.now(timezone.utc)
     snapshot = build_live_lens_snapshot(
         now_utc.date().isoformat(),
