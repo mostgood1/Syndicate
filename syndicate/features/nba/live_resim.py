@@ -957,7 +957,8 @@ def _line_values(posted: Any) -> tuple[float, ...]:
 
 def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[str, int]],
                      lines: Mapping[tuple[str, str], Any],
-                     pulled: Optional[Mapping[tuple[str, str], Any]] = None) -> tuple[list[dict[str, Any]], dict[str, int]]:
+                     pulled: Optional[Mapping[tuple[str, str], Any]] = None,
+                     players_out: Optional[set[str]] = None) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """`liveProps` rows in the snapshot contract `live_projection_join.build_live_prop_index` reads.
 
     A row exists for every LINE posted (a probability needs something to be about) where the player has a
@@ -969,7 +970,8 @@ def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[st
     same rows, flagged by `_as_pulled`, counted in `pulled_rows` and never in `priced`."""
     rows: list[dict[str, Any]] = []
     counts = {"players_simmed": 0, "rows": 0, "priced": 0, "no_actual": 0, "certainty_refused": 0, "doubles_rows": 0,
-              "pulled_rows": 0}
+              "pulled_rows": 0, "player_out_refused": 0}
+    players_out = players_out or set()
     pulled = pulled or {}
     stat_keys = tuple(key for key, _label in PROP_STATS) + tuple(COMBO_STATS)
     sims_run = int(result.get("sims_run") or 0)
@@ -996,7 +998,13 @@ def build_live_props(result: Mapping[str, Any], actuals: Mapping[str, Mapping[st
                     mean_rem = sum(int(v) * int(c) for v, c in hist.items()) / total
                     p_over: Optional[float] = round(over / total, 4)
                     reason = None
-                    if p_over in (0.0, 1.0):
+                    if nk in players_out:
+                        # lane live-player-exit-gate: the player has left the game (ejection / foul-out / injury);
+                        # his live prop is REFUSED, never priced, whatever the sim says.
+                        p_over, reason = None, "player_out"
+                        if not gone:
+                            counts["player_out_refused"] += 1
+                    elif p_over in (0.0, 1.0):
                         p_over, reason = None, "certainty_refused"
                         if not gone:
                             counts["certainty_refused"] += 1
@@ -1517,6 +1525,12 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
     scoreboard = fetch_scoreboard(league, str(date_str).replace("-", ""))
     events = pbp.scoreboard_events(scoreboard)
     live_events = [ev for ev in events if str(ev.get("status_state") or ev.get("state") or "").lower() == "in"]
+    # Lane live-player-exit-gate: a key player gone (ejection, foul-out, in-game injury) refuses the game; read from
+    # the summary this loop already fetched -- no extra GET. Counted per tick in `playerExits`.
+    from syndicate.features.shared import live_player_exit_tick as exit_tick
+    from syndicate.features.shared import live_player_status as lps
+
+    exit_tally = exit_tick.new_tally()
 
     def _carry_or_refuse(event_id: str, home: str, away: str, facts: Optional[ResumeFacts],
                          refusal: NbaResimRefusal, match: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
@@ -1541,6 +1555,17 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             games.append(_lane_row(event_id, home, away, None, resumed, league=league))
             continue
         _state, gs, facts = resumed
+        exits = exit_tick.status_from_summary(str(league).lower(), summary, event_id, exit_tally,
+                                              log_tag=f"{str(league).lower()}_live_resim")
+        players_out = [dict(p.__dict__) for p in exits.players_out] if exits is not None else None
+        key_out = lps.gameline_refusal(exits)
+        if key_out is not None:
+            # NEVER carried: a carry would republish the lane priced before the player left.
+            row = _lane_row(event_id, home, away, facts,
+                            NbaResimRefusal(lps.REASON_KEY_PLAYER_OUT, "; ".join(key_out["players"])), league=league)
+            row["playersOut"] = players_out
+            games.append(row)
+            continue
         inputs = load_engine_inputs(str(date_str), home, away, root=inputs_root, league=league)
         if isinstance(inputs, NbaResimRefusal):
             games.append(_lane_row(event_id, home, away, facts, inputs, league=league))
@@ -1569,7 +1594,8 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             current = with_neighbour_lines(lines)
             remembered = _merge_posted_lines(prior_lines.get(event_id), lines) if remember_lines else {}
             gone = pulled_lines(remembered, current) if remember_lines else {}
-            props, coverage = build_live_props(result, actuals_from_summary(summary), current, pulled=gone)
+            props, coverage = build_live_props(result, actuals_from_summary(summary), current, pulled=gone,
+                                               players_out={normalize_name(p["player"]) for p in players_out or ()})
             row["liveProps"] = props
             row["livePropsCoverage"] = {**coverage, "lines_available": len(lines),
                                         "lines_posted": sum(len(v) for v in lines.values()),
@@ -1579,7 +1605,12 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
                                         "remember_lines": bool(remember_lines)}
             if remember_lines:
                 row["postedLines"] = _posted_lines_payload(remembered)
+        if players_out is not None:
+            row["playersOut"] = players_out
         games.append(row)
+    if exit_tally["live_games"]:
+        print(f"[{str(league).lower()}_live_resim] PLAYER_EXIT_TICK "
+              + " ".join(f"{k}={v}" for k, v in exit_tally.items()), flush=True)
     if remember_lines:
         # A REFUSED TICK MUST NOT FORGET A GAME'S LINES. A carried row already holds its own (`_carried_row` copies the
         # prior row whole); any other row that published none takes the previous snapshot's.
@@ -1598,6 +1629,7 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         "games": games,
         "refusalsByReason": _refusals_by_reason(games),
         "carriedForward": sum(1 for g in games for lane in g.get("gameLens") or [] if lane.get("carriedForward")),
+        "playerExits": exit_tally,
     }
 
 

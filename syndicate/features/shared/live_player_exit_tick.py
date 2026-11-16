@@ -59,6 +59,43 @@ def row_in_progress(row: Mapping[str, Any]) -> bool:
     return row.get("in_progress") is True
 
 
+def new_tally() -> dict[str, Any]:
+    return {"live_games": 0, "read": 0, "unreadable": 0, "no_event_id": 0,
+            "budget_exhausted": 0, "players_out": 0, "key_players_out": 0}
+
+
+def status_from_summary(sport: str, summary: Any, event_id: str, tally: dict[str, Any], *,
+                        env: Mapping[str, str] | None = None, log_tag: str | None = None) -> Any:
+    """For a producer that ALREADY fetched the game's ESPN summary (NBA re-sim): no extra GET.
+    -> GameExitStatus, or None (gate off, or the summary is unreadable -- counted, never "nobody out"). Never raises."""
+    try:
+        from syndicate.features.shared import live_player_status as lps
+    except Exception as exc:  # noqa: BLE001 -- deploy-skew guard
+        tally["error"] = type(exc).__name__
+        return None
+    if not lps.gate_enabled(env):
+        tally["enabled"] = False
+        return None
+    tally["live_games"] += 1
+    if not isinstance(summary, Mapping):
+        tally["unreadable"] += 1
+        return None
+    try:
+        status = lps.exits_from_espn_summary(sport, summary, game_id=str(event_id))
+    except Exception as exc:  # noqa: BLE001
+        tally["unreadable"] += 1
+        tally["error"] = type(exc).__name__
+        return None
+    tally["read"] += 1
+    tally["players_out"] += len(status.players_out)
+    tally["key_players_out"] += len(status.key_players_out)
+    tag = log_tag or f"{sport}_live_resim"
+    for p in status.players_out:
+        print(f"[{tag}] PLAYER_OUT event={event_id} team={p.team} player={p.player!r} "
+              f"reason={p.reason} key={p.key} source={p.source} since={p.since}", flush=True)
+    return status
+
+
 def collect_exit_statuses(
     sport: str,
     live_rows: Iterable[Any],
@@ -69,8 +106,7 @@ def collect_exit_statuses(
     max_workers: int = MAX_WORKERS,
     log_tag: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    tally: dict[str, Any] = {"live_games": 0, "read": 0, "unreadable": 0, "no_event_id": 0,
-                             "budget_exhausted": 0, "players_out": 0, "key_players_out": 0}
+    tally: dict[str, Any] = new_tally()
     statuses: dict[str, Any] = {}
     tag = log_tag or f"{sport}_live_resim"
     try:
