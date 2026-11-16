@@ -181,7 +181,7 @@ def test_gate_conditions_pass_on_a_clearly_winning_calibrated_book():
     g = R.gate(R.bets_from_orders(_winning_book()))
     names = {c["name"][0]: c for c in g["conditions"]}
     assert names["1"]["pass"] and names["2"]["pass"] and names["3"]["pass"]
-    assert g["status"].startswith("PROPOSED")
+    assert g["status"].startswith("ADOPTED")
 
 
 def test_gate_refuses_too_few_events_whatever_the_results():

@@ -19,9 +19,10 @@ mostly favourites and alt lines, so a 57% win rate can lose. This reads the same
   while fee-net was −0.30 ± 0.19 pp and the venue close overpriced our sides by 6.6 pp (z −2.94).
 - **Stake quartiles and sizing paths.** A dollar ROI below the flat ROI means stake size is hurting. On 2026-11-16
   the top quartile was mostly the live $5-$10 stake band (10-20..11-02), a ~10x multiplier.
-- **The scale-up gate, PROPOSED and NOT user-approved** (findings_2026-11-16_live_book_edge_readout.md). This
-  script reports each condition over the window it is given. It cannot know whether the policy was frozen over
-  that window: pass `--since` the date of the last change to the live policy.
+- **The scale-up gate, ADOPTED by the user 2026-11-16 ("Adopt as drafted")**
+  (findings_2026-11-16_live_book_edge_readout.md). No live stake or cap rises until it passes. This script
+  reports each condition over the window it is given. It cannot know whether the policy was frozen over that
+  window: pass `--since` the date of the last change to the live policy.
 
 PINNED (2026-11-16 fleet payload, as of 2026-11-15, last 30 = 10-17..11-15): 1,526 bets / 641 events,
 $3,006.48 staked, −$218.64, ROI −7.27 ± 2.84%, excess wins −32.5 (z −1.72). `tests/test_live_book_edge_readout.py`
@@ -51,7 +52,7 @@ if str(ROOT) not in sys.path:
 LIVE_PATH = "/api/portfolio/live?on=all&show=all"
 SCOPE_SAME_BOOK = "same_book"
 
-# The scale-up gate (PROPOSED 2026-11-16, not user-approved). Each number is in the findings file.
+# The scale-up gate (ADOPTED by the user 2026-11-16, "Adopt as drafted"). Each number is in the findings file.
 GATE_MIN_EVENTS = 800
 GATE_CLOSE_CALIBRATION_Z = 2.0
 
@@ -270,7 +271,7 @@ def by_dimension(bets: Sequence[Bet], field: str, *, min_bets: int = 15) -> list
 
 
 def gate(bets: Sequence[Bet]) -> dict[str, Any]:
-    """The PROPOSED scale-up gate's conditions over this window. Not approved; never acted on by code."""
+    """The ADOPTED scale-up gate's conditions over this window. A readout: no code acts on it."""
     s = summarize(bets) or {}
     clv = clv_summary(bets).get(SCOPE_SAME_BOOK) or {}
     quartiles = stake_quartiles(bets)
@@ -307,7 +308,7 @@ def gate(bets: Sequence[Bet]) -> dict[str, Any]:
         "reading": f"Q4 ROI {top.get('roi_pct')}% vs flat ROI {s.get('flat_roi_pct')}%",
     })
     return {
-        "status": "PROPOSED -- not user-approved; nothing reads this",
+        "status": "ADOPTED 2026-11-16 (user) -- a readout; no code acts on it",
         "all_pass": all(c["pass"] for c in conditions),
         "conditions": conditions,
         "note": "Condition 5 (step caps one at a time, step back below zero) is a procedure, not a reading.",
