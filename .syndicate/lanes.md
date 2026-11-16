@@ -749,11 +749,6 @@ death, never life — do not invert it.
 - Verification: git grep for api.render.com / onrender outside data, reports, ledger and render.yaml returns only the deploy-guard's Render-BLOCKING rules and docs that say Render is retired; pytest on every changed module's tests passes; each repointed CLI run once read-only against the fleet and its verdict leaves UNKNOWN; #766 records the user's decisions on markers, env snapshot and the render.yaml guard
 - Blocked by: none
 
-### closed-lane-archive-20261116-0639 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 1c8edcd7-a178-4213-a57f-23a606923abe
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. Moved `closed-lane-archive-20261116-0040` to lanes_closed.md (owner_liveness SAFE at 240m). Table and waits: `.syndicate/log/2026-11-16.md`.
-
 ### nfl-live-total-underprojection — CLOSED 2026-11-16 (GOAL MET: possession never passed, -1.47 of Q4 per resume; engine ~2 low on 2026 ratings; todo #813) — opened 2026-11-16 — session 8062940b-57fd-454a-8de5-25fdd4804d85
 - STATUS 2026-11-16 8:37 AM CST (14:37Z): Goal: Name the cause of the NFL live re-sim's totals under-projection measured 2026-11-15 (replay of 65 games, weeks 5-10: projected minus final total -3.68 [-5.86, -1.43]; -5.05 / -2.86 / -3.12 from the end of Q1 / Q2 / Q3), split between the 2026 scoring level and the live resume path, with each part sized and its evidence written to a findings file and todo #780; read-only, no engine edit (the smartsim2 files are on LOAN to football-end-of-half-fix) -- **GOAL: MET.** Split of the end-of-Q3 shortfall -3.12: possession marginalised -1.47 [-1.65, -1.30] (all 313 live rows `possession_marginalised=True`; ESPN's `situation` is kept but never mapped); the engine's level on these games -1.93 (+-2; pregame projector -2.24 [-4.58, -0.09] over 149 games); production's shared seeds +0.29 [+0.11, +0.46]. H-ENV false as stated (2026 Q4 13.42, league level); H-LIVE true in part. Level shrink exonerated (-0.01 [-0.33, +0.30]). Written to `.syndicate/findings_2026-11-16_nfl_live_total_underprojection.md`, todo #813 and a #780 pointer. Fixes owed, the user's call; `nfl/live_resim.py` is claimed by `live-player-exit-gate`.
 - Goal: Name the cause of the NFL live re-sim's totals under-projection measured 2026-11-15 (replay of 65 games, weeks 5-10: projected minus final total -3.68 [-5.86, -1.43]; -5.05 / -2.86 / -3.12 from the end of Q1 / Q2 / Q3), split between the 2026 scoring level and the live resume path, with each part sized and its evidence written to a findings file and todo #780; read-only, no engine edit (the smartsim2 files are on LOAN to football-end-of-half-fix)
@@ -834,6 +829,11 @@ fl813\out\mnf_reads.jsonl` (7:10 PM CST to the final) and puts the result in its
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET -- owner_liveness --idle-min 240 on origin/main 512337327 read 1 SAFE of 6 CLOSED; moved `closed-lane-archive-20261116-0440`. Reading and Part B table in `.syndicate/log/2026-11-16.md`.
+
+### closed-lane-archive-20261116-1240 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session cd1c7de1-cee6-4e0f-9b75-5b47a6e95740
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET -- owner_liveness --idle-min 240 on origin/main ~18:43Z read 1 SAFE of 6 CLOSED; moved `closed-lane-archive-20261116-0639`. Reading in `.syndicate/log/2026-11-16.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1114,6 +1114,7 @@ fl813\out\mnf_reads.jsonl` (7:10 PM CST to the final) and puts the result in its
 - `closed-lane-archive-20261116-0040` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 5e2408ef-0ee8-42b2-9f3f-728391707307
 - `closed-lane-archive-20261116-0240` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 177cb42a-78ee-459c-a94a-5e9e7bd063da
 - `closed-lane-archive-20261116-0440` — CLOSED 2026-11-16 (GOAL MET: 18 blocks archived) — opened 2026-11-16 — session d8b75461-af46-460a-bbc9-5602287431fa
+- `closed-lane-archive-20261116-0639` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 1c8edcd7-a178-4213-a57f-23a606923abe
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
