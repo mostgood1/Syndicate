@@ -748,11 +748,6 @@ death, never life — do not invert it.
 - Verification: git grep for api.render.com / onrender outside data, reports, ledger and render.yaml returns only the deploy-guard's Render-BLOCKING rules and docs that say Render is retired; pytest on every changed module's tests passes; each repointed CLI run once read-only against the fleet and its verdict leaves UNKNOWN; #766 records the user's decisions on markers, env snapshot and the render.yaml guard
 - Blocked by: none
 
-### closed-lane-archive-20261116-0040 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 5e2408ef-0ee8-42b2-9f3f-728391707307
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 1 of 21 CLOSED blocks. Moved: book-grid-pull-react. The reading and the WAIT reasons are in `.syndicate/log/2026-11-15.md`.
-
 ### closed-lane-archive-20261116-0240 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 177cb42a-78ee-459c-a94a-5e9e7bd063da
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -762,6 +757,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 gave SAFE for 18 of 21 CLOSED blocks; all 18 moved. Slugs, the reading and the WAIT reasons are in `.syndicate/log/2026-11-15.md` (10:40Z 11-16 entry).
+
+### closed-lane-archive-20261116-0639 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 1c8edcd7-a178-4213-a57f-23a606923abe
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. Moved `closed-lane-archive-20261116-0040` to lanes_closed.md (owner_liveness SAFE at 240m). Table and waits: `.syndicate/log/2026-11-16.md`.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1039,6 +1039,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261115-1850` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 79585ed0-a8f1-403a-9ffe-6314d741c996
 - `closed-lane-archive-20261115-2045` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session d7be6a3b-e462-437f-8870-796f285cc9b3
 - `closed-lane-archive-20261115-2300` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 7f79320f-36a1-43e4-bbe5-1f5ab96a089b
+- `closed-lane-archive-20261116-0040` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 5e2408ef-0ee8-42b2-9f3f-728391707307
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
