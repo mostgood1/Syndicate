@@ -56,8 +56,10 @@ Render account and its suspended services are dormant: leave them alone.
 - **Fleet env is layered:** `render.yaml` → `~/syndicate-prod/render_env/<role>.json`
   (imported once from Render on 2026-10-01; now the fleet's own copy, and the import
   command is gone) → `~/syndicate-prod/local_production.env` → forced keys. A later
-  layer wins. **Neither secrets file is in the nightly backup** (it copies the data
-  root only); see todo `#766` before relying on a restore.
+  layer wins. **Neither secrets file is in the DATA backup** (it copies the data root
+  only); they have their OWN encrypted backup, `scripts/fleet_secrets_backup.py`
+  (OneDrive `SyndicateBackup/secrets`; passphrase in the user's password manager;
+  restore steps in the runbook's "Fleet secrets backup").
   - **Every key `render.yaml` declares is also in the snapshot, so editing
     `render.yaml` changes NOTHING on the fleet.** Measured 2026-11-08: 0 of 48 / 77 /
     72 keys are decided by `render.yaml` alone.
