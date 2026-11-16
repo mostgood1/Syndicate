@@ -96,3 +96,12 @@ overall -3.68 [-5.86, -1.43].
   be larger than at a quarter break.
 - The moneyline's own cost.
 - Why the engine runs low on 2026 ratings.
+
+## The fix for part 1 (lane `nfl-live-possession-map`, user "Yes, fix it here")
+
+Built 9:41 AM CST (15:41Z).
+
+- **What:** `claude/nfl-live-possession-map` @ `2f8ae4a07` (pushed as a branch, NOT on main, NOT loaded): `scripts/_nfl_live_resim_tick.normalise_live_row` now maps ESPN's `situation` -- the side from `situation.possession` (a team id) against the row's new `home_team_id` / `away_team_id` (`nfl/live_game_state.py`), down / distance only when they are a real snap (ESPN's -1 between plays, when a kickoff names the KICKING team, falls back), and field position from ESPN's own `possessionText` / `downDistanceText` matched to the two abbreviations, never from `yardLine` (its NFL frame is unverified; NCAAF measured it from the HOME goal line, `shared/game_shape` reads it as distance to the opponent's goal), which is recorded as a diagnostic `yardline_frame`. Every ambiguity falls back to the pre-#813 marginalised state, named in `situation_basis`; `run_refresh_worker` prints one `NFL_LIVE_SITUATION live= carried= marginalised= basis= yardline_frame=` line per tick. Tests: 246 passed across the 9 NFL test files that import these modules, including reachability (the mapped state reaches `resim_live_game`: `possession_marginalised` False, and a 1st-and-goal state's total differs from the marginalised one).
+- **Where it is:** Kept off main on purpose: other sessions fast-forward the fleet to main (twice today), which would load this before the payload check and the user's yes.
+- **Check before any load:** MNF check armed: background `b8jy25pyl` (`C:\tmp\livegrade\nfl813\mnf_watch.py`, Windows only, ESPN only) runs the branch's own code on the live scoreboard every 120 s from 7:10 PM CST until LAC @ BAL is final, logging the raw situation, the mapped drive and the falsifier checks to `C:\tmp\livegrade\nfl813\out\mnf_reads.jsonl`.
+- **Falsifiers (in the lane before any payload was read):** (a) fewer than half the in-progress reads carry both possession and parseable spot text; (b) the spot from `possessionText` disagrees with the spot from `downDistanceText` on any read; (c) a test shows the state does not reach `resim_live_game` (it does: the reachability test passes).
