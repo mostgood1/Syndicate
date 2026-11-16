@@ -226,3 +226,13 @@ kickoff.
 without a live card.
 
 **Restarts:** none. live-odds-worker pid 2834332.
+
+### User decision — keep the value floor (~4:35 PM CST)
+
+- **User 11-16 ~4:35 PM CST: "Keep the floor"**, answering "Should the Games Rail show live lines
+  that fall below the board's value floor?"
+- **The gate stays.** A wide-hold in-play game can still show no overlay lines on the rail. That
+  is now a decided behaviour, not a defect.
+- Lane `wncaab-overlay-zero-cards` is CLOSED, GOAL MET.
+- The `refused=` token (`146f956cb`) is logging only. It reaches the fleet with the next ff plus a
+  refresh-worker restart. Its first fleet reading will be recorded here.
