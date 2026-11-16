@@ -55,18 +55,21 @@ def test_on_kicks_off_to_the_team_that_did_not_receive_first():
 
 
 def test_reachability_on_differs_from_off():
-    off = [simulate_game(_inp(s)).final_score for s in range(1, 41)]
+    # OFF is the in-source default, named: production's NFL profile has halftime_kickoff ON since #808 (2026-11-16).
+    off = [simulate_game(_inp(s), profile=NFL_CALIBRATION_PROFILE_DEFAULT).final_score for s in range(1, 41)]
     on = [simulate_game(_inp(s), profile=ON_NFL).final_score for s in range(1, 41)]
     assert off != on
     # and OFF really is the bug being fixed: some seeds start Q3 away from the 25 / with the wrong team
-    starts = [_first_q3_drive(simulate_game(_inp(s)))["start_state"] for s in range(1, 41)]
+    starts = [_first_q3_drive(simulate_game(_inp(s), profile=NFL_CALIBRATION_PROFILE_DEFAULT))["start_state"]
+              for s in range(1, 41)]
     assert any(st["field_position"] != 25 or st["possession_owner"] == "home" for st in starts)
 
 
 def test_resume_after_the_half_is_untouched():
     for seed in range(1, 21):
         inp = _inp(seed, initial_quarter=3, initial_clock_seconds=600, initial_score_away=10)
-        assert simulate_game(inp).final_score == simulate_game(inp, profile=ON_NFL).final_score
+        assert (simulate_game(inp, profile=NFL_CALIBRATION_PROFILE_DEFAULT).final_score
+                == simulate_game(inp, profile=ON_NFL).final_score)
 
 
 def test_first_half_resume_tosses_a_coin_for_the_receiver():
