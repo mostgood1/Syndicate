@@ -79,6 +79,19 @@ def test_live_event_parses_as_in_progress_with_period_and_clock():
     assert state["home_pts"] == 0
 
 
+def test_the_row_carries_both_team_ids_for_the_possession_join():
+    """todo #813: ESPN names the team in possession by ID, so the tick adapter
+    needs the ids to resolve it to home / away."""
+    event = _event("401873275", "GB", "PIT", "in", period=1, clock="7:53")
+    competitors = event["competitions"][0]["competitors"]
+    competitors[0]["team"]["id"] = "9"
+    competitors[1]["team"]["id"] = "23"
+    state = _state_from_event(event)
+    assert state["away_team_id"] == "9" and state["home_team_id"] == "23"
+    # An id-less payload gives "", never a crash and never another team's id.
+    assert _state_from_event(_event("401873275", "GB", "PIT", "in"))["home_team_id"] == ""
+
+
 def test_pregame_event_reports_no_placeholder_score():
     # ESPN sends "0"/"0" for a game that has not kicked off. Emitting it would
     # put 0-0 on every pregame card.

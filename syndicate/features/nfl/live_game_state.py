@@ -177,6 +177,11 @@ def _state_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
         "event_id": event_id,
         "away_abbr": away_abbr,
         "home_abbr": home_abbr,
+        # ESPN names the team in possession by ID (`situation.possession`), not
+        # by side, so the live re-sim's tick adapter needs the ids to resolve
+        # it to home / away (todo #813). Text, as ESPN sends ids as strings.
+        "away_team_id": _text(away_team.get("id")),
+        "home_team_id": _text(home_team.get("id")),
         "in_progress": in_progress,
         "final": final,
         # `period`/`clock` are what game_chip_scoreboard._live_status_token

@@ -24,6 +24,7 @@ from scripts._nfl_live_resim_tick import (
     _clock_seconds,
     build_live_index,
     normalise_live_row,
+    situation_tally,
 )
 from syndicate.features.nfl import live_resim as lr
 from syndicate.features.nfl.smartsim2_projection import (
@@ -76,15 +77,109 @@ def test_the_adapter_produces_a_usable_state():
     assert not isinstance(state, lr.NflResimRefusal), getattr(state, "reason", "")
 
 
-def test_possession_is_left_ABSENT_rather_than_guessed():
-    """ESPN's `situation` payload is unverified for NFL.
+def test_an_empty_situation_keeps_the_old_marginalised_state():
+    """No situation -> exactly the pre-#813 state, named."""
+    row = normalise_live_row(ESPN_SHAPE)
+    assert (row["possession_owner"], row["down"], row["distance"], row["field_position"]) == (None, 1, 10, 25)
+    assert row["situation_basis"] == "no_situation"
 
-    `resim_live_game` marginalises over both starting owners when possession is
-    absent, costing roughly a possession of field position. Guessing it from an
-    unchecked payload could invert the starting side, which is worth more and
-    would be invisible.
-    """
-    assert normalise_live_row(ESPN_SHAPE)["possession_owner"] is None
+
+# todo #813. PHI (id 21) hosts DAL (id 6). field_position is smartsim2's: yards
+# from the POSSESSING team's own goal line.
+def _live(situation):
+    return {**ESPN_SHAPE, "away_abbr": "DAL", "home_abbr": "PHI", "away_team_id": "6",
+            "home_team_id": "21", "situation": situation}
+
+
+def test_home_on_its_own_side_reads_the_spot_from_the_text():
+    row = normalise_live_row(_live({"possession": "21", "down": 2, "distance": 7,
+                                    "possessionText": "PHI 35", "yardLine": 35}))
+    assert (row["possession_owner"], row["down"], row["distance"], row["field_position"]) == ("home", 2, 7, 35)
+    assert row["situation_basis"] == "text"
+    # Diagnostic only: NCAAF's measured frame (from the HOME goal line) agrees here.
+    assert row["yardline_frame"] == "home_frame"
+
+
+def test_away_in_the_red_zone_is_at_95_not_5():
+    """The inversion that matters: DAL on PHI's 5 is 95 yards from its OWN goal.
+    Getting it backwards would put the team at its own 5 -- a whole field."""
+    row = normalise_live_row(_live({"possession": "6", "down": 1, "distance": 5,
+                                    "possessionText": "PHI 5"}))
+    assert (row["possession_owner"], row["field_position"]) == ("away", 95)
+
+
+def test_midfield_and_the_downDistanceText_fallback():
+    row = normalise_live_row(_live({"possession": "6", "down": 3, "distance": 2,
+                                    "downDistanceText": "3rd & 2 at 50"}))
+    assert (row["possession_owner"], row["field_position"], row["down"]) == ("away", 50, 3)
+    row = normalise_live_row(_live({"possession": "21", "down": 3, "distance": 4,
+                                    "downDistanceText": "3rd & 4 at DAL 22"}))
+    assert (row["possession_owner"], row["field_position"]) == ("home", 78)
+
+
+def test_between_plays_falls_back_instead_of_giving_the_kicker_the_ball():
+    """ESPN reads down/distance -1 on kickoffs and tries, with the KICKING team
+    in possession; carrying that would hand the ball to the wrong side."""
+    row = normalise_live_row(_live({"possession": "21", "down": -1, "distance": -1,
+                                    "possessionText": "PHI 35"}))
+    assert row["possession_owner"] is None and row["field_position"] == 25
+    assert row["situation_basis"] == "between_plays"
+
+
+def test_every_ambiguity_falls_back_by_name():
+    cases = {
+        "no_possession": {"down": 1, "distance": 10, "possessionText": "PHI 35"},
+        "unknown_possessor_id": {"possession": "99", "down": 1, "distance": 10, "possessionText": "PHI 35"},
+        "no_spot_text": {"possession": "21", "down": 1, "distance": 10, "yardLine": 35},
+        "spot_side_unmatched": {"possession": "21", "down": 1, "distance": 10, "possessionText": "NYG 35"},
+    }
+    for basis, situation in cases.items():
+        row = normalise_live_row(_live(situation))
+        assert row["situation_basis"] == basis, (basis, row["situation_basis"])
+        assert (row["possession_owner"], row["down"], row["distance"], row["field_position"]) == (None, 1, 10, 25)
+    # yardLine alone is never used for the spot: its NFL frame is unverified.
+    assert normalise_live_row(_live(cases["no_spot_text"]))["field_position"] == 25
+
+
+def test_a_final_or_pregame_row_never_carries_a_drive():
+    row = normalise_live_row({**_live({"possession": "21", "down": 1, "distance": 10,
+                                       "possessionText": "PHI 35"}), "in_progress": False, "final": True})
+    assert row["possession_owner"] is None and row["situation_basis"] == "not_live"
+
+
+def test_the_drive_REACHES_the_engine_and_changes_the_answer():
+    """Reachability before correctness (model_engine_standard.md): the mapped
+    state must arrive in `resim_live_game`, and ON must differ from OFF."""
+    env = {"SYNDICATE_NFL_LIVE_RESIM": "1"}
+    ratings = dict(home_offense=0.30, home_defense=0.10, away_offense=-0.20, away_defense=-0.10)
+    base = {**ESPN_SHAPE, "period": 4, "clock": "9:00", "away_pts": 3, "home_pts": 31}
+    on_row = normalise_live_row({**_live({"possession": "21", "down": 1, "distance": 5,
+                                          "possessionText": "DAL 5"}), **{k: base[k] for k in
+                                                                          ("period", "clock", "away_pts", "home_pts")}})
+    off_row = normalise_live_row({**base, "situation": {}})
+    on = lr.live_state_from_row(on_row, away_team="Dallas Cowboys", home_team="Philadelphia Eagles")
+    off = lr.live_state_from_row(off_row, away_team="Dallas Cowboys", home_team="Philadelphia Eagles")
+    assert (on.possession_owner, on.field_position, on.down, on.distance) == ("home", 95, 1, 5)
+    assert off.possession_owner is None
+    r_on = lr.resim_live_game(on, sims=40, env=env, **ratings)
+    r_off = lr.resim_live_game(off, sims=40, env=env, **ratings)
+    assert isinstance(r_on, dict) and isinstance(r_off, dict), (r_on, r_off)
+    assert r_on["possession_marginalised"] is False and r_off["possession_marginalised"] is True
+    assert r_on["total_mean"] != r_off["total_mean"]
+    # 1st and goal at the 5 is worth more than a coin-flip drive from the 25.
+    assert r_on["total_mean"] > r_off["total_mean"]
+
+
+def test_the_tally_counts_carried_and_names_the_rest():
+    index = {
+        "a": normalise_live_row(_live({"possession": "21", "down": 2, "distance": 7,
+                                       "possessionText": "PHI 35", "yardLine": 35})),
+        "b": normalise_live_row(_live({"possession": "21", "down": -1, "distance": -1})),
+        "c": normalise_live_row({**ESPN_SHAPE, "in_progress": False, "final": True}),
+    }
+    line = situation_tally(index)
+    assert line.startswith("live=2 carried=1 marginalised=1 "), line
+    assert "'between_plays': 1" in line and "'text': 1" in line and "'home_frame': 1" in line
 
 
 def test_an_unparseable_clock_is_None_not_zero():
