@@ -119,3 +119,40 @@ yet.
 "Shard NFL game-line quotes by Central kickoff date" (local_78b841a1). Loading its fix onto the fleet
 still needs the user's yes. The MNF prediction above stands unless that load happens before
 kickoff.
+
+## Reading 5 — Mon 11-16 4:00 PM CST (22:00Z)
+
+**Fleet:**
+- Still at `db463b5be`. The NFL kickoff-shard fix (`ed63c7611`, load target `dac4d49f8`) is
+  **not loaded**. It waits on the user's yes in the fix session.
+- ff-only loads this afternoon: NHL exit gate 2:55 PM, soccer exit gate 3:17 PM (deploys.md).
+- live-odds-worker pid unchanged (2834332).
+
+**Slate:** 1 live chip — WNCAAB Penn State @ Arizona State, at HALF.
+
+**Readings:**
+- **0 flags.** 0 false, 0 missed, 0 dark.
+- **Load:**
+  - `/intelligence` 5.5 s / 21.2 MB.
+  - Query 4.1 s / 59.1 MB. Shortlist 0.6 s.
+  - Live-rail 0 rows.
+
+### ANOMALY — the WNCAAB in-play overlay published 0 cards on every build through a live game
+
+`refresh-worker.log`, 21:04-21:58Z (`C:\tmp\railmon\wz2.sh`):
+- Every sampled `INPLAY_OVERLAY sport=wncaab` (~18 of 71 builds; 68 of 71 had rows and 0
+  cards) shows `rows_inplay` 4-12, `opportunities` 6-22, `cards=0`.
+- The preceding `LIVE_GAMELINE_BUILD`s withheld most rows for
+  `quote_older_than_live_pricing_ceiling` (plus some `prob_interval_swamps_edge` /
+  `quote_older_than_the_score_the_model_saw`), **but not all**. At 21:32:04Z, 14 were
+  considered and 10 withheld.
+- So the game's live lines never reached `/api/board/live-rail` (0 WNCAAB rows). The rail card
+  shows 2 shortlist rows.
+- It is not a halftime effect: it covers Q1-Q2.
+- 11-15 context: WNCAAB 27 of 60 zero-card builds, NCAAB 9 of 185. NCAAB overlays carry cards
+  normally.
+- **What drops every WNCAAB opportunity before the card step is unknown.** The overlay logs no
+  per-row reason.
+- **Handed to local_208683f1** (overlay / live-rail owner) at ~4:05 PM CST, as a question.
+
+**Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
