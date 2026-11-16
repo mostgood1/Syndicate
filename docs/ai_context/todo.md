@@ -1,5 +1,20 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#816` — **NFL GAME-LINE QUOTES WERE FILED BY THE UTC CAPTURE DATE, SO FROM 6 PM CST EVERY NFL GAME LINE WENT TO TOMORROW'S SHARD: SNF / MNF / TNF in-play lines (and the end of every late-afternoon game) never reached their own date's in-play overlay or Games Rail. FIX ON MAIN, NOT LOADED: `_append_nfl_team_book_quotes` files by Central kickoff date (`kickoff_shard_date`), off switch `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0`** `[2026-11-16, lane nfl-gameline-kickoff-shard, session a64727a8; defect found by layer2-rail-monitor 11-15; task from local_62433e58]`
+- **Evidence:** `.syndicate/findings_2026-11-16_nfl_gameline_kickoff_shard.md`.
+  - Read-only replay of the fleet's 11-15 / 11-16 shards: all 1,901 SNF game rows captured 01:22-01:54Z 11-16 re-file to `2026-11-15`.
+  - 21,196 of the 11-16 shard's 22,551 sportsbook game rows move: 10,668 to 11-15 (SNF 9,273 + late-afternoon in-play ~1,395), 10,528 to next week's dates.
+- **Readers:** all 12 named in the findings; none needed a change. The one behaviour change: Layer 1 pre-game rows of not-today NFL games now come from their kickoff-date grids, at the forward cadence (6x).
+- **Tests:** `tests/test_nfl_gameline_kickoff_shard.py` (18).
+- **Loads with a plain fleet ff, no restart:** the writer runs in a fresh child per NFL lines run. **Loading is the user's decision.**
+- **Verification owed (MNF 11-16, 01:15Z 11-17):**
+  - `NFL_GAMELINE_QUOTE_SHARD basis=kickoff_central` in the run log;
+  - game rows captured >= 00:00Z 11-17 in `2026-11-16.jsonl`, none in `2026-11-17.jsonl`;
+  - `INPLAY_OVERLAY sport=nfl date=2026-11-16` with MNF rows;
+  - NFL game-line rows on `/api/board/live-rail`.
+- **Today's split 11-16 shard: leave it.** Rewriting an append-only shard under the incremental grid reader is the risk, and no reader needs the rows moved (findings).
+- **Follow-up, NOT done:** `fetch_nfl_preseason_odds._append_nfl_preseason_book_quotes` has the same UTC filing. Its reader `nfl/preseason_cards.py` opens grids by the game's UTC start date, so the writer and the reader must move together. Dormant until 2027-08.
+
 ### `#815` — **THE LIVE BOOK HAS NO MEASURED EDGE, SO LIVE STAKES DO NOT SCALE YET: the last 30 days are −7.3 ± 2.8% net of fees on $3,006.48 (1,526 bets / 641 events, z −1.72 on excess wins over the fill price), and the "solid week" is +0.7 ± 5.0%; the win rate (57-59%) sits BELOW the breakeven win rate of the prices paid (58-59%). Same-book CLV is +1.32% while the same 546 bets settle z −3.35, so CLV cannot gate a scale-up until reconciled. The biggest-stake quartile carries 63% of dollars and loses −9.2%** `[2026-11-16, lane portfolio-edge-measurement, session 69d80317; user asked "when can we start to increase investments"]`
 - **Evidence:** `.syndicate/findings_2026-11-16_live_book_edge_readout.md`. Source: the fleet's `/api/portfolio/live?on=all`, read 15:50Z 11-16.
 - **Scale-up gate:** PROPOSED in the findings, NOT approved. It needs ≥ 800 forward events at a frozen policy, a 95% lower bound > 0, same-book CLV agreeing with results, and the top stake quartile no worse than flat. The user decides.
