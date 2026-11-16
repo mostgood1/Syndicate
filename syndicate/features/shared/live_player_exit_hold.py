@@ -112,7 +112,7 @@ class ExitHold:
             if not isinstance(out, list):
                 return {"verdict": "unknown", "why": "game_exits_not_read", "snapshot_at": (snap.get("generated_at") or snap.get("generatedAt"))}
             key = [f"{p.get('team')}:{p.get('player')}:{p.get('reason')}" for p in out
-                   if isinstance(p, Mapping) and p.get("key")]
+                   if isinstance(p, Mapping) and p.get("key") and not p.get("modelled")]
             if key:
                 return {"verdict": "fail", "reason": REASON_KEY_PLAYER_OUT, "players": key,
                         "snapshot_at": (snap.get("generated_at") or snap.get("generatedAt"))}

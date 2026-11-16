@@ -1494,6 +1494,39 @@ def _carried_row(prior_row: Mapping[str, Any], refusal: "NbaResimRefusal", *, no
     return row
 
 
+# Exit reasons the engine models itself (see "A FOUL-OUT THE ENGINE ALREADY MODELS" in build_live_lens_snapshot).
+MODELLED_EXIT_REASONS = frozenset({"foul_out"})
+
+
+def _mark_modelled_foul_outs(players_out: list[dict[str, Any]], gs: Any, limit: int) -> None:
+    """Stamp `modelled` on each foul-out: True only when the MAPPED engine state carries that player at the limit
+    (`map_state_names` drops a name it cannot match, and the engine then keeps him in its lineups)."""
+    at_limit = {normalize_name(k) for d in (getattr(gs, "home_player_fouls", None), getattr(gs, "away_player_fouls", None))
+                for k, v in (d or {}).items() if int(v or 0) >= int(limit)}
+    for p in players_out:
+        if p.get("reason") == "foul_out":
+            p["modelled"] = normalize_name(p.get("player")) in at_limit
+
+
+def _unmodelled_key_exits(players_out: Optional[list[dict[str, Any]]], skip_reasons: Any) -> list[str]:
+    """`TEAM:Player:reason` for each KEY exit that is not modelled: neither stamped `modelled` nor of a reason in
+    `skip_reasons` (a foul-out before the mapping has decided it)."""
+    return [f"{p.get('team')}:{p.get('player')}:{p.get('reason')}" for p in players_out or ()
+            if p.get("key") and not p.get("modelled") and p.get("reason") not in skip_reasons]
+
+
+def _exit_refusal_row(event_id: str, home: str, away: str, facts: Any, key_out: list[str],
+                      players_out: Optional[list[dict[str, Any]]], league: str) -> dict[str, Any]:
+    """A game a key player has left: refused, and NEVER carried (a carry would republish the lane priced before
+    the player left)."""
+    from syndicate.features.shared.live_player_status import REASON_KEY_PLAYER_OUT
+
+    row = _lane_row(event_id, home, away, facts, NbaResimRefusal(REASON_KEY_PLAYER_OUT, "; ".join(key_out)),
+                    league=league)
+    row["playersOut"] = players_out
+    return row
+
+
 def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_seconds: float = DEFAULT_BUDGET_SECONDS,
                              fetch_scoreboard: Optional[Callable[..., Any]] = None,
                              fetch_summary: Optional[Callable[..., Any]] = None,
@@ -1558,12 +1591,14 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
         exits = exit_tick.status_from_summary(str(league).lower(), summary, event_id, exit_tally,
                                               log_tag=f"{str(league).lower()}_live_resim")
         players_out = [dict(p.__dict__) for p in exits.players_out] if exits is not None else None
-        key_out = lps.gameline_refusal(exits)
-        if key_out is not None:
-            # NEVER carried: a carry would republish the lane priced before the player left.
-            row = _lane_row(event_id, home, away, facts,
-                            NbaResimRefusal(lps.REASON_KEY_PLAYER_OUT, "; ".join(key_out["players"])), league=league)
-            row["playersOut"] = players_out
+        # A FOUL-OUT THE ENGINE ALREADY MODELS IS PRICED (user 2026-11-16, "No, keep pricing"): the resume drops every
+        # lineup holding a player at the foul limit (basketball_engine/engine.py `_fouled_out_names` ->
+        # `_drop_lineups_with`). Every OTHER exit (ejection, in-game injury) is not modelled and refuses before the
+        # engine; a foul-out is checked AFTER the name mapping below, because only a fouler whose name reaches the
+        # engine state is dropped there.
+        key_out = _unmodelled_key_exits(players_out, MODELLED_EXIT_REASONS)
+        if key_out:
+            row = _exit_refusal_row(event_id, home, away, facts, key_out, players_out, league)
             games.append(row)
             continue
         inputs = load_engine_inputs(str(date_str), home, away, root=inputs_root, league=league)
@@ -1571,6 +1606,12 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             games.append(_lane_row(event_id, home, away, facts, inputs, league=league))
             continue
         gs, match = map_state_names(gs, inputs["home_players"], inputs["away_players"])
+        if players_out:
+            _mark_modelled_foul_outs(players_out, gs, lps.FOUL_LIMIT.get(str(league).lower(), 6))
+            key_out = _unmodelled_key_exits(players_out, ())
+            if key_out:  # a starter's foul-out the engine state does not carry: not modelled, so refused
+                games.append(_exit_refusal_row(event_id, home, away, facts, key_out, players_out, league))
+                continue
         mechanisms = live_mechanisms_from_env()
         inputs = with_live_mechanisms(inputs, mechanisms)
         match = {**match, "mechanisms": sorted(mechanisms), "resumeEngine": resume_engine_label(league, league_params_overrides_of(inputs),
@@ -1595,7 +1636,8 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             remembered = _merge_posted_lines(prior_lines.get(event_id), lines) if remember_lines else {}
             gone = pulled_lines(remembered, current) if remember_lines else {}
             props, coverage = build_live_props(result, actuals_from_summary(summary), current, pulled=gone,
-                                               players_out={normalize_name(p["player"]) for p in players_out or ()})
+                                               players_out={normalize_name(p["player"]) for p in players_out or ()
+                                                            if not p.get("modelled")})
             row["liveProps"] = props
             row["livePropsCoverage"] = {**coverage, "lines_available": len(lines),
                                         "lines_posted": sum(len(v) for v in lines.values()),

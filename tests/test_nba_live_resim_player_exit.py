@@ -130,3 +130,55 @@ def test_the_LIVE_GAMELINE_index_drops_the_game_and_the_entry_hold_fails(monkeyp
     assert out["verdict"] == "fail" and out["players"] == [":H1:ejection"]
     assert H.ExitHold(read_fn=lambda sport: priced, env={}).check("nba", "New York Knicks", "Golden State Warriors")[
         "verdict"] == "pass"
+
+
+# ---------------------------------------------------------- foul-outs the engine models are priced (user 2026-11-16)
+
+def _fouled_out_summary():
+    g = Game("nba", state="in")
+    g.shot(1, "11:00", "home", "h1")
+    for i in range(6):
+        g.foul(1, f"{10 - i}:00", "home", "h1")
+    g.end_period(1)
+    g.shot(2, "11:40", "home", "h2")
+    s = g.summary(pf={"h1": 6})
+    for team in s["boxscore"]["players"]:
+        for cat in team["statistics"]:
+            cat["labels"] = cat["names"]  # a real ESPN box carries both; the detector reads PF by label
+    return s
+
+
+def _root_with_h1(tmp_path, mapped: bool):
+    kw = synthetic_game_kwargs(np.random.default_rng(7), league="nba", entrypoint="simulate_pbp_game_boxscore")
+    kw.pop("rng", None)
+    if mapped:
+        kw["home_players"] = kw["home_players"].copy()
+        kw["home_players"].loc[kw["home_players"].index[0], "player_name"] = "H1"
+    lr.persist_engine_inputs(DATE, "GSW", "NYK", {**{k: None for k in lr._INPUT_KEYS}, **kw}, root=tmp_path)
+    lr.props_csv_path(DATE, root=tmp_path).write_text(
+        "market,outcome_name,player_name,point,home_team,away_team\n"
+        "player_points,Over,H1,10.5,Golden State Warriors,New York Knicks\n", encoding="utf-8")
+    return tmp_path
+
+
+def test_a_starter_foul_out_the_engine_models_is_priced_and_not_held(monkeypatch, tmp_path):
+    snap, sims = _snap(monkeypatch, _root_with_h1(tmp_path, mapped=True), _fouled_out_summary())
+    game = snap["games"][0]
+    assert _lane(snap)["source"] == lr.LIVE_RESIM_LENS_SOURCE and sims == [1]
+    assert [(p["player"], p["reason"], p["key"], p["modelled"]) for p in game["playersOut"]] == [
+        ("H1", "foul_out", True, True)]
+    # his props stay priced too: the engine gives him no more minutes, so his remainder is modelled
+    assert game["livePropsCoverage"]["player_out_refused"] == 0
+    assert H.ExitHold(read_fn=lambda sport: snap, env={}).check(
+        "nba", "Golden State Warriors", "New York Knicks")["verdict"] == "pass"
+
+
+def test_a_foul_out_the_engine_state_does_not_carry_is_refused(monkeypatch, tmp_path):
+    """The fouler's name does not map onto the engine frame, so the engine would keep him in its lineups."""
+    snap, sims = _snap(monkeypatch, _root_with_h1(tmp_path, mapped=False), _fouled_out_summary())
+    game = snap["games"][0]
+    assert _lane(snap)["liveResimRefusal"] == "key_player_out" and sims == []
+    assert "H1:foul_out" in _lane(snap)["liveResimRefusalDetail"]
+    assert [(p["player"], p["modelled"]) for p in game["playersOut"]] == [("H1", False)]
+    assert H.ExitHold(read_fn=lambda sport: snap, env={}).check(
+        "nba", "Golden State Warriors", "New York Knicks")["verdict"] == "fail"
