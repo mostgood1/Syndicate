@@ -22,7 +22,14 @@ Prints, per sport:
               fair-value function (the gate: 0 mismatched); SEG_FRAME, a reading of the rebuilt prior against the
               join's own on the full-game lines it priced (a wrong spread frame reads far worse than the flipped one)
 
-Exit 1 on any checklist alarm or any JOIN / PRIOR / SEG_JOIN / SEG_PRIOR mismatch; 0 otherwise. Run on the fleet with the worker's environment, at
+  EVIDENCE_KEY  how each live_resim line found its game (`exact`, `team_alias` = the join's canonical pair, or the
+              refusal), and the opined lines by prior basis | probability source
+  FALLBACK_FRAME  the gate for opinions no JOIN number checks (a `market_fair_prob_over` prior or the ledger's
+              `display_prob`): per sport x family, on pairs whose prior is >= 0.15 from even (>= 30 to judge), median
+              |p - prior| <= 1/3 x median |p - (1 - prior)|; `failed` must be 0
+
+Exit 1 on any checklist alarm, any JOIN / PRIOR / SEG_JOIN / SEG_PRIOR mismatch, or a FALLBACK_FRAME family failed; 0
+otherwise. Run on the fleet with the worker's environment, at
 nice 19 (it reads ~50 MB of NBA ledger on a busy night).
 """
 
@@ -116,7 +123,7 @@ def live(date_str: str, sports: set[str] | None, root: Path | None) -> dict[str,
         if not ledger_rows:
             continue
         evidence = [row for d in _days_around(date_str) for row in lel.iter_rows(sport, d, root=root)]
-        index = ee.EvidenceIndex(evidence)
+        index = ee.EvidenceIndex(evidence, sport=sport)
         reader = ee.Reader()
         ops = ee.live_opinions(ledger_rows, index, reader)
         # The ledger's refusal rows carry no lane state or prices by design; a populated share over them would
@@ -128,10 +135,21 @@ def live(date_str: str, sports: set[str] | None, root: Path | None) -> dict[str,
             "ledger_refusal_rows": len(ledger_rows) - len(priced),
             "evidence_rows": len(evidence),
             "join": ee.join_reproduction(ops),
+            "fallback_frame": ee.fallback_frame_check(ops),
+            "evidence_key": _count(o.inputs.get("evidence_key") for o in ops if o.expert == "live_resim"),
+            "prior_basis": _count(f"{o.prior_basis}|{o.inputs.get('p_source') or 'evidence_histogram'}"
+                                  for o in ops if o.delta_logit is not None),
             "checklist": ee.checklist(ops, reader, {"live_gameline_ledger": priced, "live_evidence": evidence},
                                       sport=sport),
         }
     return out
+
+
+def _count(values) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for v in values:
+        out[str(v)] = out.get(str(v), 0) + 1
+    return dict(sorted(out.items(), key=lambda kv: -kv[1]))
 
 
 def _iter_quote_rows(sport: str, date_str: str):
@@ -164,7 +182,7 @@ def stat_progress(date_str: str, sports: set[str] | None, root: Path | None) -> 
         if not props_rows:
             continue
         evidence = [row for d in _days_around(date_str) for row in lel.iter_rows(sport, d, root=root)]
-        index = ee.EvidenceIndex(evidence)
+        index = ee.EvidenceIndex(evidence, sport=sport)
         reader = ee.Reader()
         quotes = ee.PropQuoteIndex(_iter_quote_rows(sport, date_str), reader, sport=sport)
         kept: list[Any] = []
@@ -203,7 +221,7 @@ def segments(date_str: str, sports: set[str] | None, root: Path | None) -> dict[
         evidence = [row for d in _days_around(date_str) for row in lel.iter_rows(sport, d, root=root)]
         if not any(row.get("segments") for row in evidence):
             continue
-        index = ee.EvidenceIndex(evidence)
+        index = ee.EvidenceIndex(evidence, sport=sport)
         reader = ee.Reader()
         quotes = ee.GameLineQuoteIndex(_iter_quote_rows(sport, date_str), reader)
         kept: list[Any] = []
@@ -272,13 +290,21 @@ def run(args: argparse.Namespace) -> int:
         for ex in j["examples"][:5]:
             print("      MISMATCH", json.dumps(ex, default=str))
         bad += j["mismatched"]
+        print(f"   EVIDENCE_KEY {sport} {json.dumps(block['evidence_key'])} | opined by prior|p source "
+              f"{json.dumps(block['prior_basis'])}")
+        ff = block["fallback_frame"]
+        print(f"   FALLBACK_FRAME {sport} judged={ff['judged']} failed={ff['failed']} "
+              f"{json.dumps(ff['families'], sort_keys=True)}")
+        bad += ff["failed"]
         cl = block["checklist"]
         print(f"   CHECKLIST {sport} live ok={cl['ok']} alarms={len(cl['alarms'])}")
         for a in cl["alarms"][:12]:
             print("      ALARM", json.dumps(a, default=str))
         bad += len(cl["alarms"])
         report["live"][sport] = {"coverage": ee.coverage(ops), "join": j, "checklist": cl,
-                                 "ledger_rows": block["ledger_rows"], "evidence_rows": block["evidence_rows"]}
+                                 "ledger_rows": block["ledger_rows"], "evidence_rows": block["evidence_rows"],
+                                 "fallback_frame": ff, "evidence_key": block["evidence_key"],
+                                 "prior_basis": block["prior_basis"]}
 
     report["stat_progress"] = {}
     for sport, block in stat_progress(args.date, sports, root).items():
@@ -309,6 +335,7 @@ def run(args: argparse.Namespace) -> int:
         all_ops += ops
         st = block["stats"]
         print(f"SEGMENTS sport={sport} games_quoted={st['games_quoted']} games_matched={st['games_matched']} "
+              f"(by_team_alias {st['games_matched_by_team_alias']}, ambiguous {len(st['games_ambiguous'])}) "
               f"ticks={st['ticks']} settled_skipped={st['segment_settled']} not_in_tick={st['segment_not_in_tick']} "
               f"quote_rows={block['quote_rows']} unmapped={block['quote_rows_unmapped']} "
               f"evidence_rows={block['evidence_rows']} prior_age_s={block['prior_age_s']}")

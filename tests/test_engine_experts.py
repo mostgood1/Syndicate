@@ -748,6 +748,221 @@ def test_segment_checklist_reads_the_block_population_and_names_nbas_missing_anc
                                                        "segment_block:remainingFraction"}
 
 
+# ----------------------------------------------------------------------------- live refusals (2026-11-16)
+#
+# Lane engine-experts-live-refusals. Fleet 11-09..11-14: live NCAAF refused every line `no_game_match` (the ledger names
+# the odds feed's teams, the evidence log ESPN's short names), and NHL puck lines / totals refused `no_prior` (their
+# prior sits in `market_fair_prob_over`; the puck line's number only in the ledger's `display_prob`).
+
+NCAAF_CANON = {"iowa state cyclones": "iowa state", "iowa state": "iowa state", "cincinnati bearcats": "cincinnati",
+               "cincinnati": "cincinnati", "iowa state university": "iowa state"}
+
+
+def _canon(sport, away, home):
+    """A stand-in for the join's #791 registry: (away, home) canonical, None when either side does not resolve."""
+    a, h = NCAAF_CANON.get(str(away).lower()), NCAAF_CANON.get(str(home).lower())
+    return (a, h) if a and h else None
+
+
+def _ncaaf_evidence(**kw):
+    ev = _evidence(home="Iowa State", away="Cincinnati", **kw)
+    return {**ev, "sport": "ncaaf", "event_id": None, "home": "Iowa State", "away": "Cincinnati"}
+
+
+def _ncaaf_ledger(market="totals", line=215.5, *, home="Iowa State Cyclones", away="Cincinnati Bearcats", **kw):
+    return {**_ledger(market, line, home=home, away=away, **kw), "sport": "ncaaf"}
+
+
+def test_ncaaf_names_meet_through_the_joins_canonical_pair_and_off_restores_exact_only():
+    from syndicate.features.shared.live_gameline_join import price_distribution_market
+
+    ev = _ncaaf_evidence()
+    join = price_distribution_market(dist=ev["totalRunsDist"], line=215.5, side="over", market="totals",
+                                     market_prob=0.5, sims=100)
+    row = _ncaaf_ledger(join_p=join["model_prob"])
+    on = ee.live_resim_expert(row, ee.EvidenceIndex([ev], sport="ncaaf", alias_key=_canon), ee.Reader())
+    assert on.refusal is None and on.inputs["evidence_key"] == "team_alias"
+    assert on.inputs["evidence_match"] == "same_state" and on.clock_bucket == "25-50"
+    rep = ee.join_reproduction([on])
+    assert (rep["checked"], rep["mismatched"]) == (1, 0)  # the lane the join priced, not merely a lane
+    off_env = {ee.OFF_ENV: ee.FEATURE_TEAM_ALIAS}
+    off = ee.live_resim_expert(row, ee.EvidenceIndex([ev], sport="ncaaf", alias_key=_canon, env=off_env),
+                               ee.Reader())
+    assert off.refusal == "no_game_match" and off.delta_logit is None  # off != on
+    # no sport: the index is exact-only, as every caller was before
+    assert ee.live_resim_expert(row, ee.EvidenceIndex([ev], alias_key=_canon), ee.Reader()).refusal == "no_game_match"
+    # an exact name still wins, and says so
+    exact = ee.live_resim_expert(_ncaaf_ledger(home="Iowa State", away="Cincinnati"),
+                                 ee.EvidenceIndex([ev], sport="ncaaf", alias_key=_canon), ee.Reader())
+    assert exact.inputs["evidence_key"] == "exact" and exact.refusal is None
+    # a canonical pair with the sides swapped is not the same game (the join does not swap either)
+    swapped = ee.live_resim_expert(_ncaaf_ledger(home="Cincinnati Bearcats", away="Iowa State Cyclones"),
+                                   ee.EvidenceIndex([ev], sport="ncaaf", alias_key=_canon), ee.Reader())
+    assert swapped.refusal == "no_game_match"
+
+
+def test_two_evidence_games_under_one_canonical_pair_are_refused_not_guessed():
+    a = _ncaaf_evidence()
+    b = {**_ncaaf_evidence(p_home=0.3), "home_name": "Iowa State University", "home": "Iowa State University"}
+    index = ee.EvidenceIndex([a, b], sport="ncaaf", alias_key=_canon)
+    op = ee.live_resim_expert(_ncaaf_ledger(), index, ee.Reader())
+    assert op.refusal == "team_alias_ambiguous" and op.delta_logit is None
+    # one game filed under its names AND its codes is two keys over the SAME rows: one series, not ambiguity
+    coded = {**_ncaaf_evidence(), "home": "ISU", "away": "CIN"}
+    canon = {**NCAAF_CANON, "isu": "iowa state", "cin": "cincinnati"}
+    index = ee.EvidenceIndex([coded], sport="ncaaf",
+                             alias_key=lambda s, a, h: (canon.get(str(a).lower()), canon.get(str(h).lower())))
+    assert len(index.by_game) == 2
+    assert ee.live_resim_expert(_ncaaf_ledger(), index, ee.Reader()).inputs["evidence_key"] == "team_alias"
+
+
+def test_the_default_canonical_pair_is_the_joins_own_function_and_switch(monkeypatch):
+    from syndicate.features.shared import team_aliases
+
+    monkeypatch.setattr(team_aliases, "chip_join_key", lambda sport, name: NCAAF_CANON.get(str(name).lower()))
+    monkeypatch.delenv("SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES", raising=False)
+    ev = _ncaaf_evidence()
+    on = ee.live_resim_expert(_ncaaf_ledger(), ee.EvidenceIndex([ev], sport="ncaaf"), ee.Reader())
+    assert on.inputs["evidence_key"] == "team_alias" and on.refusal is None
+    # NBA is outside the join's fallback (#791 is NCAAF only), so its names must still meet exactly
+    nba = ee.EvidenceIndex([_evidence(home="Iowa State", away="Cincinnati")], sport="nba")
+    assert nba.find("Iowa State Cyclones", "Cincinnati Bearcats") == (None, "no_game_match")
+    monkeypatch.setenv("SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES", "off")  # the join's own switch reaches the expert
+    off = ee.live_resim_expert(_ncaaf_ledger(), ee.EvidenceIndex([ev], sport="ncaaf"), ee.Reader())
+    assert off.refusal == "no_game_match"
+
+
+def test_a_line_priced_before_the_log_starts_is_a_gap_not_a_failed_identity():
+    index = ee.EvidenceIndex([_evidence()])  # first row 2026-11-10T00:20:00Z
+    early = ee.live_resim_expert(_ledger(home="Nobody", recorded_at="2026-11-10T00:05:00+00:00"), index, ee.Reader())
+    assert early.refusal == "evidence_log_starts_after_instant"
+    late = ee.live_resim_expert(_ledger(home="Nobody"), index, ee.Reader())
+    assert late.refusal == "no_game_match"
+    assert ee.live_resim_expert(_ledger(), ee.EvidenceIndex([]), ee.Reader()).refusal == \
+        "evidence_log_starts_after_instant"
+
+
+def _unpriced(market="totals", line=215.5, *, over=0.5, segment="full", **kw):
+    """A full-game row the join did not price (NHL puck line / total): no market fair, the v6 first side beside it."""
+    return {**_ledger(market, line, segment=segment, prior=None, **kw), "v": 7, "market_fair_prob_over": over,
+            "point_estimator": None}
+
+
+def test_the_prior_is_read_under_its_v6_name_on_full_game_totals_and_spreads_only():
+    index = ee.EvidenceIndex([_evidence()])
+    on = ee.live_resim_expert(_unpriced(over=0.47), index, ee.Reader())
+    assert on.refusal is None and on.p_prior == 0.47
+    assert on.prior_basis == "live_gameline_ledger.market_fair_prob_over"
+    sp = ee.live_resim_expert(_unpriced("spreads", 3.5, over=0.4), index, ee.Reader())
+    assert sp.refusal is None and sp.p_prior == 0.4 and sp.side == "home"
+    off = ee.live_resim_expert(_unpriced(over=0.47), index, ee.Reader(), frozenset({ee.FEATURE_FAIR_OVER}))
+    assert off.refusal == "no_prior" and off.delta_logit is None  # off != on
+    # the join's own price still wins where it exists
+    both = ee.live_resim_expert({**_ledger(prior=0.52), "market_fair_prob_over": 0.47}, index, ee.Reader())
+    assert both.p_prior == 0.52 and both.prior_basis == "live_gameline_ledger.market_fair_prob"
+    # never on a segment (measured: never set there) or a moneyline (P(home) is `market_fair_prob` itself)
+    seg = {**_unpriced(segment="h1", over=0.47), "market": "totals"}
+    assert ee.live_resim_expert(seg, index, ee.Reader()).refusal == "no_prior"
+    ml = {**_unpriced("h2h", None, over=0.47)}
+    assert ee.live_resim_expert(ml, index, ee.Reader()).refusal == "no_prior"
+
+
+def test_the_join_check_skips_a_row_the_join_did_not_price_and_the_frame_gate_reads_it():
+    index = ee.EvidenceIndex([_evidence()])
+    # the join keeps a raw k/n share on a row it did not price: not its estimator, so not the JOIN gate's row
+    op = ee.live_resim_expert({**_unpriced(over=0.47), "model_home_win_prob": 0.5}, index, ee.Reader())
+    assert op.refusal is None and op.inputs["join_model_p"] == 0.5
+    assert ee.join_reproduction([op])["checked"] == 0
+    assert ee.fallback_frame_check([op])["families"]["nba:totals"]["verdict"] == "UNJUDGED"  # 1 pair: not a pass
+
+
+def _opined(p, prior, *, sport="nhl", market="spreads", display=True):
+    op = ee.ExpertOpinion(expert="live_resim", sport=sport, market=market, p_expert=p, p_prior=prior,
+                          delta_logit=0.0, prior_basis=ee.PRIOR_BASIS_FAIR_OVER)
+    if display:
+        op.inputs["p_source"] = ee.P_SOURCE_DISPLAY
+    return op
+
+
+def test_the_frame_gate_passes_the_right_frame_and_fails_a_flipped_one():
+    right = [_opined(0.70 + 0.002 * i, 0.72) for i in range(30)] + [_opined(0.28, 0.30) for _ in range(10)]
+    res = ee.fallback_frame_check(right)
+    assert res["families"]["nhl:spreads"]["verdict"] == "PASS" and (res["judged"], res["failed"]) == (1, 0)
+    flipped = [_opined(1.0 - o.p_expert, o.p_prior) for o in right]  # a side error: home read as away
+    bad = ee.fallback_frame_check(flipped)
+    assert bad["families"]["nhl:spreads"]["verdict"] == "FAIL" and bad["failed"] == 1
+    near = [_opined(0.52, 0.49) for _ in range(50)]  # near even the flipped reading cannot be told apart: unjudged
+    assert ee.fallback_frame_check(near)["families"]["nhl:spreads"]["verdict"] == "UNJUDGED"
+    # opinions the JOIN gate checks are not this gate's population
+    priced = _opined(0.3, 0.7, display=False)
+    priced.prior_basis = "live_gameline_ledger.market_fair_prob"
+    assert ee.fallback_frame_check([priced])["families"] == {}
+
+
+def _nhl_evidence(**kw):
+    ev = _evidence(home="Carolina Hurricanes", away="Seattle Kraken", sims=200, period=1, clock=600.0, **kw)
+    return {k: v for k, v in {**ev, "sport": "nhl", "event_id": None}.items()
+            if k not in ("marginDist", "totalRunsDist")}  # NHL lanes log neither (displayMarginDist is not kept)
+
+
+def _nhl_puck_line(line=1.5, display=130 / 204, *, over=0.5811, reason="live_margin_published_for_display_only"):
+    return {**_unpriced("spreads", line, over=over, home="Carolina Hurricanes", away="Seattle Kraken"), "sport": "nhl",
+            "sims_run": 200, "display_prob": display, "display_basis": reason, "withheld_reason": reason,
+            "model_home_win_prob": None}
+
+
+def test_an_nhl_puck_line_opines_from_the_ledgers_display_number_and_each_switch_restores_its_refusal():
+    index = ee.EvidenceIndex([_nhl_evidence()], sport="nhl")
+    op = ee.live_resim_expert(_nhl_puck_line(), index, ee.Reader())
+    assert op.refusal is None and op.inputs["p_source"] == ee.P_SOURCE_DISPLAY
+    assert (op.inputs["k"], op.inputs["n"], op.inputs["push"]) == (128, 200, 0)
+    assert op.p_expert == pytest.approx(130 / 204, abs=1e-6) and op.p_prior == 0.5811
+    assert op.sigma_basis == "mc_agresti_coull" and op.sigma == pytest.approx(
+        ee.sigma_logit_from_se(130 / 204, ee.agresti_coull(128, 200)[1]), abs=1e-6)
+    assert op.clock_bucket == "0-25" and op.line == 1.5 and op.side == "home"
+    off_display = ee.live_resim_expert(_nhl_puck_line(), index, ee.Reader(), frozenset({ee.FEATURE_DISPLAY_MARGIN}))
+    assert off_display.refusal == "no_distribution"  # off != on
+    off_prior = ee.live_resim_expert(_nhl_puck_line(), index, ee.Reader(), frozenset({ee.FEATURE_FAIR_OVER}))
+    assert off_prior.refusal == "no_prior"  # the refusal fleet 11-09..11-14 showed on every puck line
+
+
+def test_the_display_path_refuses_by_name_what_it_cannot_read():
+    index = ee.EvidenceIndex([_nhl_evidence()], sport="nhl")
+    r = ee.Reader()
+    assert ee.live_resim_expert(_nhl_puck_line(display=0.6372), index, r).refusal == "display_prob_not_agresti_coull"
+    assert ee.live_resim_expert(_nhl_puck_line(line=2.0, display=0.5), index, r).refusal == "display_prob_whole_line"
+    assert ee.live_resim_expert(_nhl_puck_line(display=None), index, r).refusal == "no_display_probability"
+    assert ee.live_resim_expert(_nhl_puck_line(display=202 / 204), index, r).refusal == "sample_certainty"
+    # a spread with no histogram that is NOT a display-only row, and an NHL total (no histogram anywhere)
+    assert ee.live_resim_expert(_nhl_puck_line(reason="quote_stale"), index, r).refusal == "no_distribution"
+    total = {**_nhl_puck_line(), "market": "totals", "line": 6.5, "display_prob": None,
+             "withheld_reason": "live_resim_published_no_distribution_for_this_market"}
+    assert ee.live_resim_expert(total, index, r).refusal == "no_distribution"
+
+
+def test_the_segment_expert_finds_an_ncaaf_game_through_the_canonical_pair():
+    canon = {SEG_HOME.lower(): "sh", "sacred heart": "sh", SEG_AWAY.lower(): "aw", "away u": "aw"}
+
+    def alias(sport, away, home):
+        a, h = canon.get(str(away).lower()), canon.get(str(home).lower())
+        return (a, h) if a and h else None
+
+    ev = {**_seg_evidence(sport="ncaaf"), "home_name": "Sacred Heart", "away_name": "Away U"}
+    reader = ee.Reader()
+    qi = ee.GameLineQuoteIndex(_seg_quotes(), reader)
+    index = ee.EvidenceIndex([ev], sport="ncaaf", alias_key=alias)
+    ops, stats = ee.live_segment_opinions(index, qi, reader)
+    assert (stats["games_matched"], stats["games_matched_by_team_alias"], stats["games_unmatched"]) == (1, 1, [])
+    assert len(ops) == 2 and all(o.delta_logit is not None for o in ops)
+    assert ops[0].inputs["evidence_game"] == ["sacred heart", "away u"]
+    rep = ee.segment_join_reproduction(ops, index)
+    assert (rep["checked"], rep["mismatched"]) == (2, 0)  # the tick is found under the evidence log's own key
+    assert (rep := ee.segment_prior_reproduction(ops, qi))["mismatched"] == 0 and rep["checked"] == 2
+    off = ee.EvidenceIndex([ev], sport="ncaaf", alias_key=alias, env={ee.OFF_ENV: ee.FEATURE_TEAM_ALIAS})
+    ops_off, stats_off = ee.live_segment_opinions(off, qi, ee.Reader())
+    assert ops_off == [] and stats_off["games_matched"] == 0  # off != on
+
+
 # ----------------------------------------------------------------------------- shadow: no reader, no order module
 
 
