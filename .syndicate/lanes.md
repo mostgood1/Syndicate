@@ -925,11 +925,6 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_kalshi_quote_history.py tests/test_engine_experts.py (off != on for the Kalshi prior and the NFL read; a planted side flip caught; a stale / wide / one-sided / unseen point refused by name); then a fleet dry run at nice 19 on 11-14 (nba, ncaab, wncaab, ncaaf) and 11-15 (nfl): exit 0, KALSHI_PRIOR 0 mismatched, KALSHI_FRAME per family, NFL opined > 0 with NFL_JOIN 0 mismatched; readings in #736 and engine_experts.md
 - Blocked by: none
 
-### closed-lane-archive-20261115-1439 — CLOSED 2026-11-15 (GOAL MET: 3 blocks archived) — opened 2026-11-15 — session c05705db-575c-4b19-a84b-b6a3438be66c
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 at 20:41Z read 3 SAFE of 18 CLOSED; moved `soccer-live-corners-book-test`, `closed-lane-archive-20261115-0639` and `closed-lane-archive-20261115-0840` to lanes_closed.md with one pointer each. Other 15 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-15.md.
-
 ### closed-lane-archive-20261115-1640 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 31781218-8e4c-417a-bd3a-2bb5e3383950
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -953,6 +948,11 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS `[2026-11-15 23:19Z, 5:19 PM CST]`: BUILT AND ON MAIN `b2ae202d4` (tests: 14 new + 304 existing passed); NOT LOADED. Headroom read before asking (refresh-worker BOOK_GRID_TICK, 22:19-23:19Z): grid builds 2,533 s = 70% of wall; NBA 25 builds/h (9 on_pull) p50 32.2 s max 90.0 s; NFL 40/h p50 18.0 s; NCAAB 49/h p50 7.0 s. Price-on-pull re-prices a live sport whose shard changed once 30 s have passed since its last build, unless its last build took >= 45 s, so 60 s NBA pulls could take NBA to ~60 builds/h, about +1,100 s/h, near 100% of wall on a 7-game NBA + NFL + NCAAB night. The load waits on the user's call with that reading in front of them.
 - PRE-LOAD BASELINE + CORRECTION `[2026-11-15 23:57Z, 5:57 PM CST; rail monitor reading 23, findings `61290d344`]`: served NBA live rows priced on a quote <= 120 s 0 of 719 (605 of 939 at 5:34 PM, read just after a pull -- the 240 s sawtooth); NBA flags 0; our-look age at pricing p50 216 s; NBA in-play pulls 5 in 20 min, median gap 249 s. Refresh-worker over 23 min: NBA builds p50 70.9 s, max 91.7 s, deferred_slow nba 5, NBA overlay gap p50 292 s, max 343 s. CORRECTION to the STATUS line above: with the evening slate NBA is past the 45 s slow-sport line, and a slow sport is never re-priced on pull, so tonight 60 s pulls would NOT multiply NBA builds; but the ~292 s overlay gap, not the pull, would then cap how fresh a served NBA price can be. The +1,100 s/h estimate applies only while NBA builds stay under 45 s.
+
+### closed-lane-archive-20261115-1850 — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 79585ed0-a8f1-403a-9ffe-6314d741c996
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 00:50Z 11-16 read 1 SAFE of 17 CLOSED; moved `closed-lane-archive-20261115-1439` to lanes_closed.md with one pointer. Other 16 deferred (owner idle < 240m, or a missing transcript). Readings in .syndicate/log/2026-11-15.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1224,6 +1224,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261115-0639` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session 3db11340-9b28-41cb-a6ce-99f366b44ecc
 - `closed-lane-archive-20261115-0840` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session c340d9e9-7fab-4dda-b749-629ce7a17822
 - `closed-lane-archive-20261115-1041` — CLOSED 2026-11-15 (GOAL MET: 1 block archived) — opened 2026-11-15 — session e01d3a71-d04f-44a1-9853-345b01791bb2
+- `closed-lane-archive-20261115-1439` — CLOSED 2026-11-15 (GOAL MET: 3 blocks archived) — opened 2026-11-15 — session c05705db-575c-4b19-a84b-b6a3438be66c
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
