@@ -13,7 +13,11 @@ NOW = datetime(2026, 10, 20, 13, 0, tzinfo=timezone.utc)
 
 
 def _order(i: int, *, won: bool, clv: float | None, venue="paper:kalshi", sport="ncaaf",
-           market="totals", date="2026-10-10", ev=2.0, stake=10.0, scope="same_book", event=None):
+           market="totals", date="2026-10-10", ev=2.0, stake=10.0, scope="same_book", event=None,
+           fees=0.0):
+    # `fees` is a RECORDED fee (0.0 by default, so net CLV == the given CLV and these tests
+    # keep exercising the decision). None is an unknown fee, which gives no net CLV reading
+    # (todo #815; see tests/test_fee_net_clv.py).
     mark = None if clv is None else {"clv_pct": clv, "close_book_scope": scope}
     return {
         "idempotency_key": f"k{i}",
@@ -27,6 +31,7 @@ def _order(i: int, *, won: bool, clv: float | None, venue="paper:kalshi", sport=
         "outcome": "won" if won else "lost",
         "pnl_dollars": 9.0 if won else -stake,
         "fill_stake_dollars": stake,
+        "fees_dollars": fees,
         "ev_pct": ev,
         "graded_at": f"{date}T23:{i % 60:02d}:00Z",
         "closing_mark": mark,

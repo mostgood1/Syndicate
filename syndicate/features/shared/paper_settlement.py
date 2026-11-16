@@ -998,6 +998,8 @@ _CLOSE_FIELDS = (
     # `order` when no opening was recorded and the fill itself was the open
     # (`order_clv.OPENING_FROM_ORDER`); absent on every other mark.
     "opening_source",
+    # The fee in CLV's probability points (`order_clv.fee_pp_for_order`).
+    "fee_pp",
 )
 
 
@@ -1091,6 +1093,13 @@ def stamp_closing_marks(
         # ALWAYS PRESENT, possibly None: "no reading" must not look like a
         # missing key a reader could default to zero.
         mark["clv_pct"] = row.get("clv_pct")
+        # NET OF THE FEE, beside the gross [2026-11-16, todo #815]. Always
+        # present on a mark stamped from now on, None when the fee is unknown.
+        # Marks stamped before this carry no key and are not rewritten: a
+        # reader that needs the net figure for those calls
+        # `order_clv.fee_net_clv_pct(order, clv)`, which reads the order's own
+        # fee, rather than defaulting the absent key to the gross.
+        mark["clv_net_pct"] = row.get("clv_net_pct")
         order["closing_mark"] = mark
         stamped += 1
         if mark["clv_pct"] is not None:

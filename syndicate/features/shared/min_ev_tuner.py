@@ -131,6 +131,27 @@ def pooling_mode() -> str:
 def roi_basis() -> str:
     raw = str(os.environ.get(_ENV_ROI_BASIS) or "").strip().lower()
     return "dollars" if raw == "dollars" else "flat"
+
+
+# CLV NET OF THE VENUE FEE [2026-11-16, lane portfolio-edge-measurement, todo #815; user "Yes, add
+# fee-net CLV" to the order marks and this tuner, shadow only]. `net` (absent / unrecognised) or
+# `gross`. WHY NET: the gate needs ROI AND CLV both significantly negative to RAISE, and ROI is
+# already net of the fee (`pnl_dollars`). A gross CLV sits one fee above it -- measured on the
+# fleet's live ledger 2026-11-16, 545 same-book marks: gross +1.32 pp, taker fee 1.63 pp, net
+# -0.30 +- 0.19 pp -- so a cell losing money net of fees read as "beating the close" and the RAISE
+# rule could not fire on it. Comparing a net ROI with a gross CLV compares two different bets.
+# An order whose fee is unknown gives no net reading (`order_clv.fee_pp_for_order`), never the
+# gross one. `gross` is kept for the A/B and the backtest, not as a fallback.
+CLV_BASIS_NET = "net"
+CLV_BASIS_GROSS = "gross"
+_ENV_CLV_BASIS = "SYNDICATE_MIN_EV_TUNER_CLV_BASIS"
+
+
+def clv_basis() -> str:
+    raw = str(os.environ.get(_ENV_CLV_BASIS) or "").strip().lower()
+    return CLV_BASIS_GROSS if raw == CLV_BASIS_GROSS else CLV_BASIS_NET
+
+
 _DEFAULT_CLV_SCOPES = ("same_book",)
 # Paper venue orders run the SAME code as live up to the submit (see
 # `execution_ledger`), priced at the venue's own quote; live alone is one day
@@ -234,7 +255,21 @@ def _settled_at(order: Mapping[str, Any]) -> str:
     return str(order.get("graded_at") or order.get("commence_time") or order.get("selected_date") or "")
 
 
-def _clv(order: Mapping[str, Any], scopes: Sequence[str]) -> float | None:
+def _clv(order: Mapping[str, Any], scopes: Sequence[str], basis: str = CLV_BASIS_NET) -> float | None:
+    """Same-book CLV for one order on `basis` -- net of its fee by default (see `clv_basis`).
+
+    The gross figure is the one `_gross_clv` recomputes and trusts; the fee comes
+    off THAT number, so the #719 unit repair carries into the net reading.
+    """
+    gross = _gross_clv(order, scopes)
+    if gross is None or basis == CLV_BASIS_GROSS:
+        return gross
+    from syndicate.features.shared.order_clv import fee_net_clv_pct
+
+    return fee_net_clv_pct(order, gross)
+
+
+def _gross_clv(order: Mapping[str, Any], scopes: Sequence[str]) -> float | None:
     """Same-book CLV for one order, RECOMPUTED from its own prices where possible.
 
     WHY NOT JUST READ `closing_mark.clv_pct` (todo #719): every LIVE Kalshi mark
@@ -322,6 +357,7 @@ def cell_evidence(
     trailing_events: int,
     clv_scopes: Sequence[str],
     roi_basis: str = "flat",
+    clv_basis: str = CLV_BASIS_NET,
 ) -> dict[str, Any]:
     """ROI and CLV for one cell's settled orders, clustered by event.
 
@@ -351,6 +387,7 @@ def cell_evidence(
     event_flat_returns: list[float] = []
     event_flat_counts: list[float] = []
     event_clvs: list[float] = []
+    event_gross_clvs: list[float] = []
     pnl_total = stake_total = 0.0
     ev_only_pnl_total = ev_only_stake_total = 0.0
     rows = 0
@@ -361,6 +398,7 @@ def cell_evidence(
         pnl = stake = flat = 0.0
         flat_n = 0
         clvs: list[float] = []
+        gross_clvs: list[float] = []
         for order in group:
             rows += 1
             s = _stake(order) or 0.0
@@ -377,9 +415,12 @@ def cell_evidence(
             modes[mode] = modes.get(mode, 0) + 1
             who = "venue" if str(order.get("settled_by") or "") == "venue" else "inferred"
             authority[who] = authority.get(who, 0) + 1
-            clv = _clv(order, clv_scopes)
+            clv = _clv(order, clv_scopes, clv_basis)
             if clv is not None:
                 clvs.append(clv)
+            gross_clv = _clv(order, clv_scopes, CLV_BASIS_GROSS)
+            if gross_clv is not None:
+                gross_clvs.append(gross_clv)
             ev = _as_float(order.get("ev_pct"))
             if ev is not None:
                 ev_values.append(ev)
@@ -392,6 +433,8 @@ def cell_evidence(
             stake_total += stake
         if clvs:
             event_clvs.append(sum(clvs) / len(clvs))
+        if gross_clvs:
+            event_gross_clvs.append(sum(gross_clvs) / len(gross_clvs))
 
     dollar_t = _ratio_t(event_pnls, event_stakes)
     flat_t = _ratio_t(event_flat_returns, event_flat_counts)
@@ -403,6 +446,7 @@ def cell_evidence(
     else:
         roi_basis, roi, roi_t = "flat", flat_roi, flat_t
     clv_t = _t_stat(event_clvs)
+    gross_t = _t_stat(event_gross_clvs)
     return {
         "events": len(event_pnls),
         "rows": rows,
@@ -416,9 +460,19 @@ def cell_evidence(
         "ev_only_roi_pct": (
             round(100.0 * ev_only_pnl_total / ev_only_stake_total, 3) if ev_only_stake_total > 0 else None
         ),
+        # `clv_*` -- what `decide` reads -- are on `clv_basis` (fee-net by
+        # default). The gross figures ride beside them as the readout, each
+        # with its own event count: an order with an unknown fee has a gross
+        # reading and no net one.
+        "clv_basis": clv_basis,
         "clv_events": len(event_clvs),
         "avg_clv_pct": round(sum(event_clvs) / len(event_clvs), 3) if event_clvs else None,
         "clv_t": round(clv_t, 3) if clv_t is not None else None,
+        "clv_gross_events": len(event_gross_clvs),
+        "avg_clv_gross_pct": (
+            round(sum(event_gross_clvs) / len(event_gross_clvs), 3) if event_gross_clvs else None
+        ),
+        "clv_gross_t": round(gross_t, 3) if gross_t is not None else None,
         "avg_ev_pct": round(sum(ev_values) / len(ev_values), 3) if ev_values else None,
         "modes": dict(sorted(modes.items())),
         "authority": dict(sorted(authority.items())),
@@ -613,9 +667,14 @@ def collect_cells(
 
 
 def _band_event_values(
-    orders: Sequence[Mapping[str, Any]], *, trailing_events: int, clv_scopes: Sequence[str]
+    orders: Sequence[Mapping[str, Any]],
+    *,
+    trailing_events: int,
+    clv_scopes: Sequence[str],
+    clv_basis: str = CLV_BASIS_NET,
 ) -> tuple[list[float], list[float]]:
-    """Per EVENT, in `cell_evidence`'s own trailing window: mean flat return, and mean same-book CLV."""
+    """Per EVENT, in `cell_evidence`'s own trailing window: mean flat return, and mean same-book CLV
+    on `clv_basis` -- the basis the per-cell decision reads, so pooling never mixes the two."""
     by_event: dict[str, list[Mapping[str, Any]]] = {}
     for order in orders:
         by_event.setdefault(_event_id(order), []).append(order)
@@ -631,7 +690,7 @@ def _band_event_values(
             pnl = _as_float(order.get("pnl_dollars"))
             if stake and pnl is not None:
                 returns.append(pnl / stake)
-            clv = _clv(order, clv_scopes)
+            clv = _clv(order, clv_scopes, clv_basis)
             if clv is not None:
                 event_clvs.append(clv)
         if returns:
@@ -754,12 +813,18 @@ def compute_proposals(
     params: Mapping[str, float] | None = None,
     clv_scopes: Sequence[str] | None = None,
     evidence_modes: Sequence[str] | None = None,
+    clv_basis_override: str | None = None,
 ) -> dict[str, Any]:
-    """Pure pass over `orders`: per-cell evidence and decision. No writes."""
+    """Pure pass over `orders`: per-cell evidence and decision. No writes.
+
+    `clv_basis_override` (`net` / `gross`) is for the A/B and the backtest; absent,
+    the basis is `clv_basis()` from the environment.
+    """
     params = dict(params or knobs())
     clv_scopes = tuple(clv_scopes or _csv_env(_ENV_CLV_SCOPES, _DEFAULT_CLV_SCOPES))
     evidence_modes = tuple(evidence_modes or _csv_env(_ENV_EVIDENCE_MODES, _DEFAULT_EVIDENCE_MODES))
     basis = roi_basis()
+    clv_on = clv_basis_override if clv_basis_override in (CLV_BASIS_NET, CLV_BASIS_GROSS) else clv_basis()
     cells, skipped = collect_cells(orders, evidence_modes=evidence_modes)
     prior_cells = state.get("cells") if isinstance(state.get("cells"), Mapping) else {}
 
@@ -773,7 +838,8 @@ def compute_proposals(
         override = _as_float(prior.get("min_ev_pct"))
         current = override if override is not None else float(base_min_ev_pct)
         evidence = cell_evidence(
-            group, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes, roi_basis=basis
+            group, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes, roi_basis=basis,
+            clv_basis=clv_on,
         )
         effective = _effective_cut(group, current)
         band_hi = effective + params["band_pct"]
@@ -783,7 +849,8 @@ def compute_proposals(
             if ev_pct is not None and effective <= ev_pct < band_hi:
                 marginal_rows.append(order)
         marginal = cell_evidence(
-            marginal_rows, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes, roi_basis=basis
+            marginal_rows, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes, roi_basis=basis,
+            clv_basis=clv_on,
         )
         marginal["band"] = [round(effective, 4), round(band_hi, 4)]
         # Cooldown counts the WHOLE cell's events: the band itself moves with
@@ -810,7 +877,8 @@ def compute_proposals(
             entry["moved_at"] = prior.get("moved_at")
         out_cells[key] = entry
         flats, band_clvs = _band_event_values(
-            marginal_rows, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes
+            marginal_rows, trailing_events=int(params["trailing_events"]), clv_scopes=clv_scopes,
+            clv_basis=clv_on,
         )
         pool_contexts[key] = {
             "current": current, "effective": effective, "since": since,
@@ -851,6 +919,7 @@ def compute_proposals(
         "clv_scopes": list(clv_scopes),
         "evidence_modes": list(evidence_modes),
         "roi_basis": basis,
+        "clv_basis": clv_on,
         "pooling": pooling,
         "pooled_actions": dict(sorted(pooled_actions.items())),
         "base_min_ev_pct": float(base_min_ev_pct),
@@ -908,8 +977,10 @@ def run_nightly(
                     "events": ev.get("events"),
                     "roi_pct": ev.get("roi_pct"),
                     "roi_t": ev.get("roi_t"),
+                    "clv_basis": ev.get("clv_basis"),
                     "avg_clv_pct": ev.get("avg_clv_pct"),
                     "clv_t": ev.get("clv_t"),
+                    "avg_clv_gross_pct": ev.get("avg_clv_gross_pct"),
                     "modes": ev.get("modes"),
                 }
             )
@@ -924,6 +995,7 @@ def run_nightly(
         "clv_scopes": result["clv_scopes"],
         "evidence_modes": result["evidence_modes"],
         "roi_basis": result["roi_basis"],
+        "clv_basis": result["clv_basis"],
         "pooling": result["pooling"],
         "pooled_actions": result["pooled_actions"],
         "skipped": result["skipped"],
@@ -942,6 +1014,7 @@ def run_nightly(
         "[min_ev_tuner] MIN_EV_TUNER"
         f" mode={mode} date={today} cells={len(result['cells'])}"
         f" actions={result['actions']} skipped={result['skipped']}"
+        f" clv_basis={result['clv_basis']}"
         f" pooling={result['pooling']} pooled_actions={result['pooled_actions']}"
         f" base={result['base_min_ev_pct']} moves={len(moves)}",
         flush=True,

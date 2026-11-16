@@ -51,7 +51,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-__all__ = ["clv_for_orders", "order_clv_report_line"]
+__all__ = ["clv_for_orders", "fee_net_clv_pct", "fee_pp_for_order", "order_clv_report_line"]
 
 REASON_RESOLVED = "resolved"
 REASON_UNKEYABLE = "unkeyable"
@@ -82,6 +82,81 @@ def _entry_price(order: Mapping[str, Any]) -> float | None:
     """
     filled = _as_float(order.get("fill_price"))
     return filled if filled is not None else _as_float(order.get("requested_price"))
+
+
+# FEE-NET CLV  [2026-11-16, lane portfolio-edge-measurement, todo #815; user "Yes, add fee-net CLV"]
+#
+# `clv_pct` compares the PRICE we filled at with the close. A venue also takes a
+# fee that is not in the price, so a bet can beat the close and still be a worse
+# bet than the close. MEASURED on the fleet's live ledger 2026-11-16 (last 30
+# days, decided, 545 same-book marks): gross CLV +1.32 pp, mean taker fee 1.63 pp,
+# fee-net -0.30 +- 0.19 pp. The gross number said "we beat the close"; the
+# settled results said we lost (excess wins z -3.35). Net of the fee, both say
+# the same thing. So the net figure rides BESIDE the gross one, never replacing
+# it: the gross is still the right answer to "did the market move toward us".
+#
+# THE UNIT. CLV is in probability points of the contract price. Buying at `p`
+# with a stake of `S` buys `S / p` contracts; a fee of `F` dollars therefore
+# adds `F / (S / p) = p * F / S` to the price of each contract. That is the
+# same arithmetic `execution_ledger.paper_fill_fee_fields` runs in reverse
+# (contracts x per-contract fee), and the same breakeven the live readout uses.
+#
+# UNKNOWN IS NOT ZERO. `fees_dollars = None` is "we could not read the fee"
+# (`execution_ledger.paper_fill_fee_fields`), and `paper_settlement` charges it
+# as zero only so the outcome is not lost. Here an unknown fee gives NO net
+# reading: defaulting it to zero would hand back exactly the overstatement this
+# exists to remove. A recorded 0.0 (a sportsbook, whose margin is in its price)
+# is a real zero.
+#
+# PROPHETX is charged at SETTLEMENT, on a win only, so its fill records 0.0 and
+# a won order's realised fee depends on the outcome. Its fee here is the
+# expected commission at the fill's own probability -- `venue_fees`' own number
+# for choosing a bet at that venue -- never the realised one, which would put
+# the result into a pre-result measure.
+_PROPHETX_SETTLEMENT_BASIS = "prophetx_win_commission_at_settlement"
+
+
+def fee_pp_for_order(order: Mapping[str, Any], entry: Any = None) -> float | None:
+    """The fee this order paid, in the probability points CLV is measured in.
+
+    None when the fee is unknown or the order carries no usable price or stake.
+    """
+    from syndicate.features.prediction_ledger import _implied_from_price
+
+    price = _entry_price(order) if entry is None else entry
+    prob = _implied_from_price(price) if price is not None else None
+    if str(order.get("fee_basis") or "") == _PROPHETX_SETTLEMENT_BASIS:
+        if prob is None or not 0.0 < prob < 1.0:
+            return None
+        from syndicate.features.shared.venue_fees import PROPHETX_WIN_COMMISSION
+
+        return round(100.0 * PROPHETX_WIN_COMMISSION * prob * (1.0 - prob), 4)
+    fees = _as_float(order.get("fees_dollars"))
+    if fees is None:
+        return None
+    if fees == 0.0:
+        # A recorded zero is zero at any price.
+        return 0.0
+    stake = _as_float(order.get("fill_stake_dollars")) or _as_float(order.get("requested_stake_dollars"))
+    if stake is None or stake <= 0 or prob is None or not 0.0 < prob < 1.0:
+        return None
+    return round(100.0 * prob * fees / stake, 4)
+
+
+def fee_net_clv_pct(order: Mapping[str, Any], clv_pct: Any, *, entry: Any = None) -> float | None:
+    """`clv_pct` less this order's fee, in probability points. None when either is unknown.
+
+    Takes the gross CLV as an argument rather than reading the mark, so a caller
+    that recomputes the gross figure (`min_ev_tuner._clv`, todo #719) nets the
+    number it actually trusts.
+    """
+    clv = _as_float(clv_pct)
+    if clv is None:
+        return None
+    fee = fee_pp_for_order(order, entry)
+    if fee is None:
+        return None
+    return round(clv - fee, 4)
 
 
 def _scope_of(row: Mapping[str, Any]) -> str:
@@ -415,6 +490,10 @@ def clv_for_orders(
             matched_bookmaker=row.get("matched_bookmaker"),
             clv_pct=clv,
             beat_close=clv > 0,
+            # NET OF THE FEE, beside the gross (see `fee_pp_for_order`). None
+            # when the fee is unknown -- never the gross figure under a net name.
+            fee_pp=fee_pp_for_order(order, entry),
+            clv_net_pct=fee_net_clv_pct(order, clv, entry=entry),
             # The opening's own CLV, carried alongside rather than replacing
             # ours. The gap between them is what our TIMING was worth, which is
             # a different question from whether the pick was right.
@@ -479,6 +558,7 @@ def _aggregate(rows: Sequence[Mapping[str, Any]], keys: Sequence[str]) -> list[d
     labels = list(keys) + forced
     for bucket, group in sorted(buckets.items()):
         clvs = [row["clv_pct"] for row in group if row.get("clv_pct") is not None]
+        nets = [row["clv_net_pct"] for row in group if row.get("clv_net_pct") is not None]
         beats = sum(1 for row in group if row.get("beat_close"))
         entry = {label: value for label, value in zip(labels, bucket)}
         entry.update(
@@ -490,6 +570,12 @@ def _aggregate(rows: Sequence[Mapping[str, Any]], keys: Sequence[str]) -> list[d
                 "avg_clv_pct": round(sum(clvs) / len(clvs), 4) if clvs else None,
                 "beat_close": beats,
                 "beat_close_rate": round(beats / len(group), 4) if group else None,
+                # Fee-net, with its OWN n: a row whose fee is unknown has a
+                # gross reading and no net one, so the two averages can rest on
+                # different rows and each says how many.
+                "clv_net_n": len(nets),
+                "avg_clv_net_pct": round(sum(nets) / len(nets), 4) if nets else None,
+                "beat_close_net": sum(1 for value in nets if value > 0),
                 "staked_dollars": round(
                     sum(row.get("stake_dollars") or 0.0 for row in group), 2
                 ),
@@ -518,9 +604,11 @@ def order_clv_report_line(report: Mapping[str, Any]) -> str:
         # and would not mean anything.
         f" same_book_n={headline.get('n', 0)}"
         f" same_book_avg_clv_pct={headline.get('avg_clv_pct')}"
+        f" same_book_avg_clv_net_pct={headline.get('avg_clv_net_pct')}"
+        f" same_book_net_n={headline.get('clv_net_n', 0)}"
         f" same_book_beat={headline.get('beat_close', 0)}"
         f" reasons={report.get('reasons')}"
         # The split that turns "35 unresolved" into something with a remedy.
         f" no_close={report.get('no_close_reasons')}"
-        f" paper2={[(e.get('venue'), e.get('n'), e.get('avg_clv_pct')) for e in paper2]}"
+        f" paper2={[(e.get('venue'), e.get('n'), e.get('avg_clv_pct'), e.get('avg_clv_net_pct')) for e in paper2]}"
     )
