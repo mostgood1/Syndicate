@@ -156,3 +156,27 @@ kickoff.
 - **Handed to local_208683f1** (overlay / live-rail owner) at ~4:05 PM CST, as a question.
 
 **Teams:** 0 chip-less. det1 / det2 / det3 0 / 0 / 0. 0 flipped. 0 truncated.
+
+### WNCAAB zero-card overlay — CAUSE MEASURED (lane `wncaab-overlay-zero-cards`, ~4:25 PM CST)
+
+- **Not the overlay owner's.** local_208683f1 placed the drop in `_build_inplay_overlay`
+  (`book_grid_artifact.py:1085-1128`): `select_shortlist(opportunities)` returns no rows, and
+  the overlay keeps only `.get("rows")` and discards the refusal counters. No open lane claims it,
+  so I opened `wncaab-overlay-zero-cards` with the hypothesis written first (lanes.md `02e56e11f`).
+- **Replay**, read-only, nice 19, under refresh-worker's environ (`C:\tmp\railmon\wz_replay.py`;
+  `build_layer2_rows` and `select_shortlist` checked side-effect free first):
+  - WNCAAB grid 11-16 → `select_inplay_rows` → 8 rows → `build_layer2_rows` gives opportunity 5,
+    dead 3 (`live:live_market_stale` 3) → `select_shortlist` **chose 0**.
+  - **`rows_below_value_floor: 5` of 5.** Their market EV was -6.0 / -9.3 / -10.0 / -10.3%
+    against the WNCAAB floor of -2.0% (`flat_default`, both families).
+  - The quote-age limit (50,400 s) refused nothing.
+- **Mechanism:** the live join withholds the model price (`quote_older_than_live_pricing_ceiling`),
+  so the rows carry only the market-fair EV, which is the hold. WNCAAB in-play holds are wide, so
+  every live line falls under the board's value floor, and the overlay publishes 0 cards.
+- **Hypothesis CONFIRMED (value-floor half).** The quote-age half is FALSIFIED for this build.
+- **Effect on the rail:** a WNCAAB live game with a wide in-play hold shows no live lines at all.
+  The rail is information (user 2026-11-14), but the overlay is the BOARD's shortlist chain, so it
+  inherits the board's value floor. NCAAB rows pass more often (more books, tighter holds).
+- **Open question for the user (product):** should the rail's live lines include lines below the
+  board's value floor? The overlay also feeds the board's live rows, so it is not only a rail
+  change. **Not changed.**
