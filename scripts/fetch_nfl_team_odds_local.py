@@ -271,28 +271,99 @@ def write_daily_lines(payload: dict[str, Any], *, data_dir: Path) -> Path:
     return output
 
 
-def _append_nfl_team_book_quotes(events: list[dict[str, Any]]) -> None:
-    """Every book's game-market price into the shared quote log.
+def _nfl_gameline_kickoff_shard_enabled() -> bool:
+    """File NFL game-line quotes by CENTRAL KICKOFF date (default) or by the UTC capture date (off).
 
-    Sharded by the UTC date this ran rather than by week: unlike the props
-    fetchers this one has no season/week argument to key on, and team odds are
-    refreshed on a daily cadence. Never raises.
+    Off switch: `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0` (also false/no/off) restores the old
+    single write under the UTC date of the capture. Default ON, because this file runs as a child of
+    `refresh_nfl_oddsapi.py`, which takes its env from the worker that launched it, and the fleet builds
+    that env only at `up`: a default-off switch could not be turned on without a full down/up.
+    """
+    raw = str(os.environ.get("SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _append_nfl_team_book_quotes(
+    events: list[dict[str, Any]], *, now: datetime | None = None
+) -> dict[str, Any] | None:
+    """Every book's game-market price (full game + quarters/halves) into the shared quote log.
+
+    FILED BY THE GAME'S CENTRAL KICKOFF DATE (`odds_book_quotes.kickoff_shard_date`), like the NFL
+    and NCAAF prop writers and the NCAAF game-line writer, and like every board reader asks for it.
+
+    THIS USED TO BE THE UTC DATE THE FETCH RAN (`now.date()`), so from 00:00Z -- 6 PM CST -- every
+    NFL game-market quote went into TOMORROW's shard. Measured on the fleet 2026-11-15 (lane
+    layer2-rail-monitor): Sunday Night Football (PIT @ CIN, kickoff 01:22Z = 7:20 PM CST) had all
+    of its in-play game lines in `2026-11-16.jsonl` (1,470 full-game + 376 quarter/half rows) and
+    none in `2026-11-15.jsonl` after 23:58:52Z. The 11-15 in-play overlay and `/api/board/live-rail`
+    read only the 11-15 grid, so the Games Rail showed SNF with stale pre-game prices all night.
+    Every night game is hit: SNF, MNF (7:15 PM CST) and TNF.
+
+    A game's pre-game lines now land in its OWN kickoff date's shard all week instead of being
+    spread over every capture day. Every reader already covers that: the board's window reads
+    each date's grid (`layer1_board.artifact_read_dates`), the Layer 2 shortlist reads every
+    window date's shard, the refresh-worker builds the forward dates of NFL's 7-day window,
+    CLV asks the Central date first (`clv_join._candidate_shard_dates`) and the `#802`
+    market-gone drop asks the Central kickoff-date file. Lane nfl-gameline-kickoff-shard
+    names each reader in its findings file.
+
+    A row with no parseable kickoff is NOT filed under today: an unknown kickoff filed as today's
+    is indistinguishable from a real one (`kickoff_shard_date`'s own rule). It is counted, and its
+    events are named, on the always-printed `NFL_GAMELINE_QUOTE_SHARD` line.
+
+    Off switch: see `_nfl_gameline_kickoff_shard_enabled`. Returns what was written, for tests and
+    callers that want it; never raises -- a quote-log failure must not fail the odds fetch.
     """
     try:
         if not isinstance(events, list) or not events:
-            return
-        from syndicate.features.shared.odds_book_quotes import append_book_quotes, quote_rows_from_oddsapi_events
-
-        now = datetime.now(tz=timezone.utc)
-        rows = quote_rows_from_oddsapi_events(events, market_map=_nfl_segment_market_map())
-        append_book_quotes(
-            sport="nfl",
-            date_str=now.date().isoformat(),
-            rows=rows,
-            captured_at=now.isoformat(),
+            return None
+        from syndicate.features.shared.odds_book_quotes import (
+            append_book_quotes,
+            bucket_quote_rows_by_kickoff_date,
+            quote_rows_from_oddsapi_events,
         )
+
+        moment = now or datetime.now(tz=timezone.utc)
+        # ONE clock read for every shard: `append_book_quotes` stamps it on each row and into the
+        # last-seen state, so two readings would make one observation look like two.
+        captured_at = moment.isoformat()
+        rows = quote_rows_from_oddsapi_events(events, market_map=_nfl_segment_market_map())
+        if not _nfl_gameline_kickoff_shard_enabled():
+            capture_date = moment.astimezone(timezone.utc).date().isoformat()
+            append_book_quotes(sport="nfl", date_str=capture_date, rows=rows, captured_at=captured_at)
+            summary: dict[str, Any] = {
+                "basis": "utc_capture",
+                "rows": len(rows),
+                "shards": {capture_date: len(rows)},
+                "unfiled_no_commence_time": 0,
+                "unfiled_events": [],
+            }
+        else:
+            buckets, unfiled = bucket_quote_rows_by_kickoff_date(rows)
+            for shard_date in sorted(buckets):
+                append_book_quotes(sport="nfl", date_str=shard_date, rows=buckets[shard_date], captured_at=captured_at)
+            summary = {
+                "basis": "kickoff_central",
+                "rows": len(rows),
+                "shards": {shard_date: len(buckets[shard_date]) for shard_date in sorted(buckets)},
+                "unfiled_no_commence_time": len(unfiled),
+                "unfiled_events": sorted({str(row.get("event_id") or "?") for row in unfiled}),
+            }
+        # ALWAYS PRINTED: the branch-ran instrument. `basis` says which filing ran, `shards` where
+        # this capture went, and a non-zero `unfiled_no_commence_time` is the count of rows not filed.
+        shards_text = ",".join(f"{day}:{count}" for day, count in summary["shards"].items()) or "-"
+        print(
+            "[odds_book_quotes] NFL_GAMELINE_QUOTE_SHARD"
+            f" basis={summary['basis']} captured_at={captured_at} rows={summary['rows']}"
+            f" shards={shards_text}"
+            f" unfiled_no_commence_time={summary['unfiled_no_commence_time']}"
+            f" unfiled_events={','.join(summary['unfiled_events'][:10]) or '-'}",
+            flush=True,
+        )
+        return summary
     except Exception as exc:
-        print(f"[odds_book_quotes] nfl team odds append FAILED {type(exc).__name__}: {exc}")
+        print(f"[odds_book_quotes] nfl team odds append FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
 
 
 def _nfl_segment_market_map() -> dict[str, tuple[str, str]]:
