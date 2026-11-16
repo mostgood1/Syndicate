@@ -754,8 +754,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     imported = {r: load_live_env(settings, r) for r in ROLE_ORDER}
     _check(all(imported.values()), "role env snapshot (<home>/render_env/<role>.json)",
            ", ".join(f"{r}={len(imported[r])} keys" for r in ROLE_ORDER) if all(imported.values())
-           else "no -- set the missing keys in local_production.env (there is no Render re-import "
-                "since 2026-11-15, and no secrets backup yet: todo #766); blueprint-only until then",
+           else "no -- restore it with scripts/fleet_secrets_backup.py restore (runbook: 'Fleet secrets "
+                "backup'; there is no Render re-import since 2026-11-15) or set the keys in "
+                "local_production.env; blueprint-only until then",
            warn=True)
     ok &= _check(settings.env_file.is_file(), "secrets file", str(settings.env_file) if settings.env_file.is_file() else "missing -- run `init`")
     for key, why in (
@@ -1846,6 +1847,47 @@ def cmd_backup(args: argparse.Namespace) -> int:
     return rc_out
 
 
+SECRETS_BACKUP_SCRIPT = REPO_ROOT / "scripts" / "fleet_secrets_backup.py"
+# `backup`'s exit code when the data backup succeeded and the secrets backup did not.
+EXIT_SECRETS_BACKUP_FAILED = 7
+
+
+def cmd_backup_and_secrets(args: argparse.Namespace) -> int:
+    """`backup` = the data snapshot + off-disk archive (`cmd_backup`, unchanged), THEN the
+    encrypted secrets backup (`scripts/fleet_secrets_backup.py`) into `<offdisk>/secrets`.
+
+    WHY HERE `[2026-11-16, lane render-retirement, todo #766 D5 option E1, user "Yes, build
+    E1"]`. `render_env/` and `local_production.env` live beside the data root, not in it, so
+    `cmd_backup` never carried them, and their only recovery -- re-importing from Render --
+    was retired 2026-11-15. The nightly `data-backup` job runs this subcommand fresh each
+    night from the fleet checkout, so this takes effect at the next fleet ff, with no
+    restart. A separate function so `cmd_backup` (whose off-disk section another lane
+    holds) is not edited.
+
+    Exit code: the data backup's when it failed (data first); else
+    `EXIT_SECRETS_BACKUP_FAILED` when the secrets step failed or found no passphrase file
+    (the watchdog WARNs on any non-zero job rc); else 0. `--no-offdisk` or no off-disk
+    directory skips the secrets step too: there is nowhere off this disk to put it.
+    """
+    rc = cmd_backup(args)
+    if getattr(args, "no_secrets", False):
+        print("secrets backup: skipped (--no-secrets)", flush=True)
+        return rc
+    settings = settings_from_args(args)
+    local = parse_env_file(settings.env_file)
+    offdisk = None if args.no_offdisk else (Path(args.offdisk).expanduser() if args.offdisk else default_offdisk_dir(local))
+    if offdisk is None:
+        print("secrets backup: skipped (no off-disk directory)", flush=True)
+        return rc
+    command = [sys.executable, str(SECRETS_BACKUP_SCRIPT), "--home", str(settings.home),
+               "backup", "--out", str(offdisk / "secrets")]
+    secrets_rc = subprocess.run(command).returncode
+    if secrets_rc != 0:
+        print(f"FAILED: secrets backup rc={secrets_rc} (data backup rc={rc})", flush=True)
+        return rc or EXIT_SECRETS_BACKUP_FAILED
+    return rc
+
+
 # Keys that make a process act on the fleet's state or on a venue. The CI run
 # gets none of them: a test suite run with the fleet's env would read and write
 # the live Redis and data root.
@@ -2478,7 +2520,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--keep-odds-jobs", action="store_true", help="leave the roles' detached run_refresh_odds_job.py trees running (the pre-2026-10-08 behaviour)")
     p.set_defaults(func=cmd_down)
 
-    p = sub.add_parser("backup", help="snapshot the data root + redis (hard-linked, keeps --keep); a scheduled job")
+    p = sub.add_parser("backup", help="snapshot the data root + redis (hard-linked, keeps --keep), then the encrypted secrets backup; a scheduled job")
     p.add_argument("--dest", help="snapshot directory (default SYNDICATE_LOCAL_BACKUP_DIR, else <home>-backup)")
     p.add_argument("--keep", type=int, default=7)
     p.add_argument("--offdisk", help="archive directory (default SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR, else /mnt/c/SyndicateBackup on WSL)")
@@ -2486,7 +2528,9 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--offdisk-retries", type=int, default=1, help="retry a failed archive write this many times")
     p.add_argument("--offdisk-retry-delay", type=float, default=300.0, help="seconds between archive attempts")
     p.add_argument("--no-offdisk", action="store_true")
-    p.set_defaults(func=cmd_backup)
+    p.add_argument("--no-secrets", action="store_true",
+                   help="skip the encrypted secrets backup that follows the data backup (fleet_secrets_backup.py)")
+    p.set_defaults(func=cmd_backup_and_secrets)
 
     p = sub.add_parser("ci-run", help="the ci-suite cron: run_ci_suite.py in <home>/ci-checkout with a scrubbed env")
     p.set_defaults(func=cmd_ci_run)
