@@ -59,6 +59,9 @@ PRIOR_AGE_BUCKETS: tuple[tuple[float, str], ...] = ((60.0, "a<=60"), (180.0, "a6
 PRIOR_AGE_OLD = "a>900"
 PRIOR_AGE_UNKNOWN = "a?"
 FRESH_PRIOR = "a<=60"
+# The truth's name for a line that pushed: dropped, and counted. A label is the probability the opinion's side
+# won, so 0.5 is a legitimate SOFT label (a close at even money) and cannot stand for a push.
+PUSH = "push"
 
 
 def clip(p: float) -> float:
@@ -167,8 +170,9 @@ def build_examples(
 ) -> tuple[list[Example], BuildStats]:
     """Group usable opinions by (line_key, t) into examples and attach each line's outcome.
 
-    ``opinions`` yields (slate date, opinion dict). ``truth(op)`` returns (y, refusal): y = 1.0 / 0.0 for the
-    opinion's side winning / losing, 0.5 for a push (dropped), None with a named refusal when the outcome is unknown.
+    ``opinions`` yields (slate date, opinion dict). ``truth(op)`` returns (y, refusal): y = the probability that
+    the opinion's side wins -- 1.0 / 0.0 for an outcome, a soft label in (0, 1) for a close -- or None with a named
+    refusal; the refusal ``PUSH`` is a push (dropped, counted).
     """
     stats = BuildStats()
     grouped: dict[str, Example] = {}
@@ -187,12 +191,12 @@ def build_examples(
         ex = grouped.get(key)
         if ex is None:
             y, refusal = truth(op)
-            if y is None:
-                stats.no_truth += 1
-                stats.by_truth_refusal[refusal or "unknown"] += 1
-                continue
-            if y == 0.5:
+            if refusal == PUSH:
                 stats.push += 1
+                continue
+            if y is None or not 0.0 <= y <= 1.0:
+                stats.no_truth += 1
+                stats.by_truth_refusal[refusal or "label_out_of_range"] += 1
                 continue
             ex = Example(
                 key=key, line_key=line_key,
@@ -418,9 +422,14 @@ def evaluate(
 
 
 def forward_split(examples: Sequence[Example], first_test_date: str) -> tuple[list[Example], list[Example]]:
-    """Train on slates before ``first_test_date``, test on it and after. A game never straddles the split."""
-    train = [ex for ex in examples if ex.date < first_test_date]
-    test = [ex for ex in examples if ex.date >= first_test_date]
+    """Hold out, WHOLE, every game (cluster) with an example dated on or after ``first_test_date``; train on the rest.
+
+    A game's pregame lines are listed on slates before the game, so a split by example date alone put 127 games of the
+    2026-11-16 dev run on both sides (their outcome in training, their live lines in test). The runner dates each
+    example by its GAME (``scripts/engine_learner.py`` ``game_dated``); this rule holds even where it cannot."""
+    test_games = {ex.cluster for ex in examples if ex.date >= first_test_date}
+    train = [ex for ex in examples if ex.cluster not in test_games]
+    test = [ex for ex in examples if ex.cluster in test_games]
     return train, test
 
 

@@ -128,6 +128,23 @@ def test_forward_split_by_date():
     assert {e.date for e in train} == {"2026-11-10"} and {e.date for e in test} == {"2026-11-12"}
 
 
+def test_forward_split_holds_a_game_out_whole():
+    pre = _synthetic(n_games=1, lines_per_game=2, true_w={"sim": 1.0}, seed=13, date="2026-11-10")
+    live = _synthetic(n_games=1, lines_per_game=2, true_w={"sim": 1.0}, seed=14, date="2026-11-12")
+    for ex in live:
+        ex.cluster = pre[0].cluster                      # the same game: pregame on an earlier slate, live later
+    train, test = el.forward_split(pre + live, "2026-11-11")
+    assert train == [] and len(test) == 4
+
+
+def test_game_dated_moves_a_pregame_line_to_its_games_date():
+    events = {"EV1": {"commence": "2026-11-13T01:15:00Z"}}
+    ops = [("2026-11-10", {"phase": "pregame", "event_id": "EV1"}), ("2026-11-10", {"phase": "pregame",
+                                                                                     "event_id": "NOPE"}),
+           ("2026-11-12", {"phase": "live", "event_id": "EV1"})]
+    assert [d for d, _ in els.game_dated(ops, events)] == ["2026-11-12", "2026-11-10", "2026-11-12"]
+
+
 def _op(**kw):
     base = {"expert": "live_resim", "phase": "live", "t": "2026-11-10T01:00:00Z", "sport": "nba", "event_id": "E1",
             "line_key": "nba|E1|totals|full||over|220.5", "market": "totals", "segment": "full", "side": "over",
@@ -152,7 +169,7 @@ def test_build_examples_counts_and_tick_weights():
         if op["event_id"] == "E2":
             return None, "no_final"
         if op["line"] == 221.0:
-            return 0.5, None
+            return None, el.PUSH
         return 1.0, None
 
     exs, st = el.build_examples(ops, truth)
@@ -296,3 +313,193 @@ def test_college_h2_includes_overtime_and_final_only(tmp_path):
     assert t(_lop(sport="ncaab", event_id="C1", line=155.5)) == (1.0, None)                # 80 + 76 = 156
     assert t(_lop(sport="ncaab", event_id="C1", market="spreads", side="home", line=3.5)) == (1.0, None)
     assert t(_lop(sport="ncaab", event_id="C2")) == (None, els.R_NO_FINAL)
+
+
+# ----------------------------------------------------------------------------- slice 2: pushes, chips, the close
+
+
+def test_push_is_a_named_refusal_and_an_even_close_is_a_label():
+    ops = [("2026-11-10", _op()), ("2026-11-10", _op(line_key="nba|E1|totals|full||over|221", line=221.0))]
+
+    def truth(op):
+        return (None, el.PUSH) if op["line"] == 221.0 else (0.5, None)   # a close at even money
+
+    exs, st = el.build_examples(ops, truth)
+    assert st.push == 1 and st.examples == 1 and exs[0].y == 0.5
+
+
+def test_basketball_push_maps_to_the_push_refusal(tmp_path):
+    t = _truth(tmp_path)
+    assert t(_lop(line=224.0)) == (None, el.PUSH)                      # 108 + 116 = 224
+
+
+def test_outcome_book_is_the_books_own_frame():
+    # home -6.5 won by 7: covers; away +6.5 lost by 7: does not; home -7: push
+    assert els.outcome_book("spreads", "home", -6.5, 27, 20) == 1.0
+    assert els.outcome_book("spreads", "away", 6.5, 27, 20) == 0.0
+    assert els.outcome_book("spreads", "home", -7.0, 27, 20) == 0.5
+    assert els.outcome_book("spreads", "away", -2.5, 20, 27) == 1.0
+    assert els.outcome_book("totals", "under", 47.5, 27, 20) == 1.0
+    assert els.outcome_book("h2h", "away", None, 27, 20) == 0.0
+
+
+START = "2026-11-10T01:15:00Z"   # Central 2026-11-09 19:15
+
+
+def _chip(**kw):
+    c = {"sport": "nfl", "state": "final", "start_time_utc": "2026-11-10T01:15:00+00:00",
+         "away": {"key": "los angeles chargers", "name": "Los Angeles Chargers", "score": "20"},
+         "home": {"key": "baltimore ravens", "name": "Baltimore Ravens", "score": "27"},
+         "linescore": {"away": [3, 7, 3, 7], "home": [7, 10, 0, 10], "kind": "periods"}}
+    c.update(kw)
+    return c
+
+
+def _events(**extra):
+    ev = {
+        "EV1": {"sport": "nfl", "home": "Baltimore Ravens", "away": "Los Angeles Chargers", "commence": START,
+                "source": "decision_record"},
+        "EVSW": {"sport": "nfl", "home": "Los Angeles Chargers", "away": "Baltimore Ravens", "commence": START,
+                 "source": "decision_record"},
+        "LATE": {"sport": "nfl", "home": "Baltimore Ravens", "away": "Los Angeles Chargers",
+                 "commence": "2026-11-15T18:00:00Z", "source": "decision_record"},
+        "NHL1": {"sport": "nhl", "home": "Seattle Kraken", "away": "Carolina Hurricanes", "commence": START,
+                 "source": "live_ledger"},
+        "CB1": {"sport": "ncaab", "home": "Duke Blue Devils", "away": "Army Black Knights", "commence": START,
+                "source": "decision_record"},
+    }
+    ev.update(extra)
+    return ev
+
+
+CHIPS = {"2026-11-09": [
+    _chip(),
+    _chip(sport="nhl", away={"key": "carolina hurricanes", "name": "Carolina Hurricanes", "score": "4"},
+          home={"key": "seattle kraken", "name": "Seattle Kraken", "score": "1"},
+          linescore={"away": [1, 2, 1], "home": [0, 1, 0], "kind": "periods"}),
+    _chip(sport="ncaab", away={"key": "army black knights", "name": "Army Black Knights", "score": "76"},
+          home={"key": "duke blue devils", "name": "Duke Blue Devils", "score": "80"},
+          linescore={"away": [35, 35, 6], "home": [30, 40, 10], "kind": "periods"}),
+]}
+
+
+def _chip_truth(chips=CHIPS, events=None, max_commence="2026-11-15T06:00:00Z"):
+    calls = []
+
+    def fetch(d):
+        calls.append(d)
+        return {"chips": chips.get(d, [])}
+
+    src = els.Chips(fetch=fetch, last_date="2026-11-14")
+    t = els.ChipTruth(events or _events(), src, max_commence=els._dpp()._epoch(max_commence))
+    return t, calls
+
+
+def _gop(**kw):
+    base = {"phase": "pregame", "sport": "nfl", "event_id": "EV1", "market": "totals", "segment": "full",
+            "side": "over", "line": 46.5}
+    base.update(kw)
+    return base
+
+
+def test_chips_grade_pregame_in_the_books_frame_and_live_in_the_joins():
+    t, _ = _chip_truth()
+    assert t(_gop()) == (1.0, None)                                                 # 27 + 20 = 47
+    assert t(_gop(market="spreads", side="home", line=-6.5)) == (1.0, None)
+    assert t(_gop(market="spreads_alt", side="away", line=6.5)) == (0.0, None)
+    assert t(_gop(market="spreads", side="home", line=-7.0)) == (None, el.PUSH)
+    assert t(_gop(phase="live", market="spreads", side="home", line=6.5)) == (1.0, None)  # live: 7 > 6.5
+    assert t(_gop(phase="live", market="h2h", side="home", line=None)) == (1.0, None)
+
+
+def test_chips_segments_by_the_platform_rule():
+    t, _ = _chip_truth()
+    assert t(_gop(segment="h1", line=23.5)) == (1.0, None)                          # 17 + 10 = 27
+    assert t(_gop(segment="q3", line=3.5)) == (0.0, None)                           # 0 + 3
+    assert t(_gop(sport="ncaab", event_id="CB1", segment="h2", line=90.5)) == (1.0, None)   # 50 + 41: OT counts
+    assert t(_gop(sport="nhl", event_id="NHL1", segment="p1", line=0.5)) == (None, els.R_SEGMENT)
+
+
+def test_chips_orientation_window_and_refusals():
+    t, _ = _chip_truth()
+    # the records name the game the other way round: the chip is matched swapped and the side follows the record
+    assert t(_gop(event_id="EVSW", market="h2h", side="home", line=None)) == (0.0, None)
+    assert t(_gop(event_id="EVSW", market="spreads", side="away", line=-6.5)) == (1.0, None)
+    assert t(_gop(event_id="NOPE")) == (None, els.R_NO_EVENT)
+    assert t(_gop(event_id="LATE")) == (None, els.R_AFTER_WINDOW)
+    assert t(_gop(market="player_points", player="x")) == (None, els.R_PROP_OUTCOME)
+    t2, _ = _chip_truth(chips={"2026-11-09": [_chip(state="in")]})
+    assert t2(_gop()) == (None, els.R_NOT_FINAL)
+    t3, _ = _chip_truth(chips={"2026-11-09": [_chip(start_time_utc="2026-11-11T01:15:00+00:00")]})
+    assert t3(_gop()) == (None, "no_chip_match")                                    # same teams, another day
+
+
+def test_chips_never_read_after_the_last_slate():
+    events = _events(EDGE={"sport": "nfl", "home": "Baltimore Ravens", "away": "Los Angeles Chargers",
+                           "commence": "2026-11-15T02:00:00Z", "source": "decision_record"})   # Central 11-14 20:00
+    t, calls = _chip_truth(events=events)
+    t(_gop(event_id="EDGE"))
+    assert calls and max(calls) <= "2026-11-14"
+
+
+def test_truth_dispatch_routes_each_line(tmp_path):
+    chip_t, _ = _chip_truth()
+    t = els.Truth("outcome", basketball=_truth(tmp_path), chips=chip_t)
+    assert t(_lop()) == (1.0, None)                                                  # live NBA: slice 1's scores
+    assert t(_gop(phase="live", sport="nhl", event_id="NHL1", market="h2h", side="away", line=None)) == (1.0, None)
+    assert t(_gop()) == (1.0, None)                                                  # pregame NFL: the chips
+    assert t(_lop(market="player_points")) == (None, els.R_PROP_OUTCOME)
+
+
+def _q(book, side, price, line=46.5, market="totals", at="2026-11-10T00:30:00Z", ev="EV1", player=None):
+    return {"event_id": ev, "captured_at": at, "commence_time": START, "selection": side, "market": market,
+            "segment": "full", "player_name": player, "line": line, "bookmaker": book, "price": price}
+
+
+def _close_truth(quotes, events=None):
+    reads = []
+
+    def iter_quotes(sport, d):
+        reads.append((sport, d))
+        return iter(quotes if d == "2026-11-09" else [])
+
+    t = els.CloseTruth(events or _events(), max_commence=els._dpp()._epoch("2026-11-15T06:00:00Z"),
+                       last_date="2026-11-14", iter_quotes=iter_quotes)
+    return t, reads
+
+
+def test_close_truth_sharp_then_consensus_then_refused():
+    quotes = [
+        _q("pinnacle", "over", -125), _q("pinnacle", "under", 105),
+        _q("pinnacle", "over", -300, at="2026-11-10T02:00:00Z"),             # after the start: never the close
+        _q("draftkings", "home", -110, line=-6.5, market="spreads"), _q("draftkings", "away", -110, line=6.5,
+                                                                        market="spreads"),
+        _q("fanduel", "home", -120, line=-6.5, market="spreads"), _q("fanduel", "away", 100, line=6.5,
+                                                                     market="spreads"),
+        _q("draftkings", "over", -110, line=20.5, market="player_points", player="J Doe"),
+        _q("draftkings", "under", -110, line=20.5, market="player_points", player="J Doe"),
+    ]
+    t, reads = _close_truth(quotes)
+    ops = [("2026-11-09", dict(_gop(), line_key="k_tot")),
+           ("2026-11-09", dict(_gop(market="spreads", side="away", line=6.5), line_key="k_spr")),
+           ("2026-11-09", dict(_gop(market="player_points", player="J Doe", line=20.5), line_key="k_prop")),
+           ("2026-11-09", dict(_gop(event_id="LATE"), line_key="k_late"))]
+    assert t.prepare(ops) == 3
+    y, why = t(dict(_gop(), line_key="k_tot"))
+    assert why is None and 0.5 < y < 0.56 and t.basis["k_tot"] == "sharp"
+    y, why = t(dict(_gop(market="spreads", side="away", line=6.5), line_key="k_spr"))
+    assert why is None and 0.47 < y < 0.5 and t.basis["k_spr"] == "consensus"     # away the cheaper side
+    y, why = t(dict(_gop(market="player_points"), line_key="k_prop"))
+    assert y is None and why.startswith(els.R_NO_CLOSE)                            # one book: no close
+    assert t(dict(_gop(event_id="LATE"), line_key="k_late")) == (None, els.R_AFTER_WINDOW)
+    assert t(dict(_gop(phase="live"), line_key="k_tot")) == (None, els.R_PREGAME_ONLY)
+    assert reads and all(d <= "2026-11-14" for _s, d in reads)
+    assert list(t._quotes("nfl", "2026-11-15")) == []
+    assert ("nfl", "2026-11-15") not in reads
+
+
+def test_default_window_is_midnight_central_after_the_last_slate():
+    from datetime import datetime, timezone
+
+    assert datetime.fromtimestamp(els.default_max_commence("2026-11-14"), timezone.utc).isoformat() \
+        == "2026-11-15T06:00:00+00:00"
