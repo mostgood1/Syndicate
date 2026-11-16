@@ -1,4 +1,4 @@
-# NFL game-line quotes filed by Central kickoff date — lane `nfl-gameline-kickoff-shard`, todo `#816`
+# NFL game-line quotes filed by Central kickoff date — lane `nfl-gameline-kickoff-shard`, todo `#817`
 
 Session a64727a8 (side session of local_62433e58), 2026-11-16. Defect found by lane `layer2-rail-monitor`
 (`.syndicate/findings_2026-11-15_layer2_rail_monitor.md`, "DEFECT — NFL game-line quotes are filed by the
@@ -16,7 +16,7 @@ Pre-game lines of later games move to their own kickoff-date shards, which every
 01:22-01:53Z game rows under 11-15; or a reader relies on today's shard holding every upcoming NFL game's
 game lines.
 
-## Fix (code on main; see todo #816 for the commit)
+## Fix (code on main `ed63c7611`; todo #817 -- its first commits say 816, see the todo entry)
 
 - `_append_nfl_team_book_quotes` buckets its rows with `odds_book_quotes.bucket_quote_rows_by_kickoff_date`.
   It appends each bucket under its Central kickoff date, with ONE `captured_at` for all buckets.
@@ -31,7 +31,7 @@ game lines.
     restart.** Env is built only at `up`, so a default-off switch would need a full down/up.
 - **Not changed:** `fetch_nfl_preseason_odds._append_nfl_preseason_book_quotes` has the same UTC filing.
   But its reader `nfl/preseason_cards.py` opens grids by the game's UTC start date (`start_time[:10]`),
-  so the writer and the reader must move together. Preseason is dormant until 2027-08; recorded under `#816`.
+  so the writer and the reader must move together. Preseason is dormant until 2027-08; recorded under `#817`.
 
 ## Tests — `tests/test_nfl_gameline_kickoff_shard.py`, 18 pass
 

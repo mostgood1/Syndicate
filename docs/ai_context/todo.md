@@ -1,6 +1,9 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#816` — **NFL GAME-LINE QUOTES WERE FILED BY THE UTC CAPTURE DATE, SO FROM 6 PM CST EVERY NFL GAME LINE WENT TO TOMORROW'S SHARD: SNF / MNF / TNF in-play lines (and the end of every late-afternoon game) never reached their own date's in-play overlay or Games Rail. FIX ON MAIN, NOT LOADED: `_append_nfl_team_book_quotes` files by Central kickoff date (`kickoff_shard_date`), off switch `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0`** `[2026-11-16, lane nfl-gameline-kickoff-shard, session a64727a8; defect found by layer2-rail-monitor 11-15; task from local_62433e58]`
+### `#817` — **NFL GAME-LINE QUOTES WERE FILED BY THE UTC CAPTURE DATE, SO FROM 6 PM CST EVERY NFL GAME LINE WENT TO TOMORROW'S SHARD: SNF / MNF / TNF in-play lines (and the end of every late-afternoon game) never reached their own date's in-play overlay or Games Rail. FIX ON MAIN, NOT LOADED: `_append_nfl_team_book_quotes` files by Central kickoff date (`kickoff_shard_date`), off switch `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0`** `[2026-11-16, lane nfl-gameline-kickoff-shard, session a64727a8; defect found by layer2-rail-monitor 11-15; task from local_62433e58]`
+- **ID:** first written as `#816` (commits `ed63c7611`, `bc0d16116`), but lane `ncaab-total-overprojection` had
+  claimed `#816` in `lanes.md` 18 minutes earlier (`1ce76c099`). So this is `#817`, reserved with
+  `todo_id_alloc.py` (`dccf27834`). `#816` belongs to them.
 - **Evidence:** `.syndicate/findings_2026-11-16_nfl_gameline_kickoff_shard.md`.
   - Read-only replay of the fleet's 11-15 / 11-16 shards: all 1,901 SNF game rows captured 01:22-01:54Z 11-16 re-file to `2026-11-15`.
   - 21,196 of the 11-16 shard's 22,551 sportsbook game rows move: 10,668 to 11-15 (SNF 9,273 + late-afternoon in-play ~1,395), 10,528 to next week's dates.
