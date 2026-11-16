@@ -60517,3 +60517,9 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify (OWED, tonight):** NBA overlay builds on the 8-game slate (tips 00:10-02:10Z 11-17) against the 11-15 slate's 167 / median 8.6 s / max 141.9 s / 16 over 45 s -- expected: median well under, none over 45 s, NBA `lookups_reused` in the tens of thousands per 2,000-card build with `lookups_resolved` under ~100; and the per-thread sampler (`cost790_sampler.sh`, 23:55Z-04:00Z, this session's background task) for the main thread's share during each NBA build (offline: 0.16 -> 0.54).
 - **claim:** released after this entry.
 
+
+## 2026-11-16 18:15:23Z (12:15 PM CST) -- READING: the NBA live player-exit gate is LOADED in live-odds-worker (lane `live-player-exit-gate`, follows the 15:30:37Z ff) -- **load MET; behaviour on a live game still OWED tonight**
+- **how it loaded:** live-odds-worker self-recycled (supervisor: pid 2479540 `exited code=0 after 19767s`, new pid 2834332; first line from it 18:15:23.160Z). No TERM by this lane. The fleet head at the recycle was `a39058946` (lane `nba-overlay-card-cost`'s 16:29:16Z ff), which contains `09925a4b1` (`git merge-base --is-ancestor`, rc 0).
+- **verify (MET, read 18:19:31Z):** pid 2834332 on head `a39058946`, 0 tracebacks in the last 3,000 log lines, `NBA_LIVE_RESIM_TICK ... games=0 ... written=True` at 18:19:23Z (no live NBA game yet, so there is no PLAYER_EXIT_TICK line yet).
+- **NOT loaded:** the NCAAB/WNCAAB gate (`97af7b9b8`) is not in `a39058946`.
+- **verify (OWED, tonight's NBA slate):** `[nba_live_resim] PLAYER_EXIT_TICK` lines and `playerExits` in `live/nba_live_resim.json` once games are live; a refusal reading needs a real mid-game key exit.
