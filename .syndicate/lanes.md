@@ -814,11 +814,6 @@ death, never life — do not invert it.
 - Verification: fleet dry run over 11-09..11-16: graded-opinion coverage per sport x family x phase x clock bucket with its denominator; weights-0 equals the prior; held-out report printed; tests pass; gate registration pushed before its data
 - Blocked by: none
 
-### closed-lane-archive-20261116-1040 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session d9334b85-877c-40a4-b4d8-3a4ab232c91f
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET -- owner_liveness --idle-min 240 on origin/main 512337327 read 1 SAFE of 6 CLOSED; moved `closed-lane-archive-20261116-0440`. Reading and Part B table in `.syndicate/log/2026-11-16.md`.
-
 ### closed-lane-archive-20261116-1240 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session cd1c7de1-cee6-4e0f-9b75-5b47a6e95740
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -878,6 +873,11 @@ death, never life — do not invert it.
 - Falsification test: A read-only replay of build_layer2_rows + select_shortlist on a live WNCAAB build's in-play rows returns >= 1 chosen row (then the drop is after select_shortlist), or the refusing counter is something other than quote age / value floor
 - Verification: Replay on the fleet (nice 19, read-only) prints select_shortlist's counters for a WNCAAB build with cards=0; unit test proves INPLAY_OVERLAY carries the counters (off != on); on main; the user decides any load
 - Blocked by: none
+
+### closed-lane-archive-20261116-1640 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session b5197378-9e7e-48f3-a5cc-d4fa03048d24
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main gave 1 SAFE of 7 CLOSED; moved `closed-lane-archive-20261116-1040`. Table and WAIT reasons: `.syndicate/log/2026-11-16.md` 22:4xZ entry.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1160,6 +1160,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261116-0440` — CLOSED 2026-11-16 (GOAL MET: 18 blocks archived) — opened 2026-11-16 — session d8b75461-af46-460a-bbc9-5602287431fa
 - `closed-lane-archive-20261116-0639` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 1c8edcd7-a178-4213-a57f-23a606923abe
 - `closed-lane-archive-20261116-0840` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session a60661ae-5c55-42b6-b94a-9aebec374382
+- `closed-lane-archive-20261116-1040` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session d9334b85-877c-40a4-b4d8-3a4ab232c91f
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
