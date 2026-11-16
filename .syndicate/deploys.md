@@ -60552,3 +60552,26 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **ff:** `lpeg_ff_only.sh db463b5be c2794c31a` -> `on disk: MODELLED_EXIT_REASONS 2`; `apply_player_exits` in the fleet's `poll_soccer_live_state.py` (1); head db463b5be, pid 2834332 unchanged (etimes 10927 s). No TERM.
 - **verify (OWED):** after the ~23:44Z recycle, `[soccer_live_state] PLAYER_EXIT_TICK` on the next in-play soccer tick and `playerExits` in `live/soccer_live_lens.json`; after refresh-worker's next restart, `skipped_key_player_out` in the soccer gameline index diagnostics.
 - **claim:** released after this entry.
+
+## 2026-11-16 22:31:26Z (4:31 PM CST) -- DEPLOY (ff only, no restart): fleet `db463b5be` -> `dac4d49f8`, NFL game-line quotes filed by Central KICKOFF date (`ed63c7611`, todo #817, lane `nfl-gameline-kickoff-shard`, user "Load it now") -- **LOADED; MECHANISM MET on the shards (1,934 of 1,934 post-ff sportsbook game rows in their own kickoff shard, 0 misfiled); the MNF in-play reading is OWED ~01:20-02:00Z 11-17**
+- **what:** `fetch_nfl_team_odds_local._append_nfl_team_book_quotes` files each row under `kickoff_shard_date(row)` instead of the UTC capture date. Off switch `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0` (env, so a drained down/up), or a revert + ff.
+- **ride-along (db463b5be..dac4d49f8):** code is only this change and `scripts/live_book_edge_readout.py` (new, no importer, not scheduled). Main's later `book_grid_artifact.py` change (a peer lane) is NOT carried: the ff was to this lane's SHA, not `github/main`.
+- **gates:** claim live-odds-worker 22:29:13Z (holder `nfl-gameline-kickoff-shard`, rc 0).
+  - Baseline 22:30:15Z: head db463b5be; live-odds-worker pid 2834332; no `2026-11-17.jsonl`; 0 real `NFL_GAMELINE_QUOTE_SHARD` lines. (6 log hits were ALL_PROCESS_MEMORY snapshots recording the baseline's own `grep` cmdline.)
+  - Preflight `--target-commit dac4d49f8` from worktree eloquent-stonebraker at origin/main, with `--expect` fleet_head / pid / basis / no 11-17 shard: **CLEAR** 22:31:00Z.
+- **ff:** `git merge --ff-only dac4d49f8` at 22:31:26Z. Head dac4d49f8; pid 2834332 unchanged (etimes 15364 s). No TERM.
+  - The writer runs in a fresh child of each NFL lines run (`ops_refresh.launch_refresh_run` -> `refresh_odds_sources.py` -> `refresh_nfl_oddsapi.py`), so the next run loaded it.
+  - Post-ff captures seen at 22:32:13Z and 22:34:51Z. The NFL lines autorun launched at 22:32:09Z (`interval_s=150`), and a combined pregame sweep that includes nfl was also in flight, so which run wrote the 22:32:13Z rows is not attributed. Both spawn the same child.
+- **verify -- MET on the shards** (`C:\tmp\nflks816\verify_post_ff.py`, read-only, nice 19, read 22:34:55Z; output `C:\tmp\nflks816\verify_post_ff_2232.json`). Sportsbook `kind=game` rows captured >= 22:31:26Z, by shard:
+  - `2026-11-16`: 4, all MNF (LAC @ BAL, 01:15Z 11-17). **No next-week game row entered today's shard.**
+  - `2026-11-19`: 160, TNF IND @ HOU 01:15Z 11-20 -- Central Thursday, not UTC Friday.
+  - `2026-11-22`: 1,628, 11 games, incl. next week's SNF MIN @ SF 01:20Z 11-23.
+  - `2026-11-23`: 142, next week's MNF CIN @ WAS 01:15Z 11-24.
+  - Every row's `date` field equals its shard. 0 rows in a shard other than their kickoff date's. `2026-11-17.jsonl` absent.
+- **INSTRUMENT GAP, said plainly:** the writer's `NFL_GAMELINE_QUOTE_SHARD` line goes to the child's stdout, which `refresh_odds_sources._compact_step_result` blanks. It survives only if its token is in `_STEP_STDOUT_MARKERS` (today `SOCCER_CONFIRMED_LINEUPS` only). So on the fleet that line is never readable, and this verify reads the rows instead (output, not the log). Adding the token to the allowlist is a follow-up under #817, not done.
+- **verify (OWED, MNF tonight):**
+  - NFL game rows captured >= 00:00Z 11-17 land in `2026-11-16.jsonl` and `2026-11-17.jsonl` stays absent. Before this load they went to `2026-11-17.jsonl`; that is the falsifier.
+  - `INPLAY_OVERLAY sport=nfl date=2026-11-16` carries MNF in-play rows.
+  - `/api/board/live-rail` serves NFL game-line rows for MNF.
+- **today's split `2026-11-16.jsonl`:** left as is (findings: append-only + incremental grid reader; no reader needs the rows moved).
+- **claim:** released after this entry.

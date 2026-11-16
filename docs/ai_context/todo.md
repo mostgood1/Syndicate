@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#817` — **NFL GAME-LINE QUOTES WERE FILED BY THE UTC CAPTURE DATE, SO FROM 6 PM CST EVERY NFL GAME LINE WENT TO TOMORROW'S SHARD: SNF / MNF / TNF in-play lines (and the end of every late-afternoon game) never reached their own date's in-play overlay or Games Rail. FIX ON MAIN, NOT LOADED: `_append_nfl_team_book_quotes` files by Central kickoff date (`kickoff_shard_date`), off switch `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0`** `[2026-11-16, lane nfl-gameline-kickoff-shard, session a64727a8; defect found by layer2-rail-monitor 11-15; task from local_62433e58]`
+### `#817` — **NFL GAME-LINE QUOTES WERE FILED BY THE UTC CAPTURE DATE, SO FROM 6 PM CST EVERY NFL GAME LINE WENT TO TOMORROW'S SHARD: SNF / MNF / TNF in-play lines (and the end of every late-afternoon game) never reached their own date's in-play overlay or Games Rail. LOADED 2026-11-16 22:31:26Z (fleet ff to `dac4d49f8`, no restart, user "Load it now"); shards MET, MNF reading OWED: `_append_nfl_team_book_quotes` files by Central kickoff date (`kickoff_shard_date`), off switch `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0`** `[2026-11-16, lane nfl-gameline-kickoff-shard, session a64727a8; defect found by layer2-rail-monitor 11-15; task from local_62433e58]`
 - **ID:** first written as `#816` (commits `ed63c7611`, `bc0d16116`), but lane `ncaab-total-overprojection` had
   claimed `#816` in `lanes.md` 18 minutes earlier (`1ce76c099`). So this is `#817`, reserved with
   `todo_id_alloc.py` (`dccf27834`). `#816` belongs to them.
@@ -9,9 +9,10 @@
   - 21,196 of the 11-16 shard's 22,551 sportsbook game rows move: 10,668 to 11-15 (SNF 9,273 + late-afternoon in-play ~1,395), 10,528 to next week's dates.
 - **Readers:** all 12 named in the findings; none needed a change. The one behaviour change: Layer 1 pre-game rows of not-today NFL games now come from their kickoff-date grids, at the forward cadence (6x).
 - **Tests:** `tests/test_nfl_gameline_kickoff_shard.py` (18).
-- **Loads with a plain fleet ff, no restart:** the writer runs in a fresh child per NFL lines run. **Loading is the user's decision.**
+- **LOADED 22:31:26Z** (deploys.md 2026-11-16 22:31:26Z): a plain fleet ff, no restart; the writer runs in a fresh child per NFL lines run.
+- **Shards MET at 22:34:55Z:** 1,934 of 1,934 post-ff sportsbook game rows are in their own kickoff shard (11-16: MNF only; TNF -> 11-19; next Sunday + SNF -> 11-22; next MNF -> 11-23).
+- **Instrument gap:** the `NFL_GAMELINE_QUOTE_SHARD` line is blanked by `refresh_odds_sources` (child stdout survives only via `_STEP_STDOUT_MARKERS`). Follow-up, not done: add the token there. Until then verify on the rows.
 - **Verification owed (MNF 11-16, 01:15Z 11-17):**
-  - `NFL_GAMELINE_QUOTE_SHARD basis=kickoff_central` in the run log;
   - game rows captured >= 00:00Z 11-17 in `2026-11-16.jsonl`, none in `2026-11-17.jsonl`;
   - `INPLAY_OVERLAY sport=nfl date=2026-11-16` with MNF rows;
   - NFL game-line rows on `/api/board/live-rail`.
