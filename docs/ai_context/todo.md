@@ -12,7 +12,7 @@
   - `min_ev_tuner._clv` is fee-gross, so its RAISE rule (ROI AND CLV both significantly negative) is structurally hard to reach.
   - Findings § "CLV RECONCILED".
 - **Next, in this lane:**
-  - (1) DONE 11-16, see above. **Fee-net CLV BUILT 11-16 (user "Yes, add fee-net CLV"), on main, NOT on the fleet:**
+  - (1) DONE 11-16, see above. **Fee-net CLV BUILT 11-16 (user "Yes, add fee-net CLV"), on main as `6e952af46`, NOT on the fleet:**
     - `order_clv.fee_pp_for_order` / `fee_net_clv_pct` (fee pp = 100 × p × fee / stake; an unknown fee gives NO net reading, never zero; ProphetX uses its expected win commission).
     - Order rows and the per-scope aggregates carry `fee_pp`, `clv_net_pct`, `avg_clv_net_pct` with its own `clv_net_n`. New closing marks carry `fee_pp` and `clv_net_pct`.
     - The tuner reads net by default (`SYNDICATE_MIN_EV_TUNER_CLV_BASIS`: absent = net, `gross` = the old basis) and reports gross beside it. The tuner is still SHADOW.
