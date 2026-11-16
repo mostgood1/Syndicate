@@ -782,6 +782,7 @@ def test_ncaaf_names_meet_through_the_joins_canonical_pair_and_off_restores_exac
     row = _ncaaf_ledger(join_p=join["model_prob"])
     on = ee.live_resim_expert(row, ee.EvidenceIndex([ev], sport="ncaaf", alias_key=_canon), ee.Reader())
     assert on.refusal is None and on.inputs["evidence_key"] == "team_alias"
+    assert on.inputs["evidence_game"] == ["iowa state", "cincinnati"]  # the log's own key, to re-find the tick
     assert on.inputs["evidence_match"] == "same_state" and on.clock_bucket == "25-50"
     rep = ee.join_reproduction([on])
     assert (rep["checked"], rep["mismatched"]) == (1, 0)  # the lane the join priced, not merely a lane

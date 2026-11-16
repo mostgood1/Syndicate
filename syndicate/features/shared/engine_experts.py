@@ -622,6 +622,9 @@ def live_resim_expert(ledger_row: Mapping[str, Any], index: EvidenceIndex, reade
         row, match = None, how
     else:
         row, match = index.pick(index.by_game[key], at, state_as_of)
+        if how == "team_alias":
+            # The evidence log files this game under its own names: a reader re-finding the tick needs this key.
+            op.inputs["evidence_game"] = list(key)
     op.inputs["evidence_match"] = match
     if row is None:
         op.refusal = match

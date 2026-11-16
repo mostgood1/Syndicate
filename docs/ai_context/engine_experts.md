@@ -239,9 +239,16 @@ Nothing writes opinions under the data root. `run --opinions OUT` writes them wh
 - **Stat progress** is NBA only: the props log keeps any sport whose snapshot carries `liveProps`, and only NBA's does
   today. The prior does not yet prefer Kalshi's mid, which the plan names as the in-play prior where an identity check
   holds; Kalshi is one book in the median.
-- **NFL live totals/spreads have no prior.** The live join refuses every one as `no_distribution`, because the NFL
-  lane publishes its histograms at lane level (snake_case); leads 2026-11-10.
-- **NHL live** prices only the moneyline (no distributions).
+- **NFL live totals/spreads have no prior** on most rows: the join withholds them before pricing and the ledger
+  carries a fair only where `market_fair_prob_over` was written (11-13: 46 rows). Lane `engine-live-prior` rebuilds
+  the book prior from `book_quotes` for the rest. NFL 11-09's five games were priced before the NFL evidence log's
+  first row (11-09T13:16Z): refused `evidence_log_starts_after_instant`, a gap in the log, not an identity failure.
+- **NHL live totals** have no histogram anywhere (the re-sim publishes none), so they refuse `no_distribution`. NHL
+  puck lines opine from the ledger's `display_prob`, not from the evidence log: the log drops `displayMarginDist`
+  (`live_evidence_log.DIST_KEYS`), so the puck line cannot be re-derived from the log, only read back. Logging that
+  histogram is a producer change (a lead, not done here).
+- **Weekday NCAAF totals/spreads** (11-10..11-13) mostly carry no prior: the join had no two-sided price
+  (`no_two_sided_market_price`), so `no_prior` is an absence, not a field name.
 - **Segments:** WNCAAB has segment blocks but no segment quotes, so no prior. NBA segment spreads refuse for want of a
   margin anchor. `#780`'s measured over-confidence was on FULL-GAME totals (k NBA 2.16, NCAAF 2.48) and full-game
   spreads (NBA 2.02, NCAAF 1.80, NCAAB 1.34); segments were not fitted, and the segment histograms are untempered, which is right for an expert (the learner weighs it), but a segment edge must never be
