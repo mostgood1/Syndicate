@@ -12,7 +12,13 @@
   - `min_ev_tuner._clv` is fee-gross, so its RAISE rule (ROI AND CLV both significantly negative) is structurally hard to reach.
   - Findings § "CLV RECONCILED".
 - **Next, in this lane:**
-  - (1) DONE 11-16, see above. Owed: a fee-net CLV in `order_clv` / `min_ev_tuner._clv` (shadow, no live effect). User's call.
+  - (1) DONE 11-16, see above. **Fee-net CLV BUILT 11-16 (user "Yes, add fee-net CLV"), on main, NOT on the fleet:**
+    - `order_clv.fee_pp_for_order` / `fee_net_clv_pct` (fee pp = 100 × p × fee / stake; an unknown fee gives NO net reading, never zero; ProphetX uses its expected win commission).
+    - Order rows and the per-scope aggregates carry `fee_pp`, `clv_net_pct`, `avg_clv_net_pct` with its own `clv_net_n`. New closing marks carry `fee_pp` and `clv_net_pct`.
+    - The tuner reads net by default (`SYNDICATE_MIN_EV_TUNER_CLV_BASIS`: absent = net, `gross` = the old basis) and reports gross beside it. The tuner is still SHADOW.
+    - Tests: `tests/test_fee_net_clv.py` (16, incl. reachability: same rows, net RAISEs, gross HOLDs).
+    - Fleet A/B, read-only (20:21Z, 52,454 orders): the gross arm reproduces tonight's 95 holds. Net changes no cell's action. Three cells lose a gross-only CLV "significance" (band t 5.0–6.9 to 0). The pooled shadow verdict flips one cell to raise (Kalshi NCAAB totals).
+    - Owed: a fleet ff plus a refresh-worker load. That is the user's call.
   - (2) Promote the readout to `scripts/live_book_edge_readout.py` with a test pinning these numbers.
   - (3) Find why stake concentrates in the losing top quartile (stated EV 4-7% realises about −5%; see `#704`).
 - **Per-LINE only:** NCAAB (z −3.45) and totals (z −2.11) are evidence for per-line fixes, never a market switch (learnings line 1056).

@@ -122,6 +122,42 @@ probability points. The close is the venue's own last pregame quote-log price (`
   The tuner is shadow, so nothing live changes today.
 - Any surface or report that shows venue CLV should show it fee-net beside gross.
 
+## FEE-NET CLV BUILT (2026-11-16, same session; user "Yes, add fee-net CLV" — order marks + tuner, shadow only)
+
+**Code, on main, not loaded on the fleet:**
+
+- `order_clv.fee_pp_for_order(order)` gives the fee in CLV's probability points: `100 × p_entry × fees_dollars / stake`.
+  - Buying at `p` with stake `S` gets `S/p` contracts, so a fee `F` adds `p·F/S` to each contract's price.
+  - `fees_dollars = None` (unknown) gives **None**, never 0.
+  - A recorded 0.0 is 0 at any price.
+  - ProphetX's settlement-basis orders use `venue_fees`' expected win commission `0.02·p·(1−p)`. The realised fee is never used, because it depends on the result.
+- `order_clv.fee_net_clv_pct(order, clv_pct)` returns the gross minus the fee.
+- `clv_for_orders` resolved rows carry `fee_pp` and `clv_net_pct` beside `clv_pct`.
+  - Every aggregate adds `clv_net_n`, `avg_clv_net_pct` and `beat_close_net`.
+  - The ORDER_CLV log line adds `same_book_avg_clv_net_pct` and `same_book_net_n`.
+- `paper_settlement.stamp_closing_marks`: a mark stamped from now on carries `fee_pp`, and always carries `clv_net_pct` (None when the fee is unknown). Old marks are not rewritten. A reader nets them with `fee_net_clv_pct(order, clv)`.
+- `min_ev_tuner`: `SYNDICATE_MIN_EV_TUNER_CLV_BASIS`.
+  - Absent or unrecognised means `net`; `gross` is the old basis.
+  - `_clv` nets the RECOMPUTED gross (#719 repair kept).
+  - Evidence reports `clv_basis`, plus `avg_clv_gross_pct`, `clv_gross_events` and `clv_gross_t` beside the decision's numbers.
+  - The basis is in the state, every move, and the MIN_EV_TUNER log line.
+  - Mode is unchanged: shadow.
+- Tests: `tests/test_fee_net_clv.py`, 16 tests.
+  - Unit, unknown fee, ProphetX, rows, aggregates and marks.
+  - **Reachability:** the same 60 rows with gross +1.0..+2.0 pp and a 2.0 pp fee give net **RAISE** and gross **HOLD** (`roi_and_clv_opposite_signs`).
+  - `tests/test_min_ev_tuner.py`'s fixture now records `fees_dollars` 0.0. Without a recorded fee its rows give no net reading, which is the rule.
+  - 695 passed across every clv / settlement / tuner / portfolio_commit / fee suite.
+
+**Fleet A/B, read-only** (2026-11-16 20:21Z). My worktree's code was imported under refresh-worker pid 2809282's env (values not printed) at nice 19, on `full_history_orders()` = 52,454 orders, persisting nothing:
+
+- **Faithfulness:** the gross arm reproduces tonight's persisted state (95 cells, `{'hold': 95}`). No `SYNDICATE_MIN_EV_TUNER*` key is set on the worker, so the mode is shadow.
+- **Fee coverage**, same-book-marked tuned rows: Kalshi live 431/431 have a net reading, Kalshi paper 8,886/9,067, Polymarket live 116/116, Polymarket paper 3,429/3,504. The ~2% without one are paper rows with `fees_dollars = None`. That they are pre-10-06 fills (`execution_ledger` began recording paper fees then) is likely but NOT measured here.
+- **Mean fee:** Kalshi live 1.52 pp, Kalshi paper 1.52 pp, Polymarket live 2.00 pp, Polymarket paper 1.49 pp.
+- **Per-cell actions:** unchanged, 95 hold on both bases.
+- **Reasons:** they change in 3 cells. Kalshi NCAAF spreads, Kalshi NCAAF totals and Polymarket NCAAF totals held as `only_clv_significant` on gross: marginal-band gross CLV +1.5 to +2.2 pp at t 5.0–6.9, while band ROI was −11.0%, −10.7% and +10.3%. Net, that CLV is −0.13 to +0.23 pp at |t| < 0.7. That gross "significance" was the fee.
+- **Pooled (shadow)**, 1 flip: Kalshi NCAAB totals hold → raise. Band 24 events, ROI −33.4% (t −2.00), net CLV −3.52 pp (t −3.39). Its gross CLV was −1.98 (t −1.80).
+- **No money moves:** the tuner and pooling are shadow, and nothing reads them at commit.
+
 ## Method artefact
 
 The analysis script is session scratch for now (`pf_edge.py`). Its formulas are above. Promoting it to
