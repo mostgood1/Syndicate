@@ -779,3 +779,17 @@ markets carries no price of ours.
 
 Both sit next to a calibrated college total probability. The owner's fix should cover both. Hand-off to
 lane ncaab-total-overprojection at the summary.
+
+- **I-17 HANDED OFF 5:10 PM CST (23:10Z)** (user: "hand I-17 to the #816 lane now").
+  - **Sent to:** lane ncaab-total-overprojection, session b1d2088f. Its transcript's custom title is
+    "Layer 2 Game Rail monitoring", so it is local_1f10ce63.
+  - **Delivery:** SendMessage queued (message 874cd0ab); read not confirmed.
+  - **What was sent:**
+    - the 23-of-74 count and the examples;
+    - the two surfaces (`intelligence.html:3557` rail card "ours", `:4908` board table Live column);
+    - two per-line, display-only fixes: a "cal" line where served P crosses 0.5, or a "sim" label when a
+      calibration is in force;
+    - that neither changes served P, so #816's 7-day grade is not split.
+  - **The file:** the only open lane naming `intelligence.html` is dh-state-aware-pairing, scoped to the
+    doubleheader functions.
+  - Until the owner answers, the monitor keeps counting I-17 at each reading.
