@@ -857,3 +857,84 @@ NFL overlay.
   - Without a model price, the rows carry only market-fair EV, and 11 of 12 fall under the -2% floor:
     the WNCAAB mechanism. Read 2 (~7:45 PM) checks that full-game lines are priced once the re-sim
     is attached.
+
+## Reading 14 — Mon 11-16 7:21 PM CST (01:21Z 11-17) — first full reading on `d7c183d8d` (refresh-worker 3101432)
+
+**Slate: 37 live chips.**
+- NBA 7: HOU @ MIA Q2; CHI @ CLE Q3; GSW @ NOP Q1; ORL @ BOS HALF; MEM @ WAS HALF; POR @ MIN Q1;
+  PHI @ BKN Q2.
+- NFL 1: LAC @ BAL, Q1 12:50.
+- NHL 1: MTL @ NYR, P1 2:43.
+- 28 college games.
+
+**Flags: 32 shown on 21 cards (58 qualifying rows). 0 false, 0 missed, 0 dark.** 11-16 total: 88.
+- **The 6 dark flags of 6:50 PM did not recur.** That was one burst (served board 354 s old, host
+  load 19.5). Not handed off. Now: board built 129 s ago; host load 8.4.
+- **NCAAB full-game totals: 13 flags, all UNDER, all calibrated (`total_cal`):**
+  Prairie View @ Ohio State u142.5, St. Thomas @ LIU u145.5, Grambling @ Kentucky u145.5,
+  Citadel @ Clemson u141.5, Jacksonville @ Georgia u160.5, Richmond @ VT u150.5,
+  EKU @ Kent State u133.5, WKU @ Tulsa u149.5, Tarleton @ Drake u143.5, Montana @ Kansas State u154.5,
+  Central Arkansas @ Oklahoma u163.5, Western Illinois @ Mi* u136.5, Columbia @ Northwestern u127.
+  Gaps 5.7-12.2 pp.
+  - **The display inconsistency is now systematic: 8 of these 13 UNDER flags show "ours" AT OR ABOVE
+    the line.** Columbia u127 vs ours 133.7. St. Thomas u145.5 vs ours 148.0. WIU u136.5 vs ours
+    138.3. Also Richmond, WKU, Tarleton, Montana, Central Arkansas.
+  - The calibrated probability (level -0.358 logits, engine deviation x 0.229) leans under, while
+    `total_mean` stays the engine's. The count was sent to the owner as a follow-up to its 7:02 PM
+    note.
+- **The raw-fraction flags are all outside #816's scope, as designed:**
+  - NCAAB moneylines: EKU (69.5/102) and Central Arkansas (28/102).
+  - WNCAAB totals, uncalibrated by the walk-forward gate:
+    - Troy @ LSU **u174.5, model 85.8% (raw) vs fair 51.1%, 34.7 pp; ours 160.9**;
+    - Arkansas @ UALR u146.5;
+    - Albany @ Rutgers o122.5.
+- **NCAAB spreads (6), moneylines (3, including St. Thomas):** Kentucky -28.5, Clemson -22.5,
+  Georgia -29.5, VT -9.5, EKU -6, Tarleton +4.5.
+- **NBA (8):**
+  - spreads: WAS -6.5, PHI -17.5, POR -3.5;
+  - totals: ORL @ BOS 2H o103.5 (11.5 pp), MEM @ WAS o240.5, PHI @ BKN Q2 u57.5, GSW @ NOP o214.5.
+- **Totals direction, flag by flag: 44 unders, 17 overs.** This reading's 20 totals flags: 16 U
+  (13 NCAAB full, WNCAAB Troy + Arkansas, NBA PHI @ BKN Q2) and 4 O (WNCAAB Albany, NBA ORL @ BOS 2H,
+  MEM @ WAS, GSW @ NOP).
+- The fade-vs-follow series for Iona @ UMBC ends at 6:50 PM (the game is no longer flagged).
+
+**Live rows:** 1,342.
+| sport | rows | priced <= 120 s | split |
+|---|---|---|---|
+| NBA | 1,011 | 23 | 102 main (23 fresh) / 909 `_alt` (0 fresh); one 137 s pull |
+| NCAAB | 275 | 93 | 1H 137 / 2H 131 / break 7 |
+| NFL | 25 | 11 | 1H 25 |
+| WNCAAB | 29 | 12 | — |
+| NHL | 2 | 1 | — |
+
+- 21 of 156 markets carry no price of ours (the NFL ones; see MNF read 2).
+- Live-rail: 1,313-1,343 rows.
+
+**Overlay (32 min; the window spans the 00:55 restart):**
+| sport | gap p50 | gap max | build p50 / max | notes |
+|---|---|---|---|---|
+| NBA | 64 s | **515 s** | 36.5 s / **94.5 s** | **4 `deferred_slow`** |
+| NCAAB | 73 s | 365 s | 13.6 s / 32.3 s | |
+| WNCAAB | 65 s | 383 s | — | |
+| NHL | 98 s | 457 s | — | |
+| NFL | — | — | 14.2 s / **99.7 s** | 2 builds, **1 `deferred_slow`** |
+
+- **One gap over 360 s in each of NBA, NCAAB, WNCAAB and NHL.** Tick gap max 398 s: consistent with
+  the drain (~00:36Z) and the 00:55:46Z restart, which fall inside this window. Re-check next
+  reading, which will be clean.
+- Zero-card with rows: WNCAAB 6 of 20, NHL 1 of 14.
+
+**Web merges:** ncaab and wncaab fresh 40 / 40; nhl 39 / 40; nba 38 / 40; nfl 6 fresh / 34 stale
+(pregame until 7:15).
+
+**Load:**
+- **Query 14.4 s** / 83.0 MB. Shortlist 1.3 s; chips 2.1 s; live-rail 0.19 s / 1.25 MB.
+- Gunicorn workers were 85 s and 21 s old at the read, both still alive at the end. Host load 8.4.
+- **Board:** built 129 s ago; shortlist written 375 s ago.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 37 live chips have
+a live card.
+
+**Restarts:**
+- refresh-worker 2953295 → **3101432** at 00:55:46Z (the #816 display fix, recorded above).
+- live-odds-worker 2925378, unchanged.
