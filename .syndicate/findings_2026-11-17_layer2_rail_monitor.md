@@ -270,3 +270,4 @@ after.
 - If the fleet head has moved past `92ae7490a` by then, re-run the ride-along check on the new range
   first.
 - **Also, relayed by local_1f10ce63:** the user typed in that session at ~12:4x PM CST 11-17: **"carry the launcher change along"**, answering the same question. The deploys.md entry quotes both: "Carry it tonight" (this session) and "carry the launcher change along" (local_1f10ce63).
+- **Also, from local_c787e775:** asked "When should steps 1+2 load on the fleet?", the user replied at ~12:48 PM CST: **"With next down/up"**. Consistent with tonight's carry: the ff puts step 1 on disk; `reload-web` builds no env; the nightly backup, preflight env reads and the next drained down/up run it (the user was told this before answering "Carry it tonight"). The before/after readings for steps 1+2 are owed by whoever runs the next drained down/up (todo #766, `findings_2026-11-17_render_config_retirement.md` "The load"), not by this load.
