@@ -943,6 +943,14 @@ death, never life — do not invert it.
 - Verification: real sim files: mean(h2) == mean(q3)+mean(q4) and full != h1+h2 (h2 excludes OT today); unit: switch off -> h2 histogram byte-identical to today; switch on -> h2 == q3+q4+OT per draw and differs from off on a draw set with OT; targeted pytest green; pushed to origin/main
 - Blocked by: none
 
+### nba-margin-raw-zero — OPEN — opened 2026-11-16 — session b44f64ce-a648-4698-9792-51714c8aaecc
+- Goal: Name why NBA pregame smart-sim market_anchor.model_margin_raw is exactly 0.0 in 72 of 192 regular-season sims (10-21..11-15): cause at file:line, share over time, whether it is a defect, and a proposed fix with an off != on reachability plan for the user to decide. Diagnose only: no code, load or deploy (todo #821).
+- Files: .syndicate/findings_2026-11-16_nba_margin_raw_zero.md (NEW), docs/ai_context/todo.md (#821 section only), .syndicate/state_basketball.md (one [nba-margin-raw-zero] bullet only)
+- Hypothesis: RECORDED AFTER TESTING (lane opened late, stated): the job build reads the WNBA column names spread_margin/totals (basketball_props_smart_sim.py:5795-5796) but NBA predictions_<D>.csv carries pred_margin/pred_total, so both teams get baseline_off_rating 110.6 (:5825-5834); with skip_def_subtraction the raw margin is only the outs/b2b adjustment difference (:893-905), zero when outs and b2b are equal.
+- Falsification test: Any fleet NBA sim whose model_margin_raw differs from 0.5*(away_outs-home_outs)+0.8*(away_b2b-home_b2b) by >1e-9, or any NBA predictions file carrying spread_margin; the WNBA control (spread_margin present) must come out OFF that rule.
+- Verification: Rule reproduces 197/197 copied sims and 261/261 fleet NBA sims 10-03..11-16; 72/72 zeros = equal outs+b2b; WNBA control 15/15 off-rule; findings note written with 2x2 counterfactual (feed x outs penalties) on 192 graded games.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
