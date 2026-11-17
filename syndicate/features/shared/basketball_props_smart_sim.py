@@ -4649,6 +4649,8 @@ def _call_source_simulate_smart_game_local(*, processed_root: Path, league_code:
         out,
         recorded_draws,
         build_ladder=build_exact_ladder_payload,
+        # (todo #820) h2 + every OT draw, per league; OFF unless SYNDICATE_<LEAGUE>_SIM_H2_INCLUDES_OT is set.
+        h2_includes_ot=_sim_h2_includes_ot_local(league_code),
     )
     # Shrink per-minute prop rates toward each player's own as-of rate (lane wnba-sim-rate-shrink): moves the means
     # and SHIFTS the ladders, width untouched; runs BEFORE the widening below. WNBA-only, OFF unless
@@ -4730,6 +4732,34 @@ _SIM_COMBO_LADDERS_LOCAL: dict[str, tuple[str, ...]] = {
     "pr": ("pts", "reb"), "pa": ("pts", "ast"), "ra": ("reb", "ast"),
 }
 
+# SECOND HALF = Q3 + Q4 + EVERY OVERTIME, the way it settles  [2026-11-16, todo #820, lane nba-pregame-h2-ot].
+#
+# `h2` above is quarters 3+4 only. Every book settles a second-half line with all its overtime periods (DraftKings,
+# FanDuel, BetMGM, Pinnacle: `bet_status_nba._OVERTIME_RULES`; WNBA: `bet_status_wnba._segment_points`), and so do
+# the board's own actuals (`segment_actuals._NBA_SEGMENTS["h2"] = (3, 4, None)`) and the live re-sim
+# (`nba/live_resim._segments`). So an OT draw's h2 histogram value is short its OT points. Measured on 197
+# production NBA sims (10-20..11-15): mean(h2) == mean(q3) + mean(q4) to 1e-14 on every file, and the sims tie
+# after regulation in 411 of 20,100 draws (2.0%).
+#
+# DEFAULT OFF, per league: SYNDICATE_NBA_SIM_H2_INCLUDES_OT / SYNDICATE_WNBA_SIM_H2_INCLUDES_OT (1/true/yes/on).
+# Off, the output is byte-identical to before. On, h2 adds each draw's OT points and `score.dist` gains
+# `h2_includes_ot: true`; a file WITHOUT that key has the old quarters-only h2. The switch is read when a sim is
+# BUILT: an existing sim file is reused as it is (`_smart_sim_run_date_local`'s reuse checks never look at it), so
+# flipping it reaches only sims built afterwards, and an existing slate needs a re-sim.
+_SIM_H2_OT_SWITCH_ENV_LOCAL: dict[str, str] = {
+    "nba": "SYNDICATE_NBA_SIM_H2_INCLUDES_OT",
+    "wnba": "SYNDICATE_WNBA_SIM_H2_INCLUDES_OT",
+}
+
+
+def _sim_h2_includes_ot_local(league_code: Any, env: Any = None) -> bool:
+    """True when this league's switch is on. Absent, empty, unknown or any other value is OFF."""
+    name = _SIM_H2_OT_SWITCH_ENV_LOCAL.get(str(league_code or "nba").strip().lower())
+    if not name:
+        return False
+    raw = str((env if env is not None else os.environ).get(name) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
 
 def _recording_sim_draws_local(simulate_draw, recorded_draws: list[dict[str, Any]]):
     """Wrap the per-draw boxscore helper: same call, same return, and a compact copy kept."""
@@ -4768,9 +4798,15 @@ def _histogram_local(values: list[int]) -> dict[str, int]:
     return dict(sorted(counts.items(), key=lambda kv: int(kv[0])))
 
 
-def _attach_sim_distributions_local(out: Any, recorded_draws: list[dict[str, Any]], *, build_ladder: Any = None) -> None:
+def _attach_sim_distributions_local(
+    out: Any, recorded_draws: list[dict[str, Any]], *, build_ladder: Any = None, h2_includes_ot: bool = False
+) -> None:
     """Add `score.dist` (total and margin histograms per segment) and the
     `pr`/`pa`/`ra` ladders to a smart-sim result, from its own recorded draws.
+
+    `h2_includes_ot` (todo #820, default False): `h2` adds each draw's overtime points, as every book and
+    `segment_actuals` settle a second half, and `score.dist` is stamped `h2_includes_ot: true`. False leaves
+    the output exactly as before (quarters 3+4, no stamp).
 
     Adds keys only; never changes one the sim wrote. Never raises. A result
     with no recorded draws (the legacy non-PBP path) is left as it was.
@@ -4782,6 +4818,9 @@ def _attach_sim_distributions_local(out: Any, recorded_draws: list[dict[str, Any
         for segment, quarters in _SIM_DIST_SEGMENTS_LOCAL.items():
             home = [sum(d["hq"][q] for q in quarters) for d in recorded_draws]
             away = [sum(d["aq"][q] for q in quarters) for d in recorded_draws]
+            if segment == "h2" and h2_includes_ot:
+                home = [h + sum(d["hot"]) for h, d in zip(home, recorded_draws)]
+                away = [a + sum(d["aot"]) for a, d in zip(away, recorded_draws)]
             segments[segment] = {
                 "total": _histogram_local([h + a for h, a in zip(home, away)]),
                 "margin": _histogram_local([h - a for h, a in zip(home, away)]),
@@ -4800,6 +4839,8 @@ def _attach_sim_distributions_local(out: Any, recorded_draws: list[dict[str, Any
                 "segments": segments,
                 "source": "syndicate_recorded_draws",
             }
+            if h2_includes_ot:
+                score["dist"]["h2_includes_ot"] = True
         if not callable(build_ladder):
             return
         players = out.get("players")
