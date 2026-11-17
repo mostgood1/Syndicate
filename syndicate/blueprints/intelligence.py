@@ -6,13 +6,15 @@ import json
 import os
 import threading
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.parse import quote
 
-from flask import Blueprint, jsonify, make_response, redirect, render_template, request
+from flask import Blueprint, current_app, jsonify, make_response, redirect, render_template, request
 from flask import redirect
+from flask.json.provider import DefaultJSONProvider
 
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
 from pipeline.intelligence_state import read_latest_intelligence_state_response
@@ -675,6 +677,101 @@ def _versioned_query_response(response_payload: dict[str, object]) -> dict[str, 
         "response_hash": payload_hash,
         "response": response_payload,
     }
+
+
+_SERIALIZE_ONCE_MARK = "_syndicate_serialized_once"
+
+
+def _serialize_once_enabled() -> bool:
+    """Server off switch for `_versioned_query_json_response`. ABSENT IS ON.
+
+    `SYNDICATE_QUERY_SERIALIZE_ONCE=off` (or 0/false/no) restores the old exit,
+    `_versioned_query_response` + `jsonify`. The old exit produces the same bytes, so
+    this switch exists for timing and as a fallback, not for correctness. On the fleet,
+    env is built only at `up`, so flipping it needs a drained `down`/`up`.
+    """
+    raw = str(os.environ.get("SYNDICATE_QUERY_SERIALIZE_ONCE") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _versioned_query_json_response(
+    response_payload: dict[str, object],
+    envelope_fields: Mapping[str, object],
+):
+    """The `/api/intelligence/query` HTTP response, with the payload serialised ONCE.
+
+    The old exit serialised the ~24 MB board payload twice
+    (`findings_2026-11-17_board_query_response_cache.md`, lead a):
+    - `_versioned_query_response` ran `_json_safe_value` over it and `json.dumps` of it,
+      only to hash it;
+    - `jsonify` then ran the app provider's `json_safe_value` walk and a second
+      `json.dumps` of the same tree, to send it.
+
+    Here the payload is walked once and dumped once with the provider's own settings.
+    Those bytes are hashed for `version` / `response_hash` and spliced into the small
+    envelope as `response`.
+
+    The output is byte-identical to the old exit's. The provider's
+    `json.dumps(..., sort_keys=True, separators=(",", ":"))` writes a nested value the
+    same wherever it sits, and the envelope is dumped by that same provider. The
+    hash is the old hash too, whenever nothing in the payload needs a JSON `default`
+    (the old hash used `default=str`, the provider uses its own `_default`). When
+    something does need one, `version` hashes the bytes actually sent, which is the
+    more useful definition; the page compares versions only for equality
+    (`intelligence.html` skips a re-render on an unchanged `response_hash`).
+
+    Falls back to the old exit when the provider is not Flask's default kind (its dump
+    settings are unknown), when it pretty-prints (debug mode; the splice assumes compact
+    output), or when the switch is off.
+    """
+    provider = current_app.json
+    single_pass = (
+        _serialize_once_enabled()
+        and isinstance(provider, DefaultJSONProvider)
+        # Flask's own rule for pretty-printing a jsonify response.
+        and not (provider.compact is False or (provider.compact is None and current_app.debug))
+    )
+    if not single_pass:
+        versioned = _versioned_query_response(response_payload)
+        versioned.update(envelope_fields)
+        return jsonify(versioned)
+    separators = (",", ":")
+    safe_payload = _json_safe_value(dict(response_payload))
+    body = json.dumps(
+        safe_payload,
+        default=provider.default,
+        ensure_ascii=provider.ensure_ascii,
+        sort_keys=provider.sort_keys,
+        separators=separators,
+    ).encode("utf-8")
+    del safe_payload
+    payload_hash = hashlib.sha256(body).hexdigest()
+    # A placeholder string stands in for the payload while the small envelope goes
+    # through the provider (NaN guard, key order and all). It is then replaced by the
+    # bytes above. A uuid cannot occur in the envelope by accident, and the count
+    # check below makes it impossible to splice anywhere but exactly once. The keys go
+    # in the old exit's order, so the bytes match even under `sort_keys=False`.
+    placeholder = f"__syndicate_serialize_once_{uuid.uuid4().hex}__"
+    envelope: dict[str, object] = {
+        "version": payload_hash,
+        "timestamp": _server_timestamp(),
+        "response_hash": payload_hash,
+        "response": placeholder,
+    }
+    envelope.update(envelope_fields)
+    if envelope.get("response") is not placeholder:
+        raise ValueError("envelope_fields must not carry 'response'")
+    outer = provider.dumps(envelope, separators=separators).encode("utf-8")
+    token = json.dumps(placeholder).encode("utf-8")
+    if outer.count(token) != 1:
+        raise RuntimeError("serialize-once placeholder must occur exactly once in the envelope")
+    at = outer.index(token)
+    data = b"".join((outer[:at], body, outer[at + len(token):], b"\n"))
+    del body
+    http_response = current_app.response_class(data, mimetype=provider.mimetype)
+    # Read by QUERY_STAGE_MS, so a log line says which exit ran (off != on).
+    setattr(http_response, _SERIALIZE_ONCE_MARK, True)
+    return http_response
 
 
 def _unwrap_response_payload(payload: dict[str, object] | None) -> dict[str, object]:
@@ -2886,8 +2983,20 @@ def intelligence_query_api():
             _stage("drop_row_diagnostics")
             _wire_payload = _row_refs_wire_payload(payload, response_payload)
             _stage("row_refs")
-            versioned_response = _versioned_query_response(_wire_payload)
-            versioned_response.update(_debug_state_fields(response_payload, source="combined_board_window"))
+            _envelope = _debug_state_fields(response_payload, source="combined_board_window")
+            # Was unconditionally None -- correct back when this branch was
+            # only ever reached for the dateless default query. Now that an
+            # explicit single date also routes here (see the comment above),
+            # leaving this None would un-fix #113/#114: both of those wired
+            # intelligence.html's board-freshness-chip and #board-date input
+            # sync off this exact field, and a None here for an explicit-date
+            # request would read as "no date selected" again.
+            _envelope["selected_date"] = explicit_date_value if explicit_date else None
+            _envelope["dates_covered"] = response_payload.get("dates_covered")
+            # I-13 lead a: this stage now also covers the serialisation the old exit's
+            # `jsonify` did after the timer stopped. Single pass, it is the same one dump
+            # the hash always cost; with the switch off it includes `jsonify` too.
+            _http_response = _versioned_query_json_response(_wire_payload, _envelope)
             _stage("version_and_debug")
             # Rows carried, so a slow request can be read against its SIZE
             # rather than against an assumed board.
@@ -2904,25 +3013,17 @@ def intelligence_query_api():
                     {"rows": _rows, "slim": bool(_slim_asked),
                      "drop": bool(_row_diagnostics_drop_requested(payload)),
                      "refs": _wire_payload is not response_payload,
+                     "serialize_once": bool(getattr(_http_response, _SERIALIZE_ONCE_MARK, False)),
                      "limit": payload.get("limit"), "stages": _stage_ms,
                      "total_ms": round(sum(_stage_ms.values()), 1)},
                     sort_keys=True),
                 flush=True,
             )
-            # Was unconditionally None -- correct back when this branch was
-            # only ever reached for the dateless default query. Now that an
-            # explicit single date also routes here (see the comment above),
-            # leaving this None would un-fix #113/#114: both of those wired
-            # intelligence.html's board-freshness-chip and #board-date input
-            # sync off this exact field, and a None here for an explicit-date
-            # request would read as "no date selected" again.
-            versioned_response["selected_date"] = explicit_date_value if explicit_date else None
-            versioned_response["dates_covered"] = response_payload.get("dates_covered")
             _LOGGER.info(
                 "BETTING_BOARD_REFRESH_COMPLETE",
-                extra={"selected_date": versioned_response["selected_date"], "candidate_count": _response_candidate_count(response_payload), "source": "query_api_combined"},
+                extra={"selected_date": _envelope["selected_date"], "candidate_count": _response_candidate_count(response_payload), "source": "query_api_combined"},
             )
-            return _no_cache_response(jsonify(versioned_response))
+            return _no_cache_response(_http_response)
         # A combined-reader failure falls through to the existing today-only
         # path below rather than ever surfacing a 500.
     force_refresh = _query_bool(payload.get("force_refresh"))
@@ -2963,12 +3064,12 @@ def intelligence_query_api():
                         response_payload, requested=_slim_asked)
                 if _row_diagnostics_drop_requested(payload):
                     response_payload = _drop_unconsumed_row_diagnostics(response_payload)
-                versioned_response = _versioned_query_response(_row_refs_wire_payload(payload, response_payload))
-                versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
-                versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
-                _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
-                _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
-                return _no_cache_response(jsonify(versioned_response))
+                _envelope = _debug_state_fields(response_payload, source="snapshot_read")
+                _envelope["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+                _http_response = _versioned_query_json_response(_row_refs_wire_payload(payload, response_payload), _envelope)
+                _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": _envelope.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
+                _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": _envelope.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
+                return _no_cache_response(_http_response)
 
             # No cached snapshot exists yet for this exact payload (e.g. a
             # never-before-requested date, such as tomorrow's day-ahead
@@ -3037,12 +3138,12 @@ def intelligence_query_api():
                     response_payload, requested=_slim_asked)
             if _row_diagnostics_drop_requested(payload):
                 response_payload = _drop_unconsumed_row_diagnostics(response_payload)
-            versioned_response = _versioned_query_response(_row_refs_wire_payload(payload, response_payload))
-            versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
-            versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
-            _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
-            _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
-            return _no_cache_response(jsonify(versioned_response))
+            _envelope = _debug_state_fields(response_payload, source="snapshot_read")
+            _envelope["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+            _http_response = _versioned_query_json_response(_row_refs_wire_payload(payload, response_payload), _envelope)
+            _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": _envelope.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
+            _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": _envelope.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
+            return _no_cache_response(_http_response)
         else:
             try:
                 read_latest_intelligence_state_response(payload, force_refresh=False, allow_latest_fallback=False)
@@ -3188,12 +3289,12 @@ def intelligence_query_api():
     )
     _attach_intelligence_response_aliases(response)
     LAST_RESULT = dict(response.get("response") or response.get("analysis") or {})
-    versioned_response = _versioned_query_response(response)
-    versioned_response.update(_debug_state_fields(response, source="snapshot_read"))
-    versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
-    _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": candidate_count, "source": "query_api"})
-    _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": candidate_count, "source": "query_api"})
-    return _no_cache_response(jsonify(versioned_response))
+    _envelope = _debug_state_fields(response, source="snapshot_read")
+    _envelope["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
+    _http_response = _versioned_query_json_response(response, _envelope)
+    _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": _envelope.get("selected_date"), "candidate_count": candidate_count, "source": "query_api"})
+    _LOGGER.info("BETTING_BOARD_REFRESH_COMPLETE", extra={"selected_date": _envelope.get("selected_date"), "candidate_count": candidate_count, "source": "query_api"})
+    return _no_cache_response(_http_response)
 
 
 @intelligence_bp.post("/api/intelligence/portfolio-event")
