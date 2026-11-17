@@ -1401,3 +1401,56 @@ ended (expected).
 a live card.
 
 **Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
+
+## Reading 21 — Mon 11-16 10:09 PM CST (04:09Z 11-17)
+
+**Slate:** 7 live chips.
+- NBA PHX @ DEN Q4; NFL LAC @ BAL Q4 2:15; NHL VAN @ UTA P2.
+- NCAAB 4: East Texas A&M @ Oregon State H2; Long Beach State @ UCLA HALF; Texas Southern @ UCSD H2;
+  Portland State @ Saint Mary's H2.
+
+**Flags: 7 shown on 4 cards (13 qualifying rows). 0 false, 0 missed, 0 dark.** 11-16 total: 260.
+- **Totals: 4, all UNDER.**
+  - NCAAB full-game, calibrated: East Texas A&M @ Oregon State u189.5 (15.4 pp); Texas Southern @ UCSD
+    u188.5; Portland State @ Saint Mary's u161.5 (ours 162.7, above the line).
+  - NBA PHX @ DEN u228.
+- **Spreads and moneylines (3):** NBA PHX -11.5 and the PHX moneyline (97.1% vs 93.6%); NCAAB Texas
+  Southern moneyline (8.8% vs 4.3%).
+- **Totals direction, flag by flag: 111 unders, 49 overs.**
+
+**MNF (Q4 2:15):**
+- No new NFL flag: 15 NFL rows on the rail, 4 priced <= 120 s, 0 flagged.
+- The re-sim went back to `uninformative_probability` at 03:53 and 03:59Z (a close game again), and
+  resimmed at 03:47 and 04:05Z.
+- The join prices 1 (the moneyline) when resimmed.
+
+**Live rows:** 210.
+| sport | rows | priced <= 120 s | split |
+|---|---|---|---|
+| NBA | 122 | 10 | main 31 (10 fresh), `_alt` 91 (0 fresh) |
+| NCAAB | 70 | 22 | — |
+| NFL | 15 | 4 | — |
+| NHL | 3 | 2 | — |
+
+**Overlay (23 min), all 0 over 360 s:**
+| sport | gap p50 / max | build p50 / max |
+|---|---|---|
+| NBA | 57 s / 106 s | 12.8 s / 30.8 s |
+| NCAAB | 54 s / 104 s | — |
+| NFL | 51 s / 138 s | — |
+| NHL | 49 s / 162 s | — |
+
+- 0 `deferred_slow`. Tick gap p50 17 s, max 81 s.
+
+**Web merges:** fresh 59 / 59 for nba, nhl, nfl and ncaab. WNCAAB stale 59 / 59: no WNCAAB game is
+live.
+
+**Load:**
+- **Query 4.6 s** / 54.3 MB. Shortlist 0.58 s; chips 0.89 s; live-rail 0.02 s.
+- Gunicorn workers were 275 s and 42 s old at the read, both alive at the end. Host load 2.1-2.5.
+- **Board:** built 70 s ago; shortlist written 69 s ago.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 7 live chips have
+a live card.
+
+**Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
