@@ -114,8 +114,9 @@ DEFAULT_PREGAME_WINDOW_SECONDS = 6 * 3600
 DEFAULT_LIVE_WINDOW_SECONDS = 105 * 60
 
 #: PER-SPORT CODE DEFAULTS, used only when the sport's env key is unset (user 2026-10-22, NFL option E: "go with E and
-#: deploy" -- every segment, the pregame tier every 30 min, the live tier for the whole game; the live tier is still
-#: gated to 10 min by `DEFAULT_LIVE_INTERVAL_SECONDS`). Code, not env, so it ships with a fast-forward: the local fleet
+#: deploy" -- every segment, the pregame tier every 30 min, the live tier for the whole game; the live tier was then
+#: gated to 10 min by `DEFAULT_LIVE_INTERVAL_SECONDS`, and is every run again since 2026-11-17, todo #823). Code, not
+#: env, so it ships with a fast-forward: the local fleet
 #: derives role env only at `up`. Estimated from week 7's real pull times and kickoffs (14 games): ~8k credits a week
 #: with both gates (upper bound: every requested market billed). `SYNDICATE_NFL_SEGMENT_MARKETS=off` turns NFL off.
 #: Every other sport keeps "absent means OFF".
@@ -321,7 +322,20 @@ def pregame_interval_seconds(sport: str, *, env: Mapping[str, str] | None = None
 #: autorun every 150 s. NCAAF measured 12,664 -> 2,761 credits/h on this change.
 #: A CODE default, not env, so it ships with a fast-forward rather than a fleet
 #: restart; `SYNDICATE_<SPORT>_SEGMENT_LIVE_INTERVAL_SECONDS` still overrides it.
-DEFAULT_LIVE_INTERVAL_SECONDS: dict[str, int] = {"ncaaf": 600, "nfl": 600}
+#:
+#: NFL BACK TO EVERY RUN (user 2026-11-17, "A: every lines run"; todo #823, lane
+#: `nfl-live-segment-every-run`). The 600 s gate collided with the in-play overlay,
+#: which keeps only rows seen within 300 s (`book_grid_artifact.
+#: inplay_overlay_max_price_age_seconds`) and is REPLACED by every build. Measured on
+#: MNF 2026-11-16 (`findings_2026-11-17_nfl_rail_segment_cadence.md`): quarter/half
+#: lines were captured 610-660 s apart, 67 of 136 NFL overlay builds and 52% of the
+#: game's minutes had no fresh quarter/half row, and those builds made 0-6 game cards
+#: instead of 13-30, so the Games Rail lost NFL game lines about half the time.
+#: Cost, estimated: 6 segments x 3 bases = 18 markets per live event per call, ~30
+#: NFL lines runs an hour in play -> ~+430 credits per live game-hour over the gate
+#: (upper bound: every requested market billed). `..._LIVE_INTERVAL_SECONDS=600`
+#: restores the gate. NCAAF keeps 600 s: not measured there yet.
+DEFAULT_LIVE_INTERVAL_SECONDS: dict[str, int] = {"ncaaf": 600}
 
 
 def live_interval_seconds(sport: str, *, env: Mapping[str, str] | None = None) -> int:
@@ -334,7 +348,8 @@ def live_interval_seconds(sport: str, *, env: Mapping[str, str] | None = None) -
     10-minute window (~4,000/h). Full-game lines are NOT behind this gate: they
     come from the bulk call and keep the autorun's cadence; only segment lines
     are refreshed on this slower clock, so in-play quarter/half prices are up to
-    this old.
+    this old. Anything above the in-play overlay's 300 s row limit takes those rows
+    off the overlay for part of every cycle (NFL, todo #823: now 0 = every run).
     """
     default = DEFAULT_LIVE_INTERVAL_SECONDS.get(str(sport or "").strip().lower(), 0)
     return _env_int(f"{env_prefix(sport)}_LIVE_INTERVAL_SECONDS", default, env)

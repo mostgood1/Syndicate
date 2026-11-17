@@ -356,9 +356,11 @@ def test_reachability_ncaaf_live_tier_waits_10_minutes_by_default(tmp_path):
 def test_other_sports_keep_live_every_run():
     from syndicate.features.shared import segment_odds_fetch as sof
 
-    assert sof.live_interval_seconds("nfl", env={}) == 600, "NFL joined 2026-10-03 (lane nfl-live-segment-interval)"
+    # NFL joined the 600 s gate 2026-10-03 (lane nfl-live-segment-interval) and left it 2026-11-17 (todo #823,
+    # user "A: every lines run"): the gate kept quarter/half rows off the 300 s in-play overlay half the game.
+    assert sof.live_interval_seconds("nfl", env={}) == 0
     assert sof.live_interval_seconds("soccer", env={}) == 0
-    assert sof.live_interval_seconds("nfl", env={"SYNDICATE_NFL_SEGMENT_LIVE_INTERVAL_SECONDS": "0"}) == 0
+    assert sof.live_interval_seconds("nfl", env={"SYNDICATE_NFL_SEGMENT_LIVE_INTERVAL_SECONDS": "600"}) == 600
     assert sof.live_interval_seconds("ncaaf", env={}) == 600
     assert sof.live_interval_seconds("ncaaf", env={"SYNDICATE_NCAAF_SEGMENT_LIVE_INTERVAL_SECONDS": "0"}) == 0
 
