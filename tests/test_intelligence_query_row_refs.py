@@ -190,6 +190,8 @@ def test_the_recorded_slice_exercises_every_encoding_case():
     top, live, cards = refs["top_opportunities"], refs["top_live_opportunities"], refs["board_contract.cards"]
     assert all(top["patch"]), "every top row adds keys (rationale, pick, ...)"
     assert "rationale" in top["patch"][0]
+    # The RECORDED slice predates lane board-query-diag-strip, so its top_live rows are unstripped;
+    # encoded raw here (no drop), they still exercise a patched nested value.
     assert any(p and "quote" in p for p in live["patch"]), "top_live keeps its unstripped quote"
     assert cards.get("drop"), "some cards lack a key their ranked row has (actual)"
     assert any(p is None for p in cards["patch"]) and any(p for p in cards["patch"])

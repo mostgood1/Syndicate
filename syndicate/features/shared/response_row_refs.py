@@ -14,9 +14,17 @@ MEASURED on the fleet's served response, 2026-11-16 7:48 PM CST (lane
 `top_opportunities` row is its `ranked_all` row PLUS ~10 keys (`rationale`,
 `pick`, `american_odds`, ...). Every card LACKS the two logo keys, and 498 cards
 carry a different `gate`. `top_live_opportunities` never went through
-`drop_row_diagnostics`, so its `quote` / `movement` / `trace` differ on every
+`drop_row_diagnostics`, so its `quote` / `movement` / `trace` differed on every
 row. The embed's exact-match row references (`_slim_embedded_board_payload`)
 would therefore have referenced nothing here.
+
+**Since lane `board-query-diag-strip` (2026-11-17, todo `#827`)** the flag strips
+`top_live_opportunities` too and drops `rationale` from every list. On the same
+recorded response that takes this encoding's output from 33,144,917 to
+25,559,058 B raw (5,689,938 -> 4,575,384 B gzip-1): the `top_live_opportunities`
+patch falls from 5.2 MB to 0.49 MB and the `top_opportunities` patch from 3.9 to
+1.0 MB. The rows still differ from `ranked_all` (the ~9 keys the top lists add,
+the cards' `gate`), so the encoding is unchanged and still lossless.
 
 THE ENCODING, per list, is lossless by construction:
 

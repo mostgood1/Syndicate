@@ -372,7 +372,23 @@ def _slim_response_aliases(response: Any) -> Any:
 #: rebuildable -- they are simply gone. Folding them into that flag would make
 #: its promise false for the fields that need it most, so this is its own
 #: opt-in with its own declaration.
-_UNCONSUMED_ROW_DIAGNOSTICS = ("trace", "score_breakdown")
+#:
+#: **`rationale` JOINED 2026-11-17** (lane `board-query-diag-strip`, todo `#827`).
+#: It rides on `top_opportunities` / `recommendations` (4,500 rows, 2.83 MB) and
+#: `top_live_opportunities` (2,176 rows, 1.42 MB) of the fleet's 11-16 7:48 PM CST
+#: response -- the single largest field `row_refs` still sent. The flag had FOUR
+#: senders by then, and every one was surveyed, every access form plus generic row
+#: consumption (`Object.keys` / `for..in` / `JSON.stringify` / spreads of a row):
+#: `templates/intelligence.html` and the scripts it loads (bet_slip / watchlist
+#: build their entries from DOM attributes, the portfolio POST picks named fields;
+#: `ask_bar.js` reads `rationale_summary` from `/api/syndicate/query`, a different
+#: endpoint), `scripts/build_cheat_sheets.py` (reads `board_contract.cards` only,
+#: which never carry `rationale`), `scripts/layer2_rail_monitor_probe.py` with its
+#: runner and grader, and `scripts/verify_layer2_row_parity.py`: 0 reads.
+#: `scripts/watch_clamp_trigger.py` walks the payload generically but never sends
+#: this flag. `tests/test_intelligence_query_diag_strip.py` re-proves it against
+#: every sender on each run, and fails on a sender nobody surveyed.
+_UNCONSUMED_ROW_DIAGNOSTICS = ("trace", "score_breakdown", "rationale")
 
 #: `quote` sub-fields nothing reads. **16.1% of the wire on their own** --
 #: `quote` is 33.8% of every row and these are 73% of `quote`:
@@ -446,7 +462,16 @@ _REBUILDABLE_ROW_ALIASES = (
 
 #: Lists whose rows carry them. Named explicitly rather than walked, so a new
 #: list elsewhere in the payload is NOT silently stripped by a future edit.
-_DIAGNOSTIC_ROW_LISTS = ("top_opportunities", "ranked_all", "recommendations")
+#:
+#: **`top_live_opportunities` was missing until 2026-11-17** (lane
+#: `board-query-diag-strip`, todo `#827`): measured on the fleet's 11-16 response,
+#: its 2,176 rows still carried `trace` (0.47 MB), `score_breakdown` (0.83 MB), the
+#: unconsumed `quote` fields, the all-null `movement` fields and the rebuildable
+#: aliases, and under `row_refs` its patch was 5.2 MB of the remaining 33.1 MB.
+#: No sender of this flag reads the list at all (survey above, at `rationale`).
+#: The page restores its row aliases with the other lists' (`rehydrateAliases`,
+#: pinned to this tuple by `tests/test_intelligence_query_diag_strip.py`).
+_DIAGNOSTIC_ROW_LISTS = ("top_opportunities", "ranked_all", "recommendations", "top_live_opportunities")
 
 
 def _row_diagnostics_drop_requested(payload: Any) -> bool:

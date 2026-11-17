@@ -95,7 +95,9 @@ def test_it_DECLARES_what_it_dropped():
     """A missing key must not read as "the server had no value" -- that is a
     different fact and the one that sends someone debugging upstream."""
     out = intel._drop_unconsumed_row_diagnostics(_payload())
-    assert out["_dropped_row_fields"] == ["trace", "score_breakdown"]
+    # `rationale` since lane board-query-diag-strip (2026-11-17): declared even on a payload whose
+    # rows never carried it, like the other two -- the list says what the flag drops.
+    assert out["_dropped_row_fields"] == ["trace", "score_breakdown", "rationale"]
 
 
 def test_it_stays_SILENT_when_it_dropped_nothing():

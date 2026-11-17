@@ -786,7 +786,9 @@
     const rowAliases = payload._dropped_row_aliases;
     if (rowAliases && typeof rowAliases === "object") {
       const aliasPairs = Object.keys(rowAliases);
-      const lists = ["top_opportunities", "ranked_all", "recommendations"];
+      // `top_live_opportunities` since lane board-query-diag-strip (2026-11-17): the
+      // server strips it with the others now, so its aliases come back with theirs.
+      const lists = ["top_opportunities", "ranked_all", "recommendations", "top_live_opportunities"];
       const boardCards = payload.board_contract && Array.isArray(payload.board_contract.cards)
         ? [payload.board_contract.cards]
         : [];
