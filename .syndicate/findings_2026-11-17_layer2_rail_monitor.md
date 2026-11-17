@@ -573,3 +573,87 @@ WNBA offseason.**
   - It runs `scripts/build_cheat_sheets.py --picks-only`; its `fetch_board_cards()` (~line 704) POSTs the query without `row_refs` and reads only `response.board_contract.cards` (~5,300 cards).
   - 83 requests today, median 11.1 MB on the wire.
   - The fix: send `row_refs` and decode with `response_row_refs.decode_row_refs`. The file belongs to the `cheat-sheets` lane. Proposed as session card **"Cheat-sheet picks: request the compact board query" (task_8e1142e4)**. No fleet load is needed beyond the next ff, since the task runs `~/Syndicate`.
+
+## Reading 6 — Tue 11-17 4:08 PM CST (22:08Z) — the evening wave starts
+
+**Fleet changed twice since reading 5. Both changes were other lanes' work; each was recorded in deploys.md by its owner.**
+- **3:52 PM:** the render-config session ran a full `up` on `91d865fd5` (supervisor: `LOCAL PRODUCTION UP ...
+  commit=91d865fd5251`). New pids: web 28883, refresh-worker 28948 (boot 21:53:02Z), live-odds-worker 28949.
+- **3:56:24 PM:** ff to `25fc2e4f0` + `reload-web` (#827, lane board-query-diag-strip-load, deploys.md 21:56:24Z).
+  The workers still run `91d865fd5`'s code. #827 is web-only.
+- Host load 5.0. Top consumers:
+  - refresh-worker 113% CPU, RSS 2.9 GB at 18 min;
+  - a Serie A soccer artifact build 108%;
+  - live-odds-worker 58%;
+  - `kalshi_combo_capture` 55% at nice 19.
+
+**#827 is on the rail.** The probe sends the page's body, `row_refs` included.
+- **Query: 4.13 MB wire / 22.5 MB raw**, against 4.60 / 25.3 at reading 5 with nothing live (−10% / −11%).
+- `rationale` appears only in `_dropped_row_fields`; 0 `diagnostics` keys in the response.
+- **TTFB 15.2 s:** both gunicorn workers were born or recycled within ~30 s of the query (pids 32906 at
+  22:08:36Z, 33273 at 22:09:20Z). That is a cold worker, the same 15-18 s server time the de-dup lane measured.
+- Other loads: shortlist 1.5 s; chips 0.56 s; live-rail 0.02 s.
+- Board built 344 s ago; query snapshot 3,994 s old.
+
+**Slate:** 2 live chips. NCAAB Notre Dame @ Florida H1 11:40; WNCAAB Army @ UMass Q1 5:38.
+
+**Flags: 1 shown, 0 false, 0 missed, 1 dark.**
+- **Shown:** NCAAB Notre Dame @ Florida u139.5, 5.0 pp (calibrated 0.555 vs fair 0.504), priced 23.5 s ago.
+  The card shows **ours 142.2**, which sits on the other side of the line from the flagged under. See I-17 below.
+- **Dark:** the same game's 1H spread FLA −12.5 / ND +12.5, ND +12.5 side, gap 10.1 pp. Priced 100 s, now 444 s old.
+
+**Live rows: 18.**
+- NCAAB 17 (3 priced <= 120 s); WNCAAB 1 (1).
+- 12 of 18 rows are over 300 s old now; priced age p50 181 s.
+- 1 of 6 markets carries no price of ours.
+
+**Overlay (40 min).** 0 gaps over 360 s; 0 `deferred_slow`.
+
+| sport | builds | gap p50 / max | zero-card with rows |
+|---|---|---|---|
+| NCAAB | 16 | 52 s / 91 s | 0 |
+| WNCAAB | 6 | 58 s / 62 s | **6 of 6**, all the value floor (`refused={"rows_below_value_floor":N}`, N = opportunities 6-12; the user's "Keep the floor") |
+
+- **Book-grid ticks:** gap p50 58 s. The 235 s max straddles the 3:52 PM `up` (21:51:34 → 21:55:29Z).
+  Before it, during the lull, there were three gaps of 167-173 s.
+
+**Web merges:** NCAAB fresh 31 / 31. WNCAAB: **15 stale** (21:55:42-22:02:30Z, `stale_3795s`..`stale_4203s`),
+then 16 fresh.
+- **Cause:** the last WNCAAB overlay before the lull was written at 20:52:27Z. The next build came at 22:04:54Z,
+  when Army @ UMass had in-play rows.
+- So the evening's first live WNCAAB game had a chip by 21:55:42Z and **no fresh overlay for ~9 min**.
+- This matches I-10 (WNCAAB coverage is the books' in-play listings). Not checked whether any book listed
+  Army @ UMass in play before 22:04Z.
+
+**#824:** 0 of 10 college `LIVE_GAMELINE_JOIN` lines since 21:28Z carry the reason. 0 college totals flags
+below the points scored (0 of 1).
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated, 0 live chips without a live card.
+
+**Restarts:** the 3:52 PM `up` and the 3:56 PM `reload-web` above. No unplanned restart.
+
+### Improvement hunt, reading 6
+
+**I-17: college total cards show the sim's projected final next to a calibrated flag on the other side.**
+
+- **Measured (`flags.jsonl`, every shown college totals flag since the #816 load, 11-17 00:04:20Z):**
+  - **NCAAB full game: 23 of 74 flag observations** show "ours" on the opposite side of the line. That is
+    24 distinct matchup × side across NCAAB and WNCAAB.
+  - **Every one is an under with ours above the line.** Examples:
+    - Long Beach St @ UCLA u145.5 at ours 150.8;
+    - Columbia @ Northwestern u127 at ours 133.7;
+    - Texas Southern @ UC San Diego u184.5 at ours 186.2 (27.0 pp).
+  - WNCAAB full game: 1 of 17. NCAAB halves: 0 of 21 (outside #816's scope).
+- **Why:** the flag is right by #816's design.
+  - The served P is `logit p_mkt + a + c (logit p_raw − logit p_mkt)`, with the level `a` ≈ −0.29 to −0.37 on
+    the over: about −9 pp at a 50/50 line.
+  - "ours" is `live_total`, the sim's own median. #816 found that pregame this median carried no information
+    against the close (slope 0.017 ± 0.129, 621 games).
+  - So the card puts the one number we decided not to trust beside the decision that overrules it.
+- **Fix (per line, display only, no probability changes):** show the line at which the row's served P
+  crosses 0.5, as "fair line" or "cal", in place of or beside the sim's number. Or label the sim's number
+  "sim" when a calibration is in force.
+  - The rows on the card already hold that crossing. For Notre Dame @ Florida, P(under) is 0.543 at 138.5,
+    still above 0.5, so the crossing is below 138.5.
+  - Display-only, so it does not split #816's pre-registered 7-day grade (11-17..11-23), which reads served P.
+- **Owner:** lane `ncaab-total-overprojection` (#816, OPEN, session b1d2088f). Hand-off at the daily summary.
