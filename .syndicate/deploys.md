@@ -61008,3 +61008,48 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - the watcher, grepping both role logs since 16:47:06Z for `KEY_PLAYER_OUT_REFUSED`, `EXIT_HOLD` and `refused_*>0`, has seen nothing;
   - the live ticks at 18:41-18:43Z read `key_players_out=1 refused_games=0` on wncaab and ncaab. Those are modelled foul-outs, priced per the user's 11-16 rule.
 - **Verdict:** the code is loaded and in the path, but this is a null without a live population. It is not a test of the refusal. **OWED:** the first plan carrying `key_player_out` > 0 on a game with an UNMODELLED exit. The watcher (every 120 s, to ~11-19 16:47Z) catches the producer side, and the plan read follows it.
+
+## 2026-11-17 18:58:45Z (12:58 PM CST) -- DEPLOY (ff + reload-web): fleet `92ae7490a` -> `5db26434e`, loading todo #826, the board query's opt-in `row_refs` (lane `board-query-row-refs-load`, user "Load it", then "Carry both" for the ride-alongs) -- **MET: the page's query went 11,214,708 -> 4,320,530 B gzipped, `"refs": true`, and the served board renders with 0 page errors**
+- betting change: no
+- **decision:** the user answered "Load it" to "Load the board query fix onto the fleet (ff + reload-web)?". To the ride-along question the user answered **"Carry both (Recommended)"**. The two ride-alongs: `ac2cbc2fc` (the launcher, where the user had said "load later") and `2148f99cb` (`/portfolio/paper`, lane `paper-endpoint-request-path`, load not recorded). The ff cannot skip either; both sit before `5db26434e` on main.
+- **ride-along (`92ae7490a..5db26434e`, 21 commits), code only:**
+  - **mine** (`5db26434e`):
+    - `syndicate/features/shared/response_row_refs.py`;
+    - `blueprints/intelligence.py`: `_row_refs_wire_payload`, called on the three slim exits of `intelligence_query_api`;
+    - `templates/intelligence.html`: `row_refs: true`, and the rebuild runs first in `rehydrateAliases`.
+    - Opt-in. The server off switch is `SYNDICATE_QUERY_ROW_REFS=off`; absent honours the request.
+  - **`2148f99cb`** (lane `paper-endpoint-request-path`):
+    - Web half, live with this reload: `_paper_portfolio_payload` reads one date's rows and the worker-written all-dates record.
+    - Worker half: `paper_settlement` writes that record at refresh-worker's NEXT restart.
+    - Paper only.
+  - **`ac2cbc2fc`** (lane `render-config-retirement`, step 1): the launcher reads `scripts/fleet_role_spec.json` + `~/syndicate-prod/fleet_env/`.
+    - That directory exists with `web.json`, `refresh-worker.json` and `live-odds-worker.json`.
+    - Inert until the next `up`, where its lane measured 0 env keys differing.
+    - The user's later answer, via `local_c787e775`, was "With next down/up".
+  - Tooling: `scripts/check_lane_invariants.py`. The rest is ledger and tests.
+  - `vendor/` is empty. None of the 14 dirty data/report paths on the fleet checkout overlaps the incoming files.
+- **gates:** claim web at 18:54:47Z (holder `board-query-row-refs-load`, ACQUIRED).
+  - **Baseline.** My own read (the page's body + `row_refs`, 18:55:48Z) got a connection RESET at ~31 s. It left no stage line and no access line, and no recycle or timeout was logged. Web was under load: a browser query took 136.6 s at 18:56:07Z. I did not send a second 80 MB read. The baseline is instead the page's own request in the access log at **18:56:07Z: 11,214,708 B gzipped, 136,559 ms**. `QUERY_STAGE_MS` had no `refs` field (18:43:08Z, 18:53:48Z, 18:54:36Z), and `version_and_debug` read 7,411 / 7,461 / 7,945 ms.
+  - **Preflight:** `--service web --target-commit 5db26434e`, run from a worktree at origin/main, with 3 expect/baseline pairs: **CLEAR 18:58:02Z** (0 processes), live commit 92ae7490.
+- **ff + reload** (`C:\tmp\rowrefs826\ff_reload.sh 5db26434e`):
+  - `git fetch github main`, then `git merge --ff-only 5db26434e` at **18:58:45Z**;
+  - `~/.venvs/syndicate/bin/python scripts/local_production.py reload-web`: `RELOAD_WEB {"elapsed_s": 6.6, "failures": 0, "max_latency_s": 2.59, "state": "done"}`;
+  - workers 4071114/4071165 -> **4074414/4074415** (booted 18:58:46Z). Done 18:58:52Z.
+- **expect / measured:**
+  - `web_commit` 92ae7490 -> 5db26434: **MET**. Fleet head 5db26434e; the new web workers booted after the ff.
+  - `page_query_wire_bytes` 11,214,708 -> ~4.5 M: **MET, 4,320,530 B (38.5%)**.
+    - My read at 18:59:08Z (page body + `row_refs`): 200 in 18.1 s, raw 23,978,345 B. `_response_row_refs` covers all three lists; `top_opportunities` is null; `ranked_all` 5,100; `candidate_count` 4,500 (still read from the unencoded payload).
+    - Headless page load at 19:00:47Z: 4,321,074 B.
+  - `query_stage_refs` absent -> true: **MET**. At 18:59:24Z: `"refs": true`, `row_refs` stage **535.8 ms**, `version_and_debug` **1,967.7 ms** (was 7.4-7.9 s), total 16,166 ms.
+  - **The served page.** Headless Chromium opened the fleet's `/intelligence` at 19:00:47Z:
+    - it sent `row_refs: true` and got the query back as a 200;
+    - 0 page errors;
+    - "Showing 1,300 of 2,213 plays", 2,600 card nodes, the games rail drawn;
+    - `_response_row_refs` was gone after the rebuild.
+    - 20 console errors were all `cdn.nba.com` logos (`ERR_HTTP2_PROTOCOL_ERROR`). Reproduced with the query ABORTED (14 cdn.nba.com), so they are not this change.
+  - **Workers untouched:** refresh-worker pid 4060729 (up since ~18:04Z) and live-odds-worker 4062745 (~18:13Z), read at 19:03:45Z. The paper settle half and the launcher sit on disk until a refresh-worker restart and the next `up`.
+  - `/portfolio/paper`: 302 to `/portfolio/login` (the auth gate). There was no authenticated paper GET today, so the ride-along's own reading is OWED by lane `paper-endpoint-request-path`.
+- **owed:**
+  - **`WEB_WORKER_MEMORY_RECYCLE` per query request, vs before.** Before: 28 recycles 16:00-18:59Z, of which 18:42:41Z was hard after 5 requests and 18:43:00Z hard after 80.
+  - **Open tabs keep the old page JS** (no `row_refs`, still ~11 MB per poll) until reloaded.
+- **verify:** the 18:59:24Z `QUERY_STAGE_MS` with `"refs": true`, and the 18:59:26Z access line `"POST /api/intelligence/query" 200 4320530`.
