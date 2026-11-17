@@ -657,3 +657,70 @@ below the points scored (0 of 1).
     still above 0.5, so the crossing is below 138.5.
   - Display-only, so it does not split #816's pre-registered 7-day grade (11-17..11-23), which reads served P.
 - **Owner:** lane `ncaab-total-overprojection` (#816, OPEN, session b1d2088f). Hand-off at the daily summary.
+
+## Reading 7 — Tue 11-17 4:37 PM CST (22:37Z), full page
+
+**Fleet:** unchanged since reading 6. Web on `25fc2e4f0`; refresh-worker 28948 and live-odds-worker 28949 on
+the 3:52 PM `up` (`91d865fd5`). Host load 2.2.
+
+**On main since reading 6, NOT loaded.** Each load is the owner's or the user's call.
+- `64daca46f` serialise-once (lane board-query-serialize-once, todo #828). On the fleet's page response,
+  measured by the owner: bytes and version identical; median server time 2,259 → 950 ms; peak 109.9 → 79.4 MB.
+  This is the lead (a) that came out of my I-13.
+- `920c19e70` WNBA box-score polls decided per date (#829, lane wnba-boxscore-polling-per-date). This is
+  I-14's fix. The owner's checkpoint says the load is the user's call.
+- `f1a278ed8` render-config step 3b: no code reads a `RENDER*` marker any more.
+
+**Slate:** 2 live chips. NCAAB Notre Dame @ Florida H1 2:25; WNCAAB Army @ UMass Q2 2:52.
+
+**Flags: 1 shown, 0 false, 0 missed, 0 dark.**
+- NCAAB Notre Dame @ Florida u150.5, 9.8 pp (0.601 vs fair 0.503), ours 149.7. Ours is on the flag's side
+  (I-17 check: agrees).
+- 4 flagged rows lie behind the 1 shown flag.
+
+**Live rows: 21, all NCAAB.** 10 priced <= 120 s; priced age p50 145 s, max 860 s; 6 over 300 s now.
+0 markets without a price of ours.
+
+**Overlay (29 min).** 0 gaps over 360 s.
+
+| sport | builds | gap p50 / max | build s p50 / max | zero-card with rows |
+|---|---|---|---|---|
+| NCAAB | 33 | 38 s / **246 s** | 3.4 / **46.8** | 0 |
+| WNCAAB | 36 | 45 s / 79 s | 1.1 / 12.9 | 36 of 36, all the value floor |
+
+- **The 246 s NCAAB gap (22:09:45 → 22:13:51Z) is one slow build followed by a deferral.**
+  - **22:10:14:** NCAAB built in 46.8 s, against p50 3.4 s. The same tick built 4 background dates in 26.3 s
+    (ncaaf 11-19 / 11-20 / 11-21, soccer 11-20).
+  - **22:11:30:** the next tick deferred NCAAB as slow (`deferred_slow ['ncaab']`).
+  - **22:14:07:** the next NCAAB build took 4.7 s.
+  - Host load was 5.0 at 22:10. A Serie A soccer artifact build was running at 108% CPU next to the
+    refresh-worker's 113%.
+  - One event. Watching whether it repeats under the evening load before calling it a defect.
+- **Book-grid ticks:** 71, gap p50 22 s, max 57 s.
+
+**Web merges:** fresh 23 / 23 for NCAAB and WNCAAB; 0 stale.
+
+**Load (full page):**
+- `/intelligence` 6.0 s / 4.38 MB wire / 23.0 MB raw.
+- **Query 2.3 s / 4.05 MB wire / 22.0 MB raw** (warm; #827 form).
+- Shortlist 1.5 s; chips 0.34 s; live-rail 0.02 s.
+- Board built 94 s ago; query snapshot 1,735 s.
+- Gunicorn workers 99 s and 29 s old: still recycling every few minutes (the I-2 recycle read is owed at the
+  summary).
+
+**#824:** 0 of 12 college `LIVE_GAMELINE_JOIN` lines since 22:08Z carry the reason. 0 college totals flags
+below the points scored (0 of 1).
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated, 0 live chips without a live card.
+
+**Restarts:** none.
+
+### Improvement hunt, reading 7
+
+- **Lead, not yet an item: a slow background build shares the tick with the live NCAAB build.** At 22:10:14
+  one tick did both, and the NCAAB build ran 14× its median.
+  - Not shown: that the background work, rather than host contention, caused the slow build.
+  - The next readings check every NCAAB build over 20 s: what the same tick built in the background, and the
+    host load.
+  - If it repeats, the lead is to run background dates only on ticks with no live sport due, or after the
+    live builds. Owner: whoever holds the book-grid tick (to name if it repeats).
