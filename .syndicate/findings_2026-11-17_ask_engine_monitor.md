@@ -484,3 +484,45 @@ No `live_row` ask: no live game in the shortlist. `as_of_in_future` false on 5 /
 - 2e deploys.md headers in the last 40 min: one, 20:52Z (2:52 PM CST), a READING (no deploy): `2148f99cb`'s refresh-worker half is live (paper all-dates record; lane `portfolio-monitor`). It is not a new load in the window; refresh-worker and live-odds-worker etimes 4,130 s (up since ~1:56 PM CST, the host reboot). Paper endpoint, not live pricing.
 
 No anomaly.
+
+## Reading 11 (3:35 PM CST)
+
+Probe 3:35:30-3:38:04 PM CST (`ask_reading_20261117T213530Z.json`), against http://127.0.0.1:10000. The page returned 200 in 0.12 s and the shortlist returned 200 in 2.21 s (200 rows).
+
+**Ask:** 4 of 5 answered. 1 of 5 went past the 45 s cut-off. Median 19.69 s, max 73.64 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "What do you think of this spread?" | 73.64 | **no** (RemoteDisconnected, no status; user would see the timeout) | - | - | - |
+| free_text "Lakers vs Celtics" | 24.04 | yes | matchup_analysis | 2026-11-17T21:02:56Z (2,063 s old) | 0 |
+| free_text "top edges today" | 13.98 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NBA h2h, Portland Trail Blazers) | 19.69 | yes | bet_analysis | 2026-11-16 (date) | 2 |
+| pregame_prop (NBA player_threes, Miles McBride U1.5) | 4.65 | yes | bet_analysis | 2026-11-17T17:43:54Z (14,049 s old) | 7 |
+
+- `as_of_in_future`: 0 of 4.
+- No game was live: there is no `live_row` ask.
+
+**Web, 3:05:30 PM CST onward (66 requests):**
+- WORKER TIMEOUT kills: **1**, at **3:36:36 PM CST**. That is inside this probe and matches the "spread" ask's disconnect. The web access log carries no row for that ask, so it shows 4 asks, not 5.
+- Memory recycles: 5, 4 of them hard. Max anon 881.9 MB against a 644.9 MB limit.
+- Overlay warms: 17. Median 6.02 s, max 13.41 s; 0 over 45 s, 0 over 60 s.
+- Requests over 20 s: `POST /api/syndicate/query` x2. Over 45 s: 0 logged (the killed request is not logged).
+- Asks from any client: 4. 0 over 45 s, 0 non-200. All 4 are `Python-urllib`, so 0 came from outside this probe.
+
+**Host:** load 12.57 / 8.51 / 4.85 on 12 cores, so the 1-minute load was at the core count and rising. MemAvailable 8,129 MB. Top CPU:
+- `build_soccer_artifacts` (ligue_1, ni 0): 107%
+- `build_cheat_sheets` (ni 19): 96%
+- refresh-worker (ni 0): 91% at 3,460 MB RSS
+- live-odds-worker (ni 0): 42%
+- gunicorn web workers (ni 0): 20% and 12%
+- `refresh_odds_sources` (ni 0): 15%
+
+**Engine:**
+- 2a: `engine-live-prior-f2-read-1117` still has 1 run (10:30-11:17 AM CST, NOT PASSED; recorded at `c765eec64`). No newer run.
+- 2b: `engine-learner-m2-gate-read-1124` is enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 starts `c1a2c029c2a1816f`, which is Amendment 2.
+- 2d: no engine-file commits on origin/main in the last 40 min.
+- 2e: no fleet ff, DEPLOY or restart header in the last 40 min. The newest header in that list is the 2:52 PM CST READING (no deploy).
+
+- **ANOMALY:** the free_text ask "What do you think of this spread?" was not answered. It disconnected at 73.64 s with no status, past the 45 s cut-off. Check next: the web log around 3:36:36 PM CST, for what that gunicorn worker was doing (the query path vs the overlay). Also check whether the vague "spread" question without context routes to a full-form scan, the I-16 shape.
+- **ANOMALY:** a WORKER TIMEOUT kill at 3:36:36 PM CST. This probe's own ask was the victim, and it came under host load at the core count (soccer artifact build at ni 0, cheat-sheet build, refresh-worker). Check next: whether the kill repeats in the next reading at lower load, and the 4 hard recycles (881.9 MB vs the 644.9 MB limit).
