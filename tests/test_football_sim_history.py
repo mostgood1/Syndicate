@@ -75,6 +75,46 @@ def test_a_changed_write_is_kept_beside_the_first(tmp_path, change):
     ]
 
 
+ROWS = [("401999001", "Ohio State", "Michigan", "46.9"), ("401999002", "Texas", "Texas A&M", "51.2"),
+        ("401999003", "Oregon", "Washington", "55.0")]
+
+
+def _keep_rows(root: Path, history: Path, rows, *, generated_at):
+    csv_path, sidecar = _write(root, generated_at=generated_at)
+    csv_path.write_text(HEADER + "".join(f"{g},2026,11,{h},{a},{t},{generated_at}\n" for g, h, a, t in rows),
+                        encoding="utf-8")
+    return F.archive_sim_write(projections_csv=csv_path, sidecar=sidecar, season=2026, week=11, history_dir=history)
+
+
+def test_the_same_rows_in_another_order_add_nothing(tmp_path):
+    # Fleet 2026-11-17 06:31:45Z: the generator rewrote wk12 with every row equal by
+    # game_id but 56 of 66 in another position, and the ordered compare kept it.
+    live, history = tmp_path / "live", tmp_path / "history"
+    assert _keep_rows(live, history, ROWS, generated_at="2026-11-16T06:26:36+00:00") is not None
+    assert _keep_rows(live, history, [ROWS[2], ROWS[0], ROWS[1]], generated_at="2026-11-17T06:31:45+00:00") is None
+    assert len(list(history.glob("*.json.gz"))) == 1 and len(list(history.glob("*.csv.gz"))) == 1
+
+
+@pytest.mark.parametrize("rows", [
+    [ROWS[2], ROWS[0], ROWS[1][:3] + ("51.4",)],  # reordered AND one value moved
+    [ROWS[1], ROWS[0]],                           # a row dropped
+    [ROWS[0], ROWS[0], ROWS[1], ROWS[2]],         # a row repeated: same set, not the same rows
+])
+def test_reordered_rows_that_also_changed_are_still_kept(tmp_path, rows):
+    live, history = tmp_path / "live", tmp_path / "history"
+    _keep_rows(live, history, ROWS, generated_at="2026-11-16T06:26:36+00:00")
+    assert _keep_rows(live, history, rows, generated_at="2026-11-17T06:31:45+00:00") is not None
+    assert len(list(history.glob("*.json.gz"))) == 2
+
+
+def test_a_malformed_row_compares_instead_of_raising(tmp_path):
+    # csv.DictReader files extra fields under the key None (a list value); the compare
+    # must not raise on it, or keep_sim_write would log sim_history_error and keep nothing.
+    rows = [{"game_id": "1", "total_mean": "46.9"}, {"game_id": "2", "total_mean": "51.2", None: ["x"]}]
+    assert F._row_multiset(rows) == F._row_multiset(list(reversed(rows)))
+    assert F._row_multiset(rows) != F._row_multiset(rows[:1])
+
+
 def test_the_same_write_twice_is_kept_once(tmp_path):
     live, history = tmp_path / "live", tmp_path / "history"
     first = _keep(live, history)

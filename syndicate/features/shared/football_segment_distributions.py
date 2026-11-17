@@ -380,8 +380,8 @@ def read_segment_distributions_artifact(*, season: int, week: int, data_root: Pa
 # from the sidecar's own `generated_at`. The CSV goes first and the sidecar
 # second, each by an atomic rename, so a reader that pairs by stamp never sees
 # half a write. A write whose sidecar `games` and CSV rows (less the per-row
-# `generated_at`) equal the newest kept copy of that week adds nothing: that
-# copy already holds what the board served.
+# `generated_at`, in any order) equal the newest kept copy of that week adds
+# nothing: that copy already holds what the board served.
 SIM_HISTORY_DIRNAME = "sim_history"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -417,6 +417,19 @@ def _csv_rows_less_stamp(data: bytes) -> list[dict[str, str]]:
     for row in rows:
         row.pop("generated_at", None)
     return rows
+
+
+def _row_multiset(rows: list[dict[str, str]]) -> list[str]:
+    """The rows as a sorted list of canonical strings: equal for the same rows in any order.
+
+    ORDER IS NOT CONTENT. Measured on the fleet 2026-11-17 06:31:45Z: the NCAAF
+    generator rewrote wk12 with all 66 rows equal by `game_id` and every sidecar
+    game equal, but 56 of 66 rows in a different position, and an ordered-list
+    compare kept it as a new write. Each row is serialised with its keys sorted
+    and stringified, so a malformed row (`csv.DictReader` files extra fields
+    under the key None) still compares instead of raising.
+    """
+    return sorted(json.dumps(sorted((str(k), v) for k, v in row.items())) for row in rows)
 
 
 def _write_gzip_atomic(path: Path, data: bytes) -> None:
@@ -462,7 +475,7 @@ def archive_sim_write(
         if (
             isinstance(prior, Mapping)
             and prior.get("games") == payload.get("games")
-            and prior_rows == _csv_rows_less_stamp(csv_bytes)
+            and _row_multiset(prior_rows) == _row_multiset(_csv_rows_less_stamp(csv_bytes))
         ):
             return None
     _write_gzip_atomic(history_dir / csv_name, csv_bytes)
