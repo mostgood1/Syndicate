@@ -105,3 +105,69 @@ Evidence from 11-15 / 11-16 unless noted.
 | I-9 | **A priced live line missing from the rail:** the MNF moneyline | Per local_208683f1 from `refresh-worker.log`: `LIVE_GAMELINE_BUILD nfl` priceable 1 only from 03:19:44Z to 03:27:20Z (0 before and after), so at the 03:23:01Z read the line was priceable but the rail had no NFL moneyline. The overlay's `refused=` counts are aggregates and cannot name it. | **No open lane** | A one-build `select_shortlist` replay at ~03:23Z (grid snapshot likely gone). Going forward, each reading compares join-priceable lines with rail rows carrying a model probability, per sport. |
 | I-10 | **WNCAAB in-play coverage is thin** | 10 in-play grid rows for 7 live games at 5:41 PM 11-16. Owner: the WNCAAB live pull already runs on the 60 s default (live-odds-worker pid 3777750, no override); halves and quarters on 240 s. So it is more likely book coverage than cadence. | local_1f10ce63 (#810) | Count books per live WNCAAB game today |
 | I-11 | **The monitor's own footprint** | A full page plus query = 117 MB a reading | this lane | Full page only every 4th reading (done 11-16) |
+
+## Carried in (noon CST 11-17)
+
+- **Fleet head `92ae7490a`.** Overnight and morning updates, from the fleet reflog and deploys.md:
+  - `d7c183d8d` 6:55 PM 11-16 (the #816 display fix);
+  - `17ff69398` 9:25 AM;
+  - `c4d35b515` 10:24 AM (portfolio `key_player_out` refusal, #814);
+  - `8aea4fe7e` 10:26 AM (#821 F0, NBA game-model-fed audit);
+  - `0a60d9e0a` 11:01 AM (#807 NCAAF sim-history dedupe);
+  - `3d3c0a426` 11:25 AM, plus a drained, claimed refresh-worker TERM (#790 lever (i); it also carried
+    #823 option A, the NFL segment lines, I-5);
+  - `92ae7490a` 11:34 AM, plus a switch flip at 11:35 AM (**#821 F1 ON, NBA outs penalties OFF**: the
+    NBA game sim changed this morning).
+- **refresh-worker pid 4049350** (since the 11:25 AM TERM). **live-odds-worker pid 3777750.**
+- **#816:** the overnight refit wrote `total_prob_calibration_2027_asof_20261116.json` at 5:09 AM
+  11-17. Per its owner, a went from −0.358 to −0.288. Tonight's NCAAB totals run on the softer level.
+- **Not on the fleet:** the board-query de-dup `5db26434e` (I-2, the user's call).
+- **Owed by the user:** the NFL/NBA slow-sport decision; the I-2 load; #824 (I-12).
+
+## Reading 1 — Tue 11-17 12:01 PM CST (18:01Z), full page
+
+**Slate (chips):**
+- NCAAB 55 (1 live), WNCAAB 37 (3 live, 3 final), NHL 11, NBA 5, NCAAF 3 (Tuesday MACtion).
+- 282 soccer chips, all pregame.
+
+**Flags: 4 shown on 2 cards. 0 false, 0 missed, 0 dark.**
+- NCAAB Hofstra @ Murray State: MUR −16.5 (8.8 pp); u153.5 (8.3 pp, calibrated, ours 152.8); 1H u73.5
+  (6.5 pp).
+- WNCAAB Alabama State @ Mississippi State u125.5 (17.5 pp, raw, ours 121.5).
+
+**Live rows:** 23. NCAAB 19 (4 priced <= 120 s); WNCAAB 4 (3 priced <= 120 s). 2 of 8 markets carry
+no price of ours.
+
+**Overlay (60 min), 0 gaps over 360 s:**
+| sport | builds | gap p50 / max | build p50 | zero-card with rows |
+|---|---|---|---|---|
+| NCAAB | 24 | 34 s / 68 s | 2.9 s | 0 |
+| WNCAAB | 22 | 38 s / 72 s | 0.9 s | 5 |
+
+- 0 `deferred_slow`. Tick gap p50 20 s, max 63 s.
+
+**Web merges:** ncaab and wncaab fresh 79 / 79.
+
+**Load:**
+- `/intelligence` 7.6 s / 22.1 MB. **Query 8.1 s / 61.1 MB.** Shortlist 1.3 s; chips 0.4 s; live-rail
+  0.03 s.
+- Gunicorn workers were 1,276 s and 412 s old. Host load 2.1.
+- **Board:** built 187 s ago; shortlist written 231 s ago.
+
+**Teams:** 111 chips today, 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated.
+
+**Restarts:** none since the 11:25 AM refresh-worker TERM.
+
+### Improvement hunt, reading 1
+
+- **I-10 measured (books per live game, the in-play grid at 18:02Z; read-only, refresh-worker environ,
+  nice 19; `C:\tmp\railmon\books1117.py`):**
+  - NCAAB Hofstra @ Murray State: **25 in-play rows from 12 books** (BetMGM, BetOnline, BetRivers,
+    BetUS, Bovada, Caesars, Circa, DraftKings, Fanatics, FanDuel, LowVig, Polymarket).
+  - The 3 live WNCAAB games: **2, 3 and 5 in-play rows from 2-4 books each.** BetMGM and Kalshi in all
+    three; FanDuel, Bovada or Polymarket in one each.
+  - So thin WNCAAB in-play coverage is the books, not our cadence (60 s per its owner).
+  - Odds requests use `--regions us` (`scripts/refresh_odds_sources.py:4230`, default "us"). Adding a
+    second region (e.g. `us2`) for WNCAAB in-play might add books, at a credit cost per call.
+  - Candidate for local_1f10ce63 (#810), and the user's call. Not measured: which books `us2` would add
+    for WNCAAB.
