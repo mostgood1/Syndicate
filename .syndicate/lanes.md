@@ -843,6 +843,14 @@ death, never life — do not invert it.
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 6 CLOSED; owner worktree gone (no uncommitted edits possible); invariants unchanged vs baseline (same 3 contested files).
 - Moved: `closed-lane-archive-20261117-0240`. Table: .syndicate/log/2026-11-17.md.
 
+### ncaaf-sim-history-order-dedupe — OPEN — opened 2026-11-17 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- Goal: todo #807 follow-up: archive_sim_write treats a rewrite whose CSV rows are the same set in a different order as unchanged (no new kept pair), while a real row change is still kept. Done = on main with a shuffled-rows test, and on the fleet the next same-content NCAAF rewrite logs sim_history_kept=unchanged.
+- Files: syndicate/features/shared/football_segment_distributions.py, tests/test_football_sim_history.py
+- Hypothesis: n/a
+- Falsification test: a shuffled-rows rewrite still keeps a pair, or a changed row is reported unchanged
+- Verification: targeted tests at Idle; after a load, the next same-week NCAAF run logs sim_history_kept=unchanged (deploys.md)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
