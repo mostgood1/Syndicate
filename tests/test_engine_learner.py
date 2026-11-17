@@ -503,3 +503,121 @@ def test_default_window_is_midnight_central_after_the_last_slate():
 
     assert datetime.fromtimestamp(els.default_max_commence("2026-11-14"), timezone.utc).isoformat() \
         == "2026-11-15T06:00:00+00:00"
+
+
+# ----------------------------------------------------------------------------- slice 3a: NBA player props
+
+
+def _brow(name, team, matchup, d="2026-11-10", pts=20, reb=8, ast=5, fg3m=2, stl=1, blk=0):
+    return {"GAME_DATE": d, "TEAM_ABBREVIATION": team, "MATCHUP": matchup, "PLAYER_NAME": name, "PTS": str(pts),
+            "REB": str(reb), "AST": str(ast), "FG3M": str(fg3m), "STL": str(stl), "BLK": "" if blk is None else str(blk)}
+
+
+BOX_ROWS = [
+    _brow("Zion Williamson", "NOP", "NOP vs. DEN", pts=27, reb=10, ast=4),
+    _brow("Nikola Jokic", "DEN", "DEN @ NOP", pts=31, reb=14, ast=11, stl=2, blk=1),
+    _brow("Herb Jones", "NOP", "NOP vs. DEN", pts=8, reb=5, ast=2, stl=3, blk=None),   # BLK missing in the box
+    _brow("Alex Same", "NOP", "NOP vs. DEN"), _brow("Alex Same", "DEN", "DEN @ NOP"),  # one name on both teams
+    _brow("Nikola Jokic", "DEN", "DEN @ NOP", d="2026-11-15", pts=0),                  # after the window
+]
+PROP_EVENTS = {
+    "PG1": {"sport": "nba", "home": "New Orleans Pelicans", "away": "Denver Nuggets",
+            "commence": "2026-11-11T01:00:00Z", "source": "decision_record"},          # Central 11-10 19:00
+    "PGSW": {"sport": "nba", "home": "Denver Nuggets", "away": "New Orleans Pelicans",
+             "commence": "2026-11-11T01:00:00Z", "source": "decision_record"},
+    "PGLATE": {"sport": "nba", "home": "New Orleans Pelicans", "away": "Denver Nuggets",
+               "commence": "2026-11-15T18:00:00Z", "source": "decision_record"},      # after the window
+    "PG14": {"sport": "nba", "home": "New Orleans Pelicans", "away": "Denver Nuggets",
+             "commence": "2026-11-15T01:00:00Z", "source": "decision_record"},         # Central 11-14: no box game
+}
+LIVE_GAMES = {"E1": ("2026-11-10", "NOP", "DEN"), "E9": ("2026-11-15", "NOP", "DEN")}
+
+
+def _prop_truth(rows=BOX_ROWS):
+    box = els.NbaBox(rows, first="2026-11-09", last="2026-11-14")
+    return els.NbaPropTruth(box, PROP_EVENTS, LIVE_GAMES, max_commence=els._dpp()._epoch("2026-11-15T06:00:00Z"))
+
+
+def _pop(**kw):
+    base = {"phase": "live", "sport": "nba", "event_id": "E1", "market": "player_points", "segment": "full",
+            "side": "over", "line": 25.5, "player": "Zion Williamson",
+            "inputs": {"team_side": "home", "home_name": "New Orleans Pelicans", "away_name": "Denver Nuggets",
+                       "actual_so_far": 10}}
+    base.update(kw)
+    return base
+
+
+def test_prop_final_and_outcome_rules():
+    stats = {"pts": 31, "reb": 14, "ast": 11, "threes": 2, "stl": 2, "blk": 1}
+    assert els.prop_final("player_points_rebounds_assists", stats) == 56
+    assert els.prop_final("player_rebounds_assists", stats) == 25
+    assert els.prop_final("player_triple_double", stats) == 3          # pts, reb, ast at 10+
+    assert els.prop_final("player_double_double", {**stats, "ast": 9}) == 2
+    assert els.prop_final("player_blocks", {**stats, "blk": None}) is None   # missing, never read as 0
+    assert els.prop_final("player_double_double", {**stats, "stl": None}) is None
+    assert els.prop_final("player_turnovers", stats) is None
+    assert els.prop_outcome("over", 25.5, 27) == 1.0 and els.prop_outcome("under", 25.5, 27) == 0.0
+    assert els.prop_outcome("under", 9.5, 8) == 1.0
+    assert els.prop_outcome("over", 27.0, 27) == 0.5
+    assert els.prop_outcome("yes", 0.5, 1) == els.R_SIDE and els.prop_outcome("over", None, 1) == els.R_SIDE
+
+
+def test_nba_box_reads_only_its_window_and_orients_by_matchup():
+    box = els.NbaBox(BOX_ROWS, first="2026-11-09", last="2026-11-14")
+    assert set(box.games) == {("2026-11-10", "NOP", "DEN")}                      # the 11-15 row is never kept
+    assert box.rows == 5 and box.duplicates == 0
+    assert box.game("2026-11-10", "DEN", "NOP") == ("2026-11-10", "NOP", "DEN")   # either orientation finds it
+    assert box.game("2026-11-11", "NOP", "DEN") is None
+    assert box.by_name[("2026-11-10", "NOP", "DEN")]["alex same"] == ["NOP", "DEN"]
+    assert els.parse_matchup("NO @ DEN", "NOP") == ("DEN", "NOP")                 # ESPN's codes fold to nba_api's
+
+
+def test_nba_props_grade_live_and_pregame_lines():
+    t = _prop_truth()
+    assert t(_pop()) == (1.0, None)                                               # 27 > 25.5
+    assert t(_pop(player="Nikola Jokic", market="player_triple_double", line=2.5,
+                  inputs={"team_side": "away", "home_name": "New Orleans Pelicans",
+                          "away_name": "Denver Nuggets"})) == (1.0, None)
+    pg = {"phase": "pregame", "sport": "nba", "event_id": "PG1", "market": "player_rebounds", "segment": "full",
+          "side": "under", "line": 9.5, "player": "Nikola Jokic"}
+    assert t(pg) == (0.0, None)                                                   # 14 rebounds: the under lost
+    assert t({**pg, "event_id": "PGSW", "side": "over"}) == (1.0, None)           # the record names it the other way
+    assert t({**pg, "player": "Herbert Jones", "market": "player_steals", "line": 2.5, "side": "over"}) == (1.0, None)
+
+
+def test_nba_props_refusals_by_name():
+    t = _prop_truth()
+    assert t(_pop(line=27.0)) == (None, el.PUSH)
+    assert t(_pop(inputs={**_pop()["inputs"], "actual_so_far": 26})) == (None, els.R_DECIDED)
+    assert t(_pop(inputs={**_pop()["inputs"], "team_side": "away"})) == (None, els.R_TEAM_SIDE)
+    assert t(_pop(player="Nobody Here")) == (None, els.R_NO_PLAYER)
+    assert t(_pop(player="Alex Same", inputs={})) == (None, els.R_AMBIGUOUS_PLAYER)
+    assert t(_pop(player="Herb Jones", market="player_blocks", line=0.5, inputs={})) == (None, els.R_STAT_MISSING)
+    assert t(_pop(market="player_turnovers")) == (None, els.R_PROP_MARKET)
+    assert t(_pop(event_id="E2")) == (None, els.R_NO_FINAL)                      # not in the linescores
+    assert t(_pop(event_id="E9")) == (None, els.R_NO_BOX_GAME)                   # dated after the window
+    pg = {"phase": "pregame", "sport": "nba", "market": "player_points", "side": "over", "line": 20.5,
+          "player": "Zion Williamson"}
+    assert t({**pg, "event_id": "PGLATE"}) == (None, els.R_AFTER_WINDOW)
+    assert t({**pg, "event_id": "PG14"}) == (None, els.R_NO_BOX_GAME)
+    assert t({**pg, "event_id": "NOPE"}) == (None, els.R_NO_EVENT)
+    assert t(_pop(sport="nhl", market="GOALS")) == (None, els.R_PROP_OUTCOME)
+
+
+def test_truth_dispatch_sends_nba_props_to_the_box(tmp_path):
+    chip_t, _ = _chip_truth()
+    t = els.Truth("outcome", basketball=_truth(tmp_path), chips=chip_t, props=_prop_truth())
+    assert t(_pop()) == (1.0, None)
+    assert t(_lop()) == (1.0, None)                                               # a game line is unaffected
+    assert t(_gop(market="player_points", player="x")) == (None, els.R_PROP_OUTCOME)   # NFL props still owed
+
+
+def test_basketball_truth_dates_a_game_by_its_first_linescores_file(tmp_path):
+    root = _root(tmp_path)
+    late = root / "nba_source" / "data" / "processed" / "linescores_2026-11-11.json"
+    late.write_text(json.dumps({"date": "2026-11-11", "games": {
+        "E1": {"home": "NO", "away": "DEN", "home_periods": [23, 28, 31, 26], "away_periods": [29, 27, 30, 30]},
+        "E4": {"home": "BOS", "away": "MIA", "home_periods": [20, 20, 20, 20], "away_periods": [21, 21, 21, 21]},
+    }}), encoding="utf-8")
+    t = els.BasketballTruth(["2026-11-10", "2026-11-11"], root=root, evidence_teams=TEAMS)
+    assert t.nba_date["E1"] == "2026-11-10" and t.nba_date["E4"] == "2026-11-11"

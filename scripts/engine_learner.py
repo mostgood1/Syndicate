@@ -35,7 +35,14 @@ Truth (``--truth``; ``docs/ai_context/engine_learner.md``):
     book's own (``layer2_live_scorecard.grade``: the side's margin plus its line > 0). Totals OVER = total > line;
     h2h by the final; equal = push, dropped and counted. A spread or moneyline whose orientation cannot be told is
     refused, never guessed.
-  - Player props are refused (``prop_outcome_owed``; the NBA prop grader is lane ``nba-live-prop-grade``'s).
+  - NBA PLAYER PROPS (slice 3a; pregame and live): the player's final line in the official box score
+    (``nba_source/data/processed/player_logs.csv``, stats.nba.com), the rule of lane ``nba-live-prop-grade``'s
+    registered grader: a market's stats summed (double / triple double = how many of pts, reb, ast, stl, blk reach
+    10), OVER = final > line, UNDER = final < line, equal = push. The game: a live line's ESPN event id -> its
+    linescores file (the date and the teams); a pregame line's event -> its teams' tricodes and its start's Central
+    date. The player: the engine's own name key (``nba.live_resim.normalize_name``), unique in that game; a live
+    line's ``team_side`` must agree. A live line already decided at its tick (``actual_so_far`` > line) is refused,
+    as the grader does. Every other sport's props are refused (``prop_outcome_owed``).
 * ``close`` (the fast PREGAME truth, plan D11): the probability of the opinion's side at the close -- Pinnacle's (power
   devig) where it quotes that line, else the median Shin consensus of >= 2 books, the softer standard
   (``decision_policy_paper.collect_closes`` / ``close_probabilities``). Pregame only; props included.
@@ -87,6 +94,14 @@ R_AFTER_WINDOW = "commence_after_window"
 R_NOT_FINAL = "not_final"
 R_PREGAME_ONLY = "close_truth_is_pregame_only"
 R_NO_CLOSE = "no_close"
+# Slice 3a: NBA player props.
+R_PROP_MARKET = "prop_market_unscorable"
+R_NO_BOX_GAME = "no_box_game"
+R_NO_PLAYER = "player_not_in_box"
+R_AMBIGUOUS_PLAYER = "player_ambiguous"
+R_TEAM_SIDE = "team_side_mismatch"
+R_DECIDED = "decided_at_tick"
+R_STAT_MISSING = "stat_missing"
 
 
 def _module(name: str, rel: str):
@@ -207,6 +222,7 @@ class BasketballTruth:
             days.append((_date.fromisoformat(days[-1]) + timedelta(days=1)).isoformat())
         self.csg = college or _college()
         self.nba: dict[str, Mapping[str, Any]] = {}
+        self.nba_date: dict[str, str] = {}   # ESPN event id -> the FIRST linescores date holding it: the game's date
         self.college: dict[tuple[str, str], Mapping[str, Any]] = {}
         for d in days:
             path = self.root / "nba_source" / "data" / "processed" / f"linescores_{d}.json"
@@ -214,6 +230,7 @@ class BasketballTruth:
                 payload = json.loads(path.read_text(encoding="utf-8-sig"))
                 for eid, game in (payload.get("games") or {}).items():
                     self.nba[str(eid)] = game
+                    self.nba_date.setdefault(str(eid), d)
             for league in ("ncaab", "wncaab"):
                 path = self.root / f"{league}_source" / "data" / "scoreboard" / f"scoreboard_{d}.json"
                 if path.exists():
@@ -534,17 +551,199 @@ class CloseTruth:
         return self.label.get(str(op.get("line_key") or ""), (None, f"{R_NO_CLOSE}:not_prepared"))
 
 
-class Truth:
-    """``outcome``: live basketball -> slice 1's scores; every other game line -> the chips; props refused.
-    ``close``: the pregame close."""
+# ----------------------------------------------------------------------------- slice 3a: NBA player props
+#
+# The box score's columns and each market's stat sum are the rule of lane `nba-live-prop-grade`'s registered grader
+# (`scripts/nba_live_prop_grade.py`, commit f3d30ac4d), copied so the learner does not depend on a pinned grade's file.
 
-    def __init__(self, mode: str, *, basketball=None, chips=None, close=None):
-        self.mode, self.basketball, self.chips, self.close = mode, basketball, chips, close
+BOX_COLUMNS: dict[str, str] = {"pts": "PTS", "reb": "REB", "ast": "AST", "threes": "FG3M", "stl": "STL", "blk": "BLK"}
+PROP_MARKET_STATS: dict[str, tuple[str, ...]] = {
+    "player_points": ("pts",), "player_rebounds": ("reb",), "player_assists": ("ast",),
+    "player_threes": ("threes",), "player_steals": ("stl",), "player_blocks": ("blk",),
+    "player_points_rebounds": ("pts", "reb"), "player_points_assists": ("pts", "ast"),
+    "player_rebounds_assists": ("reb", "ast"), "player_points_rebounds_assists": ("pts", "reb", "ast"),
+}
+DOUBLE_MARKETS = ("player_double_double", "player_triple_double")   # the count of DOUBLE_STATS at 10+, vs the line
+DOUBLE_STATS = ("pts", "reb", "ast", "stl", "blk")
+DOUBLE_THRESHOLD = 10
+
+
+def prop_final(market: str, stats: Mapping[str, int | None]) -> int | None:
+    """The player's final number for ``market``; None when a stat it needs is missing (never read as 0)."""
+    keys = DOUBLE_STATS if market in DOUBLE_MARKETS else PROP_MARKET_STATS.get(market)
+    if not keys:
+        return None
+    values = [stats.get(k) for k in keys]
+    if any(v is None for v in values):
+        return None
+    if market in DOUBLE_MARKETS:
+        return sum(1 for v in values if v >= DOUBLE_THRESHOLD)
+    return int(sum(values))
+
+
+def prop_outcome(side: str, line: float | None, final: int) -> float | str:
+    """1.0 / 0.0 for the side winning / losing, 0.5 for a push, or a refusal."""
+    if line is None:
+        return R_SIDE
+    if final == line:
+        return 0.5
+    if side == "over":
+        return float(final > line)
+    if side == "under":
+        return float(final < line)
+    return R_SIDE
+
+
+def _int(value: Any) -> int | None:
+    try:
+        text = str(value).strip()
+        return int(float(text)) if text else None
+    except ValueError:
+        return None
+
+
+def parse_matchup(matchup: Any, team: str) -> tuple[str, str] | None:
+    """(home, away) from nba_api's MATCHUP: "AWAY @ HOME" on the away team's row, "HOME vs. AWAY" on the home's."""
+    text = str(matchup or "").strip()
+    if " @ " in text:
+        away, home = (_nba_code(s) for s in text.split(" @ ", 1))
+    elif " vs. " in text:
+        home, away = (_nba_code(s) for s in text.split(" vs. ", 1))
+    else:
+        return None
+    return (home, away) if team in (home, away) else None
+
+
+def _name_key(name: Any) -> str:
+    from syndicate.features.nba.live_resim import normalize_name
+
+    return normalize_name(name)
+
+
+def _tricode(name: Any) -> str:
+    from syndicate.features.nba.live_tick.teams import to_tricode
+
+    return _nba_code(to_tricode(str(name or "")))
+
+
+class NbaBox:
+    """The official NBA box score: (GAME_DATE, home, away) -> {(team, name key): stats}. A row dated outside
+    [first, last] is skipped on its date alone, before any stat of it is read."""
+
+    def __init__(self, rows: Iterable[Mapping[str, Any]], *, first: str, last: str,
+                 name_key: Callable[[Any], str] | None = None):
+        key = name_key or _name_key
+        self.first, self.last = first, last
+        self.games: dict[tuple[str, str, str], dict[tuple[str, str], dict[str, int | None]]] = {}
+        self.by_name: dict[tuple[str, str, str], dict[str, list[str]]] = {}
+        self.rows = self.duplicates = 0
+        for row in rows:
+            d = str(row.get("GAME_DATE") or "")[:10]
+            if not first <= d <= last:
+                continue
+            team = _nba_code(row.get("TEAM_ABBREVIATION"))
+            pair = parse_matchup(row.get("MATCHUP"), team)
+            name = key(row.get("PLAYER_NAME"))
+            if pair is None or not name:
+                continue
+            g = (d, pair[0], pair[1])
+            players = self.games.setdefault(g, {})
+            if (team, name) in players:
+                self.duplicates += 1
+            else:
+                self.by_name.setdefault(g, {}).setdefault(name, []).append(team)
+            players[(team, name)] = {stat: _int(row.get(col)) for stat, col in BOX_COLUMNS.items()}
+            self.rows += 1
+
+    @classmethod
+    def read(cls, path: Path, *, first: str, last: str, name_key=None) -> "NbaBox":
+        import csv
+
+        if not path.exists():
+            return cls([], first=first, last=last, name_key=name_key)
+        with path.open("r", encoding="utf-8", newline="") as fh:
+            return cls(csv.DictReader(fh), first=first, last=last, name_key=name_key)
+
+    def game(self, d: str, a: str, b: str) -> tuple[str, str, str] | None:
+        for g in ((d, a, b), (d, b, a)):
+            if g in self.games:
+                return g
+        return None
+
+
+class NbaPropTruth:
+    """Outcome of an NBA player prop from the box score (slice 3a; module docstring). ``live_games``: ESPN event id ->
+    (date, home code, away code) from the linescores; ``events``: a pregame line's event -> its teams and start."""
+
+    def __init__(self, box: NbaBox, events: Mapping[str, Mapping[str, Any]],
+                 live_games: Mapping[str, tuple[str, str, str]], *, max_commence: float,
+                 name_key: Callable[[Any], str] | None = None, tricode: Callable[[Any], str] | None = None):
+        self.box, self.events, self.live_games, self.max_commence = box, events, live_games, max_commence
+        self.name_key = name_key or _name_key
+        self.tricode = tricode or _tricode
+
+    def _game(self, op: Mapping[str, Any]) -> tuple[tuple[str, str, str] | None, str | None]:
+        if op.get("phase") == "live":
+            g = self.live_games.get(el.game_id(op))
+            if g is None:
+                return None, R_NO_FINAL
+            d, a, b = g
+        else:
+            ev = self.events.get(str(op.get("event_id") or ""))
+            start = _dpp()._epoch(ev.get("commence")) if ev else None
+            if ev is None or start is None:
+                return None, R_NO_EVENT
+            if start >= self.max_commence:
+                return None, R_AFTER_WINDOW
+            d, a, b = _dpp()._central_date(start), self.tricode(ev.get("home")), self.tricode(ev.get("away"))
+        g = self.box.game(d, a, b)
+        return (g, None) if g is not None else (None, R_NO_BOX_GAME)
+
+    def __call__(self, op: Mapping[str, Any]) -> tuple[float | None, str | None]:
+        market = str(op.get("market") or "")
+        if str(op.get("sport") or "") != "nba":
+            return None, R_PROP_OUTCOME
+        if market not in PROP_MARKET_STATS and market not in DOUBLE_MARKETS:
+            return None, R_PROP_MARKET
+        g, refusal = self._game(op)
+        if g is None:
+            return None, refusal
+        name = self.name_key(op.get("player"))
+        teams = self.box.by_name.get(g, {}).get(name) or []
+        if not teams:
+            return None, R_NO_PLAYER
+        if len(teams) > 1:
+            return None, R_AMBIGUOUS_PLAYER
+        team = teams[0]
+        inputs = op.get("inputs") or {}
+        side_team = inputs.get("team_side")
+        if side_team in ("home", "away"):
+            code = self.tricode(inputs.get(f"{side_team}_name"))
+            if code in g[1:] and code != team:
+                return None, R_TEAM_SIDE
+        line = el._finite(op.get("line"))
+        so_far = el._finite(inputs.get("actual_so_far"))
+        if line is not None and so_far is not None and so_far > line:
+            return None, R_DECIDED
+        final = prop_final(market, self.box.games[g][(team, name)])
+        if final is None:
+            return None, R_STAT_MISSING
+        return _graded(prop_outcome(str(op.get("side") or ""), line, final))
+
+
+class Truth:
+    """``outcome``: live basketball -> slice 1's scores; every other game line -> the chips; NBA props -> the box
+    score; any other prop refused. ``close``: the pregame close."""
+
+    def __init__(self, mode: str, *, basketball=None, chips=None, close=None, props=None):
+        self.mode, self.basketball, self.chips, self.close, self.props = mode, basketball, chips, close, props
 
     def __call__(self, op: Mapping[str, Any]) -> tuple[float | None, str | None]:
         if self.mode == "close":
             return self.close(op)
         if el.family_of(str(op.get("market") or "")) not in GAME_FAMILIES:
+            if self.props is not None and str(op.get("sport") or "") == "nba":
+                return self.props(op)
             return None, R_PROP_OUTCOME
         if op.get("phase") == "live" and str(op.get("sport") or "") in SPORTS:
             return self.basketball(op)
@@ -639,11 +838,21 @@ def build_truth(args: argparse.Namespace, dates: list[str], dirs: list[Path], ev
     base = args.base_url or os.environ.get("SYNDICATE_BASE_URL") or sc.DEFAULT_BASE_URL
     chips = Chips(base_url=base, chips_dir=Path(args.chips_dir) if args.chips_dir else None, last_date=dates[-1])
     basketball = BasketballTruth(dates, root=root)
+    # the box score: from the day before the first slate (a game whose ticks file under the next date) to the last
+    first = (_date.fromisoformat(dates[0]) - timedelta(days=1)).isoformat()
+    box = NbaBox.read(basketball.root / "nba_source" / "data" / "processed" / "player_logs.csv",
+                      first=first, last=dates[-1])
+    live_games = {eid: (basketball.nba_date[eid], _nba_code(g.get("home")), _nba_code(g.get("away")))
+                  for eid, g in basketball.nba.items()}
+    props = NbaPropTruth(box, events, live_games, max_commence=max_commence)
     print(f"TRUTH mode=outcome nba_games={len(basketball.nba)} college_games={len(basketball.college)} "
           f"evidence_games={len(basketball.teams)} events={len(events)} {json.dumps(dict(by_source))} "
           f"max_commence={window} chips={'dir ' + str(args.chips_dir) if args.chips_dir else base} "
           f"root={basketball.root}", flush=True)
-    return Truth("outcome", basketball=basketball, chips=ChipTruth(events, chips, max_commence=max_commence)), chips
+    print(f"TRUTH nba_box games={len(box.games)} rows={box.rows} duplicates={box.duplicates} window={first}..{dates[-1]} "
+          f"last_box_date={max((g[0] for g in box.games), default=None)}", flush=True)
+    return Truth("outcome", basketball=basketball, chips=ChipTruth(events, chips, max_commence=max_commence),
+                 props=props), chips
 
 
 def run(args: argparse.Namespace) -> int:
