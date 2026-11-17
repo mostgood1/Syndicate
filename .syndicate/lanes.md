@@ -1087,6 +1087,14 @@ death, never life — do not invert it.
 - Verification: pytest: byte equality off vs on over the recorded fixture + a NaN payload, a reachability test that the large payload never passes through the provider's dumps when on; local timing on a fleet-recorded response (old vs new, repeats); findings section; load is the user's call
 - Blocked by: none
 
+### stuck-kalshi-fill-repair — OPEN — opened 2026-11-17 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: Live Kalshi order f8b62e6a (11-13 slate, NSH@VGK NO, IOC submitted 2026-11-14T05:55:45Z) stops being unreconciled: an operator function records its venue fill (status filled, 4 contracts, fill cost 1.76, fee 0.069, venue executed) from Kalshi's own per-order read, without touching its outcome or P&L; UNRECONCILABLE_ORDER stops naming it and /portfolio's unreconciled list is empty
+- Files: syndicate/features/shared/execution_ledger.py (operator_fill_from_venue + _OPERATOR_FILL_FIELDS beside operator_grade_from_venue ONLY), tests/test_operator_fill_from_venue.py (NEW), scripts/operator_fill_from_venue.py (NEW, one-off CLI: reads the venue, then applies)
+- Hypothesis: Stated before any write: the venue settled and graded the order (outcome lost, pnl -1.829 = -(1.76 + 0.069)) before any reconcile pass saw its IOC fill, and reconcile_live_orders only takes outcome-is-None orders, so its fill fields stay empty forever. Kalshi's per-order read (state executed, fill_count 4, taker cost 1.76, fee 0.069) is the missing evidence
+- Falsification test: The venue read disagrees with the graded P&L (fill cost + fee != 1.829), names a different client order id, or shows no fill; then the row is not repaired and the case goes to the user
+- Verification: pytest tests/test_operator_fill_from_venue.py (fields set from the view; outcome/pnl/settled untouched; pre_operator_fill kept; refusals for not-live / not-submitted / ungraded / identity mismatch / no fill / absurd fill / no note); then one run on the fleet: the row reads status=filled contracts=4, /api/portfolio/live unreconciled == 0, and no UNRECONCILABLE_ORDER line for f8b62e6a after the run
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
