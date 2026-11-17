@@ -999,6 +999,13 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Live cost, measured 10-04 (2 games):** ~14 NBA fetches/h live, ~300 credits/h (~10 credits per event per fetch, no props). Pregame was 20 credits over ~3.7 h; the post-game tail was free. Projected (unmeasured), 10-game regular-season night: ~9-10k credits game lines only, up to ~20k with live props.
 - **Prop calibration reaches the sims.** The fleet has the stale-sim rule (468b8620, via ff 4345ba0d). The 10-05 sims were re-simulated with `nba_prop_calibration.factor_sha` 82ba04dd2dbd41f5 (prior-season fallback); Embiid pts 21.08 -> 24.87, sd 6.91 -> 8.86. Switch: env flag unset on both workers, the factor file decides.
 - **Edge shape to watch:** totals 5/5 favoured the OVER on 10-04 (2 games). The sim's prop means run low (minutes bias; Markkanen 9.8 pts on 10-04), which predicts an UNDER pile on props.
+- **Quarter/half rows are served at the market's price (w = 0), and that is now MEASURED** `[2026-11-16 7:06 PM CST, todo #818, lane nba-segment-grade, grader blob d43e9de2d4d7]`.
+  - The fleet's `nba_game_book_blend.json` has no period keys, so every period row takes `default` 0.
+  - Pre-registered grade, 192 regular-season games, tips 10-21 .. 11-15: the RAW sim LOSES to the de-vigged consensus in totals (+0.0127 Brier), spreads (+0.0044) and h2h (+0.0054), every CI above 0.
+  - No family earns a weight (G2 TEST).
+  - The file's provenance line still says "unmeasured"; rewriting it is a fleet data edit and the user's call.
+  - Re-grade: Mon 12-07 1:00 PM CST (task `nba-segment-regrade-818`).
+  - Evidence: `findings_2026-11-16_nba_segment_skill.md` RESULTS.
 
 ## [wnba-props-model-skill] WNBA PROPS: NO MARKET BEATS THE BOOK; ALL FOUR ESTIMATORS (AVAILABILITY, RATE SHRINK, SHAPE, DISPERSION) + INJURY EXCLUSIONS ARE LIVE ON THE FLEET `[verified 2026-10-05, lanes wnba-lines-props-backtest / basketball-injury-exclusion-reinclusion / wnba-book-information / wnba-sim-availability / wnba-sim-rate-shrink / wnba-minutes-redistribution]`
 

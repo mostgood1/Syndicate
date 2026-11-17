@@ -60652,3 +60652,19 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `book_grid_ticks_10min` >= 5: first tick 01:01:31.975Z (a cold first tick: every shard re-read, `fresh:new`; INPLAY_OVERLAY ncaab 00:59:51Z, 112 cards). Read again at the next monitor reading. `real_tracebacks_10min` <= 1: **MET** (0), 0 `COLLEGE_TOTAL_CALIBRATION_ERROR`.
 - **revert:** `git revert d7c183d8d` + claimed ff + drained refresh-worker TERM (the 00:04Z load's revert paths still apply to the whole calibration).
 - **Claims:** refresh-worker released after this entry.
+
+## 2026-11-17 01:15Z (7:15 PM CST 11-16) -- READING (no deploy): the pre-registered NBA quarter/half grade (todo #818, lane `nba-segment-grade`) -- **no family earns a period weight; the fleet's w = 0 on NBA periods stands, now measured**
+- **what:** the raw sim's period probabilities (production's `_projection_from_dist`, before `served_game_probability`) vs the de-vigged pregame consensus. Regular-season tips 10-20 12:00Z .. 11-16 12:00Z. Grader `scripts/nba_segment_skill.py` blob `d43e9de2d4d7` (main `43aa06ec6`, pushed before any outcome), seed 818, Idle, PYTHONHASHSEED=0.
+- **data:** a read-only copy of the fleet into `C:\tmp\nba_seg\` (00:45:50Z..00:46:31Z): quotes, 197 sims (`cp -p`, 197 of 197 mtimes match the fleet), game_cards, phase scoreboards, `nba_game_book_blend.json`. ESPN boxes fetched to `linescores.json`.
+- **reading:**
+  - Population: 192 games / 3,399 lines.
+  - G1 dBrier (raw - market):
+    - totals +0.01268 [+0.00560, +0.01976];
+    - spreads +0.00437 [+0.00057, +0.00816];
+    - h2h +0.00536 [+0.00141, +0.00940].
+    - All three lose.
+  - G2 w_fit: totals 0.00, spreads 0.20 (TEST d +0.00068 [-0.00026, +0.00172]), h2h 0.25 (TEST d +0.00127 [+0.00010, +0.00247]). None earns.
+- **verify:** `C:\tmp\nba_seg\result.json` `g2.families.*.earns_weight` = false for all three. RESULTS are in `.syndicate/findings_2026-11-16_nba_segment_skill.md`.
+- **fleet:** untouched. No claim, no preflight, nothing loaded; `nba_game_book_blend.json` was not edited.
+- **betting change: no** (loads nothing).
+- **owed:** the Dec 7 re-grade, scheduled task `nba-segment-regrade-818` (Mon 2026-12-07 1:00 PM CST, w frozen at 0 / 0.20 / 0.25).

@@ -884,7 +884,16 @@ death, never life — do not invert it.
 - Verification: tests pass; the register seeded from deploys.md with verified load times; the readout run against the fleet prints the clock (last change, events since, unclassified loads) and its focus count equals a hand count of bets submitted after that load
 - Blocked by: none
 
-### nba-segment-grade — OPEN — opened 2026-11-16 — session 24d2e336-9705-44d9-8d8a-f728270f237f
+### nba-segment-grade — CLOSED 2026-11-16 (GOAL MET: graded as registered; no family earns a period weight, w = 0 stands; Dec 7 re-grade scheduled) — opened 2026-11-16 — session 24d2e336-9705-44d9-8d8a-f728270f237f
+- Verdict 2026-11-16 7:20 PM CST: Goal "Run the PRE-REGISTERED first NBA quarter/half grade (todo #818, .syndicate/findings_2026-11-16_nba_segment_skill.md, main 53c4f664e) exactly as written: the grader committed to main after a --count-only run and before any outcome is read; G1/G2/G3 on regular-season tips 2026-10-20 12:00Z..2026-11-16 12:00Z with seed 818; P1-P4 scored held/failed in a RESULTS section citing the grader blob; a one-time Dec 7 1:00 PM CST re-grade task with each family's w_fit frozen. Nothing on the fleet is changed or loaded." -> **GOAL: MET.**
+  - Order: count-only 00:51Z, then grader blob `d43e9de2d4d7` pushed in `43aa06ec6` 00:56Z, then the graded run 01:01-01:06Z.
+  - Graded 192 games / 3,399 lines. G1: the raw sim LOSES in all three families. G2: w_fit 0 / 0.20 / 0.25, none earns.
+  - P1 FAILED, P2 FAILED, P3 HELD, P4 HELD. RESULTS are in the findings file.
+  - Task `nba-segment-regrade-818` is scheduled for 2026-12-07T13:00-06:00.
+  - Fleet: untouched.
+  - **Stated deviation:** the frozen grader's box join (by the sim's `game_id`) dropped 2 of the 194 registered games, whose sims carry NBA.com ids. A descriptive re-run with them in changes no verdict.
+  - The bridge also needed `game_cards_<d>.csv`, which the registration's Data list did not name. They were copied read-only.
+  - Built and shipped only the grader and its tests: research-only, nothing in production imports them.
 - Goal: Run the PRE-REGISTERED first NBA quarter/half grade (todo #818, .syndicate/findings_2026-11-16_nba_segment_skill.md, main 53c4f664e) exactly as written: the grader committed to main after a --count-only run and before any outcome is read; G1/G2/G3 on regular-season tips 2026-10-20 12:00Z..2026-11-16 12:00Z with seed 818; P1-P4 scored held/failed in a RESULTS section citing the grader blob; a one-time Dec 7 1:00 PM CST re-grade task with each family's w_fit frozen. Nothing on the fleet is changed or loaded.
 - Files: scripts/nba_segment_skill.py (NEW), tests/test_nba_segment_skill.py (NEW), .syndicate/findings_2026-11-16_nba_segment_skill.md (RESULTS section only), docs/ai_context/todo.md (#818 section only)
 - Hypothesis: n/a (pre-registered grade; predictions P1-P4 are in the findings file)
