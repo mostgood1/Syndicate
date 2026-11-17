@@ -893,6 +893,14 @@ death, never life — do not invert it.
 - Verification: Per-build reconstruction over every NFL 11-16 overlay build of MNF from the quote shard's capture times and the INPLAY_OVERLAY / BOOK_GRID_QUOTE_READ log lines; the three builds whose game-card state is known (01:41:11Z none, 01:44:39Z and 01:45:50Z served, 01:47:27Z none) must match; rates and the decision options in the findings file and todo #823
 - Blocked by: none
 
+### nfl-live-segment-every-run — OPEN — opened 2026-11-17 — session a64727a8-3eef-46d7-829e-0844ab4012ff
+- Goal: Option A of todo #823 (user 2026-11-17 'A: every lines run'): NFL in-play quarter/half lines are fetched on every NFL lines run (code default live interval 600 -> 0; SYNDICATE_NFL_SEGMENT_LIVE_INTERVAL_SECONDS=600 restores the gate), so on the next NFL game the in-play overlay has fresh quarter/half rows in every build and the Games Rail keeps NFL game cards; NCAAF unchanged; on main with tests incl. reachability (off != on); the fleet load is the user's call
+- Files: syndicate/features/shared/segment_odds_fetch.py (DEFAULT_LIVE_INTERVAL_SECONDS + its comment + the live_interval_seconds docstring ONLY), tests/test_nfl_segment_capture_default.py, tests/test_inplay_board_cadence.py (test_other_sports_keep_live_every_run ONLY), docs/ai_context/todo.md (#823 section ONLY)
+- Hypothesis: n/a (decided change; the diagnosis is lane nfl-rail-segment-cadence)
+- Falsification test: On the next NFL game after the load: quarter/half capture instants still more than 300 s apart, or overlay builds with no fresh quarter/half row while a game is live
+- Verification: pytest on the two segment test files; after the load, on TNF 11-19: quarter/half capture gaps from the shard (expect about one lines-run apart, under 300 s), share of NFL overlay builds with fresh quarter/half rows (was 69 of 136 on MNF), Games Rail polls serving NFL game rows, and the NFL segment credits per live game-hour
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
