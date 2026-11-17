@@ -442,3 +442,4 @@ flags below the points scored (0 of 1).
   - It reads the last 400 MB of `web.log` (env `RECYCLE_TAIL_BYTES`); the Monday window may need a larger tail.
   - The load lane voided its restart-spanning window (deploys.md 20:02:54Z, main `2e43d5bd2`).
   - The 19:51Z `up` is classified BC-033 "no" by the load lane. Do not add a second row.
+- **Render-config step 1, verified after the restart's `up`** (local_c787e775, deploys.md "2026-11-17 19:58:28Z", BC-035 no; the load is BC-033): every role's live `/proc` environ (160 / 262 / 235 keys) matches what the old and new launchers build, with **0 keys differing**. `ANTHROPIC_API_KEY` is not new: the old launcher listed the same unset key on web, and the two launchers' unset lists are identical. Steps 2 / 3a are not on the fleet.
