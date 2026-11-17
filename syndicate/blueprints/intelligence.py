@@ -55,6 +55,7 @@ from syndicate.features.shared.ops_refresh import load_latest_refresh_status
 from syndicate.features.portfolio_summary import build_portfolio_summary
 from syndicate.features.prediction_ledger import delete_prediction
 from syndicate.features.prediction_ledger import record_prediction
+from syndicate.features.shared.service_identity import service_marker
 
 
 intelligence_bp = Blueprint("syndicate_intelligence", __name__)
@@ -208,7 +209,7 @@ def _no_cache_response(response):
 
 
 def _render_hosted_request() -> bool:
-    raw_value = str(os.environ.get("RENDER") or os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
+    raw_value = str(service_marker("SYNDICATE_HOSTED") or os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
     return raw_value in {"1", "true", "yes", "on"}
 
 

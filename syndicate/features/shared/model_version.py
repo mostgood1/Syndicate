@@ -26,6 +26,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from syndicate.features.shared.source_roots import repo_root_from
+from syndicate.features.shared.service_identity import service_marker
 
 _UNKNOWN_VERSION = "unknown"
 
@@ -57,7 +58,7 @@ def code_version() -> str:
     called on every recorded prediction/recommendation, and neither the
     env var nor the repo's HEAD can change without a redeploy/restart."""
     env_commit = str(
-        os.environ.get("RENDER_GIT_COMMIT")
+        service_marker("SYNDICATE_GIT_COMMIT")
         or os.environ.get("GIT_COMMIT")
         or os.environ.get("SOURCE_VERSION")
         or ""

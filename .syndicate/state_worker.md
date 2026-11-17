@@ -446,20 +446,22 @@ live-odds-worker **exit 0, 620.2 MB** of 2048. Production run-modes preserved �
 ## [local-production-host] PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared disk `[verified 2026-09-30, lane local-production-host, PR #118 f565a435, NO DEPLOY]`
 
 All three Render services are billing-suspended (2026-09-30 06:37:51Z). `py -3 scripts/local_production.py init | doctor | up` (`import-render-env` was REMOVED 2026-11-15, lane render-retirement, `f9ed2ec0f`)
-runs web + refresh-worker + live-odds-worker + a local Redis, deriving each role's env from `render.yaml` PER SERVICE (then the
-live dashboard env, then `<home>/local_production.env`). This is the PRODUCTION counterpart of `[local-fleet-runner]`, which stays the
+runs web + refresh-worker + live-odds-worker + a local Redis, deriving each role's env from `scripts/fleet_role_spec.json` (then
+`<home>/fleet_env/<role>.json`, then `<home>/local_production.env`) -- render.yaml and render_env/ are NOT read from `ac2cbc2fc` on
+`[2026-11-17, lane render-config-retirement]`; the running roles were built by the older launcher, measured to give the identical env. This is the PRODUCTION counterpart of `[local-fleet-runner]`, which stays the
 rehearsal harness. Runbook: `docs/ai_context/local_production_runbook.md`.
 
 - **VERIFIED (Linux container):** all three roles up, web gunicorn 2x4 with the memory guard, both workers on keyvalue, ticks
   complete, `kill -9` recovered in 10 s. **Fresh upstream data NOT measured** (container egress): owed, `#692` item 2.
 - **`SYNDICATE_WEB_PUBLISH_URL` MUST BE UNSET when roles share a disk.** The publish receiver `os.replace`s/merges the very file
   the worker is appending to (rows appended mid-merge are lost). Pulls `os.replace` over the live file. Unset + `SYNDICATE_LOCAL_PRODUCTION=1` -> `artifact_publisher.shared_disk_fleet()`: a publish is delivered by the write and a pull is current, silently `[verified 2026-10-02, `08d7ec4d`: 0 BOOK_GRID_PUBLISH_FAILED / 0 *SKIP_NOT_CONFIGURED on both workers]`.
-- **Web needs a Render marker (`RENDER_SERVICE_ID`) or `syndicate/app.py` starts the intelligence + live-refresh loops on first
-  request WITHOUT reading their flags** -- a second board builder on the same disk.
+- **Web needs a service marker (`SYNDICATE_SERVICE_ID`, else `RENDER_SERVICE_ID`) or `syndicate/app.py` starts the intelligence + live-refresh loops on first
+  request WITHOUT reading their flags** -- a second board builder on the same disk. Readers prefer the neutral `SYNDICATE_*` name (`service_identity`, 2026-11-17);
+  the launcher on main sets both spellings, the RUNNING roles carry only `RENDER*` until their next `up` (read 2026-11-17 17:1xZ from /proc).
 - **Worker->web URLs are FORCED to the local web** by `local_production.py` (`SYNDICATE_INTERNAL_WEB_BASE_URL` / `SYNDICATE_WNBA_LIVE_BOX_BASE_URL` / `SYNDICATE_BASE_URL`).
   Unset, only `live_lens_loop._wnba_live_box_base_url` still falls back to the PUBLIC onrender host. `publish_model_scorecard.base_url` uses `_base_url.default_base_url` (the fleet) `[read 2026-11-08, lane render-retirement-inventory]`.
-- **`render.yaml` EDITS ARE INERT ON THE FLEET** `[measured 2026-11-08 on the fleet, lane render-retirement-inventory, findings_2026-11-07_render_dependency_inventory.md §1]`:
-  - Layering: `derive_role_env` = `render.yaml` -> `<home>/render_env/<role>.json` (Render snapshot, `fetched_at` 2026-10-01T01:11Z, 88/182/148 keys) -> `local_production.env` -> forced. A later layer wins.
+- **`render.yaml` EDITS ARE INERT ON THE FLEET** `[measured 2026-11-08 on the fleet, lane render-retirement-inventory, findings_2026-11-07_render_dependency_inventory.md §1; NOT READ AT ALL from `ac2cbc2fc`, 2026-11-17]`:
+  - Layering (main, `ac2cbc2fc`+): `derive_role_env` = `scripts/fleet_role_spec.json` (frozen from render.yaml, 52/84/76 keys) -> `<home>/fleet_env/<role>.json` (the Render snapshot, `fetched_at` 2026-10-01T01:11Z, 88/182/148 keys; migrated from `render_env/` 2026-11-17 17:24:08Z, check SAME, `render_env/` kept as the rollback) -> `local_production.env` -> forced. A later layer wins. Old vs new launcher on the live home: 0 keys differ (findings_2026-11-17_render_config_retirement.md). `up` REFUSES a role with no `fleet_env/` file.
   - Every `render.yaml` value key (48/77/72) is in the snapshot, so 0 are decided by `render.yaml` alone. Editing an existing key changes nothing, a NEW key applies at the next `up`, and a deletion changes nothing.
   - The snapshot lives outside `<home>/data`, so the nightly backup does not carry it; nor does it carry `local_production.env` (78 keys, 42 `ROLE__KEY`). Re-read 2026-11-16 02:3xZ (counts/modes only). `import-render-env` was removed 2026-11-15 (lane render-retirement, `f9ed2ec0f`). **Their recovery is now the encrypted secrets backup** (`scripts/fleet_secrets_backup.py`, todo #766 D5/E1, `c053671a2`): FIRST BACKUP 2026-11-16 17:31:15Z, `OneDrive/SyndicateBackup/secrets/fleet-secrets-20261116T173115Z.tar.gpg`, 17,507 B, OpenPGP AES256 header, 0 plaintext key names in the file; `verify` integrity ok, 5 of 5 files same as live (78 / 148 / 182 / 88 keys + the 10-04 `.bak`). Passphrase `~/.syndicate-secrets-passphrase` (mode 600) with a copy in the user's password manager. NIGHTLY runs start at the next fleet ff carrying `c053671a2` (inside `local_production.py backup`).
   - All four `render_env/` files are mode 600 since 2026-11-08 16:54Z. `live-odds-worker.json` had been 644 since a 10-04 rewrite; it was changed by user decision.

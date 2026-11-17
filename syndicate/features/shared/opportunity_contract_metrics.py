@@ -42,6 +42,7 @@ service produced it is not interpretable ([[project-three-service-architecture]]
 from __future__ import annotations
 
 import os
+from syndicate.features.shared.service_identity import service_marker
 import threading
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -140,7 +141,7 @@ def snapshot() -> dict[str, Any]:
         # _finalize_home_prop_rows runs on BOTH web and refresh-worker, and their
         # disks are separate. A count without this is not interpretable.
         "service_role": os.environ.get("SYNDICATE_SERVICE_ROLE")
-        or os.environ.get("RENDER_SERVICE_NAME")
+        or service_marker("SYNDICATE_SERVICE_NAME")
         or "unknown",
         "by_sport": by_sport,
     }

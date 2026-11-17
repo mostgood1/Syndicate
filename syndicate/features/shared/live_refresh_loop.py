@@ -35,6 +35,7 @@ from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared import slate_phase as _slate_phase
 from syndicate.features.shared.process_liveness import pid_is_alive
 from syndicate.features.shared.process_liveness import process_cmdline
+from syndicate.features.shared.service_identity import service_marker
 
 try:
 	import fcntl  # type: ignore
@@ -3000,7 +3001,7 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 				state="running",
 				trigger=str(decision.get("reason") or "") or None,
 				scope=decision.get("game_pks"),
-				service=str(os.environ.get("RENDER_SERVICE_NAME") or "") or None,
+				service=str(service_marker("SYNDICATE_SERVICE_NAME") or "") or None,
 				detail=f"pid={process.pid}",
 			)
 		except Exception:

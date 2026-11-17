@@ -19,6 +19,7 @@ from syndicate.features.mlb.game_state import mlb_status_is_final
 from syndicate.features.mlb.game_state import mlb_status_is_live
 from syndicate.features.mlb.sources import default_mlb_source_root
 from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+from syndicate.features.shared.service_identity import service_marker
 
 
 API_BASE = "https://api.the-odds-api.com/v4"
@@ -738,7 +739,7 @@ def diagnose_odds_history_provenance(date_str: str) -> dict[str, Any] | None:
 
         payload = {
             "date": date_str,
-            "service_role": os.environ.get("SYNDICATE_SERVICE_ROLE") or os.environ.get("RENDER_SERVICE_NAME") or "unknown",
+            "service_role": os.environ.get("SYNDICATE_SERVICE_ROLE") or service_marker("SYNDICATE_SERVICE_NAME") or "unknown",
             "candidate_paths": paths,
             "freshest_summary": summary,
         }

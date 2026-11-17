@@ -44,6 +44,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
+from syndicate.features.shared.service_identity import service_marker as _service_marker
+
 PHASE_PREGAME = "pregame"
 PHASE_STARTING_SOON = "starting_soon"
 PHASE_LIVE = "live"
@@ -520,7 +522,7 @@ def publish_phases(
         sports[sport] = {"phase": phase.phase, "next_start_epoch": next_start, "reason": phase.reason}
     payload = {
         "written_at_epoch": float(now_epoch),
-        "service": str(_env(env).get("RENDER_SERVICE_NAME") or "").strip() or None,
+        "service": str(_service_marker("SYNDICATE_SERVICE_NAME", env=_env(env)) or "").strip() or None,
         "starting_soon_enabled": starting_soon_enabled(env),
         "sports": sports,
     }

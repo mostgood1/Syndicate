@@ -6,6 +6,7 @@ from typing import Any
 
 from syndicate.features.shared.publication_adapter import normalize_publication_game
 from syndicate.features.shared.simulation_adapter import build_simulation_contract_from_context
+from syndicate.features.shared.service_identity import service_marker
 
 
 def _sim_payload(game: dict[str, Any] | None) -> dict[str, Any]:
@@ -81,9 +82,9 @@ def _render_web_dyno() -> bool:
     if explicit:
         return explicit in {"1", "true", "yes", "on"}
     return bool(
-        str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
-        or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
-        or str(os.environ.get("RENDER_SERVICE_ID") or "").strip()
+        str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}
+        or str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip()
+        or str(service_marker("SYNDICATE_SERVICE_ID") or "").strip()
     )
 
 

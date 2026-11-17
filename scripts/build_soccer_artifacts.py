@@ -57,6 +57,7 @@ from syndicate.features.soccer.features.team_names import match_team_name
 from syndicate.features.soccer.ingestion.espn_lineups import LEAGUE_ESPN_SLUGS
 from syndicate.features.soccer.ingestion.espn_lineups import fetch_events
 from syndicate.features.soccer.ingestion.player_history import fetch_asa_mls_team_history
+from syndicate.features.shared.service_identity import service_marker
 
 _GOALS_BASED_RATING_LEAGUES = {"eredivisie", "primeira_liga", "championship", "belgian_pro_league"}
 PROMOTED_TEAM_RATING = {"attack_rating": -0.18, "defense_rating": -0.18}
@@ -1394,7 +1395,7 @@ PREKICKOFF_FREEZE_SCHEMA = "soccer_prekickoff_freeze_v1"
 
 
 def _prekickoff_service_tag() -> str:
-    raw = str(os.environ.get("RENDER_SERVICE_NAME") or "").strip().lower()
+    raw = str(service_marker("SYNDICATE_SERVICE_NAME") or "").strip().lower()
     tag = "".join(ch if ch.isalnum() or ch == "-" else "-" for ch in raw).strip("-")
     return tag or "local"
 

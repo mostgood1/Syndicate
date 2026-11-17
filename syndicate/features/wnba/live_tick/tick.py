@@ -4713,7 +4713,8 @@ def _maybe_fetch_remote_processed(fname: str) -> Optional[Path]:
         if out.exists():
             return out
         repo = os.environ.get("GITHUB_REPOSITORY") or "mostgood1/WNBA-Betting"
-        branch = os.environ.get("GIT_BRANCH") or os.environ.get("RENDER_GIT_BRANCH") or "main"
+        from syndicate.features.shared.service_identity import service_marker
+        branch = os.environ.get("GIT_BRANCH") or service_marker("SYNDICATE_GIT_BRANCH") or "main"
         url = f"https://raw.githubusercontent.com/{repo}/{branch}/data/processed/{fname}"
         try:
             import requests as _rq  # type: ignore

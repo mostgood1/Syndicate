@@ -76,8 +76,11 @@ def _interval_seconds() -> int:
 
 def _service_slug() -> str:
     """Which service is asking. Used to keep the daily stamp per-worker."""
-    for name in ("SYNDICATE_REFRESH_LANE", "RENDER_SERVICE_NAME", "RENDER_SERVICE_ID"):
-        value = str(os.environ.get(name) or "").strip().lower()
+    from syndicate.features.shared.service_identity import service_marker
+
+    for raw in (os.environ.get("SYNDICATE_REFRESH_LANE"), service_marker("SYNDICATE_SERVICE_NAME"),
+                service_marker("SYNDICATE_SERVICE_ID")):
+        value = str(raw or "").strip().lower()
         if value:
             return "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in value)
     return "local"

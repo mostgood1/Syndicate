@@ -170,6 +170,21 @@ RENDER_INJECTED_ENV = (
     "RENDER_DISCOVERY_SERVICE",
 )
 
+# The NEUTRAL names the fleet sets beside the Render ones since 2026-11-17
+# (`syndicate/features/shared/service_identity.py`), which every reader prefers.
+# Scrubbing only the Render spellings would leave the step "hosted" through these.
+# Spelled out rather than imported: this script runs before `syndicate` is
+# importable. `tests/test_service_marker_readers.py` pins the two lists together.
+NEUTRAL_MARKER_ENV = (
+    "SYNDICATE_HOSTED",
+    "SYNDICATE_SERVICE_NAME",
+    "SYNDICATE_SERVICE_ID",
+    "SYNDICATE_INSTANCE_ID",
+    "SYNDICATE_GIT_COMMIT",
+    "SYNDICATE_EXTERNAL_URL",
+    "SYNDICATE_GIT_BRANCH",
+)
+
 
 def _step_env() -> dict[str, str]:
     """The child environment for every step: this host, minus "I am Render".
@@ -201,7 +216,7 @@ def _step_env() -> dict[str, str]:
     on configuration should do regardless of where it runs.
     """
     env = dict(os.environ)
-    for key in RENDER_INJECTED_ENV:
+    for key in RENDER_INJECTED_ENV + NEUTRAL_MARKER_ENV:
         env.pop(key, None)
     return env
 

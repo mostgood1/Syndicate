@@ -27,6 +27,7 @@ from pipeline.intelligence_state import start_intelligence_state_background_loop
 from syndicate.features.shared.timezone import central_datetime_from_epoch
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.shared.live_refresh_loop import _run_mlb_sim_tick
+from syndicate.features.shared.service_identity import service_marker
 
 
 def _refresh_state_store() -> dict[str, Any]:
@@ -4046,7 +4047,7 @@ def _launch_autorun_evaluation_settlement(
         chunk_diagnostics["_env_as_seen_by_process"] = {
             "SYNDICATE_REPORTS_ROOT": os.environ.get("SYNDICATE_REPORTS_ROOT"),
             "SYNDICATE_STATE_ROOT": os.environ.get("SYNDICATE_STATE_ROOT"),
-            "RENDER": os.environ.get("RENDER"),
+            "SYNDICATE_HOSTED": service_marker("SYNDICATE_HOSTED"),
         }
         chunk_diagnostics["_default_ledger_path_as_imported"] = str(DEFAULT_LEDGER_PATH)
 
@@ -4222,20 +4223,20 @@ _JOB_PROCESS_MARKER = "run_refresh_odds_job.py"
 def _job_belongs_elsewhere(entry: Path, own_service: str) -> bool:
     """True only when the job's environ positively names a DIFFERENT service.
 
-    Unreadable, or no `RENDER_SERVICE_NAME` on either side, is False: count it.
+    Unreadable, or no service name on either side, is False: count it. The name is
+    `SYNDICATE_SERVICE_NAME`, else `RENDER_SERVICE_NAME` (`service_identity`; a job
+    started before the launcher set the neutral name carries only the old one).
     """
     if not own_service:
         return False
     try:
-        environ = (entry / "environ").read_bytes().split(b"\x00")
+        blob = (entry / "environ").read_bytes()
     except (OSError, PermissionError):
         return False
-    prefix = b"RENDER_SERVICE_NAME="
-    for item in environ:
-        if item.startswith(prefix):
-            service = item[len(prefix):].decode("utf-8", "replace").strip()
-            return bool(service) and service != own_service
-    return False
+    from syndicate.features.shared.service_identity import environ_markers
+
+    service = str(service_marker("SYNDICATE_SERVICE_NAME", env=environ_markers(blob)) or "").strip()
+    return bool(service) and service != own_service
 
 
 def _running_job_process_count(proc_root: Path | None = None) -> int | None:
@@ -4270,7 +4271,7 @@ def _running_job_process_count(proc_root: Path | None = None) -> int | None:
     must not read low, because low is the direction that spawns. With no name of
     our own (a bare local run) nothing is filtered, which is the old behaviour.
     """
-    own_service = str(os.environ.get("RENDER_SERVICE_NAME") or "").strip()
+    own_service = str(service_marker("SYNDICATE_SERVICE_NAME") or "").strip()
     try:
         proc_root = Path("/proc") if proc_root is None else Path(proc_root)
         if proc_root.is_dir():
@@ -4305,7 +4306,7 @@ def _running_job_process_count(proc_root: Path | None = None) -> int | None:
             if not any(_JOB_PROCESS_MARKER in str(part) for part in parts):
                 continue
             try:
-                service = str((process.environ() or {}).get("RENDER_SERVICE_NAME") or "").strip()
+                service = str(service_marker("SYNDICATE_SERVICE_NAME", env=process.environ() or {}) or "").strip()
             except Exception:
                 service = ""
             if own_service and service and service != own_service:
@@ -5869,7 +5870,7 @@ def _record_season_projection_in_sim_ledger(
             state='running',
             trigger='season_projection_autorun',
             scope=f'season={season} week={week}',
-            service=str(os.environ.get('RENDER_SERVICE_NAME') or '') or None,
+            service=str(service_marker('SYNDICATE_SERVICE_NAME') or '') or None,
             detail=f'pid={pid}',
         )
     except Exception:

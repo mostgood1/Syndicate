@@ -167,7 +167,7 @@ def main() -> int:
     base_url = str(args.base_url or "").strip() or _infer_render_base_url()
     cron_token = str(args.cron_token or "").strip() or _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
     if not base_url:
-        raise SystemExit("Missing base URL. Pass --base-url or set MLB_BETTING_BASE_URL/RENDER_URL.")
+        raise SystemExit("Missing base URL. Pass --base-url or set MLB_BETTING_BASE_URL/SYNDICATE_BASE_URL.")
     if not cron_token:
         raise SystemExit("Missing cron token. Pass --cron-token or set MLB_BETTING_CRON_TOKEN/MLB_CRON_TOKEN/CRON_TOKEN.")
 

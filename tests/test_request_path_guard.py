@@ -15,7 +15,10 @@ from syndicate.features.shared.request_path_guard import _HOSTED_MARKERS
 from syndicate.features.shared.request_path_guard import hosted_signal
 from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
 
-_ALL_HOSTED_KEYS = tuple(_HOSTED_FLAGS) + tuple(_HOSTED_MARKERS)
+from syndicate.features.shared.service_identity import ALL_MARKER_NAMES
+
+# Both spellings of every marker (neutral first since 2026-11-17, `service_identity`).
+_ALL_HOSTED_KEYS = tuple(dict.fromkeys(tuple(_HOSTED_FLAGS) + tuple(_HOSTED_MARKERS) + ALL_MARKER_NAMES))
 
 
 class RequestPathGuardTests(unittest.TestCase):

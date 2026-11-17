@@ -85,13 +85,20 @@ def _env(name: str) -> str:
     return str(os.environ.get(name) or "").strip()
 
 
+def _marker(name: str) -> str:
+    """A service marker, neutral name first (`service_identity`), stripped like `_env`."""
+    from syndicate.features.shared.service_identity import service_marker
+
+    return str(service_marker(name) or "").strip()
+
+
 def _on_render() -> bool:
     # Same predicate as `syndicate.app._is_render_web_dyno`, restated rather
     # than imported because that module imports this one.
     return bool(
-        _env("RENDER").lower() in {"1", "true", "yes", "on"}
-        or _env("RENDER_EXTERNAL_URL")
-        or _env("RENDER_SERVICE_ID")
+        _marker("SYNDICATE_HOSTED").lower() in {"1", "true", "yes", "on"}
+        or _marker("SYNDICATE_EXTERNAL_URL")
+        or _marker("SYNDICATE_SERVICE_ID")
     )
 
 

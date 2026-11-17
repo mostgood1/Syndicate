@@ -41,6 +41,7 @@ from syndicate.features.shared.refresh_state_store import read_json_file_result
 from syndicate.features.shared.refresh_state_store import read_text_file
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.source_roots import repo_root_from
+from syndicate.features.shared.service_identity import service_marker
 
 
 REPO_ROOT = repo_root_from(__file__)
@@ -410,7 +411,7 @@ def _ensure_refresh_context_consistent(context: dict[str, Any]) -> None:
 
 
 def _this_service_identity() -> str:
-    return str(os.environ.get("RENDER_SERVICE_ID") or os.environ.get("RENDER_SERVICE_NAME") or "").strip()
+    return str(service_marker("SYNDICATE_SERVICE_ID") or service_marker("SYNDICATE_SERVICE_NAME") or "").strip()
 
 
 def _this_instance_identity() -> str:
@@ -421,7 +422,7 @@ def _this_instance_identity() -> str:
     # so _refresh_run_still_active fell into the same-service pid-liveness
     # branch and checked a pid number that could easily be reoccupied by an
     # unrelated process in the fresh container, blocking the next launch.
-    return str(os.environ.get("RENDER_INSTANCE_ID") or "").strip()
+    return str(service_marker("SYNDICATE_INSTANCE_ID") or "").strip()
 
 
 _LEGACY_REFRESH_LANE_KEY = "global"

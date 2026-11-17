@@ -49,6 +49,7 @@ from __future__ import annotations
 import gzip
 import json
 import os
+from syndicate.features.shared.service_identity import service_marker
 import re
 import threading
 import time
@@ -86,7 +87,7 @@ def disk_compaction_wanted(service_slug: str) -> bool:
     # well as the service name: tests/test_disk_maintenance.py sets
     # SYNDICATE_REFRESH_LANE=refresh-worker and calls run_disk_maintenance for real,
     # which without this started compaction against a developer's local data/.
-    if not _truthy(os.environ.get("RENDER") or ""):
+    if not _truthy(service_marker("SYNDICATE_HOSTED") or ""):
         return False
     services = os.environ.get("SYNDICATE_DISK_COMPACTION_SERVICES") or "refresh-worker"
     wanted = {part.strip().lower() for part in services.split(",") if part.strip()}

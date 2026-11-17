@@ -56,13 +56,20 @@ every `onrender.com` fallback repointed at `http://127.0.0.1:10000`).
 
 ## What still says "Render", and why that is not a dependency
 
-- **`RENDER_*` env markers.** The fleet sets `RENDER=true`, `RENDER_SERVICE_NAME` / `_ID`,
-  `RENDER_INSTANCE_ID` and `RENDER_GIT_COMMIT` on purpose, because code branches on them
-  (CLAUDE.md). They are names, not calls: nothing reaches Render through them.
-- **`render.yaml`.** `local_production.py` still reads it as the lowest env layer and for
-  each role's start command. Pushing it may still fire `blueprint_sync` against the
-  suspended services, so it is left untouched, and the deploy guard refuses a push that
-  carries it (todo #766 D3').
+- **`RENDER_*` env markers.** Since 2026-11-17 (lane `render-config-retirement`) every
+  reader asks `service_identity.service_marker("SYNDICATE_X")`, which prefers the neutral
+  name, and the launcher sets BOTH spellings to one value. The `RENDER*` names stay set
+  until a separate decision (step 3) drops them. They are names, not calls: nothing
+  reaches Render through them. Each reader and its default:
+  `.syndicate/findings_2026-11-17_render_config_retirement.md`.
+- **`render.yaml`.** NOT READ by anything since `ac2cbc2fc` (2026-11-17). The launcher
+  builds env from `scripts/fleet_role_spec.json` (frozen from render.yaml, key for key)
+  and `<home>/fleet_env/<role>.json`. Role start commands were always hard-coded in
+  `role_command`. The file stays in git, untouched: pushing it may still fire
+  `blueprint_sync` against the suspended services, so the deploy guard refuses a push
+  that carries it (todo #766 D3').
+- **`<home>/render_env/`** on the fleet: left in place as the rollback for checkouts older
+  than `ac2cbc2fc`. Only `scripts/fleet_env_snapshot.py` reads it, to migrate it.
 - **`.claude/hooks/deploy-guard.py`** keeps its rules that BLOCK a Render deploy (a POST
   to the deploys endpoint) and a `render.yaml` push. Those protect against using Render;
   they do not need it, and the guard makes no Render call.

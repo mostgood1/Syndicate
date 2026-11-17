@@ -53,6 +53,7 @@ from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.refresh_state_store import write_json_file
 from syndicate.features.shared.timezone import normalize_timestamped_payload
+from syndicate.features.shared.service_identity import service_marker
 
 
 ops_bp = Blueprint("ops", __name__)
@@ -194,13 +195,13 @@ def _git_value(repo_root: Path, *args: str) -> str | None:
 def _build_version_payload() -> dict[str, Any]:
     repo_root = Path(current_app.root_path).resolve().parent
     env_commit = str(
-        os.environ.get("RENDER_GIT_COMMIT")
+        service_marker("SYNDICATE_GIT_COMMIT")
         or os.environ.get("GIT_COMMIT")
         or os.environ.get("SOURCE_VERSION")
         or ""
     ).strip()
     env_branch = str(
-        os.environ.get("RENDER_GIT_BRANCH")
+        service_marker("SYNDICATE_GIT_BRANCH")
         or os.environ.get("GIT_BRANCH")
         or ""
     ).strip()
@@ -219,9 +220,9 @@ def _build_version_payload() -> dict[str, Any]:
         "commit_source": commit_source,
         "branch": branch,
         "branch_source": branch_source,
-        "render_service_name": str(os.environ.get("RENDER_SERVICE_NAME") or "").strip() or None,
-        "render_instance_id": str(os.environ.get("RENDER_INSTANCE_ID") or "").strip() or None,
-        "render_external_url": str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip() or None,
+        "render_service_name": str(service_marker("SYNDICATE_SERVICE_NAME") or "").strip() or None,
+        "render_instance_id": str(service_marker("SYNDICATE_INSTANCE_ID") or "").strip() or None,
+        "render_external_url": str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip() or None,
         "syndicate_data_root": str(current_app.config.get("SYNDICATE_DATA_ROOT") or os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or None,
         "syndicate_reports_root": str(current_app.config.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_REPORTS_ROOT") or "").strip() or None,
     }

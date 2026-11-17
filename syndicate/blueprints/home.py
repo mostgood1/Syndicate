@@ -69,6 +69,7 @@ from syndicate.features.shared.sport_data_provider import artifact_signature
 from syndicate.features.shared.sport_data_provider import get_sport_data_provider
 from syndicate.features.shared.sport_data_provider import register_sport_data_provider
 from syndicate.features.shared.sport_data_provider import sport_manifest_signature
+from syndicate.features.shared.service_identity import service_marker
 
 
 home_bp = Blueprint("syndicate_home", __name__)
@@ -295,9 +296,9 @@ def _home_selected_date(selected_date: str | None = None) -> str:
 
 def _render_web_dyno() -> bool:
     return bool(
-        str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
-        or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
-        or str(os.environ.get("RENDER_SERVICE_ID") or "").strip()
+        str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}
+        or str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip()
+        or str(service_marker("SYNDICATE_SERVICE_ID") or "").strip()
     )
 
 
@@ -307,13 +308,13 @@ def _allow_stored_date_fallback() -> bool:
 
 def _public_version_payload() -> dict[str, str] | None:
     commit = str(
-        os.environ.get("RENDER_GIT_COMMIT")
+        service_marker("SYNDICATE_GIT_COMMIT")
         or os.environ.get("GIT_COMMIT")
         or os.environ.get("SOURCE_VERSION")
         or ""
     ).strip()
     branch = str(
-        os.environ.get("RENDER_GIT_BRANCH")
+        service_marker("SYNDICATE_GIT_BRANCH")
         or os.environ.get("GIT_BRANCH")
         or ""
     ).strip()
@@ -348,13 +349,13 @@ def _git_value(repo_root: Path, *args: str) -> str | None:
 def _public_detailed_version_payload() -> dict[str, Any]:
     repo_root = Path(current_app.root_path).resolve().parent
     env_commit = str(
-        os.environ.get("RENDER_GIT_COMMIT")
+        service_marker("SYNDICATE_GIT_COMMIT")
         or os.environ.get("GIT_COMMIT")
         or os.environ.get("SOURCE_VERSION")
         or ""
     ).strip() or None
     env_branch = str(
-        os.environ.get("RENDER_GIT_BRANCH")
+        service_marker("SYNDICATE_GIT_BRANCH")
         or os.environ.get("GIT_BRANCH")
         or ""
     ).strip() or None
@@ -380,9 +381,9 @@ def _public_detailed_version_payload() -> dict[str, Any]:
         "branch_source": "env" if env_branch else "git" if git_branch else "unknown",
         "commit_matches_checkout": bool(env_commit and git_commit and env_commit == git_commit) if env_commit or git_commit else None,
         "branch_matches_checkout": branch_matches_checkout,
-        "render_service_name": str(os.environ.get("RENDER_SERVICE_NAME") or "").strip() or None,
-        "render_instance_id": str(os.environ.get("RENDER_INSTANCE_ID") or "").strip() or None,
-        "render_external_url": str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip() or None,
+        "render_service_name": str(service_marker("SYNDICATE_SERVICE_NAME") or "").strip() or None,
+        "render_instance_id": str(service_marker("SYNDICATE_INSTANCE_ID") or "").strip() or None,
+        "render_external_url": str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip() or None,
         "hostname": hostname,
         "pid": pid,
         "served_at": served_at,

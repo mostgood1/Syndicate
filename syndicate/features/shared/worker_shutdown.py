@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+from syndicate.features.shared.service_identity import service_marker
 import signal
 import sys
 import threading
@@ -150,7 +151,7 @@ def build_shutdown_record(worker: str, signal_name: str) -> dict[str, Any]:
         "uptime_seconds": int(time.time() - _STARTED_AT),
         # Which code was actually running -- the question `#403` had to answer
         # from logs because nothing recorded it.
-        "commit": str(os.environ.get("RENDER_GIT_COMMIT") or "")[:12] or None,
+        "commit": str(service_marker("SYNDICATE_GIT_COMMIT") or "")[:12] or None,
         "board_build": build,
         "registered_in_flight": {k: int(time.time() - v) for k, v in registered.items()},
         "children": _safe(_interesting_children, []),

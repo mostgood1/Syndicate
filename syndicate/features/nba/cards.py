@@ -46,6 +46,7 @@ from syndicate.features.shared.status_text import BASKETBALL_LIVE_TOKENS
 from syndicate.features.shared.status_text import TERMINAL_TOKENS
 from syndicate.features.shared.status_text import looks_live_status_text as _shared_looks_live
 from syndicate.features.shared.status_text import looks_terminal_status_text as _shared_looks_terminal
+from syndicate.features.shared.service_identity import service_marker
 
 
 def _render_web_dyno() -> bool:
@@ -63,7 +64,7 @@ def _render_web_dyno() -> bool:
     explicit = str(os.environ.get("SYNDICATE_WEB_DYNO") or "").strip().lower()
     if explicit:
         return explicit in {"1", "true", "yes", "on"}
-    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    return str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 # cache_key -> (live_signature, context). The live signature lives in the VALUE, not the key, so a live-state change

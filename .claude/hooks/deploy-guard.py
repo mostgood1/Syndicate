@@ -1085,7 +1085,8 @@ def main():
             sys.stderr.write(
                 "BLOCKED: this push carries `render.yaml`.\n\n"
                 "Render is retired (todo #766): on the fleet a render.yaml VALUE edit\n"
-                "changes nothing (env comes from ~/syndicate-prod/render_env/ and\n"
+                "changes nothing (render.yaml is not read: env comes from\n"
+                "scripts/fleet_role_spec.json, ~/syndicate-prod/fleet_env/ and\n"
                 "local_production.env), and the push's only possible effect is\n"
                 "`blueprint_sync` against the suspended Render services. To change fleet\n"
                 "env, edit local_production.env (ROLE__KEY for one role) and do a drained\n"

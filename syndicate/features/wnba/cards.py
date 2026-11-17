@@ -64,6 +64,7 @@ from syndicate.features.shared.status_text import BASKETBALL_LIVE_TOKENS
 from syndicate.features.shared.status_text import TERMINAL_TOKENS
 from syndicate.features.shared.status_text import looks_live_status_text as _shared_looks_live
 from syndicate.features.shared.status_text import looks_terminal_status_text as _shared_looks_terminal
+from syndicate.features.shared.service_identity import service_marker
 
 
 _WNBA_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], dict[str, Any]]" = OrderedDict()
@@ -107,9 +108,9 @@ def _render_web_dyno() -> bool:
     if explicit:
         return explicit in {"1", "true", "yes", "on"}
     return bool(
-        str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
-        or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
-        or str(os.environ.get("RENDER_SERVICE_ID") or "").strip()
+        str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}
+        or str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip()
+        or str(service_marker("SYNDICATE_SERVICE_ID") or "").strip()
     )
 
 

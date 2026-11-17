@@ -83,8 +83,11 @@ _RECENT_LIMIT = 10
 
 def service_slug() -> str:
     """Which service is writing. Mirrors `disk_maintenance._service_slug`."""
-    for name in ("SYNDICATE_REFRESH_LANE", "RENDER_SERVICE_NAME", "RENDER_SERVICE_ID"):
-        value = str(os.environ.get(name) or "").strip().lower()
+    from syndicate.features.shared.service_identity import service_marker
+
+    for raw in (os.environ.get("SYNDICATE_REFRESH_LANE"), service_marker("SYNDICATE_SERVICE_NAME"),
+                service_marker("SYNDICATE_SERVICE_ID")):
+        value = str(raw or "").strip().lower()
         if value:
             return "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in value)
     return "local"
@@ -117,11 +120,13 @@ def _now_iso() -> str:
 
 
 def _commit() -> str | None:
-    for name in ("RENDER_GIT_COMMIT", "SYNDICATE_GIT_COMMIT"):
-        value = str(os.environ.get(name) or "").strip()
-        if value:
-            return value
-    return None
+    # `SYNDICATE_GIT_COMMIT` first, then `RENDER_GIT_COMMIT` (`service_identity`). This read
+    # them the other way round until 2026-11-17; nothing set the neutral one then, and the
+    # launcher now sets both to one value, so the answer is unchanged.
+    from syndicate.features.shared.service_identity import service_marker
+
+    value = str(service_marker("SYNDICATE_GIT_COMMIT") or "").strip()
+    return value or None
 
 
 def build_reading(

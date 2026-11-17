@@ -70,6 +70,7 @@ from syndicate.features.soccer.sources import week_date_list as soccer_week_date
 from syndicate.features.soccer.features.schedule import season_date_range as soccer_season_date_range
 from syndicate.features.shared.timezone import central_today
 from syndicate.features.wnba.sources import available_dates as wnba_available_dates
+from syndicate.features.shared.service_identity import service_marker
 
 
 _PUBLISH_MANIFEST_LOCK = Lock()
@@ -2798,7 +2799,7 @@ def _record_step_in_sim_ledger(step: RefreshStep, *, started: str, finished: str
             state="finished",
             trigger="odds_refresh_step",
             scope=step.name,
-            service=str(os.environ.get('RENDER_SERVICE_NAME') or '') or None,
+            service=str(service_marker('SYNDICATE_SERVICE_NAME') or '') or None,
         )
     except Exception:
         return

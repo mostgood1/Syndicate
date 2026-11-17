@@ -47,6 +47,7 @@ from syndicate.features.shared.process_liveness import pid_is_alive
 from syndicate.features.shared.portfolio_auth import install_portfolio_auth
 from syndicate.features.shared.response_compression import install_response_compression
 from syndicate.features.shared.live_refresh_loop import start_live_refresh_background_loop
+from syndicate.features.shared.service_identity import service_marker
 from pipeline.intelligence_state import start_intelligence_state_background_loop
 
 
@@ -298,9 +299,9 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
 
 def _is_render_web_dyno() -> bool:
     return bool(
-        str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
-        or str(os.environ.get("RENDER_EXTERNAL_URL") or "").strip()
-        or str(os.environ.get("RENDER_SERVICE_ID") or "").strip()
+        str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}
+        or str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip()
+        or str(service_marker("SYNDICATE_SERVICE_ID") or "").strip()
     )
 
 

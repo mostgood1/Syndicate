@@ -37,6 +37,7 @@ Encoding that once, here, is the point of this module.
 from __future__ import annotations
 
 import os
+from syndicate.features.shared.service_identity import service_marker
 import time
 from pathlib import Path
 from typing import Any
@@ -242,7 +243,7 @@ def publish_worker_state(worker: str, *, extra: dict[str, Any] | None = None) ->
         # cannot distinguish "not draining" from "cannot read the flag".
         "drain_aware": True,
         "acked_drain_at": _now() if drain_active() else None,
-        "commit": str(os.environ.get("RENDER_GIT_COMMIT") or "")[:12] or None,
+        "commit": str(service_marker("SYNDICATE_GIT_COMMIT") or "")[:12] or None,
         "in_flight": dict(_IN_FLIGHT),
         **(extra or {}),
     }

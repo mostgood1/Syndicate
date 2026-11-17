@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 import os
+from syndicate.features.shared.service_identity import service_marker
 from pathlib import Path
 
 
@@ -47,7 +48,7 @@ def _root_env_fingerprint(env_var: str) -> tuple[str, str, str, str]:
         str(os.environ.get(env_var) or "").strip(),
         str(os.environ.get("SYNDICATE_DATA_ROOT") or "").strip(),
         str(os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower(),
-        str(os.environ.get("RENDER") or "").strip().lower(),
+        str(service_marker("SYNDICATE_HOSTED") or "").strip().lower(),
     )
 
 
@@ -71,7 +72,7 @@ def _strict_hosted_storage_enabled() -> bool:
     raw_value = str(os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
     if raw_value in {"1", "true", "yes", "on"}:
         return True
-    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    return str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def preferred_source_roots(
@@ -102,7 +103,7 @@ def _preferred_source_roots_cached(
     def _append_repo_fallback(candidates: list[Path]) -> None:
         if not _strict_hosted_storage_enabled():
             return
-        if str(os.environ.get("RENDER") or "").strip().lower() not in {"1", "true", "yes", "on"}:
+        if str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() not in {"1", "true", "yes", "on"}:
             return
         repo_fallback = (repo_root_from(file_path) / "data" / local_dir_name).resolve()
         if repo_fallback not in candidates:
@@ -123,13 +124,13 @@ def _preferred_source_roots_cached(
         local_mirror = (repo_root / "data" / local_dir_name).resolve()
         candidates.append(local_mirror)
     elif not candidates:
-        if str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        if str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}:
             candidates.append((repo_root / "data" / local_dir_name).resolve())
         else:
             raise RuntimeError(
                 f"SYNDICATE_DATA_ROOT must be set when strict hosted storage is enabled for {local_dir_name}."
             )
-    elif _strict_hosted_storage_enabled() and str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+    elif _strict_hosted_storage_enabled() and str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}:
         repo_mirror = (repo_root / "data" / local_dir_name).resolve()
         if repo_mirror not in candidates:
             candidates.append(repo_mirror)
@@ -210,7 +211,7 @@ def _preferred_artifact_roots_cached(
         _append_root(local_mirror / "source_artifacts")
         _append_root(local_mirror)
     elif not candidates:
-        if str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        if str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}:
             local_mirror = (repo_root / "data" / local_dir_name).resolve()
             _append_root(local_mirror / "source_artifacts")
             _append_root(local_mirror)
@@ -219,7 +220,7 @@ def _preferred_artifact_roots_cached(
                 f"SYNDICATE_DATA_ROOT must be set when strict hosted storage is enabled for {local_dir_name}."
             )
 
-    if _strict_hosted_storage_enabled() and str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+    if _strict_hosted_storage_enabled() and str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}:
         local_mirror = (repo_root / "data" / local_dir_name).resolve()
         _append_root(local_mirror / "source_artifacts")
         _append_root(local_mirror)

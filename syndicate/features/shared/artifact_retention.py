@@ -60,6 +60,7 @@ from typing import Any, Iterator
 from syndicate.features.shared.timezone import central_today
 
 from syndicate.features.shared.artifact_publisher import _artifact_date, _data_root
+from syndicate.features.shared.service_identity import service_marker
 
 
 class RetentionRuleError(ValueError):
@@ -314,7 +315,7 @@ _DIR_DATE = re.compile(r"^(20\d{2})[-_](\d{2})[-_](\d{2})$")
 def _cursor_path(root: Path) -> Path:
     from syndicate.features.shared.refresh_state_store import reports_root
 
-    slug = str(os.environ.get("SYNDICATE_REFRESH_LANE") or os.environ.get("RENDER_SERVICE_ID") or "local").strip().lower()
+    slug = str(os.environ.get("SYNDICATE_REFRESH_LANE") or service_marker("SYNDICATE_SERVICE_ID") or "local").strip().lower()
     slug = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in slug) or "local"
     return reports_root() / "refresh_status" / "latest" / f"retention_cursor_{slug}.json"
 

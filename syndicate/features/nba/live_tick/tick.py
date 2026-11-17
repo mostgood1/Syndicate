@@ -4783,7 +4783,8 @@ def _maybe_fetch_remote_processed(fname: str) -> Optional[Path]:
         if miss_ttl_sec > 0 and miss_ts is not None and (now_ts - float(miss_ts) < float(miss_ttl_sec)):
             return None
         repo = os.environ.get("GITHUB_REPOSITORY") or "mostgood1/NBA-Betting"
-        branch = os.environ.get("GIT_BRANCH") or os.environ.get("RENDER_GIT_BRANCH") or "main"
+        from syndicate.features.shared.service_identity import service_marker
+        branch = os.environ.get("GIT_BRANCH") or service_marker("SYNDICATE_GIT_BRANCH") or "main"
         url = f"https://raw.githubusercontent.com/{repo}/{branch}/data/processed/{fname}"
         try:
             import requests as _rq  # type: ignore

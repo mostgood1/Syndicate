@@ -23,17 +23,17 @@ Lane `local-production-host`, 2026-09-30. On 2026-09-30 at 06:37:51Z Render susp
 
 The three services run the **same code** with **different environments**. The environment decides which loops run where. For example, the intelligence loop runs only on refresh-worker, the live-odds loop and the MLB refresh tick only on live-odds-worker, and the MLB sim, weekly sports and look-ahead only on refresh-worker.
 
-So the local tool does not hand-write any run-mode. It reads `render.yaml` at start, service by service. It then layers on each service's **live** dashboard env if you import it (section 3), and after that your local overrides.
+So the local tool does not hand-write any run-mode. At every `up` it builds each role's env from three layers, a later one winning: `scripts/fleet_role_spec.json` (the keys each role declares, frozen 2026-11-17 from what `render.yaml` declared), then the role's env snapshot `<home>/fleet_env/<role>.json` (section 3), then your local overrides in `local_production.env`. **Nothing reads `render.yaml` or `render_env/` any more** (lane `render-config-retirement`, 2026-11-17; `.syndicate/findings_2026-11-17_render_config_retirement.md`).
 
 ### Changes from Render, and why each one is there
 
 | Change | Why |
 |---|---|
-| `/opt/render/project/data/*` becomes `<home>/data/*`, the same path for all three roles | There is one disk. Readers resolve artifacts from `data_root()` directly. |
+| `{data_root}/*` becomes `<home>/data/*` (and `{repo_root}/*` the checkout), the same path for all three roles. These placeholders replaced Render's `/opt/render/project/{data,src}` prefixes when the snapshot moved to `fleet_env/` | There is one disk. Readers resolve artifacts from `data_root()` directly. |
 | `SYNDICATE_WEB_PUBLISH_URL` is **removed** | On Render, workers pushed files to web and pulled them back over HTTP because the disks were separate. On one disk that path is **harmful**, not merely redundant: the publish receiver `os.replace`s and merges the very file the worker is appending to, so rows appended during a merge are lost. With the URL unset, the publisher logs `*_SKIP_NOT_CONFIGURED` and does nothing, which is correct here. |
 | `SYNDICATE_INTERNAL_WEB_BASE_URL`, `SYNDICATE_WNBA_LIVE_BOX_BASE_URL` and `SYNDICATE_BASE_URL` point at `http://127.0.0.1:<port>` | Unset, the code falls back to the public `syndicate-an21.onrender.com`, which is suspended. |
-| `RENDER=true`, plus `RENDER_SERVICE_NAME`, `RENDER_SERVICE_ID`, `RENDER_INSTANCE_ID` and `RENDER_GIT_COMMIT` per role | The code branches on these. They turn on the request-path compute guard, required portfolio login and disk compaction. Most importantly, without a marker **web starts the intelligence and live-refresh loops on its first request whatever their flags say** (`syndicate/app.py _start_background_loops`), and you get a second board builder on the same disk. |
-| State store: a local Redis on `127.0.0.1:6379` | Production is keyvalue. With `RENDER=true`, the workers refuse a file backend. |
+| `SYNDICATE_HOSTED=true`, plus `SYNDICATE_SERVICE_NAME`, `SYNDICATE_SERVICE_ID`, `SYNDICATE_INSTANCE_ID` and `SYNDICATE_GIT_COMMIT` per role, each ALSO set under its Render-era name (`RENDER`, `RENDER_SERVICE_NAME`, ...) to the same value. Readers prefer the neutral name (`syndicate/features/shared/service_identity.py`); dropping the Render names is a separate, later decision | The code branches on these. They turn on the request-path compute guard, required portfolio login and disk compaction. Most importantly, without a marker **web starts the intelligence and live-refresh loops on its first request whatever their flags say** (`syndicate/app.py _start_background_loops`), and you get a second board builder on the same disk. |
+| State store: a local Redis on `127.0.0.1:6379` | Production is keyvalue. With `SYNDICATE_HOSTED=true` (or `RENDER=true`), the workers refuse a file backend. |
 | Bootstrap runs **once** in `up`, before any role starts, and `SYNDICATE_BOOTSTRAP_ON_START=0` inside the roles | This is the same seed-only copy of the checkout mirror that Render ran at boot. Existing files are never overwritten. It runs once instead of racing on one disk. |
 | Money is **always paper** unless you pass `up --allow-live-execution` | The live services ran `SYNDICATE_EXECUTION_MODE=live` and `LIVE_ARMED=1` with real Kalshi and Polymarket keys. Importing that env must not, by itself, arm real orders on a new machine. |
 | `RENDER_API_KEY` is never passed to any role | A local fleet must not act on the Render account. |
@@ -83,7 +83,7 @@ pip install -r requirements.txt psutil waitress pyyaml
 Native Windows fallback (no WSL):
 
 - `py -3.11 -m pip install -r requirements.txt psutil waitress pyyaml`
-- Install **Memurai Developer**, which is Redis-compatible and runs as a Windows service. Alternatively, run `up --state file`, which clears `RENDER`; section 1 lists what that turns off.
+- Install **Memurai Developer**, which is Redis-compatible and runs as a Windows service. Alternatively, run `up --state file`, which clears `SYNDICATE_HOSTED` and `RENDER`; section 1 lists what that turns off.
 - Keep `SYNDICATE_LOCAL_HOME` **out of OneDrive**. The default is `%LOCALAPPDATA%\SyndicateProd`.
 - **Found on the first native-Windows run (2026-09-30, lane `local-production-first-run`):**
   - **Clone at least two directories below the drive root**, e.g. `C:\SyndicateProd\repo\Syndicate`. At `C:\Syndicate`, web crashes on import with `IndexError: 3`, because `pipeline/intelligence_state.py` calls `repo_root_from(__file__)` = `parents[3]` (`#313`). On Render that resolves to `/opt/render`, so the clone depth reproduces Render and the code is left alone. `doctor` now checks it.
@@ -99,16 +99,16 @@ python3 scripts/local_production.py init
 - `init` creates `<home>`:
   - `~/syndicate-prod` on Linux/WSL, or `%LOCALAPPDATA%\SyndicateProd` on Windows.
   - Override with `SYNDICATE_LOCAL_HOME`, and pick it **once**: the Redis keys embed the absolute data-root path.
-- It also writes `<home>/local_production.env`, a template listing every key the blueprint declares without a value, plus the dashboard-only keys the code reads. It generates a fresh `ADMIN_TOKEN`.
+- It also writes `<home>/local_production.env`, a template listing every key the role spec declares without a value, plus the dashboard-only keys the code reads. It generates a fresh `ADMIN_TOKEN`.
 
-**The role env snapshot, `<home>/render_env/{web,refresh-worker,live-odds-worker}.json`.** It holds each role's full live env (88 / 182 / 148 keys), imported ONCE from the Render API on 2026-10-01, when the blueprint was about 166 keys behind live. It is the fleet's own copy now: the import command (`import-render-env`) was removed 2026-11-15 with the rest of the Render tooling (lane `render-retirement`; `docs/ai_context/render_retirement.md`), because Render must not be needed for anything.
+**The role env snapshot, `<home>/fleet_env/{web,refresh-worker,live-odds-worker}.json`.** It holds each role's full live env (88 / 182 / 148 keys), imported ONCE from the Render API on 2026-10-01 into `render_env/` (when the blueprint was about 166 keys behind live), and moved to `fleet_env/` on 2026-11-17 by `scripts/fleet_env_snapshot.py migrate` (the only code that reads `render_env/`; that directory is left on disk as the rollback for older checkouts). **`up` refuses to start a role whose snapshot is missing** (absent is not off: the venue keys and most `*_AUTORUN` switches live here); `--allow-missing-env-snapshot` overrides. It is the fleet's own copy now: the import command (`import-render-env`) was removed 2026-11-15 with the rest of the Render tooling (lane `render-retirement`; `docs/ai_context/render_retirement.md`), because Render must not be needed for anything.
 - The files hold real values, mode 600, outside the repo. **Never commit them, and never print a value.**
 - Anything in `local_production.env` overrides them. Use it to change a single key (`ROLE__KEY` for one role), such as your own `ADMIN_TOKEN` or turning an autorun off; then a drained full `down`/`up`.
 - **They are not in the DATA backup** (it copies `<home>/data`), and neither is `local_production.env`. Since 2026-11-16 they have their OWN encrypted backup instead -- see "Fleet secrets backup" below. Render is no longer a way back.
 
 Without the snapshot, you must set these yourself in `local_production.env`. `doctor` lists what is absent per role.
 
-**Fleet secrets backup** (`scripts/fleet_secrets_backup.py`; todo `#766` D5, option E1, user 2026-11-16 "Yes, build E1"). `render_env/` and `local_production.env` hold every live venue and API secret, and the data backup never carried them.
+**Fleet secrets backup** (`scripts/fleet_secrets_backup.py`; todo `#766` D5, option E1, user 2026-11-16 "Yes, build E1"). `fleet_env/` (`render_env/` before 2026-11-17) and `local_production.env` hold every live venue and API secret, and the data backup never carried them.
 - **What runs:** `local_production.py backup` (the nightly `data-backup` job) runs the data snapshot and archive unchanged, THEN `fleet_secrets_backup.py backup --out <offdisk>/secrets`. That step tars both files IN MEMORY with a manifest (names, sizes, sha256, key COUNTS), encrypts it with `gpg --symmetric` (AES256, SHA512 S2K), and writes ONE `fleet-secrets-<UTC>.tar.gpg` into `SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR/secrets` (OneDrive on the fleet), `.partial` until complete. It then decrypts the file it wrote and checks it; one that does not read back is renamed `.bad` and the run fails. The newest 30 are kept. Plaintext never touches a disk. Nothing secret is printed.
 - **The passphrase** is a file on the fleet host, `~/.syndicate-secrets-passphrase` (mode 600, at least 16 characters; `SYNDICATE_SECRETS_PASSPHRASE_FILE` moves it). **The same passphrase must also be in the user's password manager: that is the only copy off this machine, and without it every backup is unreadable.** Created by the user, never by a session:
   ```bash
@@ -121,7 +121,7 @@ Without the snapshot, you must set these yourself in `local_production.env`. `do
   ```bash
   python3 scripts/fleet_secrets_backup.py --passphrase-file <file> restore --file <offdisk>/secrets/fleet-secrets-<ts>.tar.gpg --to /tmp/secrets-restore
   ```
-  It refuses a non-empty target and the live home. Move `local_production.env` and `render_env/` into `<home>` by hand, keep them mode 600, then do a drained full `down`/`up`.
+  It refuses a non-empty target and the live home. A backup taken before 2026-11-17 holds `render_env/`: run `python3 scripts/fleet_env_snapshot.py migrate --home /tmp/secrets-restore` to produce `fleet_env/`. Move `local_production.env` and `fleet_env/` into `<home>` by hand, keep them mode 600 (the directory 700), then do a drained full `down`/`up`.
 - **When it starts:** the nightly run uses the FLEET checkout, so it starts after the next fleet ff that carries it, and only once the passphrase file exists. Until then a run exits 7.
 
 | key | role | note |
@@ -132,7 +132,7 @@ Without the snapshot, you must set these yourself in `local_production.env`. `do
 | `SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN` | live-odds-worker | The ledger records `true`. |
 | `ANTHROPIC_API_KEY` | web | Ask the Syndicate. Absent means snapshot-only answers. |
 | `KALSHI_*`, `POLYMARKET_US_*` | workers | Venue quotes. Orders happen only when live-armed. |
-| `SYNDICATE_PORTFOLIO_USERNAME`, `SYNDICATE_PORTFOLIO_PASSWORD_HASH` | web | Required: with `RENDER=true`, `/portfolio` returns 503 until they are set. |
+| `SYNDICATE_PORTFOLIO_USERNAME`, `SYNDICATE_PORTFOLIO_PASSWORD_HASH` | web | Required: with `SYNDICATE_HOSTED=true` (or `RENDER=true`), `/portfolio` returns 503 until they are set. |
 
 ## 4. Run
 
@@ -218,7 +218,7 @@ Alerts fire when a problem is new, again while it persists (failures every 6 hou
 Web binds `127.0.0.1` by default. Do not port-forward it. To serve the public:
 
 1. Install `cloudflared` and create a named tunnel to `http://127.0.0.1:10000` in the Cloudflare dashboard.
-2. Put `CLOUDFLARED_TUNNEL_TOKEN=...` and `SYNDICATE_PUBLIC_URL=https://your.host` in `local_production.env`. `up` then supervises the tunnel as a fourth role, and the URL becomes `RENDER_EXTERNAL_URL`.
+2. Put `CLOUDFLARED_TUNNEL_TOKEN=...` and `SYNDICATE_PUBLIC_URL=https://your.host` in `local_production.env`. `up` then supervises the tunnel as a fourth role, and the URL becomes `SYNDICATE_EXTERNAL_URL` (and `RENDER_EXTERNAL_URL`, until the Render names are dropped).
 3. Set portfolio credentials first. `/api/syndicate/query` is public and capped by `SYNDICATE_ASK_LLM_MAX_CALLS`, as on Render.
 
 `.github/workflows/daily-update.yml` (manual trigger) takes a `base_url` input. Point it at the tunnel URL; it still needs the `ADMIN_TOKEN` secret to match your local one.

@@ -53,16 +53,19 @@ Render account and its suspended services are dormant: leave them alone.
 
   An ff alone reaches web at its next worker recycle. So land a behaviour change
   only when you are ready to measure it (learnings 2026-10-03).
-- **Fleet env is layered:** `render.yaml` → `~/syndicate-prod/render_env/<role>.json`
-  (imported once from Render on 2026-10-01; now the fleet's own copy, and the import
-  command is gone) → `~/syndicate-prod/local_production.env` → forced keys. A later
-  layer wins. **Neither secrets file is in the DATA backup** (it copies the data root
-  only); they have their OWN encrypted backup, `scripts/fleet_secrets_backup.py`
-  (OneDrive `SyndicateBackup/secrets`; passphrase in the user's password manager;
-  restore steps in the runbook's "Fleet secrets backup").
-  - **Every key `render.yaml` declares is also in the snapshot, so editing
-    `render.yaml` changes NOTHING on the fleet.** Measured 2026-11-08: 0 of 48 / 77 /
-    72 keys are decided by `render.yaml` alone.
+- **Fleet env is layered:** `scripts/fleet_role_spec.json` →
+  `~/syndicate-prod/fleet_env/<role>.json` (the 2026-10-01 Render snapshot, moved out of
+  `render_env/` on 2026-11-17) → `~/syndicate-prod/local_production.env` → forced keys.
+  A later layer wins. **The launcher reads neither `render.yaml` nor `render_env/` from
+  `ac2cbc2fc` on** `[2026-11-17, lane render-config-retirement]`, and `up` refuses a role
+  whose `fleet_env/` file is missing. (The fleet picks this up at its next `up` on a
+  checkout that carries it; the env it builds was measured byte-identical to the old one.) **Neither secrets file is in the DATA backup** (it
+  copies the data root only); they have their OWN encrypted backup,
+  `scripts/fleet_secrets_backup.py` (OneDrive `SyndicateBackup/secrets`; passphrase in
+  the user's password manager; restore steps in the runbook's "Fleet secrets backup").
+  - **Editing `render.yaml` changes NOTHING on the fleet.** It is not read; the role
+    spec was frozen from it, and every declared key is shadowed by the snapshot anyway
+    (measured 2026-11-08: 0 of 48 / 77 / 72).
   - To change env, edit `local_production.env` (global, or `ROLE__KEY` for one
     role), then run a drained full `down`/`up`. Env is built only at `up`, and a role
     restart reuses the old env.
@@ -74,16 +77,20 @@ Render account and its suspended services are dormant: leave them alone.
   `_evaluation_settlement_auto_refresh_enabled` treats absent as **False**;
   `_mlb_refresh_tick_owner_here` defaults **True**. The same edit is a no-op in one
   case and a behaviour change in the other.
-- **The code still branches on `RENDER*` markers, and the fleet fakes them on
-  purpose.** `local_production.py` sets `RENDER=true`,
-  `RENDER_SERVICE_NAME`/`_ID=local-<role>`, `RENDER_INSTANCE_ID` and
-  `RENDER_GIT_COMMIT` on every role. Without them:
+- **The code branches on service markers, and the fleet sets each under TWO names.**
+  `local_production.py` sets `SYNDICATE_HOSTED=true` (`RENDER=true`),
+  `SYNDICATE_SERVICE_NAME`/`_ID=local-<role>` (`RENDER_SERVICE_NAME`/`_ID`),
+  `SYNDICATE_INSTANCE_ID` and `SYNDICATE_GIT_COMMIT` (`RENDER_INSTANCE_ID`,
+  `RENDER_GIT_COMMIT`), one value per pair. Every reader asks
+  `service_identity.service_marker("SYNDICATE_X")`, which prefers the neutral name and
+  falls back on the Render one; a test fails on any other read. Without the markers:
   - web starts its own board builder (`syndicate/app.py _start_background_loops`);
   - the request-path guard switches off;
   - the two workers count each other's jobs.
 
-  Do not strip them. They are NAMES, not a dependency: nothing reaches Render through
-  them. Which code reads each one: `.syndicate/findings_2026-11-15_render_retirement.md`.
+  Do not strip them, and a child env that must not look hosted scrubs BOTH spellings.
+  Dropping the `RENDER*` names is a separate decision (step 3). Each reader and its
+  default: `.syndicate/findings_2026-11-17_render_config_retirement.md`.
 
 History (`#284`): on Render, `autoDeploy = no` held for code. But `blueprint_sync`
 applied any pushed `render.yaml` to every service. Measured 2026-08-08: an unordered

@@ -832,6 +832,8 @@ def _child_env(scratch: Path) -> dict[str, str]:
     # `RENDER=1` makes `data_root()` raise instead of falling back, which is
     # right on Render and wrong here -- the fixture root is set explicitly.
     env.pop("RENDER", None)
+    # ...and its neutral name, which readers prefer since 2026-11-17 (`service_identity`).
+    env.pop("SYNDICATE_HOSTED", None)
     env.pop("SYNDICATE_REQUIRE_HOSTED_STORAGE", None)
     env["SYNDICATE_DATA_ROOT"] = str(scratch)
     # `reports_root()` is NOT under SYNDICATE_DATA_ROOT (refresh_state_store.py:367).

@@ -20,8 +20,10 @@ class ComputeInRequestPathError(RuntimeError):
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
-# Opt-in flags. Either one being TRUE means hosted.
-_HOSTED_FLAGS = ("RENDER", "SYNDICATE_REQUIRE_HOSTED_STORAGE")
+# Opt-in flags. Either one being TRUE means hosted. `SYNDICATE_HOSTED` is the
+# neutral name of `RENDER` (`service_identity`, 2026-11-17): it is read first and
+# `RENDER` only when it is absent; the fleet sets both to one value.
+_HOSTED_FLAGS = ("SYNDICATE_HOSTED", "SYNDICATE_REQUIRE_HOSTED_STORAGE")
 
 # Injected by the Render RUNTIME, not by the service's env-var config, and so
 # not deletable from the dashboard. Verified 2026-09-04 against the live web
@@ -30,8 +32,9 @@ _HOSTED_FLAGS = ("RENDER", "SYNDICATE_REQUIRE_HOSTED_STORAGE")
 # RENDER_INSTANCE_ID='srv-d88ahvrbc2fs73eodu30-7cff65c8c4-68pvq',
 # RENDER_EXTERNAL_URL='https://syndicate-an21.onrender.com' -- while NONE of
 # them appear among that service's 76 user-defined env vars. Presence alone is
-# the signal; these carry identifiers, not booleans.
-_HOSTED_MARKERS = ("RENDER_SERVICE_ID", "RENDER_INSTANCE_ID", "RENDER_SERVICE_NAME", "RENDER_EXTERNAL_URL")
+# the signal; these carry identifiers, not booleans. Since 2026-11-17 each is read
+# under its neutral name first (`service_identity`); the fleet sets both spellings.
+_HOSTED_MARKERS = ("SYNDICATE_SERVICE_ID", "SYNDICATE_INSTANCE_ID", "SYNDICATE_SERVICE_NAME", "SYNDICATE_EXTERNAL_URL")
 
 
 # --------------------------------------------------------------------------
@@ -132,12 +135,24 @@ def hosted_signal() -> str | None:
     was an open question on 2026-09-04 precisely because nothing recorded WHICH
     key armed it, and the two candidates have very different durability.
     """
+    from syndicate.features.shared.service_identity import service_marker, service_marker_key
+
+    def _read(key: str) -> tuple[str | None, str | None]:
+        # (the key actually read, its value): a service marker resolves to its neutral
+        # name when present, else its Render-era name; any other key is read as itself.
+        try:
+            return service_marker_key(key), service_marker(key)
+        except KeyError:
+            return key, os.environ.get(key)
+
     for key in _HOSTED_FLAGS:
-        if str(os.environ.get(key) or "").strip().lower() in _TRUTHY:
-            return key
+        name, value = _read(key)
+        if str(value or "").strip().lower() in _TRUTHY:
+            return name
     for key in _HOSTED_MARKERS:
-        if str(os.environ.get(key) or "").strip():
-            return key
+        name, value = _read(key)
+        if str(value or "").strip():
+            return name
     return None
 
 

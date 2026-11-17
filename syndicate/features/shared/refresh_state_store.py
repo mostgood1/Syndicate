@@ -31,6 +31,7 @@ from urllib.parse import urlsplit
 from syndicate.features.shared.timezone import normalize_timestamped_payload
 from syndicate.features.shared.source_roots import repo_root_from
 from syndicate.features.shared.build_lookup_scope import scoped_lookup
+from syndicate.features.shared.service_identity import service_marker
 
 
 REPO_ROOT = repo_root_from(__file__)
@@ -42,7 +43,7 @@ def _refresh_state_backend_name() -> str:
     value = str(os.environ.get("SYNDICATE_REFRESH_STATE_BACKEND") or "").strip().lower()
     if value:
         return value
-    hosted = _strict_hosted_storage_enabled() or bool(str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"})
+    hosted = _strict_hosted_storage_enabled() or bool(str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"})
     if hosted and str(os.environ.get("SYNDICATE_REFRESH_STATE_URL") or os.environ.get("REDIS_URL") or "").strip():
         return "keyvalue"
     return "filesystem"
@@ -51,7 +52,7 @@ def _strict_hosted_storage_enabled() -> bool:
     raw_value = str(os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
     if raw_value in {"1", "true", "yes", "on"}:
         return True
-    return str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}
+    return str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _state_backend_kind() -> str:
@@ -372,7 +373,7 @@ def known_refresh_lanes() -> list[str]:
 def assert_refresh_state_backend_ready(*, process_name: str | None = None) -> str:
     backend_name = _refresh_state_backend_name()
     print(f"REFRESH_STATE_BACKEND = {backend_name}")
-    hosted = _strict_hosted_storage_enabled() or bool(str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"})
+    hosted = _strict_hosted_storage_enabled() or bool(str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"})
     if hosted and backend_name not in {"redis", "keyvalue", "valkey"}:
         owner = f" for {process_name}" if process_name else ""
         raise RuntimeError(f"Local state backend not allowed in multi-service deployment{owner}: {backend_name}")
@@ -431,7 +432,7 @@ def reports_root() -> Path:
     if override:
         return Path(override).expanduser().resolve()
     if _strict_hosted_storage_enabled():
-        if str(os.environ.get("RENDER") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        if str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}:
             return REPORTS_ROOT
         raise RuntimeError("SYNDICATE_REPORTS_ROOT or SYNDICATE_STATE_ROOT must be set when hosted storage is required.")
     return REPORTS_ROOT
