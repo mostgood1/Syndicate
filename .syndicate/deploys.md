@@ -61187,3 +61187,41 @@ Lane `render-config-retirement` (session 267d8859). The Windows host rebooted at
 - betting change: no (one historical row's fill bookkeeping, 11-13 slate. Outcome and P&L unchanged; nothing that places, sizes, holds or exits a bet).
 - **what:** `scripts/operator_fill_from_venue.py --apply` (code on main `b96ea17a7`, run from a worktree at that SHA against the fleet store with the live-odds-worker's env, nice 19). It read Kalshi order `01a1d8a0`: executed, 4 filled, cost 1.76, fee 0.069 (= the graded loss 1.829). It wrote status `submitted -> filled`, contracts 4, fill_price 0.44, fill_stake 1.76, venue_status `executed`, and kept `pre_operator_fill` + `operator_fill` on the row. One CAS write: `OPERATOR_FILL ... outcome=lost (unchanged)`.
 - **verify -- MET (21:45Z):** `/api/portfolio/live?on=all` unreconciled 0 (was 1 all day). **OWED:** no `UNRECONCILABLE_ORDER key='f8b62e6a…'` after 21:45:02Z on the next reconcile passes.
+
+## 2026-11-17 21:52:41Z (3:52 PM CST) -- DEPLOY (ff + drained full down/up): fleet `5db26434e` -> `91d865fd5`, loading render-config-retirement steps 2 + 3a (todo #766) -- **MET: every role now carries ONLY the neutral `SYNDICATE_*` markers, values equal to their old `RENDER*` twins; nothing else in any role's env changed**
+
+Lane `render-config-retirement` (session 267d8859).
+- **User decisions, all in my session, 2026-11-17:**
+  - "go ahead with step 3" (relayed verbatim by the parent session);
+  - timing "When live games end", chosen over "Now" and "Tomorrow's vhdx window", after "do the restart now" was relayed;
+  - ride-alongs "Carry it" (the paper-page retirement).
+- **Sequence (UTC):**
+  1. 21:36:58 no live game on any source (watcher on `check_deploy_safety`).
+  2. 21:37:41 claims web / refresh-worker / live-odds-worker.
+  3. Drain requested 21:38:23; refresh-worker acked and went idle 21:48:28.
+  4. Baseline read 21:49:10; env snapshot (`fleet_role_env_reading.py snapshot`) 21:49.
+  5. Preflight: refresh-worker HOLD 21:49:28 (an odds job with an eredivisie soccer build) -> joint CLEAR of all three at 21:52:31 (`--target-commit 91d865fd5 --reinject-env --expect render_markers_per_role=0,neutral_markers_per_role=5 --baseline 5,0`).
+  6. ff 21:52:41, after a dirty-overlap check (14 dirty runtime paths, 0 in the 86 changed files).
+  7. `watchdog_no_autostart` set; `down` 21:52:53; `Start-ScheduledTask SyndicateLocalProduction` 21:53:00.
+  8. `LOCAL PRODUCTION UP ... commit=91d865fd5251`, money LIVE as before, web `/healthz` 200 at 21:53:08.
+  9. Undrain 21:53:32 against the NEW refresh-worker; marker removed.
+- **New pids:** supervisor 28868, web 28883, refresh-worker 28948, live-odds-worker 28949; `status` code=91d865fd on all three, restarts=0.
+- **Measured -- `fleet_role_env_reading.py compare` against the pre-`down` snapshot, per role:**
+  - removed `RENDER`, `RENDER_GIT_COMMIT`, `RENDER_INSTANCE_ID`, `RENDER_SERVICE_ID`, `RENDER_SERVICE_NAME`;
+  - added the 5 `SYNDICATE_*` twins, with `SYNDICATE_HOSTED` / `_SERVICE_NAME` / `_SERVICE_ID` hash-equal to the old twins;
+  - key counts unchanged: 160 / 262 / 235;
+  - one other key changed, `WSL_INTEROP` (WSL's per-launch interop socket path, inherited from the scheduled task's session; it changes on every task-started `up`). The first compare flagged it (rc 3); re-run with `--expect-changed WSL_INTEROP`: **OK, rc 0**.
+- **Expectation:** `render_markers_per_role` 5 -> **0** and `neutral_markers_per_role` 0 -> **5** on all three roles (read 21:53:19Z). MET.
+- **Readers on the neutral names (the RENDER* names are gone, so only the neutral ones can answer):**
+  - both workers `REFRESH_STATE_BACKEND = keyvalue` (the hosted assert passed);
+  - web `/api/ops/version`: `version.render_service_name` = `local-web`, `render_instance_id` = `local-web-1794952380`, `commit` = `91d865fd5...`;
+  - no Traceback in any role log since 21:53;
+  - web started no intelligence / live-refresh loop of its own.
+  - OWED: web's `COMBINED_BOARD_OVERLAY_WARMER_STARTED ... armed_by=hosted:SYNDICATE_HOSTED`, logged when a new web worker starts its warmer; none had logged by 21:54Z.
+- **Ride-alongs, all 55 commits `5db26434e..91d865fd5` classified.** Runtime-touching:
+  - `cc90fb653` + `91d865fd5`: this lane;
+  - `f7fb3ed4e` paper-page retirement (lane `paper-page-retirement`, user "Retire it", carried at the user's "Carry it"): `/portfolio/paper` -> 302, `/api/portfolio/paper` -> 410, two page-only helpers removed. Paper only: the paper book and its settlement stay;
+  - offline scripts no role runs: `ea723a9d9` engine learner, `47d504ea2` college-total grader, `dbd80b5a5` / `ff66c2986` / `8fad92e15` monitor probes.
+  - The other 47 commits are ledger, docs or tests.
+- betting change: no. No reader changes its answer (pinned under either spelling and confirmed above), and the paper retirement touches no live bet. BC row added.
+- **verify:** the compare table above (rc 0); `status` code=91d865fd x3; `/api/ops/version` service fields from the neutral markers. **Step 3b** (delete the readers' `RENDER*` fallback) is now unblocked.
