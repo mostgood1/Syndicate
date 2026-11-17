@@ -1020,6 +1020,14 @@ death, never life — do not invert it.
 - Verification: the #821 header names the task and the by-hand fallback, on origin/main
 - Blocked by: none
 
+### nba-segment-regrade-split — OPEN — opened 2026-11-17 — session 24d2e336-9705-44d9-8d8a-f728270f237f
+- Goal: Register a descriptive pre/post-F1 split for the Dec 7 NBA quarter/half re-grade (#818) before any re-grade outcome exists (user 2026-11-17 'Yes, add the split'): addendum in the findings' Dec 7 section, todo #818 STATUS, scheduled task nba-segment-regrade-818 prompt step 4b; no gate, window, seed, weight or population changed
+- Files: .syndicate/findings_2026-11-16_nba_segment_skill.md (Dec 7 re-grade section only), docs/ai_context/todo.md (#818 section only), .syndicate/log/2026-11-17.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: addendum + todo STATUS on origin/main before 2026-12-07; the task's saved SKILL.md carries step 4b with no stray tabs
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
