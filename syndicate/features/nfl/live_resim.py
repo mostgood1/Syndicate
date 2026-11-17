@@ -53,6 +53,7 @@ registration is a two-entry change rather than a translation layer.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import random
 import time
@@ -230,6 +231,11 @@ class NflLiveGameState:
     # `end_of_half_clock` ON; with it OFF the engine never reads them.
     home_timeouts: int | None = None
     away_timeouts: int | None = None
+    # ESPN's event id, from the normalised live row (todo #813 part 2, lane
+    # `nfl-live-resim-event-seeds`). It keys this game's seeds, so two games
+    # stop drawing the same random numbers. None means the row did not carry
+    # one, and the re-sim then uses the shared seeds 1..N it always used.
+    event_id: str | None = None
 
 
 def default_sims() -> int:
@@ -421,6 +427,27 @@ def _perturbed_ratings(
     )
 
 
+def _event_seed_base(event_id: str | None) -> int:
+    """The offset this game's seeds start after. 0 (the shared seeds) when no id.
+
+    Before todo #813 part 2, every NFL game at every tick ran seeds 1..N, so one
+    set of random numbers carried the whole slate and its errors leaned the same
+    way in every game -- measured +0.29 [+0.11, +0.46] points at the end of Q3
+    over the 11-09..11-16 replay. Keyed by the GAME, not the tick: a game keeps
+    its seeds from tick to tick, so its line moves with the score and the clock
+    and not with a fresh draw of noise.
+
+    A sha256 of a fixed string, NOT `hash()`: Python randomises str hashes per
+    process (PYTHONHASHSEED), and a seed that moved on every worker restart could
+    not be replayed. 31 bits keeps any downstream int32 consumer safe.
+    """
+    key = str(event_id or "").strip()
+    if not key:
+        return 0
+    digest = hashlib.sha256(f"nfl-live-resim-seed|{key}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], "big") & 0x7FFFFFFF
+
+
 def _histogram(values: list[int]) -> dict[str, int]:
     """`{value: count}` over integer draws, keyed by str so it survives JSON.
 
@@ -518,6 +545,11 @@ def resim_live_game(
     # the same games. That is asserted by a test rather than assumed.
     sd = max(0.0, float(rating_sd or 0.0))
 
+    # PER-GAME SEEDS when the row named the game; otherwise the shared seeds
+    # 1..N, bit-identical to before (a test asserts it). Both possession plans of
+    # a marginalised game reuse the same seeds, as they always did.
+    seed_base = _event_seed_base(state.event_id)
+
     started = time.time()
     home_wins = 0
     ties = 0
@@ -526,7 +558,7 @@ def resim_live_game(
     ran = 0
     per_plan = max(1, n // len(plans))
     for owner, field_position in plans:
-        for seed in range(1, per_plan + 1):
+        for seed in range(seed_base + 1, seed_base + per_plan + 1):
             call = base
             if sd > 0.0:
                 # RESAMPLED PER SIMULATION, so each draw is a game played by a
@@ -618,6 +650,9 @@ def resim_live_game(
         # from the feed. False means the engine assumed a fresh half (3 each),
         # which is invisible in the probability itself.
         "timeouts_fed": state.home_timeouts is not None and state.away_timeouts is not None,
+        # AUDITABLE the same way: "event" when this game drew its own seeds,
+        # "shared" when it fell back on 1..N because the row carried no id.
+        "seed_basis": "event" if seed_base else "shared",
         "elapsed_seconds": round(time.time() - started, 3),
     }
 
@@ -886,6 +921,8 @@ def live_state_from_row(
         # from ESPN `situation`); absent until it emits them, which is None here.
         home_timeouts=_timeouts_left(row.get("home_timeouts")),
         away_timeouts=_timeouts_left(row.get("away_timeouts")),
+        # `normalise_live_row` passes ESPN's `event_id` through; it keys the seeds.
+        event_id=str(row.get("event_id") or "").strip() or None,
     )
 
 
