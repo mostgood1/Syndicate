@@ -1,5 +1,24 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#826` — **THE BOARD QUERY SENT EACH OPPORTUNITY ROW UP TO FOUR TIMES. The page's `/api/intelligence/query` was 80.3 MB raw / 14.4 MB gzipped / 78 s on the fleet 11-16 7:48 PM CST: `ranked_all`, `board_contract.cards`, `top_opportunities` and `top_live_opportunities` carry the same 6,295 rows by `pick_id`. Opt-in `row_refs` sends them once, losslessly: 33.1 MB / 5.7 MB** `[2026-11-17, lane board-query-row-refs; layer2-rail-monitor I-2, user "start the board query de-dup session"]` — ON MAIN; NOT LOADED (a web reload is the user's call)
+- **No row was an exact copy**, so references alone would have lost data.
+  - top rows add ~10 keys, among them `rationale`.
+  - cards lack the logos, and 498 differ in `gate`.
+  - `top_live` was never diagnostic-stripped.
+- **The fix.** Each list travels as indices into `ranked_all` plus a per-row patch, a key order and drops, and stays `null` in place. The page's `rehydrateAliases` rebuilds the lists first, before the row aliases. Code: `syndicate/features/shared/response_row_refs.py`, `_row_refs_wire_payload` on the three slim exits, the template's `row_refs: true`.
+- **Equivalence on the recorded response:**
+  - the Python reference rebuild is byte-identical, key order included;
+  - the template's real function under node gives a JSON.stringify-identical payload (149,957,250 chars);
+  - the browser A/B of the rendered board is in the findings.
+- **Server path** (encode + versioned copy/hash + provider dump + gzip): 12.0-18.2 s off, 5.1-7.6 s on. The encoder costs ~1.6 s at worst.
+- **Off switches:** `SYNDICATE_QUERY_ROW_REFS=off` (env; absent = honoured), or remove the template line.
+- **Load:** ff + `reload-web` only. Betting change: no.
+- **Owed after a load:** `QUERY_STAGE_MS` `"refs": true` on web.log, the served Content-Length (~14.4 -> ~5.7 MB), and the `WEB_WORKER_MEMORY_RECYCLE` rate per request against the 5-15 baseline.
+- **Not done** (two leads in `leads.md`):
+  - `top_live_opportunities` is outside `_DIAGNOSTIC_ROW_LISTS`; its patch is still 5.2 MB, and the page never reads the list.
+  - `rationale` (2.78 MB) is unread by the page.
+- Findings: `.syndicate/findings_2026-11-17_board_query_row_refs.md`.
+
 ### `#825` — **WNBA QUARTER/HALF RE-GRADE, 2027: re-grade the WNBA's period lines on the 2027 regular season's first three-plus weeks, against the de-vigged book, beside the 2026 grade. Nothing to do before the 2027 season** `[2026-11-17, user "do the WNBA segment re-grade in 2027"; session 69e3a2e5]`
 - **Why.** The user asked for a re-grade of every sport's period lines on 2026-11-16..17. NFL `#752` is on 12-08, NCAAF `#805` and NBA `#818` on 12-07, NCAAB `#763` on 12-08. The WNBA was off-season, and the user chose 2027.
 - **Unlike the NBA, the WNBA board serves its own sim's period probabilities.** NBA periods are served at w = 0 (`#818`). `#820` records that a WNBA h2 flip "changes served h2 probabilities and edges". So a WNBA period grade measures prices the board actually served.
