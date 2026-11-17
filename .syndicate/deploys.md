@@ -60802,3 +60802,31 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
     No NFL game is live before then.
 - **revert:** `git revert f5be2b5e2`, or remove `data/calibration/nfl_profile.json` (absent = the in-source default). Then a claimed ff and a drained refresh-worker TERM. Fresh processes revert at the ff alone.
 - **Claims:** web released 15:26Z; refresh-worker released after this entry.
+
+## 2026-11-17 16:17:31Z (10:17 AM CST) -- REBUILD (no code, no restart): week 11's NFL projection rebuilt on #808's profile (lane `nfl-profile-load`, user "Rebuild now") -- **MET: the CSV + sidecar were rewritten after the 15:25:08Z ff, and the quarter shape moved the way #808 predicts (q2 12.90 -> 14.11, q3 10.71 -> 9.23 points a game, 13 games)**
+- **Why.** Week 11 had built at 04:35:18Z 11-17 on the DEFAULT profile, before the profile's ff. Otherwise the next daily `artifact_stale` launch, around 04:35Z 11-18, would have rebuilt it. The user chose "Rebuild now" over "Wait for tonight".
+- **What ran** (`C:\tmp\nfl_live_timeouts\npl_rebuild.sh`):
+  - the autorun's own command, `scripts/generate_smartsim2_nfl_projections.py --season 2026 --week 11` from `~/Syndicate`, under refresh-worker's `/proc` environ (never printed), at nice 19;
+  - first checks: no NFL projection already running, fleet head 17ff69398, profile on disk;
+  - container memory 39% of max;
+  - **16:12:37.427Z -> 16:17:31.082Z**, exit 0, `elapsed_seconds=289.0`. The worker's 04:34Z run took 59.7 s; the extra time is the new end-of-half mechanisms or nice 19, unmeasured.
+- **Inputs are the same as the worker's run:** `segment_distributions_games=13`, `real_schedule_rows=13`, `pbp_rows=0`, `injury_adjustments_applied=0`, `projections_written=13`, `artifact_published=True`, `ratings_artifact_published=True`.
+- **Measured** (copies in `C:\tmp\nfl_live_timeouts\wk11_before\`, `wk11_after\`; `npl_wk11_cmp.py`):
+  - `smartsim2_projections_2026_wk11.csv` mtime 04:35:18Z -> **16:17:28Z**, rows `generated_at` 16:13:37Z..16:17Z.
+  - `smartsim2_segment_distributions_2026_wk11.json` `generated_at` 04:35:18Z -> **16:17:30Z**.
+  - Mean points a game over 13 games, before -> after:
+    - q1 9.19 -> 8.71;
+    - **q2 12.90 -> 14.11** (league 14.02);
+    - **q3 10.71 -> 9.23** (league 9.50);
+    - q4 13.02 -> 13.11;
+    - full 45.97 -> 45.27.
+  - q2 share 0.281 -> 0.312; q3 share 0.233 -> 0.204.
+  - CSV `total_mean` -0.69 on average (max |3.43|); `margin_mean` -0.47; `home_win_rate` -0.006 (max |0.093|).
+  - OT sims 96 -> 70 of 3,900.
+- **Caveats.**
+  - The output carries no profile stamp: the CSV's `profile_name` reads `nfl_v1` both times, which is the engine's name, not the file's version. The evidence is the fresh-process read (15:25:33Z and 15:47:28Z) plus this shape.
+  - The manual run is not in the sim-run ledger (`_record_season_projection_in_sim_ledger` runs only on the autorun's launch).
+  - The worker's next NFL `artifact_stale` launch moves to ~16:17Z 11-18, still before TNF (11-20 01:15Z).
+- **The #752 re-grade's condition (d):** week 11's sidecar was written after 15:25:08Z. MET for now; later rewrites before kickoff also come after the ff.
+- **Betting change:** no new row. The rebuild is pregame projection data under BC-022's load; it changes no code, env or live-bet rule.
+- **revert:** none needed. The next daily run rewrites the same files on the same profile.

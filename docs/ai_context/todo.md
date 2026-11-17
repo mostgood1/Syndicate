@@ -208,6 +208,11 @@
       - The next daily `artifact_stale` launch (~04:35Z 11-18) rebuilds it on the profile, before TNF 11-20 01:15Z.
       - The #752 re-grade's condition (d) needs that rewrite. A watcher reads it.
     - **TNF readings owed 11-19:** `timeouts_fed`, `possession_marginalised`, and refusals by reason.
+    - **WEEK 11 REBUILT ON THE PROFILE 10:17 AM CST 11-17** (user "Rebuild now").
+      - CSV + sidecar rewritten 16:17:28Z / 16:17:30Z by the autorun's own command under refresh-worker's environ.
+      - Over 13 games: q2 12.90 -> 14.11 and q3 10.71 -> 9.23 points a game (league 14.02 / 9.50).
+      - Lane `nfl-profile-load` CLOSED, GOAL MET. Findings: `findings_2026-11-16_nfl_profile_load.md`.
+      - Still owed under this item: the TNF 11-19 live readings, and the #752 re-grade on 12-08.
 - **Read-only.** Production's own NFL `build_projection`, 136 games of 2024-25 x 100 seeds, same seeds per arm (patched in the research process only), against nflverse pbp 2024-25 (544 games). Findings: `.syndicate/findings_2026-11-15_football_end_of_half_scoring.md`.
 - **The whole Q2 gap is in its last 120 s:** sim 3.14 points a game against the league's 4.78 [4.46, 5.10]. The regulation total looks right (45.84 vs 45.62) only because the errors cancel.
 - **Cause 1, halftime carry-over (`halftime_kickoff` OFF):** a drive crosses the half in 0.84 of games and scores 2.33 points a game in Q3. Switching it on: q3 -0.95 [-1.07, -0.83] (to 9.57, the league's 9.50), q2 0, total -1.07. That total drop is why the switch failed alone upstream.
