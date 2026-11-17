@@ -1404,6 +1404,75 @@ def full_game_prob_scale(market: Any, segment: Any, sport: Any, *, anchored: boo
 _COLLEGE_TOTAL_SPORTS = frozenset({"ncaab", "wncaab"})
 
 
+def college_calibrated_total(dist: Any, *, sims: Any, prob_scale: float, calibration: Any, line: Any,
+                             market_prob_over: Any) -> float | None:
+    """The TOTAL at which the calibrated P(over) is 50/50 -- the number a college totals card shows as "ours" when the
+    #816 calibration is in force (I-17, lane ncaab-total-overprojection; the user chose this over a "sim" label,
+    2026-11-17).
+
+    Why: the card showed the sim's projected final next to a flag the calibration made. On 11-17 23 of 74 NCAAB
+    full-game under flags showed "ours" ABOVE the line (rail monitor), because the calibration's level moves the
+    probability and nothing moved the number. This is the number the calibrated probability implies.
+
+    How: the engine's P(over L) at any L is the sim histogram, Agresti-Coull smoothed and #780-scaled, exactly as the
+    pricer does it. The market is priced only at the row's line, so elsewhere it is modelled as the sim's own spread
+    shifted to match that quote (normal, sd = the histogram's): at the quoted line this reproduces the served P
+    exactly, so the total is always on the same side of the line as the calibrated lean. Bisection on the monotone
+    calibrated curve; None when anything is missing or the curve does not cross 0.5 inside the histogram's range."""
+    from statistics import NormalDist
+
+    from syndicate.features.shared.prop_projections import _dist_prob_over
+
+    try:
+        anchor_line, p_mkt = float(line), float(market_prob_over)
+    except (TypeError, ValueError):
+        return None
+    if calibration is None or not isinstance(dist, Mapping) or not dist or not 0.0 < p_mkt < 1.0:
+        return None
+    points: list[tuple[float, float]] = []
+    for k, v in dist.items():
+        try:
+            points.append((float(k), float(v)))
+        except (TypeError, ValueError):
+            continue
+    weight = sum(c for _x, c in points)
+    if weight <= 0.0:
+        return None
+    mean = sum(x * c for x, c in points) / weight
+    sd = math.sqrt(sum(c * (x - mean) ** 2 for x, c in points) / weight)
+    if not sd > 0.0:
+        return None
+    normal = NormalDist()
+    market_mean = anchor_line + sd * normal.inv_cdf(p_mkt)      # so P_market(over anchor_line) == p_mkt
+
+    def calibrated_over(total: float) -> float | None:
+        raw = _dist_prob_over(dist, total)
+        if raw is None:
+            # Outside the histogram's support `_dist_prob_over` answers None; the probability there is known.
+            raw = 1.0 if total < mean else 0.0
+        smoothed = agresti_coull_point(raw, sims)
+        engine = float(smoothed if smoothed is not None else raw)
+        if prob_scale != 1.0:
+            engine = scale_prob(engine, prob_scale)
+        market = min(0.99, max(0.01, 1.0 - normal.cdf((total - market_mean) / sd)))
+        return calibration.apply(engine, market)
+
+    lo, hi = min(x for x, _c in points) - 1.0, max(x for x, _c in points) + 1.0
+    p_lo, p_hi = calibrated_over(lo), calibrated_over(hi)
+    if p_lo is None or p_hi is None or not (p_lo >= 0.5 >= p_hi):
+        return None
+    for _ in range(50):
+        mid = (lo + hi) / 2.0
+        p_mid = calibrated_over(mid)
+        if p_mid is None:
+            return None
+        if p_mid > 0.5:
+            lo = mid
+        else:
+            hi = mid
+    return round((lo + hi) / 2.0, 1)
+
+
 def college_live_total_calibration(market: Any, segment: Any, sport: Any, commence_time: Any = None) -> Any:
     league = str(sport or "").strip().lower()
     if (league not in _COLLEGE_TOTAL_SPORTS or str(market or "").strip().lower() not in _TOTALS_MARKETS
@@ -1488,6 +1557,7 @@ def price_distribution_market(
         # #816 college totals calibration: set only when one was applied (the engine's number, and the fit's stamp).
         "model_prob_uncalibrated": None,
         "total_calibration": None,
+        "calibrated_total": None,
     }
     if not isinstance(dist, Mapping) or not dist:
         out["withheld_reason"] = REASON_NO_LIVE_DISTRIBUTION
@@ -1576,6 +1646,11 @@ def price_distribution_market(
         out["prob_std_err"] = std_err
         model_prob = total_calibration.apply(engine_prob, market_p)
         out["model_prob"] = model_prob
+        if token in {"over", "o"}:
+            # I-17: the total the calibrated probability implies, for the card's "ours" (display only).
+            out["calibrated_total"] = college_calibrated_total(
+                dist, sims=sims, prob_scale=float(prob_scale), calibration=total_calibration, line=line_value,
+                market_prob_over=market_p)
     edge = _edge_pp(float(model_prob), market_p)
     out["edge_pp"] = round(edge, 2)
     # THE SAME BAR AS THE MONEYLINE, deliberately. A histogram answers "what is
@@ -1737,6 +1812,13 @@ def live_display_block(
             prob = cal.apply(engine_prob, fair) if fair is not None and 0.0 < fair < 1.0 else None
             calibrated = {"total_calibration": cal.stamp(), "prob_over_uncalibrated": engine_prob,
                           **({} if prob is not None else {"prob_withheld": "no two-sided market to calibrate against"})}
+            if prob is not None:
+                # I-17: the same calibrated total as the priced path, for the Live column and the rail's "ours".
+                calibrated["calibrated_total"] = college_calibrated_total(
+                    hit.get("total_runs_dist"), sims=sims,
+                    prob_scale=full_game_prob_scale(market_key, hit.get("segment") or "full", sport,
+                                                    anchored=bool(hit.get("margin_anchored"))),
+                    calibration=cal, line=row.get("line"), market_prob_over=fair)
     total_mean = hit.get("total_mean") if market_key in _TOTALS_MARKETS else None
     if prob is None and total_mean is None:
         return None

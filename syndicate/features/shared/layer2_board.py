@@ -3946,6 +3946,20 @@ def _game_total_actual(row: Mapping[str, Any]) -> float | None:
     return home + away
 
 
+def _calibrated_live_total(out: dict[str, Any], block: Mapping[str, Any], total_mean: float | None) -> None:
+    """A college total under the #816 calibration shows the CALIBRATED total as its live number (I-17, lane
+    ncaab-total-overprojection; the user chose this over a "sim" label, 2026-11-17): the total at which the calibrated
+    P(over) is 50/50 (`live_gameline_join.college_calibrated_total`), so the Live column and the rail's "ours" agree
+    with the flag beside them. On 11-17, 23 of 74 NCAAB full-game under flags showed the sim's total ABOVE the line.
+    The sim's own number stays on the row as `live_total_sim`; `live_total_basis` says which one `live_total` is."""
+    calibrated = _as_float(block.get("calibrated_total"))
+    if calibrated is None:
+        return
+    out["live_total"] = calibrated
+    out["live_total_sim"] = total_mean
+    out["live_total_basis"] = "calibrated"
+
+
 def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
     """The LIVE re-sim's number and the live actual, under the names the
     board's Live and Actual columns read.
@@ -4024,11 +4038,13 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
         total_mean = _as_float(gameline.get("total_mean"))
         if total_mean is not None:
             out["live_total"] = total_mean
+        _calibrated_live_total(out, gameline, total_mean)
     elif display and str(row.get("market") or "").strip().lower() in _TOTALS_ACTUAL_MARKETS:
         # A quarter/half block's `total_mean` is that segment's own live total, so this is the row's count.
         total_mean = _as_float(display.get("total_mean"))
         if total_mean is not None:
             out["live_total"] = total_mean
+        _calibrated_live_total(out, display, total_mean)
 
     # **h2h GAME ROWS DELIBERATELY DO NOT REACH THIS, AND MUST NOT** `[2026-09-05,
     # lane edge-basis-moneyline]`. The comment above used to say `_apply_verdict`

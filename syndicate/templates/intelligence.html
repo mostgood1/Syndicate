@@ -3554,7 +3554,12 @@
         let ours = null;
         let book = "–";
         if (spec.key === "totals") {
-          const total = liveRailNum(final.total) ?? marketRows.map((row) => liveRailNum(row.live_total)).find((v) => v !== null) ?? null;
+          // I-17 (#816 lane, user chose the calibrated total, 2026-11-17): a college total under the totals
+          // calibration shows the total its CALIBRATED probability implies (`live_total_basis: "calibrated"`), not the
+          // sim's projected final -- which sat on the other side of the line from 23 of 74 NCAAB under flags on 11-17.
+          const calibratedRow = marketRows.find((row) => row.live_total_basis === "calibrated" && liveRailNum(row.live_total) !== null);
+          const total = calibratedRow ? liveRailNum(calibratedRow.live_total)
+            : (liveRailNum(final.total) ?? marketRows.map((row) => liveRailNum(row.live_total)).find((v) => v !== null) ?? null);
           ours = total === null ? null : total.toFixed(1);
           book = line === null ? "–" : (Number.isInteger(line) ? String(line) : line.toFixed(1));
         } else if (spec.key === "spreads") {

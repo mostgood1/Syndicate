@@ -28,7 +28,8 @@ FLAG = "SYNDICATE_LIVE_RAIL_FAST_POLL"
 # What the rail reads off a row (`intelligence.html`, LIVE RAIL LINES + gameKey / displayMatchup), and nothing else.
 ROW_FIELDS = (
     "kind", "candidate_type", "market_state", "is_live", "lane", "market", "market_type", "segment",
-    "segment_label", "line", "side", "odds", "live_model_probability", "live_total", "model_edge_pct", "live_aware",
+    "segment_label", "line", "side", "odds", "live_model_probability", "live_total", "live_total_basis",
+    "live_total_sim", "model_edge_pct", "live_aware",
     "book_age_seconds", "price_grid_generated_at", "team", "display_name", "home_key", "away_key", "home_team",
     "away_team", "matchup", "sport", "sport_slug", "event_id", "game_id", "gamePk", "player_name",
     "game_date", "commence_time", "source", "source_board_date",
