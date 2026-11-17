@@ -949,6 +949,7 @@ death, never life — do not invert it.
 - Hypothesis: n/a (build; the #818 grade measured totals/h2 as the worst-losing segment, +0.0273 Brier, 11 of 192 games OT -- consistent with the mismatch, not shown caused by it)
 - Falsification test: n/a
 - Verification: real sim files: mean(h2) == mean(q3)+mean(q4) and full != h1+h2 (h2 excludes OT today); unit: switch off -> h2 histogram byte-identical to today; switch on -> h2 == q3+q4+OT per draw and differs from off on a draw set with OT; targeted pytest green; pushed to origin/main
+- STATUS 2026-11-16 (7:55 PM CST): BUILT + ON MAIN (a4d4b65af), DEFAULT OFF, NOT LOADED. Confirmed on 197 fleet NBA sims (C:\tmp\nba_seg copy): mean(h2) == mean(q3)+mean(q4) to 1e-14, OT dropped in 176. WNBA shares the path (bet_status_wnba settles h2 with OT; wnba_game_projections serves the raw p, so a WNBA flip is a betting change; NBA period w = 0, so an NBA flip moves p_model_raw only). A flip reaches only sims built after it (reuse never reads score.dist; tip freeze). 18 tests incl. off != on through _call_source_simulate_smart_game_local. LEAD: sim P(OT) 2.0% (411/20,100) vs 5.7% real (11/192). Findings .syndicate/findings_2026-11-16_nba_pregame_h2_ot.md; todo #820. Owed: the user's load decision.
 - Blocked by: none
 
 ### nba-margin-raw-zero — CLOSED 2026-11-16 (GOAL MET: cause named -- NBA job build reads WNBA column names, game model never fed; F0/F1 is the user's call, todo #821) — opened 2026-11-16 — session b44f64ce-a648-4698-9792-51714c8aaecc
