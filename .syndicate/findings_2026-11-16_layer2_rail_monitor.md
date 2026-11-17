@@ -1651,3 +1651,5 @@ count was not broken down by date. The grade waits for the 3 live games to go fi
   - **`d7c183d8d` 6:55 PM** (#816 display fix).
 - **refresh-worker restarts:** 2809282 → 2953295 (6:04 PM) → 3101432 (6:55 PM).
 - **live-odds-worker:** routine recycles to 2834332 (12:5x PM) and 2925378 (6:00 PM).
+
+**Page:** "Rail Watch, Mon Nov 16", https://claude.ai/artifact/NatuXkAdpFRR3RN5EmBjRq (private; published ~11:35 PM CST).
