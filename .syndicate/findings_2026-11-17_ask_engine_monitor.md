@@ -421,3 +421,37 @@ Probe 2:03:04-2:03:56 PM CST (`ask_reading_20261117T200304Z.json`); page 200 in 
 
 - **ANOMALY:** 1 of 17 overlay warms took over 60 s (max 91.51 s); 3 took over 45 s. These probably came right after the restart, with cold caches and the host under load. Next: check whether warms over 60 s still appear in the next reading's window, which has no restart in it.
 - **ANOMALY:** New fleet load. Host restart + `up` at 1:51:31 PM CST put refresh-worker and live-odds-worker on `5db26434e`, from `92ae7490a`. This is the first launcher-spec/`fleet_env` `up` (`[web] ANTHROPIC_API_KEY` declared with no value). Next: lane `render-config-retirement`'s owed environ compare. Also check that Ask answers and live-row pricing stay consistent through the evening slate. Note the Ask `as_of` of 18:16:24Z predates the restart.
+
+## Reading 9 (2:34 PM CST)
+
+Probe started 20:34:56Z (2:34 PM CST); file `C:\tmp\elp\askmon\readings\ask_reading_20261117T203456Z.json`.
+
+**Ask:** 5 of 5 answered, 0 of 5 past the 45 s cut-off, median 3.1 s, max 7.4 s. Page 200 in 0.06 s; shortlist 200 in 2.15 s (200 rows). All answers `answer_source=snapshot`.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "What do you think of this spread?" | 3.10 | True | bet_analysis | 2026-11-17T20:17:26Z (age 1053 s) | 0 |
+| free_text "Lakers vs Celtics" | 0.51 | True | matchup_analysis | 2026-11-17T20:17:26Z (age 1054 s) | 0 |
+| free_text "top edges today" | 7.40 | True | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NBA, Lakers h2h) | 5.51 | True | bet_analysis | 2026-11-15 (date) | 2 |
+| pregame_prop (NBA, McBride threes U1.5) | 1.95 | True | bet_analysis | 2026-11-17T17:43:54Z (age 10286 s) | 7 |
+
+No `live_row` ask: no game was live. `as_of_in_future` false on 5 of 5.
+
+**Web, 20:04:56Z-20:35Z (2:04-2:35 PM CST), 137 requests:**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 8 (7 hard), max anon 956.1 MB vs limit 649.2 MB.
+- Overlay warms: 23, median 10.61 s, 4 over 20 s, 1 over 45 s, 0 over 60 s, max 49.48 s.
+- Requests over 20 s: 1 (`POST /api/intelligence/query`); over 45 s: 0.
+- Asks from any client: 5, 0 over 45 s, 0 non-200; 0 of 5 NOT this probe (all `Python-urllib/3.12`).
+
+**Host:** load 2.11 / 2.46 / 3.21 on 12 cores; MemAvailable 8434 MB. Top CPU: refresh-worker 108% (ni 0, RSS 3385 MB), live-odds-worker 53% (ni 0), three `<defunct>` python children 15-22% (ni 0, 16 s old), live_resim_workers x2 ~7% (ni 5), gunicorn 5.5% (ni 0).
+
+**Engine:**
+- 2a: `engine-live-prior-f2-read-1117` has 1 run total (16:30-17:17Z, 10:30-11:17 AM CST, "did NOT PASS") -- the one already recorded on main (`c765eec64`); no newer run.
+- 2b: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 `c1a2c029c2a1816f...` -- matches Amendment 2.
+- 2d: 0 commits to the engine files on origin/main in the last 40 min.
+- 2e: deploys.md headers stamped since 19:55Z are all READINGs (19:56:39Z, 19:56:53Z, 19:58:28Z, 20:02:54Z); no new FLEET ff / DEPLOY / restart. The host reboot's `up` (19:50:39Z, `5db26434e`) is ~44 min old, just outside this window.
+
+No anomaly.
