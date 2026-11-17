@@ -60747,3 +60747,14 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - NBA A cells INSUFFICIENT (29 / 21 / 8 games): totals crosses 30 at the next NBA night; spreads k 1.57 needs ~9 more games; k 2.02 has 8 games, plausibly because the k 1.57 anchor took over NBA spreads from 11-14 (not checked), so that cell may never reach 30.
   - NCAAB h2h is WORSE THAN MARKET (untempered, k 1): not #780's tempering, but a board finding for whoever owns live h2h.
 - **betting change:** no (reading only). **Claims:** none.
+
+## 2026-11-17 15:17:27Z (9:17 AM CST) -- READING, no deploy: the owed live reading of the 11-11 20:25:12Z Kalshi fractional-counts load (lane kalshi-fractional-fills) -- **MET**
+
+- scheduled task `kalshi-fractional-fill-read-1117` ran `C:\tmp\kff_read_1117\run.sh` (read-only; the only venue call is the paged GET `/portfolio/fills`). Fleet HEAD d7c183d8d; live-odds-worker pid 3777750, env commit 5b30d2415 contains `e102faf79`, `SYNDICATE_KALSHI_FRACTIONAL_COUNTS` absent (= on).
+- fills window: Kalshi /portfolio/fills 2026-11-11 .. 2026-11-17T15:16:09Z, 441 fills; 3 orders with a fractional filled total, all first filled after 2026-11-11T20:25:42Z.
+- `TRUE_SIZE ENTRY 9908188f KXNHLAST-26NOV16VANUTA-UTAALEE72-1 leg=no first_fill=2026-11-17T02:35:09Z venue=1.01 ours=1.01 status=filled outcome=lost`
+- WRONG_SIZE lines: none.
+- `ENTRY_91822817 {'status': 'filled', 'contracts': 0.03, 'outcome': 'won'}`
+- `SUMMARY ours_true_size=1 ours_wrong_size=0 paper=0 not_ours=2` -- `VERDICT MET` (exit 0).
+- verify: kff_read.py VERDICT MET -- 1 of 1 fractional fill of ours since the load recorded at the venue's size (1.01 = 1.01), 0 WRONG_SIZE; 91822817 filled 0.03.
+- **betting change:** no (reading only). **Claims:** none.
