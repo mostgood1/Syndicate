@@ -941,6 +941,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_paper_payload_request_path.py (equivalence of ledger_for_date vs the old full-history filter on a planted archive incl. re-archived copies and doc-wins; worker writes the paper-only all-time doc; web reads it and degrades to None when absent); an A/B on the fleet data (old vs new builder) for 3 dates; after a web reload, one paper GET timed from the access log with no WORKER TIMEOUT, and the all-time doc's written_at after the refresh-worker loads
 - Blocked by: none
 
+### lane-invariants-speed-2 — OPEN — opened 2026-11-17 — session f60eabcb
+- Goal: check_lane_invariants.py measurably faster again (same-instant A/B on the primary tree, serial and alongside the other session-start checks) with byte-identical stdout and exit code; third lane after lane-claims-parse-memo and lane-claims-checker-speed
+- Files: `scripts/check_lane_invariants.py`, `.claude/hooks/lane_claims.py`, `tests/test_check_lane_invariants_speed.py` (new), `tests/test_check_lane_invariants.py`
+- Hypothesis: Measured 2026-11-17 ~10:40 AM CST on the primary before any change (host loaded): orphaned_lane_markers 630-770 ms, read 8.7 MB of archives in text mode (99-177 ms: decode ~40 + newline translation 46-105) to classify 77 non-live marker slugs, plus 305 marker reads (42-66 ms, 186 of them empty); contested_files 58 ms quiet / 124-182 loaded (claim_groups compares all ~61k spelling pairs); argparse ~30 ms. A bytes scan (bytes.find + the UTF-8 forms of every str \s char, CR or LF as line start) gave identical headings in 30-37 ms against 122-157 ms; same_file can only hold within one basename unless one side is a directory claim.
+- Falsification test: Any stdout or exit-code difference old vs new on the primary tree; any heading list, marker classification or claim group differing on a test population; no speedup in alternating pairs.
+- Verification: Alternating old/new pairs on the primary tree (serial and concurrent with the other eight checks), stdout + rc compared per pair; existing check_lane_invariants and lane_claims tests; new equivalence tests; findings file .syndicate/findings_2026-11-17_lane_invariants_speed_2.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
