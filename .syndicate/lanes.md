@@ -929,7 +929,7 @@ death, never life — do not invert it.
 
 ### session-start-hook-runtime — OPEN — opened 2026-11-16 — session 2f342db9-e588-4aa5-8aa1-11115dcb276c
 - Goal: The session-start hook reliably finishes inside its 20 s SessionStart timeout: max under ~12 s over >=5 primary-tree runs with every check still running (was 11.8-25.4 s in a worktree), and it still exits 0 with no traceback when python or any script is missing
-- Files: .claude/hooks/session-start.sh (runtime only: python checks run concurrently, one wc for the size alarms; output byte-identical), tests/test_session_start_hook.py (NEW), .syndicate/findings_2026-11-16_session_start_runtime.md (NEW)
+- Files: .claude/hooks/session-start.sh (runtime: python checks run concurrently + one wc for the size alarms + output byte-identical), scripts/session_start_jobs.py (NEW), tests/test_session_start_jobs.py (NEW), .syndicate/findings_2026-11-16_session_start_runtime.md (NEW)
 - Hypothesis: Two costs dominate: the five coherence checkers run serially (7.4 s, check_lane_invariants 2.6-3.9 s alone, CPU-bound in lane_claims.sections_are_disjoint) and the state-size loop forks wc+tr per file (15 files, ~4.4 s at ~0.15 s per MSYS fork)
 - Falsification test: If running the python checks concurrently plus one wc call does not cut the max below 12 s over 5 primary-tree runs, the cost is elsewhere (host contention or git) and the change is not enough
 - Verification: Per-section xtrace timing table over 5 primary-tree runs before and after (median, max); new hook stdout byte-identical to the old hook's on the same tree; exit 0 and no traceback with python absent from PATH and with each script removed
