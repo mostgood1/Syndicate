@@ -61117,3 +61117,16 @@ Lane `render-config-retirement` (CLOSED; session 267d8859). It follows the 18:58
   - Recycles are driven by every route (the request rates are similar, ~210 an hour before and after), and the after window is 1 h.
 - **What is known.** Every new-form query was 4.32-4.73 MB, against 11.2-12.1 MB for the same moment in the old form.
 - **Owed.** Re-read once the user's tab is reloaded and over a window of several hours, by the rail monitor at its next reading or by this script, comparing recycles per new-form vs full-form query.
+
+## 2026-11-17 20:02:54Z (2:02 PM CST) -- READING (no deploy): CORRECTION to the 19:56:53Z recycle reading (todo #826) + what the host restart's 19:51Z `up` loaded from the 18:58:45Z ff
+- betting change: no
+- **The 19:56:53Z "after" window (18:58:52-19:56:53Z) SPANNED A HOST RESTART.** Its numbers mix two web processes and an outage, so they are void as an after-load rate. Its verdict ("not attributable") stands.
+  - The rail monitor read a user-initiated Windows restart at 19:48:57Z (1:48:57 PM CST, event 1074).
+  - Read-only on the fleet at 20:02:54Z: WSL uptime 698 s; supervisor `LOCAL PRODUCTION UP ... commit=5db26434e310`, money LIVE; web pid 496 (workers 3415/3419), refresh-worker 560 and live-odds-worker 561, both started 19:51:31Z.
+  - The monitor's own clean pre-restart window, 18:58:46-19:48:50Z: 11 recycles; 13 query POSTs, 5 with `row_refs`; 13.2 per hour, 0.85 per query.
+  - **The clean re-read starts 19:51Z.** Every role is fresh, and browsers reloading get the new page JS. The rail monitor will measure it over tonight's slate.
+- **What the 19:51Z `up` loaded beyond web** (code the 18:58:45Z ff put on disk; the workers had last loaded 92ae7490a):
+  - `2148f99cb` worker half: `paper_settlement` writes the paper all-dates record. Paper only. The page's retirement `f7fb3ed4e` is NOT on the fleet.
+  - `ac2cbc2fc`: this was the first `up` built by `fleet_role_spec.json` + `fleet_env/`, and it started all three roles. It printed `[web] 1 declared key(s) with no value in any layer: ANTHROPIC_API_KEY`; whether that matches the old launcher is for lane `render-config-retirement` to read.
+  - Nothing that places, sizes, holds or exits a live bet, so betting change: no.
+- **Owed by lane `render-config-retirement`:** its post-`up` reading, that each role's /proc environ equals the pre-up one except `RENDER_GIT_COMMIT` / `RENDER_INSTANCE_ID`. It has been told.
