@@ -625,7 +625,10 @@ first readings of `INPLAY_OVERLAY ... refused=` (33 overlay lines 00:04:38Z-00:2
   | game | 5:20 PM | 5:41 PM | 6:04 PM | 6:27 PM |
   |---|---|---|---|---|
   | Iona @ UMBC | 141.5 / 145.4 | 134 / 142.7 | 126.5 / 136.5 | 122.5 / 124.6, now UNDER |
-- Totals direction across 11-16 totals flags, counted flag by flag: **19 unders, 12 overs.**
+- Totals direction across 11-16 totals flags, counted flag by flag: **20 unders, 12 overs.**
+  - Through 6:04 PM: 11 U / 9 O.
+  - Reading 12 adds 9 U (7 NCAAB full, WNCAAB u129.5, NBA u235.5) and 3 O (Richmond o139.5, NBA
+    o237.5, o198.5).
 
 ### ANOMALY — the #816 calibration reaches about 1/3 of the served NCAAB full-game total rows (handed to local_1f10ce63)
 
