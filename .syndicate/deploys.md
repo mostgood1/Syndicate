@@ -61139,3 +61139,23 @@ Lane `render-config-retirement` (CLOSED; session 267d8859). It follows the 18:58
   - live-odds-worker: d7c183d8d..5db26434e. Its execution files changed only in `execution_ledger.py` (+54, display); #814's MLB entry hold (MLB out of season, no bet affected).
   - Classified `no`: nothing that changes which live bets are placed, sized, held or exited.
 - **portfolio reading:** a balance read failed at 19:47:19Z, before the restart (Kalshi `balance_auth_error`, Polymarket `balance_path_unknown`). The new worker's boot stamp (~19:51:19Z, 3 s before its first good balance read) showed every dollar cap at 0 on `/portfolio` until the 20:00:03Z stamp. The worker's enforced caps were nonzero at 19:51:54Z / 19:52:21Z. `unknown_submits` 0. Detail: `.syndicate/findings_2026-11-17_portfolio_monitor.md` Reading 7.
+
+## 2026-11-17 19:58:28Z (1:58 PM CST) -- READING (no deploy of mine): the host REBOOT's unplanned `up` (supervisor pid 328, 19:50:39Z, `5db26434e`) was the first on render-config step 1's launcher -- **MET: every role runs exactly the env both launchers build, 0 keys differ**
+
+Lane `render-config-retirement` (session 267d8859). The Windows host rebooted at 1:50 PM CST (relayed by sessions `local_431175b6` and `local_bc8d3e61`; WSL uptime 454 s at 19:58:28Z). `SyndicateLocalProduction` ran `up --allow-live-execution` at `5db26434e` with no drain. That checkout carries step 1 (`ac2cbc2fc`: the launcher reads `fleet_role_spec.json` + `fleet_env/`), NOT step 2 (`cc90fb653`) and NOT step 3a (`91d865fd5`).
+- **What the restart loaded:**
+  - web, refresh-worker and live-odds-worker all now run `5db26434e`; the workers were on `92ae7490a` before. The ride-alongs between those commits are classified in BC-032 (all `no`).
+  - Any in-flight job at 19:50Z died with the host, not with a deploy.
+- **Reading (read-only, fleet venv, key names only; `next_up_vs_running.py` method of the 19:06:39Z entry):** for each role, its live `/proc/<pid>/environ` against the env the on-disk launcher builds (`fleet_role_spec.json` + `fleet_env/`) and the env the `92ae7490a` launcher would have built (`render.yaml` + `render_env/`). Base: supervisor 328's own environ plus `--allow-live-execution`; the instance id is pinned to the role's own.
+
+| role (pid) | keys | new launcher vs running | old launcher vs running | new vs old |
+|---|---|---|---|---|
+| web (496) | 160 | 0 differ | 0 differ | 0 differ |
+| refresh-worker (560) | 262 | 0 differ | 0 differ | 0 differ |
+| live-odds-worker (561) | 235 | 0 differ | 0 differ | 0 differ |
+
+  `RENDER_GIT_COMMIT` now matches too, since HEAD = the loaded commit. The markers are `RENDER*` only, as predicted: step 2 / 3a are not on the fleet. Key counts are unchanged from the 19:06Z pre-reboot reading.
+- **Step 1 is LIVE and verified.** Its prediction ("env byte-identical to the old one") held on a real `up`.
+- **Step 3b's gate is NOT met by this restart.** It needs an `up` at or after `91d865fd5` plus a clean `scripts/fleet_role_env_reading.py` compare, i.e. the vhdx-shrink window. Until then the roles carry only `RENDER*`, and the readers' fallback must stay.
+- betting change: no (step 1 builds the identical env; nothing is placed, sized, held or exited differently). The restart load itself is BC-033 (lane `board-query-row-refs-load`, deploys.md 20:02:54Z); this reading is BC-035.
+- **verify:** this table; the next drained `up` at or after `91d865fd5` owes the snapshot/compare (todo #766).

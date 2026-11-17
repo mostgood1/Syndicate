@@ -236,6 +236,8 @@ refresh-worker kills an in-flight MLB sim**, so the load needs the deploy claim 
   returns the same value, and job counting is test-pinned under every child spelling. If a
   reading shows any reader changed, that is a falsification, and the answer becomes `yes`.
 
+**STEP 1 LIVE, 19:50:39Z (1:50 PM CST):** the host rebooted, and `SyndicateLocalProduction`'s undrained `up` at `5db26434e` was the first on the new launcher. Reading at 19:58:28Z: each role's live env (160 / 262 / 235 keys) equals both launchers' build, 0 keys differ (deploys.md, BC-035 `no`; the load itself is BC-033). Markers are still `RENDER*` only; step 2 / 3a are not on the fleet.
+
 ## Step 3 — APPROVED 2026-11-17 (user "go ahead with step 3", relayed verbatim by the parent session); 3a ON MAIN `91d865fd5`, 3b waits for a restart
 
 **Sequencing.** The running roles carry ONLY the `RENDER*` names: no `up` has run step 2's
