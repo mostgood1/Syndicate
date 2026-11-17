@@ -61097,3 +61097,23 @@ Lane `render-config-retirement` (CLOSED; session 267d8859). It follows the 18:58
 - **Reachability still MET after the restart:** the WSL VM booted 2026-11-17 13:50:54 CST (`uptime -s`; cause not in deploys.md at this reading, not this lane's). The fleet came back at `5db26434e` (contains `3dbe53df0`), supervised refresh-worker pid 560 (etimes 341 s at 19:56:39Z); guard markers on disk 1; post-load rows with `state_*` fields NCAAB 309 of 394 (the rest refused-half records), WNCAAB 169 of 169; pre-load 0; 0 tracebacks in 10 min; 7 BOOK_GRID ticks in the first ~5 min.
 - **Still owed:** NCAAB's first refusal (the rail monitor counts `model_projected_final_below_points_scored` in every college reading from tonight); the #816 7-day grade, scheduled task `college-total-cal-grade-816` (Mon 11-24 10:00 AM CST; task file present after the restart).
 - betting change: no (reading only)
+
+## 2026-11-17 19:56:53Z (1:56 PM CST) -- READING (no deploy): web memory recycles per board query, before vs after the 18:58:45Z `row_refs` load (todo #826, lanes `board-query-row-refs` / `-load`) -- **NOT ATTRIBUTABLE YET: only 5 of 14 post-load queries used the new form**
+- **Source.** `C:\tmp\rowrefs826\recycle.py`, run read-only over the tail of `~/syndicate-prod/logs/web.log`. A query counts as the new form when its access-log size is < 7 MB.
+
+| | before (16:00:32-18:58:51Z, 2.97 h) | after (18:58:52-19:56:53Z, 0.97 h) |
+|---|---|---|
+| all requests | 624 | 203 |
+| board queries | 25 (0 new form) | 14 (**5 new form**, 9 full) |
+| mean query size / time | 11.51 MB / 47.6 s | 9.07 MB / 23.7 s |
+| `WEB_WORKER_MEMORY_RECYCLE` | 28 (20 hard) | 11 (7 hard) |
+| recycles per query / per hour | 1.12 / 9.43 | 0.79 / 11.34 |
+| median requests per recycle / anon MB at recycle | 15 / 893 | 10 / 836 |
+
+- **Why it cannot be read yet:**
+  - 9 of the 14 post-load queries still pulled the full ~11.2-12.1 MB response.
+  - 8 of those 9 are `Python-urllib` scripts that do not send `row_refs`. The rail probe started sending it at `ff66c2986`.
+  - The 9th is the user's browser at 19:17:53Z (11,950,201 B, referer `/?live_edge=any`). `/` renders the same `intelligence.html` via `intelligence_home()`, so this is a tab opened before the 18:58:52Z reload, still running the old JS.
+  - Recycles are driven by every route (the request rates are similar, ~210 an hour before and after), and the after window is 1 h.
+- **What is known.** Every new-form query was 4.32-4.73 MB, against 11.2-12.1 MB for the same moment in the old form.
+- **Owed.** Re-read once the user's tab is reloaded and over a window of several hours, by the rail monitor at its next reading or by this script, comparing recycles per new-form vs full-form query.
