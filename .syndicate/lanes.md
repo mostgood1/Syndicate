@@ -935,6 +935,14 @@ death, never life — do not invert it.
 - Verification: Per-section xtrace timing table over 5 primary-tree runs before and after (median, max); new hook stdout byte-identical to the old hook's on the same tree; exit 0 and no traceback with python absent from PATH and with each script removed
 - Blocked by: none
 
+### nba-pregame-h2-ot — OPEN — opened 2026-11-16 — session e8ebbfe5-93ff-4a11-8e8b-3cf27e80e511
+- Goal: todo #820: the NBA/WNBA pregame smart-sim's score.dist.segments.h2 histogram can carry q3 + q4 + every OT draw (the rule books and segment_actuals/bet_status_* settle h2 on), DEFAULT-OFF behind a switch, with an off != on reachability test, the WNBA path checked, and whether a flip needs a re-sim to reach production documented; pushed to main, NOT loaded on the fleet (loading is the user's call)
+- Files: syndicate/features/shared/basketball_props_smart_sim.py (the _SIM_DIST_SEGMENTS_LOCAL block + _attach_sim_distributions_local + its call in _call_source_simulate_smart_game_local section only), tests/test_basketball_pregame_h2_ot.py (NEW), .syndicate/findings_2026-11-16_nba_pregame_h2_ot.md (NEW), docs/ai_context/todo.md (#820 section only)
+- Hypothesis: n/a (build; the #818 grade measured totals/h2 as the worst-losing segment, +0.0273 Brier, 11 of 192 games OT -- consistent with the mismatch, not shown caused by it)
+- Falsification test: n/a
+- Verification: real sim files: mean(h2) == mean(q3)+mean(q4) and full != h1+h2 (h2 excludes OT today); unit: switch off -> h2 histogram byte-identical to today; switch on -> h2 == q3+q4+OT per draw and differs from off on a draw set with OT; targeted pytest green; pushed to origin/main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
