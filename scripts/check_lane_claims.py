@@ -300,7 +300,62 @@ def _is_test_of(test_name, module_name):
     return test_name in ("test_" + module_name, stem + "_test" + suffix)
 
 
-def _near_miss(claim, by_base):
+def _names_by_length(names):
+    """{length: [name, ...]}, `_close_basename`'s index. Build it once per run:
+    the length window then reads only the buckets inside it, and never scans
+    every name again for each claim (measured: 19 scans cost ~90 ms)."""
+    out = {}
+    for name in names:
+        out.setdefault(len(name), []).append(name)
+    return out
+
+
+def _close_basename(base, names, cutoff, by_len=None):
+    """`difflib.get_close_matches(base, list(names), n=1, cutoff=cutoff)`, the
+    same answer, after dropping candidates that difflib would drop anyway.
+
+    `by_len` is `_names_by_length(names)`, passed in so that one run builds it
+    once. It must come from the same `names`.
+
+    WHY (lane `lane-claims-checker-speed`, 2026-11-17). `_near_miss` runs once
+    per claim that names no file, and each call scored every tracked basename:
+    18 claims x 21,556 names = 388,008 candidates, 1.2-1.8 s of a 2.3-3.3 s
+    run on the primary tree. That made this check the critical path of the
+    session-start hook.
+
+    `get_close_matches` keeps a candidate only if THREE scores reach the cutoff:
+    `real_quick_ratio`, then `quick_ratio`, then `ratio`. The two filters here
+    each compute a number that is never below one of the first two scores, by
+    difflib's own formula `2.0 * matches / (len(a) + len(b))`:
+
+      * the LENGTH WINDOW is `real_quick_ratio` itself, where
+        matches = min(len(a), len(b));
+      * the ABSENT-CHARACTER BOUND bounds `quick_ratio` from above. Its matches
+        count a's characters that occur in `base` at all. A character that never
+        occurs in `base` cannot be part of any match, so `quick_ratio`, which
+        counts the multiset intersection, is never higher. `str.translate`
+        deletes the characters `base` has; what is left is the absent ones.
+
+    So every candidate dropped here would have failed inside `get_close_matches`,
+    and every one kept is scored by `get_close_matches` itself. The best match
+    is the maximum of (ratio, name), which does not depend on candidate order.
+    Measured on the live tree, 19 claims: the pool fell from 409,564 to 8,288
+    candidates, and the stage from 677-739 ms to ~140 ms in-process, with
+    identical answers. `tests/test_check_lane_claims_speed.py` compares the two
+    on real and synthetic name sets.
+    """
+    if by_len is None:
+        by_len = _names_by_length(names)
+    lb = len(base)
+    in_base = dict.fromkeys(map(ord, set(base)))  # translate() deletes these
+    pool = [n for ln, group in by_len.items()
+            if 2.0 * min(ln, lb) / (ln + lb) >= cutoff
+            for n in group
+            if 2.0 * (ln - len(n.translate(in_base))) / (ln + lb) >= cutoff]
+    return difflib.get_close_matches(base, pool, n=1, cutoff=cutoff)
+
+
+def _near_miss(claim, by_base, by_len=None):
     """A tracked file this claim was probably MEANT to name, or None.
 
     This is what keeps the severity split from being too blunt. Demoting every
@@ -318,7 +373,7 @@ def _near_miss(claim, by_base):
     base = claim.rsplit("/", 1)[-1]
     if not base:
         return None
-    close = difflib.get_close_matches(base, list(by_base), n=1, cutoff=0.85)
+    close = _close_basename(base, by_base, cutoff=0.85, by_len=by_len)
     if not close or close[0] == base:
         return None
     # A MODULE IS NEVER THE TYPO-CORRECTION FOR ITS OWN TEST.
@@ -501,9 +556,12 @@ def main():
         holders.setdefault(claim, set()).add(slug)
 
     broken, unwritten, inert = [], [], []
+    by_len = None  # `_close_basename`'s length index: built once, only if a claim needs it
     for slug, claim in claims:
         if not _resolves(claim, paths, by_base, root):
-            neighbour = _near_miss(claim, by_base)
+            if by_len is None:
+                by_len = _names_by_length(by_base)
+            neighbour = _near_miss(claim, by_base, by_len)
             held_by = sorted(holders.get(neighbour, set()) - {slug}) if neighbour else []
             # An impossible token stays BROKEN however it is marked: a glob or a
             # brace list cannot resolve when the file lands, so `(NEW)` does not
