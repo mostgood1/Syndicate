@@ -793,3 +793,105 @@ lane ncaab-total-overprojection at the summary.
   - **The file:** the only open lane naming `intelligence.html` is dh-state-aware-pairing, scoped to the
     doubleheader functions.
   - Until the owner answers, the monitor keeps counting I-17 at each reading.
+
+## Reading 9 — Tue 11-17 5:27 PM CST (23:27Z) — the wave starts, and a deploy drain freezes the board
+
+**Fleet changes since reading 8 (other lanes, each in deploys.md):**
+- **23:15:44Z:** ff `25fc2e4f0` → `64daca46f` + `reload-web`. Board query serialise-once, #828 (lane
+  board-query-serialize-once-load); MET.
+- **23:22:26Z:** live-odds-worker TERM at `64daca46f`, loading #829's live-capture half (lane
+  wnba-boxscore-polling-per-date, user "Load it"). New pid 52087. `WNBA_LIVE_BOX_SKIPPED` on its first tick.
+- The refresh-worker 28948 still runs `91d865fd5`.
+- **The I-2 recycle reading now has two windows:**
+  - 21:56:26Z → 23:15:44Z, #827 only (the de-dup owner gave the start; its deploys entry counts 19 recycles in
+    78 min);
+  - after 23:15:44Z, #827 + #828.
+
+  Each window's baseline is taken inside that window.
+- **I-17 accepted** by lane ncaab-total-overprojection (`ef4163bb5`; the user chose the calibrated total).
+
+### ANOMALY: a refresh-worker deploy drain has held the Layer 2 board since 23:14Z
+
+- **Who and when:** `deploy_drain.json` (fleet Redis, data root): owner **ncaaf-grid-build-speed**, reason
+  `check_deploy_safety --drain`.
+  - Requested **23:09:26Z** (5:09 PM CST); **expires 01:39:26Z** (7:39 PM CST), a 2.5 h lifetime.
+  - The same lane holds the refresh-worker claim (acquired ~23:08Z).
+- **The worker is ready:** `worker_drain_state_refresh-worker.json` shows `acked_drain_at` 23:30:27Z and
+  `in_flight {"mlb_sim": false}`. It is idle and waiting for the TERM.
+- **What has stopped:**
+  - Every board build since 23:14:42Z logs `DEFERRED_BOARD_BUILD reason=deploy_drain_requested` (13 by 23:29Z).
+  - `LAYER2_TODAY_CADENCE ran=held age_before_s=1764 limit_s=300` at 23:30:11Z.
+  - The last today board was published 23:02:14Z (2,741 candidates). The 23:13:09Z build (522 s wall) was the
+    11-18 board.
+  - The board-loop `PORTFOLIO_EXECUTED` (mode=paper) last ran 23:12:01Z.
+  - `DRAIN_HOLD stage=mlb_sim_tick` every ~35 s.
+- **What has NOT stopped:** the in-play overlay. In 26 min: NCAAB 31 builds, WNCAAB 28, NCAAF 20; every gap
+  under 145 s; web merges fresh 61 / 61 / 51. The live rows on the cards stay fresh.
+- **Handed off at 23:31Z** to the claim holder's session, local_208683f1. Transcript 0f519972's custom title
+  is "Layer 2 rail: live edge line, highlight and filter". Message 20522098 is queued; read not confirmed.
+  - **Asked:** TERM now, since the worker is idle, or clear the drain until ready.
+  - Nothing touched by me.
+
+### The reading
+
+**Slate: 11 live chips.**
+- NCAAB 4: Notre Dame @ Florida H2 8:50; St. Peter's @ UMass Lowell; SIU @ Liberty; Marist @ Army.
+- NCAAF 1: Eastern Michigan @ Western Michigan, Q1.
+- WNCAAB 6.
+
+**Flags: 4 shown, 0 false, 0 missed, 0 dark.**
+- NCAAB Notre Dame @ Florida u161.5, 11.9 pp; ours 161.5, on the line itself.
+- NCAAB Marist @ Army u132.5, 3.8 pp; **ours 137.7, on the other side (I-17)**.
+- NCAAB St. Peter's @ UMass Lowell ML UML, 5.8 pp.
+- WNCAAB Tennessee St @ Louisville u149.5, 14.2 pp; ours 144.6, agrees.
+- **I-17 this reading: 1 of 3 totals flags contradicts its "ours"**, plus 1 tie.
+
+**Live rows: 97.** 36 priced <= 120 s; 26 over 300 s now; priced age p50 156 s.
+
+**13 of 28 live markets carry no price of ours:**
+- **WNCAAB 7, all fresh in-play rows (67-250 s).**
+  - h2h 4: heavy favourites −400 to −1,900.
+  - Full-game totals 3.
+- **6 live markets display a PREGAME shortlist quote as their book** (`source=layer2_shortlist`, no in-play
+  row for that market):
+  - NCAAF Eastern Michigan @ Western Michigan: spread EM +17.5 (971 s), ML WM −800 (1,287 s), 1H spread
+    EM +10.5, and 1H total 23.5 (1,032 s);
+  - NCAAB Marist @ Army: spread **ARMY −1 at 26,035 s (7.2 h)** and 1H spread MRST +0.5 (2,367 s).
+  - No flag can fire on these, since there is no price of ours. The cards carry the age.
+
+**Team cards: 1 flipped.**
+- The NCAAB card is titled **"Liberty Flames @ Southern Illinois Salukis"** (the odds feed: home SIU). Its chip
+  (ESPN 401920953) is **"Southern Illinois @ Liberty"** (home Liberty).
+- The card carries only totals (full + 1H), which are symmetric in home/away, so no price on it depends on
+  the orientation.
+- 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 truncated, 0 live chips without a live card.
+
+**Overlay (26 min).** 0 gaps over 360 s; 0 `deferred_slow`.
+
+| sport | builds | gap p50 / max | build s p50 / max | zero-card with rows |
+|---|---|---|---|---|
+| NCAAB | 31 | 51 s / 89 s | 5.4 / **22.4** | 0 |
+| WNCAAB | 28 | 64 s / 123 s | 1.6 / 7.5 | 2 |
+| NCAAF | 20 | 70 s / 145 s | 1.6 / 11.9 | 0 |
+
+- **Reading 7's lead is weakened.** 3 NCAAB builds took over 20 s (23:06:58 20.8 s, 23:08:28 22.4 s,
+  23:09:21 22.2 s), and **2 of the 3 had no background build in the same tick**. The NCAAB slate is now 57
+  games. No deferral followed.
+- **Book-grid ticks:** 64, gap p50 18 s, max 90 s. Host load 4.2.
+
+**Load (#827 + #828 on web):**
+- **Query 3.8 s / 4.25 MB wire / 23.0 MB raw.**
+- Shortlist 1.8 s; chips 0.05 s; live-rail 0.03 s (70-92 rows).
+- Board built 900 s ago (the drain); query snapshot 1,644 s.
+- Gunicorn workers 96 s and 27 s old.
+
+**#824:** 0 of 2 college `LIVE_GAMELINE_JOIN` lines since 23:01Z carry the reason. 0 college totals flags below
+the points scored (0 of 3).
+
+### Improvement hunt, reading 9
+
+| # | improvement | evidence | owner | next step |
+|---|---|---|---|---|
+| I-18 | **A deploy drain can freeze the board for its whole 2.5 h lifetime** once the worker has acked and gone idle. Lead: an idle-acked drain with no TERM should alarm after N minutes, or expire well under 2.5 h. | Above: requested 23:09:26Z, acked idle, board held 16+ min of the evening wave, expiry 01:39:26Z. | `check_deploy_safety.py --drain` (to name the lane at the summary); the holder now | First, the holder's TERM. Then measure how long past drains sat acked-idle. |
+| I-19 | **Live cards show a pregame shortlist quote as the market's book** when no in-play row exists for that market (6 of 28 live markets, up to 7.2 h old). | Above. | Rail lane (local_208683f1), or a display decision for the user | Count it every reading tonight; find whether the card marks it as pregame. |
+| — | Flipped card (Liberty / SIU): the odds feed and ESPN disagree on home/away. Totals only, no price depends on it. | Above. | Rail team-card matching | Count it every reading; any side market on such a card would matter. |
