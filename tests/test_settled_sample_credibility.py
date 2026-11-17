@@ -221,8 +221,9 @@ LEDGER = [
 
 
 def _paper_page_by_sport(ledger):
-    """What `/portfolio/paper` computes: the payload's own `mode != LIVE` filter
-    (`intelligence.py`, `_paper_portfolio_payload`) and then `by_sport`."""
+    """What the paper book's all-dates record computes: `mode != LIVE`, then `by_sport`.
+    `/portfolio/paper` computed it until 2026-11-17; the refresh-worker's
+    `paper_settlement.write_paper_all_time` does now, with the same filter."""
     paper_rows = [o for o in ledger if str(o.get("mode") or "paper") != "live"]
     summary = settlement_summary(None, orders=paper_rows)
     return {b["key"]: b["settled"] for b in summary["by_sport"]}

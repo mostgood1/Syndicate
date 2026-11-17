@@ -879,9 +879,13 @@ def settle_orders(
             stored = write_paper_all_time(history)
             if stored is not None:
                 stored_total = (stored.get("summary") or {}).get("total") or {}
+                # The record itself, on the line: the portfolio monitor reads it here.
+                # Counts and rates only -- no dollar figures on a line the monitor copies.
                 print(
                     f"[paper_settlement] PAPER_ALL_TIME_WRITTEN rows={stored['rows']}"
                     f" settled={stored_total.get('settled')} pending={stored_total.get('pending')}"
+                    f" won={stored_total.get('won')} lost={stored_total.get('lost')} push={stored_total.get('push')}"
+                    f" roi_pct={stored_total.get('roi_pct')} win_pct={stored_total.get('win_pct')}"
                     f" at={stored['written_at']}",
                     flush=True,
                 )
@@ -1851,13 +1855,15 @@ def _aggregate(buckets: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     return out
 
 
-# THE ALL-TIME PAPER RECORD IS WORKER-WRITTEN AND WEB-READ [2026-11-17, lane
-# paper-endpoint-request-path]. `/portfolio/paper` used to build it inside the
-# request: every order of every date (the two-month archive, 51,075 rows /
-# 120 MB on 2026-11-17), settled twice. Profiled that day the builder took 24 s
-# and 772 MB, and one GET ran ~177 s until gunicorn killed its web worker. The
-# settle pass below already holds the full history, so it settles the PAPER rows
-# (the page's population, `mode != live`) once more and stores the result.
+# THE ALL-TIME PAPER RECORD IS WORKER-WRITTEN [2026-11-17, lanes
+# paper-endpoint-request-path, paper-page-retirement]. `/portfolio/paper` used to
+# build it inside the request: every order of every date (the two-month archive,
+# 51,075 rows / 120 MB on 2026-11-17), settled twice. Profiled that day the builder
+# took 24 s and 772 MB, and one GET ran ~177 s until gunicorn killed its web worker.
+# That page is retired. The settle pass below already holds the full history, so it
+# settles the PAPER rows (`mode != live`) once more, stores the result for ops
+# readers, and prints it on one `PAPER_ALL_TIME_WRITTEN` line, which is what the
+# portfolio monitor (`scripts/portfolio_monitor_probe.py`) reads.
 PAPER_ALL_TIME_POPULATION = "paper_mode_order_rows_portfolio_book_all_dates"
 PAPER_ALL_TIME_MIN_INTERVAL_SECONDS = 600.0
 
@@ -1895,14 +1901,6 @@ def write_paper_all_time(
     }
     write_json_file(path, doc)
     return doc
-
-
-def read_paper_all_time() -> dict[str, Any] | None:
-    """The worker's stored all-time paper record, or None before the first write."""
-    from syndicate.features.shared.refresh_state_store import read_json_file
-
-    doc = read_json_file(paper_all_time_path())
-    return dict(doc) if isinstance(doc, Mapping) and isinstance(doc.get("summary"), Mapping) else None
 
 
 def settlement_summary(

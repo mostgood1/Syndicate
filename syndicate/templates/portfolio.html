@@ -14,8 +14,9 @@
   `/portfolio/live` used to be its own page. It is now a redirect here, and its
   whole body is the first half of this file. The argument for splitting them was
   real -- simulated positions shown beside real ones get mistaken for bets
-  somebody placed -- but that argument is about PAPER, and paper is still its
-  own page at `/portfolio/paper`. Real money and the user's own logged bets are
+  somebody placed -- but that argument is about PAPER, which had its own page at
+  `/portfolio/paper` until it was retired on 2026-11-17 (unvisited since 10-19;
+  it now redirects here). Real money and the user's own logged bets are
   both real; keeping the engine on a URL nobody lands on meant the one surface
   that spends money was the one nobody had open.
 
@@ -324,7 +325,6 @@
     <span class="portfolio-band__note">Real submissions to a real venue,
       {% if L.all_dates %}across all dates{% else %}on the {{ L.on_date }} slate{% endif %}.</span>
     <span class="portfolio-band__links">
-      <a href="/portfolio/paper">Paper portfolio</a> ·
       <a href="/api/portfolio/live">Live JSON</a>
     </span>
   </div>

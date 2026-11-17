@@ -138,3 +138,17 @@ def test_a_clean_reading_has_no_anomalies():
         "gate": {"clock": {"pending": False, "unclassified": 0}},
     }
     assert pm.anomalies(reading) == []
+
+
+def test_the_paper_books_all_dates_record_is_read_from_the_worker_line():
+    """The /portfolio/paper page was retired 2026-11-17; the record it showed is the refresh-worker's
+    PAPER_ALL_TIME_WRITTEN line now, and the newest one in the window wins."""
+    older = ("2026-11-17T18:00:00.000Z [paper_settlement] PAPER_ALL_TIME_WRITTEN rows=10 settled=8 pending=2 "
+             "won=4 lost=4 push=0 roi_pct=-1.5 win_pct=50.0 at=2026-11-17T18:00:00Z")
+    newer = ("2026-11-17T18:11:00.000Z [paper_settlement] PAPER_ALL_TIME_WRITTEN rows=51075 settled=14605 pending=7 "
+             "won=7400 lost=7100 push=105 roi_pct=None win_pct=51.03 at=2026-11-17T18:11:00Z")
+    e = pm.execution([older, newer], "2026-11-17T17:00:00")
+    pr = e["paper_record"]
+    assert pr["rows"] == 51075 and pr["settled"] == 14605 and pr["win_pct"] == 51.03 and pr["roi_pct"] is None
+    assert pr["at"] == "2026-11-17T18:11:00Z"
+    assert pm.execution([older], "2026-11-17T18:05:00")["paper_record"] is None  # outside the window

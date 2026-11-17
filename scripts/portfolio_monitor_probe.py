@@ -301,6 +301,7 @@ def execution(lines: Iterable[str], cutoff: str) -> dict[str, Any]:
     venues: dict[str, dict[str, Any]] = {}
     plans: dict[str, dict[str, Any]] = {}
     unrec_keys: set[str] = set()
+    paper_record: dict[str, Any] | None = None
     for line in lines:
         if line[:24] < cutoff:
             continue
@@ -329,9 +330,21 @@ def execution(lines: Iterable[str], cutoff: str) -> dict[str, Any]:
             m = re.search(r"key='([0-9a-f]+)'", line)
             if m:
                 unrec_keys.add(m.group(1)[:8])
+        elif "[paper_settlement] PAPER_ALL_TIME_WRITTEN " in line:
+            # The paper BOOK's all-dates record, which the refresh-worker's settle pass prints at most
+            # every 10 min (the /portfolio/paper page that showed it was retired 2026-11-17). Newest wins.
+            kv = _kv(line)
+            paper_record = {"at": kv.get("at") or line[:24]}
+            for f in ("rows", "settled", "pending", "won", "lost", "push", "roi_pct", "win_pct"):
+                raw = kv.get(f)
+                try:
+                    paper_record[f] = None if raw in (None, "None") else (float(raw) if "." in raw else int(raw))
+                except ValueError:
+                    paper_record[f] = None
     for v in venues.values():
         v["refused"] = dict(v["refused"])
-    return {"live_ticks": venues, "plans": plans, "unreconcilable_keys": sorted(unrec_keys)}
+    return {"live_ticks": venues, "plans": plans, "unreconcilable_keys": sorted(unrec_keys),
+            "paper_record": paper_record}
 
 
 # ---------------------------------------------------------------- anomalies
@@ -435,7 +448,7 @@ cd ~/syndicate-prod/logs || exit 0
 { tail -c 6000000 web.log.1 2>/dev/null; tail -c 6000000 web.log; } | grep -a -E 'portfolio|WORKER TIMEOUT' | awk -v c="$1" '$1 >= c'
 echo '@@WORKERS@@'
 for f in live-odds-worker.log refresh-worker.log; do
-  { tail -c 40000000 "$f.1" 2>/dev/null; tail -c 40000000 "$f"; } | grep -a -E '\[execute_portfolio\] EXECUTED |\[portfolio_commit\] LIVE_PLAN_WRITTEN |\[execution_ledger\] UNRECONCILABLE_ORDER ' | awk -v c="$1" '$1 >= c'
+  { tail -c 40000000 "$f.1" 2>/dev/null; tail -c 40000000 "$f"; } | grep -a -E '\[execute_portfolio\] EXECUTED |\[portfolio_commit\] LIVE_PLAN_WRITTEN |\[execution_ledger\] UNRECONCILABLE_ORDER |\[paper_settlement\] PAPER_ALL_TIME_WRITTEN ' | awk -v c="$1" '$1 >= c'
 done
 """
 
@@ -513,6 +526,11 @@ def render(r: Mapping[str, Any]) -> str:
     for venue, v in (ex.get("live_ticks") or {}).items():
         lines.append(f"  exec {venue}: {v['ticks']} live ticks placed {v['placed']} filled {v['filled']}"
                      f" failed {v['failed']} refused {v['refused']}")
+    pr = ex.get("paper_record")
+    lines.append("  paper book (all dates): " + (
+        f"{pr.get('won')}W-{pr.get('lost')}L-{pr.get('push')}P of {pr.get('settled')} settled, ROI {pr.get('roi_pct')}%,"
+        f" win {pr.get('win_pct')}% ({pr.get('rows')} rows, {pr.get('pending')} pending) at {pr.get('at')}"
+        if pr else "no PAPER_ALL_TIME_WRITTEN line in the window (refresh-worker not on the writer yet, or no settle pass)"))
     for venue, pl in (ex.get("plans") or {}).items():
         lines.append(f"  live plan {venue} @{pl['at'][11:19]}Z: rows_in {pl['rows_in']} placeable {pl['placeable_in']}"
                      f" positions {pl['positions']} refusals {pl['refusals']}")

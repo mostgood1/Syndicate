@@ -151,22 +151,17 @@ def test_the_calibration_fitter_reads_the_archive_beside_the_document(tmp_path):
     assert len(rows) == 1 and rows[0]["y"] == 0  # the document's copy won
 
 
-def test_the_paper_page_shows_archived_rows_for_a_past_date_and_all_time(monkeypatch):
-    """Reachability through `/portfolio/paper`: its rows read the date's month
-    shard (`ledger_for_date`), and its all-dates tile reads the record the
-    worker's settle pass writes from `full_history_orders` (2026-11-17, lane
-    paper-endpoint-request-path), so a date the cap moved out still renders."""
-    import pipeline.portfolio_commit as commit_mod
-    from syndicate.blueprints import intelligence as intelligence_bp
+def test_the_all_dates_paper_record_counts_archived_rows(monkeypatch):
+    """Reachability for the paper book's all-dates record: the refresh-worker's
+    settle pass writes it from `full_history_orders`, so a row the cap moved to
+    the archive still counts. (Through `/portfolio/paper` until that page was
+    retired on 2026-11-17, lane paper-page-retirement.)"""
     from syndicate.features.shared import paper_settlement
 
-    monkeypatch.setattr(commit_mod, "read_portfolio_plan", lambda date: None)
     monkeypatch.setattr(ledger, "_MAX_RECORDS", 1)
     ledger._persist({"orders": [_row("old", outcome="won", pnl=10.0, date="2026-09-30"),
                                 _row("new", outcome="lost", pnl=-10.0, date="2026-10-08")]})
     assert _keys(ledger._load()["orders"]) == ["new"]
 
-    paper_settlement.write_paper_all_time(ledger.full_history_orders(), min_interval_seconds=0)
-    payload = intelligence_bp._paper_portfolio_payload("2026-09-30")
-    assert payload["settlement_all_time"]["total"]["settled"] == 2
-    assert payload["settlement"]["total"]["settled"] == 1
+    record = paper_settlement.write_paper_all_time(ledger.full_history_orders(), min_interval_seconds=0)
+    assert record["rows"] == 2 and record["summary"]["total"]["settled"] == 2

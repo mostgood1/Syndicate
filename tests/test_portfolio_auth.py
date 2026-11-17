@@ -79,7 +79,6 @@ def handlers_must_not_run(monkeypatch):
         raise AssertionError("a gated handler ran for a signed-out request")
 
     monkeypatch.setattr(intelligence_bp, "_live_portfolio_payload", boom)
-    monkeypatch.setattr(intelligence_bp, "_paper_portfolio_payload", boom)
     monkeypatch.setattr(intelligence_bp, "build_portfolio_summary", boom)
     monkeypatch.setattr(intelligence_bp, "record_prediction", boom)
     monkeypatch.setattr(portfolio_books, "build_book_view", boom)

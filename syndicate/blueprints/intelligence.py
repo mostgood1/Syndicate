@@ -5000,310 +5000,27 @@ def portfolio_plan_api():
     return _no_cache_response(jsonify({"ok": True, "date": selected_date, "plan_present": True, **plan}))
 
 
-def _paper_portfolio_payload(selected_date: str) -> dict:
-    """Today's committed plan plus the paper orders placed against it.
-
-    A PURE READ of two artifacts the worker wrote. Both cross the service
-    boundary through `refresh_state_store`, which is the only reason web can
-    see them at all -- `#502` is what happens when a ledger is written the one
-    way that cannot cross.
-
-    Absences are DISTINGUISHED rather than collapsed to an empty page: no plan,
-    a plan with no positions, and a plan whose orders have not been placed are
-    three different states with three different fixes, and a bare "nothing here"
-    would read as the first when it is usually the third.
-    """
-    from pipeline.portfolio_commit import (
-        paper2_venues,
-        portfolio_commit_enabled,
-        read_portfolio_plan,
-        read_portfolio_plan_for_venue,
-    )
-    from syndicate.features.shared.execution_ledger import (
-        LIVE,
-        PAPER,
-        execution_mode,
-        ledger_for_date,
-    )
-    from pipeline.execute_portfolio import execution_enabled
-
-    try:
-        plan = read_portfolio_plan(selected_date)
-    except Exception:
-        _LOGGER.exception("PAPER_PLAN_READ_FAILURE date=%s", selected_date)
-        plan = None
-
-    orders: list = []
-    summary: dict = {}
-    ledger_error = None
-    try:
-        # ONE DATE, ONE READ [2026-11-17, lane paper-endpoint-request-path]. This
-        # used to read `full_history_orders()` -- every order of every date, the
-        # whole two-month archive -- to find one date's rows and to settle all
-        # of them for the all-dates line. Measured that day: 24 s and 772 MB per
-        # request, and one GET ran ~177 s until gunicorn killed its web worker.
-        # `ledger_for_date` reads the live document plus only this date's rows of
-        # its month's shard. The all-dates record is now the worker's (below).
-        date_ledger = ledger_for_date(selected_date)
-        summary = date_ledger["summary"]
-        # PAPER ORDERS ONLY, and this filter is load-bearing rather than tidy.
-        # This page's banner says "Simulated fills only. No money moves, no book
-        # is contacted, nothing here is a real wager." A live order rendered
-        # under that sentence is a real position wearing a disclaimer that it is
-        # not one -- the single most dangerous thing this surface could show.
-        # Live orders render on `/portfolio` (merged there 2026-08-26; the old
-        # `/portfolio/live` redirects). This filter is what keeps them off THIS
-        # page, and the merge did not move it -- the wall is between live and
-        # SIMULATED, not between live and the user's own real logged bets.
-        # The archive still answers a past date: the record cap moves old rows
-        # there [2026-10-08, lane execution-ledger-keyvalue-growth], and
-        # `ledger_for_date` reads the date's month shard.
-        orders = [
-            order
-            for order in date_ledger["orders"]
-            if str(order.get("mode") or PAPER) != LIVE
-        ]
-        orders.sort(key=lambda item: str(item.get("submitted_at") or ""), reverse=True)
-    except Exception as exc:
-        # The ledger REFUSES rather than reading empty when it cannot be read;
-        # surfacing that is the whole point, since an empty page would
-        # otherwise look like "no bets" instead of "cannot see the bets".
-        _LOGGER.exception("PAPER_LEDGER_READ_FAILURE date=%s", selected_date)
-        ledger_error = f"{type(exc).__name__}: {exc}"
-
-    # The venue-restricted book. Read the same way and just as fail-safe: a
-    # missing paper2 must degrade to "not running" and never take down the
-    # portfolio it is being compared against.
-    paper2 = []
-    for venue in paper2_venues():
-        venue_plan = None
-        try:
-            venue_plan = read_portfolio_plan_for_venue(selected_date, venue)
-        except Exception:
-            # Per venue, so one unreadable plan cannot hide the other three.
-            _LOGGER.exception(
-                "PAPER2_PLAN_READ_FAILURE date=%s venue=%s", selected_date, venue
-            )
-
-        venue_totals = (venue_plan or {}).get("totals") or {}
-        scope_refusals = (venue_plan or {}).get("venue_scope_refusals") or {}
-        venue_refusals = (venue_plan or {}).get("refusals") or {}
-        scoped_in = int((venue_plan or {}).get("rows_in", 0) or 0)
-        # Coverage is the Stage D number: what share of the board this venue
-        # quotes at all. DERIVED from the refusal counts rather than stored
-        # separately, so it can never disagree with them.
-        considered = scoped_in + sum(int(v or 0) for v in scope_refusals.values())
-        no_view = int(venue_refusals.get("no_model_edge_pct", 0) or 0)
-        # "THE MODEL HAS A VIEW ON N" IS COUNTED ON THE ROWS, NOT INFERRED FROM A REFUSAL.
-        # rows_in minus `no_model_edge_pct` was exact only while every row with no sim edge
-        # was refused for that reason. EV-only staking (user decision 2026-09-16) sizes such
-        # rows, so the inference would call them viewed. The plan's own `sim_coverage` is
-        # counted row by row (`portfolio_commit`, 2026-09-16); an older plan without it keeps
-        # the old derivation.
-        rows_with_sim_edge = ((venue_plan or {}).get("sim_coverage") or {}).get("rows_with_sim_edge")
-        sim_view_on = (
-            int(rows_with_sim_edge)
-            if isinstance(rows_with_sim_edge, int) and not isinstance(rows_with_sim_edge, bool)
-            else max(scoped_in - no_view, 0)
-        )
-        paper2.append(
-            {
-                "venue": venue,
-                "plan_present": isinstance(venue_plan, dict),
-                "positions": venue_totals.get("positions"),
-                "staked_dollars": venue_totals.get("staked_dollars"),
-                "sim_share_of_staked": venue_totals.get("sim_share_of_staked"),
-                "rows_in": scoped_in,
-                "venue_not_quoting": int(scope_refusals.get("venue_not_quoting", 0) or 0),
-                "coverage": round(scoped_in / considered, 4) if considered else None,
-                # THE SECOND NUMBER STAGE D TURNS ON. Coverage alone is not the
-                # constraint -- Kalshi quoted 47 rows and the model had a view on
-                # 12 of them. A venue that quotes plenty of markets the sim has
-                # no opinion about is not a venue this system can trade.
-                "sim_view_on": sim_view_on,
-                "scope_refusals": scope_refusals,
-                "refusals": venue_refusals,
-                "rows": (venue_plan or {}).get("positions") or [],
-            }
-        )
-
-    settlement = None
-    settlement_all_time = None
-    settlement_all_time_as_of = None
-    settlement_error = None
-    try:
-        from syndicate.features.shared.paper_settlement import (
-            read_paper_all_time,
-            settlement_summary,
-        )
-
-        settlement = settlement_summary(selected_date, orders=orders)
-        # ACROSS EVERY DATE. A per-day figure alone answers "how did Saturday go"
-        # and cannot answer "is this working", which is the question that
-        # actually matters -- and clicking through days one at a time to add them
-        # up by eye is not an answer, it is a chore that produces a guess.
-        #
-        # READ, NOT COMPUTED [2026-11-17, lane paper-endpoint-request-path]: the
-        # refresh-worker's settle pass writes it (`write_paper_all_time`), over
-        # the same population this page used to compute it from. Before the
-        # worker's first write it is None, and the page leaves the line off.
-        #
-        # AND IT IS THE PAPER BOOK, WHICH IS NOT THE SAME POPULATION AS THE
-        # CREDIBILITY SAMPLE [2026-09-04]. The worker filters to `mode != LIVE`,
-        # deliberately and load-bearingly, as this page did. So
-        # this number is settled paper ORDER ROWS. It said NFL `orders=1,
-        # settled=0` on the same day `portfolio_commit`'s SETTLED_SAMPLE line
-        # printed `nfl: 18` -- and both were right, about different things.
-        # The credibility sample is
-        # `paper_settlement.settled_decisions_by_sport`: every mode, deduped to
-        # one row per DECISION. Do not substitute one for the other; the
-        # identity between them is pinned in
-        # `tests/test_settled_sample_credibility.py`.
-        stored_all_time = read_paper_all_time()
-        if stored_all_time is not None:
-            settlement_all_time = stored_all_time["summary"]
-            settlement_all_time_as_of = stored_all_time.get("written_at")
-    except Exception as exc:
-        # Named, never swallowed into an empty record.
-        settlement_error = f"{type(exc).__name__}: {exc}"
-        _LOGGER.exception("SETTLEMENT_SUMMARY_FAILURE date=%s", selected_date)
-
-    job_state = (plan or {}).get("job_state") or {}
-    positions = (plan or {}).get("positions") or []
-    # Join the ledger onto the plan by `position_key`, so a row shows both what
-    # was decided and what happened to it.
-    by_key = {str(order.get("position_key") or ""): order for order in orders}
-    # Live marks are computed by the WORKER against the board it just built and
-    # ride in the plan artifact; this only looks them up. Keyed by
-    # `idempotency_key` because that is the identity of an ORDER, and marks
-    # cover orphans whose position is no longer in the plan.
-    live_marks = (plan or {}).get("live_marks") or {}
-    # Where each bet stands against the GAME. Computed by the worker (it needs
-    # the live feed); this only looks it up, keyed by order identity.
-    bet_status = (plan or {}).get("bet_status") or {}
-    status_by_order = {
-        str(row.get("idempotency_key") or ""): row
-        for row in (bet_status.get("rows") or [])
-    }
-    marks_by_order = {
-        str(mark.get("idempotency_key") or ""): mark
-        for mark in (live_marks.get("marks") or [])
-    }
-    rows = []
-    for position in positions:
-        order = by_key.get(str(position.get("position_key") or ""))
-        rows.append(
-            {
-                **position,
-                "order": order,
-                "mark": marks_by_order.get(str((order or {}).get("idempotency_key") or "")),
-                "bet_status": status_by_order.get(
-                    str((order or {}).get("idempotency_key") or "")
-                ),
-            }
-        )
-
-    return {
-        "date": selected_date,
-        # THE WORKER'S FLAG STATE, NOT THIS PROCESS'S. The jobs run on
-        # refresh-worker; reading the env here reported "off" on a page full of
-        # committed positions and filled orders, which is true of the web
-        # service and worthless to a reader. The worker stamps `job_state` into
-        # the plan; these fall back to the local env only when no plan has been
-        # written yet, and `job_state_source` says which one you are looking at.
-        "commit_enabled": bool(job_state.get("commit_enabled", portfolio_commit_enabled())),
-        "execution_enabled": bool(job_state.get("execution_enabled", execution_enabled())),
-        "execution_mode": str(job_state.get("execution_mode") or execution_mode()),
-        "job_state_source": "worker" if job_state else "web_env",
-        "live_marks": live_marks,
-        "bet_status": bet_status,
-        "plan_present": isinstance(plan, dict),
-        "generated_at": (plan or {}).get("generated_at"),
-        "bankroll_units": (plan or {}).get("bankroll_units"),
-        "totals": (plan or {}).get("totals") or {},
-        "refusals": (plan or {}).get("refusals") or {},
-        "sim_coverage": (plan or {}).get("sim_coverage") or {},
-        # Stage C's precondition, reported every slate rather than discovered at
-        # the end of the window. Computed by the WORKER and read here -- web
-        # joining ~3k opening records per request would be a recompute in a
-        # request handler. Absent on plans committed before the join existed,
-        # which is why the page distinguishes "no join" from "matched nothing".
-        "clv_join": (plan or {}).get("clv_join") or {},
-        # PAPER2 -- the venue-restricted book, on the SAME page as the
-        # unrestricted one.
-        #
-        # Deliberately the opposite call from keeping `/portfolio/paper` off
-        # `/portfolio`, and for a reason that does not contradict it. That split
-        # exists because simulated positions beside REAL ones can be mistaken
-        # for bets the user placed. These two are both paper, neither is a
-        # wager, and they exist ONLY to be compared -- putting them on separate
-        # pages would defeat the entire purpose of building the second one.
-        "paper2": paper2,
-        "rows": rows,
-        "orphan_orders": [
-            {
-                **order,
-                "mark": marks_by_order.get(str(order.get("idempotency_key") or "")),
-                "bet_status": status_by_order.get(str(order.get("idempotency_key") or "")),
-            }
-            for order in orders
-            if str(order.get("position_key") or "")
-            not in {str(p.get("position_key") or "") for p in positions}
-        ],
-        "ledger": summary,
-        "ledger_error": ledger_error,
-        # HOW THE BOOK ACTUALLY DID. Read-only, from the grades the worker
-        # already wrote -- `settle_orders` runs on the worker, never here, per
-        # the web/worker split. An unreadable ledger degrades to None rather
-        # than to a zeroed record, because a 0-0 record and "we cannot see the
-        # record" are the two things this page exists to keep apart.
-        "settlement": settlement,
-        # Every date this ledger holds, not just the one being viewed.
-        "settlement_all_time": settlement_all_time,
-        # When the refresh-worker last wrote it (UTC); None before its first write.
-        "settlement_all_time_as_of": settlement_all_time_as_of,
-        # WHAT `settlement_all_time` IS A COUNT OF, said in the payload rather
-        # than only in a comment, because the confusion it prevents happened to
-        # a reader of the JSON and not to a reader of this file. See the note at
-        # the `settlement_summary` call above.
-        "settlement_all_time_population": (
-            "paper_mode_order_rows_portfolio_book_all_dates"
-        ),
-        "settlement_error": settlement_error,
-        # DATE NAVIGATION, computed here rather than in Jinja: date arithmetic
-        # in a template is where off-by-one-day bugs live, and this page is
-        # about a slate date whose boundary is already subtle (`#370`).
-        # `next_date` is None ON today rather than a link into the future --
-        # a control that navigates to a day that cannot have data is a control
-        # that teaches the reader the page is broken.
-        **_paper_date_nav(selected_date),
-    }
-
-
-def _paper_date_nav(selected_date: str) -> dict[str, Any]:
-    from datetime import date as _date
-    from datetime import timedelta as _timedelta
-
-    today = central_today_iso()
-    try:
-        current = _date.fromisoformat(str(selected_date))
-    except (TypeError, ValueError):
-        # An unparseable date still renders the page; it just gets no arrows.
-        return {"prev_date": None, "next_date": None, "today_date": today, "is_today": False}
-
-    nxt = (current + _timedelta(days=1)).isoformat()
-    return {
-        "prev_date": (current - _timedelta(days=1)).isoformat(),
-        "next_date": nxt if nxt <= today else None,
-        "today_date": today,
-        "is_today": str(selected_date) == today,
-    }
+# THE PAPER PAGE IS RETIRED [user "Retire it", 2026-11-17, lane paper-page-retirement].
+# No person had opened it since 2026-10-19, nothing scheduled called it, and its builder
+# re-read and re-settled the whole two-month paper archive per request: one GET on
+# 2026-11-17 ran ~177 s until gunicorn killed its web worker. The paper BOOK is unchanged:
+# the workers still place and settle paper orders, sizing's credibility sample and the
+# min-EV tuner still read them from the ledger, and the refresh-worker's settle pass
+# writes the all-dates paper record (`paper_settlement.write_paper_all_time`, logged
+# `PAPER_ALL_TIME_WRITTEN`). A 410 rather than a 404 so a script that still calls this
+# learns why.
+PAPER_PAGE_RETIRED = {
+    "ok": False,
+    "retired": "2026-11-17",
+    "error": "The paper portfolio page and API are retired. Paper orders stay in the execution ledger; "
+    "the all-dates paper record is the refresh-worker's PAPER_ALL_TIME_WRITTEN line and "
+    "reports/intelligence/paper_settlement_all_time.json.",
+}
 
 
 @intelligence_bp.get("/api/portfolio/paper")
 def portfolio_paper_api():
-    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    return _no_cache_response(jsonify({"ok": True, **_paper_portfolio_payload(selected_date)}))
+    return _no_cache_response(jsonify(PAPER_PAGE_RETIRED)), 410
 
 
 # Statuses that never became a position. Hidden by DEFAULT on the live page
@@ -5572,7 +5289,7 @@ def _live_portfolio_payload(
     on_date: str | None = None,
     venue: str | None = None,
 ) -> dict[str, Any]:
-    """Real money only. The mirror image of `_paper_portfolio_payload`.
+    """Real money only. The mirror image of the paper page's builder (retired 2026-11-17).
 
     A SEPARATE PAGE RATHER THAN A FILTER ON THE PAPER ONE. The two answer the
     same questions about different things, and the whole reason `/portfolio` and
@@ -6029,7 +5746,7 @@ def _live_portfolio_payload(
         # mismatch the `hidden_orders` term was added to remove.
         "position_count_all_dates": len(whole_book) - len(hidden_orders) - len(unknown_submits),
         # The arrows and the reset for that control. Computed here, not in
-        # Jinja, for the reason `_paper_date_nav` gives: date arithmetic in a
+        # Jinja, because date arithmetic in a
         # template is where off-by-one-day bugs live.
         **_live_date_nav(date_options, on_date),
         "periods": periods,
@@ -6057,7 +5774,7 @@ def _live_portfolio_payload(
 def _live_date_nav(date_options: list, on_date: str | None) -> dict[str, Any]:
     """Arrows that step between slates THAT EXIST, not between calendar days.
 
-    `_paper_date_nav` walks the calendar because the paper page's plan artifact
+    The retired paper page walked the calendar because its plan artifact
     is written every day whether or not anything was committed, so `date - 1`
     always names a real page. This book is SPARSE -- a live order exists only on
     a day somebody actually traded -- so a plus/minus-one-day arrow would spend
@@ -6148,16 +5865,9 @@ def portfolio_live_page():
 
 @intelligence_bp.get("/portfolio/paper")
 def portfolio_paper_home():
-    """The model's PAPER portfolio, kept on its own page.
-
-    Deliberately NOT merged into `/portfolio`. That page is the user's own
-    logged bets, and `portfolio_summary._is_user_placed_bet` exists precisely
-    because auto-tracked model rows once flooded it with 1000+ "tracked plays"
-    nobody had bet. Showing simulated positions beside real ones would rebuild
-    that confusion with better formatting.
-    """
-    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
-    return render_template("portfolio_paper.html", paper=_paper_portfolio_payload(selected_date))
+    """RETIRED 2026-11-17 (see `PAPER_PAGE_RETIRED`). A redirect, as `/portfolio/live`
+    is, so an old bookmark lands on the portfolio page instead of a 404."""
+    return redirect("/portfolio", code=302)
 
 
 @intelligence_bp.get("/portfolio")
@@ -6165,7 +5875,7 @@ def portfolio_home():
     """The primary portfolio page: the Kalshi + Polymarket live buying engine.
 
     ONE PORTFOLIO PER PAGE since 2026-09-10 [user request]. A dropdown switches
-    between this book, `/portfolio/paper`, and the user's MANUAL books at
+    between this book and the user's MANUAL books at
     `/portfolio/books/<id>` (`portfolio_books.py`). The prediction ledger's
     user-logged bets used to render as this page's second half; they are a
     manual book now ("Other books" by default), so this handler no longer reads
@@ -6173,8 +5883,9 @@ def portfolio_home():
     stands: every count here comes from the execution ledger and is never
     summed with another book.
 
-    PAPER STAYS ON ITS OWN PAGE, for the reason it always did: simulated
-    positions beside real ones get mistaken for wagers somebody placed.
+    PAPER IS NOT SHOWN HERE, for the reason it always had its own page: simulated
+    positions beside real ones get mistaken for wagers somebody placed. That page
+    was retired 2026-11-17 (`PAPER_PAGE_RETIRED`); `/portfolio/paper` redirects here.
 
     STILL A PURE READ. The payload reads artifacts the workers wrote -- no
     simulation, no order placement, nothing recomputed in a request handler.

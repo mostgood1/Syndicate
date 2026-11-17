@@ -39,8 +39,6 @@ _NOTICES = {
 def _active_portfolio_id(path: str) -> str | None:
     if path.startswith("/portfolio/books/"):
         return path[len("/portfolio/books/"):].split("/", 1)[0] or None
-    if path.startswith("/portfolio/paper"):
-        return "paper"
     if path == "/portfolio" or path.startswith("/portfolio/"):
         return "live"
     return None

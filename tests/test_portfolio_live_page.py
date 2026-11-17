@@ -10,7 +10,9 @@ between live and PAPER, and paper is still its own page.
 Two things are worth testing here and they are both about CONFUSION, not
 arithmetic:
 
-1. A live order must never render on `/portfolio/paper`. That page's banner
+1. A live order must never render on `/portfolio/paper` (RETIRED 2026-11-17; it
+   now redirects here, and the paper filter lives in the worker's all-dates
+   record, `paper_settlement.write_paper_all_time`). That page's banner
    says "Simulated fills only. No money moves, no book is contacted, nothing
    here is a real wager." A real position under that sentence is the single
    most dangerous thing either surface could show, and until 2026-08-23 the
@@ -125,51 +127,52 @@ def _payload(_live_env):
 # --------------------------------------------------------------------------
 
 
-def test_a_live_order_is_not_on_the_paper_page(live_env):
-    """The defect this page was built around.
-
-    `_paper_portfolio_payload` filtered by DATE and by nothing else, so the
-    first real Kalshi fill would have rendered under a banner promising no
-    money moves.
-    """
+def test_the_retired_paper_page_redirects_to_the_portfolio(app_client, live_env):
+    """`/portfolio/paper` was retired 2026-11-17 (lane paper-page-retirement). A
+    live order can no longer render under its "no money moves" banner because the
+    page is gone; an old bookmark lands on `/portfolio` instead of a 404."""
     live_env["orders"] = [_order()]
-    paper = intelligence_bp._paper_portfolio_payload(DATE)
-    # No plan is injected, so a paper order on this date would land in
-    # `orphan_orders` -- which is exactly where a live one must NOT.
-    assert paper["orphan_orders"] == []
-    assert paper["rows"] == []
+    response = app_client.get(f"/portfolio/paper?date={DATE}")
+    assert response.status_code == 302 and response.headers["Location"].endswith("/portfolio")
 
 
-def test_a_live_order_does_not_reach_the_rendered_paper_page(app_client, live_env):
-    live_env["orders"] = [_order()]
-    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
-    assert "Test Guard" not in body
+def test_the_retired_paper_api_says_why(app_client, live_env):
+    response = app_client.get(f"/api/portfolio/paper?date={DATE}")
+    assert response.status_code == 410
+    body = response.get_json()
+    assert body["ok"] is False and body["retired"] == "2026-11-17" and "PAPER_ALL_TIME_WRITTEN" in body["error"]
+
+
+def _paper_record(orders, tmp_path, monkeypatch):
+    from syndicate.features.shared import paper_settlement
+
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "file")
+    return paper_settlement.write_paper_all_time(orders, min_interval_seconds=0)
 
 
 def test_a_live_order_is_excluded_from_the_paper_all_dates_record(live_env, tmp_path, monkeypatch):
     """The all-dates rollup is computed from the unfiltered list, so it is the
     one place the mode filter is easy to forget. Since 2026-11-17 the worker's
-    settle pass computes it (`write_paper_all_time`) and the page reads it, so
-    the filter is pinned where it now runs."""
+    settle pass computes it (`write_paper_all_time`), so the filter is pinned
+    where it runs."""
     import syndicate.features.shared.execution_ledger as ledger_mod
-    from syndicate.features.shared import paper_settlement
 
-    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
-    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "file")
     live_env["orders"] = [
         _order(outcome="won", pnl_dollars=4.35, fill_stake_dollars=5.0),
     ]
-    paper_settlement.write_paper_all_time(ledger_mod.full_history_orders(), min_interval_seconds=0)
-    paper = intelligence_bp._paper_portfolio_payload(DATE)
-    assert paper["settlement_all_time"]["total"]["settled"] == 0
+    record = _paper_record(ledger_mod.full_history_orders(), tmp_path, monkeypatch)
+    assert record["rows"] == 0 and record["summary"]["total"]["settled"] == 0
 
 
-def test_an_order_with_no_mode_is_treated_as_paper(live_env):
+def test_an_order_with_no_mode_is_treated_as_paper(live_env, tmp_path, monkeypatch):
     """Absent mode predates the field. It must default to the SAFE reading --
     paper -- rather than to live."""
+    import syndicate.features.shared.execution_ledger as ledger_mod
+
     live_env["orders"] = [_order(mode=None)]
     assert _payload(live_env)["orders"] == []
-    assert len(intelligence_bp._paper_portfolio_payload(DATE)["orphan_orders"]) == 1
+    assert _paper_record(ledger_mod.full_history_orders(), tmp_path, monkeypatch)["rows"] == 1
 
 
 def test_the_live_page_shows_only_live_orders(live_env):
@@ -649,9 +652,9 @@ def test_the_caps_in_force_are_on_the_page(app_client, live_env, monkeypatch):
 # --------------------------------------------------------------------------
 
 
-def test_the_paper_page_links_to_the_live_book(app_client, live_env):
-    body = app_client.get(f"/portfolio/paper?date={DATE}").get_data(as_text=True)
-    assert 'href="/portfolio#live"' in body
+def test_the_portfolio_page_no_longer_links_to_the_retired_paper_page(app_client, live_env):
+    body = app_client.get("/portfolio").get_data(as_text=True)
+    assert 'href="/portfolio/paper"' not in body
 
 
 # --------------------------------------------------------------------------

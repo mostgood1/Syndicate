@@ -296,3 +296,68 @@ One pass over every portfolio route, before any probe existed:
 - I flagged `ac2cbc2fc` (launcher role spec) to them as another ride-along; it is read at `up`, not at reload.
 - **Owed after their load:** one `/portfolio/paper` GET timed from the web access log with no WORKER TIMEOUT,
   and `PAPER_ALL_TIME_WRITTEN` after refresh-worker's next restart.
+
+## PAPER PAGE RETIRED (user "Retire it", ~1:05 PM CST; lane `paper-page-retirement`)
+
+- **Question, answered with the logs (web.log.1 + web.log, ~10-03..now):**
+  - 176 requests to `/portfolio/paper` or `/api/portfolio/paper` in all. The last browser visit was
+    **2026-10-19** (one session: 3 page views, 4 API calls). Every request since came from a script: 105 on
+    11-02/03, 1 on 11-10, and mine on 11-17.
+  - For comparison, `/portfolio` had 16 browser visits since 11-01.
+  - No scheduled job, worker or other page calls it. The only programmatic reader,
+    `scripts/measure_game_market_option_value.py`, was a one-off study, last touched 10-06.
+- **Kept:** the paper BOOK. Workers place and settle paper orders (813 on 11-17), and the following read
+  the ledger directly, not this endpoint:
+  - sizing's credibility sample (`settled_decisions_by_sport`);
+  - the min-EV tuner;
+  - the paper ladder and policy studies.
+- **Removed:**
+  - `_paper_portfolio_payload` and `_paper_date_nav`;
+  - `portfolio_paper.html` and `paper_portfolio_pulse.js`;
+  - the "Paper portfolio" link on `/portfolio`;
+  - the Paper entry in the book switcher (`BUILTIN_PORTFOLIOS`; `paper` stays a reserved id);
+  - `execution_ledger.ledger_for_date` / `_archived_rows_for_date` and `paper_settlement.read_paper_all_time`.
+    I added these today; with the page gone, nothing calls them.
+- **Retired routes:** `/portfolio/paper` now 302-redirects to `/portfolio` (as `/portfolio/live` does), and
+  `/api/portfolio/paper` answers **410** with `PAPER_PAGE_RETIRED` saying where the data is now.
+- **The all-dates paper record moves to Portfolio Watch.**
+  - The refresh-worker's settle pass still writes it (`write_paper_all_time`, at most every 10 min).
+  - Its `PAPER_ALL_TIME_WRITTEN` line now carries won / lost / push / roi_pct / win_pct, counts and rates
+    only, with no dollars.
+  - The probe reads the newest such line, and the page has a "Paper book, all dates" tile.
+  - Until the refresh-worker loads that code (its next restart after a fleet ff past this commit), the tile
+    shows "—".
+- **Research script:** `measure_game_market_option_value.py` reads its cache, then `--ledger-json`, a fleet
+  dump of `full_history_orders()`. Without either it says the API is retired.
+- **Shared file:** `syndicate/blueprints/intelligence.py` is also claimed by `nba-live-props-midnight`
+  (`_lens_prop_index` and `_refresh_lens_prop_live_columns` only). My hunks touch neither function. A note is
+  in that lane's block, because my block replacement ran as a script, which the lane guard does not see.
+- **Tests:** `test_portfolio_paper_page.py` deleted. `test_paper_payload_request_path.py` rewritten: worker
+  record, throttle, settle-pass reachability, the line's fields with no `$`, redirect plus 410, switcher.
+  Updated: live page, auth, books, credibility, ledger archive, probe (+1).
+- **Not deployed.** This lands on main after `5db26434e` (tonight's approved load, which carries `2148f99cb`),
+  so it reaches the fleet with a later ff. Betting change: no (a page and an API removed, one log line
+  widened).
+
+## Reading 6 — Tue 11-17 1:03 PM CST (19:04Z), window 70 min
+
+- **Endpoints:** all 7 read 200, inside budget (`live` 1.09 s, `live?on=all` 1.00 s, `/portfolio` 0.78 s).
+  - Web: **0 worker kills; none since 16:49:49Z** (2 h 14 min). 0 5xx on 16 portfolio requests; 0 from a browser.
+- **Banner:** ok, armed, worker state 299 s old (limit 900).
+- **Execution, 70 min:** 22 live ticks (11 per venue), 5 placed (kalshi 3, polymarket 2), 0 failed.
+  117 refused `outside_price_band`.
+- **Live plan kalshi 18:45Z:** 886 -> 28 placeable -> 7 positions (831 of 886, 94%, below the net floor).
+- **Orders today:** 33 (32 filled, 1 resting). Cap use: kalshi 14.9%, polymarket 13.1%.
+- **Gate clock moved to BC-030** (18:04:04Z, #824: college live totals below the points scored are refused).
+  0 of 800 events.
+- **Register (origin/main, read 19:1xZ):**
+  - the 16:24Z #814 refusal was classified by its lane: BC-027 / BC-031, `yes`, loaded at the 17:26:26Z
+    refresh-worker TERM. My fail-closed fallback is not needed.
+  - **2 entries stay unclassified, handed to their lanes:** 16:17:31Z NFL week-11 rebuild (`nfl-profile-load`)
+    and the 17:01:55Z ff `8aea4fe7e -> 0a60d9e0a`, no restart (`ncaaf-sim-history-order-dedupe`).
+  - Both are older than BC-030, and the 17:26:26Z refresh-worker restart loaded anything ff'd before it.
+    However they are classified, the clock start stays at BC-030 and the count at 0.
+- **Paper book record:** no `PAPER_ALL_TIME_WRITTEN` line yet. Expected: the writer is in `2148f99cb`, which is
+  not on the fleet until tonight's load.
+- **Unchanged anomalies:** unreconciled `f8b62e6a`; the resting maker-pilot order (772 min); the late NHL bet
+  (16.4 h).

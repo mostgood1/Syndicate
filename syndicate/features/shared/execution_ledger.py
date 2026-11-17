@@ -4242,56 +4242,6 @@ def _reconcilable(order: Mapping[str, Any]) -> tuple[bool, str]:
     return True, ""
 
 
-def _archived_rows_for_date(selected_date: str) -> list[dict[str, Any]]:
-    """One date's archived rows, last copy per identity, WITHOUT parsing the whole shard.
-
-    `_parse_shard` parses every row of a month's shard and keeps them in this
-    process's parse cache, which is right for a long-running worker and wrong
-    for a web request. Measured 2026-11-17 (lane paper-endpoint-request-path):
-    the 2026-10 + 2026-11 shards are 120 MB / 69,664 lines and parse to ~625 MB
-    RSS, which a web worker then holds until its memory guard recycles it. A line
-    is parsed here only when it contains the date string, and its
-    `selected_date` is then checked exactly. Every copy of an order carries the
-    same `selected_date` (it is part of the idempotency key), so filtering
-    before the last-copy dedupe gives the same rows as filtering after it.
-    """
-    date = str(selected_date)
-    path = _archive_dir() / f"orders_{date[:7]}.jsonl"
-    if not path.is_file():
-        return []
-    latest: dict[str, dict[str, Any]] = {}
-    with open(path, encoding="utf-8") as handle:
-        for line in handle:
-            if date not in line:
-                continue
-            try:
-                row = json.loads(line)
-            except ValueError:
-                continue  # a torn final line, as in `_parse_shard`
-            if not isinstance(row, dict) or row.get("selected_date") != date:
-                continue
-            identity = _order_identity(row)
-            latest.pop(identity, None)  # re-insert at the newest copy's position
-            latest[identity] = row
-    return list(latest.values())
-
-
-def ledger_for_date(selected_date: str) -> dict[str, Any]:
-    """Every order for one slate date (all modes) and its `ledger_summary`, from ONE read.
-
-    Same rows as `[o for o in full_history_orders() if o["selected_date"] == d]`:
-    the live document's rows plus that month's archived rows, a row present in
-    the document taken from the document (`_with_archive`). For readers in a
-    web request, which must not parse whole shards (`_archived_rows_for_date`).
-    """
-    state = _load()
-    live = [o for o in (state.get("orders") or []) if isinstance(o, Mapping)]
-    present = {_order_identity(o) for o in live}
-    archived = [dict(o) for o in _archived_rows_for_date(selected_date) if _order_identity(o) not in present]
-    orders = archived + [o for o in live if o.get("selected_date") == selected_date]
-    return {"orders": orders, "summary": _summary_of(orders, selected_date, state)}
-
-
 def ledger_summary(selected_date: str | None = None) -> dict[str, Any]:
     state = _load()
     orders = state.get("orders") or []

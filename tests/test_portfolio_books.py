@@ -292,9 +292,11 @@ def test_the_bet_endpoint_files_into_a_known_book_and_refuses_an_unknown_one(sto
 def test_the_book_page_lists_every_portfolio_and_takes_a_bet(stores, client):
     books.create_book("FanDuel")
     page = client.get("/portfolio/books/manual").get_data(as_text=True)
-    for label in ("Kalshi + Polymarket", "Paper", "Other books", "FanDuel"):
+    for label in ("Kalshi + Polymarket", "Other books", "FanDuel"):
         assert label in page, label
-    assert 'href="/portfolio"' in page and 'href="/portfolio/paper"' in page and 'href="/portfolio/books/fanduel"' in page
+    assert 'href="/portfolio"' in page and 'href="/portfolio/books/fanduel"' in page
+    # The paper page was retired 2026-11-17 (lane paper-page-retirement): no longer listed.
+    assert 'href="/portfolio/paper"' not in page
     assert 'action="/portfolio/books/manual/bets"' in page
 
     response = client.post("/portfolio/books/manual/bets", data=BET)
@@ -325,4 +327,4 @@ def test_books_can_be_created_and_listed_over_http(stores, client):
     listing = client.get("/api/portfolio/books").get_json()
     assert listing["default"] == "manual"
     assert [b["id"] for b in listing["books"]] == ["manual", "hard-rock"]
-    assert [b["id"] for b in listing["builtin"]] == ["live", "paper"]
+    assert [b["id"] for b in listing["builtin"]] == ["live"]  # paper retired 2026-11-17

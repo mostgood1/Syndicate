@@ -246,23 +246,38 @@ def admin_token(explicit: str) -> str:
 
 # ------------------------------------------------------------------ fetching
 
-def fetch_orders(day: str, cache_dir: Path) -> list[dict]:
-    """Filled paper orders for one date, from the served portfolio payload.
+def fetch_orders(day: str, cache_dir: Path, ledger_json: str = "") -> list[dict]:
+    """Filled paper orders for one date.
 
     `orphan_orders` is the ORDER-level view -- one row per venue book that
     actually took a price, which is the unit an entry improvement applies to.
     `settlement.by_market_family` is the POSITION-level view and is smaller;
     section 6 of the 08-31 assessment is that view, so the two counts differ by
-    construction and neither is wrong."""
+    construction and neither is wrong.
+
+    SOURCE. `/api/portfolio/paper` was RETIRED 2026-11-17 (lane
+    paper-page-retirement; it answers 410). A date already cached here
+    (`paper_<day>.json`, the 08-22..08-31 study) still reads from the cache. Any
+    other date reads `--ledger-json`: a dump of
+    `execution_ledger.full_history_orders()` taken on the fleet (nice 19), as
+    `scripts/paper_ladder_readout.py` uses. From the ledger the rows are the
+    date's paper ORDERS only; the old payload also added paper2's venue-plan
+    positions, which the ledger does not hold, so say so if you compare a new
+    date with the cached ones."""
     dest = cache_dir / f"paper_{day}.json"
     if not dest.exists():
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        # Behind the portfolio sign-in since 2026-09-10; the ops token passes it.
-        request = urllib.request.Request(
-            f"{BASE}/api/portfolio/paper?date={day}", headers={"X-Admin-Token": admin_token("")}
-        )
-        with urllib.request.urlopen(request, timeout=600) as response:
-            dest.write_bytes(response.read())
+        if not ledger_json:
+            raise SystemExit(
+                f"no cached paper payload for {day} and /api/portfolio/paper is retired (410): "
+                "pass --ledger-json <dump of execution_ledger.full_history_orders()>"
+            )
+        dump = json.loads(Path(ledger_json).read_text(encoding="utf-8"))
+        orders = dump.get("orders", dump) if isinstance(dump, dict) else dump
+        rows = [dict(o) for o in orders
+                if o.get("selected_date") == day and str(o.get("mode") or "paper") != "live"]
+        for row in rows:
+            row["_date"] = day
+        return rows
     payload = json.loads(dest.read_text(encoding="utf-8"))
     rows = list(payload.get("orphan_orders") or [])
     for book in (payload.get("paper2") or []):
@@ -701,6 +716,9 @@ def main() -> int:
     parser.add_argument("--cache-dir",
                         default=str(REPO_ROOT / "reports" / "game_market_option_value"))
     parser.add_argument("--emit-table", action="store_true")
+    parser.add_argument("--ledger-json", default="",
+                        help="dump of execution_ledger.full_history_orders() for dates not in the cache "
+                             "(/api/portfolio/paper was retired 2026-11-17)")
     parser.add_argument("--allow-clobbered", action="store_true",
                         help="score a date whose shard lost rows to the publish "
                              "race anyway. Reproduces a pre-guard number exactly; "
@@ -715,7 +733,7 @@ def main() -> int:
     indexes: dict = {}
     shard_health: dict = {}
     for day in dates_between(args.start, args.end):
-        orders.extend(fetch_orders(day, cache))
+        orders.extend(fetch_orders(day, cache, args.ledger_json))
         indexes[day] = load_quote_index(fetch_quotes(day, args.admin_token, cache))
         shard_health[day] = load_writer_report(day, cache)
 

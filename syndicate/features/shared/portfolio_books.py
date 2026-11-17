@@ -2,11 +2,12 @@
 
 THE PORTFOLIOS, as the dropdown on every portfolio page lists them:
   * `live`  -- Kalshi + Polymarket, the automated buying engine. `/portfolio`.
-  * `paper` -- the model's simulated book. `/portfolio/paper`.
+  * (`paper` -- the model's simulated book at `/portfolio/paper` -- was retired
+    2026-11-17; that URL redirects to `/portfolio`, and `paper` stays a reserved id.)
   * MANUAL BOOKS, user-created, each at `/portfolio/books/<id>`: bets the user
     placed at other sportsbooks, entered by hand and settled by hand. `manual`
     ("Other books") is the default one and always exists.
-The first two are pages that already exist; they are listed, not stored. Only
+The live book is a page that already exists; it is listed, not stored. Only
 manual books are records.
 
 A MANUAL BOOK HAS TWO SOURCES AND ONE TABLE.
@@ -67,7 +68,6 @@ MAX_STAKE = 1_000_000.0
 
 BUILTIN_PORTFOLIOS: tuple[dict[str, str], ...] = (
     {"id": "live", "name": "Kalshi + Polymarket", "note": "Automated · real money", "url": "/portfolio"},
-    {"id": "paper", "name": "Paper", "note": "Automated · simulated, no money moves", "url": "/portfolio/paper"},
 )
 # Anything that is, or could become, a sibling path under `/portfolio/`.
 _RESERVED_IDS = frozenset({"live", "paper", "new", "books", "bets", "login", "logout", "settings", "limits", "api"})
