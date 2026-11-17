@@ -3472,3 +3472,14 @@ as a verdict.
 - **Measured (fleet NCAAB ledgers 11-08..11-16 x ESPN finals + play wallclocks, 285 games):** those totals flags hit +11.5 +- 1.8 pp over their own price; only rows whose projected final was already BELOW the points scored lost (unders -8.9 +- 5.6 pp, 47 games). #824 refuses that contradiction alone. Same session: "drop the #816 level after one bad night" also fell -- the level won 4 of 5 walk-forward nights.
 - **Rule:** grade a proposed refusal on the population it would remove BEFORE building it, against the price those rows were offered. Three remembered losses describe what lost, not what the rule removes; and one night is one draw of a shared shock, so read the walk-forward by night before reversing a fitted term.
 - **Repeat, same session:** a fixed-size line window used to place a lane STATUS line crossed into the next lane's block once a peer added a line to mine. Bound every in-place lanes.md edit by the next `### ` heading.
+
+## 2026-11-17 — OVERTURNED: "refresh-worker's WNBA postgame backfill is stuck re-asking 06-03..06-05" — those requests were the TEST SUITE calling the live fleet's web `[lane wnba-boxscore-polling-per-date, session efcb7ede]`
+- **Believed (rail monitor I-14, reading 5):** the `final_player_boxscore?count_only=1` requests for three June dates came from a backfill that never publishes and retries every few minutes.
+- **Measured:**
+  - Every such request on 11-15..11-17 falls in a test-run window. About 76 a day arrive in 08:14-08:58Z, the window of `job-ci-suite.log`'s pytest shards from `~/syndicate-prod/ci-checkout`. Bursts in the daytime match sessions' own runs.
+  - A urlopen spy caught `tests/test_intelligence_state.py` tests making these calls, because `build_wnba_boxscores.web_base_url()` falls back to `http://127.0.0.1:10000`.
+  - The backfill calls ESPN directly and never web. The route was right; the caller was wrong.
+- **Rule:**
+  - Before you name a caller from a log, check the request's user agent and its hour-of-day distribution against the nightly suite and session test runs.
+  - A client whose default base URL is the fleet is reachable from the test suite. Pin it in `tests/conftest.py` at import, not in a fixture, because threads outlive tests.
+  - A fixture date (June, September) asked of production in November is the signature of a test.

@@ -468,6 +468,7 @@ once this index exists: re-splitting would orphan the parts.
 | [shipped-verified] | SHIPPED / VERIFIED — current status by item `[2026-08-18; replaces a dozen dated snapshot sections]` | `state.md` |
 | [live-sha-authority] | LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]` | `state.md` |
 | [nba-betting-card-assets-404] | THE NBA BETTING-CARD CSS AND JS WERE 404 IN PRODUCTION -- FIXED, DEPLOYED AND VERIFIED ON THE SERVED PAYLOAD ` | `state_basketball.md` |
+| [wnba-boxscore-web-polling] | WNBA BOX-SCORE CALLS WERE 29.4% OF FLEET WEB REQUESTS IN THE OFFSEASON; the June "stuck backfill" was TESTS re | `state_basketball.md` |
 | [wnba-live-lens-directory] | THE WNBA LIVE-LENS READERS OPENED THE WRONG DIRECTORY — fixed and verified locally, NOT DEPLOYED `[verified 20 | `state_basketball.md` |
 | [wnba-recon-producer] | `recon_games` WAS WRITTEN PREGAME AND NEVER REWRITTEN; the producer now exists `[2026-08-31, lane wnba-accurac | `state_basketball.md` |
 | [wnba-consensus-price] | BOOK PRICES WERE AVERAGED ON THE AMERICAN SCALE; 43% OF CARD PRICES WERE IMPOSSIBLE `[2026-08-31, lane wnba-ac | `state_basketball.md` |

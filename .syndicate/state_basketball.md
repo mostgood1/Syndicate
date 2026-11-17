@@ -1601,3 +1601,23 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **The lens tick is ~170 s, not 60 s** (`TICK_COMPLETE` 22:13:33Z, then 22:16:24Z). A game can read `Scheduled` for up to one tick after tip.
 - **Cost, measured on the fleet:** a cold cards build is ~0.3 s of work plus two ~0.2 s deepcopies of a 1.79 MB-pickle context; a hit is 0.22 s.
 - **Diacritics in the live prop join: FIXED `[verified 2026-11-09 02:30Z, lane nba-live-proj-actuals, 7d72f8e9d]`:** the join folds accents. Lens `Karlo Matković` joins board `Karlo Matkovic` (7 of 7 rows), and Dončić joined on 11-09 LAL@ATL.
+
+## [wnba-boxscore-web-polling] WNBA BOX-SCORE CALLS WERE 29.4% OF FLEET WEB REQUESTS IN THE OFFSEASON; the June "stuck backfill" was TESTS reaching the fleet `[verified 2026-11-17, lane wnba-boxscore-polling-per-date, todo #829]`
+
+- **The share.** The fleet's web.log, 10-31 03:14Z .. 11-17 21:39Z:
+  - 29,449 of 100,005 web requests were `GET /wnba/api/live_player_boxscore` (17,756) or `GET /wnba/api/final_player_boxscore` (11,693);
+  - no WNBA game falls on any of those dates;
+  - clean window 19:52-21:52Z 11-17: 224 of 386 (58.0%), with 10.46 web recycles an hour.
+- **The callers:**
+  - live-odds-worker's live-lens capture (`live_lens_loop`), ~1,000-1,160 a day, p50 731 ms of a web worker;
+  - refresh-worker's settlement count (`intelligence_state._refresh_wnba_boxscores`, today + yesterday), ~550-770 a day;
+  - **the test suite**. Both box clients fell back to `http://127.0.0.1:10000`, the fleet. About 76 a day arrive in the nightly `ci-checkout` shards (08:14-08:58Z), plus sessions' own runs. Every request for 2026-06-03..06-05 / 06-09/10 / 09-09/10 is one of these.
+- **EXONERATED: the WNBA postgame backfill** (`run_refresh_worker.py` `_run_wnba_postgame_producer_tick`). It calls ESPN directly over a 30-day window and settles hourly.
+- **The fix, ON MAIN `920c19e70`, NOT LOADED:**
+  - both loops skip a DATE whose `schedule_<YYYY>.csv` is readable, has rows and lists no game on it;
+  - unknown polls and logs its reason;
+  - no sport or season switch;
+  - `tests/conftest.py` pins the box URL to a refusing port.
+- **The schedule is a safe skip signal.** Checked against the producer's ESPN finals, it never under-counts: 0 of 75 dates, and all 132 box files fall on listed dates.
+- **The published cards context is NOT a skip signal.** On 11-17 it said `games: []` while its `source_path` was absent.
+- Findings: `findings_2026-11-17_wnba_boxscore_polling.md`.
