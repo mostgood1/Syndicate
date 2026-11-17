@@ -35,6 +35,7 @@ because the work kept deviating:
 ---
 
 ## Open
+- [ ] 2026-11-16 — from `ncaab-total-overprojection` — #816 display: the calibration's level moves a college total's P(over) but not the projected total shown beside it (Richmond @ VT 11-17 00:50Z: UNDER 143.5 flagged at calibrated 57.6% while "ours" read 146.0); show a calibrated total or label the raw one — evidence: rail monitor message 01:0xZ; live_gameline_join.live_display_block total_mean / _apply_verdict total_mean
 - [ ] 2026-11-15 — from `layer2-rail-monitor` — an NHL game at ESPN `STATUS_END_PERIOD` "End of 3rd Period" shows on the Games Rail as state=pregame with its start time (`VAN @ VGK` chip `8:00P CT`, score 6-3, 04:51:44Z artifact; it read P3 11:03 at 04:24Z), while END P1 / END P2 intermissions map correctly; transient until FINAL; NHL chips also carry positional game_keys "1".."5" — evidence: `/api/board/game-chips?sports=nhl&date=2026-11-15` vs ESPN NHL scoreboard 20261115 at 04:52Z
 - [ ] 2026-11-15 — from `layer2-rail-monitor` — in play, a book's superseded main spread/total line stays on the Layer 2 board/rail until book_grid's SUPERSEDED_SURVIVORS (within_lag) or the 300 s observation gate drops it: of 120 stale full-game NCAAB live-rail rows at 19:46:38Z, 44 were already replaced by the book, ~41 likely, 35 skipped-then-returned; candidate: drop a book's old line once it quotes a newer one (rail impact low, board/portfolio unmeasured) — evidence: C:	mp
 ailload\grid809_stalefull.py (0f519972) + findings_2026-11-15_layer2_rail_monitor.md reading 13 addendum
