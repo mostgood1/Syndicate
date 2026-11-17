@@ -543,3 +543,38 @@ One pass over every portfolio route, before any probe existed:
   - On the 22:29Z payload at its own time: 1 resting, 0 overdue, so no ORDERS anomaly.
 - **Owed:** after 00:10Z, the order reads expired / not resting (Kalshi's own expiry at kickoff). If it is still
   resting, the probe now flags it by name.
+
+## Reading 11 — Tue 11-17 5:16 PM CST (23:16Z), window 48 min
+
+- **Endpoints:** all 7 read 200, inside budget. 0 kills, 0 5xx, 0 browser requests. **Banner:** ok, armed,
+  state 270 s.
+- **The maker-pilot post is no longer flagged** (the probe change; the post rests until its 6 PM kickoff).
+- **Plan (15 min):** board 4,803 -> suggested 87 -> sized 25 -> positions 10.
+  - Live plans 23:11Z: kalshi 308 rows in (was ~900, as tonight's games go in play), polymarket 240 (was 428).
+- **Execution, 48 min:** 16 live ticks; 2 placed; 0 failed. Refused: 57 `outside_price_band` and a new reason,
+  **`axis_held_live` 6** (kalshi), meaning a live position is already held on that axis.
+- **Ledger:** unreconciled 0, unknown submits 0. Orders today 52. Cap use: polymarket 16.7%.
+
+### The late NHL bet, diagnosed (read-only): Kalshi graded it won, but our venue grader cannot attribute the payout
+
+- **The bet:** key `a2c3f0c0`, 11-16 slate, Utah +1.5 vs Vancouver as NO on `KXNHLSPREAD-26NOV16VANUTA-VAN2`.
+  An in-play IOC at 04:44:44Z 11-17, reconciled `filled` 4 at 0.66 ($2.64, fee $0.0629).
+  - A take-profit exit fired at 05:18:04Z, but `FAST_EXIT_LIVE_DISPATCH ... live_exits={'phase_not_armed': 1}`:
+    in-game live exits are off (BC-003), so it was held to the end.
+- **Kalshi:** market `finalized`, `result=no`, closed 05:19:35Z, so **our NO won** (Vancouver won by 1). The
+  bet tracker on the row also reads `won`.
+- **Why it is ungraded after 20 h:** Kalshi's settlement row for the ticker carries our `no_count_fp 4.00`
+  ($2.64) **and `yes_count_fp 66.46` ($23.93) on the same account**.
+  - The YES side is not in our ledger. It is among the foreign-client orders that `RECONCILE_ORPHANS` counts
+    every pass (357 on Kalshi).
+  - With both sides held, `grade_kalshi_settlement` cannot hand the row's revenue to our order (the
+    `both_sides_held` refusal, documented in `operator_grade_from_venue`).
+  - `settle_from_venue(dry_run=True)` on the fleet (23:3xZ): status ok, settled 0, awaiting 72, refused 1,
+    errors 0. Kalshi settlements fetched: 1,375, error None.
+- **Expected resolution, no action now:** `settle_orders` holds a live row for the venue for
+  `_venue_grace_hours()` = **24 h** after its start (02:40Z 11-17), then grades it from the game. Due at **02:40Z
+  11-18 (8:40 PM CST tonight)**.
+  - If it is still ungraded by then, `execution_ledger.operator_grade_from_venue(..., market_result="no")` is the
+    documented exit for exactly this case.
+- **Worth knowing:** another client trades on the same Kalshi account (66.46 YES on this market). Every such
+  overlap delays our venue grade by up to 24 h.
