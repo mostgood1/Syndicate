@@ -133,3 +133,34 @@ def test_the_nfl_gameline_shard_line_the_writer_prints_survives_blanking(module,
     module._compact_step_result(result)
     assert result["stdout"] == ""
     assert module._compact_step_result_view(result)["stdout_markers"] == [filing.strip(), failed.strip()]
+
+
+def test_the_smart_sim_game_model_unfed_line_survives_blanking(module, capsys):
+    """Lane `nba-game-model-fed-audit` (todo #821 F0, 2026-11-17). The basketball pregame smart-sim prints one
+    `SMART_SIM_GAME_MODEL_UNFED` line per run with an unfed game, inside `refresh_nba_oddsapi_props.py` -- a child
+    step whose stdout is blanked here. This prints the line with the REAL reporter and feeds it through the real
+    `_run_command`, so a renamed token on either side fails here."""
+    from syndicate.features.shared import basketball_props_smart_sim as bps
+
+    jobs = [{"home_tri": "WAS", "away_tri": "MIL", "game_model_fed": False, "game_model_columns": ["pred_total", "pred_margin"]},
+            {"home_tri": "TOR", "away_tri": "NYK", "game_model_fed": False, "game_model_columns": ["pred_total", "pred_margin"]}]
+    bps._report_game_model_unfed_local(jobs, date_str="2026-11-17", league_code="nba")
+    printed = capsys.readouterr().out
+    line = next(text for text in printed.splitlines() if "SMART_SIM_GAME_MODEL_UNFED" in text)
+    assert "unfed=2 of=2" in line and "found=pred_total,pred_margin" in line
+
+    step = module.RefreshStep(name="nba_oddsapi_props", phases=("pregame",), cwd=Path("."),
+                              command=("python", "refresh_nba_oddsapi_props.py"), env_updates=None, description="t")
+    completed = subprocess.CompletedProcess(args=list(step.command), returncode=0,
+                                            stdout=f"noise\n{printed}more noise\n", stderr="")
+    with patch.object(module.subprocess, "run", return_value=completed), \
+            patch.object(module, "_log_memory", return_value=None), \
+            patch.object(module, "_dump_child_runtime_state", return_value=None), \
+            patch.object(module, "_record_step_in_sim_ledger", return_value=None), \
+            patch.object(module, "_step_rss_cap_mb", return_value=None):
+        result = module._run_command(step)
+    err = capsys.readouterr().err
+    assert f"STEP_MARKER name=nba_oddsapi_props {line.strip()}" in err
+    module._compact_step_result(result)
+    assert result["stdout"] == ""
+    assert module._compact_step_result_view(result)["stdout_markers"] == [line.strip()]

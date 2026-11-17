@@ -2822,7 +2822,13 @@ def _record_step_in_sim_ledger(step: RefreshStep, *, started: str, finished: str
 # and one `... FAILED NFL_GAMELINE_QUOTE_SHARD ...` line if the append raised.
 # Measured at the 22:31Z 11-16 load: 0 such lines readable on the fleet, so the
 # load could only be verified on the shard rows. One line per step, under the caps.
-_STEP_STDOUT_MARKERS = ("SOCCER_CONFIRMED_LINEUPS", "NFL_GAMELINE_QUOTE_SHARD")
+#
+# `SMART_SIM_GAME_MODEL_UNFED` (lane `nba-game-model-fed-audit`, todo #821 F0,
+# 2026-11-17): the basketball pregame smart-sim prints it once per run when a game's
+# team ratings never received the game model (on NBA, every game, until F1). The
+# sim runs inside `refresh_nba_oddsapi_props.py`, a child step, so without this the
+# line would be emitted and blanked. At most one line per step.
+_STEP_STDOUT_MARKERS = ("SOCCER_CONFIRMED_LINEUPS", "NFL_GAMELINE_QUOTE_SHARD", "SMART_SIM_GAME_MODEL_UNFED")
 _STEP_MARKER_MAX_LINES = 64
 _STEP_MARKER_MAX_CHARS = 300
 
