@@ -1048,3 +1048,75 @@ markets.** 11-16 total: 139.
 a live card.
 
 **Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
+
+## Reading 16 — Mon 11-16 8:13 PM CST (02:13Z 11-17), full page
+
+**Slate:** 27 live chips.
+- NBA 8: HOU @ MIA Q3; CHI @ CLE Q4; GSW @ NOP end Q2; ORL @ BOS Q4; MEM @ WAS Q4; POR @ MIN HALF;
+  PHX @ DEN Q1; PHI @ BKN Q3.
+- NFL LAC @ BAL Q2 10:16; NHL MTL @ NYR P2.
+- 17 college games.
+
+**Flags: 23 shown on 14 cards (40 qualifying rows). 0 false, 0 missed, 0 DARK.** 11-16 total: 162.
+- **The 7:48 PM dark burst (70 rows) cleared.** NBA builds p50 24.4 s, max 64.8 s, 2
+  `deferred_slow`; NBA gap max 320 s, 0 over 360 s.
+- **NBA `_alt`:** 0 of 899 rows priced <= 120 s again (466 of 802 at 7:48). So an alt pull ran around
+  7:4x and none since. #811's 60 s pulls stay main-only.
+- **Totals: 12 flags, 10 UNDER / 2 OVER.**
+  - NCAAB full-game, all calibrated: WKU @ Tulsa u139.5, Tarleton @ Drake u156.5, Columbia @
+    Northwestern u128.5, Western Illinois @ Minnesota u156.5, Central Arkansas @ Oklahoma u167.5,
+    SE Louisiana @ Texas A&M u165.5.
+  - **Tarleton @ Drake 2H u87.5 is RAW** (66/102). #816 calibrates full-game totals only; segment
+    totals are outside its scope.
+  - WNCAAB, RAW: Troy @ LSU u181.5 (**36.1 pp**, ours 169.4); Michigan @ Central Michigan u142.5
+    (17.3 pp).
+  - NBA: MEM @ WAS u244.5; ORL @ BOS o207.5; POR @ MIN o220.5 (12.3 pp).
+  - Under flag beside an "ours" above the line, again: Columbia u128.5 vs 130.3; Central Arkansas
+    u167.5 vs 168.6; also NBA MEM @ WAS u244.5 vs 245.7.
+- **Spreads and moneylines (11):** NBA MEM -10.5 at **26.8 pp**, PHI -18.5, ORL +2.5 (full and Q4),
+  CLE -14.5, MIA -13.5; NCAAB Minnesota -39.5, Columbia -2.5, Tulsa -2.5 and moneyline, Tarleton +1.5.
+- **Totals direction, flag by flag: 73 unders, 27 overs.** This reading adds 10 U (6 NCAAB full,
+  1 NCAAB 2H, 2 WNCAAB, 1 NBA) and 2 O (NBA).
+
+**MNF (LAC @ BAL, Q2 10:16):**
+- 15 NFL rows on live-rail, 10 priced <= 120 s by the book; **0 with a model price**.
+- `NFL_LIVE_RESIM` resimmed the game ONCE, at 01:55:39Z (`live_resimmed 1`, refusals only
+  `game_final` 13). It went back to `uninformative_probability` from 02:01Z.
+- `LIVE_GAMELINE_BUILD`: priceable 0, `no_live_gameline_projection` 30. No MNF flag can show while
+  P(home) stays inside 0.35-0.65.
+
+**Live rows:** 1,242.
+| sport | rows | priced <= 120 s | split |
+|---|---|---|---|
+| NBA | 1,065 | 35 | main 166 (35 fresh), `_alt` 899 (0 fresh); 1H 356 / 2H 537 / break 172 |
+| NCAAB | 143 | 44 | 2H 127 |
+| WNCAAB | 18 | 6 | — |
+| NFL | 15 | 10 | no model price |
+| NHL | 1 | — | — |
+
+- 380 rows older than 300 s now. 23 of 118 markets carry no price of ours.
+
+**Overlay (25 min):**
+| sport | gap p50 / max | build p50 / max | notes |
+|---|---|---|---|
+| NBA | 59 s / 320 s | — | |
+| NCAAB | 59 s / 188 s | — | |
+| WNCAAB | 85 s / 210 s | — | |
+| NFL | 108 s / 264 s | 12.1 s / 76.0 s | 1 `deferred_slow` |
+| NHL | 117 s / **375 s** (1 over 360 s) | — | 6 of 12 zero-card with rows |
+
+- Tick gap p50 28 s, max 135 s.
+
+**Web merges:** fresh 58 / 58 everywhere except NHL 57 / 58.
+
+**Load:**
+- `/intelligence` 11.5 s / 35.0 MB. **Query 8.2 s** / 76.8 MB. Shortlist 1.1 s; chips 2.2 s;
+  live-rail 0.14 s.
+- Gunicorn workers were 77 s and 35 s old at the read, both alive at the end (126 / 84 s). Host
+  load 4.7.
+- **Board:** built 154 s ago; shortlist written 229 s ago (1,287 s at 7:48 PM).
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 27 live chips have
+a live card.
+
+**Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
