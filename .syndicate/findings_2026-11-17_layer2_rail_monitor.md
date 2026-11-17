@@ -724,3 +724,58 @@ below the points scored (0 of 1).
     host load.
   - If it repeats, the lead is to run background dates only on ticks with no live sport due, or after the
     live builds. Owner: whoever holds the book-grid tick (to name if it repeats).
+
+## Reading 8 — Tue 11-17 5:01 PM CST (23:01Z)
+
+**Fleet:** unchanged (web `25fc2e4f0`; workers 28948 / 28949, up 3,783 s). Host load 3.2.
+
+**Slate:** 2 live chips. NCAAB Notre Dame @ Florida H2 18:42; WNCAAB Army @ UMass Q3 9:18. The 6 PM CST
+wave has not tipped yet.
+
+**Flags: 0 shown, 0 false, 0 missed, 0 dark.**
+
+**Live rows: 7.** NCAAB 5 (1 priced <= 120 s); WNCAAB 2 (2). Priced age p50 225 s, max 535 s. 1 of 5
+markets carries no price of ours.
+
+**Live strip (`/api/board/live-rail`): 1 row.**
+- Notre Dame @ Florida under 157.5 +104 at Polymarket (7 books quoting), P 0.561 vs fair 0.500.
+- Book age 535 s, seen 178 s ago.
+- **`live_total` 158.99 sits above the line of the under it carries: I-17's contradiction again.**
+
+**Overlay (24 min).** 0 gaps over 360 s; 0 `deferred_slow`.
+
+| sport | builds | gap p50 / max | build s p50 / max | zero-card with rows |
+|---|---|---|---|---|
+| NCAAB | 33 | 40 s / 91 s | 2.4 / 9.2 | 2 |
+| WNCAAB | 34 | 36 s / 69 s | 0.5 / 3.5 | 34 of 34 |
+
+- The 2 NCAAB zero-card builds (22:50:01, 22:50:39Z) refused every opportunity: value floor 28 / 30 and an
+  implausible book 2. That is the decided floor (the user's "Keep the floor"). The WNCAAB ones are the floor
+  too.
+- **No NCAAB build over 20 s, so the reading-7 lead did not repeat.**
+- **Book-grid ticks:** 72, gap p50 18 s, max 62 s.
+
+**Web merges:** fresh 19 / 19 for NCAAB and WNCAAB.
+
+**Load:**
+- **Query 5.7 s / 4.24 MB wire / 23.1 MB raw.**
+- Shortlist 0.66 s; chips 0.39 s; live-rail 0.02 s.
+- Board built 60 s ago; query snapshot 3,169 s.
+- Gunicorn workers 1,383 s and 466 s old: longer-lived than at 4:08-4:38 PM, when they recycled every
+  few minutes.
+
+**#824:** 0 of 16 college `LIVE_GAMELINE_JOIN` lines since 22:37Z carry the reason; 0 college totals flags.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated, 0 live chips without a live card.
+
+**Restarts:** none.
+
+### Improvement hunt, reading 8
+
+**I-17 is wider than the rail card.** The sim's number is shown on two surfaces:
+- the rail card's "ours" (`syndicate/templates/intelligence.html:3557`, `final.total ?? row.live_total`);
+- the board table's **Live** column, live rows only (`intelligence.html:4908`,
+  `live_projection ?? live_total`).
+
+Both sit next to a calibrated college total probability. The owner's fix should cover both. Hand-off to
+lane ncaab-total-overprojection at the summary.
