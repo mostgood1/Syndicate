@@ -526,3 +526,52 @@ Probe 3:35:30-3:38:04 PM CST (`ask_reading_20261117T213530Z.json`), against http
 
 - **ANOMALY:** the free_text ask "What do you think of this spread?" was not answered. It disconnected at 73.64 s with no status, past the 45 s cut-off. Check next: the web log around 3:36:36 PM CST, for what that gunicorn worker was doing (the query path vs the overlay). Also check whether the vague "spread" question without context routes to a full-form scan, the I-16 shape.
 - **ANOMALY:** a WORKER TIMEOUT kill at 3:36:36 PM CST. This probe's own ask was the victim, and it came under host load at the core count (soccer artifact build at ni 0, cheat-sheet build, refresh-worker). Check next: whether the kill repeats in the next reading at lower load, and the 4 hard recycles (881.9 MB vs the 644.9 MB limit).
+
+## Reading 12 (4:05 PM CST)
+
+Probe 22:05:10-22:05:37Z (4:05 PM CST); web window from 21:35:10Z (3:35 PM CST). File `C:\tmp\elp\askmon\readings\ask_reading_20261117T220510Z.json`.
+
+**Ask:** 5/5 answered, 0 past 45 s, median 4.50 s, max 9.23 s. Page 200 in 0.07 s; shortlist 200, 200 rows, 0.71 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "this spread?" | 9.23 | True | bet_analysis | 2026-11-17T21:02:56Z (age 3,747 s) | 0 |
+| free_text "Lakers vs Celtics" | 1.81 | True | matchup_analysis | 2026-11-17T21:02:56Z | 0 |
+| free_text "top edges today" | 4.64 | True | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line NBA NYK@TOR Q1 Under 55.5 | 4.50 | True | bet_analysis | 2026-11-15 (date) | 2 |
+| pregame_prop McBride threes Under 1.5 | 2.27 | True | bet_analysis | 2026-11-17T17:43:54Z (age 15,703 s) | 7 |
+
+No `live_row` ask, so the shortlist had no live game. `as_of_in_future` false on 5/5.
+
+**Web (21:35Z-22:05Z, 203 requests):**
+- WORKER TIMEOUT kills: 1, at 21:36:36Z (3:36 PM CST).
+- Memory recycles: 5 (3 hard); max anon 960 MB vs the 641.6 MB limit.
+- Overlay warms: 10; median 11.08 s; 1 over 20 s; 0 over 45 s; 0 over 60 s; max 21.07 s.
+- Over 20 s: `POST /api/syndicate/query` 2, `POST /api/intelligence/query` 1. Over 45 s: 0.
+- Asks from any client: 9; 0 over 45 s; 0 non-200. 0 of 9 were non-probe (all `Python-urllib/3.12`). The 4 at 21:37Z (max 26.7 s) were the previous reading's probe.
+
+**Host:** load average 3.89 / 3.67 / 3.91 on 12 cores; MemAvailable 9,496 MB. Top CPU:
+- refresh-worker 114% (ni 0, 2,475 MB, up 696 s);
+- `build_soccer_artifacts` epl wk12 107% (ni 0);
+- cloud-init status 79% (ni 0);
+- live-odds-worker 50% (ni 0, up 696 s);
+- gunicorn web 20% (ni 0, up 129 s);
+- live_resim_workers 6% (ni 5).
+
+The workers' 696 s uptime matches the 3:52 PM full down/up.
+
+**Engine:**
+- 2a: F2 has 1 run (10:30-11:17 AM CST, succeeded, "did NOT PASS"), already recorded at `c765eec64`. No newer run.
+- 2b: `engine-learner-m2-gate-read-1124` is enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 starts `c1a2c029c2a1816f`, unchanged.
+- 2d: 1 engine-file commit in the last 40 min: `85af16b35` (3:39 PM CST) "engine experts: an evidence row's instant is the later of its tick and its state (FEATURE_STATE_INSTANT) -- NHL / NCAAF". It is not in fleet `25fc2e4f0`.
+- 2e: two fleet loads in the last 40 min:
+  - 3:52 PM CST: DEPLOY ff + drained full down/up, `5db26434e` -> `91d865fd5` (render-config-retirement steps 2 + 3a, #766);
+  - 3:56 PM CST: DEPLOY ff + reload-web, `91d865fd5` -> `25fc2e4f0` (board-query diagnostic strip, #827).
+
+  `5db26434e..25fc2e4f0` touches 36 files under `syndicate/`, among them `execution_ledger.py`, `live_refresh_loop.py`, `game_board_contract.py`, `mlb/cards.py`, `nba/cards.py` and `nba/live_tick/tick.py`.
+
+**Anomalies:**
+- **ANOMALY:** 1 WORKER TIMEOUT kill at 3:36:36 PM CST, before both loads. Check next: the web role log around 21:36Z for the killed request's route. The 21:37Z probe asks ran 13.98-26.7 s, against 1.81-9.23 s now.
+- **ANOMALY:** new engine-file commit `85af16b35` (3:39 PM CST, experts evidence-row instant, NHL / NCAAF). Check next: its lane's ledger entry. Does it change the experts' reproduction that F2 depends on? It is not loaded on the fleet.
+- **ANOMALY:** new fleet loads at 3:52 PM CST (full down/up -> `91d865fd5`) and 3:56 PM CST (reload-web -> `25fc2e4f0`). The range touches live-path files (`execution_ledger`, `live_refresh_loop`, `game_board_contract`, NBA live tick, cards). Check next: whether either deploy changed what the live join serves. Use the deploys.md `verify:` lines and a next experts reproduction. Watch whether web recycles (5 in 30 min, max anon 960/641.6 MB) settle after the reload.
