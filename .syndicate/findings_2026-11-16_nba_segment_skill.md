@@ -109,6 +109,26 @@ real number.
   fresh held-out.
 - Same grader blob and seed.
 - It runs as a one-time task, Mon 2026-12-07 1:00 PM CST, after the NCAAF re-grade at 10:00 AM.
+- **ADDENDUM: a descriptive split by engine.** Registered 2026-11-17 12:42 PM CST (18:42Z), before any re-grade
+  outcome exists; user: "Yes, add the split".
+  - **Why:** todo `#821` F1 was switched on at 2026-11-17 17:35:08Z (11:35 AM CST). See the `deploys.md` entries at
+    17:34:59Z and the verification at 17:45:20Z. From then on, the NBA sim takes the game model's numbers, with the
+    injury penalties off. The re-grade window (11-16 12:00Z .. 12-07 12:00Z) therefore holds sims from two engines.
+  - **Arms**, read from each sim's own `market_anchor`:
+    - **F1**: `game_model_fed` is true AND `nba_total_inputs.skip_outs_penalties` is true.
+    - **PRE**: `game_model_fed` is absent or false AND `skip_outs_penalties` is absent or false.
+    - **MIXED**: anything else. It is counted and named, but not graded.
+    - Each arm is cross-tabbed against the sim's fleet mtime before/after 17:35:08Z, and any disagreement is named.
+  - **Method:** the frozen grader, unchanged, runs once per arm. Each run uses a copy of the data root that holds
+    only that arm's sims, so the other games refuse `no_smart_sim_file`. Quotes, linescores, window, seed and frozen
+    w are the same as the main run.
+    - Check: each arm's graded games + the other arm's + MIXED = the main run's graded games.
+  - **Reported per arm and family:** G1 dBrier with its CI, and G2's frozen d with its CI.
+  - **It changes nothing registered.** The verdicts, P1/P3/P4 and any weight confirmation rest on the whole
+    population; the split alone cannot confirm or refute a weight. PRE holds only sims written before 11:35 AM CST
+    11-17, so its CIs will be wide.
+  - **Other loads:** any other NBA sim engine load inside the window is named with its time (from `deploys.md`; for
+    example `#820`'s h2-includes-OT switch). No further split is graded.
 
 ## What the result is allowed to change
 

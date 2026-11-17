@@ -104,6 +104,12 @@
     - the pregame `score.dist` `h2` excludes overtime (`_SIM_DIST_SEGMENTS_LOCAL`), while settlement includes it.
   - **Grader join gap:** 2 games whose sims carry an NBA.com id were refused `no_espn_event`. A descriptive re-run with them in changes no verdict.
   - **Owed:** the Dec 7 re-grade, scheduled task `nba-segment-regrade-818` (Mon 2026-12-07 1:00 PM CST, weights frozen at 0 / 0.20 / 0.25). The provenance line of `nba_game_book_blend.json` still says "unmeasured"; rewriting it is a fleet data edit and the user's call.
+- **STATUS 2026-11-17 12:42 PM CST: a descriptive split by engine is added to the Dec 7 re-grade.** Registered before any re-grade outcome; user "Yes, add the split". See the ADDENDUM in the findings' "The Dec 7 re-grade" section.
+  - Why: #821 F1 went on at 11:35 AM CST 11-17, inside the window.
+  - Arms come from each sim's `market_anchor`: F1 = `game_model_fed` + `skip_outs_penalties` true; PRE = neither; MIXED is counted only.
+  - It is graded with the frozen grader, once per arm, on a data-root copy that holds only that arm's sims.
+  - No gate, window, seed, weight or population changed. Verdicts and P1/P3/P4 still rest on the whole population.
+  - Task `nba-segment-regrade-818` prompt updated (step 4b).
 
 ### `#817` — **NFL GAME-LINE QUOTES WERE FILED BY THE UTC CAPTURE DATE, SO FROM 6 PM CST EVERY NFL GAME LINE WENT TO TOMORROW'S SHARD: SNF / MNF / TNF in-play lines (and the end of every late-afternoon game) never reached their own date's in-play overlay or Games Rail. LOADED 2026-11-16 22:31:26Z (fleet ff to `dac4d49f8`, no restart, user "Load it now"). VERIFIED ON MNF, GOAL MET 01:40-01:47Z 11-17; lane CLOSED: `_append_nfl_team_book_quotes` files by Central kickoff date (`kickoff_shard_date`), off switch `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0`** `[2026-11-16, lane nfl-gameline-kickoff-shard, session a64727a8; defect found by layer2-rail-monitor 11-15; task from local_62433e58]`
 - **ID:** first written as `#816` (commits `ed63c7611`, `bc0d16116`), but lane `ncaab-total-overprojection` had
