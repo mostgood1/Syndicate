@@ -832,12 +832,6 @@ death, never life — do not invert it.
 - Verification: (1) targeted football / NFL tests on the default profile and on the file; (2) fleet baseline before the ff: source=default; after: source=artifact and the nine fields; (3) the new refresh-worker pid first seen after the ff; (4) the next NFL projection CSV generated after the ff. The #752 segment re-grade stays owed (about 3 more weeks of games on the new profile).
 - Blocked by: the MNF timeouts check (lane nfl-live-timeouts), the user's sequencing. The push waits for it too: any peer's fleet ff after the push would carry the file.
 
-### closed-lane-archive-20261116-1440 — CLOSED 2026-11-16 (GOAL MET: 2 blocks archived) — opened 2026-11-16 — session bbf28575-4057-44ea-bf39-e76eb68ef14c
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 2 of 7 CLOSED SAFE; both moved to lanes_closed.md with one pointer each; check_lane_invariants shows the same 3 contested files as the origin/main baseline, none new.
-- Moved: nfl-live-total-underprojection, closed-lane-archive-20261116-0840. Table and WAIT reasons: .syndicate/log/2026-11-16.md.
-
 ### ncaab-total-overprojection — OPEN — opened 2026-11-16 — session b1d2088f-b4a3-474a-99c8-8fd14e19d2c2
 - Goal: Explain why the model pointed OVER on FAMU @ UTEP NCAAB 11-16 (pregame sim 145.8 vs market ~139.5 at tip; live 137.2 projected at 40-70 vs 125 final) and fix what is systematic: per-state bias of the NCAAB live total (final - model_total_mean, by margin and progress) and of the pregame total calibration (target - close, by raw prior), each against the market's own residual over every graded 11-02..11-16 game; any fix tested off != on, on main, loaded only with the user's OK, then re-measured
 - Files: .syndicate/findings_2026-11-16_ncaab_total_overprojection.md (NEW), syndicate/features/college_basketball/total_prob_calibration.py (NEW), tests/test_college_total_calibration.py (NEW), scripts/fit_college_total_calibration.py (NEW), syndicate/features/shared/live_gameline_join.py (the total_calibration step in price_distribution_market + its one call site + a college_live_total_calibration helper + the same step in live_display_block ONLY) (LOAN from live-player-exit-gate approved by the user 2026-11-16 -- that lane names the file only in a not-yet-claimed sentence), syndicate/features/shared/live_gameline_ledger.py (two new build_records fields ONLY), syndicate/features/shared/college_game_projections.py (the _served totals branch + its _project_row call ONLY), scripts/build_college_pregame_sims.py (a refresh_total_calibrations step + its call in main ONLY), docs/ai_context/todo.md (#816 entry ONLY)
@@ -965,6 +959,11 @@ death, never life — do not invert it.
 - Falsification test: Any fleet NBA sim whose model_margin_raw differs from 0.5*(away_outs-home_outs)+0.8*(away_b2b-home_b2b) by >1e-9, or any NBA predictions file carrying spread_margin; the WNBA control (spread_margin present) must come out OFF that rule.
 - Verification: Rule reproduces 197/197 copied sims and 261/261 fleet NBA sims 10-03..11-16; 72/72 zeros = equal outs+b2b; WNBA control 15/15 off-rule; findings note written with 2x2 counterfactual (feed x outs penalties) on 192 graded games.
 - Blocked by: none
+
+### closed-lane-archive-20261116-2040 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 45d8ff17-6e51-467f-8f9e-188751b071a5
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 02:42Z 11-17 (8:42 PM CST): 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261116-1440`. Table and waits: log/2026-11-16.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1249,6 +1248,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261116-0840` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session a60661ae-5c55-42b6-b94a-9aebec374382
 - `closed-lane-archive-20261116-1040` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session d9334b85-877c-40a4-b4d8-3a4ab232c91f
 - `closed-lane-archive-20261116-1240` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session cd1c7de1-cee6-4e0f-9b75-5b47a6e95740
+- `closed-lane-archive-20261116-1440` — CLOSED 2026-11-16 (GOAL MET: 2 blocks archived) — opened 2026-11-16 — session bbf28575-4057-44ea-bf39-e76eb68ef14c
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
