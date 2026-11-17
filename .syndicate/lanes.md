@@ -892,6 +892,14 @@ death, never life — do not invert it.
 - Verification: tests pass; the register seeded from deploys.md with verified load times; the readout run against the fleet prints the clock (last change, events since, unclassified loads) and its focus count equals a hand count of bets submitted after that load
 - Blocked by: none
 
+### nba-segment-grade — OPEN — opened 2026-11-16 — session 24d2e336-9705-44d9-8d8a-f728270f237f
+- Goal: Run the PRE-REGISTERED first NBA quarter/half grade (todo #818, .syndicate/findings_2026-11-16_nba_segment_skill.md, main 53c4f664e) exactly as written: the grader committed to main after a --count-only run and before any outcome is read; G1/G2/G3 on regular-season tips 2026-10-20 12:00Z..2026-11-16 12:00Z with seed 818; P1-P4 scored held/failed in a RESULTS section citing the grader blob; a one-time Dec 7 1:00 PM CST re-grade task with each family's w_fit frozen. Nothing on the fleet is changed or loaded.
+- Files: scripts/nba_segment_skill.py (NEW), tests/test_nba_segment_skill.py (NEW), .syndicate/findings_2026-11-16_nba_segment_skill.md (RESULTS section only), docs/ai_context/todo.md (#818 section only)
+- Hypothesis: n/a (pre-registered grade; predictions P1-P4 are in the findings file)
+- Falsification test: n/a (the registration's gates decide)
+- Verification: count-only population recorded and grader blob on origin/main BEFORE the graded run; result.json G1/G2/G3 tables in the findings RESULTS section; scheduled task nba-segment-regrade-818 listed for 2026-12-07T13:00-06:00
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
