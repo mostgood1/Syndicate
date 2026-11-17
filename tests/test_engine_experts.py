@@ -337,6 +337,39 @@ def test_the_evidence_lookup_prefers_the_state_the_join_priced():
     assert match == "as_of_instant" and row["modelHomeWinProb"] == 0.7
 
 
+def test_a_row_whose_state_is_newer_than_its_tick_is_filed_at_its_state():
+    # NHL stamps its snapshot BEFORE it reads the scoreboard: this row's state is 20 s newer than its tick.
+    row = _evidence(t="2026-11-09T18:20:00-06:00", as_of="2026-11-10T00:20:20+00:00", p_home=0.7)
+    at = ee._parse("2026-11-10T00:20:10+00:00")
+    on = ee.EvidenceIndex([row])
+    assert on.state_after_tick == 1 and on.instant(row) == ee._parse("2026-11-10T00:20:20Z")
+    assert on.lookup("Charlotte Hornets", "Cleveland Cavaliers", at, None) == (None, "no_evidence_before_instant")
+    off = ee.EvidenceIndex([row], env={ee.OFF_ENV: ee.FEATURE_STATE_INSTANT})
+    assert off.state_after_tick == 0 and off.instant(row) == ee._parse(row["t"])
+    found, match = off.lookup("Charlotte Hornets", "Cleveland Cavaliers", at, None)
+    assert match == "as_of_instant" and found["modelHomeWinProb"] == 0.7
+    # A state at or before its tick is untouched (NBA / NCAAB stamp the snapshot after they read the state).
+    plain = _evidence()
+    assert ee.EvidenceIndex([plain]).instant(plain) == ee._parse(plain["t"])
+
+
+def test_live_resim_never_scores_a_line_against_a_state_newer_than_the_line():
+    row = _evidence(t="2026-11-09T18:20:00-06:00", as_of="2026-11-10T00:20:20+00:00")
+    off_env = {ee.OFF_ENV: ee.FEATURE_STATE_INSTANT}
+    early = [_ledger(recorded_at="2026-11-10T00:20:10+00:00", state_as_of=None, join_p=0.5)]
+    on = ee.live_opinions(early, ee.EvidenceIndex([row]), ee.Reader())[0]
+    off = ee.live_opinions(early, ee.EvidenceIndex([row], env=off_env), ee.Reader(), env=off_env)[0]
+    assert on.refusal == "no_evidence_before_instant" and on.p_expert is None
+    assert off.inputs["evidence_match"] == "as_of_instant" and off.inputs["evidence_age_s"] == 10.0
+    late = [_ledger(recorded_at="2026-11-10T00:20:40+00:00", state_as_of=None, join_p=0.5)]
+    on = ee.live_opinions(late, ee.EvidenceIndex([row]), ee.Reader())[0]
+    off = ee.live_opinions(late, ee.EvidenceIndex([row], env=off_env), ee.Reader(), env=off_env)[0]
+    # The evidence is as old as its STATE, not its stamp; the stamp still re-finds the row.
+    assert on.inputs["evidence_age_s"] == 20.0 and on.inputs["evidence_instant"] == "2026-11-10T00:20:20+00:00"
+    assert on.inputs["evidence_t"] == row["t"]
+    assert off.inputs["evidence_age_s"] == 40.0 and "evidence_instant" not in off.inputs
+
+
 # ----------------------------------------------------------------------------- the checklist
 
 
@@ -603,7 +636,7 @@ def _seg_quotes(**kw):
 
 
 def _seg(evidence, quotes, *, env=None):
-    index = ee.EvidenceIndex(evidence)
+    index = ee.EvidenceIndex(evidence, env=env)
     reader = ee.Reader()
     qi = ee.GameLineQuoteIndex(quotes, reader)
     rows, blocks = [], []
@@ -656,6 +689,21 @@ def test_live_segment_on_then_off():
     assert len(on) == len(off) == 2
     assert all(o.delta_logit is not None for o in on)
     assert all(o.refusal == "expert_off" and o.delta_logit is None and o.p_expert is None for o in off)
+
+
+def test_a_segment_opinion_on_a_tick_whose_state_is_newer_is_dated_and_priced_at_the_state():
+    ev = _seg_evidence()
+    ev["as_of"] = "2026-11-13T01:00:20+00:00"  # 20 s after its tick (T_TICK is 01:00:00Z)
+    on, _, index, *_ = _seg([ev], _seg_quotes())
+    off, *_ = _seg([dict(ev)], _seg_quotes(), env={ee.OFF_ENV: ee.FEATURE_STATE_INSTANT})
+    t_on, t_off = _by(on, "totals")[0], _by(off, "totals")[0]
+    assert t_on.t == "2026-11-13T01:00:20+00:00" and t_on.inputs["evidence_t"] == T_TICK
+    assert t_off.t == T_TICK and "evidence_t" not in t_off.inputs
+    # Same books, read 20 s later: the prior is the same number, 20 s older.
+    assert t_on.p_prior == t_off.p_prior and t_on.prior_age_s == t_off.prior_age_s + 20.0
+    # The reproduction still re-finds the tick through the stamp the opinion kept.
+    rep = ee.segment_join_reproduction(on, index)
+    assert (rep["checked"], rep["mismatched"]) == (2, 0)
 
 
 def test_only_lines_standing_at_the_tick_are_opined_and_a_settled_half_is_skipped():

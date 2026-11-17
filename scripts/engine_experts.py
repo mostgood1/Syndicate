@@ -137,6 +137,8 @@ def live(date_str: str, sports: set[str] | None, root: Path | None) -> dict[str,
             "join": ee.join_reproduction(ops),
             "fallback_frame": ee.fallback_frame_check(ops),
             "evidence_key": _count(o.inputs.get("evidence_key") for o in ops if o.expert == "live_resim"),
+            # Rows filed at their state, not their tick (`FEATURE_STATE_INSTANT`): NHL / NCAAF / NFL stamp first.
+            "evidence_state_after_tick": index.state_after_tick,
             "prior_basis": _count(f"{o.prior_basis}|{o.inputs.get('p_source') or 'evidence_histogram'}"
                                   for o in ops if o.delta_logit is not None),
             "checklist": ee.checklist(ops, reader, {"live_gameline_ledger": priced, "live_evidence": evidence},
@@ -292,7 +294,8 @@ def run(args: argparse.Namespace) -> int:
             print("      MISMATCH", json.dumps(ex, default=str))
         bad += j["mismatched"]
         print(f"   EVIDENCE_KEY {sport} {json.dumps(block['evidence_key'])} | opined by prior|p source "
-              f"{json.dumps(block['prior_basis'])}")
+              f"{json.dumps(block['prior_basis'])} | rows filed at their state, not their tick: "
+              f"{block['evidence_state_after_tick']} of {block['evidence_rows']}")
         ff = block["fallback_frame"]
         print(f"   FALLBACK_FRAME {sport} judged={ff['judged']} failed={ff['failed']} "
               f"{json.dumps(ff['families'], sort_keys=True)}")

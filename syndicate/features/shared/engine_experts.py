@@ -83,6 +83,13 @@ OFF_ENV = "SYNDICATE_ENGINE_EXPERTS_OFF"  # comma list of expert (or feature) na
 FEATURE_TEAM_ALIAS = "team_alias"  # EvidenceIndex's canonical-pair fallback
 FEATURE_FAIR_OVER = "fair_over"  # live_resim's prior from `market_fair_prob_over`
 FEATURE_DISPLAY_MARGIN = "display_margin"  # live_resim's NHL puck line from the ledger's `display_prob`
+# An evidence row's INSTANT is the later of its tick `t` and its state `as_of` (lane engine-live-prior, 2026-11-16).
+# NHL and NCAAF / NFL stamp the snapshot's `generatedAt` BEFORE they read the scoreboard (`nhl/live_resim.py`:
+# `generated_at` and then `fetch_score_rows`; each state's `as_of` is stamped as it is parsed; `ncaaf/live_resim.py`
+# likewise), so a row can hold state NEWER than its tick. Measured on the dev logs 11-09..11-14 (priced rows): NHL
+# 1,839 of 3,307 by up to 25 s, NCAAF 318 of 2,800 (<= 0.73 s), NFL 34 of 34 (<= 0.99 s); NBA / NCAAB / WNCAAB 0
+# (they stamp after). Keyed by its tick alone, an opinion could see past the line it is scored against.
+FEATURE_STATE_INSTANT = "state_instant"
 
 PHASE_PREGAME = "pregame"
 PHASE_LIVE = "live"
@@ -452,13 +459,19 @@ class EvidenceIndex:
     the fleet: NCAAF's ledger names are the odds feed's ("Iowa State Cyclones"), its evidence rows ESPN's short
     `home_name` ("Iowa State", `live_evidence_log.lane_row`) with no event id; exact keys met 0 of 55 games on 11-14,
     the canonical pair 55 of 55. Two evidence games under one canonical pair are refused `team_alias_ambiguous`, never
-    guessed. `FEATURE_TEAM_ALIAS` in the experts' off list restores exact-only."""
+    guessed. `FEATURE_TEAM_ALIAS` in the experts' off list restores exact-only.
+
+    INSTANT: each row is filed under `instant(row)`, the later of its tick and its state (`FEATURE_STATE_INSTANT`), so
+    no lookup at `at` returns a state newer than `at`. `state_after_tick` counts the rows that moved."""
 
     def __init__(self, rows: Iterable[Mapping[str, Any]], *, sport: Any = None,
                  alias_key: Callable[[Any, Any, Any], Any] | None = None,
                  env: Mapping[str, str] | None = None) -> None:
         self.by_game: dict[tuple[str, str], list[tuple[datetime, Mapping[str, Any]]]] = {}
         self.sport = str(sport or "").strip().lower()
+        off = experts_off(env)
+        self.state_instant = FEATURE_STATE_INSTANT not in off
+        self.state_after_tick = 0
         # The earliest instant logged for this sport: a line priced before it had no evidence to find, which is a
         # gap in the log, not a failed identity (NFL 11-09: five games priced before the NFL log's first row).
         self.first_t: datetime | None = None
@@ -466,9 +479,11 @@ class EvidenceIndex:
         for row in rows:
             if row.get("refusal") is not None or row.get("carried"):
                 continue
-            t = _parse(row.get("t"))
+            t = self.instant(row)
             if t is None:
                 continue
+            if t != _parse(row.get("t")):
+                self.state_after_tick += 1
             if self.first_t is None or t < self.first_t:
                 self.first_t = t
             # ONCE PER DISTINCT KEY (lane college-segment-grade, 2026-11-13). NCAAB's evidence rows carry `home` /
@@ -485,7 +500,7 @@ class EvidenceIndex:
                     names.setdefault(key, set()).add(keys[key])
         for series in self.by_game.values():
             series.sort(key=lambda item: item[0])
-        self.alias_on = bool(self.sport) and FEATURE_TEAM_ALIAS not in experts_off(env)
+        self.alias_on = bool(self.sport) and FEATURE_TEAM_ALIAS not in off
         self._alias_fn = alias_key or _join_team_alias_pair_key
         self._alias_cache: dict[tuple[Any, Any], tuple[str, str] | None] = {}
         self.by_alias: dict[tuple[str, str], set[tuple[str, str]]] = {}
@@ -495,6 +510,16 @@ class EvidenceIndex:
                     pair = self._alias(home, away)
                     if pair is not None:
                         self.by_alias.setdefault(pair, set()).add(key)
+
+    def instant(self, row: Mapping[str, Any]) -> datetime | None:
+        """When this row's evidence existed: its tick `t`, or its state's `as_of` when that is later (on unless
+        `FEATURE_STATE_INSTANT` is off)."""
+        t = _parse(row.get("t"))
+        if t is not None and self.state_instant:
+            state_t = _parse(row.get("as_of"))
+            if state_t is not None and state_t > t:
+                return state_t
+        return t
 
     def _alias(self, home: Any, away: Any) -> tuple[str, str] | None:
         if (home, away) not in self._alias_cache:
@@ -630,10 +655,12 @@ def live_resim_expert(ledger_row: Mapping[str, Any], index: EvidenceIndex, reade
         op.refusal = match
         return op
     e = lambda path: reader.get(name, "live_evidence", row, path)  # noqa: E731
-    ev_t = _parse(e("t"))
+    ev_t = index.instant(row) if e("t") is not None else None
     age = None if ev_t is None else (at - ev_t).total_seconds()
     op.inputs.update({"evidence_t": e("t"), "evidence_age_s": None if age is None else round(age, 1),
                       "evidence_event_id": e("event_id")})
+    if ev_t is not None and ev_t != _parse(e("t")):
+        op.inputs["evidence_instant"] = ev_t.isoformat()  # its state is newer than its tick (FEATURE_STATE_INSTANT)
     share, bucket = elapsed_share(sport, e("state"))
     op.elapsed_share, op.clock_bucket = share, bucket
     if age is not None and age > LIVE_EVIDENCE_MAX_AGE_S:
@@ -986,7 +1013,7 @@ def stat_progress_expert(prop: Mapping[str, Any], props_row: Mapping[str, Any], 
     op.inputs["evidence_match"] = match
     if row is not None:
         e = lambda path: reader.get(name, "live_evidence", row, path)  # noqa: E731
-        ev_t = _parse(e("t"))
+        ev_t = index.instant(row) if e("t") is not None else None
         age = None if ev_t is None else (at - ev_t).total_seconds()
         op.inputs["evidence_age_s"] = None if age is None else round(age, 1)
         if age is not None and age <= LIVE_EVIDENCE_MAX_AGE_S:
@@ -1181,12 +1208,15 @@ def live_segment_expert(evidence_row: Mapping[str, Any], segment: str, market: s
                         entries: Sequence[tuple], reader: Reader, off: frozenset[str] = frozenset(),
                         game_key: tuple[str, str] | None = None,
                         evidence_game: tuple[str, str] | None = None,
-                        quote_event_id: str | None = None) -> ExpertOpinion:
+                        quote_event_id: str | None = None, instant: datetime | None = None) -> ExpertOpinion:
     """One segment line at one logged tick -> an opinion on OVER (totals) / HOME COVERS (spreads).
 
     p_expert: the segment block's histogram, two-way (push sims out) and Agresti-Coull smoothed -- the join's
     estimator, as `live_resim`; sigma: its Monte Carlo error on the logit scale. Prior: `prop_prior` over the line's
-    `GameLineQuoteIndex` entries at the tick's instant. A spread needs `marginAnchored` (the join's own rule)."""
+    `GameLineQuoteIndex` entries at the tick's instant. A spread needs `marginAnchored` (the join's own rule).
+
+    `instant` (`EvidenceIndex.instant`): when it is later than the tick (the row's state is newer than its stamp),
+    the opinion is dated, and its prior read, at `instant`; `inputs.evidence_t` keeps the tick that re-finds the row."""
     name, version = "live_segment", "live_segment/1"
     e = lambda path: reader.get(name, "live_evidence", evidence_row, path)  # noqa: E731
     sport = str(e("sport") or "").lower()
@@ -1195,6 +1225,10 @@ def live_segment_expert(evidence_row: Mapping[str, Any], segment: str, market: s
     if not event_id and quote_event_id:
         event_id, event_id_source = str(quote_event_id), "book_quotes"
     t = str(e("t") or "")
+    tick = _parse(t)
+    evidence_t = None
+    if instant is not None and tick is not None and instant > tick:
+        evidence_t, t = t, instant.isoformat()
     market = str(market or "").lower()
     segment = str(segment or "").lower()
     side = "home" if market in _SPREADS else "over"
@@ -1218,6 +1252,8 @@ def live_segment_expert(evidence_row: Mapping[str, Any], segment: str, market: s
         op.inputs["evidence_game"] = list(evidence_game)
     if event_id_source != "live_evidence":
         op.inputs["event_id_source"] = event_id_source
+    if evidence_t is not None:
+        op.inputs["evidence_t"] = evidence_t  # the tick that re-finds the row; the opinion is dated at its state
     if name in off:
         op.refusal = "expert_off"
         return op
@@ -1312,7 +1348,7 @@ def live_segment_opinions(index: EvidenceIndex, quotes: GameLineQuoteIndex, read
                         if not line_live_at(entries, t):
                             continue
                         out.append(live_segment_expert(row, segment, market, line, entries, reader, off, game_key,
-                                                       evidence_game, quotes.event_ids.get(game_key)))
+                                                       evidence_game, quotes.event_ids.get(game_key), instant=t))
                         used = block_used = True
                 if block_used and keep_blocks is not None:
                     keep_blocks.append(block)
@@ -1342,7 +1378,7 @@ def segment_join_reproduction(opinions: Sequence[ExpertOpinion], index: Evidence
         if op.expert != "live_segment" or op.p_expert is None or op.line is None:
             continue
         home_key, away_key = op.inputs.get("evidence_game") or (op.inputs.get("home_key"), op.inputs.get("away_key"))
-        row = rows_at.get((str(home_key), str(away_key), op.t))
+        row = rows_at.get((str(home_key), str(away_key), str(op.inputs.get("evidence_t") or op.t)))
         block = ((row or {}).get("segments") or {}).get(op.segment) if row else None
         if not isinstance(block, Mapping):
             out["checked"] += 1
