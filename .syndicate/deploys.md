@@ -61269,3 +61269,46 @@ Lane `render-config-retirement` (session 267d8859).
 
 ## 2026-11-17 23:1xZ (5:1x PM CST) -- STAMP CORRECTION (no deploy), lane `ncaab-total-overprojection`: the #816 7-day grade task `college-total-cal-grade-816` runs **Tue** 2026-11-24 10:00 AM CST, not Mon (the 19:56:39Z entry says Mon). The date and task are unchanged.
 - betting change: no
+
+## 2026-11-17 23:15:44Z (5:15 PM CST) -- DEPLOY (ff + reload-web): fleet `25fc2e4f0` -> `64daca46f`, loading the board query's serialize-once (todo #828, lane `board-query-serialize-once-load`) -- **REACHABILITY + CORRECTNESS MET; THE PRODUCTION TIMING SERIES WAS SLOWER AFTER THE LOAD (median 9.8 s vs 6.4 s), confounded, second series owed. Fleet-Python A/B of the change itself: 1,665 -> 882 ms**
+- betting change: no
+- **what:** `64daca46f` makes the four exits of `/api/intelligence/query` serialise the payload once: the bytes hashed for `version` are the bytes sent (web only). The ff also carries, as listed to the user before "Load it":
+  - render-config step 3b `f1a278ed8` (no code reads a RENDER* marker; every role has the neutral SYNDICATE_* markers since the 21:53Z drained up);
+  - WNBA box-score polls per date `920c19e70` (#829: live-odds-worker + refresh-worker, loads at their next restart; skips polls on dates with no WNBA game);
+  - `execution_ledger.operator_fill_from_venue` `b96ea17a7` (inert unless the CLI runs);
+  - engine experts `85af16b35` (only offline scripts import it);
+  - scripts no role runs.
+  None changes which live bets are placed, sized, held or exited.
+- **decision:** the user said "Load it" (2026-11-17), after the ride-alongs above were listed in the same message that asked.
+- **gates:**
+  - claim web 23:15:04Z (holder `board-query-serialize-once-load`, ACQUIRED);
+  - the ff touches none of the fleet checkout's dirty paths (76 incoming files);
+  - preflight `--service web --target-commit 64daca46f`, run from a worktree at origin/main `ee47c930a`, with 5 expect/baseline pairs read at 23:14:40Z: **CLEAR 23:15:22Z** (0 processes).
+  - Two peers held the worker claims throughout (refresh-worker `ncaaf-grid-build-speed`, live-odds-worker `wnba-boxscore-polling-per-date`) and had not ff'd. Fleet HEAD was still `25fc2e4f0` at 23:15:43Z.
+- **ff + reload** (`C:\tmp\i13\ff_reload.sh 64daca46f`):
+  - `git merge --ff-only 64daca46f` at **23:15:44Z**;
+  - `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "state": "done"}`;
+  - web workers 49150/49457 -> **49762/49763**, master 28883 unchanged.
+- **expect / measured.** The series are the page's own body (`slim_aliases`, `drop_row_diagnostics`, `row_refs`), 6 reads 30 s apart, from `C:\tmp\i13\read_series.py`, saved to `C:\tmp\i13\load_series_20261117.jsonl`. Stages are from web.log `QUERY_STAGE_MS`.
+  - `web_commit` 25fc2e4f -> 64daca46: **MET.** Fleet HEAD `64daca46f3a1`, and the new web workers booted after the ff.
+  - `query_stage_serialize_once` absent -> true: **MET, 7 of 7** post-load queries log `"serialize_once": true`.
+  - `version_is_hash_of_sent_response` true -> true: **MET, 6 of 6** post-load reads. `version` == sha256 of the `response` bytes exactly as received.
+  - Errors: 0 Traceback, 0 WORKER TIMEOUT and 0 SIGKILL in web.log from 23:15:44Z to ~23:21Z.
+  - `page_query_median_seconds` 6.4 -> "below 6.4": **NOT MET, 9.8 s.**
+    - pre (23:11:32-23:14:40Z): 8.22 / 10.38 / 5.45 / 6.94 / 2.94 / 5.88 s;
+    - post (23:16:07-23:19:33Z): 13.33 / 15.78 / 10.39 / 4.17 / 7.06 / 8.61 s.
+    - The post series ran on fresh web workers (the reload, then two `WEB_WORKER_MEMORY_RECYCLE` hard recycles at 23:18:35Z and 23:20:25Z, ~900 MB anon against a 622 MB limit), so board caches were cold.
+    - It also ran on a busier host (load ~4.2-4.8 on 12 cores: a soccer artifact build at ~107% CPU, refresh-worker ~88%, a cheat-sheet build, odds jobs).
+    - Stages this change does not touch slowed too. `hydrate_and_mirror` went from a median of ~0.84 s to 0.74-3.94 s, and `board_read` missed on 4 of 7 queries (pre: 4 of 11).
+    - Time after the stages (client seconds - server total) **fell** from a median of ~1.6 s to ~1.3 s, despite the load. That share is where the old `jsonify` ran.
+  - `version_and_debug_median_ms` 973 -> "within noise": **NOT MET, median 1,852 ms (787-2,633).**
+    - **My expectation was wrong.** This stage now holds the WHOLE serialisation (the old one held only the hash dump). On the fleet's Python that is 882 ms against the old hash part's 674 ms (the A/B below): +31% expected, before contention.
+- **The change's own cost on the fleet's Python, same host, same payload, alternated** (`C:\tmp\i13\fleet_bench.py`):
+  - run at nice 19 from `~/Syndicate`, with no `create_app` and nothing written;
+  - payload: the page response saved at 21:46:25Z, 24,446,438 B;
+  - bytes identical; `version` == the version the fleet served;
+  - old exit: median **1,665 ms** (hash part 674 + `jsonify` part 935);
+  - new exit: median **882 ms**, 10 runs each, at 23:21-23:22Z, under the same host load;
+  - **783 ms saved (47%)**.
+- **Owed:** a second production series once the host is quieter and the web workers are warm, against a fresh pre-style baseline of the same conditions. That series decides the lane's verdict. Also the `WEB_WORKER_MEMORY_RECYCLE` rate per query against 21:57-23:15Z (19 recycles in 78 min, pre-existing; the new exit's tracemalloc peak is 30 MB lower).
+- **Record:** BC row (no). Claim web released after this entry.
