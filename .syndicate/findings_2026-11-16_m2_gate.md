@@ -502,3 +502,13 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 ```
+## Amendment 1, measured exposure (2026-11-16 7:38 PM CST; the rule is unchanged)
+
+The look-ahead behind Amendment 1 is real in the evidence LOG (NHL rows stamped before their state), but on the dev
+days it reached NO graded opinion. Every graded `live_resim` opinion, in every sport, matched the join's own state
+(`same_state`: NHL 3,431, NCAAF 23,620, NBA 103,064, NCAAB 56,326, NFL 61). That state cannot postdate the ledger row
+it priced, and the by-time fallback that could see a newer state never fired. The only expert dated by its tick is
+`live_segment`, and NHL has no segment opinions. A fix that files every row at the later of tick and state
+(`6d22b4d6e`, local, lane engine-live-prior) changed NO `live_resim` opinion on 11-09..11-14 and re-dated 1,099 NCAAF
+segment totals. NHL live stays excluded in this gate as a precaution: the pinned code (`981ef14f6`) lacks the fix, and
+its fallback path could still look ahead in the forward window.
