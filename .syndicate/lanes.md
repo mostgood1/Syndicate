@@ -949,6 +949,14 @@ death, never life — do not invert it.
 - Verification: Alternating old/new pairs on the primary tree (serial and concurrent with the other eight checks), stdout + rc compared per pair; existing check_lane_invariants and lane_claims tests; new equivalence tests; findings file .syndicate/findings_2026-11-17_lane_invariants_speed_2.md
 - Blocked by: none
 
+### ci-suite-red-1116 — OPEN — opened 2026-11-17 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
+- Goal: The two non-exit-gate failures from the 11-16 nightly ci-suite pass in the next nightly ci-suite run on the fleet's Linux venv: (1) tests/test_probability_differential.py::test_every_converter_is_registered_or_excused (scripts/nfl_segment_skill.py american_to_prob + devig_pair, added 11-14 fee389971, are neither in REGISTRY nor NOT_A_SCALAR_CONVERTER) and (2) tests/test_nfl_prop_name_resolution.py::test_two_letter_prefix_is_tried_after_an_ambiguous_initial (passes alone on Windows and Linux, fails only in the full suite). The third failure (test_live_player_exit_hold, Linux-only) belongs to lane live-player-exit-gate, messaged 11-17 with user approval.
+- Files: scripts/probability_differential.py (REGISTRY / NOT_A_SCALAR_CONVERTER entries for nfl_segment_skill ONLY), tests/test_nfl_prop_name_resolution.py (test isolation ONLY)
+- Hypothesis: (1) is a missing classification, not a defect; per learnings 2026-10-20 a registration can turn test_failing_set_does_not_grow red by exposing old debt, so read both tests before choosing REGISTRY vs NOT_A_SCALAR_CONVERTER. (2) is test pollution: an earlier test in the same pytest process leaves module state (a cache or monkeypatched roster) in syndicate.features.nfl.player_stats that this test reads.
+- Falsification test: (2): if the test fails when run ALONE on the ci-checkout's exact SHA with the ci env, it is not order-dependent; if it passes in the full suite on current main, it was fixed by another commit.
+- Verification: Both tests pass under ~/.venvs/syndicate/bin/python in a full-suite-order run locally, then the next nightly ci-suite log (~/syndicate-prod/logs/job-ci-suite.log) lists neither as a NEW FAILURE.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
