@@ -1006,6 +1006,14 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - The file's provenance line still says "unmeasured"; rewriting it is a fleet data edit and the user's call.
   - Re-grade: Mon 12-07 1:00 PM CST (task `nba-segment-regrade-818`).
   - Evidence: `findings_2026-11-16_nba_segment_skill.md` RESULTS.
+- **The pregame `score.dist` `h2` carries NO overtime (todo #820, measured 2026-11-16 7:4x PM CST).**
+  - Measured on 197 fleet NBA sims (10-20 .. 11-15): mean(h2) == mean(q3) + mean(q4) to 1e-14; OT dropped in 176.
+  - Books, `segment_actuals` and `bet_status_wnba` all settle h2 WITH OT. The WNBA shares the producer.
+  - Fix on main 123c0aee2, DEFAULT OFF, NOT on the fleet: `SYNDICATE_NBA_SIM_H2_INCLUDES_OT` / `SYNDICATE_WNBA_SIM_H2_INCLUDES_OT`.
+    A file stamped `score.dist.h2_includes_ot: true` has OT in h2; an unstamped file does not.
+  - A flip reaches only sims built after it. Existing sims are reused as they are, and tipped games are frozen.
+  - The sims tie after regulation in 2.0% of draws (411 of 20,100); real games went to OT 5.7% of the time (11 of 192).
+  - Evidence: `findings_2026-11-16_nba_pregame_h2_ot.md`.
 
 ## [wnba-props-model-skill] WNBA PROPS: NO MARKET BEATS THE BOOK; ALL FOUR ESTIMATORS (AVAILABILITY, RATE SHRINK, SHAPE, DISPERSION) + INJURY EXCLUSIONS ARE LIVE ON THE FLEET `[verified 2026-10-05, lanes wnba-lines-props-backtest / basketball-injury-exclusion-reinclusion / wnba-book-information / wnba-sim-availability / wnba-sim-rate-shrink / wnba-minutes-redistribution]`
 
