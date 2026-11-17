@@ -117,7 +117,7 @@ close on prior is unbiased per bucket, as built.
   the model's state score / clock onto the ledger so the rule is graded. Follow-up: re-sim end-of-period games first so
   the model keeps up.
 
-## 2026-11-17 (9:20 AM - 12:30 PM CST): the end-game rule graded before building; #824 built; the level re-graded
+## 2026-11-17 (9:20 - 10:30 AM CST): the end-game rule graded before building; #824 built; the level re-graded
 
 Read-only grading of the fleet's NCAAB live-gameline ledgers, slates 11-08..11-16 (the score-change quote basis in force
 throughout), priced full-game rows against ESPN finals and ESPN play wallclocks. Scripts: `C:\tmp\ncal816\endgame\
