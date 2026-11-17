@@ -872,6 +872,14 @@ death, never life — do not invert it.
 - Verification: cmp of the three tools' stdout before/after on the primary tree's lanes.md; existing lane_claims tests; >=5 alternating A/B pairs timed on the primary tree; findings file .syndicate/findings_2026-11-17_lane_claims_parse_memo.md
 - Blocked by: none
 
+### nba-game-model-fed-audit — OPEN — opened 2026-11-17 — session b44f64ce-a648-4698-9792-51714c8aaecc
+- Goal: todo #821 F0 (behaviour-neutral): every pregame smart-sim artifact records market_anchor.game_model_fed + game_model_columns; one SMART_SIM_GAME_MODEL_UNFED line per run with an unfed job; basketball_sim_input_checklist.py gains a Level 4 (quarter-model TeamContextLocal fields over dataclasses.fields + a replay of the job build game-model read over recent predictions files + the artifact field) that alarms on the NBA unfed read. No served value changes.
+- Files: syndicate/features/shared/basketball_props_smart_sim.py (the game-model audit helpers before _smart_sim_run_date_local + the pregame job build game-model read and job audit fields and unfed print + the worker market_anchor record block section only), scripts/basketball_sim_input_checklist.py, tests/test_nba_game_model_fed_audit.py (NEW), tests/test_basketball_sim_input_checklist_level4.py (NEW), .syndicate/findings_2026-11-16_nba_margin_raw_zero.md, docs/ai_context/todo.md (#821 section only), .syndicate/state_basketball.md (one bullet in [nba-sim-totals-and-strength] only)
+- Hypothesis: n/a (build; the cause is diagnosed in findings_2026-11-16_nba_margin_raw_zero.md)
+- Falsification test: Behaviour-neutral fails if any served number moves: job home_off_rtg/away_off_rtg and every pre-existing market_anchor field must be identical with and without the audit (test pins today: NBA-named row -> 110.6/110.6 + fed False; WNBA-named row -> ratings from the means + fed True).
+- Verification: Targeted pytest green; the real run-date loop carries the audit on its jobs; the real worker writes it into market_anchor; checklist Level 4 alarms on an NBA-named fixture and passes a WNBA-named one + a positive control. Production reading of the artifact field is owed after a load (user-gated; not done here).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
