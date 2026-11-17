@@ -434,3 +434,11 @@ flags below the points scored (0 of 1).
 | # | improvement | evidence | owner | next step |
 |---|---|---|---|---|
 | I-16 | **Read-only scripts still pull the full ~11.8 MB board query.** Have each send `row_refs` and decode with `response_row_refs.decode_row_refs` (or the page's `rehydrateAliases`), as this monitor's probe does since I-15. | 8 Python-urllib full-form POSTs in the hour after the load. Ad-hoc readers that POST `/api/intelligence/query` sit in `C:\tmp\railload\` (`rail_probe.py`, `rail_census.py`, `callout_tracker.py`, `served_dump.py`, ...), `C:\tmp\nbaname\` (`liveedge_read.py`, `portis_liveedge*.py`), `C:\tmp\lpa\ledger_nfl_sunday.py`. Which run on a schedule is unknown. | Each script's session; scheduled monitors first | Count full-form POSTs per hour from `web.log` tonight (response size > 7 MB), then name the recurring callers |
+- **The I-2 recycle reading, as run tonight.** The args are START SPLIT END in UTC; under 7 MB counts as the new form.
+  - **After** (the clean window):
+    `MSYS_NO_PATHCONV=1 wsl -d Ubuntu-24.04 -- python3 /mnt/c/tmp/rowrefs826/recycle.py 2026-11-17T19:51:31 2026-11-17T19:51:31 <END_UTC>`
+  - **Before** (Monday evening, the same kind of slate):
+    `... recycle.py 2026-11-16T23:00:00 2026-11-17T05:00:00 2026-11-17T05:00:01`
+  - It reads the last 400 MB of `web.log` (env `RECYCLE_TAIL_BYTES`); the Monday window may need a larger tail.
+  - The load lane voided its restart-spanning window (deploys.md 20:02:54Z, main `2e43d5bd2`).
+  - The 19:51Z `up` is classified BC-033 "no" by the load lane. Do not add a second row.
