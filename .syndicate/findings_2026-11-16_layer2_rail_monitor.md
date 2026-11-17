@@ -812,3 +812,21 @@ probability). It is falsified if any served row after the load still carries a r
 have a live card.
 
 **Restarts:** live-odds-worker 2925378 and refresh-worker 2953295, both unchanged.
+
+### #816 display fix LOADED by its owner — prediction MET (7:02 PM CST)
+
+- **Load (owner local_1f10ce63, lane `ncaab-total-overprojection`, user "Load it" there):**
+  - fleet ff `69bd95177 -> d7c183d8d` at 00:55:46.694Z;
+  - refresh-worker TERM 00:55:46.699Z; new pid **3101432** up 00:55:54.769Z;
+  - drain from ~00:36Z, cleared right after.
+  - I did not load it in parallel. The user also asked here ("load the #816 display fix"); the owner
+    already held the claim.
+  - The NBA overlay-cost lane got the restart time: its second mid-slate cold-cache boundary tonight.
+- **Verification** (`/api/board/live-rail` at 01:02:49Z and 01:02:50Z, after 2 post-restart NCAAB
+  overlay builds; `C:\tmp\ncal816\rawcheck.py`, read-only):
+  - NCAAB full-game total rows: **0 raw**, 70 calibrated, 9 no-prob.
+  - Flags 6 under, 0 over.
+  - Pre-load: 35-47 raw (00:35-00:50Z). **The registered prediction (raw → 0) is MET.**
+  - 0 refresh-worker tracebacks since the restart.
+- **Display note passed to the owner (by design, not a defect):** an UNDER flag can sit beside a
+  raw "ours" total above the line (Richmond @ VT u143.5 vs ours 146.0 at 6:50 PM).
