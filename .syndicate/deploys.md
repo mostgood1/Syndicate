@@ -61000,3 +61000,11 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - (My watcher's first count read 0 because it grepped `"recorded_at": "` with a space; the ledger writes compact JSON. The parsed count above is the reading.)
 - **revert:** `SYNDICATE_LIVE_MODEL_BEHIND_SCORE_GUARD=off` needs a drained down/up (env is built at `up`); faster: `git revert 3dbe53df0`, claimed ff, drained refresh-worker TERM.
 - **claim:** refresh-worker released after this entry.
+
+## 2026-11-17 18:44:46Z (12:44 PM CST) -- READING (no deploy): #814's portfolio `key_player_out` refusal after its load (lane `live-player-exit-gate`)
+- **loaded:** refresh-worker pid 4049350 at 17:26:26Z (the #790 TERM, BC-027), and again by the #824 TERM at 18:04:04Z (pid 4060729). Classified as BC-031 (yes, loaded-at 17:26:26Z, same load as BC-027).
+- **reading** (`/api/portfolio/plan?date=2026-11-17`, generated 12:34:26 PM CST): `refusals` = below_min_ev_pct_after_fair_noise 1, below_min_stake 16, beyond_max_positions 77, in_play_market_fair 1, zero_kelly_stake 1. **`key_player_out` absent (0)**, over rows_in 105.
+- **Denominator:** at least 1 in-play row reached the refusal loop (`in_play_market_fair` 1). The `key_player_out` check runs just before that one in the loop. No game had a failed verdict to refuse:
+  - the watcher, grepping both role logs since 16:47:06Z for `KEY_PLAYER_OUT_REFUSED`, `EXIT_HOLD` and `refused_*>0`, has seen nothing;
+  - the live ticks at 18:41-18:43Z read `key_players_out=1 refused_games=0` on wncaab and ncaab. Those are modelled foul-outs, priced per the user's 11-16 rule.
+- **Verdict:** the code is loaded and in the path, but this is a null without a live population. It is not a test of the refusal. **OWED:** the first plan carrying `key_player_out` > 0 on a game with an UNMODELLED exit. The watcher (every 120 s, to ~11-19 16:47Z) catches the producer side, and the plan read follows it.
