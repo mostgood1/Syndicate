@@ -61380,3 +61380,26 @@ Lane `render-config-retirement` (session 267d8859).
 - **Cost:** ~24 min (23:09-23:33Z) with no today board, no shortlist cadence and no board-loop paper portfolio, in the live evening wave.
 - **Learned:** during the live evening, refresh-worker's idle windows are seconds long or absent (board builds up to ~9 min, odds jobs ~30 min back to back). The drain did not stop a new odds child job from starting after the ack (recorded as a lead). Load at a quiet hour instead.
 - **betting change:** no (nothing loaded).
+
+## 2026-11-17 23:54Z (5:54 PM CST) -- READING (no deploy): #829's live-capture half after the 23:22:26Z live-odds-worker TERM; the refresh-worker half NOT loaded (lane `wnba-boxscore-polling-per-date`) -- **MET for the live capture: `live_player_boxscore` to web 43/h -> 0, WNBA share of web requests 40.1% -> 0.8%. The recycle effect is UNREADABLE in this window: the evening wave doubled the request rate at the same time**
+- betting change: no
+- **Reading** (`C:\tmp\wnba_boxpoll\measure.py`, the fleet's web.log; windows in UTC):
+
+| window | hours | web requests | live box | final box | WNBA share | recycles/h | requests/recycle |
+|---|---|---|---|---|---|---|---|
+| 19:52-21:52 (afternoon lull, before) | 2.01 | 386 | 84 | 140 | 58.0% | 10.46 | 18.4 |
+| 22:22-23:22 (hour before the TERM) | 1.00 | 257 | 43 | 60 | 40.1% | 14.03 | 18.4 |
+| 23:25-23:54 (after) | 0.48 | 241 | **0** | 2 | **0.8%** | 37.78 | 13.4 |
+
+- `WNBA_LIVE_BOX_SKIPPED` on 19 of 19 WNBA ticks since 23:25:10Z. There were 0 `EMPTY`, 0 `SLATE_UNKNOWN`, 0 `FAILED` and 0 tracebacks on live-odds-worker pid 52087.
+- **The "before" `final` counts include test leaks** (June dates 88 of 140, then 34 of 60). The two in the after-window are refresh-worker's settlement pass (11-16 and 11-17), which is not loaded yet.
+- **Recycles: not attributable here.**
+  - The after-window starts as the evening slate does: 500 requests/h against 257 in the hour before, almost none of them WNBA.
+  - The board query also changed at 23:15:44Z (#828 serialize-once, web).
+  - Requests per recycle got worse (18.4 -> 13.4) because the evening requests are heavier. Removing ~43 cheap empty requests an hour cannot be read against that.
+  - The comparable reading is the same quiet window on the next day.
+- **The refresh-worker half is NOT LOADED.** Lane `ncaaf-grid-build-speed` claimed refresh-worker for `3f337b2d9`, which contains `920c19e70`. Its 23:46Z entry records the attempt ABORTED: refresh-worker was never idle in the live evening, and the drain held the Layer 2 board ~24 min. I did not try a second drain in the same evening. My settlement half loads at the next refresh-worker restart, with that lane's quiet-hour retry or anyone's.
+- **Owed:**
+  1. **At the next refresh-worker restart:** `WNBA_BOXSCORES_COUNT_SKIPPED date=<today|yesterday> reason=schedule_has_no_games` in refresh-worker.log, and 0 `final_player_boxscore` for those dates in web.log after it (`C:\tmp\wnba_boxpoll\baseline829.sh <since>`).
+  2. **08:14-08:58Z 11-18, the nightly suite (`ci-checkout` follows main):** 0 `final_player_boxscore` for June/September dates. It was ~76 a night.
+  3. **Recycles**, once both halves are loaded: `measure.py 2026-11-18T19:51:31 2026-11-18T21:52:41` against 11-17's 224/386, 10.46/h, 18.4 requests/recycle. It is confounded by #828 (web memory per query), so name that in the reading.

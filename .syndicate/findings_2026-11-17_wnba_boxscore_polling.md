@@ -181,6 +181,16 @@ It is set at import rather than in a fixture because settlement threads outlive 
   `holds_ungraded_wnba`, and a check that neither box client resolves to `:10000`
   under the suite.
 
+## Loaded (2026-11-17)
+
+- **The live-capture half was LOADED at 23:22:26Z** by a claimed live-odds-worker TERM at fleet `64daca46f`.
+  - The first tick printed `WNBA_LIVE_BOX_SKIPPED date=2026-11-17 reason=schedule_has_no_games`.
+  - `live_player_boxscore` to web went from 43/h to 0.
+  - The WNBA share of web requests went from 40.1% (the hour before) to 0.8% (23:25-23:54Z).
+  - Recycles are unreadable in that window, because the evening wave doubled the request rate.
+  - See deploys.md 23:22:26Z and 23:54Z.
+- **The settlement half is NOT loaded.** refresh-worker was never idle in the live evening (lane `ncaaf-grid-build-speed`'s attempt, deploys.md 23:46Z). It loads at the next refresh-worker restart.
+
 ## Expected effect after a load (to be measured, deploys.md)
 
 - **Live box:** ~1,000-1,160 a day to 0 on no-game dates. This needs live-odds-worker
