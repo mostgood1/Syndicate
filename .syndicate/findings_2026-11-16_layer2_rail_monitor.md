@@ -1492,3 +1492,162 @@ ours.
 **Teams:** 0 chip-less, all detectors 0, 0 flipped, 0 truncated.
 
 **Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
+
+## Reading 23 — Mon 11-16 11:09 PM CST (05:09Z 11-17) — the last reading
+
+**Slate:** 3 live chips, all ending:
+- Long Beach State @ UCLA, end of H2;
+- Texas Southern @ UCSD, H2 0:09;
+- NHL VAN @ UTA, P3 3:42.
+
+**Flags: 2 shown** (Texas Southern @ UCSD u184.5; Long Beach State +38.5). 0 false, 0 missed, 0 dark.
+11-16 total: 267 flag-markets shown across 23 readings.
+
+**Load:** query 3.6 s / 44.7 MB; live-rail 13 rows.
+
+**Overlay (32 min):** 0 gaps over 360 s.
+
+**Teams:** 0 defects.
+
+**Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
+
+**Chips:** 352 in this reading's `chips.json`: final 66, live 3, pregame 282, cancelled 1. The pregame
+count was not broken down by date. The grade waits for the 3 live games to go final.
+
+## DAILY SUMMARY — Mon 11-16 (readings 1-23, 11:59 AM - 11:09 PM CST)
+
+**Coverage:**
+- 23 readings of the served Games Rail on the fleet: hourly while quiet (noon-4 PM), then every
+  ~20-25 min.
+- Every reading ran the page's own rail code (`scripts/layer2_rail_monitor_run.mjs`) on what the fleet
+  served, re-derived every flag independently, and read the fleet logs.
+- Times are CST.
+
+### Flags
+
+- **267 flag-markets shown** across the 23 readings: 257 unique flags by first sighting
+  (chip, market, segment, side incl. line).
+- **0 false, 0 missed in all 23 readings.**
+- **Dark: 77 rows in 3 readings:**
+  - 6 at 6:50 PM, a host-load burst (load 19.5 on 12 cores, served board 354 s old, both web workers
+    recycled);
+  - 70 at 7:48 PM, NBA `spreads_alt` served 318-357 s after pricing (NBA builds p50 58 s,
+    4 `deferred_slow`);
+  - 1 at 9:22 PM.
+- **Unique graded flags by sport:** NCAAB 133, NBA 105, WNCAAB 16, NFL 1, NHL 1. The first flag came
+  at 4:36 PM; the busiest reading was 7:48 PM (51).
+- **Totals direction (flag-markets per reading): 115 unders, 49 overs.** Among the unique graded totals
+  flags: 110 U / 49 O.
+
+### Grade
+
+- **Method:** `C:\tmp\railmon\grade1116.py` (wraps `scripts/layer2_rail_flag_grade.grade`).
+  - Population: first sighting on 11-16 CT. Graded against the fleet's final chips (all 11-16 games
+    final at 11:19:58 PM).
+  - Game-clustered bootstrap, 90% interval on (hit rate - mean book fair). Output
+    `C:\tmp\railmon\grade_1116.json`.
+  - **Disclosure:** the wrapper's debug run at 9:55 PM printed partial results on the then-final games
+    before the slate ended. All four splits below had been registered earlier (5:41 PM, 6:04 PM,
+    6:27 PM, 8:36 PM); none was added or changed after that run.
+
+| population | flags | games | W-L | hit | mean model | mean fair | Brier model / fair | 90% CI hit - fair |
+|---|---|---|---|---|---|---|---|---|
+| **ALL** | 256 | 35 | 128-128 | **50.0%** | 58.9% | 47.6% | **0.2496 / 0.2321** | [-4.6, +9.6] pp |
+| totals, UNDER side | 110 | 31 | 38-72 | **34.5%** | 61.5% | 49.0% | 0.2998 / 0.2368 | [-23.5, -3.8] |
+| totals, OVER side | 49 | 14 | 34-15 | **69.4%** | 59.6% | 49.9% | 0.2248 / 0.2488 | [+2.5, +36.6] |
+| moneylines (full) | 15 | 14 | 9-6 | 60.0% | 48.2% | 38.3% | 0.1569 / 0.1841 | [+7.7, +37.1] |
+| spreads, segments | 26 | 8 | 17-9 | 65.4% | 59.0% | 47.8% | 0.1543 / 0.1938 | [+4.8, +29.0] |
+| spreads, full | 56 | 26 | 30-26 | 53.6% | 55.9% | 45.1% | 0.2419 / 0.2391 | [-7.8, +24.9] |
+| totals, full | 110 | 33 | 46-64 | 41.8% | 60.3% | 48.2% | 0.2833 / 0.2417 | [-16.0, +3.1] |
+| NBA | 105 | 8 | 57-48 | 54.3% | 56.0% | 45.2% | 0.2105 / 0.2187 | [-3.2, +20.8] |
+| NCAAB | 133 | 20 | 62-71 | 46.6% | 60.2% | 49.2% | 0.2732 / 0.2439 | [-11.8, +6.4] |
+| WNCAAB | 16 | 5 | 7-9 | 43.8% | 65.2% | 47.9% | 0.3300 / 0.2303 | [-28.6, +49.7] |
+| NFL (MNF LAC moneyline) | 1 | 1 | 1-0 | - | 89.0% | 73.1% | - | - |
+| NHL (VAN moneyline) | 1 | 1 | 1-0 | - | 57.8% | 47.8% | - | - |
+
+**The pre-registered splits:**
+
+1. **S1 fade vs follow** (registered 5:41 PM; totals flags; book main-line move since the game's
+   previous reading):
+   - FADE: 60 flags / 27 games, 27-33 (45.0% vs fair 49.6%), CI [-15.0, +5.6].
+   - FOLLOW: 45 / 21, 24-21 (53.3% vs 46.5%), CI [-6.7, +18.7].
+   - Flat: 9 flags, 4-5. No prior line: 45 flags, 17-28 (37.8%), CI [-24.8, -0.8].
+   - **Reading:** fading the book's in-game move did 8 pp worse than following it, but the intervals
+     overlap: **not shown on one night.** The same split on 11-15's data was not run.
+2. **S2 NCAAB pre/post the #816 calibration load (00:04:38Z):**
+   - **Post-load NCAAB full-game totals: 63 flags / 20 games, 23-40 (36.5% vs fair 50.4%),
+     CI [-25.9, -1.1], Brier 0.2893 vs 0.2490.** All 63 were UNDER (the fitted level).
+   - Pre-load full totals: 5 flags / 3 games (3-2), too few to compare.
+   - All NCAAB: post 53-65 (44.9%), pre 9-6.
+   - **Reading:** on its first night, the calibration's under lean lost, and the interval excludes zero
+     at 90%. The night ran over everywhere (all-sport totals overs 69.4%), so this is one night against
+     a level fitted on 11-11..11-15. It is #816's 7-day grade to judge, not this monitor. **Sent to
+     local_1f10ce63 at ~11:25 PM.**
+3. **S3 raw vs calibrated totals** (registered 6:27 PM):
+   - NCAAB calibrated: 58 flags / 20 games, 20-38 (34.5%), CI [-28.2, -1.8].
+   - NCAAB raw (segments plus pre-load): 35 / 13, 16-19 (45.7%), CI [-28.4, +16.9].
+   - WNCAAB raw: 15 / 5, 7-8.
+   - NBA totals (calibrated or scaled): 51 / 8, 29-22 (56.9%), Brier 0.2179 vs 0.2232.
+   - **Reading:** calibrated did worse than raw tonight, mostly through the under lean. The intervals
+     overlap.
+4. **S4 NBA tail vs body** (registered 8:36 PM; book fair < 0.20 or > 0.80):
+   - TAIL: 6 flags / 5 games, **1-5** (16.7% vs fair 23.3%), **Brier 0.0918 vs 0.0176**.
+   - BODY: 99 / 8, 56-43 (56.6% vs 46.6%), CI [-3.1, +22.6], Brier 0.2176 vs 0.2309.
+   - **Reading:** the wide-tail flags lost and were badly overconfident; NBA body flags beat the book's
+     Brier. Small n on tails.
+
+**What this does NOT show:**
+- One night and 35 games. The flags are information, not bets, and no line here is a P&L.
+- 11-15 graded +5.0 pp on 66 games (Brier slightly worse than fair). 11-16 is +2.4 pp, Brier worse by
+  0.0175, driven by the under lean on a night that ran over.
+
+### Refresh, cadence, load
+
+- **Overlay gaps over 360 s: 7 in 23 readings:**
+  - 4 at 7:21 PM, around the 6:55 PM restart;
+  - 2 NBA at 7:48 PM;
+  - 1 NHL at 8:13 PM;
+  - none after 8:13 PM.
+- **`deferred_slow`:** NBA 1-4 per window 6:27-8:13 PM, NFL 1 twice. 0 from 8:36 PM.
+- **NBA builds:** p50 24-58 s at the 7-8 NBA game peak, 13-21 s later.
+- **NBA `_alt` lines:** priced <= 120 s in only 2 readings (466 of 802 at 7:48 PM, 511 of 761 at
+  8:36 PM). #811's 60 s pulls refresh main lines only.
+- **Board shortlist age:** 69-1,287 s. The worst was 21 min at 7:48 PM (the board build's lock convoy
+  with 7 NBA games live).
+- **Board query:** 3.2-78.3 s and 45-83 MB.
+  - Worst 7:48 PM (78.3 s, both web workers recycled mid-probe) and 6:50 PM (37.2 s, host load 19.5);
+    otherwise 3-20 s.
+  - Page 1.5-25.6 s; live-rail 0.0-3.3 s.
+- **Web workers** are memory-recycled every 5-15 requests (lead in `leads.md`).
+
+### Teams
+
+- **0 defects in all 23 readings:** 0 chip-less, det1 / det2 / det3 0, 0 flipped, 0 truncated.
+- Every live chip had a live card.
+- Florida A&M @ UTEP, chip-less on 11-15, joined normally on 11-16 (ESPN's Monday kickoff was right).
+
+### Anomalies, owners, outcomes
+
+| anomaly | owner | outcome |
+|---|---|---|
+| WNCAAB overlay zero cards | lane `wncaab-overlay-zero-cards` (this session) | Cause: the board's -2% value floor (17 of 20 refused at 5:41 PM). **User: "Keep the floor".** Lane CLOSED, GOAL MET. The `refused=` token (`146f956cb`) is on the fleet since 00:04:38Z. |
+| #816 calibration reached 31 of 92 served NCAAB total rows | local_1f10ce63 | Display fix `d7c183d8d` loaded by the owner at 00:55:46Z; **verified 0 raw rows** (01:02Z). |
+| Under flag beside an "ours" at or above the line | local_1f10ce63 | By design (the level moves the probability, not `total_mean`): 8 of 13 at 7:21 PM. Owner told; its call. |
+| MNF / NFL kickoff-date shard | local_78b841a1 | Fix loaded at 4:31 PM. **Registered prediction MET:** overlay game lines from kickoff, then the first MNF flag (LAC moneyline 89.0% vs 73.1%, 9:46 PM), graded 1-0. |
+| NFL live lines mostly unpriced | NFL live-engine lanes (known) | Totals and spreads are behind the #780 distribution gate; the moneyline is refused inside the 0.35-0.65 band. Not handed off. |
+| Slow-sport cadence (NFL/NBA) | local_208683f1 | 70 dark NBA rows at 7:48 PM. **The decision is still with the user.** |
+| Web memory recycles and cold-worker query times | lead in `leads.md` | Not followed. |
+| NBA wide-tail flags | this monitor | Pre-registered S4: 1-5 tonight. |
+
+### Fleet events (11-16)
+
+- **Fleet ff:**
+  - `5963e16f4` 12:39 PM;
+  - `c2794c31a` 2:55 PM;
+  - `db463b5be` 3:17 PM;
+  - **`dac4d49f8` 4:31 PM** (NFL kickoff shard);
+  - **`13ec8f348` 6:04 PM** (#816);
+  - `69bd95177` 6:20 PM (#817 shard line);
+  - **`d7c183d8d` 6:55 PM** (#816 display fix).
+- **refresh-worker restarts:** 2809282 → 2953295 (6:04 PM) → 3101432 (6:55 PM).
+- **live-odds-worker:** routine recycles to 2834332 (12:5x PM) and 2925378 (6:00 PM).
