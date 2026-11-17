@@ -289,6 +289,15 @@ _LIVE_FEED_CACHE_TTL_SECONDS = float(_env_int("MLB_LIVE_FEED_CACHE_TTL_SECONDS",
 
 _LIVE_GAME_MC_SIMS = _env_int("MLB_LIVE_GAME_MC_SIMS", 120, minimum=20)
 
+# Lane `mlb-live-mc-batting-pitcher` (todo #814 side finding). `_live_mc_projection`
+# used to pass `estimate_live` only the FIELDING team's pitcher, so the engine
+# seeded the BATTING team with its pregame starter (`live_mc._default_pitcher_id`):
+# once a starter was pulled, every sim started while his team batted put him back
+# on the mound, at his own pitch count. ON passes the batting team's last-used
+# pitcher (`teams[side].pitcherOrder[-1]`, the feed's appearance order). Read at
+# call time so a test can flip it; ABSENT = OFF (today's behaviour).
+_LIVE_MC_BATTING_PITCHER_ENV = "MLB_LIVE_MC_BATTING_SIDE_PITCHER"
+
 
 _LIVE_HITTER_PROP_MIN_MARKET_EDGE = 0.05
 
@@ -13190,6 +13199,19 @@ def _load_live_lens_cards(
     )
 
 
+def _box_pitcher_order(feed: Dict[str, Any], side: str) -> List[int]:
+    """The side's pitchers in APPEARANCE order (`liveData.boxscore.teams[side].pitchers`).
+
+    `boxscore.pitching` rows are sorted starter-first then by pitches thrown, so
+    they cannot say who pitched LAST; this list can. Its last id is the team's
+    current pitcher, also while the team is batting."""
+    try:
+        raw = ((((feed.get("liveData") or {}).get("boxscore") or {}).get("teams") or {}).get(side) or {}).get("pitchers") or []
+        return [int(x) for x in raw if _safe_int(x)]
+    except Exception:
+        return []
+
+
 def _load_live_lens_snapshot(game_pk: int, d: str, *, feed: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     try:
         game_feed = feed if isinstance(feed, dict) and feed else _load_live_lens_feed(int(game_pk), d)
@@ -13211,6 +13233,7 @@ def _load_live_lens_snapshot(game_pk: int, d: str, *, feed: Optional[Dict[str, A
                     "starter": {"id": away_sp, "name": _player_name_from_box(feed, away_sp) if away_sp else ""},
                     "lineup": _lineup_from_box(feed, "away"),
                     "totals": _team_totals(feed, "away"),
+                    "pitcherOrder": _box_pitcher_order(feed, "away"),
                     "boxscore": {
                         "batting": _boxscore_batting(feed, "away"),
                         "pitching": _boxscore_pitching(feed, "away"),
@@ -13220,6 +13243,7 @@ def _load_live_lens_snapshot(game_pk: int, d: str, *, feed: Optional[Dict[str, A
                     "starter": {"id": home_sp, "name": _player_name_from_box(feed, home_sp) if home_sp else ""},
                     "lineup": _lineup_from_box(feed, "home"),
                     "totals": _team_totals(feed, "home"),
+                    "pitcherOrder": _box_pitcher_order(feed, "home"),
                     "boxscore": {
                         "batting": _boxscore_batting(feed, "home"),
                         "pitching": _boxscore_pitching(feed, "home"),
@@ -13540,6 +13564,19 @@ def _lane_has_live_mc_first5(live_mc_projection: Optional[Dict[str, Any]]) -> bo
     return live_mc_projection.get("first5HomeWinProb") is not None
 
 
+def _live_mc_batting_side_pitcher(snapshot: Optional[Dict[str, Any]], batting_side: str) -> Optional[int]:
+    """The batting team's last-used pitcher when the switch is ON, else None.
+
+    None also when the team has not pitched yet (top of the 1st) -- the engine's
+    default, its starter, is then right."""
+    if not _env_bool(_LIVE_MC_BATTING_PITCHER_ENV, False):
+        return None
+    order = (((snapshot or {}).get("teams") or {}).get(batting_side) or {}).get("pitcherOrder")
+    if not isinstance(order, list) or not order:
+        return None
+    return _safe_int(order[-1]) or None
+
+
 def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optional[Dict[str, Any]], *, date_str: Optional[str] = None) -> Optional[Dict[str, Any]]:
     if not isinstance(snapshot, dict) or not isinstance(sim_context, dict):
         _live_mc_bail("no_snapshot_or_sim_context")
@@ -13586,6 +13623,9 @@ def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optiona
     fielding_side = "home" if batting_side == "away" else "away"
     current_batter_id = _safe_int(((current.get("batter") or {}).get("id")))
     current_pitcher_id = _safe_int(((current.get("pitcher") or {}).get("id")))
+    # The BATTING team's pitcher: None (OFF) leaves the engine's default, its
+    # pregame starter -- see `_LIVE_MC_BATTING_PITCHER_ENV`.
+    batting_pitcher_id = _live_mc_batting_side_pitcher(snapshot, batting_side)
     balls = _safe_int(((current.get("count") or {}).get("balls")))
     strikes = _safe_int(((current.get("count") or {}).get("strikes")))
     away_next_index = _live_team_next_batter_index(snapshot, away_roster, "away", current_batter_id=current_batter_id, batting_side=batting_side)
@@ -13626,8 +13666,14 @@ def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optiona
                 runner_on_3b=int(runner_on_3b),
                 away_next_batter_index=int(away_next_index),
                 home_next_batter_index=int(home_next_index),
-                away_pitcher_id=int(current_pitcher_id) if fielding_side == "away" and current_pitcher_id is not None else None,
-                home_pitcher_id=int(current_pitcher_id) if fielding_side == "home" and current_pitcher_id is not None else None,
+                away_pitcher_id=(
+                    int(current_pitcher_id) if fielding_side == "away" and current_pitcher_id is not None
+                    else (batting_pitcher_id if batting_side == "away" else None)
+                ),
+                home_pitcher_id=(
+                    int(current_pitcher_id) if fielding_side == "home" and current_pitcher_id is not None
+                    else (batting_pitcher_id if batting_side == "home" else None)
+                ),
                 current_batter_id=int(current_batter_id) if current_batter_id is not None else None,
                 balls=int(balls) if balls is not None else 0,
                 strikes=int(strikes) if strikes is not None else 0,
