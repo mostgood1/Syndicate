@@ -1454,3 +1454,41 @@ live.
 a live card.
 
 **Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
+
+## Reading 22 — Mon 11-16 10:37 PM CST (04:37Z 11-17)
+
+**Slate:** 4 live chips.
+- NCAAB 3: Long Beach State @ UCLA H2 9:53; Texas Southern @ UCSD H2 10:39; Portland State @ Saint
+  Mary's H2 6:47.
+- NHL VAN @ UTA P3 17:09.
+- MNF, NBA and the earlier college games are final.
+
+**Flags: 5 shown on 4 cards. 0 false, 0 missed, 0 dark.** 11-16 total: 265.
+- **Totals:** 3 U (NCAAB full: Long Beach State @ UCLA u164.5, Texas Southern @ UCSD u189.5; Portland
+  State 2H u89.5).
+- **Others:** Saint Mary's -13.5; NHL VAN moneyline (10.0 pp).
+- **Totals direction, flag by flag: 114 unders, 49 overs.**
+
+**Live rows:** 40 (NCAAB 36 with 13 priced <= 120 s; NHL 4 with 3). 0 markets without a price of
+ours.
+
+**Overlay (28 min), all 0 over 360 s:**
+| sport | gap p50 / max |
+|---|---|
+| NBA | 60 s / 77 s |
+| NHL | 45 s / 190 s |
+| NCAAB | 41 s / 121 s |
+| NFL | 65 s / 151 s |
+
+- 0 `deferred_slow`. Tick gap p50 18 s, max 124 s.
+
+**Web merges:** stale for the ended sports (wncaab 86, nba 22, nfl 20), as expected.
+
+**Load:**
+- **Query 3.2 s** / 45.1 MB. Shortlist 0.22 s; chips 0.44 s; live-rail 0.02 s.
+- Gunicorn workers were 175 s and 109 s old at the read. The 175 s worker was recycled during the
+  probe. Host load 1.8-2.1.
+
+**Teams:** 0 chip-less, all detectors 0, 0 flipped, 0 truncated.
+
+**Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
