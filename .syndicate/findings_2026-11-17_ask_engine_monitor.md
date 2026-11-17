@@ -304,3 +304,49 @@ The live-odds-worker restarted at 12:13:15 PM CST. The supervisor log reads "exi
 - **ANOMALY:** `as_of_in_future` is true on the pregame_prop ask (soccer, Ismael Boura Over 0.5, as_of 2026-11-20, date kind). This is the same item Readings 2 and 3 flagged. Check next: whether the fixture date is leaking into `as_of` instead of the data time.
 - **ANOMALY:** An F2 result exists, and its two sources still disagree: the run summary says "did NOT PASS", while the verdict file says PASS 12/12. This is carried from Reading 4. Check next: the owning session reads run `local_dc76d55c` and records which verdict stands before the 11-24 M2 read.
 - **ANOMALY:** New fleet load: the 12:03 PM CST refresh-worker TERM loads #824, the NCAAB totals over-projection fix. It touches live NCAAB totals pricing, the same family where #816 broke the experts' reproduction on 11-16. This reading's live_row ask was an NCAAB total, and it answered normally. Check next: whether the experts/gate reproduction of NCAAB live_resim:totals still matches the live join after 12:03 PM CST.
+
+## Reading 6 (1:06 PM CST)
+
+Probe file `ask_reading_20261117T190556Z.json` (asks 1:06:25-1:08:10 PM CST; web window from 12:35:56 PM).
+
+**Ask: 6 / 6 answered, 0 / 6 past the 45 s cut-off, median 23.53 s, max 31.99 s.** Page 200 in 0.13 s. Median is up about 4x on Reading 5 (6.27 s); see the host line.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "What do you think of this spread?" | 28.80 | yes | bet_analysis | 2026-11-17T18:16:24Z (ts) | 0 |
+| free_text "Lakers vs Celtics" | 0.90 | yes | matchup_analysis | 2026-11-17T18:16:24Z (ts) | 0 |
+| free_text "top edges today" | 20.06 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (Minnesota Timberwolves) | 23.53 | yes | bet_analysis | 2026-11-16 (date) | 2 |
+| pregame_prop (Jaden McDaniels Under 24.5) | 31.99 | yes | bet_analysis | 2026-11-17T18:53:39Z (ts) | 7 |
+| live_row (Murray St Racers) | 21.09 | yes | bet_analysis | 2026-11-17T18:16:24Z (ts) | 0 |
+
+A game was live: the `live_row` ask exists. as_of_in_future: 0 / 6. Three answers still carry as_of 18:16:24Z, ~50 min old at ask time; the game-line answer carries yesterday's date.
+
+**Web, 12:36-1:08 PM CST (101 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 7, of which 4 hard; max anon 906.3 MB against a 649.6 MB limit.
+- Overlay warms: 24, median 23.3 s, 14 over 20 s, 5 over 45 s, 3 over 60 s, max 136.56 s.
+- Requests over 20 s: 14 (POST /api/intelligence/query 6, POST /api/syndicate/query 5, GET /api/board/game-chips 1, GET /intelligence 1, GET /api/portfolio/paper 1). Over 45 s: 2, both POST /api/intelligence/query.
+- Asks from any client: 9, 0 over 45 s, 0 non-200. 0 of 9 were NOT this probe (all `Python-urllib/3.12`: 3 at 12:36 PM from Reading 5, 6 at 1:06-1:08 PM).
+
+**Host:** load 10.55 / 10.88 / 9.34 on 12 cores (Reading 5: 3.40); MemAvailable 7,676 MB. Top CPU:
+- fetch_soccer_oddsapi_props_local mls, 136%, ni 0 (1 s old);
+- refresh-worker, 94%, ni 0, 3,368 MB;
+- gunicorn worker, 94%, ni 0, 347 MB, up 11 s (fresh recycle);
+- build_soccer_artifacts championship wk14, 93%, ni 0;
+- live-odds-worker, 61%, ni 0, 1,148 MB;
+- gunicorn worker, 48%, ni 0, 970 MB, up 281 s;
+- backup `du -sb`, 45%, ni 19.
+
+**Engine:**
+- 2a: `engine-live-prior-f2-read-1117` has 1 run, succeeded (10:30-11:17 AM CST), summary "did NOT PASS". `f2_verdict.txt` (mtime 11:15 AM) last line: `F2_VERDICT PASS judged_families=12 failed_families=0 cutoff=2026-11-15T20:00:00Z files=2`. Unchanged since Reading 4.
+- 2b: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 starts `6915bb6a5ecb80f2`, unchanged.
+- 2d: 1 commit in the last 40 min touches the engine files: `ea723a9d9 engine learner slice 3a: NBA player-prop outcomes from the official box score (player_logs.csv), pregame and live -- the`.
+- 2e: one fleet load in the last 40 min: `2026-11-17 18:58:45Z (12:58 PM CST) -- DEPLOY (ff + reload-web): fleet 92ae7490a -> 5db26434e`, loading todo #826 (board query opt-in `row_refs`, lane `board-query-row-refs-load`). Per the 11-17 findings this load also carries `ac2cbc2fc` (render-config step 1) and `2148f99cb` (paper endpoint).
+
+- **ANOMALY:** 3 of 24 overlay warms over 60 s (max 136.56 s), with 5 over 45 s; Reading 5 had 0 over 45 s (max 17.52 s). It coincides with host load ~10.6 on 12 cores (soccer props fetch + soccer artifact build + refresh-worker, all ni 0) and the 12:58 PM reload-web. Check next: whether warm times fall back once the soccer jobs finish, and whether the slow warms cluster just after the reload.
+- **ANOMALY:** 2 POST /api/intelligence/query requests over 45 s (none from this probe's Ask route, which maxed at 31.99 s). Check next: their agent and timing in the web log, and whether a user-facing caller saw them.
+- **ANOMALY:** An F2 result exists and its two sources still disagree: the run summary says "did NOT PASS", the verdict file says PASS 12/12. Carried from Readings 4-5. Check next: the owning session reads run `local_dc76d55c` and records which verdict stands before the 11-24 M2 read.
+- **ANOMALY:** New engine-file commit `ea723a9d9` (learner slice 3a, NBA player-prop outcomes). Check next: that it does not change `m2_gate.py`'s inputs or the frozen M2 population before 11-24.
+- **ANOMALY:** New fleet load: 12:58 PM CST ff `92ae7490a -> 5db26434e` + reload-web (#826 row_refs, plus `ac2cbc2fc` and `2148f99cb`). It is web-side (board query), not a live-pricing change as named. Check next: whether the Ask latency jump (median 6.3 s -> 23.5 s) tracks the reload or only the host load.
