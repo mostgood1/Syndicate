@@ -2358,7 +2358,7 @@ class IntelligenceStateTests(unittest.TestCase):
         }
 
         with app.test_client() as client:
-            with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
+            with patch.dict(os.environ, {"SYNDICATE_HOSTED": "true"}, clear=False):
                 with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(dict(empty_cached_response), "worker")):
                     with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as mocked_queue:
                         response = client.get("/intelligence?date=2026-06-17")

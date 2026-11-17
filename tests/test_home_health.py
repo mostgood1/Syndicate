@@ -29,9 +29,9 @@ class HomeHealthRouteTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "RENDER_GIT_COMMIT": "e6aa9a6",
-                "RENDER_GIT_BRANCH": "main",
-                "RENDER_SERVICE_NAME": "syndicate-web",
+                "SYNDICATE_GIT_COMMIT": "e6aa9a6",
+                "SYNDICATE_GIT_BRANCH": "main",
+                "SYNDICATE_SERVICE_NAME": "syndicate-web",
             },
             clear=False,
         ), patch("syndicate.blueprints.home._git_value", side_effect=["ebb2136d", "main"]), patch(
@@ -61,8 +61,8 @@ class HomeHealthRouteTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "RENDER_GIT_COMMIT": "e6aa9a6",
-                "RENDER_GIT_BRANCH": "main",
+                "SYNDICATE_GIT_COMMIT": "e6aa9a6",
+                "SYNDICATE_GIT_BRANCH": "main",
             },
             clear=False,
         ), patch("syndicate.blueprints.home._git_value", side_effect=["ebb2136d", "HEAD"]), patch(

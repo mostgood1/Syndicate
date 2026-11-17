@@ -11,13 +11,16 @@ the sha256 of every value in `/proc/<pid>/environ` -- NEVER a value -- into a mo
 
 EXPECTED changes, which `compare` labels and does not fail on:
 - every key that `--expect-removed` / `--expect-added` / `--expect-changed` names (repeatable);
-- by default (`--render-markers-step3`, on unless `--no-render-markers-step3`):
+- on every `up`: the instance id and the commit marker, and `WSL_INTEROP` (WSL's per-launch
+  interop socket path, inherited from the scheduled task's session; measured changing on the
+  2026-11-17 21:53Z `up`);
+- only with `--render-markers-step3` (the one-time transition, loaded 2026-11-17 21:53Z;
+  off by default since step 3b):
   - RENDER, RENDER_SERVICE_NAME, RENDER_SERVICE_ID, RENDER_INSTANCE_ID, RENDER_GIT_COMMIT and
     RENDER_EXTERNAL_URL removed;
   - their SYNDICATE_* twins added;
   - and, for the three that do not move with a restart (SYNDICATE_HOSTED,
     SYNDICATE_SERVICE_NAME / _ID), the new value's hash equal to the old RENDER twin's.
-  - The instance id and the commit change on every `up` by design.
 
 Exit codes: 0 = only expected changes; 3 = an unexpected key change (the names are printed);
 2 = refused (no supervisor pidfile, unreadable /proc, missing or foreign snapshot).
@@ -50,7 +53,7 @@ MARKERS = {
 # Twins whose value must carry over unchanged across an `up`.
 STABLE_TWINS = ("SYNDICATE_HOSTED", "SYNDICATE_SERVICE_NAME", "SYNDICATE_SERVICE_ID")
 # Keys that change on EVERY `up`, whatever the launcher does.
-ALWAYS_CHANGES = {"RENDER_INSTANCE_ID", "SYNDICATE_INSTANCE_ID", "RENDER_GIT_COMMIT", "SYNDICATE_GIT_COMMIT"}
+ALWAYS_CHANGES = {"RENDER_INSTANCE_ID", "SYNDICATE_INSTANCE_ID", "RENDER_GIT_COMMIT", "SYNDICATE_GIT_COMMIT", "WSL_INTEROP"}
 
 
 def _hash(value: bytes) -> str:
@@ -152,7 +155,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", required=True)
     p = sub.add_parser("compare")
     p.add_argument("--before", required=True)
-    p.add_argument("--no-render-markers-step3", action="store_true")
+    p.add_argument("--render-markers-step3", action="store_true",
+                   help="also expect the one-time RENDER* -> SYNDICATE_* marker transition (done 2026-11-17)")
+    p.add_argument("--no-render-markers-step3", action="store_true", help="the default since step 3b; accepted for old runbooks")
     p.add_argument("--expect-removed", action="append", default=[])
     p.add_argument("--expect-added", action="append", default=[])
     p.add_argument("--expect-changed", action="append", default=[])
@@ -161,7 +166,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.cmd == "snapshot":
             return cmd_snapshot(home, Path(args.out).expanduser(), proc_root)
-        return cmd_compare(home, Path(args.before).expanduser(), proc_root, step3=not args.no_render_markers_step3,
+        return cmd_compare(home, Path(args.before).expanduser(), proc_root,
+                           step3=bool(args.render_markers_step3) and not args.no_render_markers_step3,
                            removed_ok=args.expect_removed, added_ok=args.expect_added, changed_ok=args.expect_changed)
     except SystemExit as exc:
         print(exc)

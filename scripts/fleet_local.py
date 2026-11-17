@@ -158,8 +158,7 @@ FORCED_ENV_BASE: dict[str, str] = {
     "SYNDICATE_BOOTSTRAP_ON_START": "0",
     # `data_root()` raises instead of falling back when this is set, which is
     # right on Render and wrong here.
-    "RENDER": "",
-    # ...and its neutral name, which readers prefer since 2026-11-17 (`service_identity`).
+    # (The hosted marker: `SYNDICATE_HOSTED`, `RENDER` until 2026-11-17, `service_identity`.)
     "SYNDICATE_HOSTED": "",
     "PYTHONIOENCODING": "utf-8",
     "PYTHONUNBUFFERED": "1",

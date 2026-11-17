@@ -1147,7 +1147,7 @@ def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: s
         reused = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger=trigger)
         if reused is not None:
             return reused
-    base_url = _normalize_render_base_url(_env_first("MLB_BETTING_BASE_URL", "BASE_URL", "RENDER_URL", "SYNDICATE_EXTERNAL_URL", "RENDER_EXTERNAL_URL"))
+    base_url = _normalize_render_base_url(_env_first("MLB_BETTING_BASE_URL", "BASE_URL", "RENDER_URL", "SYNDICATE_EXTERNAL_URL"))
     token = _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
     if base_url and token:
         try:

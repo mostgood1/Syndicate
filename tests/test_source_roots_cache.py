@@ -57,7 +57,7 @@ def test_strict_hosted_storage_change_is_seen(monkeypatch, tmp_path):
     monkeypatch.delenv("SYNDICATE_TEST_ROOT", raising=False)
     monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
     monkeypatch.delenv("SYNDICATE_REQUIRE_HOSTED_STORAGE", raising=False)
-    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.delenv("SYNDICATE_HOSTED", raising=False)
     loose = SR.preferred_source_roots(HERE, env_var="SYNDICATE_TEST_ROOT", local_dir_name="mlb_source")
     monkeypatch.setenv("SYNDICATE_REQUIRE_HOSTED_STORAGE", "1")
     strict = SR.preferred_source_roots(HERE, env_var="SYNDICATE_TEST_ROOT", local_dir_name="mlb_source")
@@ -119,7 +119,7 @@ def test_strict_mode_still_raises_rather_than_caching_a_bad_answer(monkeypatch):
     """lru_cache does not memoize exceptions, so this must raise EVERY time."""
     monkeypatch.delenv("SYNDICATE_TEST_ROOT", raising=False)
     monkeypatch.delenv("SYNDICATE_DATA_ROOT", raising=False)
-    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.delenv("SYNDICATE_HOSTED", raising=False)
     monkeypatch.setenv("SYNDICATE_REQUIRE_HOSTED_STORAGE", "1")
     for _ in range(3):
         with pytest.raises(RuntimeError):

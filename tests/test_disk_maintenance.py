@@ -254,7 +254,7 @@ def test_one_workers_run_does_not_stand_the_other_down(_clean, monkeypatch):
 
 
 def test_an_unidentifiable_service_still_gets_a_stamp(_clean, monkeypatch):
-    for key in ("SYNDICATE_REFRESH_LANE", "RENDER_SERVICE_NAME", "RENDER_SERVICE_ID"):
+    for key in ("SYNDICATE_REFRESH_LANE", "SYNDICATE_SERVICE_NAME", "SYNDICATE_SERVICE_ID"):
         monkeypatch.delenv(key, raising=False)
     assert dm._service_slug() == "local"
     assert dm._status_path().name.endswith("_local.json")

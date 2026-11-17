@@ -37,9 +37,9 @@ def stores(monkeypatch, tmp_path):
         "SYNDICATE_PORTFOLIO_PASSWORD",
         "SYNDICATE_PORTFOLIO_PASSWORD_HASH",
         "SYNDICATE_PORTFOLIO_AUTH",
-        "RENDER",
-        "RENDER_EXTERNAL_URL",
-        "RENDER_SERVICE_ID",
+        "SYNDICATE_HOSTED",
+        "SYNDICATE_EXTERNAL_URL",
+        "SYNDICATE_SERVICE_ID",
     ):
         monkeypatch.delenv(key, raising=False)
     store = tmp_path / "portfolio_books.json"

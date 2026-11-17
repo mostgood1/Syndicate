@@ -34,7 +34,7 @@ ENV_VARS = (
     "SYNDICATE_OPS_BASE_URL",
     "SYNDICATE_DIAG_BASE_URL",
     "SCRIPT_SPECIFIC_URL",
-    "RENDER",
+    "SYNDICATE_HOSTED",
     "SYNDICATE_LOCAL_PRODUCTION",
     "ADMIN_TOKEN",
     "SYNDICATE_ADMIN_TOKEN",
@@ -67,7 +67,7 @@ def test_the_render_marker_no_longer_picks_render(clean_env):
     """Render is retired (2026-11-15): `RENDER` is only a marker the fleet fakes, and
     with or without `SYNDICATE_LOCAL_PRODUCTION` the fallback is the fleet."""
     assert not hasattr(_base_url, "RENDER_BASE_URL")
-    clean_env.setenv("RENDER", "true")
+    clean_env.setenv("SYNDICATE_HOSTED", "true")
     assert default_base_url() == FLEET_BASE_URL
     clean_env.setenv("SYNDICATE_LOCAL_PRODUCTION", "1")
     assert default_base_url() == FLEET_BASE_URL

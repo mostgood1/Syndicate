@@ -204,7 +204,7 @@ def test_run_order_and_summary_line(tmp_path, monkeypatch):
 def test_default_only_on_refresh_worker(monkeypatch):
     monkeypatch.delenv("SYNDICATE_DISK_COMPACTION", raising=False)
     monkeypatch.delenv("SYNDICATE_DISK_COMPACTION_SERVICES", raising=False)
-    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("SYNDICATE_HOSTED", "true")
     assert dc.disk_compaction_wanted("refresh-worker") is True
     assert dc.disk_compaction_wanted("live-odds-worker") is False
     monkeypatch.setenv("SYNDICATE_DISK_COMPACTION", "0")
@@ -215,7 +215,7 @@ def test_default_never_runs_off_render(monkeypatch):
     """A dev checkout named refresh-worker (tests do this) must not compact local data/."""
     monkeypatch.delenv("SYNDICATE_DISK_COMPACTION", raising=False)
     monkeypatch.delenv("SYNDICATE_DISK_COMPACTION_SERVICES", raising=False)
-    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.delenv("SYNDICATE_HOSTED", raising=False)
     assert dc.disk_compaction_wanted("refresh-worker") is False
     monkeypatch.setenv("SYNDICATE_DISK_COMPACTION", "1")
     assert dc.disk_compaction_wanted("refresh-worker") is True
@@ -225,7 +225,7 @@ def test_starts_once(tmp_path, monkeypatch):
     monkeypatch.setitem(dc._STATE, "started", False)
     monkeypatch.delenv("SYNDICATE_DISK_COMPACTION", raising=False)
     monkeypatch.delenv("SYNDICATE_DISK_COMPACTION_SERVICES", raising=False)
-    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("SYNDICATE_HOSTED", "true")
     calls: list[str] = []
     monkeypatch.setattr(dc, "run_disk_compaction", lambda root, **k: calls.append(str(root)) or {})
     assert dc.start_disk_compaction_once(tmp_path, "refresh-worker") is True
@@ -242,7 +242,7 @@ def _maintenance(monkeypatch, *, enabled: bool) -> list[str]:
     monkeypatch.setattr(inv, "start_disk_inventory_once", lambda *a, **k: False)
     monkeypatch.setattr(dc, "start_disk_compaction_once", lambda root, slug, **k: calls.append(slug) or True)
     monkeypatch.setattr(dm, "_due", lambda: False)
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "refresh-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "refresh-worker")
     monkeypatch.delenv("SYNDICATE_REFRESH_LANE", raising=False)
     if enabled:
         monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")

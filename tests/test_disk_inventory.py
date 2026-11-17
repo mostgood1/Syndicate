@@ -203,7 +203,7 @@ def _run_maintenance(monkeypatch, *, enabled: bool) -> list[tuple[str, str]]:
     calls: list[tuple[str, str]] = []
     monkeypatch.setattr(inv, "start_disk_inventory_once", lambda root, slug, **k: calls.append((str(root), slug)) or True)
     monkeypatch.setattr(dm, "_due", lambda: False)
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "refresh-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "refresh-worker")
     monkeypatch.delenv("SYNDICATE_REFRESH_LANE", raising=False)
     if enabled:
         monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")

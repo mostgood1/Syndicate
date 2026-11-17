@@ -69,7 +69,7 @@ class RequestPathGuardTests(unittest.TestCase):
         # incident is exactly why not.
         app = Flask(__name__)
         with app.test_request_context("/api/test", method="GET"):
-            with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
+            with patch.dict(os.environ, {"SYNDICATE_HOSTED": "true"}, clear=False):
                 with self.assertRaises(ComputeInRequestPathError):
                     refuse_if_compute_in_request_path("some_heavy_operation")
 
@@ -93,7 +93,7 @@ class RequestPathGuardTests(unittest.TestCase):
         # refresh-worker is a plain script with no Flask app, so this must
         # never fire for its background loop regardless of hosted status --
         # has_request_context() is always False there.
-        with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
+        with patch.dict(os.environ, {"SYNDICATE_HOSTED": "true"}, clear=False):
             refuse_if_compute_in_request_path("some_heavy_operation")  # must not raise
 
     def test_build_candidate_pool_refuses_on_hosted_web_request(self) -> None:
@@ -104,7 +104,7 @@ class RequestPathGuardTests(unittest.TestCase):
         service = IntelligenceStateService()
         app = Flask(__name__)
         with app.test_request_context("/api/ops/intelligence/candidate-trace", method="GET"):
-            with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
+            with patch.dict(os.environ, {"SYNDICATE_HOSTED": "true"}, clear=False):
                 with self.assertRaises(ComputeInRequestPathError):
                     service._build_candidate_pool("2026-07-27", "fingerprint-1")
 
@@ -120,7 +120,7 @@ class RequestPathGuardTests(unittest.TestCase):
             # hosted-storage check, which requires SYNDICATE_DATA_ROOT to be
             # set before it will even read a manifest for fingerprinting --
             # unrelated to this guard, but has to be satisfied to reach it.
-            with patch.dict(os.environ, {"RENDER": "true", "SYNDICATE_DATA_ROOT": str(Path(__file__).resolve().parent.parent / "data")}, clear=False):
+            with patch.dict(os.environ, {"SYNDICATE_HOSTED": "true", "SYNDICATE_DATA_ROOT": str(Path(__file__).resolve().parent.parent / "data")}, clear=False):
                 with self.assertRaises(ComputeInRequestPathError):
                     service._compute_response({"question": "top edges today", "date": "2026-07-27"}, force_refresh=True)
 
@@ -148,8 +148,8 @@ class RequestPathGuardArmingTests(unittest.TestCase):
         RENDER_* markers appear among its 76 user-defined env vars. Deleting
         every key a human can edit must still leave the gate hard."""
         self._clean_env()
-        os.environ["RENDER_INSTANCE_ID"] = "srv-d88ahvrbc2fs73eodu30-7cff65c8c4-68pvq"
-        self.assertEqual(hosted_signal(), "RENDER_INSTANCE_ID")
+        os.environ["SYNDICATE_INSTANCE_ID"] = "srv-d88ahvrbc2fs73eodu30-7cff65c8c4-68pvq"
+        self.assertEqual(hosted_signal(), "SYNDICATE_INSTANCE_ID")
         app = Flask(__name__)
         with app.test_request_context("/api/test", method="GET"):
             with self.assertRaises(ComputeInRequestPathError):
@@ -157,17 +157,30 @@ class RequestPathGuardArmingTests(unittest.TestCase):
 
     def test_render_false_no_longer_disarms_the_storage_flag(self) -> None:
         """The original chained the LOOKUPS, not the results: `os.environ.get
-        ("RENDER") or os.environ.get("SYNDICATE_...")` short-circuits on ANY
+        ("SYNDICATE_HOSTED") or os.environ.get("SYNDICATE_...")` short-circuits on ANY
         non-empty RENDER, so `RENDER=false` suppressed the fallback entirely and
         the guard went warn-only with the storage flag sitting at `true`."""
         self._clean_env()
-        os.environ["RENDER"] = "false"
+        os.environ["SYNDICATE_HOSTED"] = "false"
         os.environ["SYNDICATE_REQUIRE_HOSTED_STORAGE"] = "true"
         self.assertEqual(hosted_signal(), "SYNDICATE_REQUIRE_HOSTED_STORAGE")
         app = Flask(__name__)
         with app.test_request_context("/api/test", method="GET"):
             with self.assertRaises(ComputeInRequestPathError):
                 refuse_if_compute_in_request_path("some_heavy_operation")
+
+    def test_a_render_era_marker_alone_no_longer_arms(self) -> None:
+        """Step 3b (2026-11-17): no reader consults the Render names. A stray
+        `RENDER=true` or `RENDER_INSTANCE_ID` must not arm the gate; the fleet's
+        roles carry only the neutral markers since the 21:53Z up at 91d865fd5."""
+        self._clean_env()
+        for legacy in ("RENDER", "RENDER_INSTANCE_ID", "RENDER_SERVICE_ID", "RENDER_SERVICE_NAME", "RENDER_EXTERNAL_URL"):
+            os.environ[legacy] = "true"
+        try:
+            self.assertIsNone(hosted_signal())
+        finally:
+            for legacy in ("RENDER", "RENDER_INSTANCE_ID", "RENDER_SERVICE_ID", "RENDER_SERVICE_NAME", "RENDER_EXTERNAL_URL"):
+                os.environ.pop(legacy, None)
 
     def test_hosted_signal_is_none_off_render(self) -> None:
         """Local dev keeps warn-only. The gate must not fire on a laptop."""
@@ -179,7 +192,7 @@ class RequestPathGuardArmingTests(unittest.TestCase):
         only into `extra`, which the default formatter drops, so
         `_compute_response` could not be told from `_build_candidate_pool`."""
         self._clean_env()
-        os.environ["RENDER"] = "true"
+        os.environ["SYNDICATE_HOSTED"] = "true"
         app = Flask(__name__)
         with app.test_request_context("/api/test", method="GET"):
             with patch("syndicate.features.shared.request_path_guard.logger.error") as mocked_error:
@@ -188,7 +201,7 @@ class RequestPathGuardArmingTests(unittest.TestCase):
 
         rendered = mocked_error.call_args.args[0] % mocked_error.call_args.args[1:]
         self.assertIn("_build_candidate_pool", rendered)
-        self.assertIn("RENDER", rendered)
+        self.assertIn("SYNDICATE_HOSTED", rendered)
 
 
 class RequestPathGuardCounterTests(unittest.TestCase):
@@ -216,7 +229,7 @@ class RequestPathGuardCounterTests(unittest.TestCase):
     def test_refusals_are_counted_and_attributed_to_the_operation(self) -> None:
         from syndicate.features.shared.request_path_guard import guard_counters
 
-        os.environ["RENDER"] = "true"
+        os.environ["SYNDICATE_HOSTED"] = "true"
         self._refuse("_compute_response")
         self._refuse("_compute_response")
         self._refuse("_build_candidate_pool")
@@ -247,7 +260,7 @@ class RequestPathGuardCounterTests(unittest.TestCase):
         from syndicate.features.shared.request_path_guard import _OVERFLOW_KEY
         from syndicate.features.shared.request_path_guard import guard_counters
 
-        os.environ["RENDER"] = "true"
+        os.environ["SYNDICATE_HOSTED"] = "true"
         extra = 5
         for index in range(_MAX_TRACKED_OPERATIONS + extra):
             self._refuse(f"operation_{index}")
@@ -289,7 +302,7 @@ class RequestPathGuardCounterTests(unittest.TestCase):
 
         from syndicate.features.shared.request_path_guard import guard_counters
 
-        os.environ["RENDER"] = "true"
+        os.environ["SYNDICATE_HOSTED"] = "true"
         errors: list[BaseException] = []
 
         def hammer() -> None:

@@ -101,7 +101,7 @@ def _data_root(monkeypatch):
     # Hermetic: without this `preferred_artifact_roots` appends the repo's own
     # `data/soccer_source` mirror after the fixture root.
     monkeypatch.setenv("SYNDICATE_REQUIRE_HOSTED_STORAGE", "1")
-    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.delenv("SYNDICATE_HOSTED", raising=False)
     monkeypatch.delenv("SYNDICATE_SOCCER_SOURCE_ROOT", raising=False)
 
 

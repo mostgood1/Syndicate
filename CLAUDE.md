@@ -79,22 +79,20 @@ Render account and its suspended services are dormant: leave them alone.
   case and a behaviour change in the other.
 - **The code branches on service markers.** `local_production.py` sets
   `SYNDICATE_HOSTED=true`, `SYNDICATE_SERVICE_NAME`/`_ID=local-<role>`,
-  `SYNDICATE_INSTANCE_ID` and `SYNDICATE_GIT_COMMIT`; since step 3a
-  (`[2026-11-17, user "go ahead with step 3"]`) it no longer sets the Render-era twins
-  (`RENDER=true`, `RENDER_SERVICE_NAME`, ...). Roles started before the next drained
-  `up` still carry ONLY the Render names. Every reader asks
-  `service_identity.service_marker("SYNDICATE_X")`, which falls back on the Render name
-  for those roles; a test fails on any other read. Without the markers:
+  `SYNDICATE_INSTANCE_ID` and `SYNDICATE_GIT_COMMIT` on every role. Every reader asks
+  `service_identity.service_marker("SYNDICATE_X")`, and a test fails on any other read.
+  **The `RENDER*` names are gone** `[2026-11-17, lane render-config-retirement, user "go
+  ahead with step 3" / "drop the RENDER names too"]`: no role carries them since the drained
+  `up` at `91d865fd5` (21:53Z), and no code reads them since step 3b. Without the markers:
   - web starts its own board builder (`syndicate/app.py _start_background_loops`);
   - the request-path guard switches off;
   - the two workers count each other's jobs.
 
-  Do not strip them, and a child env that must not look hosted scrubs BOTH spellings.
-  **Do not delete the readers' Render-name fallback (step 3b) until a drained `up` has run
-  on a launcher at or after step 3a** -- until then the running roles have no neutral
-  marker, and an ff + `reload-web` would leave web unmarked. The restart's reading:
-  `scripts/fleet_role_env_reading.py snapshot` before `down`, `compare` after `up`. Each
-  reader and its default: `.syndicate/findings_2026-11-17_render_config_retirement.md`.
+  Do not strip them; a child env that must not look hosted scrubs
+  `service_identity.SERVICE_MARKERS`. Take any drained `down`/`up`'s before/after env
+  reading with `scripts/fleet_role_env_reading.py snapshot` (before `down`) and `compare`
+  (after `up`). Each reader and its default:
+  `.syndicate/findings_2026-11-17_render_config_retirement.md`.
 
 History (`#284`): on Render, `autoDeploy = no` held for code. But `blueprint_sync`
 applied any pushed `render.yaml` to every service. Measured 2026-08-08: an unordered

@@ -77,9 +77,9 @@ class GameBoardSimulationContractTests(unittest.TestCase):
         with patch.dict(
             "os.environ",
             {
-                "RENDER": "1",
-                "RENDER_EXTERNAL_URL": "https://syndicate-an21.onrender.com",
-                "RENDER_SERVICE_ID": "srv-test",
+                "SYNDICATE_HOSTED": "1",
+                "SYNDICATE_EXTERNAL_URL": "https://syndicate-an21.onrender.com",
+                "SYNDICATE_SERVICE_ID": "srv-test",
             },
             clear=False,
         ):

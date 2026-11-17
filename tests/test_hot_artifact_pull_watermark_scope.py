@@ -58,7 +58,7 @@ class HotArtifactPullWatermarkScopeTests(unittest.TestCase):
             p.stop()
 
     def _as_service(self, name: str):
-        return patch.dict("os.environ", {"RENDER_SERVICE_NAME": name, "SYNDICATE_REFRESH_LANE": ""}, clear=False)
+        return patch.dict("os.environ", {"SYNDICATE_SERVICE_NAME": name, "SYNDICATE_REFRESH_LANE": ""}, clear=False)
 
     def _record(self, epoch: float, date_str: str | None) -> None:
         artifact_publisher._record_hot_artifact_pull_watermark(epoch, date_str=date_str)

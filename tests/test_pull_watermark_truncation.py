@@ -96,7 +96,7 @@ class PullHotArtifactsReachabilityTests(unittest.TestCase):
             patch("syndicate.features.shared.refresh_state_store.read_json_file", side_effect=self.store.read),
             patch("syndicate.features.shared.refresh_state_store.write_json_file", side_effect=self.store.write),
             patch.dict("os.environ", {
-                "RENDER_SERVICE_NAME": "refresh-worker",
+                "SYNDICATE_SERVICE_NAME": "refresh-worker",
                 "SYNDICATE_REFRESH_LANE": "",
                 "SYNDICATE_WEB_PUBLISH_URL": "http://web/api/ops/artifacts/publish",
             }, clear=False),
@@ -160,7 +160,7 @@ class PullWindowClampTests(unittest.TestCase):
         self._patches = [
             patch("syndicate.features.shared.refresh_state_store.read_json_file", side_effect=self.store.read),
             patch("syndicate.features.shared.refresh_state_store.write_json_file", side_effect=self.store.write),
-            patch.dict("os.environ", {"RENDER_SERVICE_NAME": "refresh-worker", "SYNDICATE_REFRESH_LANE": ""}, clear=False),
+            patch.dict("os.environ", {"SYNDICATE_SERVICE_NAME": "refresh-worker", "SYNDICATE_REFRESH_LANE": ""}, clear=False),
         ]
         for p in self._patches:
             p.start()

@@ -115,7 +115,7 @@ def _maintenance(monkeypatch, *, enabled: bool, service: str) -> list[float]:
     monkeypatch.setattr(dc, "start_disk_compaction_once", lambda *a, **k: False)
     monkeypatch.setattr(obq, "start_resolve_probe_once", lambda delay_seconds=600.0: calls.append(delay_seconds) or True)
     monkeypatch.setattr(dm, "_due", lambda: False)
-    monkeypatch.setenv("RENDER_SERVICE_NAME", service)
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", service)
     monkeypatch.delenv("SYNDICATE_REFRESH_LANE", raising=False)
     if enabled:
         monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")

@@ -30,9 +30,9 @@ _ENV_KEYS = (
     "SYNDICATE_PORTFOLIO_SESSION_SECRET",
     "SYNDICATE_PORTFOLIO_SESSION_DAYS",
     "SYNDICATE_PORTFOLIO_AUTH",
-    "RENDER",
-    "RENDER_EXTERNAL_URL",
-    "RENDER_SERVICE_ID",
+    "SYNDICATE_HOSTED",
+    "SYNDICATE_EXTERNAL_URL",
+    "SYNDICATE_SERVICE_ID",
     "ADMIN_TOKEN",
     "SYNDICATE_ADMIN_TOKEN",
 )
@@ -270,7 +270,7 @@ def test_no_admin_token_configured_means_no_token_passes(creds, client):
 
 
 def test_on_render_with_no_credentials_the_portfolio_is_locked_not_open(env, client, handlers_must_not_run):
-    env.setenv("RENDER", "true")
+    env.setenv("SYNDICATE_HOSTED", "true")
     assert portfolio_auth.auth_mode() == "required"
     page = client.get("/portfolio")
     assert page.status_code == 503
@@ -282,14 +282,14 @@ def test_on_render_with_no_credentials_the_portfolio_is_locked_not_open(env, cli
 
 
 def test_on_render_an_unrecognised_mode_still_locks(env, client):
-    env.setenv("RENDER", "true")
+    env.setenv("SYNDICATE_HOSTED", "true")
     env.setenv("SYNDICATE_PORTFOLIO_AUTH", "requierd")
     assert portfolio_auth.auth_mode() == "required"
     assert client.get("/api/portfolio/books").status_code == 503
 
 
 def test_an_explicit_off_is_honoured_even_on_render(env, client):
-    env.setenv("RENDER", "true")
+    env.setenv("SYNDICATE_HOSTED", "true")
     env.setenv("SYNDICATE_PORTFOLIO_AUTH", "off")
     assert client.get("/api/portfolio/books").status_code == 200
 
@@ -309,7 +309,7 @@ def test_a_plain_password_in_the_hash_key_locks_loudly_instead_of_failing_every_
     without raising, and nothing said why -- five `LOGIN_FAILED` and no cause.
     It is a CONFIGURATION error, so it must read as one, and never echo the value."""
     secret = "Plain-Text-Pw1!"
-    env.setenv("RENDER", "true")
+    env.setenv("SYNDICATE_HOSTED", "true")
     env.setenv("SYNDICATE_PORTFOLIO_USERNAME", USER)
     env.setenv("SYNDICATE_PORTFOLIO_PASSWORD_HASH", secret)
     creds = portfolio_auth.credentials()

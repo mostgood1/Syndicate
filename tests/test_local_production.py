@@ -657,8 +657,8 @@ def _now_repo(git_repo, monkeypatch):
 
 def test_role_spawn_stamp_reads_the_supervisors_instance_id(monkeypatch):
     _fake_psutil(monkeypatch, {
-        1: _EnvProc(1, 0.0, env={"RENDER_INSTANCE_ID": "local-live-odds-worker-1794440075"}),
-        2: _EnvProc(2, 0.0, env={"RENDER_INSTANCE_ID": "srv-abc123"}),          # a Render id: no stamp
+        1: _EnvProc(1, 0.0, env={"SYNDICATE_INSTANCE_ID": "local-live-odds-worker-1794440075"}),
+        2: _EnvProc(2, 0.0, env={"SYNDICATE_INSTANCE_ID": "srv-abc123"}),          # a Render id: no stamp
         3: _EnvProc(3, 0.0, env={}),
         4: _FakeProc(4, 0.0),                                                     # environ unreadable
     })
@@ -673,7 +673,7 @@ def test_an_aged_worker_reads_its_post_ff_commit_from_the_spawn_stamp(git_repo, 
     """The 225134 case: spawned 6 s after the ff, /proc now 106 s early (before the ff)."""
     repo, old, new, t = _now_repo(git_repo, monkeypatch)
     spawn = t + 6
-    _fake_psutil(monkeypatch, {30: _EnvProc(30, spawn - 107, env={"RENDER_INSTANCE_ID": f"local-refresh-worker-{spawn}"})})
+    _fake_psutil(monkeypatch, {30: _EnvProc(30, spawn - 107, env={"SYNDICATE_INSTANCE_ID": f"local-refresh-worker-{spawn}"})})
     monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: spawn - 106.0)
     monkeypatch.setattr(lp, "role_loaded_commit", lambda pid: old)
     assert lp.role_start_epoch(30, "refresh-worker") == float(spawn)
@@ -686,7 +686,7 @@ def test_a_spawn_stamp_far_from_the_proc_start_is_not_trusted(git_repo, monkeypa
     """A stamp that is not this process's own (minutes-to-hours off a 2 h-old process) falls back to /proc."""
     repo, old, new, t = _now_repo(git_repo, monkeypatch)
     estimate = t - 500.0                                                          # a process from before the ff
-    _fake_psutil(monkeypatch, {31: _EnvProc(31, estimate, env={"RENDER_INSTANCE_ID": f"local-refresh-worker-{t + 3000}"})})
+    _fake_psutil(monkeypatch, {31: _EnvProc(31, estimate, env={"SYNDICATE_INSTANCE_ID": f"local-refresh-worker-{t + 3000}"})})
     monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: estimate)
     assert lp.role_start_epoch(31, "refresh-worker") == estimate
     assert lp.role_code(31, "refresh-worker", repo) == (old, "reflog")
@@ -729,7 +729,7 @@ def test_an_aged_web_worker_reads_its_post_ff_commit_from_its_boot_line(git_repo
     logs = _web_log(tmp_path, [f"{iso}Z [g] [41] [INFO] Booting worker with pid: 41"])
     kids = [_EnvProc(41, 0.0), _EnvProc(42, 0.0)]
     # workers inherit the MASTER's stamp: it must not be read for web
-    _fake_psutil(monkeypatch, {40: _EnvProc(40, 0.0, kids, env={"RENDER_INSTANCE_ID": f"local-web-{t - 30000}"})})
+    _fake_psutil(monkeypatch, {40: _EnvProc(40, 0.0, kids, env={"SYNDICATE_INSTANCE_ID": f"local-web-{t - 30000}"})})
     monkeypatch.setattr(lp, "linux_start_epoch", lambda pid: {41: boot - 90.0, 42: boot + 600.0}[pid])
     assert lp.role_start_epoch(40, "web", logs_dir=logs) == pytest.approx(boot, abs=1e-3)
     assert lp.role_code(40, "web", repo, logs_dir=logs) == (new, "reflog")

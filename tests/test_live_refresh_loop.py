@@ -262,8 +262,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "RENDER": "true",
-                "RENDER_SERVICE_ID": "svc-test",
+                "SYNDICATE_HOSTED": "true",
+                "SYNDICATE_SERVICE_ID": "svc-test",
                 "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "true",
                 "SYNDICATE_LIVE_ODDS_REFRESH_MODE": "full",
                 "SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE": "false",
@@ -2654,7 +2654,7 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertFalse(started)
 
     def test_create_app_starts_shared_live_refresh_loop(self) -> None:
-        with patch.dict(os.environ, {"RENDER": "", "RENDER_EXTERNAL_URL": "", "RENDER_SERVICE_ID": ""}, clear=False), patch(
+        with patch.dict(os.environ, {"SYNDICATE_HOSTED": "", "SYNDICATE_EXTERNAL_URL": "", "SYNDICATE_SERVICE_ID": ""}, clear=False), patch(
             "syndicate.app.start_live_refresh_background_loop"
         ) as mocked_start, patch("syndicate.app.Flask.before_request", side_effect=_fire_only_the_bootstrap):
             create_app()
@@ -2678,8 +2678,8 @@ class LiveRefreshLoopTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "RENDER": "true",
-                "RENDER_SERVICE_ID": "svc-test",
+                "SYNDICATE_HOSTED": "true",
+                "SYNDICATE_SERVICE_ID": "svc-test",
                 "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP": "false",
                 "SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP": "false",
                 "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",

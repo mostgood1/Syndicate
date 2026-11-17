@@ -38,7 +38,7 @@ class MigrationGateRuntimeDependencyTests(unittest.TestCase):
             file_path = repo_root / "syndicate" / "features" / "nba" / "sources.py"
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with patch.dict(os.environ, {"RENDER": "", "SYNDICATE_REQUIRE_HOSTED_STORAGE": "", "SYNDICATE_DATA_ROOT": ""}, clear=False):
+            with patch.dict(os.environ, {"SYNDICATE_HOSTED": "", "SYNDICATE_REQUIRE_HOSTED_STORAGE": "", "SYNDICATE_DATA_ROOT": ""}, clear=False):
                 roots = preferred_source_roots(
                     file_path,
                     env_var="TEST_SOURCE_ROOT",
@@ -53,7 +53,7 @@ class MigrationGateRuntimeDependencyTests(unittest.TestCase):
             file_path = repo_root / "syndicate" / "features" / "nba" / "sources.py"
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with patch.dict(os.environ, {"RENDER": "", "SYNDICATE_REQUIRE_HOSTED_STORAGE": "", "SYNDICATE_DATA_ROOT": ""}, clear=False):
+            with patch.dict(os.environ, {"SYNDICATE_HOSTED": "", "SYNDICATE_REQUIRE_HOSTED_STORAGE": "", "SYNDICATE_DATA_ROOT": ""}, clear=False):
                 roots = preferred_artifact_roots(
                     file_path,
                     env_var="TEST_SOURCE_ROOT",
@@ -290,7 +290,7 @@ class MigrationGateRuntimeDependencyTests(unittest.TestCase):
     def test_evaluate_protected_local_resolvers_passes_current_contracts(self) -> None:
         with TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "repo"
-            with patch.dict(os.environ, {"RENDER": "", "SYNDICATE_REQUIRE_HOSTED_STORAGE": "", "SYNDICATE_DATA_ROOT": ""}, clear=False):
+            with patch.dict(os.environ, {"SYNDICATE_HOSTED": "", "SYNDICATE_REQUIRE_HOSTED_STORAGE": "", "SYNDICATE_DATA_ROOT": ""}, clear=False):
                 with patch("syndicate.features.shared.source_roots.repo_root_from", return_value=repo_root):
                     violations = evaluate_protected_local_resolvers()
 

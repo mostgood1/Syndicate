@@ -2889,7 +2889,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         # it already computed). Reverted: a cache miss on Render always
         # returns the queued/empty placeholder and waits for the background
         # loop's own next cycle, regardless of how novel the payload is.
-        with patch.dict(os.environ, {"RENDER": "true"}, clear=False):
+        with patch.dict(os.environ, {"SYNDICATE_HOSTED": "true"}, clear=False):
             with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh") as queue_mock:
                 with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state_response", return_value=None):
                     with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(None, "fallback")) as cached_mock:
@@ -3037,7 +3037,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         # and this mock was dead, so the response came from whatever real
         # repo artifacts _compute_intelligence_response found on disk
         # (observed: "Jordin Canada OVER 9.5").
-        with patch.dict(os.environ, {"RENDER": "1"}):
+        with patch.dict(os.environ, {"SYNDICATE_HOSTED": "1"}):
             with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", return_value=(dict(computed_response), "render_compute")):
                 with patch("syndicate.blueprints.intelligence.queue_intelligence_state_refresh"):
                     response = self.client.post(

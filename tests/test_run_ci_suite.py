@@ -165,42 +165,41 @@ def test_the_pytest_cap_is_a_knob_with_a_raised_default(module):
     assert module.FAST_STEP_TIMEOUT == 900
 
 
-def test_render_injected_vars_are_scrubbed_from_steps(module, monkeypatch):
+def test_service_markers_are_scrubbed_from_steps(module, monkeypatch):
     """The fix for the 18-failure/21-error cron run, at the choke point.
 
     Every step goes through `_step_env()`, so this is the one place that has to
-    hold rather than nineteen call sites.
+    hold rather than nineteen call sites. The markers were Render's injected
+    `RENDER*` names until 2026-11-17; since step 3b of lane
+    `render-config-retirement` they are the fleet's `SYNDICATE_*` names.
     """
-    monkeypatch.setenv("RENDER", "true")
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "ci-suite")
-    monkeypatch.setenv("RENDER_GIT_COMMIT", "deadbeef")
+    monkeypatch.setenv("SYNDICATE_HOSTED", "true")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "ci-suite")
+    monkeypatch.setenv("SYNDICATE_GIT_COMMIT", "deadbeef")
 
     env = module._step_env()
 
-    assert "RENDER" not in env
-    assert "RENDER_SERVICE_NAME" not in env
-    assert "RENDER_GIT_COMMIT" not in env
+    assert "SYNDICATE_HOSTED" not in env
+    assert "SYNDICATE_SERVICE_NAME" not in env
+    assert "SYNDICATE_GIT_COMMIT" not in env
 
 
 def test_the_user_secret_is_not_scrubbed(module, monkeypatch):
-    """`RENDER_API_KEY` is user-set, not Render-injected.
-
-    A `RENDER_*` wildcard would have taken it, which is why the list is an
-    explicit allowlist of injected names.
-    """
+    """`RENDER_API_KEY` is a user-set secret, not a service marker: the scrub
+    list is an explicit allowlist of markers, never a wildcard."""
     monkeypatch.setenv("RENDER_API_KEY", "rnd_secret")
-    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("SYNDICATE_HOSTED", "true")
 
     env = module._step_env()
 
     assert env["RENDER_API_KEY"] == "rnd_secret"
-    assert "RENDER" not in env
-    assert "RENDER_API_KEY" not in module.RENDER_INJECTED_ENV
+    assert "SYNDICATE_HOSTED" not in env
+    assert "RENDER_API_KEY" not in module.NEUTRAL_MARKER_ENV
 
 
 def test_the_rest_of_the_environment_survives(module, monkeypatch):
     """Scrubbing must be surgical -- the steps still need PATH, tokens, etc."""
-    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("SYNDICATE_HOSTED", "true")
     monkeypatch.setenv("SYNDICATE_DATA_ROOT", "/opt/render/project/src/data")
 
     env = module._step_env()
@@ -215,13 +214,13 @@ def test_a_step_child_actually_sees_the_scrub(module, monkeypatch):
     `run()` had to be wired to pass `env=`; a correct `_step_env()` that nothing
     calls is the inert-fix shape, and it would look identical from the dict.
     """
-    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("SYNDICATE_HOSTED", "true")
 
     result = module.run(
         "env probe",
-        ["-c", "import os; print('RENDER=' + repr(os.environ.get('RENDER')))"],
+        ["-c", "import os; print('HOSTED=' + repr(os.environ.get('SYNDICATE_HOSTED')))"],
         timeout=60,
     )
 
     assert result["rc"] == 0
-    assert result["tail"] == ["RENDER=None"]
+    assert result["tail"] == ["HOSTED=None"]

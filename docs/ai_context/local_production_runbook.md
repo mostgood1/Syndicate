@@ -32,8 +32,8 @@ So the local tool does not hand-write any run-mode. At every `up` it builds each
 | `{data_root}/*` becomes `<home>/data/*` (and `{repo_root}/*` the checkout), the same path for all three roles. These placeholders replaced Render's `/opt/render/project/{data,src}` prefixes when the snapshot moved to `fleet_env/` | There is one disk. Readers resolve artifacts from `data_root()` directly. |
 | `SYNDICATE_WEB_PUBLISH_URL` is **removed** | On Render, workers pushed files to web and pulled them back over HTTP because the disks were separate. On one disk that path is **harmful**, not merely redundant: the publish receiver `os.replace`s and merges the very file the worker is appending to, so rows appended during a merge are lost. With the URL unset, the publisher logs `*_SKIP_NOT_CONFIGURED` and does nothing, which is correct here. |
 | `SYNDICATE_INTERNAL_WEB_BASE_URL`, `SYNDICATE_WNBA_LIVE_BOX_BASE_URL` and `SYNDICATE_BASE_URL` point at `http://127.0.0.1:<port>` | Unset, the code falls back to the public `syndicate-an21.onrender.com`, which is suspended. |
-| `SYNDICATE_HOSTED=true`, plus `SYNDICATE_SERVICE_NAME`, `SYNDICATE_SERVICE_ID`, `SYNDICATE_INSTANCE_ID` and `SYNDICATE_GIT_COMMIT` per role, and, since step 3a (2026-11-17), NOT under the Render-era names (`RENDER`, `RENDER_SERVICE_NAME`, ...) any more. Readers ask the neutral name (`syndicate/features/shared/service_identity.py`) and fall back on the Render name only for a role started by an older launcher. Take the before/after reading of any drained `down`/`up` with `scripts/fleet_role_env_reading.py snapshot` (before `down`) and `compare` (after `up`) | The code branches on these. They turn on the request-path compute guard, required portfolio login and disk compaction. Most importantly, without a marker **web starts the intelligence and live-refresh loops on its first request whatever their flags say** (`syndicate/app.py _start_background_loops`), and you get a second board builder on the same disk. |
-| State store: a local Redis on `127.0.0.1:6379` | Production is keyvalue. With `SYNDICATE_HOSTED=true` (or `RENDER=true`), the workers refuse a file backend. |
+| `SYNDICATE_HOSTED=true`, plus `SYNDICATE_SERVICE_NAME`, `SYNDICATE_SERVICE_ID`, `SYNDICATE_INSTANCE_ID` and `SYNDICATE_GIT_COMMIT` per role, and, since 2026-11-17 (lane `render-config-retirement`), NOT under the Render-era names (`RENDER`, `RENDER_SERVICE_NAME`, ...): no role carries them, and no code reads them. Readers ask these names only (`syndicate/features/shared/service_identity.py`). Take the before/after reading of any drained `down`/`up` with `scripts/fleet_role_env_reading.py snapshot` (before `down`) and `compare` (after `up`) | The code branches on these. They turn on the request-path compute guard, required portfolio login and disk compaction. Most importantly, without a marker **web starts the intelligence and live-refresh loops on its first request whatever their flags say** (`syndicate/app.py _start_background_loops`), and you get a second board builder on the same disk. |
+| State store: a local Redis on `127.0.0.1:6379` | Production is keyvalue. With `SYNDICATE_HOSTED=true`, the workers refuse a file backend. |
 | Bootstrap runs **once** in `up`, before any role starts, and `SYNDICATE_BOOTSTRAP_ON_START=0` inside the roles | This is the same seed-only copy of the checkout mirror that Render ran at boot. Existing files are never overwritten. It runs once instead of racing on one disk. |
 | Money is **always paper** unless you pass `up --allow-live-execution` | The live services ran `SYNDICATE_EXECUTION_MODE=live` and `LIVE_ARMED=1` with real Kalshi and Polymarket keys. Importing that env must not, by itself, arm real orders on a new machine. |
 | `RENDER_API_KEY` is never passed to any role | A local fleet must not act on the Render account. |
@@ -83,7 +83,7 @@ pip install -r requirements.txt psutil waitress pyyaml
 Native Windows fallback (no WSL):
 
 - `py -3.11 -m pip install -r requirements.txt psutil waitress pyyaml`
-- Install **Memurai Developer**, which is Redis-compatible and runs as a Windows service. Alternatively, run `up --state file`, which clears `SYNDICATE_HOSTED` and `RENDER`; section 1 lists what that turns off.
+- Install **Memurai Developer**, which is Redis-compatible and runs as a Windows service. Alternatively, run `up --state file`, which clears `SYNDICATE_HOSTED`; section 1 lists what that turns off.
 - Keep `SYNDICATE_LOCAL_HOME` **out of OneDrive**. The default is `%LOCALAPPDATA%\SyndicateProd`.
 - **Found on the first native-Windows run (2026-09-30, lane `local-production-first-run`):**
   - **Clone at least two directories below the drive root**, e.g. `C:\SyndicateProd\repo\Syndicate`. At `C:\Syndicate`, web crashes on import with `IndexError: 3`, because `pipeline/intelligence_state.py` calls `repo_root_from(__file__)` = `parents[3]` (`#313`). On Render that resolves to `/opt/render`, so the clone depth reproduces Render and the code is left alone. `doctor` now checks it.
@@ -132,7 +132,7 @@ Without the snapshot, you must set these yourself in `local_production.env`. `do
 | `SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN` | live-odds-worker | The ledger records `true`. |
 | `ANTHROPIC_API_KEY` | web | Ask the Syndicate. Absent means snapshot-only answers. |
 | `KALSHI_*`, `POLYMARKET_US_*` | workers | Venue quotes. Orders happen only when live-armed. |
-| `SYNDICATE_PORTFOLIO_USERNAME`, `SYNDICATE_PORTFOLIO_PASSWORD_HASH` | web | Required: with `SYNDICATE_HOSTED=true` (or `RENDER=true`), `/portfolio` returns 503 until they are set. |
+| `SYNDICATE_PORTFOLIO_USERNAME`, `SYNDICATE_PORTFOLIO_PASSWORD_HASH` | web | Required: with `SYNDICATE_HOSTED=true`, `/portfolio` returns 503 until they are set. |
 
 ## 4. Run
 
@@ -218,7 +218,7 @@ Alerts fire when a problem is new, again while it persists (failures every 6 hou
 Web binds `127.0.0.1` by default. Do not port-forward it. To serve the public:
 
 1. Install `cloudflared` and create a named tunnel to `http://127.0.0.1:10000` in the Cloudflare dashboard.
-2. Put `CLOUDFLARED_TUNNEL_TOKEN=...` and `SYNDICATE_PUBLIC_URL=https://your.host` in `local_production.env`. `up` then supervises the tunnel as a fourth role, and the URL becomes `SYNDICATE_EXTERNAL_URL` (and `RENDER_EXTERNAL_URL`, until the Render names are dropped).
+2. Put `CLOUDFLARED_TUNNEL_TOKEN=...` and `SYNDICATE_PUBLIC_URL=https://your.host` in `local_production.env`. `up` then supervises the tunnel as a fourth role, and the URL becomes `SYNDICATE_EXTERNAL_URL`.
 3. Set portfolio credentials first. `/api/syndicate/query` is public and capped by `SYNDICATE_ASK_LLM_MAX_CALLS`, as on Render.
 
 `.github/workflows/daily-update.yml` (manual trigger) takes a `base_url` input. Point it at the tunnel URL; it still needs the `ADMIN_TOKEN` secret to match your local one.

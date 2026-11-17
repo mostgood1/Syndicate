@@ -1,18 +1,18 @@
-"""Every reader of a service marker prefers the NEUTRAL name and falls back on the Render-era
-one, and gives the same answer either way (lane `render-config-retirement`, todo #766, user
-2026-11-17: "we should not depend on render at all").
+"""Every reader of a service marker reads the fleet's NEUTRAL `SYNDICATE_*` name, and nothing
+reads a Render-era name any more (lane `render-config-retirement`, todo #766; user 2026-11-17:
+"we should not depend on render at all", "go ahead with step 3", "drop the RENDER names too").
 
 For each reader, four environments:
   neither  -- no marker at all (a laptop, CI);
-  legacy   -- only the Render-era name (a role started before the launcher set both);
-  neutral  -- only the neutral name (what step 3 will leave);
-  both     -- both, one value (what the launcher sets now).
-The reader must answer legacy == neutral == both (EQUIVALENCE: loading the launcher change
-changes nothing) and neutral != neither (REACHABILITY: the branch really reads the neutral
-name, `model_engine_standard`'s off != on rule).
+  legacy   -- only the Render-era name (what the fleet carried until the 21:53Z 11-17 `up`);
+  neutral  -- only the neutral name (what every role carries since then);
+  both     -- both, one value.
+Since step 3b the reader must answer neutral == both (the Render twin is ignored),
+neutral != neither (REACHABILITY, `model_engine_standard`'s off != on rule), and
+legacy == neither (the fallback is GONE).
 
-Then a SOURCE test: no non-test file reads a Render-era marker except through
-`service_identity`, outside an allowlist of scrubbers and the two tables.
+Then a SOURCE test: no non-test file names a Render-era marker, outside an allowlist of two
+(the launcher's stray-name strip and the env-reading tool's history table).
 """
 
 from __future__ import annotations
@@ -28,6 +28,20 @@ from syndicate.features.shared import service_identity as si
 
 REPO = Path(__file__).resolve().parents[1]
 
+# The Render-era twin of each neutral marker -- history, kept HERE only (the code no longer
+# knows these names). Render also injected the four in `_RENDER_ONLY`.
+_RENDER_TWIN = {
+    "SYNDICATE_HOSTED": "RENDER",
+    "SYNDICATE_SERVICE_NAME": "RENDER_SERVICE_NAME",
+    "SYNDICATE_SERVICE_ID": "RENDER_SERVICE_ID",
+    "SYNDICATE_INSTANCE_ID": "RENDER_INSTANCE_ID",
+    "SYNDICATE_GIT_COMMIT": "RENDER_GIT_COMMIT",
+    "SYNDICATE_EXTERNAL_URL": "RENDER_EXTERNAL_URL",
+    "SYNDICATE_GIT_BRANCH": "RENDER_GIT_BRANCH",
+}
+_RENDER_ONLY = ("RENDER_SERVICE_TYPE", "RENDER_EXTERNAL_HOSTNAME", "RENDER_GIT_REPO_SLUG", "RENDER_DISCOVERY_SERVICE")
+_RENDER_MARKERS = set(_RENDER_TWIN.values()) | set(_RENDER_ONLY)
+
 # Keys that some readers consult BEFORE the marker; cleared so the marker branch decides.
 _OVERRIDES = (
     "SYNDICATE_WEB_DYNO", "SYNDICATE_REQUIRE_HOSTED_STORAGE", "SYNDICATE_REFRESH_LANE",
@@ -37,7 +51,7 @@ _OVERRIDES = (
 
 
 def _clear(monkeypatch) -> None:
-    for name in si.ALL_MARKER_NAMES + _OVERRIDES:
+    for name in si.ALL_MARKER_NAMES + tuple(sorted(_RENDER_MARKERS)) + _OVERRIDES:
         monkeypatch.delenv(name, raising=False)
 
 
@@ -52,7 +66,7 @@ def _four(monkeypatch, markers: dict[str, str], read, *, setup=None) -> dict[str
             if mode in ("neutral", "both"):
                 monkeypatch.setenv(neutral, value)
             if mode in ("legacy", "both"):
-                monkeypatch.setenv(si.NEUTRAL_TO_RENDER[neutral], value)
+                monkeypatch.setenv(_RENDER_TWIN[neutral], value)
         try:
             out[mode] = read()
         except Exception as exc:  # a reader that RAISES off-host is still an answer
@@ -61,34 +75,34 @@ def _four(monkeypatch, markers: dict[str, str], read, *, setup=None) -> dict[str
 
 
 def _assert_reachable_and_equivalent(results: dict[str, object]) -> None:
-    assert results["legacy"] == results["neutral"] == results["both"], results
+    """Step 3b: the neutral name decides, the Render twin changes nothing."""
+    assert results["neutral"] == results["both"], results
     assert results["neutral"] != results["neither"], results
+    assert results["legacy"] == results["neither"], results  # no Render fallback
 
 
 # --- the helper itself ------------------------------------------------------------------
 
-def test_neutral_name_wins_when_present_even_empty(monkeypatch) -> None:
+def test_only_the_neutral_name_counts(monkeypatch) -> None:
     _clear(monkeypatch)
-    assert si.service_marker("SYNDICATE_HOSTED") is None
     monkeypatch.setenv("RENDER", "true")
+    assert si.service_marker("SYNDICATE_HOSTED") is None  # the Render name means nothing now
+    assert si.service_marker_key("SYNDICATE_HOSTED") is None
+    monkeypatch.setenv("SYNDICATE_HOSTED", "true")
     assert si.service_marker("SYNDICATE_HOSTED") == "true"
-    assert si.service_marker_key("SYNDICATE_HOSTED") == "RENDER"
-    monkeypatch.setenv("SYNDICATE_HOSTED", "")
-    assert si.service_marker("SYNDICATE_HOSTED") == ""
     assert si.service_marker_key("SYNDICATE_HOSTED") == "SYNDICATE_HOSTED"
     with pytest.raises(KeyError):
-        si.service_marker("RENDER")  # readers ask by the NEUTRAL name only
+        si.service_marker("RENDER")
 
 
-def test_environ_markers_decodes_only_marker_keys() -> None:
+def test_environ_markers_decodes_only_neutral_marker_keys() -> None:
     blob = b"KALSHI_PRIVATE_KEY=secret\x00RENDER_SERVICE_NAME=local-refresh-worker\x00SYNDICATE_SERVICE_NAME=x\x00junk"
-    assert si.environ_markers(blob) == {"RENDER_SERVICE_NAME": "local-refresh-worker", "SYNDICATE_SERVICE_NAME": "x"}
+    assert si.environ_markers(blob) == {"SYNDICATE_SERVICE_NAME": "x"}
 
 
-def test_marker_env_and_scrub_cover_both_spellings() -> None:
-    both = si.marker_env({"SYNDICATE_HOSTED": "true", "SYNDICATE_GIT_COMMIT": "abc"})
-    assert both == {"SYNDICATE_HOSTED": "true", "RENDER": "true", "SYNDICATE_GIT_COMMIT": "abc", "RENDER_GIT_COMMIT": "abc"}
-    env = dict(both, OTHER="1", RENDER_EXTERNAL_HOSTNAME="h")
+def test_scrub_removes_every_marker() -> None:
+    env = {name: "1" for name in si.SERVICE_MARKERS}
+    env.update(OTHER="1")
     assert si.scrub(env) == {"OTHER": "1"}
 
 
@@ -183,7 +197,7 @@ def test_source_roots_hosted_branches(monkeypatch, tmp_path) -> None:
     source_roots.clear_source_root_caches()
 
 
-def test_request_path_guard_arms_on_either_spelling(monkeypatch) -> None:
+def test_request_path_guard_arms_on_the_neutral_name_only(monkeypatch) -> None:
     from syndicate.features.shared import request_path_guard as guard
 
     for marker, value in (("SYNDICATE_HOSTED", "true"), ("SYNDICATE_INSTANCE_ID", "local-web-1"),
@@ -191,7 +205,7 @@ def test_request_path_guard_arms_on_either_spelling(monkeypatch) -> None:
                           ("SYNDICATE_EXTERNAL_URL", "https://x.test")):
         results = _four(monkeypatch, {marker: value}, guard.hosted_signal)
         assert results["neither"] is None
-        assert results["legacy"] == si.NEUTRAL_TO_RENDER[marker]  # names the key that armed it
+        assert results["legacy"] is None  # a Render name alone no longer arms it
         assert results["neutral"] == results["both"] == marker
         armed = _four(monkeypatch, {marker: value}, guard._is_render_hosted)
         _assert_reachable_and_equivalent(armed)
@@ -249,9 +263,10 @@ def _fake_proc(root: Path, pid: int, environ: dict[str, str], *, job: bool = Tru
     (entry / "environ").write_bytes(b"\x00".join(f"{k}={v}".encode() for k, v in environ.items()))
 
 
-def test_refresh_worker_counts_only_its_own_jobs_under_either_spelling(monkeypatch, tmp_path) -> None:
+def test_refresh_worker_counts_only_its_own_jobs(monkeypatch, tmp_path) -> None:
     """The throttle that once counted live-odds-worker's jobs as refresh-worker's
-    (2026-10-03: 17 of 18 ticks JOB_CAP_THROTTLED)."""
+    (2026-10-03: 17 of 18 ticks JOB_CAP_THROTTLED). A job carrying only a Render-era name
+    is now a job with NO name, and counts (unknown must not read low)."""
     from scripts import run_refresh_worker as rrw
 
     for child_style in ("legacy", "neutral", "both"):
@@ -263,7 +278,7 @@ def test_refresh_worker_counts_only_its_own_jobs_under_either_spelling(monkeypat
                 return {"RENDER_SERVICE_NAME": service}
             if child_style == "neutral":
                 return {"SYNDICATE_SERVICE_NAME": service}
-            return si.marker_env({"SYNDICATE_SERVICE_NAME": service})
+            return {"SYNDICATE_SERVICE_NAME": service, "RENDER_SERVICE_NAME": service}
 
         _fake_proc(root, 101, env_for(mine))
         _fake_proc(root, 102, env_for(theirs))
@@ -271,8 +286,9 @@ def test_refresh_worker_counts_only_its_own_jobs_under_either_spelling(monkeypat
         _fake_proc(root, 104, {})  # no name: counts (unknown must not read low)
         _fake_proc(root, 105, env_for(theirs), job=False)
         results = _four(monkeypatch, {"SYNDICATE_SERVICE_NAME": mine}, lambda: rrw._running_job_process_count(root))
-        assert results["neither"] == 4  # no own name: nothing filtered (the old behaviour)
-        assert results["legacy"] == results["neutral"] == results["both"] == 2, (child_style, results)
+        assert results["neither"] == results["legacy"] == 4  # no own neutral name: nothing filtered
+        expected = 4 if child_style == "legacy" else 2  # Render-named children read as unnamed
+        assert results["neutral"] == results["both"] == expected, (child_style, results)
 
 
 # --- C "which commit" -------------------------------------------------------------------
@@ -292,12 +308,12 @@ def test_commit_readers(monkeypatch) -> None:
         monkeypatch, {"SYNDICATE_GIT_COMMIT": sha}, lambda: worker_shutdown.build_shutdown_record("w", "SIGTERM")["commit"]))
 
 
-# --- the launcher sets both, and scrubbers remove both ----------------------------------
+# --- the launcher sets the neutral markers, and scrubbers remove them -------------------
 
 def test_launcher_table_is_the_helper_table() -> None:
     from scripts import local_production as lp
 
-    assert lp.SERVICE_MARKERS == si.NEUTRAL_TO_RENDER
+    assert lp.SERVICE_MARKERS == si.SERVICE_MARKERS
 
 
 @pytest.mark.parametrize("state", ["redis", "file"])
@@ -309,11 +325,11 @@ def test_launcher_sets_only_the_neutral_markers(tmp_path, state) -> None:
 
     spec = lp.load_role_spec()
     settings = lp.Settings(home=tmp_path, state=state)
-    stray = {name: "stray" for name in si.ALL_MARKER_NAMES}
+    stray = {name: "stray" for name in si.ALL_MARKER_NAMES + tuple(sorted(_RENDER_MARKERS))}
     for role in lp.ROLE_ORDER:
         env, _ = lp.derive_role_env(role, spec, {"SYNDICATE_PUBLIC_URL": "https://x.test"}, settings,
                                     base_env=dict(stray), instance_id=f"local-{role}-1794930464")
-        assert not (set(si.NEUTRAL_TO_RENDER.values()) | set(si.RENDER_ONLY_INJECTED)) & set(env), role
+        assert not _RENDER_MARKERS & set(env), role  # stray Render names are stripped too
         assert env["SYNDICATE_SERVICE_NAME"] == env["SYNDICATE_SERVICE_ID"] == f"local-{role}"
         assert env["SYNDICATE_INSTANCE_ID"] == f"local-{role}-1794930464"
         assert env["SYNDICATE_EXTERNAL_URL"] == "https://x.test"
@@ -324,9 +340,10 @@ def test_launcher_sets_only_the_neutral_markers(tmp_path, state) -> None:
             assert "SYNDICATE_HOSTED" not in env
 
 
-def test_readers_answer_the_same_on_the_new_launcher_env(monkeypatch, tmp_path) -> None:
-    """The load-bearing readers, given the env the step-3a launcher builds (neutral only),
-    answer exactly what they answer on an old-launcher env (Render names only)."""
+def test_readers_on_the_launcher_env_and_on_a_render_named_env(monkeypatch, tmp_path) -> None:
+    """The load-bearing readers on the env the launcher builds answer "hosted, this role";
+    on the same values under the Render names they answer as if unmarked -- the fallback is
+    gone, so a role must carry the neutral names (every role has since 21:53Z 11-17)."""
     from scripts import local_production as lp
     from syndicate import app as app_module
     from syndicate.features.shared import disk_compaction, ops_refresh, portfolio_auth, source_roots
@@ -342,15 +359,17 @@ def test_readers_answer_the_same_on_the_new_launcher_env(monkeypatch, tmp_path) 
     }
     for role in lp.ROLE_ORDER:
         env, _ = lp.derive_role_env(role, spec, {}, settings, base_env={}, instance_id=f"local-{role}-1")
-        markers = {k: v for k, v in env.items() if k in si.NEUTRAL_TO_RENDER}
+        markers = {k: v for k, v in env.items() if k in si.SERVICE_MARKERS}
         answers = {}
-        for style in ("new", "old"):
+        for style in ("neutral", "render", "none"):
             _clear(monkeypatch)
-            for k, v in markers.items():
-                monkeypatch.setenv(k if style == "new" else si.NEUTRAL_TO_RENDER[k], v)
+            if style != "none":
+                for k, v in markers.items():
+                    monkeypatch.setenv(k if style == "neutral" else _RENDER_TWIN[k], v)
             answers[style] = {name: read() for name, read in readers.items()}
-        assert answers["new"] == answers["old"], role
-        assert answers["new"]["app"] is True and answers["new"]["compaction"] is True
+        assert answers["neutral"]["app"] is True and answers["neutral"]["compaction"] is True
+        assert answers["neutral"]["service"] == f"local-{role}"
+        assert answers["render"] == answers["none"], role
 
 
 def test_launcher_status_reads_prefer_the_neutral_name(monkeypatch) -> None:
@@ -367,22 +386,22 @@ def test_launcher_status_reads_prefer_the_neutral_name(monkeypatch) -> None:
 
     envs = {
         1: {"RENDER_GIT_COMMIT": "old", "RENDER_INSTANCE_ID": "local-web-1794000000"},
-        2: si.marker_env({"SYNDICATE_GIT_COMMIT": "new", "SYNDICATE_INSTANCE_ID": "local-web-1794111111"}),
+        2: {"SYNDICATE_GIT_COMMIT": "new", "SYNDICATE_INSTANCE_ID": "local-web-1794111111"},
         3: {"SYNDICATE_GIT_COMMIT": "neutral", "RENDER_GIT_COMMIT": "legacy"},
     }
     monkeypatch.setitem(__import__("sys").modules, "psutil", types.SimpleNamespace(Process=lambda pid: _Proc(envs[pid])))
-    assert lp.role_loaded_commit(1) == "old"
+    assert lp.role_loaded_commit(1) is None  # Render names are not read any more
     assert lp.role_loaded_commit(2) == "new"
     assert lp.role_loaded_commit(3) == "neutral"
-    assert lp.role_spawn_stamp(1) == 1794000000.0
+    assert lp.role_spawn_stamp(1) is None
     assert lp.role_spawn_stamp(2) == 1794111111.0
 
 
-def test_ci_steps_scrub_both_spellings(monkeypatch) -> None:
+def test_ci_steps_scrub_the_markers(monkeypatch) -> None:
     from scripts import run_ci_suite
 
-    assert run_ci_suite.NEUTRAL_MARKER_ENV == tuple(si.NEUTRAL_TO_RENDER)
-    assert set(run_ci_suite.RENDER_INJECTED_ENV) == set(si.NEUTRAL_TO_RENDER.values()) | set(si.RENDER_ONLY_INJECTED)
+    assert run_ci_suite.NEUTRAL_MARKER_ENV == si.SERVICE_MARKERS
+    assert not hasattr(run_ci_suite, "RENDER_INJECTED_ENV")
     for name in si.ALL_MARKER_NAMES:
         monkeypatch.setenv(name, "x")
     env = run_ci_suite._step_env()
@@ -393,31 +412,23 @@ def test_replay_and_rehearsal_harnesses_clear_the_neutral_hosted_flag(monkeypatc
     from scripts import fleet_local, replay_diff_gate
 
     monkeypatch.setenv("SYNDICATE_HOSTED", "true")
-    monkeypatch.setenv("RENDER", "true")
     env = replay_diff_gate._child_env(tmp_path)
-    assert "SYNDICATE_HOSTED" not in env and "RENDER" not in env
-    assert fleet_local.FORCED_ENV_BASE["SYNDICATE_HOSTED"] == fleet_local.FORCED_ENV_BASE["RENDER"] == ""
+    assert "SYNDICATE_HOSTED" not in env
+    assert fleet_local.FORCED_ENV_BASE["SYNDICATE_HOSTED"] == ""
+    assert "RENDER" not in fleet_local.FORCED_ENV_BASE
 
 
-def test_mlb_base_url_prefers_the_neutral_external_url() -> None:
+def test_mlb_base_url_reads_the_neutral_external_url() -> None:
     text = (REPO / "scripts" / "refresh_mlb_oddsapi.py").read_text(encoding="utf-8")
-    assert '"SYNDICATE_EXTERNAL_URL", "RENDER_EXTERNAL_URL"' in text
+    assert '"SYNDICATE_EXTERNAL_URL"' in text and '"RENDER_EXTERNAL_URL"' not in text
 
 
 # --- nothing reads a Render marker any other way ----------------------------------------
 
-_RENDER_MARKERS = set(si.NEUTRAL_TO_RENDER.values()) | set(si.RENDER_ONLY_INJECTED)
-
-# file -> why it may still NAME a Render marker. Each is a table, a scrubber, or a
-# fallback that sits AFTER its neutral name.
+# file -> why it may still NAME a Render marker. Neither reads one from the environment.
 _ALLOWED = {
-    "syndicate/features/shared/service_identity.py": "the neutral -> Render table",
-    "scripts/local_production.py": "SERVICE_MARKERS (pinned above) and the stray-RENDER strip",
-    "scripts/run_ci_suite.py": "RENDER_INJECTED_ENV scrub list (pinned above)",
-    "scripts/replay_diff_gate.py": "pops RENDER from the replay child (pinned above)",
-    "scripts/fleet_local.py": "clears RENDER in the rehearsal env (pinned above)",
-    "scripts/refresh_mlb_oddsapi.py": "RENDER_EXTERNAL_URL after SYNDICATE_EXTERNAL_URL (pinned above)",
-    "scripts/fleet_role_env_reading.py": "the before/after reading's marker table (pinned in its own test); reads no env",
+    "scripts/local_production.py": "strips stray RENDER* names from the operator's shell before building a role env",
+    "scripts/fleet_role_env_reading.py": "the before/after reading's history table (--render-markers-step3); reads no env by name",
 }
 
 

@@ -3617,7 +3617,7 @@ class HomeBoardTests(unittest.TestCase):
             "source_title": "WNBA cards",
         }
 
-        with patch.dict("os.environ", {"RENDER": "true"}, clear=False):
+        with patch.dict("os.environ", {"SYNDICATE_HOSTED": "true"}, clear=False):
             with patch("syndicate.features.nba.cards.build_cards_page_context", return_value=dict(nba_payload)) as nba_mock:
                 nba_games = home_module._load_home_games("nba", context_label="2026-05-20")
             with patch("syndicate.features.wnba.cards.build_cards_page_context", return_value=dict(wnba_payload)) as wnba_mock:

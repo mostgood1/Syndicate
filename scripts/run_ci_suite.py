@@ -34,7 +34,8 @@ EVERY STEP RUNS EVEN IF AN EARLIER ONE FAILS. Stopping at the first failure
 would hide the rest, and the whole point of a once-a-day signal is to see the
 full picture in one run.
 
-THE STEPS RUN WITH RENDER'S OWN ENV VARS SCRUBBED -- see `_step_env()`, and it
+THE STEPS RUN WITH THE FLEET'S SERVICE MARKERS SCRUBBED (`SYNDICATE_HOSTED` and the rest;
+Render's injected `RENDER*` names until 2026-11-17) -- see `_step_env()`, and it
 is load-bearing rather than tidying. `RENDER` is injected on every Render
 service type, cron jobs included, so a suite running ON a cron trips every
 production branch gated on it and ends up measuring its own host. Measured
@@ -149,32 +150,13 @@ def _pytest_step(workers: str, chunks: int) -> tuple[str, list[str]]:
              "tests/", "-n", workers, "--dist=loadscope"])
 
 
-# Environment variables RENDER INJECTS to describe the host, scrubbed from
-# every step's child environment by `_step_env()`.
-#
-# `RENDER_API_KEY` is deliberately NOT here: Render does not inject it, it is a
-# user-set secret, and scrubbing someone's credential to fix a host-detection
-# bug would be a second bug. This is an allowlist of injected names for exactly
-# that reason, not a `RENDER_*` wildcard.
-RENDER_INJECTED_ENV = (
-    "RENDER",
-    "RENDER_SERVICE_ID",
-    "RENDER_SERVICE_NAME",
-    "RENDER_SERVICE_TYPE",
-    "RENDER_INSTANCE_ID",
-    "RENDER_EXTERNAL_URL",
-    "RENDER_EXTERNAL_HOSTNAME",
-    "RENDER_GIT_COMMIT",
-    "RENDER_GIT_BRANCH",
-    "RENDER_GIT_REPO_SLUG",
-    "RENDER_DISCOVERY_SERVICE",
-)
-
-# The NEUTRAL names the fleet sets beside the Render ones since 2026-11-17
-# (`syndicate/features/shared/service_identity.py`), which every reader prefers.
-# Scrubbing only the Render spellings would leave the step "hosted" through these.
-# Spelled out rather than imported: this script runs before `syndicate` is
-# importable. `tests/test_service_marker_readers.py` pins the two lists together.
+# The fleet's service markers (`syndicate/features/shared/service_identity.py`), scrubbed
+# from every step's child environment by `_step_env()`: a step that inherits them runs the
+# hosted branches and measures its host. Until 2026-11-17 these were Render's own injected
+# names (`RENDER`, `RENDER_SERVICE_NAME`, ...); since step 3b of lane
+# `render-config-retirement` no code reads those, and the fleet sets only these. Spelled out
+# rather than imported: this script runs before `syndicate` is importable.
+# `tests/test_service_marker_readers.py` pins this list to `service_identity`.
 NEUTRAL_MARKER_ENV = (
     "SYNDICATE_HOSTED",
     "SYNDICATE_SERVICE_NAME",
@@ -187,7 +169,7 @@ NEUTRAL_MARKER_ENV = (
 
 
 def _step_env() -> dict[str, str]:
-    """The child environment for every step: this host, minus "I am Render".
+    """The child environment for every step: this host, minus "I am the hosted fleet".
 
     THE TESTS WERE MEASURING THE HOST. Measured 2026-09-08 on the `ci-suite`
     cron: `Ran 386 tests ... FAILED (failures=18, errors=21)` where the same
@@ -216,7 +198,7 @@ def _step_env() -> dict[str, str]:
     on configuration should do regardless of where it runs.
     """
     env = dict(os.environ)
-    for key in RENDER_INJECTED_ENV + NEUTRAL_MARKER_ENV:
+    for key in NEUTRAL_MARKER_ENV:
         env.pop(key, None)
     return env
 

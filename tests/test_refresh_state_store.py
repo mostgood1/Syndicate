@@ -21,7 +21,7 @@ from syndicate.features.shared.source_roots import preferred_source_roots
 # falls_back_to_repo_reports` SETS `RENDER` on purpose and must keep it -- the
 # distinction that matters is "this test set it" versus "it was ambient", and
 # only the second is pollution.
-_ALSO_SUPPRESSES_THE_RAISE = ("RENDER", "SYNDICATE_SOURCE_ROOT_NBA", "SYNDICATE_ARTIFACT_ROOT_NBA")
+_ALSO_SUPPRESSES_THE_RAISE = ("SYNDICATE_HOSTED", "SYNDICATE_SOURCE_ROOT_NBA", "SYNDICATE_ARTIFACT_ROOT_NBA")
 
 
 def _without_explicit_roots(*, also: tuple[str, ...] = ()) -> None:
@@ -169,7 +169,7 @@ class RefreshStateStoreTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "RENDER": "true",
+                "SYNDICATE_HOSTED": "true",
                 "SYNDICATE_REFRESH_STATE_BACKEND": "filesystem",
                 "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
             },
@@ -185,7 +185,7 @@ class RefreshStateStoreTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "RENDER": "true",
+                "SYNDICATE_HOSTED": "true",
                 "SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue",
                 "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
             },
@@ -201,7 +201,7 @@ class RefreshStateStoreTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "RENDER": "true",
+                "SYNDICATE_HOSTED": "true",
                 "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
                 "SYNDICATE_REFRESH_STATE_URL": "redis://example",
             },
@@ -217,7 +217,7 @@ class RefreshStateStoreTests(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "RENDER": "1",
+                "SYNDICATE_HOSTED": "1",
                 "SYNDICATE_REQUIRE_HOSTED_STORAGE": "true",
             },
             clear=False,

@@ -56,11 +56,10 @@ every `onrender.com` fallback repointed at `http://127.0.0.1:10000`).
 
 ## What still says "Render", and why that is not a dependency
 
-- **`RENDER_*` env markers.** Since 2026-11-17 (lane `render-config-retirement`) every
-  reader asks `service_identity.service_marker("SYNDICATE_X")`, which prefers the neutral
-  name, and the launcher sets BOTH spellings to one value. The `RENDER*` names stay set
-  until a separate decision (step 3) drops them. They are names, not calls: nothing
-  reaches Render through them. Each reader and its default:
+- **`RENDER_*` env markers: GONE** (2026-11-17, lane `render-config-retirement`). The
+  fleet sets only the neutral `SYNDICATE_*` markers (loaded by the drained `up` at
+  `91d865fd5`, 21:53Z), and every reader asks `service_identity.service_marker("SYNDICATE_X")`
+  with no Render fallback (step 3b). Each reader and its default:
   `.syndicate/findings_2026-11-17_render_config_retirement.md`.
 - **`render.yaml`.** NOT READ by anything since `ac2cbc2fc` (2026-11-17). The launcher
   builds env from `scripts/fleet_role_spec.json` (frozen from render.yaml, key for key)

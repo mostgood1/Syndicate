@@ -168,11 +168,11 @@ def test_a_failure_while_building_the_body_leaves_the_previous_freeze_intact(art
 def test_one_file_per_service_so_two_writers_never_replace_each_other(artifacts, tmp_path, monkeypatch):
     """live-odds-worker and refresh-worker both build and publish soccer
     recommendations; one shared path would be #630's whole-file replace."""
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "live-odds-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "live-odds-worker")
     artifacts.freeze_prekickoff(tmp_path, "2026-09-19", _payload("2026-09-19T09:00:00+00:00"))
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "refresh-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "refresh-worker")
     artifacts.freeze_prekickoff(tmp_path, "2026-09-19", _payload("2026-09-19T10:00:00+00:00"))
-    monkeypatch.delenv("RENDER_SERVICE_NAME")
+    monkeypatch.delenv("SYNDICATE_SERVICE_NAME")
     assert artifacts.prekickoff_freeze_path(tmp_path, "2026-09-19").name == "recommendations_prekickoff_2026-09-19.local.json"
     names = sorted(p.name for p in tmp_path.iterdir())
     assert names == ["recommendations_prekickoff_2026-09-19.live-odds-worker.json",
@@ -219,7 +219,7 @@ def _wire_build(artifacts, monkeypatch, kickoff):
 def test_REACHABILITY_build_artifacts_writes_the_freeze_beside_the_artifact(artifacts, tmp_path, monkeypatch):
     """Read back from DISK. A helper that is tested but never called is the
     inert-feature shape `model_engine_standard.md` exists for."""
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "live-odds-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "live-odds-worker")
     _wire_build(artifacts, monkeypatch, "2099-09-19T14:00Z")
     out_root = tmp_path / "out"
     artifacts.build_artifacts("epl", "2099-09-19", source_root=tmp_path / "src", out_root=out_root, simulations=10)

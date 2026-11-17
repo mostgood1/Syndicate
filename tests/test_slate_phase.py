@@ -175,7 +175,7 @@ def test_publish_then_read_round_trip():
         "nfl": sp.SlatePhase("nfl", sp.PHASE_STARTING_SOON, 4500.0, "within_10800s"),
         "mlb": sp.SlatePhase("mlb", sp.PHASE_LIVE, None, "game_in_progress"),
     }
-    sp.publish_phases(phases, now_epoch=NOW, write=store.__setitem__, path="p", env={"RENDER_SERVICE_NAME": "refresh-worker"})
+    sp.publish_phases(phases, now_epoch=NOW, write=store.__setitem__, path="p", env={"SYNDICATE_SERVICE_NAME": "refresh-worker"})
     out = sp.read_published_phases(read=store.get, now_epoch=NOW + 60, path="p")
     assert out["available"] is True and out["service"] == "refresh-worker"
     assert out["sports"]["nfl"] == {"phase": "starting_soon", "next_start_epoch": NOW + 4500.0}

@@ -177,7 +177,7 @@ class Layer2FastRefreshTests(unittest.TestCase):
         from flask import Flask
 
         app = Flask(__name__)
-        with patch.dict("os.environ", {"RENDER": "true"}):
+        with patch.dict("os.environ", {"SYNDICATE_HOSTED": "true"}):
             with app.test_request_context("/"):
                 result = self._run()
         self.assertIsNone(result)

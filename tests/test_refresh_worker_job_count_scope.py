@@ -36,7 +36,7 @@ def _proc(root: Path, pid: int, cmdline: str, service: str | None, *, environ_re
     entry.mkdir(parents=True)
     (entry / "cmdline").write_bytes(cmdline.replace(" ", "\x00").encode())
     if environ_readable:
-        env = ["PATH=/usr/bin"] + ([f"RENDER_SERVICE_NAME={service}"] if service is not None else [])
+        env = ["PATH=/usr/bin"] + ([f"SYNDICATE_SERVICE_NAME={service}"] if service is not None else [])
         (entry / "environ").write_bytes("\x00".join(env).encode())
 
 
@@ -53,7 +53,7 @@ def fleet_proc(tmp_path):
 
 
 def test_counts_only_this_services_jobs(worker, fleet_proc, monkeypatch):
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "local-refresh-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "local-refresh-worker")
     assert worker._running_job_process_count(fleet_proc) == 1
 
 
@@ -61,15 +61,15 @@ def test_reachability_scoped_differs_from_host_wide(worker, fleet_proc, monkeypa
     # off != on: the same /proc reads 4 with no service name of our own (the old,
     # host-wide behaviour) and 1 once the name scopes it. The production failure
     # was the 4: at max=1 every tick throttled.
-    monkeypatch.delenv("RENDER_SERVICE_NAME", raising=False)
+    monkeypatch.delenv("SYNDICATE_SERVICE_NAME", raising=False)
     host_wide = worker._running_job_process_count(fleet_proc)
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "local-refresh-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "local-refresh-worker")
     scoped = worker._running_job_process_count(fleet_proc)
     assert (host_wide, scoped) == (4, 1)
 
 
 def test_the_other_worker_sees_its_own_three(worker, fleet_proc, monkeypatch):
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "local-live-odds-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "local-live-odds-worker")
     assert worker._running_job_process_count(fleet_proc) == 3, "the orphan must still count for its own role"
 
 
@@ -79,7 +79,7 @@ def test_unknown_owner_still_counts(worker, tmp_path, monkeypatch):
     _proc(root, 10, JOB, None)  # environ readable, no service name
     _proc(root, 11, JOB, None, environ_readable=False)  # environ unreadable
     _proc(root, 12, JOB, "")  # empty name
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "local-refresh-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "local-refresh-worker")
     assert worker._running_job_process_count(root) == 3
 
 
@@ -87,5 +87,5 @@ def test_non_job_processes_never_count(worker, tmp_path, monkeypatch):
     root = tmp_path / "proc"
     _proc(root, 20, "/home/amyn/.venvs/syndicate/bin/python scripts/run_refresh_worker.py", "local-refresh-worker")
     _proc(root, 21, "python scripts/refresh_odds_sources.py --date 2026-10-03", "local-refresh-worker")
-    monkeypatch.setenv("RENDER_SERVICE_NAME", "local-refresh-worker")
+    monkeypatch.setenv("SYNDICATE_SERVICE_NAME", "local-refresh-worker")
     assert worker._running_job_process_count(root) == 0

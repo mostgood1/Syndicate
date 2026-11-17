@@ -820,7 +820,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         # unreachable on Render (_remote_live_snapshot_payload) was itself
         # dead code -- confirmed zero callers anywhere in wnba/cards.py --
         # and removed, so there's nothing left to assert isn't called there.
-        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+        with patch.dict("os.environ", {"SYNDICATE_HOSTED": "1"}, clear=False), patch(
             "syndicate.features.wnba.cards.central_today_iso",
             return_value="2026-05-21",
         ), patch(
@@ -868,7 +868,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(public_payload.call_count, 0)
 
     def test_live_state_payload_render_normalizes_stringified_status_dict(self) -> None:
-        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+        with patch.dict("os.environ", {"SYNDICATE_HOSTED": "1"}, clear=False), patch(
             "syndicate.features.wnba.cards.central_today_iso",
             return_value="2026-05-21",
         ), patch(
@@ -913,7 +913,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         # total unconditionally, so a pregame game reported a fabricated
         # decimal "score" (e.g. 91.81-91.17) even though it hadn't tipped
         # off. Must be omitted (None) unless the game is live or final.
-        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+        with patch.dict("os.environ", {"SYNDICATE_HOSTED": "1"}, clear=False), patch(
             "syndicate.features.wnba.cards.central_today_iso",
             return_value="2026-07-30",
         ), patch(
@@ -947,7 +947,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertIsNone(game.get("home_pts"))
 
     def test_live_state_payload_render_keeps_projected_pts_for_live_game(self) -> None:
-        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+        with patch.dict("os.environ", {"SYNDICATE_HOSTED": "1"}, clear=False), patch(
             "syndicate.features.wnba.cards.central_today_iso",
             return_value="2026-07-30",
         ), patch(
@@ -989,7 +989,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         # for a game genuinely at 47-44 with 2:37 left in Q2 (per ESPN and
         # this same game's own `live_state.away_pts`/`home_pts`, which this
         # branch never looked at). Real points must win whenever available.
-        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+        with patch.dict("os.environ", {"SYNDICATE_HOSTED": "1"}, clear=False), patch(
             "syndicate.features.wnba.cards.central_today_iso",
             return_value="2026-07-31",
         ), patch(
@@ -1029,7 +1029,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertEqual(game.get("home_pts"), 44.0)
 
     def test_live_state_payload_render_rejects_mixed_stale_snapshot(self) -> None:
-        with patch.dict("os.environ", {"RENDER": "1"}, clear=False), patch(
+        with patch.dict("os.environ", {"SYNDICATE_HOSTED": "1"}, clear=False), patch(
             "syndicate.features.wnba.cards.central_today_iso",
             return_value="2026-05-21",
         ), patch(

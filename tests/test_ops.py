@@ -252,9 +252,9 @@ class OpsRefreshApiTests(unittest.TestCase):
             os.environ,
             {
                 "ADMIN_TOKEN": "secret-token",
-                "RENDER_GIT_COMMIT": "273983a",
-                "RENDER_GIT_BRANCH": "main",
-                "RENDER_SERVICE_NAME": "syndicate-web",
+                "SYNDICATE_GIT_COMMIT": "273983a",
+                "SYNDICATE_GIT_BRANCH": "main",
+                "SYNDICATE_SERVICE_NAME": "syndicate-web",
             },
             clear=False,
         ), patch("syndicate.blueprints.ops._git_value", return_value=None):
@@ -2263,7 +2263,7 @@ class OpsRefreshApiTests(unittest.TestCase):
             reports_root = repo_root / "reports"
             with patch.dict(
                 os.environ,
-                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "RENDER_SERVICE_ID": "svc-123"},
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_SERVICE_ID": "svc-123"},
                 clear=False,
             ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
                 "syndicate.features.shared.ops_refresh.subprocess.Popen"
@@ -2517,7 +2517,7 @@ class OpsRefreshApiTests(unittest.TestCase):
 
             with patch.dict(
                 os.environ,
-                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "RENDER_SERVICE_ID": "srv-live-odds-worker"},
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_SERVICE_ID": "srv-live-odds-worker"},
                 clear=False,
             ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
                 "syndicate.features.shared.ops_refresh._pid_is_running", return_value=False
@@ -2552,7 +2552,7 @@ class OpsRefreshApiTests(unittest.TestCase):
 
             with patch.dict(
                 os.environ,
-                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "RENDER_SERVICE_ID": "srv-live-odds-worker"},
+                {"SYNDICATE_REPORTS_ROOT": str(reports_root), "SYNDICATE_SERVICE_ID": "srv-live-odds-worker"},
                 clear=False,
             ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
                 "syndicate.features.shared.ops_refresh._pid_is_running", return_value=False
@@ -2564,7 +2564,7 @@ class OpsRefreshApiTests(unittest.TestCase):
     def test_refresh_run_still_active_matches_expected_command_within_same_service(self) -> None:
         from syndicate.features.shared import ops_refresh
 
-        with patch.dict(os.environ, {"RENDER_SERVICE_ID": "srv-live-odds-worker"}, clear=False), patch(
+        with patch.dict(os.environ, {"SYNDICATE_SERVICE_ID": "srv-live-odds-worker"}, clear=False), patch(
             "syndicate.features.shared.ops_refresh._pid_is_running", return_value=True
         ), patch(
             "syndicate.features.shared.ops_refresh._process_cmdline", return_value=["python", "run_refresh_odds_job.py"]
@@ -2589,7 +2589,7 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         with patch.dict(
             os.environ,
-            {"RENDER_SERVICE_ID": "srv-live-odds-worker", "RENDER_INSTANCE_ID": "instance-new"},
+            {"SYNDICATE_SERVICE_ID": "srv-live-odds-worker", "SYNDICATE_INSTANCE_ID": "instance-new"},
             clear=False,
         ), patch("syndicate.features.shared.ops_refresh._pid_is_running", return_value=True), patch(
             "syndicate.features.shared.ops_refresh._process_cmdline", return_value=["python", "run_refresh_odds_job.py"]
@@ -2607,7 +2607,7 @@ class OpsRefreshApiTests(unittest.TestCase):
 
         with patch.dict(
             os.environ,
-            {"RENDER_SERVICE_ID": "srv-live-odds-worker", "RENDER_INSTANCE_ID": "instance-current"},
+            {"SYNDICATE_SERVICE_ID": "srv-live-odds-worker", "SYNDICATE_INSTANCE_ID": "instance-current"},
             clear=False,
         ), patch("syndicate.features.shared.ops_refresh._pid_is_running", return_value=True), patch(
             "syndicate.features.shared.ops_refresh._process_cmdline", return_value=["python", "run_refresh_odds_job.py"]
@@ -2629,8 +2629,8 @@ class OpsRefreshApiTests(unittest.TestCase):
                 os.environ,
                 {
                     "SYNDICATE_REPORTS_ROOT": str(reports_root),
-                    "RENDER_SERVICE_ID": "srv-live-odds-worker",
-                    "RENDER_INSTANCE_ID": "instance-abc",
+                    "SYNDICATE_SERVICE_ID": "srv-live-odds-worker",
+                    "SYNDICATE_INSTANCE_ID": "instance-abc",
                 },
                 clear=False,
             ), patch("syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root), patch(
@@ -3007,25 +3007,25 @@ class RefreshRunPerServiceLaneTests(unittest.TestCase):
         self.ops_refresh = ops_refresh
         self._env_patch = patch.dict(os.environ, {}, clear=False)
         self._env_patch.start()
-        for key in ("SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES", "SYNDICATE_REFRESH_LANE", "RENDER_SERVICE_ID", "RENDER_SERVICE_NAME"):
+        for key in ("SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES", "SYNDICATE_REFRESH_LANE", "SYNDICATE_SERVICE_ID", "SYNDICATE_SERVICE_NAME"):
             os.environ.pop(key, None)
 
     def tearDown(self) -> None:
         self._env_patch.stop()
 
     def test_lane_key_defaults_to_legacy_when_flag_disabled(self) -> None:
-        os.environ["RENDER_SERVICE_ID"] = "srv-some-service"
+        os.environ["SYNDICATE_SERVICE_ID"] = "srv-some-service"
         self.assertEqual(self.ops_refresh._refresh_lane_key(), "global")
         self.assertEqual(self.ops_refresh._refresh_lane_key("refresh-worker"), "global")
 
     def test_lane_key_resolves_service_identity_when_enabled(self) -> None:
         os.environ["SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES"] = "true"
-        os.environ["RENDER_SERVICE_ID"] = "srv-some-service"
+        os.environ["SYNDICATE_SERVICE_ID"] = "srv-some-service"
         self.assertEqual(self.ops_refresh._refresh_lane_key(), "srv-some-service")
 
     def test_lane_key_prefers_explicit_syndicate_refresh_lane_env_over_service_identity(self) -> None:
         os.environ["SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES"] = "true"
-        os.environ["RENDER_SERVICE_ID"] = "srv-some-service"
+        os.environ["SYNDICATE_SERVICE_ID"] = "srv-some-service"
         os.environ["SYNDICATE_REFRESH_LANE"] = "refresh-worker"
         self.assertEqual(self.ops_refresh._refresh_lane_key(), "refresh-worker")
 

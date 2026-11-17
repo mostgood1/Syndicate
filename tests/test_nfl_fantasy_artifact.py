@@ -67,7 +67,7 @@ def _isolate_source_root(monkeypatch, root):
     are modelling.
     """
     monkeypatch.setenv("SYNDICATE_NFL_SOURCE_ROOT", str(root))
-    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.delenv("SYNDICATE_HOSTED", raising=False)
     monkeypatch.setenv("SYNDICATE_REQUIRE_HOSTED_STORAGE", "1")
 
 

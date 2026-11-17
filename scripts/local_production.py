@@ -54,18 +54,17 @@ Everything not listed is passed through verbatim.
   SYNDICATE_BOOTSTRAP_ON_START  -> 0 in the roles    `up` seeds ONCE, first
   PORT                          -> --port
   SYNDICATE_HOSTED=true, SYNDICATE_SERVICE_NAME / _ID, SYNDICATE_INSTANCE_ID,
-  SYNDICATE_GIT_COMMIT -- and, since step 3a (2026-11-17), NOT the Render-era
-  names (RENDER, RENDER_SERVICE_NAME, ...; `SERVICE_MARKERS`) any more
+  SYNDICATE_GIT_COMMIT (`SERVICE_MARKERS`) -- and, since step 3a (2026-11-17),
+  NOT the Render-era names (RENDER, RENDER_SERVICE_NAME, ...), which no reader
+  consults since step 3b
                                 -> set, because the code branches on them:
                                    the request-path compute guard, portfolio
                                    auth (`required` when hosted), disk
                                    compaction, per-service lanes. Without them
                                    the web process quietly behaves like a
                                    developer laptop instead of production.
-                                   Readers ask the neutral name
-                                   (`service_identity`); their Render-name
-                                   fallback only serves roles started before
-                                   step 3a, and goes in step 3b.
+                                   Readers ask these names only
+                                   (`service_identity`).
   SYNDICATE_EXECUTION_MODE / _LIVE_ARMED -> paper, 0
                                    UNLESS `up --allow-live-execution`. Real
                                    money is never armed by a config file alone.
@@ -90,7 +89,7 @@ Production is `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` with
 file backend (`assert_refresh_state_backend_ready`). So the default here is a
 local Redis, and `up` starts `redis-server` itself (persistent, loopback only)
 when one is installed and nothing is listening. `--state file` is the fallback
-for a machine with no Redis at all: it clears SYNDICATE_HOSTED (and RENDER) and
+for a machine with no Redis at all: it clears SYNDICATE_HOSTED and
 REQUIRE_HOSTED_STORAGE, which is honest on one shared disk but means the
 hosted-only branches above are OFF -- `doctor` says so.
 """
@@ -177,33 +176,29 @@ DASHBOARD_ONLY_KEYS: dict[str, str] = {
 # Render itself, and a local fleet must not act on production's account.
 NEVER_CARRY = ("RENDER_API_KEY",)
 
-# The service markers every role gets, under their NEUTRAL name -> the Render-era
-# name each mirrors (lane `render-config-retirement`, 2026-11-17). Each is set under
-# its NEUTRAL name only since step 3a (user "go ahead with step 3", 2026-11-17).
-# Readers ask `service_identity.service_marker(<neutral>)`, which falls back on the
-# old name only for a role started by an older launcher. The same table as
-# `syndicate/features/shared/service_identity.NEUTRAL_TO_RENDER`, pinned by
+# The service markers every role gets (lane `render-config-retirement`, todo #766). Readers
+# ask `service_identity.service_marker(<name>)`; there is no Render-era fallback any more
+# (step 3b, user "drop the RENDER names too", 2026-11-17). The same names as
+# `syndicate/features/shared/service_identity.SERVICE_MARKERS`, pinned by
 # `tests/test_service_marker_readers.py`; spelled out rather than imported because
-# importing `syndicate` installs its global urllib opener, and the supervisor process
-# must not change. Deleting the readers' Render-name fallback is step 3b, after a
-# restart has run on this launcher.
-SERVICE_MARKERS: dict[str, str] = {
-    "SYNDICATE_HOSTED": "RENDER",
-    "SYNDICATE_SERVICE_NAME": "RENDER_SERVICE_NAME",
-    "SYNDICATE_SERVICE_ID": "RENDER_SERVICE_ID",
-    "SYNDICATE_INSTANCE_ID": "RENDER_INSTANCE_ID",
-    "SYNDICATE_GIT_COMMIT": "RENDER_GIT_COMMIT",
-    "SYNDICATE_EXTERNAL_URL": "RENDER_EXTERNAL_URL",
-    "SYNDICATE_GIT_BRANCH": "RENDER_GIT_BRANCH",
-}
+# importing `syndicate` installs its global urllib opener, and the supervisor process must
+# not change. Since the 21:53Z 11-17 `up` at `91d865fd5` every role carries only these.
+SERVICE_MARKERS: tuple[str, ...] = (
+    "SYNDICATE_HOSTED",
+    "SYNDICATE_SERVICE_NAME",
+    "SYNDICATE_SERVICE_ID",
+    "SYNDICATE_INSTANCE_ID",
+    "SYNDICATE_GIT_COMMIT",
+    "SYNDICATE_EXTERNAL_URL",
+    "SYNDICATE_GIT_BRANCH",
+)
 
 
-def read_marker(env: dict[str, str], neutral: str) -> str | None:
-    """`service_identity.service_marker` over a given environ: the neutral key if present,
-    else its Render-era key, else None."""
-    if neutral in env:
-        return env[neutral]
-    return env.get(SERVICE_MARKERS[neutral])
+def read_marker(env: dict[str, str], name: str) -> str | None:
+    """`service_identity.service_marker` over a given environ."""
+    if name not in SERVICE_MARKERS:
+        raise KeyError(name)
+    return env.get(name)
 
 
 # --------------------------------------------------------------------------
@@ -396,9 +391,9 @@ def derive_role_env(
     undeclared keys are where most `*_AUTORUN` switches and all venue
     credentials live."""
     env = dict(os.environ if base_env is None else base_env)
-    # A stray RENDER_* in the operator's shell must not leak in, nor a stray neutral
-    # marker: readers PREFER the neutral name, so one inherited `SYNDICATE_HOSTED`
-    # would outvote everything set below.
+    # A stray neutral marker in the operator's shell must not leak in (one inherited
+    # `SYNDICATE_HOSTED` would decide hosted-ness on its own), and stray Render-era
+    # names are dropped too: nothing reads them, and a role env should not carry them.
     for name in list(env):
         if name.startswith("RENDER_") or name == "RENDER" or name in SERVICE_MARKERS:
             env.pop(name, None)
@@ -480,11 +475,9 @@ def derive_role_env(
     # `_is_render_web_dyno()`, and then syndicate/app.py starts the intelligence
     # and live-refresh loops on first request WITHOUT reading their flags --
     # duplicating refresh-worker's board build on the same disk.
-    # Each marker under its NEUTRAL name only (step 3a, user "go ahead with step 3",
-    # 2026-11-17), in exactly the cases the Render name was set before. Every
-    # reader asks the neutral name first (`service_identity`), measured equal under
-    # either spelling (`tests/test_service_marker_readers.py`); the Render names
-    # are stripped from the base env above, so no role carries them.
+    # Each marker under its neutral name (steps 3a/3b, user "go ahead with step 3",
+    # 2026-11-17), in exactly the cases the Render name was set before; every reader
+    # asks these names only (`service_identity`, `tests/test_service_marker_readers.py`).
     markers: dict[str, str] = {
         "SYNDICATE_SERVICE_NAME": f"local-{role}",
         "SYNDICATE_SERVICE_ID": f"local-{role}",
@@ -746,7 +739,7 @@ def template_text(spec: dict[str, list[RoleEnvKey]]) -> str:
     lines += [
         "",
         "# --- local-only ---",
-        "# Public URL if you expose the site (cloudflared etc.); becomes SYNDICATE_EXTERNAL_URL (+ RENDER_EXTERNAL_URL).",
+        "# Public URL if you expose the site (cloudflared etc.); becomes SYNDICATE_EXTERNAL_URL.",
         "# SYNDICATE_PUBLIC_URL=https://syndicate.example.com",
         "# cloudflared named-tunnel token: `up` then also runs the tunnel as a role.",
         "# CLOUDFLARED_TUNNEL_TOKEN=",
@@ -860,7 +853,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         ok &= _check(good, f"state store {settings.redis_url}", detail)
     else:
         _check(True, "state store: filesystem",
-               "SYNDICATE_HOSTED/RENDER/REQUIRE_HOSTED_STORAGE cleared -> request-path compute guard is warn-only, portfolio auth only if creds set",
+               "SYNDICATE_HOSTED/REQUIRE_HOSTED_STORAGE cleared -> request-path compute guard is warn-only, portfolio auth only if creds set",
                warn=True)
 
     web_host = settings.host
@@ -2147,8 +2140,8 @@ def _ci_run_suite(args: argparse.Namespace) -> int:
 
 
 def role_loaded_commit(pid: int | None) -> str | None:
-    """SYNDICATE_GIT_COMMIT (else RENDER_GIT_COMMIT, `read_marker`) from the role's
-    own environment: the commit of the supervisor's last `up`. NOT what a role runs after a role-only restart
+    """SYNDICATE_GIT_COMMIT from the role's own environment: the commit of the
+    supervisor's last `up`. NOT what a role runs after a role-only restart
     (the supervisor reuses the env) or a gunicorn HUP -- see `role_code`."""
     if not pid:
         return None
@@ -2260,9 +2253,8 @@ _SPAWN_STAMP_RE = re.compile(r"^local-.+-(\d{9,11})$")
 def role_spawn_stamp(pid: int | None) -> float | None:
     """The supervisor's own wall-clock record of when it spawned this process.
 
-    The record is the epoch in `SYNDICATE_INSTANCE_ID=local-<role>-<epoch>` (else
-    `RENDER_INSTANCE_ID`, `read_marker`), read from the process's own environ
-    (that key only).
+    The record is the epoch in `SYNDICATE_INSTANCE_ID=local-<role>-<epoch>`, read
+    from the process's own environ (that key only).
     - On a restart, the supervisor sets the stamp to `int(time.time())`
       immediately before `_spawn`.
     - At `up`, the stamp is the boot moment, taken just before the roles
