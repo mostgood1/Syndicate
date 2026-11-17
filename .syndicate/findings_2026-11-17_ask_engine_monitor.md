@@ -385,3 +385,39 @@ A game was live (a `live_row` ask existed).
 - **ANOMALY:** overlay warm 91.51 s (> 60 s), with 3 hard memory recycles (max anon 1008.8 MB vs 636.6 MB). Check next: the web role log for the warm's route and whether it ran beside a recycle; does it recur in the next reading?
 - **ANOMALY:** M2 gate hash changed (`c1a2c029...` ≠ `6915bb6a...`), the file rewritten at 1:58 PM CST, apparently by Amendment 2 (draft still unfilled: `__TIME__`, `__YES__`). Check next: the lane owner confirms the user registered Amendment 2, the draft's placeholders are filled, and the M2 task prompt's expected hash is updated before 11-24.
 - **ANOMALY:** F2 result in. The run summary says "did NOT PASS", but `f2_verdict.txt`'s last line says `PASS ... failed_families=0`. Check next: read the F2 run's session (local_dc76d55c) and the whole verdict file to settle which is the recorded verdict.
+
+## Reading 8 (2:03 PM CST)
+
+Probe 2:03:04-2:03:56 PM CST (`ask_reading_20261117T200304Z.json`); page 200 in 0.22 s; shortlist 200, 200 rows, 2.31 s.
+
+**Ask:** 6 of 6 answered, 0 of 6 past the 45 s cut-off, median 10.54 s, max 11.85 s. All 6 status 200, ok, `answer_source` snapshot, no transport error.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "spread" | 1.56 | yes | bet_analysis | 18:16:24Z (ts, age 1.8 h) | 0 |
+| free_text "Lakers vs Celtics" | 2.79 | yes | matchup_analysis | 18:16:24Z (ts) | 0 |
+| free_text "top edges today" | 11.85 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line NBA UTA@LAC h1 Under 109.5 | 11.17 | yes | bet_analysis | 2026-11-15 (date) | 2 |
+| pregame_prop NBA McBride threes U1.5 | 5.33 | yes | bet_analysis | 17:43:54Z (ts, age 2.3 h) | 7 |
+| live_row WNCAAB Murray St @ Oregon h2h | 10.54 | yes | bet_analysis | 18:16:24Z (ts) | 0 |
+
+`as_of_in_future`: 0 of 6. A game was live: yes (a `live_row` ask exists).
+
+**Web, 1:33-2:03 PM CST** (69 requests; the window spans the 1:48:57 PM host restart, so it mixes two web processes):
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 5, all 5 hard; max anon 1008.8 MB vs limit 641.5 MB.
+- Overlay warms: 17, median 24.81 s; 11 over 20 s, 3 over 45 s, 1 over 60 s; max 91.51 s.
+- Requests over 20 s: 6 (POST /api/syndicate/query 3, POST /api/intelligence/query 2, GET /intelligence 1). Over 45 s: 0.
+- Asks from any client: 12, 0 over 45 s, 0 non-200. All 12 are `Python-urllib/3.12`, so 0 from a non-probe client. 6 at 1:57-1:58 PM ran 0.9-29.4 s (first requests after the restart).
+
+**Host:** load 7.22 / 6.98 / 4.09 on 12 cores; MemAvailable 9441 MB. Top CPU, all nice 0: soccer OddsAPI fetch (serie_a) 139%; refresh-worker 122%; NHL OddsAPI refresh 64%; live-odds-worker 64%; two gunicorn workers 59% and 55% (ages 24 s and 7 s, i.e. just recycled).
+
+**Engine:**
+- 2a F2: 1 run total (10:30-11:17 AM CST, NOT PASSED, recorded `c765eec64`); no newer run.
+- 2b M2: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c `m2_gate.py` sha256 `c1a2c029c2a1816f...` = Amendment 2.
+- 2d Engine-file commits on origin/main in the last 40 min: 0.
+- 2e deploys.md: a user-initiated Windows restart at 1:48:57 PM CST, then a fleet `up` at 1:51:31 PM CST on commit `5db26434e` (entry 20:02:54Z, betting change: no). That `up` started all three roles. The workers last loaded `92ae7490a`, so they now run the code from the 12:58 PM ff. It was also the first `up` built from `fleet_role_spec.json` + `fleet_env/`.
+
+- **ANOMALY:** 1 of 17 overlay warms took over 60 s (max 91.51 s); 3 took over 45 s. These probably came right after the restart, with cold caches and the host under load. Next: check whether warms over 60 s still appear in the next reading's window, which has no restart in it.
+- **ANOMALY:** New fleet load. Host restart + `up` at 1:51:31 PM CST put refresh-worker and live-odds-worker on `5db26434e`, from `92ae7490a`. This is the first launcher-spec/`fleet_env` `up` (`[web] ANTHROPIC_API_KEY` declared with no value). Next: lane `render-config-retirement`'s owed environ compare. Also check that Ask answers and live-row pricing stay consistent through the evening slate. Note the Ask `as_of` of 18:16:24Z predates the restart.
