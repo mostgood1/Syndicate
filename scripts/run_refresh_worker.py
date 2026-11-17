@@ -7529,8 +7529,15 @@ def _run_book_grid_artifact_tick(*, pull_only: bool = False) -> dict[str, Any] |
                 return
             # When this build read the shard: price-on-pull compares the shard's next change to this.
             quotes_read_at = time.time()
+            # The quote read's 30-min self-check is LISTED during the build and run below, once the build is
+            # timed and published (todo #790, lane nba-grid-check-after-build): measured on 11-16's NBA slate it
+            # took 3.2-17.5 s inside 10 of 214 NBA builds -- time the overlay waited for and the slow-sport
+            # schedule counted. Off switch: SYNDICATE_BOOK_GRID_CHECK_AFTER_BUILD=off (checks inside the build).
+            from syndicate.features.shared.book_grid_quote_read import checks_after_build, run_checks_after_build
+
             build_started = _book_grid_build_clock()
-            payload = build_book_grid_artifact(sport, build_date)
+            with checks_after_build() as quote_checks:
+                payload = build_book_grid_artifact(sport, build_date)
             if not payload:
                 if build_date == selected_date:
                     skipped.append(sport)
@@ -7585,6 +7592,11 @@ def _run_book_grid_artifact_tick(*, pull_only: bool = False) -> dict[str, Any] |
                     )
             except Exception as exc:
                 print(f"[refresh_worker] BOOK_GRID_PUBLISH_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
+            # After the clock and the publish. A MISMATCH turned the incremental read off, and the rows this build
+            # served were that read's: build the sport again now, from the one-pass read, so the wrong rows stand
+            # only for the length of the check (before, the reference rows served the mismatching build itself).
+            if quote_checks and "MISMATCH" in run_checks_after_build(quote_checks).values():
+                _build_one(build_date, sport)
         except Exception as exc:
             print(f"[refresh_worker] BOOK_GRID_BUILD_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
 
