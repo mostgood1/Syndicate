@@ -423,3 +423,14 @@ flags below the points scored (0 of 1).
 - Recycled workers ran anon 650-980 MB after 5-20 requests.
 - From the 19:50Z restart, every worker is fresh and browsers likely load the new page. **Tonight's slate
   is the clean window:** recycles per hour and per `row_refs` query, read at the daily summary.
+
+- **I-2 recycle reading, the load lane's partial (deploys.md 19:56:53Z, main `675fe06fb`): NOT ATTRIBUTABLE yet.**
+  - Before (16:00-18:59Z): 25 queries, all full form; 28 recycles (20 hard); 1.12 per query.
+  - After (18:59-19:57Z): 14 queries, 5 in the new form; 11 recycles (7 hard); 0.79 per query.
+  - The request rate is about the same (~210 per hour).
+  - The 9 full-form queries after the load: **8 Python-urllib scripts** (19:01, 19:07, 19:08, 19:10, 19:15, 19:22, 19:38, 19:52Z, each 11.2-12.1 MB; several are this monitor's A/B and pre-I-15 probe), plus 1 browser tab still on the old page JS (19:17:53Z, referer `/?live_edge=any`).
+  - This monitor finishes the reading tonight over the clean post-restart window, with `C:\tmp\rowrefs826\recycle.py` (`wsl -- python3`; it splits by response size, < 7 MB = new form).
+
+| # | improvement | evidence | owner | next step |
+|---|---|---|---|---|
+| I-16 | **Read-only scripts still pull the full ~11.8 MB board query.** Have each send `row_refs` and decode with `response_row_refs.decode_row_refs` (or the page's `rehydrateAliases`), as this monitor's probe does since I-15. | 8 Python-urllib full-form POSTs in the hour after the load. Ad-hoc readers that POST `/api/intelligence/query` sit in `C:\tmp\railload\` (`rail_probe.py`, `rail_census.py`, `callout_tracker.py`, `served_dump.py`, ...), `C:\tmp\nbaname\` (`liveedge_read.py`, `portis_liveedge*.py`), `C:\tmp\lpa\ledger_nfl_sunday.py`. Which run on a schedule is unknown. | Each script's session; scheduled monitors first | Count full-form POSTs per hour from `web.log` tonight (response size > 7 MB), then name the recurring callers |
