@@ -1020,7 +1020,8 @@ death, never life — do not invert it.
 - Verification: the #821 header names the task and the by-hand fallback, on origin/main
 - Blocked by: none
 
-### nba-segment-regrade-split — OPEN — opened 2026-11-17 — session 24d2e336-9705-44d9-8d8a-f728270f237f
+### nba-segment-regrade-split — CLOSED 2026-11-17 — opened 2026-11-17 — session 24d2e336-9705-44d9-8d8a-f728270f237f
+- **GOAL VERDICT.** Goal (verbatim): "Register a descriptive pre/post-F1 split for the Dec 7 NBA quarter/half re-grade (#818) before any re-grade outcome exists (user 2026-11-17 'Yes, add the split'): addendum in the findings' Dec 7 section, todo #818 STATUS, scheduled task nba-segment-regrade-818 prompt step 4b; no gate, window, seed, weight or population changed". **GOAL: MET.** Read on origin/main after `8a1a8c733`: the findings' "ADDENDUM: a descriptive split by engine" is present (1 match), as is the todo #818 STATUS (1 match). The task's saved SKILL.md has `4b. SPLIT BY ENGINE` (1 match) and 0 tab characters. The re-grade itself runs Mon 12-07 1:00 PM CST.
 - Goal: Register a descriptive pre/post-F1 split for the Dec 7 NBA quarter/half re-grade (#818) before any re-grade outcome exists (user 2026-11-17 'Yes, add the split'): addendum in the findings' Dec 7 section, todo #818 STATUS, scheduled task nba-segment-regrade-818 prompt step 4b; no gate, window, seed, weight or population changed
 - Files: .syndicate/findings_2026-11-16_nba_segment_skill.md (Dec 7 re-grade section only), docs/ai_context/todo.md (#818 section only), .syndicate/log/2026-11-17.md
 - Hypothesis: n/a
