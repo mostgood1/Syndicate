@@ -89,3 +89,30 @@ close on prior is unbiased per bucket, as built.
 - **Money paths at load:** pregame execution is live and armed (band 0.40-0.75, cell gate on). Kalshi lists NCAAB
   moneylines only; Polymarket lists some NCAAB totals, so a calibrated NCAAB under can reach a real Polymarket order
   through the portfolio's gates. In-game live entries trade NHL spreads only.
+
+## End-of-half / end-of-game failures (user 2026-11-16 ~6:55 PM CST: "Iona UMBC end game and PV/OSU end of half ... Thats now 3 that failed due to end game/end half situations. We need to find a solve for this")
+
+- **Iona @ UMBC (final 67-75 = 142; halves 57 / 85):** every live full-game total row from 00:41Z priced off a model
+  state 103-257 s old (`recorded_at - live_state_as_of`). At 60-70 (130 points, 00:47:57Z) the model projected 132.6; at
+  65-72 (137 points, 00:50:17Z) 133.3 -- a final BELOW the points already scored. Under 138.5 was flagged at -17 to -18
+  pp (served 0.25-0.31 against a ~0.49 market); the game went over.
+- **Prairie View A&M @ Ohio State (1st half 29-34 = 63):** first-half total lines are not priced for NCAAB
+  (`segment_pricing_disabled`); the end-of-half recommendations were full-game unders (~144.5, -8 to -9 pp) from a model
+  state 136-182 s old as the half closed. (Still live at 10:18 2nd half when read; what was bet is to be confirmed.)
+- **FAMU @ UTEP:** the 2nd-half row was fresh (22 s); that miss was a 0.7-point disagreement read as +7 pp, which the
+  #816 calibration now removes.
+- **Graded, all NCAAB ledger dates (priceable flags |edge| >= 3 against finals, game-weighted):** when the model's
+  projected final is below the points already scored (654 of 79,209 full-game total rows; 455 flagged), UNDER flags hit
+  **0.420 +- 0.044 (71 games)** -- the over flags there hit 1.000 (24 games) because their lines were already passed.
+  Under flags by model-state lag: <= 60 s 0.643 (220 games), 60-120 s 0.631, 120-240 s 0.625, > 240 s **0.565** (189).
+  Late flags are NOT worse in general: the last 10% of projected points hit 0.739 over (227) / 0.681 under (328).
+  The failure is a STALE model in a fast-scoring endgame -- it has not counted the latest points, so it says under.
+- **Mechanism available:** the NCAAB live lane already publishes the state it simulated from (`projection.homeScore /
+  awayScore / period / clockSeconds`, `ncaab/live_resim.py` ~1020), but `live_gameline_from_lens` does not carry it to the
+  pricer, and NCAAB's lane-age ceiling is 600 s (`_MAX_LANE_AGE_SECONDS_BY_SPORT`); the 30 s guard that exists
+  (`_MAX_QUOTE_LAG_BEHIND_SCORE_SECONDS`) is for the QUOTE behind the score, not the model.
+- **Proposed solve (not built):** a per-row `model_behind_score` refusal for live full-game totals and spreads -- refuse
+  when the row's score is ahead of the model's simulated score inside an end-of-period window (<= 2:00 left in the 1st
+  half, <= 5:00 in the 2nd half, any OT), and always when the projected final total is below the points scored; carry
+  the model's state score / clock onto the ledger so the rule is graded. Follow-up: re-sim end-of-period games first so
+  the model keeps up.
