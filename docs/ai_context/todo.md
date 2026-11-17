@@ -11,7 +11,12 @@
 - **Tests:** `tests/test_nfl_gameline_kickoff_shard.py` (18).
 - **LOADED 22:31:26Z** (deploys.md 2026-11-16 22:31:26Z): a plain fleet ff, no restart; the writer runs in a fresh child per NFL lines run.
 - **Shards MET at 22:34:55Z:** 1,934 of 1,934 post-ff sportsbook game rows are in their own kickoff shard (11-16: MNF only; TNF -> 11-19; next Sunday + SNF -> 11-22; next MNF -> 11-23).
-- **Instrument gap:** the `NFL_GAMELINE_QUOTE_SHARD` line is blanked by `refresh_odds_sources` (child stdout survives only via `_STEP_STDOUT_MARKERS`). Follow-up, not done: add the token there. Until then verify on the rows.
+- **Instrument gap:** the `NFL_GAMELINE_QUOTE_SHARD` line is blanked by `refresh_odds_sources` (child stdout survives only via `_STEP_STDOUT_MARKERS`). **FIXED ON MAIN `69bd95177`, NOT LOADED** `[2026-11-16 ~6:05 PM CST, user "Yes, do it here" to "Make the writer's filing line survive on the fleet by allowlisting it?"]`:
+  - the token was added to `_STEP_STDOUT_MARKERS`;
+  - the writer's FAILED line now carries it too;
+  - test `test_the_nfl_gameline_shard_line_the_writer_prints_survives_blanking` drives the real writer through the real `_run_command`, and it fails with the token removed.
+
+  Once loaded, the line reads as `STEP_MARKER name=nfl_oddsapi_refresh ...` in each run's `reports/migration_runs/*/odds_refresh_*/odds_refresh.stderr.txt`, and as `stdout_markers` in the compact step view. Until it is loaded, verify on the rows.
 - **Verification owed (MNF 11-16, 01:15Z 11-17):**
   - game rows captured >= 00:00Z 11-17 in `2026-11-16.jsonl`, none in `2026-11-17.jsonl`;
   - `INPLAY_OVERLAY sport=nfl date=2026-11-16` with MNF rows;
