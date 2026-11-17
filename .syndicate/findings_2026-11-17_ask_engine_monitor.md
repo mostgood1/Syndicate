@@ -120,3 +120,62 @@ asks taking more than twice as long as board-row asks across >= 10 pairs.
   - Recorded under lane `engine-learner`.
 - **M2 gate read** (`engine-learner-m2-gate-read-1124`): scheduled Tue 11-24 10:30 AM. The gate sha check is
   `6915bb6a5ecb80f2`.
+## Reading 2 (11:11-11:15 AM): the probe, F2, and a gate consequence
+
+**The probe.** `scripts/ask_monitor_probe.py` (local, 4 tests, not on main) ran on the fleet at nice 19. It
+asks the page's three examples exactly as `/syndicate` sends them, plus rows picked from the Layer 2 shortlist
+exactly as the Ask button sends them. Its first run crashed on an answer whose `as_of` had no zone: 3 asks were
+made, then fixed. A date-only `as_of` is now reported as a date, with no age.
+
+| ask | s | schema | as_of |
+|---|---|---|---|
+| "What do you think of this spread?" | 2.0 | bet_analysis | 15:58:10Z (the snapshot) |
+| "Lakers vs Celtics" | 7.5 | matchup_analysis | 15:58:10Z |
+| "top edges today" | 8.0 | market_summary (1 table) | 2026-11-17 (a date) |
+| Gent (soccer pregame game line) | 8.7 | bet_analysis (5 tables) | 2026-11-17 |
+| Ismael Boura Over 0.5 (soccer pregame prop) | 2.2 | bet_analysis (10 tables) | **2026-11-20** |
+
+- **5 of 5 answered, 0 past the 45 s cut-off.** `/syndicate` loaded in 0.16 s. No game was live, so no live row
+  was asked about. The shortlist itself took 24.2 s for 837 KB (reading 1).
+- **The intelligence snapshot behind the free-text answers was computed at 15:58:10Z**, 74 min before the ask.
+- **A-5, an answer dated in the future:** the soccer prop answer's `as_of` is 2026-11-20, three days ahead. That
+  looks like the fixture's date, not when its data was read. Owner: Ask (the soccer prop-evidence provider).
+  Verify the field before any change.
+- **Web, 16:41Z-17:12Z:**
+  - 1 kill (10:49).
+  - 6 memory recycles (4 hard; anon up to 1,031 MB against a 649 MB limit).
+  - 11 overlay warms: median 18.1 s, 3 over 45 s, 2 over 60 s, max 64.5 s.
+  - 14 requests over 20 s: `/api/intelligence/query` 6, Ask 2 (mine), the shortlist 2, `GET /` 2,
+    `/intelligence` 1, game-chips 1.
+  - 5 over 45 s: `GET /` 2, `/api/intelligence/query` 2, game-chips 1.
+- **Ask traffic:** all 16 Asks in the window came from this monitor.
+
+**Decision engine: F2 did NOT pass, on reproduction.** The verdict is the F2 session's to record.
+
+- The 11-15 runner: rc 0, every check clean.
+- The 11-16 runner: rc 1, `RESULT ... alarms_plus_mismatches=4296`.
+  - All 4,296 are one check: `JOIN ncaab half_point checked=9266 mismatched=4296`. Every other sport, and the
+    Kalshi prior checks (`KALSHI_PRIOR ncaab checked=2132 mismatched=0`), are clean.
+  - Every kept example is an NCAAB full-game total at 00:06:37Z (6:06 PM CST 11-16). That is two minutes after
+    todo #816's per-line college totals calibration loaded (deploys.md 00:04:20Z, lane
+    `ncaab-total-overprojection`).
+  - So the live join now serves calibrated NCAAB totals, and the experts' reproduction does not apply that
+    calibration. This is a likely cause, not a proven one: only 10 of the 4,296 rows are printed.
+- The pooled F2 verdict was still being written at 11:15 AM.
+
+**The same mismatch will void the M2 gate.**
+- The gate's precondition (`m2_gate.py:124-128`) needs `alarms_plus_mismatches=0 exit=0` from the experts on
+  EVERY test slate, 11-15..11-22.
+- Its pinned experts (`981ef14f6`) predate #816, so 11-16..11-22 will fail on NCAAB live totals. The 11-24 read
+  would print `M2_VERDICT NOT_A_VERDICT` and judge nothing.
+- What would avoid it, both before any test-window outcome is read (none has been):
+  - the experts reproduce #816's calibration (lane `engine-experts` / `engine-live-prior`, with the state-instant
+    fix already owed after F2);
+  - then a gate Amendment 2 that re-pins the code.
+
+  The alternative is an amendment that drops NCAAB live totals after 00:04Z from the precondition and from
+  judgement. Either path is the user's decision.
+- Owner: lane `engine-learner` (the gate) + `engine-live-prior` (the experts).
+
+**Learner slice 3a** (NBA prop outcomes): built locally (`d2609efd1` + `0a6c2e5d7`); dev reading in reading 1's
+status block. Not pushed.
