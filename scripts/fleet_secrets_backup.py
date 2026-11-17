@@ -7,8 +7,11 @@
 WHY THIS EXISTS `[2026-11-16, lane render-retirement, user: "Yes, build E1"]`. Every live
 secret the fleet runs on lives in two places on ONE WSL disk:
 
-  * `<home>/render_env/<role>.json` -- each role's full env (88 / 182 / 148 keys),
-    imported once from Render on 2026-10-01;
+  * `<home>/fleet_env/<role>.json` -- each role's full env (88 / 182 / 148 keys),
+    imported once from Render on 2026-10-01 into `render_env/`, and moved to `fleet_env/`
+    by `scripts/fleet_env_snapshot.py migrate` on 2026-11-17 (lane `render-config-retirement`).
+    A backup taken BEFORE that holds `render_env/<role>.json`: restore it, then run
+    `fleet_env_snapshot.py migrate --home <restored dir>` to get the files `up` reads;
   * `<home>/local_production.env` -- the overrides (78 keys, 42 of them `ROLE__KEY`).
 
 The nightly `backup` copies the DATA ROOT (`<home>/data`) only, so neither file was in any
@@ -55,7 +58,7 @@ EXIT_OK, EXIT_REFUSED, EXIT_NO_PASSPHRASE, EXIT_GPG, EXIT_VERIFY = 0, 2, 3, 4, 5
 DEFAULT_HOME = "~/syndicate-prod"
 DEFAULT_PASSPHRASE_FILE = "~/.syndicate-secrets-passphrase"
 ENV_FILE_NAME = "local_production.env"
-SNAPSHOT_DIR_NAME = "render_env"
+SNAPSHOT_DIR_NAME = "fleet_env"  # `render_env` before 2026-11-17
 MANIFEST_NAME = "MANIFEST.json"
 PREFIX, SUFFIX = "fleet-secrets-", ".tar.gpg"
 MIN_PASSPHRASE_CHARS = 16
@@ -82,7 +85,7 @@ class Refused(Exception):
 def secret_files(home: Path) -> list[tuple[str, Path]]:
     """(archive name, path) for every file this backs up, in a stable order.
 
-    `local_production.env` must exist and `render_env/` must hold at least one `.json`:
+    `local_production.env` must exist and `fleet_env/` must hold at least one `.json`:
     a backup missing either is a backup of the wrong home, refused rather than written.
     """
     env_file = home / ENV_FILE_NAME

@@ -1,7 +1,7 @@
 """scripts/local_production.py -- the env each local role runs with.
 
 The derivation is the whole risk surface: it decides which loops run where
-(render.yaml's per-service flags), where data lands, and whether money is live.
+(the fleet role spec's per-role flags), where data lands, and whether money is live.
 """
 
 from __future__ import annotations
@@ -19,34 +19,35 @@ def settings(tmp_path: Path) -> lp.Settings:
 
 
 @pytest.fixture(scope="module")
-def blueprint():
-    return lp.load_blueprint()
+def spec():
+    return lp.load_role_spec()
 
 
-def _env(role, blueprint, settings, local=None, live=None):
-    env, audit = lp.derive_role_env(role, blueprint, local or {}, settings, live=live, base_env={})
+def _env(role, spec, settings, local=None, live=None):
+    # `live` = the role's env snapshot layer (`fleet_env/<role>.json`).
+    env, audit = lp.derive_role_env(role, spec, local or {}, settings, snapshot=live, base_env={})
     return env, audit
 
 
-def test_blueprint_has_all_three_roles(blueprint):
-    assert set(lp.ROLE_ORDER) <= set(blueprint)
-    assert all(blueprint[r] for r in lp.ROLE_ORDER)
+def test_spec_has_all_three_roles(spec):
+    assert set(lp.ROLE_ORDER) <= set(spec)
+    assert all(spec[r] for r in lp.ROLE_ORDER)
 
 
-def test_render_paths_rewritten_to_one_shared_data_root(blueprint, settings):
+def test_render_paths_rewritten_to_one_shared_data_root(spec, settings):
     for role in lp.ROLE_ORDER:
-        env, _ = _env(role, blueprint, settings)
+        env, _ = _env(role, spec, settings)
         assert env["SYNDICATE_DATA_ROOT"] == str(settings.data_root)
         assert not any(str(v).startswith("/opt/render") for v in env.values()), role
-    web, _ = _env("web", blueprint, settings)
-    worker, _ = _env("refresh-worker", blueprint, settings)
+    web, _ = _env("web", spec, settings)
+    worker, _ = _env("refresh-worker", spec, settings)
     assert web["SYNDICATE_REPORTS_ROOT"] == worker["SYNDICATE_REPORTS_ROOT"]
 
 
-def test_loop_ownership_comes_from_the_blueprint_per_role(blueprint, settings):
-    web, _ = _env("web", blueprint, settings)
-    rw, _ = _env("refresh-worker", blueprint, settings)
-    low, _ = _env("live-odds-worker", blueprint, settings)
+def test_loop_ownership_comes_from_the_spec_per_role(spec, settings):
+    web, _ = _env("web", spec, settings)
+    rw, _ = _env("refresh-worker", spec, settings)
+    low, _ = _env("live-odds-worker", spec, settings)
     # intelligence loop: refresh-worker only
     assert rw["SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP"] == "true"
     assert web["SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP"] == "false"
@@ -59,9 +60,9 @@ def test_loop_ownership_comes_from_the_blueprint_per_role(blueprint, settings):
     assert web["SYNDICATE_WEB_DYNO"] == "true" and rw["SYNDICATE_WEB_DYNO"] == "false"
 
 
-def test_redis_state_mode_keeps_production_semantics(blueprint, settings):
+def test_redis_state_mode_keeps_production_semantics(spec, settings):
     for role in lp.ROLE_ORDER:
-        env, _ = _env(role, blueprint, settings)
+        env, _ = _env(role, spec, settings)
         assert env["RENDER"] == "true"
         assert env["SYNDICATE_REFRESH_STATE_BACKEND"] == "keyvalue"
         assert env["SYNDICATE_REFRESH_STATE_URL"] == settings.redis_url
@@ -70,71 +71,71 @@ def test_redis_state_mode_keeps_production_semantics(blueprint, settings):
         assert env["SYNDICATE_BOOTSTRAP_ON_START"] == "0"
 
 
-def test_file_state_mode_clears_hosted_flags(blueprint, tmp_path):
+def test_file_state_mode_clears_hosted_flags(spec, tmp_path):
     settings = lp.Settings(home=tmp_path, state="file")
-    env, _ = _env("refresh-worker", blueprint, settings)
+    env, _ = _env("refresh-worker", spec, settings)
     assert env["SYNDICATE_REFRESH_STATE_BACKEND"] == "filesystem"
     assert "RENDER" not in env
     assert "SYNDICATE_REQUIRE_HOSTED_STORAGE" not in env
 
 
-def test_publish_url_dropped_on_a_shared_disk(blueprint, settings):
-    env, _ = _env("refresh-worker", blueprint, settings)
+def test_publish_url_dropped_on_a_shared_disk(spec, settings):
+    env, _ = _env("refresh-worker", spec, settings)
     assert "SYNDICATE_WEB_PUBLISH_URL" not in env
     loop = lp.Settings(home=settings.home, port=12345, publish_loopback=True)
-    env, _ = _env("refresh-worker", blueprint, loop)
+    env, _ = _env("refresh-worker", spec, loop)
     assert env["SYNDICATE_WEB_PUBLISH_URL"] == "http://127.0.0.1:12345"
 
 
-def test_money_is_paper_unless_explicitly_allowed(blueprint, settings):
+def test_money_is_paper_unless_explicitly_allowed(spec, settings):
     armed = {"SYNDICATE_EXECUTION_MODE": "live", "SYNDICATE_EXECUTION_LIVE_ARMED": "1", "SYNDICATE_EXECUTION_ENABLED": "1"}
-    env, _ = _env("live-odds-worker", blueprint, settings, live=armed)
+    env, _ = _env("live-odds-worker", spec, settings, live=armed)
     assert env["SYNDICATE_EXECUTION_MODE"] == "paper"
     assert env["SYNDICATE_EXECUTION_LIVE_ARMED"] == "0"
     assert not lp.money_is_live(env)
     allowed = lp.Settings(home=settings.home, allow_live_execution=True)
-    env, _ = _env("live-odds-worker", blueprint, allowed, live=armed)
+    env, _ = _env("live-odds-worker", spec, allowed, live=armed)
     assert lp.money_is_live(env)
 
 
-def test_paper_execution_runs_by_default_and_the_local_file_can_stop_it(blueprint, settings):
+def test_paper_execution_runs_by_default_and_the_local_file_can_stop_it(spec, settings):
     # ENABLED=0 silenced paper fills, venue settlement and ORDER_PATH on the
     # whole fleet (2026-10-02). Paper must RUN; only mode+armed keep money off.
     for role in ("live-odds-worker", "refresh-worker"):
-        env, _ = _env(role, blueprint, settings, live={"SYNDICATE_EXECUTION_ENABLED": "0"})
+        env, _ = _env(role, spec, settings, live={"SYNDICATE_EXECUTION_ENABLED": "0"})
         assert env["SYNDICATE_EXECUTION_ENABLED"] == "1"
         assert env["SYNDICATE_EXECUTION_MODE"] == "paper"
         assert env["SYNDICATE_EXECUTION_LIVE_ARMED"] == "0"
         assert not lp.money_is_live(env)
-    env, _ = _env("live-odds-worker", blueprint, settings, local={"SYNDICATE_EXECUTION_ENABLED": "0"})
+    env, _ = _env("live-odds-worker", spec, settings, local={"SYNDICATE_EXECUTION_ENABLED": "0"})
     assert env["SYNDICATE_EXECUTION_ENABLED"] == "0"
 
 
-def test_layering_live_over_blueprint_and_local_over_live(blueprint, settings):
-    live = {"SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS": "90", "SOME_DASHBOARD_KEY": "/opt/render/project/data/x"}
-    env, audit = _env("live-odds-worker", blueprint, settings, live=live)
+def test_layering_snapshot_over_spec_and_local_over_snapshot(spec, settings):
+    live = {"SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS": "90", "SOME_DASHBOARD_KEY": "{data_root}/x"}
+    env, audit = _env("live-odds-worker", spec, settings, live=live)
     assert env["SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS"] == "90"
     assert env["SOME_DASHBOARD_KEY"] == str(settings.data_root / "x")
-    env, _ = _env("live-odds-worker", blueprint, settings, live=live, local={"SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS": "120"})
+    env, _ = _env("live-odds-worker", spec, settings, live=live, local={"SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS": "120"})
     assert env["SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS"] == "120"
 
 
-def test_sync_false_keys_absent_until_supplied(blueprint, settings):
-    env, audit = _env("refresh-worker", blueprint, settings)
+def test_sync_false_keys_absent_until_supplied(spec, settings):
+    env, audit = _env("refresh-worker", spec, settings)
     assert "EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN" not in env
     assert "EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN" in audit["unset"]
-    env, audit = _env("refresh-worker", blueprint, settings, live={"EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN": "true"})
+    env, audit = _env("refresh-worker", spec, settings, live={"EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN": "true"})
     assert env["EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN"] == "true"
     assert "EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN" not in audit["unset"]
 
 
-def test_render_api_key_never_carried(blueprint, settings):
-    env, _ = _env("web", blueprint, settings, live={"RENDER_API_KEY": "x"}, local={"RENDER_API_KEY": "y"})
+def test_render_api_key_never_carried(spec, settings):
+    env, _ = _env("web", spec, settings, live={"RENDER_API_KEY": "x"}, local={"RENDER_API_KEY": "y"})
     assert "RENDER_API_KEY" not in env
 
 
-def test_stray_render_markers_in_operator_shell_do_not_leak(blueprint, settings):
-    env, _ = lp.derive_role_env("web", blueprint, {}, settings, base_env={"RENDER_EXTERNAL_URL": "https://syndicate-an21.onrender.com"})
+def test_stray_render_markers_in_operator_shell_do_not_leak(spec, settings):
+    env, _ = lp.derive_role_env("web", spec, {}, settings, base_env={"RENDER_EXTERNAL_URL": "https://syndicate-an21.onrender.com"})
     assert "RENDER_EXTERNAL_URL" not in env
 
 
@@ -145,35 +146,35 @@ def test_env_file_parsing(tmp_path):
     assert values == {"A": "1", "B": "two words", "PEM": "-----BEGIN-----\nabc\n-----END-----", "C": "q"}
 
 
-def test_template_lists_every_value_less_blueprint_key(blueprint):
-    text = lp.template_text(blueprint)
-    for items in blueprint.values():
+def test_template_lists_every_value_less_spec_key(spec):
+    text = lp.template_text(spec)
+    for items in spec.values():
         for item in items:
             if item.source in {"generate", "from_web", "sync_false"}:
                 assert item.key in text
     assert "ADMIN_TOKEN=" in text  # generated, not left blank
 
 
-def test_web_command_is_a_production_server(blueprint, settings):
-    env, _ = _env("web", blueprint, settings)
+def test_web_command_is_a_production_server(spec, settings):
+    env, _ = _env("web", spec, settings)
     command, server = lp.role_command("web", env, settings)
     assert server in {"gunicorn", "waitress"}
     assert "12345" in " ".join(command)
 
 
-def test_worker_to_web_urls_point_at_local_web_never_onrender(blueprint, settings):
+def test_worker_to_web_urls_point_at_local_web_never_onrender(spec, settings):
     for role in lp.ROLE_ORDER:
-        env, _ = _env(role, blueprint, settings, live={"SYNDICATE_WNBA_LIVE_BOX_BASE_URL": "http://syndicate-an21:10000"})
+        env, _ = _env(role, spec, settings, live={"SYNDICATE_WNBA_LIVE_BOX_BASE_URL": "http://syndicate-an21:10000"})
         for key in ("SYNDICATE_INTERNAL_WEB_BASE_URL", "SYNDICATE_WNBA_LIVE_BOX_BASE_URL", "SYNDICATE_BASE_URL"):
             assert env[key] == "http://127.0.0.1:12345"
         assert not any("onrender.com" in str(v) or "syndicate-an21" in str(v) for v in env.values()), role
 
 
-def test_web_counts_as_render_web_dyno_in_both_state_modes(blueprint, tmp_path):
+def test_web_counts_as_render_web_dyno_in_both_state_modes(spec, tmp_path):
     # Without a marker, syndicate/app.py starts the intelligence loop on web
     # regardless of its flag -- a second board builder on the same disk.
     for state in ("redis", "file"):
-        env, _ = _env("web", blueprint, lp.Settings(home=tmp_path, state=state))
+        env, _ = _env("web", spec, lp.Settings(home=tmp_path, state=state))
         assert env["RENDER_SERVICE_ID"] == "local-web"
         assert env["SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP"] == "false"
 
@@ -290,12 +291,12 @@ def test_checkout_depth_matches_repo_root_from():
         assert resolved is expected
 
 
-def test_each_role_gets_its_render_plan_as_a_memory_ceiling(blueprint, settings):
+def test_each_role_gets_its_render_plan_as_a_memory_ceiling(spec, settings):
     # Without a ceiling every headroom gate reads None and fails closed.
     for role, megabytes in lp.PLAN_MEMORY_MB.items():
-        assert _env(role, blueprint, settings)[0]["SYNDICATE_LOCAL_MEMORY_LIMIT_MB"] == str(megabytes)
+        assert _env(role, spec, settings)[0]["SYNDICATE_LOCAL_MEMORY_LIMIT_MB"] == str(megabytes)
     override = {"SYNDICATE_LOCAL_MEMORY_LIMIT_MB": "8192"}
-    assert _env("refresh-worker", blueprint, settings, local=override)[0]["SYNDICATE_LOCAL_MEMORY_LIMIT_MB"] == "8192"
+    assert _env("refresh-worker", spec, settings, local=override)[0]["SYNDICATE_LOCAL_MEMORY_LIMIT_MB"] == "8192"
 
 
 def test_gunicorn_usable_does_not_require_gunicorn_on_path(monkeypatch):

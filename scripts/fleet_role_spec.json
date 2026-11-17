@@ -1,0 +1,1066 @@
+{
+ "about": [
+  "The fleet's per-role DECLARED env: the lowest layer of every role's env, under",
+  "<home>/fleet_env/<role>.json, then <home>/local_production.env, then the launcher's forced keys.",
+  "Owned by the fleet (scripts/local_production.py load_role_spec). Frozen 2026-11-17 from what",
+  "render.yaml declared (lane render-config-retirement, todo #766); render.yaml is no longer read.",
+  "source: value = this literal (placeholders {data_root} / {repo_root} expanded at up);",
+  "keyvalue = the local state store URL; generate / from_web / sync_false = a key with no value",
+  "here: the snapshot or the local file sets it, else it is removed from the role's env.",
+  "Every value here is shadowed by the snapshot today (measured 2026-11-08: 0 of 48/77/72).",
+  "Absent is not off: check the code default before deleting a key."
+ ],
+ "roles": {
+  "web": [
+   {
+    "key": "TZ",
+    "source": "value",
+    "value": "America/Chicago"
+   },
+   {
+    "key": "PYTHON_VERSION",
+    "source": "value",
+    "value": "3.11.9"
+   },
+   {
+    "key": "ADMIN_TOKEN",
+    "source": "generate"
+   },
+   {
+    "key": "ODDS_API_KEY",
+    "source": "value",
+    "value": "77ae1c35140c82da1675af85dde36a44"
+   },
+   {
+    "key": "ANTHROPIC_API_KEY",
+    "source": "sync_false"
+   },
+   {
+    "key": "SYNDICATE_ASK_MODEL",
+    "source": "value",
+    "value": "claude-haiku-4-5"
+   },
+   {
+    "key": "SYNDICATE_ASK_LLM_MAX_CALLS",
+    "source": "value",
+    "value": "30"
+   },
+   {
+    "key": "SYNDICATE_ASK_LLM_WINDOW_SECONDS",
+    "source": "value",
+    "value": "600"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_LAUNCH_MODE",
+    "source": "value",
+    "value": "detached_subprocess"
+   },
+   {
+    "key": "SYNDICATE_WEB_DYNO",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_LANE",
+    "source": "value",
+    "value": "web"
+   },
+   {
+    "key": "SYNDICATE_REQUIRE_HOSTED_STORAGE",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_STATE_BACKEND",
+    "source": "value",
+    "value": "keyvalue"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_STATE_URL",
+    "source": "keyvalue"
+   },
+   {
+    "key": "SYNDICATE_BOOTSTRAP_ON_START",
+    "source": "value",
+    "value": "1"
+   },
+   {
+    "key": "SYNDICATE_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}"
+   },
+   {
+    "key": "SYNDICATE_MLB_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/mlb_source"
+   },
+   {
+    "key": "SYNDICATE_NBA_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/nba_source"
+   },
+   {
+    "key": "SYNDICATE_NBA_ARTIFACT_ROOT",
+    "source": "value",
+    "value": "{data_root}/nba_source/source_artifacts"
+   },
+   {
+    "key": "SYNDICATE_NHL_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/nhl_source"
+   },
+   {
+    "key": "SYNDICATE_BOOTSTRAP_WNBA_TODAY",
+    "source": "value",
+    "value": "0"
+   },
+   {
+    "key": "SYNDICATE_NFL_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/nfl_source"
+   },
+   {
+    "key": "SYNDICATE_NCAAF_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/ncaaf_source"
+   },
+   {
+    "key": "SYNDICATE_NCAAB_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/ncaab_source"
+   },
+   {
+    "key": "SYNDICATE_WNBA_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/wnba_source"
+   },
+   {
+    "key": "SYNDICATE_REPORTS_ROOT",
+    "source": "value",
+    "value": "{data_root}/reports"
+   },
+   {
+    "key": "SYNDICATE_WNBA_SOURCE_APP_FALLBACK",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "WEB_CONCURRENCY",
+    "source": "value",
+    "value": "2"
+   },
+   {
+    "key": "GUNICORN_THREADS",
+    "source": "value",
+    "value": "4"
+   },
+   {
+    "key": "GUNICORN_TIMEOUT",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "GUNICORN_GRACEFUL_TIMEOUT",
+    "source": "value",
+    "value": "30"
+   },
+   {
+    "key": "GUNICORN_KEEPALIVE",
+    "source": "value",
+    "value": "5"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE",
+    "source": "value",
+    "value": "detached_subprocess"
+   },
+   {
+    "key": "SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_PHASE",
+    "source": "value",
+    "value": "live"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE",
+    "source": "value",
+    "value": "source"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_MODE",
+    "source": "value",
+    "value": "full"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_REGIONS",
+    "source": "value",
+    "value": "us"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "MLB_BETTING_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}/mlb_source/source_artifacts/data"
+   },
+   {
+    "key": "MLB_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "{data_root}/mlb_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "NBA_BETTING_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}/nba_source/data"
+   },
+   {
+    "key": "NBA_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "{data_root}/nba_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "NHL_DATA_DIR",
+    "source": "value",
+    "value": "./data/nhl_source/source_artifacts/data"
+   },
+   {
+    "key": "WNBA_BETTING_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}/wnba_source/data"
+   },
+   {
+    "key": "WNBA_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "{data_root}/wnba_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS",
+    "source": "sync_false"
+   },
+   {
+    "key": "MLB_LIVE_LENS_REPORT_MAX_AGE_SECONDS",
+    "source": "value",
+    "value": "60"
+   }
+  ],
+  "refresh-worker": [
+   {
+    "key": "TZ",
+    "source": "value",
+    "value": "America/Chicago"
+   },
+   {
+    "key": "PYTHON_VERSION",
+    "source": "value",
+    "value": "3.11.9"
+   },
+   {
+    "key": "ADMIN_TOKEN",
+    "source": "from_web"
+   },
+   {
+    "key": "ODDS_API_KEY",
+    "source": "value",
+    "value": "77ae1c35140c82da1675af85dde36a44"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_LAUNCH_MODE",
+    "source": "value",
+    "value": "detached_subprocess"
+   },
+   {
+    "key": "SYNDICATE_WEB_DYNO",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_LANE",
+    "source": "value",
+    "value": "refresh-worker"
+   },
+   {
+    "key": "RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN",
+    "source": "sync_false"
+   },
+   {
+    "key": "RECONCILIATION_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "86400"
+   },
+   {
+    "key": "RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER",
+    "source": "sync_false"
+   },
+   {
+    "key": "RECONCILIATION_MLB_ACTUALS_WRITER_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "3600"
+   },
+   {
+    "key": "EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN",
+    "source": "sync_false"
+   },
+   {
+    "key": "SYNDICATE_REQUIRE_HOSTED_STORAGE",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_STATE_BACKEND",
+    "source": "value",
+    "value": "keyvalue"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_STATE_URL",
+    "source": "keyvalue"
+   },
+   {
+    "key": "SYNDICATE_BOOTSTRAP_ON_START",
+    "source": "value",
+    "value": "1"
+   },
+   {
+    "key": "SYNDICATE_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}"
+   },
+   {
+    "key": "SYNDICATE_MLB_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/mlb_source"
+   },
+   {
+    "key": "SYNDICATE_NBA_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/nba_source"
+   },
+   {
+    "key": "SYNDICATE_NBA_ARTIFACT_ROOT",
+    "source": "value",
+    "value": "{data_root}/nba_source/source_artifacts"
+   },
+   {
+    "key": "SYNDICATE_NHL_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/nhl_source"
+   },
+   {
+    "key": "SYNDICATE_NFL_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/nfl_source"
+   },
+   {
+    "key": "SYNDICATE_NCAAF_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/ncaaf_source"
+   },
+   {
+    "key": "SYNDICATE_NCAAB_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/ncaab_source"
+   },
+   {
+    "key": "SYNDICATE_WNBA_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/wnba_source"
+   },
+   {
+    "key": "SYNDICATE_REPORTS_ROOT",
+    "source": "value",
+    "value": "{data_root}/reports"
+   },
+   {
+    "key": "SYNDICATE_WEB_PUBLISH_URL",
+    "source": "value",
+    "value": "http://syndicate-an21:10000"
+   },
+   {
+    "key": "SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET",
+    "source": "value",
+    "value": "21474836480"
+   },
+   {
+    "key": "SYNDICATE_BOOTSTRAP_WNBA_TODAY",
+    "source": "value",
+    "value": "1"
+   },
+   {
+    "key": "SYNDICATE_NBA_SOURCE_APP_FALLBACK",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_WNBA_SOURCE_APP_FALLBACK",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_NHL_SOURCE_CLI_GENERATION",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "WEB_CONCURRENCY",
+    "source": "value",
+    "value": "1"
+   },
+   {
+    "key": "GUNICORN_THREADS",
+    "source": "value",
+    "value": "1"
+   },
+   {
+    "key": "GUNICORN_TIMEOUT",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "GUNICORN_GRACEFUL_TIMEOUT",
+    "source": "value",
+    "value": "30"
+   },
+   {
+    "key": "GUNICORN_KEEPALIVE",
+    "source": "value",
+    "value": "5"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_IDLE_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "900"
+   },
+   {
+    "key": "SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE",
+    "source": "value",
+    "value": "detached_subprocess"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_PHASE",
+    "source": "value",
+    "value": "live"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE",
+    "source": "value",
+    "value": "source"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_MODE",
+    "source": "value",
+    "value": "full"
+   },
+   {
+    "key": "SYNDICATE_SERIAL_SPORT_REFRESH",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_REGIONS",
+    "source": "value",
+    "value": "us"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS",
+    "source": "value",
+    "value": "eu,us_ex"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "MLB_BETTING_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}/mlb_source/source_artifacts/data"
+   },
+   {
+    "key": "MLB_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "{data_root}/mlb_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "NBA_BETTING_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}/nba_source/data"
+   },
+   {
+    "key": "NBA_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "{data_root}/nba_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "NHL_DATA_DIR",
+    "source": "value",
+    "value": "./data/nhl_source/source_artifacts/data"
+   },
+   {
+    "key": "NHL_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "./data/nhl_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "WNBA_BETTING_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}/wnba_source/data"
+   },
+   {
+    "key": "WNBA_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "{data_root}/wnba_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "MLB_ENABLE_LIVE_LENS_LOOP",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS",
+    "source": "sync_false"
+   },
+   {
+    "key": "MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "30"
+   },
+   {
+    "key": "MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "30"
+   },
+   {
+    "key": "MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "REFRESH_PREDICT_PROPS_SMART_SIM_PBP",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "MLB_ENABLE_REFRESH_WORKER_AUTORUN",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_MLB_REFRESH_TICK_OWNER",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "21600"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN",
+    "source": "sync_false"
+   },
+   {
+    "key": "SYNDICATE_SOCCER_WEEKLY_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "14400"
+   },
+   {
+    "key": "WEEKLY_SPORTS_REFRESH_TICK_OWNER",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_EVENT_SIM_FORCE_WINDOW_MINUTES",
+    "source": "value",
+    "value": "30"
+   },
+   {
+    "key": "SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "600"
+   },
+   {
+    "key": "SYNDICATE_MLB_SIM_TIMEOUT_SECONDS",
+    "source": "value",
+    "value": "5400"
+   },
+   {
+    "key": "SYNDICATE_MLB_SIM_COUNT",
+    "source": "value",
+    "value": "1000"
+   },
+   {
+    "key": "SYNDICATE_MLB_SIM_WORKERS",
+    "source": "value",
+    "value": "2"
+   },
+   {
+    "key": "SYNDICATE_SCHEDULE_ADAPTER_TTL_SECONDS",
+    "source": "value",
+    "value": "900"
+   },
+   {
+    "key": "SYNDICATE_LOOK_AHEAD_ENABLED",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_LOOK_AHEAD_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "3600"
+   },
+   {
+    "key": "SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_START_HOUR",
+    "source": "value",
+    "value": "18"
+   }
+  ],
+  "live-odds-worker": [
+   {
+    "key": "TZ",
+    "source": "value",
+    "value": "America/Chicago"
+   },
+   {
+    "key": "PYTHON_VERSION",
+    "source": "value",
+    "value": "3.11.9"
+   },
+   {
+    "key": "ADMIN_TOKEN",
+    "source": "from_web"
+   },
+   {
+    "key": "ODDS_API_KEY",
+    "source": "value",
+    "value": "77ae1c35140c82da1675af85dde36a44"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_LAUNCH_MODE",
+    "source": "value",
+    "value": "detached_subprocess"
+   },
+   {
+    "key": "SYNDICATE_WEB_DYNO",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_LANE",
+    "source": "value",
+    "value": "live-odds-worker"
+   },
+   {
+    "key": "SYNDICATE_REQUIRE_HOSTED_STORAGE",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_STATE_BACKEND",
+    "source": "value",
+    "value": "keyvalue"
+   },
+   {
+    "key": "SYNDICATE_REFRESH_STATE_URL",
+    "source": "keyvalue"
+   },
+   {
+    "key": "SYNDICATE_BOOTSTRAP_ON_START",
+    "source": "value",
+    "value": "1"
+   },
+   {
+    "key": "SYNDICATE_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}"
+   },
+   {
+    "key": "SYNDICATE_MLB_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/mlb_source"
+   },
+   {
+    "key": "SYNDICATE_NBA_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/nba_source"
+   },
+   {
+    "key": "SYNDICATE_NBA_ARTIFACT_ROOT",
+    "source": "value",
+    "value": "{data_root}/nba_source/source_artifacts"
+   },
+   {
+    "key": "SYNDICATE_NHL_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/nhl_source"
+   },
+   {
+    "key": "SYNDICATE_NFL_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/nfl_source"
+   },
+   {
+    "key": "SYNDICATE_NCAAF_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/ncaaf_source"
+   },
+   {
+    "key": "SYNDICATE_NCAAB_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/ncaab_source"
+   },
+   {
+    "key": "SYNDICATE_WNBA_SOURCE_ROOT",
+    "source": "value",
+    "value": "{data_root}/wnba_source"
+   },
+   {
+    "key": "SYNDICATE_REPORTS_ROOT",
+    "source": "value",
+    "value": "{data_root}/reports"
+   },
+   {
+    "key": "SYNDICATE_WEB_PUBLISH_URL",
+    "source": "value",
+    "value": "http://syndicate-an21:10000"
+   },
+   {
+    "key": "SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET",
+    "source": "value",
+    "value": "21474836480"
+   },
+   {
+    "key": "SYNDICATE_NBA_SOURCE_APP_FALLBACK",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_WNBA_SOURCE_APP_FALLBACK",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_NHL_SOURCE_CLI_GENERATION",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "WEB_CONCURRENCY",
+    "source": "value",
+    "value": "1"
+   },
+   {
+    "key": "GUNICORN_THREADS",
+    "source": "value",
+    "value": "1"
+   },
+   {
+    "key": "GUNICORN_TIMEOUT",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "GUNICORN_GRACEFUL_TIMEOUT",
+    "source": "value",
+    "value": "30"
+   },
+   {
+    "key": "GUNICORN_KEEPALIVE",
+    "source": "value",
+    "value": "5"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_BOOTSTRAP_WNBA_TODAY",
+    "source": "value",
+    "value": "1"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_IDLE_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "900"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS",
+    "source": "value",
+    "value": "21600"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_PREGAME_RELAUNCH_COOLDOWN_SECONDS",
+    "source": "value",
+    "value": "1800"
+   },
+   {
+    "key": "SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_LAUNCH_MODE",
+    "source": "value",
+    "value": "detached_subprocess"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_PHASE",
+    "source": "value",
+    "value": "live"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_EXECUTION_MODE",
+    "source": "value",
+    "value": "source"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_MODE",
+    "source": "value",
+    "value": "full"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_REGIONS",
+    "source": "value",
+    "value": "us"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS",
+    "source": "value",
+    "value": "eu,us_ex"
+   },
+   {
+    "key": "SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS",
+    "source": "value",
+    "value": "4500"
+   },
+   {
+    "key": "SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_MLB_SIM_TICK_OWNER",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_MLB_REFRESH_TICK_OWNER",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "WEEKLY_SPORTS_REFRESH_TICK_OWNER",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN",
+    "source": "sync_false"
+   },
+   {
+    "key": "SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "14400"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_LOOK_AHEAD_ENABLED",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED",
+    "source": "value",
+    "value": "false"
+   },
+   {
+    "key": "MLB_BETTING_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}/mlb_source/source_artifacts/data"
+   },
+   {
+    "key": "MLB_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "{data_root}/mlb_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "NBA_BETTING_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}/nba_source/data"
+   },
+   {
+    "key": "NBA_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "{data_root}/nba_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "NHL_DATA_DIR",
+    "source": "value",
+    "value": "./data/nhl_source/source_artifacts/data"
+   },
+   {
+    "key": "NHL_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "./data/nhl_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "WNBA_BETTING_DATA_ROOT",
+    "source": "value",
+    "value": "{data_root}/wnba_source/data"
+   },
+   {
+    "key": "WNBA_LIVE_LENS_DIR",
+    "source": "value",
+    "value": "{data_root}/wnba_source/source_artifacts/data/live_lens"
+   },
+   {
+    "key": "REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS",
+    "source": "value",
+    "value": "100"
+   },
+   {
+    "key": "MLB_ENABLE_LIVE_LENS_LOOP",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS",
+    "source": "sync_false"
+   },
+   {
+    "key": "MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "30"
+   },
+   {
+    "key": "MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "MLB_LIVE_LENS_REPORT_MAX_AGE_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "SYNDICATE_ENABLE_LIVE_LENS_LOOP",
+    "source": "value",
+    "value": "true"
+   },
+   {
+    "key": "SYNDICATE_LIVE_LENS_INTERVAL_SECONDS",
+    "source": "value",
+    "value": "60"
+   },
+   {
+    "key": "SYNDICATE_LIVE_LENS_MIN_HEADROOM_MB",
+    "source": "value",
+    "value": "300"
+   },
+   {
+    "key": "REFRESH_PREDICT_PROPS_SMART_SIM_PBP",
+    "source": "value",
+    "value": "true"
+   }
+  ]
+ }
+}

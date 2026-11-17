@@ -1,7 +1,8 @@
 """Run Syndicate PRODUCTION on one machine -- web, refresh-worker,
-live-odds-worker and the shared state store -- from render.yaml's own config.
+live-odds-worker and the shared state store -- from the fleet's own config.
 Lane `local-production-host` `[2026-09-30]`: all three Render services are
-billing-suspended.
+billing-suspended. Since lane `render-config-retirement` `[2026-11-17]` nothing
+here reads a Render file: not `render.yaml`, not `<home>/render_env/`.
 
     py -3 scripts/local_production.py init        # home dir + secrets template
     py -3 scripts/local_production.py doctor      # everything that would stop `up`
@@ -20,26 +21,33 @@ HOW THIS DIFFERS FROM scripts/fleet_local.py
 admin token, paper money, a bounded run. That is right for testing code and
 wrong for serving production. This tool is the production counterpart:
 
-* The env comes from `render.yaml` ITSELF, parsed at start, per service. Nothing
-  here restates a run-mode. Loop ownership (`SYNDICATE_MLB_REFRESH_TICK_OWNER`,
-  `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP`, the intelligence loop on
-  refresh-worker only, ...) is whatever the blueprint says for that service, so
-  a change to render.yaml changes the local fleet the same way it would have
-  changed Render.
-* Keys the blueprint marks `sync: false`, `generateValue: true`, or that live
-  only in the Render dashboard (venue keys, ANTHROPIC_API_KEY, the
-  `*_AUTORUN` switches) come from ONE local file, `local_production.env`, in
-  the home directory -- never from the repo. `init` writes a template listing
-  every such key the blueprint names.
+* Each role's env is built at `up` from three layers, a later one winning:
+    1. `scripts/fleet_role_spec.json` -- the keys each role DECLARES (frozen
+       2026-11-17 from what render.yaml declared; render.yaml is not read).
+    2. `<home>/fleet_env/<role>.json` -- the role's full env snapshot (taken
+       from Render once on 2026-10-01, migrated by `fleet_env_snapshot.py`).
+       Every declared value is shadowed by it (measured 2026-11-08).
+    3. `<home>/local_production.env` -- operator overrides, `ROLE__KEY` for one
+       role.
+  then the forced keys below. Nothing here restates a run-mode: loop ownership
+  (`SYNDICATE_MLB_REFRESH_TICK_OWNER`, `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP`,
+  the intelligence loop on refresh-worker only, ...) is whatever those layers
+  say for that role.
+* Keys the spec declares without a value (`generate` / `from_web` /
+  `sync_false`) and keys no layer declares (venue keys, ANTHROPIC_API_KEY, the
+  `*_AUTORUN` switches) come from the snapshot or from `local_production.env`
+  -- never from the repo. `init` writes a template listing every such key.
 * Real network, real keys, a long-running supervisor that restarts a role that
   exits (Render restarts a crashed worker; so does this).
 
-WHAT IS CHANGED FROM THE BLUEPRINT, AND WHY EACH ONE
-----------------------------------------------------
+WHAT IS CHANGED FROM THOSE LAYERS, AND WHY EACH ONE
+---------------------------------------------------
 Everything not listed is passed through verbatim.
 
-  /opt/render/project/data/...  -> <home>/data/...   one shared disk (see below)
-  /opt/render/project/src/...   -> <repo>/...
+  {data_root}[/...]             -> <home>/data/...   one shared disk (see below)
+  {repo_root}[/...]             -> <repo>/...        (the snapshot's old Render
+                                   disk paths, /opt/render/project/{data,src},
+                                   became these placeholders at migration)
   SYNDICATE_REFRESH_STATE_URL   -> local redis       the keyvalue `fromService`
   ADMIN_TOKEN (fromService/generateValue) -> local_production.env, one value
   SYNDICATE_WEB_PUBLISH_URL     -> REMOVED           see "one shared disk"
@@ -106,17 +114,23 @@ LOGSTAMP_DIR = REPO_ROOT / "scripts" / "local_logstamp"
 # root, and `down` imports syndicate.features.shared.process_liveness.
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-RENDER_YAML = REPO_ROOT / "render.yaml"
+# The fleet's own role spec (declared keys per role). `render.yaml` is NOT read:
+# it was the source of this file once, frozen 2026-11-17 (lane
+# `render-config-retirement`), and a `render.yaml` push is refused by the guard.
+ROLE_SPEC_PATH = REPO_ROOT / "scripts" / "fleet_role_spec.json"
 IS_WINDOWS = os.name == "nt"
 
-RENDER_DATA_PREFIX = "/opt/render/project/data"
-RENDER_SRC_PREFIX = "/opt/render/project/src"
+# Path placeholders in the spec, the snapshot and the local file. Expanded per
+# `up` against `--home` and this checkout (`expand_path`).
+DATA_ROOT_TOKEN = "{data_root}"
+REPO_ROOT_TOKEN = "{repo_root}"
 ENV_FILE_NAME = "local_production.env"
+# `<home>/fleet_env/<role>.json`: each role's env snapshot (`env_snapshot_path`).
+ENV_SNAPSHOT_DIR_NAME = "fleet_env"
 PIDFILE_NAME = "supervisor.json"
 
 ROLE_ORDER = ("web", "refresh-worker", "live-odds-worker")
-# render.yaml service name -> local role name
-SERVICE_TO_ROLE = {"syndicate": "web", "refresh-worker": "refresh-worker", "live-odds-worker": "live-odds-worker"}
+ROLE_SPEC_SOURCES = ("value", "generate", "from_web", "keyvalue", "sync_false")
 # Render plan memory: each role's DEFAULT emulated cap (`derive_role_env`), which
 # `local_production.env` overrides. `status` prints the cap a role actually runs
 # with (`role_running_memory_cap_mb`), not this.
@@ -159,47 +173,46 @@ NEVER_CARRY = ("RENDER_API_KEY",)
 
 
 # --------------------------------------------------------------------------
-# render.yaml -> per-role env
+# fleet role spec + env snapshot -> per-role env
 # --------------------------------------------------------------------------
 
 
 @dataclass
-class BlueprintKey:
+class RoleEnvKey:
     key: str
-    value: str | None  # None = needs a local value
-    source: str  # value | generate | from_web | keyvalue | sync_false
+    value: str | None  # None = the snapshot or the local file decides
+    source: str  # value | generate | from_web | keyvalue | sync_false (ROLE_SPEC_SOURCES)
 
 
-def load_blueprint(path: Path = RENDER_YAML) -> dict[str, list[BlueprintKey]]:
-    import yaml
+def load_role_spec(path: Path = ROLE_SPEC_PATH) -> dict[str, list[RoleEnvKey]]:
+    """{role: [RoleEnvKey, ...]} from `scripts/fleet_role_spec.json`, in file order.
 
-    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
-    out: dict[str, list[BlueprintKey]] = {}
-    for service in doc.get("services") or []:
-        role = SERVICE_TO_ROLE.get(str(service.get("name") or ""))
-        if role is None:
-            continue
-        keys: list[BlueprintKey] = []
-        for entry in service.get("envVars") or []:
-            name = str(entry.get("key") or "").strip()
-            if not name:
-                continue
-            if "value" in entry:
-                keys.append(BlueprintKey(name, str(entry["value"]), "value"))
-            elif entry.get("generateValue"):
-                keys.append(BlueprintKey(name, None, "generate"))
-            elif isinstance(entry.get("fromService"), dict):
-                ref = entry["fromService"]
-                if str(ref.get("type")) == "keyvalue":
-                    keys.append(BlueprintKey(name, None, "keyvalue"))
-                else:
-                    keys.append(BlueprintKey(name, None, "from_web"))
-            elif entry.get("sync") is False:
-                keys.append(BlueprintKey(name, None, "sync_false"))
+    It holds what render.yaml declared for each service on 2026-11-17, key for
+    key (`tests/test_fleet_role_spec.py`), with the Render disk paths turned
+    into `{data_root}` / `{repo_root}`. A malformed spec refuses to start
+    rather than run a role on a partial env."""
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    roles = doc.get("roles") if isinstance(doc, dict) else None
+    if not isinstance(roles, dict):
+        raise SystemExit(f"{path}: no `roles` object")
+    out: dict[str, list[RoleEnvKey]] = {}
+    for role in ROLE_ORDER:
+        entries = roles.get(role)
+        if not isinstance(entries, list) or not entries:
+            raise SystemExit(f"{path}: no keys for role {role!r}; expected {list(ROLE_ORDER)}")
+        keys: list[RoleEnvKey] = []
+        for entry in entries:
+            name = str((entry or {}).get("key") or "").strip()
+            source = str((entry or {}).get("source") or "")
+            if not name or source not in ROLE_SPEC_SOURCES:
+                raise SystemExit(f"{path}: bad entry for role {role!r}: key={name!r} source={source!r}")
+            if source == "value":
+                if "value" not in entry:
+                    raise SystemExit(f"{path}: {role} {name} is source=value with no value")
+                keys.append(RoleEnvKey(name, str(entry["value"]), source))
+            else:
+                keys.append(RoleEnvKey(name, None, source))
         out[role] = keys
-    missing = [r for r in ROLE_ORDER if r not in out]
-    if missing:
-        raise SystemExit(f"render.yaml has no service for role(s) {missing}; expected {SERVICE_TO_ROLE}")
     return out
 
 
@@ -227,12 +240,17 @@ def parse_env_file(path: Path) -> dict[str, str]:
     return values
 
 
-def rewrite_path(value: str, *, data_root: Path) -> str:
-    if value == RENDER_DATA_PREFIX or value.startswith(RENDER_DATA_PREFIX + "/"):
-        tail = value[len(RENDER_DATA_PREFIX):].lstrip("/")
+def expand_path(value: str, *, data_root: Path) -> str:
+    """`{data_root}[/...]` -> the data root, `{repo_root}[/...]` -> this checkout.
+
+    Same rule the Render-era `rewrite_path` applied to `/opt/render/project/
+    {data,src}` (exact, or the token plus `/`), so a migrated value expands to
+    exactly what its original was rewritten to (`tests/test_fleet_env_snapshot.py`)."""
+    if value == DATA_ROOT_TOKEN or value.startswith(DATA_ROOT_TOKEN + "/"):
+        tail = value[len(DATA_ROOT_TOKEN):].lstrip("/")
         return str(data_root.joinpath(*tail.split("/")) if tail else data_root)
-    if value == RENDER_SRC_PREFIX or value.startswith(RENDER_SRC_PREFIX + "/"):
-        tail = value[len(RENDER_SRC_PREFIX):].lstrip("/")
+    if value == REPO_ROOT_TOKEN or value.startswith(REPO_ROOT_TOKEN + "/"):
+        tail = value[len(REPO_ROOT_TOKEN):].lstrip("/")
         return str(REPO_ROOT.joinpath(*tail.split("/")) if tail else REPO_ROOT)
     return value
 
@@ -264,15 +282,23 @@ class Settings:
         return self.home / ENV_FILE_NAME
 
 
-def live_env_path(settings: "Settings", role: str) -> Path:
-    """The fleet's per-role env snapshot. Imported ONCE from Render on 2026-10-01;
-    the import command was retired 2026-11-15 (lane `render-retirement`), so this
-    file is the fleet's own copy now and Render is not a recovery path for it."""
-    return settings.home / "render_env" / f"{role}.json"
+def env_snapshot_path(settings: "Settings", role: str) -> Path:
+    """The fleet's per-role env snapshot, `<home>/fleet_env/<role>.json`.
+
+    Taken from Render ONCE on 2026-10-01 into `render_env/`, and migrated here by
+    `scripts/fleet_env_snapshot.py migrate` on 2026-11-17 (lane
+    `render-config-retirement`). The fleet's own file: Render is not a recovery
+    path for it (the encrypted copy is `fleet_secrets_backup.py`). This launcher
+    never opens `render_env/`."""
+    return settings.home / ENV_SNAPSHOT_DIR_NAME / f"{role}.json"
 
 
-def load_live_env(settings: "Settings", role: str) -> dict[str, str]:
-    path = live_env_path(settings, role)
+def missing_env_snapshots(settings: "Settings", roles: Iterable[str]) -> list[str]:
+    return [role for role in roles if not env_snapshot_path(settings, role).is_file()]
+
+
+def load_env_snapshot(settings: "Settings", role: str) -> dict[str, str]:
+    path = env_snapshot_path(settings, role)
     if not path.is_file():
         return {}
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -321,41 +347,42 @@ def role_local_view(local: dict[str, str], role: str) -> tuple[dict[str, str], l
 
 def derive_role_env(
     role: str,
-    blueprint: dict[str, list[BlueprintKey]],
+    spec: dict[str, list[RoleEnvKey]],
     local: dict[str, str],
     settings: Settings,
     *,
-    live: dict[str, str] | None = None,
+    snapshot: dict[str, str] | None = None,
     base_env: dict[str, str] | None = None,
     instance_id: str = "",
 ) -> tuple[dict[str, str], dict[str, Any]]:
-    """Blueprint -> live Render env (if imported) -> local file -> forced.
+    """Role spec -> env snapshot (`fleet_env/<role>.json`) -> local file -> forced.
 
-    The live layer matters: the blueprint was 166 keys behind the live services
-    (learnings.md, FORBIDDEN note on render.yaml), and those undeclared keys are
-    where most `*_AUTORUN` switches and all venue credentials live."""
+    The snapshot layer matters: the declared keys were 166 behind what the
+    services ran (learnings.md, FORBIDDEN note on render.yaml), and those
+    undeclared keys are where most `*_AUTORUN` switches and all venue
+    credentials live."""
     env = dict(os.environ if base_env is None else base_env)
     # A stray RENDER_* in the operator's shell must not leak in.
     for name in list(env):
         if name.startswith("RENDER_") or name == "RENDER":
             env.pop(name, None)
-    audit: dict[str, Any] = {"rewritten": [], "local": [], "unset": [], "forced": {}, "live": 0}
-    live = live or {}
+    audit: dict[str, Any] = {"rewritten": [], "local": [], "unset": [], "forced": {}, "snapshot": 0}
+    snapshot = snapshot or {}
     # Role-scoped `ROLE__KEY` lines resolve to plain keys for this role only, and
     # beat the same key's global line; every layer below sees the resolved view.
     local, audit["role_scoped"] = role_local_view(local, role)
 
-    for item in blueprint[role]:
+    for item in spec[role]:
         if item.source == "value":
-            value = rewrite_path(item.value or "", data_root=settings.data_root)
+            value = expand_path(item.value or "", data_root=settings.data_root)
             if value != item.value:
                 audit["rewritten"].append(item.key)
             env[item.key] = value
         elif item.source == "keyvalue":
             env[item.key] = settings.redis_url
-        else:  # generate / from_web / sync_false -> live env or the local file decides
-            if item.key in live:
-                env[item.key] = rewrite_path(str(live[item.key]), data_root=settings.data_root)
+        else:  # generate / from_web / sync_false -> the snapshot or the local file decides
+            if item.key in snapshot:
+                env[item.key] = expand_path(str(snapshot[item.key]), data_root=settings.data_root)
             elif item.key in local:
                 env[item.key] = local[item.key]
                 audit["local"].append(item.key)
@@ -363,24 +390,24 @@ def derive_role_env(
                 env.pop(item.key, None)
                 audit["unset"].append(item.key)
 
-    # The live service's own env overrides its blueprint declaration: live is
-    # what production actually ran.
-    for key, value in live.items():
+    # The snapshot overrides the spec's declaration: it is what the services
+    # actually ran.
+    for key, value in snapshot.items():
         if key in NEVER_CARRY or value is None:
             continue
-        new = rewrite_path(str(value), data_root=settings.data_root)
+        new = expand_path(str(value), data_root=settings.data_root)
         if env.get(key) != new:
-            audit["live"] += 1
+            audit["snapshot"] += 1
         env[key] = new
         if key in audit["unset"]:
             audit["unset"].remove(key)
 
     # Local file: explicit operator overrides, applied to every role. With no
-    # live import this is also where dashboard-only keys come from.
+    # snapshot this is also where undeclared keys come from.
     for key, value in local.items():
         if key in NEVER_CARRY:
             continue
-        env[key] = rewrite_path(value, data_root=settings.data_root)
+        env[key] = expand_path(value, data_root=settings.data_root)
         if key in audit["unset"]:
             audit["unset"].remove(key)
         if key not in audit["local"]:
@@ -448,7 +475,7 @@ def derive_role_env(
     if not settings.allow_live_execution:
         forced.update(PAPER_EXECUTION)
         # Only the operator's own file may turn paper execution off; the
-        # Render import's value is about LIVE money and does not apply here.
+        # snapshot's value is about LIVE money and does not apply here.
         forced["SYNDICATE_EXECUTION_ENABLED"] = (
             str(local.get("SYNDICATE_EXECUTION_ENABLED") or "").strip() or PAPER_EXECUTION_ENABLED_DEFAULT
         )
@@ -505,9 +532,10 @@ def role_command(role: str, env: dict[str, str], settings: Settings) -> tuple[li
         workers = env.get("WEB_CONCURRENCY", "2")
         threads = env.get("GUNICORN_THREADS", "4")
         if gunicorn_usable():
-            # render.yaml's startCommand, minus the `sh -c` wrapper. It runs from
-            # the repo root, so ./gunicorn.conf.py (memory guard, access-log
-            # durations) loads exactly as on Render.
+            # The fleet's own start command (every role's command is defined here,
+            # never read from a file; it began as render.yaml's startCommand minus
+            # the `sh -c` wrapper). It runs from the repo root, so
+            # ./gunicorn.conf.py (memory guard, access-log durations) loads.
             return (
                 [
                     sys.executable, "-m", "gunicorn", "wsgi:application",
@@ -647,9 +675,9 @@ def settings_from_args(args: argparse.Namespace) -> Settings:
     )
 
 
-def template_text(blueprint: dict[str, list[BlueprintKey]]) -> str:
+def template_text(spec: dict[str, list[RoleEnvKey]]) -> str:
     needed: dict[str, set[str]] = {}
-    for role, items in blueprint.items():
+    for role, items in spec.items():
         for item in items:
             if item.source in {"generate", "from_web", "sync_false"}:
                 needed.setdefault(item.key, set()).add(role)
@@ -659,7 +687,7 @@ def template_text(blueprint: dict[str, list[BlueprintKey]]) -> str:
         "# Blank or commented-out = the key is ABSENT, and absent is not always 'off':",
         "# check the code default before relying on it (CLAUDE.md #284).",
         "",
-        "# --- declared in render.yaml without a value (sync: false / generated) ---",
+        "# --- declared in scripts/fleet_role_spec.json without a value ---",
     ]
     for key in sorted(needed):
         roles = ",".join(sorted(needed[key]))
@@ -670,7 +698,7 @@ def template_text(blueprint: dict[str, list[BlueprintKey]]) -> str:
             default = secrets.token_hex(24)
         lines.append(f"# roles: {roles}")
         lines.append(f"{key}={default}" if default else f"# {key}=")
-    lines += ["", "# --- read by the code, set only in the Render dashboard ---"]
+    lines += ["", "# --- read by the code, declared in no spec (also in fleet_env/<role>.json) ---"]
     for key, why in DASHBOARD_ONLY_KEYS.items():
         lines.append(f"# {why}")
         lines.append(f"# {key}=")
@@ -693,7 +721,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     if settings.env_file.exists() and not args.force:
         print(f"kept existing {settings.env_file} (use --force to rewrite the template)")
     else:
-        settings.env_file.write_text(template_text(load_blueprint()), encoding="utf-8")
+        settings.env_file.write_text(template_text(load_role_spec()), encoding="utf-8")
         try:
             os.chmod(settings.env_file, 0o600)
         except OSError:
@@ -719,7 +747,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     settings = settings_from_args(args)
     print(f"LOCAL PRODUCTION DOCTOR   home={settings.home}   state={settings.state}")
     ok = True
-    ok &= _check(sys.version_info[:2] == (3, 11), "python 3.11 (render.yaml PYTHON_VERSION=3.11.9)",
+    ok &= _check(sys.version_info[:2] == (3, 11), "python 3.11 (production has run 3.11.9 since the Render era)",
                  platform.python_version(), warn=sys.version_info[:2] >= (3, 11))
     # `#313`: pipeline/intelligence_state.py does `repo_root_from(__file__)`,
     # which is `parents[3]` -- two levels ABOVE the repo. A checkout at
@@ -744,26 +772,30 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     ok &= _check(not missing, "python packages", "missing: " + ", ".join(missing) + "  -> pip install -r requirements.txt psutil waitress pyyaml" if missing else f"web server: {web_server}")
 
     try:
-        blueprint = load_blueprint()
-        _check(True, "render.yaml parsed", ", ".join(f"{r}={len(blueprint[r])} keys" for r in ROLE_ORDER))
-    except Exception as exc:  # noqa: BLE001
-        _check(False, "render.yaml parsed", str(exc))
+        spec = load_role_spec()
+        _check(True, "role spec parsed", f"{ROLE_SPEC_PATH.name}: " + ", ".join(f"{r}={len(spec[r])} keys" for r in ROLE_ORDER))
+    except (Exception, SystemExit) as exc:  # noqa: BLE001
+        _check(False, "role spec parsed", str(exc))
         return 1
 
     local = parse_env_file(settings.env_file)
-    imported = {r: load_live_env(settings, r) for r in ROLE_ORDER}
-    _check(all(imported.values()), "role env snapshot (<home>/render_env/<role>.json)",
-           ", ".join(f"{r}={len(imported[r])} keys" for r in ROLE_ORDER) if all(imported.values())
-           else "no -- restore it with scripts/fleet_secrets_backup.py restore (runbook: 'Fleet secrets "
-                "backup'; there is no Render re-import since 2026-11-15) or set the keys in "
-                "local_production.env; blueprint-only until then",
-           warn=True)
+    imported = {r: load_env_snapshot(settings, r) for r in ROLE_ORDER}
+    missing_snapshots = missing_env_snapshots(settings, ROLE_ORDER)
+    # FATAL since 2026-11-17: `up` refuses to start without every role's snapshot
+    # (see `cmd_up`), because the snapshot is where the venue keys and the
+    # `*_AUTORUN` switches live, and absent is not off.
+    ok &= _check(not missing_snapshots, f"role env snapshot (<home>/{ENV_SNAPSHOT_DIR_NAME}/<role>.json)",
+                 ", ".join(f"{r}={len(imported[r])} keys" for r in ROLE_ORDER) if not missing_snapshots
+                 else f"MISSING for {missing_snapshots} -- `up` will refuse. Restore it with "
+                      "scripts/fleet_secrets_backup.py restore (runbook: 'Fleet secrets backup'; a backup "
+                      "from before 2026-11-17 holds render_env/: run scripts/fleet_env_snapshot.py migrate "
+                      "--home <restored dir>), or start with `up --allow-missing-env-snapshot`")
     ok &= _check(settings.env_file.is_file(), "secrets file", str(settings.env_file) if settings.env_file.is_file() else "missing -- run `init`")
     for key, why in (
         ("ADMIN_TOKEN", "ops API, artifact export/publish"),
         ("ODDS_API_KEY", "every odds refresh"),
     ):
-        present = bool(local.get(key) or imported["web"].get(key) or any(i.key == key and i.value for i in blueprint["web"]))
+        present = bool(local.get(key) or imported["web"].get(key) or any(i.key == key and i.value for i in spec["web"]))
         ok &= _check(present, f"{key}", why if present else f"ABSENT -- {why} will not work")
     for key in ("ANTHROPIC_API_KEY", "KALSHI_API_KEY_ID", "POLYMARKET_US_API_KEY_ID", "CFBD_API_KEY", "SYNDICATE_PORTFOLIO_USERNAME"):
         have = bool(local.get(key) or any(imported[r].get(key) for r in ROLE_ORDER))
@@ -771,11 +803,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     unset: dict[str, list[str]] = {}
     for role in ROLE_ORDER:
-        _, audit = derive_role_env(role, blueprint, local, settings, live=load_live_env(settings, role))
+        _, audit = derive_role_env(role, spec, local, settings, snapshot=load_env_snapshot(settings, role))
         for key in audit["unset"]:
             unset.setdefault(key, []).append(role)
     if unset:
-        print("  [INFO] blueprint keys with no local value (absent on these roles):")
+        print("  [INFO] declared keys with no value in any layer (absent on these roles):")
         for key in sorted(unset):
             print(f"           {key}  ({', '.join(unset[key])})")
 
@@ -824,9 +856,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 def cmd_env(args: argparse.Namespace) -> int:
     settings = settings_from_args(args)
-    blueprint = load_blueprint()
+    spec = load_role_spec()
     local = parse_env_file(settings.env_file)
-    env, audit = derive_role_env(args.role, blueprint, local, settings, live=load_live_env(settings, args.role), base_env={})
+    env, audit = derive_role_env(args.role, spec, local, settings, snapshot=load_env_snapshot(settings, args.role), base_env={})
     for key in sorted(env):
         print(f"{key}={mask(key, env[key]) if not args.unmask else env[key]}")
     print(f"# rewritten paths: {len(audit['rewritten'])}  local: {len(audit['local'])}  unset: {audit['unset']}", file=sys.stderr)
@@ -834,11 +866,11 @@ def cmd_env(args: argparse.Namespace) -> int:
     return 0
 
 
-def run_bootstrap(settings: Settings, blueprint: dict[str, list[BlueprintKey]], local: dict[str, str]) -> int:
+def run_bootstrap(settings: Settings, spec: dict[str, list[RoleEnvKey]], local: dict[str, str]) -> int:
     """Seed the shared data root from the checkout ONCE, before any role starts.
     Same script and env Render ran at boot (seed-only: existing files are never
     overwritten), but one pass instead of three racing ones on one disk."""
-    env, _ = derive_role_env("refresh-worker", blueprint, local, settings, live=load_live_env(settings, "refresh-worker"))
+    env, _ = derive_role_env("refresh-worker", spec, local, settings, snapshot=load_env_snapshot(settings, "refresh-worker"))
     env["SYNDICATE_BOOTSTRAP_ON_START"] = "1"
     settings.data_root.mkdir(parents=True, exist_ok=True)
     (settings.data_root / "reports").mkdir(parents=True, exist_ok=True)
@@ -1211,14 +1243,26 @@ def cmd_up(args: argparse.Namespace) -> int:
         except (ValueError, ImportError):
             pass
 
-    blueprint = load_blueprint()
+    spec = load_role_spec()
     local = parse_env_file(settings.env_file)
     if not settings.env_file.is_file():
         raise SystemExit(f"no {settings.env_file}. Run `init` first.")
     roles = [r for r in ROLE_ORDER if r in args.roles]
+    # FAIL CLOSED ON A MISSING SNAPSHOT `[2026-11-17, lane render-config-retirement]`.
+    # The snapshot holds the venue keys and most `*_AUTORUN` switches; a role
+    # started without it runs with them ABSENT, and absent is not off. Until this
+    # lane a missing file was a doctor WARN and `up` ran spec-only. A loud refusal
+    # beats a quiet fleet that trades differently.
+    missing = missing_env_snapshots(settings, roles)
+    if missing and not getattr(args, "allow_missing_env_snapshot", False):
+        raise SystemExit(
+            f"no env snapshot for {missing} under {settings.home / ENV_SNAPSHOT_DIR_NAME}. Restore it "
+            "(runbook 'Fleet secrets backup'; a pre-2026-11-17 backup holds render_env/: run "
+            "scripts/fleet_env_snapshot.py migrate --home <dir>), or pass --allow-missing-env-snapshot "
+            "to start those roles from the spec and local_production.env alone.")
 
     live_money = settings.allow_live_execution and any(
-        money_is_live({**load_live_env(settings, r), **local}) for r in roles
+        money_is_live({**load_env_snapshot(settings, r), **local}) for r in roles
     )
     print(f"LOCAL PRODUCTION UP   home={settings.home}   state={settings.state}   port={settings.port}   commit={git_commit()[:12]}")
     print(f"  money: {'LIVE -- real orders can be placed' if live_money else 'paper'}", flush=True)
@@ -1228,19 +1272,19 @@ def cmd_up(args: argparse.Namespace) -> int:
         print(f"  [redis] {ensure_redis_durable(settings.redis_url)}", flush=True)
 
     if not args.skip_bootstrap:
-        rc = run_bootstrap(settings, blueprint, local)
+        rc = run_bootstrap(settings, spec, local)
         if rc != 0:
             print("  [bootstrap] non-zero exit -- continuing; roles read whatever is present (see log)", flush=True)
 
     boot = int(time.time())
     items: list[Supervised] = []
     for role in roles:
-        env, audit = derive_role_env(role, blueprint, local, settings, live=load_live_env(settings, role), instance_id=f"local-{role}-{boot}")
+        env, audit = derive_role_env(role, spec, local, settings, snapshot=load_env_snapshot(settings, role), instance_id=f"local-{role}-{boot}")
         command, server = role_command(role, env, settings)
         if role == "web" and server == "waitress":
             print("  [web] waitress (gunicorn cannot run on Windows). Same app, one process, threaded.", flush=True)
         if audit["unset"]:
-            print(f"  [{role}] {len(audit['unset'])} blueprint key(s) absent locally: {', '.join(audit['unset'])}", flush=True)
+            print(f"  [{role}] {len(audit['unset'])} declared key(s) with no value in any layer: {', '.join(audit['unset'])}", flush=True)
         items.append(Supervised(role, command, env, settings.logs_dir / f"{role}.log"))
     token = local.get("CLOUDFLARED_TUNNEL_TOKEN", "").strip()
     if token and not args.no_tunnel and shutil.which("cloudflared"):
@@ -2473,14 +2517,14 @@ def cmd_status(args: argparse.Namespace) -> int:
         psutil = None  # type: ignore[assignment]
     head = git_commit()
     try:
-        blueprint, local = load_blueprint(), parse_env_file(settings.env_file)
+        spec, local = load_role_spec(), parse_env_file(settings.env_file)
     except Exception:
-        blueprint = local = None
+        spec = local = None
     for name, pid in (info.get("roles") or {}).items():
         next_up = None
-        if blueprint is not None and local is not None and name in PLAN_MEMORY_MB:
+        if spec is not None and local is not None and name in PLAN_MEMORY_MB:
             try:
-                env, _ = derive_role_env(name, blueprint, local, settings, live=load_live_env(settings, name), base_env={})
+                env, _ = derive_role_env(name, spec, local, settings, snapshot=load_env_snapshot(settings, name), base_env={})
                 next_up = _cap_mb(env.get(MEMORY_LIMIT_KEY))
             except Exception:
                 next_up = None
@@ -2554,6 +2598,9 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     p.add_argument("--allow-live-execution", action="store_true",
                    help="let the env file's SYNDICATE_EXECUTION_* through. Without this, money is always paper.")
     p.add_argument("--publish-loopback", action="store_true", help="point SYNDICATE_WEB_PUBLISH_URL at the local web")
+    p.add_argument("--allow-missing-env-snapshot", action="store_true",
+                   help="start roles that have no <home>/fleet_env/<role>.json (venue keys and *_AUTORUN switches then "
+                        "come only from local_production.env); refused without this flag")
     p.add_argument("--no-tunnel", action="store_true")
     p.add_argument("--no-jobs", action="store_true", help="do not run the scheduled jobs (SCHEDULED_JOBS: the Render crons + data-backup)")
     p.add_argument("--web-start-timeout", type=float, default=180.0)

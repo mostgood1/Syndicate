@@ -32,13 +32,13 @@ SECRET_VALUE = "sk-live-NEVER-PRINTED-1234567890"
 @pytest.fixture()
 def home(tmp_path: Path) -> Path:
     home = tmp_path / "syndicate-prod"
-    (home / "render_env").mkdir(parents=True)
+    (home / "fleet_env").mkdir(parents=True)
     (home / "local_production.env").write_text(
         f"# comment\nADMIN_TOKEN={SECRET_VALUE}\nREFRESH_WORKER__FLAG=1\n"
         "SYNDICATE_LOCAL_BACKUP_OFFDISK_DIR=/nowhere/offdisk\n", encoding="utf-8")
-    (home / "render_env" / "web.json").write_text(
+    (home / "fleet_env" / "web.json").write_text(
         json.dumps({"service_id": "srv-x", "values": {"ODDS_API_KEY": SECRET_VALUE, "B": "2"}}), encoding="utf-8")
-    (home / "render_env" / "refresh-worker.json").write_text(
+    (home / "fleet_env" / "refresh-worker.json").write_text(
         json.dumps({"values": {"A": "1", "B": "2", "C": "3"}}), encoding="utf-8")
     return home
 
@@ -78,9 +78,9 @@ def test_backup_writes_one_encrypted_file_and_reads_it_back(home, passphrase, fa
     files = fsb.backups_in(out)
     assert [Path(report["path"])] == files and not list(out.glob("*.partial"))
     assert [row["path"] for row in report["files"]] == [
-        "local_production.env", "render_env/refresh-worker.json", "render_env/web.json"]
+        "local_production.env", "fleet_env/refresh-worker.json", "fleet_env/web.json"]
     assert {row["path"]: row["keys"] for row in report["files"]} == {
-        "local_production.env": 3, "render_env/refresh-worker.json": 3, "render_env/web.json": 2}
+        "local_production.env": 3, "fleet_env/refresh-worker.json": 3, "fleet_env/web.json": 2}
     # encrypt then the read-back decrypt: the file on disk was re-read.
     assert [("--symmetric" in c, "--decrypt" in c) for c in fake_gpg] == [(True, False), (False, True)]
 
@@ -99,7 +99,7 @@ def test_nothing_secret_is_printed(home, passphrase, fake_gpg, tmp_path, capsys)
     (lambda h, p: p.unlink(), fsb.EXIT_NO_PASSPHRASE),
     (lambda h, p: p.write_text("short", encoding="utf-8"), fsb.EXIT_NO_PASSPHRASE),
     (lambda h, p: (h / "local_production.env").unlink(), fsb.EXIT_REFUSED),
-    (lambda h, p: shutil.rmtree(h / "render_env"), fsb.EXIT_REFUSED),
+    (lambda h, p: shutil.rmtree(h / "fleet_env"), fsb.EXIT_REFUSED),
 ])
 def test_refusals_write_nothing(home, passphrase, fake_gpg, tmp_path, break_it, code):
     break_it(home, passphrase)
@@ -133,15 +133,15 @@ def test_verify_reports_a_live_file_that_changed(home, passphrase, fake_gpg, tmp
     (home / "local_production.env").write_text("ADMIN_TOKEN=rotated-later\n", encoding="utf-8")
     verdicts = {row["path"]: row["live"] for row in fsb.do_verify(home, Path(report["path"]), passphrase)["files"]}
     assert verdicts["local_production.env"] == "DIFFERS from live"
-    assert verdicts["render_env/web.json"] == "same as live"
+    assert verdicts["fleet_env/web.json"] == "same as live"
 
 
 def test_a_tampered_archive_fails_integrity(home, passphrase, fake_gpg, tmp_path):
     files = fsb.secret_files(home)
     tar_bytes, _ = fsb.build_archive(files, home=home, now=fsb.dt.datetime.now(fsb.dt.timezone.utc))
     manifest, members = fsb.read_archive(tar_bytes)
-    members["render_env/web.json"] = b"{}"
-    assert fsb.integrity_problems(manifest, members) == ["render_env/web.json: content does not match its manifest hash"]
+    members["fleet_env/web.json"] = b"{}"
+    assert fsb.integrity_problems(manifest, members) == ["fleet_env/web.json: content does not match its manifest hash"]
 
 
 def test_restore_round_trip_and_its_refusals(home, passphrase, fake_gpg, tmp_path):

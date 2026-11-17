@@ -89,10 +89,10 @@ def test_supervisor_role_env_carries_the_stamp_dir_unless_disabled(tmp_path: Pat
     from scripts import local_production as lp
 
     settings = lp.Settings(home=tmp_path / "home", port=12345)
-    blueprint = lp.load_blueprint()
+    spec = lp.load_role_spec()
     for role in lp.ROLE_ORDER:
-        env, _ = lp.derive_role_env(role, blueprint, {}, settings, base_env={})
+        env, _ = lp.derive_role_env(role, spec, {}, settings, base_env={})
         assert env["PYTHONPATH"].split(os.pathsep)[:2] == [str(STAMP_DIR), str(REPO)]
-    env, _ = lp.derive_role_env("refresh-worker", blueprint, {}, settings,
+    env, _ = lp.derive_role_env("refresh-worker", spec, {}, settings,
                                 base_env={"SYNDICATE_LOCAL_LOG_TIMESTAMPS": "0"})
     assert str(STAMP_DIR) not in env["PYTHONPATH"].split(os.pathsep)
