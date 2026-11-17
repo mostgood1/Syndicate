@@ -455,3 +455,32 @@ No `live_row` ask: no game was live. `as_of_in_future` false on 5 of 5.
 - 2e: deploys.md headers stamped since 19:55Z are all READINGs (19:56:39Z, 19:56:53Z, 19:58:28Z, 20:02:54Z); no new FLEET ff / DEPLOY / restart. The host reboot's `up` (19:50:39Z, `5db26434e`) is ~44 min old, just outside this window.
 
 No anomaly.
+
+## Reading 10 (3:05 PM CST)
+
+Probe `ask_reading_20261117T210454Z.json` (asks 3:04:56-3:05:10 PM CST; web window 2:34:54-3:05 PM CST).
+
+**Ask:** 5 / 5 answered, 0 past the 45 s cut-off, median 2.58 s, max 4.91 s. Shortlist 200 in 0.81 s (200 rows).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "spread?" | 2.58 | True | bet_analysis | 2026-11-17T20:59:53Z | 0 |
+| free_text "Lakers vs Celtics" | 2.47 | True | matchup_analysis | 2026-11-17T20:59:53Z | 0 |
+| free_text "top edges today" | 4.91 | True | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NBA UTA@LAC H1 Under 109.5) | 3.81 | True | bet_analysis | 2026-11-15 (date) | 2 |
+| pregame_prop (Henderson U1.5) | 1.71 | True | bet_analysis | 2026-11-17T20:54:26Z | 7 |
+
+No `live_row` ask: no live game in the shortlist. `as_of_in_future` false on 5 / 5. (The game-line ask's as_of is a 2-day-old date, 2026-11-15; noted, not a rule breach.)
+
+**Web (2:34-3:05 PM CST, 73 requests):** WORKER TIMEOUT kills 0. Memory recycles 3 (3 hard, max anon 986.5 MB vs limit 645.8 MB). Overlay warms 18: median 4.91 s, 0 over 45 s, 0 over 60 s, max 9.93 s. Requests over 20 s: 0; over 45 s: 0. Asks from any client 10, 0 over 45 s, 0 non-200; 0 of 10 were not this probe's (all `Python-urllib`; the 5 at 2:34-2:35 PM are reading 9's).
+
+**Host:** load 2.36 / 2.35 / 2.33 on 12 cores; MemAvailable 8,403 MB. Top CPU: build_soccer_artifacts (mls wk34) 99.7% ni 0; refresh-worker 95.1% ni 0 (3,452 MB RSS); fetch_espn_live_status 71.4% ni 0; live-odds-worker 43.6% ni 0; live_resim_workers x2 ~4.5% ni 5; gunicorn web 3.3% ni 0; this probe 2.3% ni 19.
+
+**Engine:**
+- 2a F2: 1 run total (16:30-17:17Z, 10:30-11:17 AM CST, "did NOT PASS"), already on main `c765eec64`; no newer run.
+- 2b `engine-learner-m2-gate-read-1124`: enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c `m2_gate.py` sha256 `c1a2c029c2a1816f...` = Amendment 2.
+- 2d engine-file commits on origin/main in the last 40 min: none.
+- 2e deploys.md headers in the last 40 min: one, 20:52Z (2:52 PM CST), a READING (no deploy): `2148f99cb`'s refresh-worker half is live (paper all-dates record; lane `portfolio-monitor`). It is not a new load in the window; refresh-worker and live-odds-worker etimes 4,130 s (up since ~1:56 PM CST, the host reboot). Paper endpoint, not live pricing.
+
+No anomaly.
