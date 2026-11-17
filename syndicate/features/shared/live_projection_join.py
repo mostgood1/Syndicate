@@ -358,8 +358,33 @@ def _status_text(status: Mapping[str, Any] | str | None) -> str:
     return " ".join(str(part).strip() for part in parts if part).strip().lower()
 
 
-def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
+def players_out_of_snapshot(snapshot: Any) -> set[str]:
+    """`_norm_name` of every player a live snapshot lists as OUT and NOT modelled (lane live-player-exit-gate).
+
+    Read from each game's `playersOut`, the list every live producer publishes (`live_player_status`). A
+    MODELLED exit (an NBA foul-out the engine state carries, a soccer red card the sim applied) is left out:
+    the prop sim already gives that player a 0 remainder, an exact price (user 11-16, "No, keep pricing")."""
+    out: set[str] = set()
+    games = snapshot.get("games") if isinstance(snapshot, Mapping) else None
+    for game in games if isinstance(games, Sequence) else ():
+        if not isinstance(game, Mapping):
+            continue
+        for p in game.get("playersOut") if isinstance(game.get("playersOut"), Sequence) else ():
+            if isinstance(p, Mapping) and not p.get("modelled"):
+                name = _norm_name(p.get("player"))
+                if name:
+                    out.add(name)
+    return out
+
+
+def build_live_prop_index(snapshot: Mapping[str, Any] | None, *, players_out: set[str] | None = None) -> dict[str, Any]:
     """Index the published live-lens snapshot by (player, market, line).
+
+    `players_out` (lane live-player-exit-gate): `_norm_name`s of players out of their game, for a sport whose
+    exits are published in ANOTHER snapshot than its props (NBA: `nba_live_resim.json` vs `nba_live_lens.json`).
+    This snapshot's own `playersOut` and any row's `notPricedReason` are read as well. An out player's rows are
+    still indexed -- so the board shows his Live/Actual columns and a miss is not misread as "not live" -- but
+    flagged `player_out`, and `attach_live_projections` never prices them.
 
     Side is NOT part of the key. The re-sim emits one distribution per
     player-market-line; `modelProbOver` is the over probability and the under is
@@ -409,6 +434,8 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
     # dilute the denominator with guaranteed zeros. Only the `live` row of this
     # table can falsify anything.
     by_state: dict[str, dict[str, int]] = {}
+    out_names = set(players_out or ()) | players_out_of_snapshot(snapshot)
+    rows_player_out = 0
 
     def _bucket(state: str) -> dict[str, int]:
         return by_state.setdefault(state, {"rows": 0, "with_live_prob": 0, "with_live_projection": 0})
@@ -488,7 +515,11 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
                 # `#762` (6): a line the books took down. Shown, never priced -- see `attach_live_projections`.
                 "quote_pulled": prop.get("quotePulled") is True,
                 "live_display_prob_over": prop.get("liveDisplayProbOver"),
+                # Lane live-player-exit-gate: the player has left the game and the prop sim does not know it.
+                "player_out": bool(player in out_names or prop.get("notPricedReason") == "player_out"),
             }
+            if index[(player, market, line)]["player_out"]:
+                rows_player_out += 1
             rows_indexed += 1
             if has_live_prob:
                 rows_with_live_prob_indexed += 1
@@ -502,6 +533,8 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
         "live_games": live_games,
         "rows_seen": rows_seen,
         "rows_indexed": rows_indexed,
+        "rows_player_out": rows_player_out,
+        "players_out": len(out_names),
         "skipped_no_live_projection": skipped_no_live_projection,
         "skipped_no_key": skipped_no_key,
         "rows_with_live_prob_seen": rows_with_live_prob_seen,
@@ -637,6 +670,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
     prob_withheld = 0
     display_only = 0
     display_only_pulled = 0
+    display_only_player_out = 0
     considered = 0
     miss_no_player = 0
     miss_no_market_alias = 0
@@ -725,6 +759,19 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         if via_alias:
             player_alias_matched += 1
         pulled = hit.get("quote_pulled") is True
+        player_out = hit.get("player_out") is True
+        if player_out:
+            # LANE live-player-exit-gate. The player has left the game (injury, ejection, starter pulled) and the
+            # live prop sim still has him playing, so its probability is for a game he is not in. Shown with his
+            # actuals; no live probability and never an edge. A MODELLED exit never reaches here.
+            shown = dict(row.get("projection") or {})
+            shown.update({"live_projected": hit["live_projection"], "actual_so_far": hit.get("actual_so_far"),
+                          "live_display_prob_over": None, "live_display_only": True,
+                          "live_player_out": True, "edge_unavailable_reason": "player_out"})
+            row["projection"] = refuse_published_certainty(shown)  # type: ignore[index]
+            display_only += 1
+            display_only_player_out += 1
+            continue
         if pulled or _norm_market(row.get("market")) in _DISPLAY_ONLY_LIVE_PROP_MARKETS:
             # See `_DISPLAY_ONLY_LIVE_PROP_MARKETS`: the Live and Actual columns only.
             #
@@ -1120,6 +1167,8 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         "rows_live_display_only": display_only,
         # `#762` (6): of those, the rows whose line the books had pulled. Inside `rows_live_display_only`, not beside it.
         "rows_live_display_only_pulled": display_only_pulled,
+        # Lane live-player-exit-gate: rows of a player out of his game. Inside `rows_live_display_only`.
+        "rows_live_display_only_player_out": display_only_player_out,
         # `#762` (7): joined rows (projected or display-only) found only through the engine's canonical player key.
         "rows_live_player_alias": player_alias_matched,
         "rows_live_edge_withheld": edge_blocked,

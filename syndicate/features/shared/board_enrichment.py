@@ -2314,7 +2314,7 @@ def attach_live_projections_for_sport(grid: list, *, sport: str, selected_date: 
                           "(producer not wired)",
                 "rows_live_projected": 0,
             }
-        return attach_live_projections(grid, build_live_prop_index(snapshot))
+        return attach_live_projections(grid, build_live_prop_index(snapshot, players_out=_exit_players_out(sport)))
     except Exception:
         _LOGGER.exception("BOOK_GRID_LIVE_PROJECTION_FAILURE sport=%s date=%s", sport, selected_date)
         return {"supported": True, "error": "live projection join failed", "rows_live_projected": 0}
@@ -2674,6 +2674,25 @@ def _nba_live_priced() -> bool:
 
 def _live_gameline_sports() -> frozenset:
     return _LIVE_GAMELINE_SPORTS | {"nba"} if _nba_live_priced() else _LIVE_GAMELINE_SPORTS
+
+
+def _exit_players_out(sport: str) -> set[str]:
+    """Out players from the sport's EXIT snapshot when it is not its prop snapshot (NBA), else empty.
+
+    Lane live-player-exit-gate. The props join already reads `playersOut` on the snapshot it indexes; NBA
+    publishes exits on its re-sim file (`nba_live_resim.json`) and props on its page lens, so that file is read
+    here too. Never raises: an unreadable exit snapshot prices as before (the hold counts it `unknown`)."""
+    try:
+        from syndicate.features.shared.live_player_exit_hold import PUBLISHING_SPORTS
+        from syndicate.features.shared.live_projection_join import players_out_of_snapshot
+        from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+        name = PUBLISHING_SPORTS.get(sport)
+        if not name or name == f"{sport}_live_lens.json":
+            return set()
+        return players_out_of_snapshot(read_json_file(data_root() / "live" / name))
+    except Exception:
+        return set()
 
 
 def _live_prop_sports() -> frozenset:
