@@ -447,3 +447,32 @@ One pass over every portfolio route, before any probe existed:
     the settled count and dashes.
 - **Unchanged anomalies:** unreconciled `f8b62e6a`; the resting maker-pilot order (880 min); the late NHL bet
   (18.2 h); the 2 unclassified loads (16:17Z, 17:01Z), with their lanes.
+
+## F4 FIXED — the stuck Kalshi order (user "fix the stuck Kalshi order", ~3:10 PM CST; lane `stuck-kalshi-fill-repair`)
+
+- **What it was:** key `f8b62e6a`, an in-play IOC for 4 NO on `KXNHLGAME-26NOV13NSHVGK-NSH` (NSH @ VGK, 11-13
+  slate), submitted 2026-11-14 05:55:45Z late in the game.
+  - It filled at once. Kalshi's per-order read: `executed`, `fill_count_fp 4.00`, taker cost $1.76 (0.44 a
+    contract, inside the 0.62 limit), fee $0.069.
+  - The row stayed `submitted`. Venue settlement graded it `lost`, pnl -1.829 = -(1.76 + 0.069), at 05:59:19Z,
+    before any reconcile pass read the fill.
+  - `reconcile_live_orders` takes only outcome-is-None rows, so status, contracts and price could never be
+    filled in. `UNRECONCILABLE_ORDER ... outcome_already_set` was logged on every pass and `/portfolio` listed it
+    unreconciled for 3 days.
+  - **The loss was real and correctly graded; only the fill bookkeeping was missing.**
+- **Fix:** `execution_ledger.operator_fill_from_venue` (main `b96ea17a7`, 12 tests) writes exactly reconcile's
+  filled-branch fields from the reconciler's own view of the venue's per-order read.
+  - It never touches outcome, P&L or settlement fields, and keeps `pre_operator_fill` and `operator_fill`
+    (evidence, note, time).
+  - It refuses not-live, not-submitted, ungraded, identity mismatch, no fill, absurd fill, or no note.
+  - CLI `scripts/operator_fill_from_venue.py`: dry run by default.
+- **Applied on the fleet 21:45:02Z** (my worktree's code against the fleet store, with the live-odds-worker's
+  env, nice 19; `_load`/`_persist` are identical to the fleet's). The ledger's CAS write landed:
+  `OPERATOR_FILL ... contracts=4 fill_price=0.44 fill_stake=1.76 outcome=lost (unchanged)`.
+- **Verified, read 21:45Z:** `/api/portfolio/live?on=all` shows unreconciled **0** (was 1 at every reading
+  today); the row is `filled`, 4, 0.44, $1.76, fee $0.069, `executed`, still `lost` / -1.829. 
+- **Owed:** no `UNRECONCILABLE_ORDER key='f8b62e6a…'` on a reconcile pass after 21:45:02Z. The last lines were
+  live-odds 21:43:21Z and refresh 21:33:01Z, and no pass had run 29 s after the write.
+- **Root cause stays possible:** an in-play IOC that venue settlement grades before reconcile reads its fill.
+  This is the first in 2,282 live orders. The operator path is the documented exit; a reconcile change that
+  fills in venue-graded rows would be its own lane.
