@@ -4,9 +4,9 @@ Origin: layer2-rail-monitor backlog **I-2** (`findings_2026-11-17_layer2_rail_mo
 User 11-17 ~11:0x AM CST: "start the board query de-dup session".
 Times are Central (CST) unless marked Z.
 
-**Status: ON MAIN `5db26434e` (ledger `2e638ee61`), NOT LOADED.** Loading it is the user's decision: an ff plus `reload-web`, with no env
-change. Read-only on production throughout: every measurement below runs on a response the monitor had
-already recorded. The fleet was never called.
+**Status: ON MAIN `5db26434e` (ledger `2e638ee61`), LOADED on the fleet 2026-11-17 18:58:45Z** (user
+"Load it", then "Carry both"; see "Loaded" at the end). Everything before that section was measured
+on a response the monitor had already recorded, without calling the fleet.
 
 ## Before: the recorded fleet response
 
@@ -181,3 +181,32 @@ template fails it the same way, so it is not a regression; it is recorded as a l
   it changes an existing flag for four callers, so it needs its own consumer survey.
 - `rationale` (2.78 MB) has 0 reads on the page.
 - Together these are roughly 33 -> 26 MB, the brief's "about 27 MB".
+- This follow-up was started as its own session ("Strip top_live diagnostics and rationale from the
+  board query"), on the user's click.
+
+## Loaded, 2026-11-17 18:58:45Z (lane `board-query-row-refs-load`; deploys.md 18:58:45Z, BC-032 no)
+
+- **What loaded.** ff of `~/Syndicate` from `92ae7490a` to `5db26434e`, then `reload-web` (done at
+  18:58:52Z, failures 0). It carried two ride-alongs, on the user's "Carry both":
+  - `2148f99cb`: the `/portfolio/paper` speed-up. Its web half is live; its worker half loads at
+    refresh-worker's next restart.
+  - `ac2cbc2fc`: the launcher reading `fleet_env/`. It takes effect at the next `up`.
+  - The workers were untouched.
+- **Baseline.** I tried my own read and the connection was reset at about 31 s while web was loaded.
+  I used the page's own request in the access log at 18:56:07Z instead: **11,214,708 B gzipped,
+  136.6 s**. `QUERY_STAGE_MS` had no `refs` field, and `version_and_debug` read 7.4-7.9 s.
+- **After.** The page's body plus `row_refs`, at 18:59:08Z:
+  - **4,320,530 B gzipped (38.5%)**, raw 23,978,345 B, 200 in 18.1 s;
+  - `_response_row_refs` covers all three lists, and `candidate_count` stays at 4,500;
+  - `QUERY_STAGE_MS`: `"refs": true`, `row_refs` 535.8 ms on the live payload (the 1.6 s
+    worst case was not reached), and `version_and_debug` **1,967.7 ms**.
+- **The fleet's `/intelligence`** in headless Chromium, 19:00:47Z:
+  - it sent `row_refs: true` and got the query back as a 200 of 4,321,074 B;
+  - 0 page errors, "Showing 1,300 of 2,213 plays", 2,600 card nodes, the rail drawn;
+  - the refs key was removed after the rebuild.
+  - Console errors were `cdn.nba.com` logos only, and they reproduce with the query aborted.
+- **Not verified by me.** `/portfolio/paper` sits behind the portfolio login (302). Its 200 belongs
+  to the paper lane's own reading.
+- **Owed.** The `WEB_WORKER_MEMORY_RECYCLE` rate per query request, against 28 recycles 16:00-18:59Z.
+  Browser tabs opened before the load keep the old page JS, and so the old ~11 MB response, until
+  reloaded.

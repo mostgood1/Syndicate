@@ -1,6 +1,11 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#826` — **THE BOARD QUERY SENT EACH OPPORTUNITY ROW UP TO FOUR TIMES. The page's `/api/intelligence/query` was 80.3 MB raw / 14.4 MB gzipped / 78 s on the fleet 11-16 7:48 PM CST: `ranked_all`, `board_contract.cards`, `top_opportunities` and `top_live_opportunities` carry the same 6,295 rows by `pick_id`. Opt-in `row_refs` sends them once, losslessly: 33.1 MB / 5.7 MB** `[2026-11-17, lane board-query-row-refs; layer2-rail-monitor I-2, user "start the board query de-dup session"]` — ON MAIN `5db26434e`; NOT LOADED (a web reload is the user's call)
+### `#826` — **THE BOARD QUERY SENT EACH OPPORTUNITY ROW UP TO FOUR TIMES. The page's `/api/intelligence/query` was 80.3 MB raw / 14.4 MB gzipped / 78 s on the fleet 11-16 7:48 PM CST: `ranked_all`, `board_contract.cards`, `top_opportunities` and `top_live_opportunities` carry the same 6,295 rows by `pick_id`. Opt-in `row_refs` sends them once, losslessly: 33.1 MB / 5.7 MB** `[2026-11-17, lane board-query-row-refs; layer2-rail-monitor I-2, user "start the board query de-dup session"]` — ON MAIN `5db26434e`; **LOADED 2026-11-17 18:58:45Z** (user "Load it" + "Carry both"; deploys.md 18:58:45Z, BC-032 no)
+- **Measured on the fleet after the load:**
+  - the page's query 11,214,708 -> 4,320,530 B gzipped;
+  - `QUERY_STAGE_MS` `"refs": true`, `row_refs` 536 ms, `version_and_debug` 7.4-7.9 s -> 2.0 s;
+  - the fleet's `/intelligence` renders with 0 page errors (2,600 card nodes).
+- **Still owed:** the `WEB_WORKER_MEMORY_RECYCLE` rate per query request against before (28 recycles 16:00-18:59Z). Open tabs keep the old page JS until reloaded.
 - **No row was an exact copy**, so references alone would have lost data.
   - top rows add ~10 keys, among them `rationale`.
   - cards lack the logos, and 498 differ in `gate`.
@@ -12,8 +17,6 @@
   - the browser A/B of the rendered board is in the findings.
 - **Server path** (encode + versioned copy/hash + provider dump + gzip): 12.0-18.2 s off, 5.1-7.6 s on. The encoder costs ~1.6 s at worst.
 - **Off switches:** `SYNDICATE_QUERY_ROW_REFS=off` (env; absent = honoured), or remove the template line.
-- **Load:** ff + `reload-web` only. Betting change: no.
-- **Owed after a load:** `QUERY_STAGE_MS` `"refs": true` on web.log, the served Content-Length (~14.4 -> ~5.7 MB), and the `WEB_WORKER_MEMORY_RECYCLE` rate per request against the 5-15 baseline.
 - **Not done** (two leads in `leads.md`):
   - `top_live_opportunities` is outside `_DIAGNOSTIC_ROW_LISTS`; its patch is still 5.2 MB, and the page never reads the list.
   - `rationale` (2.78 MB) is unread by the page.

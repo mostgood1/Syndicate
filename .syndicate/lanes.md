@@ -1045,7 +1045,15 @@ death, never life — do not invert it.
 - Blocked by: none
 - **Shared file:** `syndicate/blueprints/intelligence.py` is also claimed by `nba-live-props-midnight` (`_lens_prop_index` + `_refresh_lens_prop_live_columns` only). The edits here stay outside those two functions; a note is in that lane's block.
 
-### board-query-row-refs-load — OPEN — opened 2026-11-17 — session e569a6cd-3808-4d13-81bd-53671669f80d
+### board-query-row-refs-load — CLOSED 2026-11-17 1:08 PM CST (GOAL MET except the paper 200, now moot: loaded 18:58:45Z, page query 11,214,708 -> 4,320,530 B gzipped, refs true, fleet board renders with 0 page errors) — opened 2026-11-17 — session e569a6cd-3808-4d13-81bd-53671669f80d
+- **GOAL VERDICT `[2026-11-17 19:08Z]`:** Goal, verbatim: "todo #826 LOADED on the fleet (user 2026-11-17 'Load it', then 'Carry both' for the ride-alongs ac2cbc2fc launcher and 2148f99cb paper endpoint): ff ~/Syndicate 92ae7490a -> 5db26434e and reload-web; the served /api/intelligence/query with the page's body (slim_aliases + drop_row_diagnostics + row_refs) carries _response_row_refs and is ~60% smaller on the wire than the same body's baseline, web.log QUERY_STAGE_MS shows refs true, /intelligence renders with 0 page errors, and /portfolio/paper still answers 200". **GOAL: MET, except the last clause, which is NOT VERIFIED and now MOOT.**
+  - **Loaded:** ff 18:58:45Z; `reload-web` done 18:58:52Z (failures 0; workers 4074414/4074415).
+  - **The page's query:** 11,214,708 -> **4,320,530 B gzipped (38.5%)**, carrying `_response_row_refs` for all 3 lists.
+  - **web.log:** at 18:59:24Z `QUERY_STAGE_MS` reads `"refs": true`, `row_refs` 535.8 ms, `version_and_debug` 7.4-7.9 s -> 2.0 s.
+  - **The fleet's `/intelligence`** (headless, 19:00:47Z): `row_refs` sent, 0 page errors, 2,600 card nodes, the rail drawn.
+  - **`/portfolio/paper`:** 302 to `/portfolio/login` (the auth gate); I did not sign in. Main `f7fb3ed4e` (paper-page-retirement, user "Retire it") then retired `/portfolio/paper` and `/api/portfolio/paper`, so the clause is moot.
+  - Record: deploys.md 18:58:45Z (main `ea6aab2e2`), BC-032 (no). Claim released 19:05Z.
+  - Told: the paper lane, the vhdx down/up planner and the render-config owner (the new launcher is on disk and takes effect at the next `up`).
 - Goal: todo #826 LOADED on the fleet (user 2026-11-17 'Load it', then 'Carry both' for the ride-alongs ac2cbc2fc launcher and 2148f99cb paper endpoint): ff ~/Syndicate 92ae7490a -> 5db26434e and reload-web; the served /api/intelligence/query with the page's body (slim_aliases + drop_row_diagnostics + row_refs) carries _response_row_refs and is ~60% smaller on the wire than the same body's baseline, web.log QUERY_STAGE_MS shows refs true, /intelligence renders with 0 page errors, and /portfolio/paper still answers 200
 - Files: docs/ai_context/todo.md (the #826 item ONLY), .syndicate/findings_2026-11-17_board_query_row_refs.md
 - Hypothesis: n/a (a user-approved load of a change measured on a recorded response)
