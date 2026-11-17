@@ -1136,6 +1136,15 @@ death, never life — do not invert it.
 - Verification: Tests: off!=on reachability, 0-game date skipped, game date polled, unknown schedule polls + logs. After a user-approved load: WNBA box-score share of web requests and web recycles per hour, before vs after, in deploys.md
 - Blocked by: none
 - Hypothesis RESULT: CONFIRMED. The June calls are tests in the nightly ci-checkout shards plus daytime runs. The postgame backfill is EXONERATED (ESPN direct, settles hourly). Ride-alongs `25fc2e4f0`..`920c19e70`: engine_experts `85af16b35` (no role imports it), execution_ledger `b96ea17a7` (additive, operator CLI only). Findings: findings_2026-11-17_wnba_boxscore_polling.md; log 2026-11-17 4:16 PM CST.
+
+### nfl-live-resim-event-seeds — OPEN — opened 2026-11-17 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: The NFL live re-sim stops sharing seeds 1..N across every game (todo #813 part 2): resim_live_game seeds each game from its ESPN event id (a stable sha256 offset, identical in every process), keeping the same seeds across a game's ticks so its line does not jitter on noise; a state with no event id keeps today's seeds bit-identically, and the output names the basis (seed_basis event|shared). On main with tests incl. off != on; the fleet load is the user's decision, after the TNF 11-19 possession reading
+- Files: syndicate/features/nfl/live_resim.py (NflLiveGameState + live_state_from_row + resim_live_game ONLY), tests/test_nfl_live_resim_event_seeds.py (NEW)
+- Hypothesis: n/a (build). Measured before (findings_2026-11-16_nfl_live_total_underprojection.md): production's shared seeds lift the end-of-Q3 resume +0.29 [+0.11, +0.46] points across the slate
+- Falsification test: n/a
+- Verification: Tests: two event ids give different seed sets and different margin draws; the same id reproduces bit-identically across calls and across a fresh interpreter (PYTHONHASHSEED varied); no id == the old seeds 1..N bit-identically; live_state_from_row carries event_id from the normalised row; seed_basis named. Then the existing NFL live re-sim test files pass. Fleet: after a load (user's call), live_resim rows carry seed_basis=event
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
