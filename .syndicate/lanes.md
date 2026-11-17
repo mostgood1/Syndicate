@@ -967,6 +967,14 @@ death, never life — do not invert it.
 - Verification: The findings file carries a dated Central-time block per reading with rates and denominators; each actionable anomaly names its owner lane or a new lane; a daily summary with per-metric trend
 - Blocked by: none
 
+### board-query-row-refs — OPEN — opened 2026-11-17 — session e569a6cd-3808-4d13-81bd-53671669f80d
+- Goal: The served /intelligence page's /api/intelligence/query response sends each opportunity row once: a new opt-in body flag row_refs (default OFF; server off switch SYNDICATE_QUERY_ROW_REFS=off) sends top_opportunities, top_live_opportunities and board_contract.cards as indices into ranked_all plus a per-row patch, the page rebuilds them before any reader, and the rebuilt payload is JSON-identical (key order included) to the flag-off payload; measured before/after on the recorded fleet response of 11-16 7:48 PM CST (C:/tmp/railmon/readings/20261117T014841Z/query.json, 80.3 MB); fix on main with tests incl. off != on; loading on the fleet (web reload) is the user's decision
+- Files: syndicate/features/shared/response_row_refs.py (NEW), syndicate/blueprints/intelligence.py (the row_refs flag check and its call after drop_row_diagnostics on the three slim exits of intelligence_query_api ONLY), syndicate/templates/intelligence.html (intelligenceQueryPayload's row_refs field and the row-refs rebuild at the top of rehydrateAliases ONLY), tests/test_intelligence_query_row_refs.py (NEW), tests/fixtures/intelligence_query_row_refs_sample.json (NEW), docs/ai_context/todo.md (the board-query row-refs item ONLY)
+- Hypothesis: Stated 2026-11-17 before any change: the query repeats ranked_all's rows in top_opportunities (4,500), top_live_opportunities (2,176) and board_contract.cards (6,295). MEASURED on the recorded response: no row is an exact copy (top rows add ~10 keys incl. rationale; cards drop the logos and differ in gate on 498; top_live was never diagnostic-stripped), so plain references would lose data, but a lossless index+patch encoding cuts 80.2 MB to ~33 MB
+- Falsification test: On the recorded 11-16 response the encoded payload is > 40 MB, or after the page's own rehydrateAliases (run in node) the flag-on payload differs from the flag-off payload in any byte of JSON.stringify, or the encoder costs more server time than the serialisation it saves
+- Verification: pytest tests/test_intelligence_query_row_refs.py: off != on through the body flag and through SYNDICATE_QUERY_ROW_REFS=off; byte-size reduction on the sampled fixture; node rehydration of the real template function gives JSON.stringify-identical payloads on the fixture; plus a one-off run on the full recorded 80 MB response (sizes raw and gzip, encoder ms, equivalence) written to the lane findings
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
