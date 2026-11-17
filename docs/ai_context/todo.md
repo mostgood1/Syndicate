@@ -185,6 +185,19 @@
     - Inert with `end_of_half_clock` OFF (byte-identical, test-pinned). Reachable with it ON: at Q4 1:50 with the leader's ball, total 41.23 vs 43.40 for away 0 vs 3 timeouts.
     - Owed: the MNF read of the site scoreboard's keys; the push; then the profile load. Detail: `.syndicate/findings_2026-11-16_nfl_live_timeouts.md`.
     - **PUSHED 9:59 AM CST (user "Push it"):** `6f7cb9eb3` on main (`1f723feaa..6f7cb9eb3`, the same change rebased). Inert until the adapter keys land and the clock is ON.
+  - **NFL PROFILE LOADED 2026-11-17 9:25 AM CST** (lane `nfl-profile-load`).
+    - **User decisions:** "load the NFL profile after the MNF check"; "Check at Q4 2:00"; "Ff now, let them ride" (to the #814 ride-alongs).
+    - **Push:** `data/calibration/nfl_profile.json` `nfl-808-v3h0.03-t0.825` went to main as `f5be2b5e2` (`f571a8ffa..0111eae90`, 10:13 PM CST 11-16), after the Q4 timeouts check.
+    - **Fleet ff `d7c183d8d` -> `17ff69398` at 15:25:08Z.** One ff also loaded:
+      - #813's possession map (`9049537d1`);
+      - the timeouts adapter (`17ff69398`);
+      - #814's `884a2928a` / `f668eb6b9`.
+    - **Restart:** drained, claimed refresh-worker TERM 15:47:38Z; new pid 4027303 booted after the ff (MET).
+    - **Fresh process:** source=artifact with the nine fields (MET).
+    - **Week 11 built on the DEFAULT profile** at 04:35Z 11-17. That was 10 min after the MNF final and before the ff: the ff answer came 11 h after the Q4 trigger.
+      - The next daily `artifact_stale` launch (~04:35Z 11-18) rebuilds it on the profile, before TNF 11-20 01:15Z.
+      - The #752 re-grade's condition (d) needs that rewrite. A watcher reads it.
+    - **TNF readings owed 11-19:** `timeouts_fed`, `possession_marginalised`, and refusals by reason.
 - **Read-only.** Production's own NFL `build_projection`, 136 games of 2024-25 x 100 seeds, same seeds per arm (patched in the research process only), against nflverse pbp 2024-25 (544 games). Findings: `.syndicate/findings_2026-11-15_football_end_of_half_scoring.md`.
 - **The whole Q2 gap is in its last 120 s:** sim 3.14 points a game against the league's 4.78 [4.46, 5.10]. The regulation total looks right (45.84 vs 45.62) only because the errors cancel.
 - **Cause 1, halftime carry-over (`halftime_kickoff` OFF):** a drive crosses the half in 0.84 of games and scores 2.33 points a game in Q3. Switching it on: q3 -0.95 [-1.07, -0.83] (to 9.57, the league's 9.50), q2 0, total -1.07. That total drop is why the switch failed alone upstream.

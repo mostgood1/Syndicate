@@ -82,3 +82,45 @@ Q4 1:50, home leads 24-17 with the ball at its own 30. 400 sims each, PYTHONHASH
 3. **The NFL profile load** (the seven switches, hfb 0.03, TD 0.825) and the #752 / #805 re-grade: the user's call.
    Live timeouts only matter after it.
 4. **NCAAF is not wired.** Its profile stays OFF; `ncaaf/live_resim.py` maps `situation` separately.
+
+## MNF read, 2026-11-16 (LAC @ BAL, event 401873065): MET
+
+Written 2026-11-17, session 69e3a2e5.
+
+**Method.**
+- **Reads:** this lane's watcher (`C:\tmp\nfl_live_timeouts\mnf_watch_timeouts.py`) read ESPN's site scoreboard every 120 s from kickoff to the final. That gave 97 reads, 93 of them in progress.
+- **Grading:** `mnf_analyze.py` graded every read against ESPN's own play-by-play summary, saved at the final. Timeouts left = 3 minus the highest "Timeout #n by TEAM" at or before the read, within the read's half.
+  - Play-text codes are mapped (`BLT` is BAL).
+  - A read within 180 s after a timeout play counts as boundary lag (the scoreboard catching up).
+  - A halftime read (Q2 0:00) is counted apart.
+- **The game:** 11 timeouts in the play-by-play (LAC 5, BAL 6) and one challenge (LAC, 01:45:33Z). The challenge was reversed, so no timeout was charged.
+
+**Result.**
+
+| check | reads |
+|---|---|
+| `homeTimeouts` and `awayTimeouts` both present | **93 of 93** live reads |
+| ints in 0..3 | **93 of 93** |
+| equal to the play-by-play's timeouts left | **83** |
+| boundary lag (within 180 s after a timeout play) | 3 |
+| after a challenge | 0 |
+| **mismatch** | **0** |
+| halftime (Q2 0:00, 02:47Z-02:59Z) | 7, all (3, 3) |
+
+- **Halftime is the second-half reset.** All seven halftime reads show (3, 3), not the first half's (0, 1) left. That is the right input for a re-sim that resumes in the second half.
+- **The peer read the same.** On lane `nfl-live-possession-map`'s own reads, the same grader finds:
+  - the keys and ints on 94 of 94 live reads;
+  - 85 match, 2 are boundary lag, 0 mismatch;
+  - 7 halftime reads (1 equal to the first half's left, 6 other).
+- **The Q4 two-minute check matched.** At 04:11:40Z it read the same way: 87 live, 78 match, 2 boundary, 0 mismatch, 7 halftime. It was sent to the peer before its timeouts commit landed.
+- **The belief is now VERIFIED.** The site scoreboard's live `situation` carries `homeTimeouts` / `awayTimeouts` as the timeouts LEFT in the current half. At halftime they show the second half's three.
+
+**Owed, updated.**
+1. **The MNF read: done** (above).
+2. **Main: done.** The consumer is `6f7cb9eb3`. The adapter keys are `17ff69398` (lane `nfl-live-possession-map`, landed after this read), stacked on its #813 possession map `9049537d1`.
+3. **The NFL profile load: done** (lane `nfl-profile-load`).
+   - Fleet ff `d7c183d8d` -> `17ff69398` at 2026-11-17 15:25:08Z.
+   - Then a claimed and drained refresh-worker restart; deploys.md has the 2026-11-17 entry.
+   - The clock is ON, so fed timeouts now reach the engine.
+   - **Owed at TNF 11-19** (IND @ HOU), by lane `nfl-profile-load`'s TNF readings: the share of in-progress NFL lanes with `timeouts_fed` True, and the fed values against ESPN's at the read.
+4. **NCAAF is not wired** (unchanged).

@@ -60758,3 +60758,47 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - `SUMMARY ours_true_size=1 ours_wrong_size=0 paper=0 not_ours=2` -- `VERDICT MET` (exit 0).
 - verify: kff_read.py VERDICT MET -- 1 of 1 fractional fill of ours since the load recorded at the venue's size (1.01 = 1.01), 0 WRONG_SIZE; 91822817 filled 0.03.
 - **betting change:** no (reading only). **Claims:** none.
+
+## 2026-11-17 15:25:08Z (9:25 AM CST) -- FLEET ff `d7c183d8d` -> `17ff69398` + drained, claimed refresh-worker TERM 15:47:38Z: todo #808's NFL profile (lane `nfl-profile-load`), with #813's possession map and the live timeouts adapter (lane `nfl-live-possession-map`) -- **LOADED; MET: a fresh process reads `source=artifact version=nfl-808-v3h0.03-t0.825` with the nine fields; new refresh-worker pid 4027303 booted after the ff. OWED: week 11's projection rewritten on the profile (~04:35Z 11-18) and the TNF live readings 11-19**
+- **User, in this session's chat** (2026-11-16):
+  - "load the NFL profile after the MNF check", then "Check at Q4 2:00";
+  - "land the timeouts adapter after the MNF check too";
+  - "land the possession map with it too";
+  - 2026-11-17 ~9:15 AM CST, to the ride-along question: **"Ff now, let them ride"**.
+- **The check.** The Q4 two-minute trigger fired 04:11:40Z (MNF LAC @ BAL, Q4 1:59). On the scoreboard's live `situation`, timeouts were present on 87 of 87 live reads; 78 matched ESPN's play-by-play, 2 were boundary lag, 0 mismatched. The verdict went to the peer.
+  - Push: main `f571a8ffa..0111eae90` (profile file `f5be2b5e2` and two test-name commits), 04:13Z.
+  - The peer landed `9049537d1` and `17ff69398` on top at 04:14:49Z.
+- **Timing: the ff did NOT precede the MNF final.** The ff answer came 11 h after the Q4 trigger, and the first claim and preflight (04:14Z, CLEAR) expired in the meantime.
+  - Week 11's NFL projection had already launched at 04:34:19Z (`reason=artifact_is_preseason_backfill`). It wrote `smartsim2_projections_2026_wk11.csv` and `smartsim2_segment_distributions_2026_wk11.json` at 04:35:18Z on the DEFAULT profile.
+  - The next daily `artifact_stale` launch (~04:35Z 11-18) rewrites both on the profile, before TNF (11-20 01:15Z).
+  - The #752 re-grade's condition (d) (`findings_2026-11-16_nfl_segment_regrade_808.md`) counts a week only if its sidecar was written after **15:25:08Z**.
+- **Range `d7c183d8d..17ff69398`: 59 commits.** Runtime ride-alongs were listed (`npl_ridealong.sh`) before the merge, in their own call:
+  - **mine:** `data/calibration/nfl_profile.json`;
+  - **peer's:** `scripts/_nfl_live_resim_tick.py`, `scripts/run_refresh_worker.py`, `nfl/live_game_state.py`;
+  - **#814 (`live-player-exit-gate`, not loaded by its owner), default ON, user "let them ride":**
+    - `884a2928a`: the board's live props join never prices a player the feed lists as out;
+    - `f668eb6b9`: the MLB starter-exit gate, inert out of season;
+  - **#820 `123c0aee2`:** default OFF;
+  - **tooling only:** `43aa06ec6` (NBA grader), `betting_change.py`, the session-start hook, `live_book_edge_readout.py`.
+  - `vendor/` is empty.
+- **gates:**
+  - **ff:** claim web 15:23Z (holder `nfl-profile-load`, rc 0). Baseline 15:23:45Z: head d7c183d8d, profile absent, fresh process `source=default`. Preflight `--target-commit 17ff69398` from this lane's worktree at origin/main: **CLEAR**.
+  - **TERM:** claim refresh-worker 15:26:27Z (rc 0). Drain (`npl_drain.sh`, under the worker's own environ): CLEAR at ~15:47Z, idle after a save. Baseline 15:47:28Z: head 17ff69398, profile on disk, rw 3101432. Preflight `--target-commit 17ff69398`: **CLEAR**.
+- **load:**
+  - `git merge --ff-only 17ff69398` **15:25:08.591Z**, profile on disk.
+  - `kill -TERM 3101432` **15:47:38.540Z**. New refresh-worker **pid 4027303** first seen 15:47:46.588Z. `role_restarts.jsonl`: exit 15:47:39Z, claimed, holder `nfl-profile-load`.
+  - Undrained right after (`DRAIN_CLEARED owner=nfl-profile-load`).
+- **expect / measured:**
+  - `fleet_checkout_head` d7c183d8d -> 17ff69398: **MET**.
+  - `profile_on_disk` absent -> `nfl-808-v3h0.03-t0.825`: **MET**.
+  - `fresh_process_profile` `source=default` -> `source=artifact` with halftime_kickoff, q2_urgency_ignores_score, end_of_half_clock, end_of_half_kneel_out, end_of_half_clock_by_need, q4_kick_waits, kneel_out_q4_only ON, hfb 0.03, TD 0.825: **MET** (15:25:33Z and 15:47:28Z, refresh-worker's environ).
+  - `refresh_worker_pid` 3101432 -> new, booted after the ff: **MET** (4027303).
+  - New worker health, 15:49:07Z (80 s after boot): 0 lines starting `Traceback` and 0 containing it; LOOP_ITERATION 1; the cycle is running (`[intelligence] OVERVIEW_SPORT_END` 9, `[book_grid] LIVE_GAMELINE_BUILD` 9, `ODDS_SWEEP_OUTCOME` 7). The first board save is not yet read; the rail monitor's next reading covers it.
+  - `nfl_projection_wk11` mtime 04:35:18Z (default profile) -> rewritten after 15:25:08Z on the profile: **OWED** ~04:35Z 11-18. Watcher `C:\tmp\nfl_live_timeouts\npl_wk11_watch.py` (read-only, Idle, 600 s, 40 h cap) exits on both files.
+  - `nfl_live_resim_profile`, the in-process live re-sim on the new worker: **OWED** at the next NFL live game, TNF 11-19 (IND @ HOU), together with:
+    - `timeouts_fed` True on in-progress lanes, with the fed values against ESPN's;
+    - `possession_marginalised` False (the peer's #813 gate);
+    - refusals by reason.
+    No NFL game is live before then.
+- **revert:** `git revert f5be2b5e2`, or remove `data/calibration/nfl_profile.json` (absent = the in-source default). Then a claimed ff and a drained refresh-worker TERM. Fresh processes revert at the ff alone.
+- **Claims:** web released 15:26Z; refresh-worker released after this entry.
