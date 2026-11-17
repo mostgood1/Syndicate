@@ -214,6 +214,8 @@ CLI runs (`status`, `env` -- incl. `deploy_preflight` -- `doctor`), the nightly 
 (re-checked 18:39:29Z: SAME, 88 / 182 / 148 keys). The board-query de-dup ff
 (`92ae7490a` -> `5db26434e`) carries step 1 (`ac2cbc2fc`) but not step 2 (`cc90fb653`).
 
+**UPDATE 19:06Z (1:06 PM CST): step 1 is ON THE FLEET'S DISK.** It rode the 18:58:45Z ff `92ae7490a` -> `5db26434e` (lane `board-query-row-refs-load`, user "Carry both"); only web was HUPed. A read-only reading at 19:06:39Z, recorded in deploys.md, built each role's env as the next `up` would. Base: the supervisor's own environ plus `--allow-live-execution`. **Result: identical to what each role runs (160 / 262 / 235 keys), except `RENDER_GIT_COMMIT`**; the `92ae7490a` launcher gives the same, 0 keys differ. `status` from the new code: rc 0. Step 2 (`cc90fb653`) is not on the fleet yet.
+
 The down/up that loads them:
 
 Steps 1+2 reach the fleet only at a drained full `down` + `Start-ScheduledTask

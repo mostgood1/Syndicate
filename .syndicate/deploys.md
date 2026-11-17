@@ -61053,3 +61053,25 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **`WEB_WORKER_MEMORY_RECYCLE` per query request, vs before.** Before: 28 recycles 16:00-18:59Z, of which 18:42:41Z was hard after 5 requests and 18:43:00Z hard after 80.
   - **Open tabs keep the old page JS** (no `row_refs`, still ~11 MB per poll) until reloaded.
 - **verify:** the 18:59:24Z `QUERY_STAGE_MS` with `"refs": true`, and the 18:59:26Z access line `"POST /api/intelligence/query" 200 4320530`.
+
+## 2026-11-17 19:06:39Z (1:06 PM CST) -- READING (no deploy): what the NEXT `up` gives each role now that `ac2cbc2fc` (render-config-retirement step 1) is on the fleet's disk -- **identical to what each role runs, except `RENDER_GIT_COMMIT`**
+
+Lane `render-config-retirement` (CLOSED; session 267d8859). It follows the 18:58:45Z ff `92ae7490a` -> `5db26434e` above, which carried `ac2cbc2fc` (user "Carry both"). The user decided the load on 2026-11-17: "With next down/up". Nothing was started, stopped or signalled.
+- **Method (read-only, fleet venv):**
+  - Each role's env was built twice, as `up` would build it: with the launcher on disk at `5db26434e` (`fleet_role_spec.json` + `fleet_env/`), and with the `92ae7490a` launcher (`render.yaml` + `render_env/`).
+  - Both builds used the supervisor's own `/proc/308/environ` as the base and `--allow-live-execution`, with the instance id pinned to the role's own.
+  - Each build was compared per key by sha256 with the role's live `/proc/<pid>/environ`. Key names only were printed.
+- **Result:**
+
+| role (pid) | keys running / next up | new vs old launcher | new launcher vs running |
+|---|---|---|---|
+| web (438) | 160 / 160 | 0 differ | `RENDER_GIT_COMMIT` only |
+| refresh-worker (4060729) | 262 / 262 | 0 differ | `RENDER_GIT_COMMIT` only |
+| live-odds-worker (4062745) | 235 / 235 | 0 differ | `RENDER_GIT_COMMIT` only |
+
+  `RENDER_GIT_COMMIT` is the new HEAD by design. So the next drained `down`/`up`, e.g. the planned vhdx shrink, changes no role's env through this launcher change. Step 2 (`cc90fb653`) is NOT on the fleet; when it arrives, the 5 neutral `SYNDICATE_*` keys are added with values equal to their `RENDER*` twins.
+- **`local_production.py status` from `~/Syndicate` at `5db26434e`:**
+  - rc 0, with each role's cap line computed through `load_role_spec` + `fleet_env/`;
+  - web `code=5db26434`; both workers `code=92ae7490 (STALE)`, as expected after a web-only reload;
+  - one unrelated line: `GET /api/ops/version -> HTTPError 401` (status asks web without a token).
+- **verify:** this table; and at the next `up`, each role's `/proc` environ equal to the pre-`up` one except `RENDER_GIT_COMMIT` / `RENDER_INSTANCE_ID` (owed by whoever runs it; `.syndicate/findings_2026-11-17_render_config_retirement.md` "The load").
