@@ -1224,6 +1224,128 @@ def operator_grade_from_venue(
     raise OperatorResolutionError(f"order_not_found: {key}")
 
 
+_OPERATOR_FILL_FIELDS = (
+    "status", "contracts", "fill_price", "fill_stake_dollars", "fees_dollars", "venue_status",
+    "venue_open", "venue_remaining_count", "venue_order_id", "reconciled_at", "reconciled_from",
+)
+
+
+def operator_fill_from_venue(
+    idempotency_key: str,
+    *,
+    seen: Mapping[str, Any],
+    note: str,
+    venue: str = "kalshi",
+) -> dict[str, Any]:
+    """Record ONE live order's fill from the venue's own per-order read, where the
+    venue GRADED it before any reconcile pass saw it fill. An operator's act, with
+    its evidence kept on the row.
+
+    WHY IT EXISTS [2026-11-17, lane stuck-kalshi-fill-repair]. Key `f8b62e6a` sent an
+    immediate-or-cancel order for 4 NO on `KXNHLGAME-26NOV13NSHVGK-NSH` at 05:55:45Z
+    on 2026-11-14, late in the game. It filled at once (Kalshi: `executed`,
+    `fill_count_fp=4.00`, taker cost $1.76, fee $0.069), but the row stayed
+    `submitted`. Kalshi settled the market at 05:59:19Z and `settle_from_venue`
+    graded the row `lost`, pnl -1.829 (= -(1.76 + 0.069)), before a reconcile pass
+    had read the fill. `reconcile_live_orders` only takes rows whose outcome is
+    None, so from then on nothing could ever fill in status, contracts or price.
+    `unreconciled_orders` named it as UNRECONCILABLE_ORDER on every pass, and
+    `/portfolio` listed it as unreconciled, for three days.
+
+    WHAT IT DECIDES AND WHAT IT DOES NOT. The FILL is the venue's: `seen` is the
+    reconciler's own normalized view of the venue's order (`_venue_reader`'s view
+    over `_venue_single_order_reader`'s result), and the fields written are exactly
+    the ones `reconcile_live_orders` writes for a filled order. The OUTCOME, P&L and
+    settlement fields are NOT touched: the venue already graded the row. Every
+    field it overwrites is kept under `pre_operator_fill`, and the evidence, the
+    note and the time under `operator_fill`.
+
+    Refuses (OperatorResolutionError): no note, not found, not LIVE, another venue,
+    not `submitted`, NOT already graded (an ungraded row is ordinary reconcile's
+    job), a view that names a different order, a venue state other than `filled`,
+    no filled contracts, or a fill whose dollars are absurd against the stake.
+    """
+    text = str(note or "").strip()
+    if not text:
+        raise OperatorResolutionError("note_required: an operator fill must say why")
+    key = str(idempotency_key or "").strip()
+    if not key:
+        raise OperatorResolutionError("no_idempotency_key")
+    venue_name = str(venue or "").strip().lower()
+    view = dict(seen or {})
+
+    state = _load()
+    for order in state.get("orders") or []:
+        if str(order.get("idempotency_key") or "") != key:
+            continue
+        if str(order.get("mode") or "") != LIVE:
+            raise OperatorResolutionError(f"not_live: mode={order.get('mode')}")
+        if not str(order.get("venue") or "").strip().lower().startswith(venue_name):
+            raise OperatorResolutionError(f"venue_mismatch: {order.get('venue')} != {venue_name}")
+        if str(order.get("status") or "") != STATUS_SUBMITTED:
+            raise OperatorResolutionError(f"not_submitted: status={order.get('status')}")
+        if order.get("outcome") is None:
+            raise OperatorResolutionError("not_graded: an ungraded order is reconcile_live_orders' job")
+        client_id = str(view.get("client_order_id") or "")
+        venue_id = str(view.get("order_id") or "")
+        if client_id != key and (not venue_id or venue_id != str(order.get("venue_order_id") or "")):
+            raise OperatorResolutionError(
+                f"identity_mismatch: view client_order_id={client_id!r} order_id={venue_id!r}"
+            )
+        if view.get("state") != "filled":
+            raise OperatorResolutionError(f"not_filled_at_venue: state={view.get('state')!r}")
+        try:
+            contracts = float(view.get("filled_count"))
+        except (TypeError, ValueError):
+            contracts = 0.0
+        if contracts <= 0:
+            raise OperatorResolutionError(f"no_filled_contracts: {view.get('filled_count')!r}")
+        price = _price_as_probability(view.get("fill_price"))
+        stake = view.get("fill_cost_dollars")
+        if stake is None and price is not None:
+            stake = round(contracts * float(price), 2)
+        try:
+            requested = float(order.get("requested_stake_dollars") or 0.0)
+        except (TypeError, ValueError):
+            requested = 0.0
+        if stake is not None and requested > 0 and float(stake) > requested * _FILL_DOLLAR_ABSURD:
+            raise OperatorResolutionError(f"absurd_fill: {stake} against a {requested} stake")
+        before = str(order.get("status") or "")
+        at = _utc_now()
+        order["pre_operator_fill"] = {field: order.get(field) for field in _OPERATOR_FILL_FIELDS}
+        order.update({
+            "status": STATUS_FILLED,
+            "contracts": view.get("filled_count"),
+            "fill_price": price,
+            "fill_stake_dollars": stake,
+            "fees_dollars": view.get("fees_dollars", order.get("fees_dollars")),
+            "venue_status": view.get("venue_status"),
+            "venue_open": bool(view.get("open_at_venue")),
+            "venue_remaining_count": view.get("remaining_count"),
+            "venue_order_id": venue_id or order.get("venue_order_id"),
+            "reconciled_at": at,
+            "reconciled_from": before,
+        })
+        order["operator_fill"] = {
+            "evidence": {k: view.get(k) for k in (
+                "order_id", "client_order_id", "ticker", "state", "venue_status", "filled_count",
+                "remaining_count", "fill_price", "fill_cost_dollars", "fees_dollars",
+                "taker_fill_cost_dollars", "maker_fill_cost_dollars", "yes_price", "no_price",
+            )},
+            "note": text,
+            "at": at,
+        }
+        _persist(state)
+        print(
+            f"[execution_ledger] OPERATOR_FILL key={key} venue={order.get('venue')}"
+            f" ticker={order.get('venue_ticker')} contracts={order.get('contracts')}"
+            f" fill_price={price} fill_stake={stake} outcome={order.get('outcome')} (unchanged)",
+            flush=True,
+        )
+        return dict(order)
+    raise OperatorResolutionError(f"order_not_found: {key}")
+
+
 # `#656`. How many times `_persist` re-reads, re-merges and re-SETs before it
 # stops insisting on atomicity for one write. Five conflicts in a row need five
 # other SETs landing in five consecutive ~0.3-0.5 s windows; the densest burst
