@@ -142,3 +142,24 @@ One pass over every portfolio route, before any probe existed:
 - **Execution, 30 min:** 9 live ticks, 0 placed. Refusals: 27 `outside_price_band`, 5 `already_held_other_slate`,
   2 `game_started`.
 - **Anomalies:** the same 4. The resting order is now 617 min old; the late NHL bet is 13.8 h after its start.
+
+## Reading 3 — Tue 11-17 10:34 AM CST (16:34Z), window 30 min — the loop starts
+
+- **Endpoints:** all 7 read 200, inside budget. `live` took 1.48 s, the slowest of three readings (budget 3 s);
+  `live?on=all` 2.28 s.
+- **Web log:** 1 timeout in the window (16:13Z, mine). 0 5xx on 26 portfolio requests, 0 from a browser.
+- **Plans rewritten 16:30Z:**
+  - kalshi: 860 -> 22 placeable -> 5 positions (was 4).
+  - polymarket: 437 -> 9 -> 6 (was 5).
+  - The share below the live net floor is unchanged: kalshi 801 of 860 (93%), polymarket 268 of 437 (61%).
+- **Execution, 30 min:** 8 live ticks, 0 placed, 0 failed. Refusals: 24 `outside_price_band`,
+  4 `already_held_other_slate`, 1 `game_started`.
+- **Unchanged:** the resting maker-pilot order (622 min old); the late NHL bet (13.9 h after its start);
+  the unreconciled `f8b62e6a`.
+- **NEW anomaly: 2 deploys.md loads unclassified in the betting-change register. Handed to their lanes.**
+  - 16:17:31Z, NFL week-11 projection REBUILD on #808's profile (lane `nfl-profile-load`); no code, no restart.
+  - 16:24:06Z, ff-only `17ff69398 -> c4d35b515`, #814's portfolio `key_player_out` refusal (lane
+    `live-player-exit-gate`). By its own description this changes which live bets are placed, so it reads as a
+    `yes` pending a refresh-worker load.
+  - Effect now: none. The gate count is 0 of 800 either way (0 bets since BC-022). If neither lane classifies
+    them by the next readings, I will raise it again.
