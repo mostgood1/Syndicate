@@ -1613,7 +1613,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - refresh-worker's settlement count (`intelligence_state._refresh_wnba_boxscores`, today + yesterday), ~550-770 a day;
   - **the test suite**. Both box clients fell back to `http://127.0.0.1:10000`, the fleet. About 76 a day arrive in the nightly `ci-checkout` shards (08:14-08:58Z), plus sessions' own runs. Every request for 2026-06-03..06-05 / 06-09/10 / 09-09/10 is one of these.
 - **EXONERATED: the WNBA postgame backfill** (`run_refresh_worker.py` `_run_wnba_postgame_producer_tick`). It calls ESPN directly over a 30-day window and settles hourly.
-- **The fix, ON MAIN `920c19e70`, NOT LOADED:**
+- **The fix, ON MAIN `920c19e70`.** The live-capture half has been LOADED on live-odds-worker since 2026-11-17 23:22:26Z: `live_player_boxscore` to web went from 43/h to 0 (deploys.md 23:54Z). The settlement half on refresh-worker is NOT loaded; it loads at the next refresh-worker restart:
   - both loops skip a DATE whose `schedule_<YYYY>.csv` is readable, has rows and lists no game on it;
   - unknown polls and logs its reason;
   - no sport or season switch;
