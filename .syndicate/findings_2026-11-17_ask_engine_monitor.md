@@ -616,3 +616,45 @@ A game was live: a `live_row` ask exists. as_of_in_future: 0 of 6.
 - 2e: the newest header is 3:56 PM CST, DEPLOY ff + reload-web `91d865fd5` -> `25fc2e4f0` (#827). It falls 39.7 min ago, at the edge of the window. Reading 12 already flagged it, so it is not a new load. No fleet load since then.
 
 No anomaly.
+
+## Reading 14 (5:06 PM CST)
+
+Probe ran 5:06:06-5:07:10 PM CST (`ask_reading_20261117T230606Z.json`).
+
+**Ask:** 5 of 5 answered, 0 past the 45 s cut-off, median 10.29 s, max 17.44 s. Page 200 in 0.15 s. Slower than Reading 13 (median 4.67 s, max 7.80 s); the host was busier (below).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "spread?" | 10.26 | yes | bet_analysis | 2026-11-17T22:08:55Z | 0 |
+| free_text "Lakers vs Celtics" | 0.82 | yes | matchup_analysis | 2026-11-17T22:08:55Z | 0 |
+| free_text "top edges today" | 10.29 | yes | market_summary | 2026-11-17 | 1 |
+| pregame_game_line (Buccaneers) | 15.10 | yes | bet_analysis | 2026-11-15 | 5 |
+| pregame_prop (C.J. Stroud Under 1.5) | 17.44 | yes | bet_analysis | 2026-11-17T22:57:48Z | 9 |
+
+No game was live in the probe's rows: no `live_row` ask. as_of_in_future: 0 of 5.
+
+**Web, 4:36-5:06 PM CST (62 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 5, of which 4 were hard; max anon 1,018.9 MB against a 645.9 MB limit.
+- Overlay warms: 30, median 5.18 s, 1 over 20 s, 0 over 45 s, 0 over 60 s, max 31.17 s.
+- Requests over 20 s: 0. Over 45 s: 0.
+- Asks from any client: 5, 0 over 45 s, 0 non-200. 0 of 5 were from another client: all `Python-urllib`, this probe's.
+
+**Host:** load 6.33 / 4.37 / 3.09 on 12 cores (rising); MemAvailable 7,693 MB. Top CPU:
+- soccer artifact build (serie_a), ni 0, 107%;
+- refresh-worker, ni 0, 91%, 3.4 GB RSS;
+- `refresh_nhl_oddsapi`, ni 0, 74%;
+- `fetch_espn_live_status_for_date`, ni 0, 72%;
+- `refresh_odds_sources`, ni 0, 49%;
+- live-odds-worker, ni 0, 44%;
+- gunicorn web, ni 0, 42% (113 s old, a fresh recycle);
+- live_resim_workers, ni 5, about 4%.
+
+**Engine:**
+- 2a: F2 has 1 run (10:30-11:17 AM CST, NOT PASSED, already recorded at `c765eec64`). No newer run.
+- 2b: `engine-learner-m2-gate-read-1124` is enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 starts `c1a2c029c2a1816f` (Amendment 2). Unchanged.
+- 2d: 0 engine-file commits on origin/main in the last 40 min.
+- 2e: the newest header is still 3:56 PM CST (DEPLOY ff + reload-web `91d865fd5` -> `25fc2e4f0`, #827), 71 min ago and already flagged by Reading 12. No fleet load in the last 40 min.
+
+No anomaly.
