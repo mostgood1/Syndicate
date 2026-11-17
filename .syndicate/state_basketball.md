@@ -1252,8 +1252,12 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - Served anchored total runs +3.42 low (actual − anchored, 192 games). Feeding the game model with the outs
     penalties still on is the worst arm.
   - Nothing changed in served numbers. F0 (behaviour-neutral: `market_anchor.game_model_fed` + `game_model_columns`,
-    a `SMART_SIM_GAME_MODEL_UNFED` print, checklist Level 4) is on main `8aea4fe7e` 2026-11-17, NOT LOADED; until it
-    is, no fleet sim carries the field (0 of 103 NBA sims 11-04..11-17). F1 is the user's call:
+    a `SMART_SIM_GAME_MODEL_UNFED` print, checklist Level 4) is LOADED: fleet ff to `8aea4fe7e` 2026-11-17 16:26:58Z,
+    no restart; the first 2 post-load NBA sims read `game_model_fed: false` `[verified 2026-11-17 16:51Z]`.
+  - F1 (`"feed_game_model": true` in `nba_sim_total_inputs.json` makes the job build read `pred_total`/`pred_margin`)
+    is on main `92ae7490a`, DEFAULT OFF, not loaded, not switched on. A replay through the real quarter model
+    reproduces production exactly and gives anchored total MAE 14.504 today vs 14.811 with F1 alone and 14.387 with F1 +
+    outs off (no arm clears 95%). Switching it on is the user's call:
     `.syndicate/findings_2026-11-16_nba_margin_raw_zero.md`.
 ## [basketball-props-refresh-off-vendor] BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verified 2026-10-14, lanes nba-source-cli-native + basketball-games-history-freshness]`
 

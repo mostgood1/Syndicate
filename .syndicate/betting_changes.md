@@ -54,3 +54,4 @@ Load times derived from process ages (BC-013..BC-017, ±5 s): live-odds-worker p
 | BC-023 | no | 2026-11-17T01:40:22Z | READING: MNF in-play game lines on the fleet after the 22:31:26Z kickoff-shard deploy (#817); no load | 2026-11-17T01:40:22Z | nfl-gameline-kickoff-shard |
 | BC-024 | no | 2026-11-17T05:08:22Z | READING, no deploy: the #790 check-once-per-build fix (a39058946, loaded 16:29:16Z 11-16) on the 11-16 NBA slate | 2026-11-17T05:08:22Z | nba-overlay-card-cost |
 | BC-025 | no | 2026-11-17T16:26:58Z | todo #821 F0: NBA pregame sims record market_anchor.game_model_fed + game_model_columns and print an unfed line; same read, no served number changes (ff only; child job loads it) | 2026-11-17T16:26:58Z | nba-game-model-fed-audit |
+| BC-026 | no | 2026-11-17T16:51:28Z | READING: F0 artifact field on the first 2 NBA sims after the 16:26:58Z ff (#821); no load | 2026-11-17T16:51:28Z | nba-game-model-fed-audit |

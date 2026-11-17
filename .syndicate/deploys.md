@@ -60868,3 +60868,15 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **What this does and does not show:** the producer half refuses a real exit the engine does not (yet) model, within one tick, and lifts it when the engine catches up. NOT read: the served board row or `commit_portfolio` for that tick (not recoverable from logs after the fact). NOT yet seen: an exit the engine never models (injury, ejection, NHL goalie change, soccer keeper change, MLB starter injury). A background watcher on both worker logs (every 120 s, 48 h, from 16:44Z) is waiting for one.
 - **Lane goal:** still NOT MET (per sport, on an unmodelled exit, with the board side read).
 - **Stamp correction for "2026-11-17 16:5xZ (10:5x AM CST) -- READING ... FIRST REAL exit refusal" (appended; the heading is left as written):** that stamp was written before reading the clock; the reading's clock read was **16:49:00Z (10:49 AM CST)**.
+
+## 2026-11-17 16:51:28Z (10:51 AM CST) -- READING (no deploy): the owed F0 artifact reading after the 16:26:58Z ff to `8aea4fe7e` (todo #821, lane `nba-game-model-fed-audit`) -- **MET: the first two NBA pregame sims written after the ff carry `market_anchor.game_model_fed: false` + `game_model_columns: [pred_total, pred_margin]`**
+- betting change: no
+- **reading** (`C:\tmp\nba_margin0\f0_read.py 2026-11-17T16:26:58Z`, read-only, fired by watcher `f0_watch_sim.sh` at its first hit + 90 s):
+  - fleet head `8aea4fe7e`; refresh-worker pid 4027303 and live-odds-worker pid 3777750, both unchanged.
+  - NBA sims with mtime after the ff: **2 of 2 carry the field, 0 fed**:
+    - `smart_sim_2026-11-17_MIN_POR.json`, written 16:45:44Z: raw margin 1.0;
+    - `smart_sim_2026-11-17_TOR_NYK.json`, written 16:47:07Z: raw margin −0.5.
+  - Both raw margins sit on the outs/b2b rule: the defect as diagnosed, now recorded.
+  - `SMART_SIM_GAME_MODEL_UNFED` marker lines after the ff: 0. That was expected, because the allowlist `f252a5969` is not on the fleet.
+- **expect / measured** (vs the 16:26:58Z entry): `nba_sims_with_game_model_fed` 0 -> at least 1 false with `[pred_total, pred_margin]`: **MET** (2). `unfed_marker_lines` 0 -> 0: **MET as predicted**.
+- Built alongside, not loaded: F1 `92ae7490a` (default off, `feed_game_model`; user "build F1 behind the switch, default off").

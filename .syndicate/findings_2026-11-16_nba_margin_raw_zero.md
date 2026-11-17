@@ -281,6 +281,72 @@ plus a refresh-worker restart.
   `game_model_fed: false` and `game_model_columns: ["pred_total", "pred_margin"]`, and the
   refresh-worker log shows one `SMART_SIM_GAME_MODEL_UNFED league=nba` line per run.
 
+**F0 loaded and verified** `[2026-11-17]`. The fleet was ff'd to `8aea4fe7e` at 16:26:58Z
+with no restart (`deploys.md`). The first two NBA sims written after the ff carry
+`game_model_fed: false` and `[pred_total, pred_margin]`:
+
+- `MIN_POR`, 16:45:44Z: raw margin 1.0;
+- `TOR_NYK`, 16:47:07Z: raw margin −0.5.
+
+Both raw margins sit on the outs/b2b rule. The allowlist for the unfed line (`f252a5969`) is not
+on the fleet yet, so the line is blanked there for now.
+
+## F1 built, DEFAULT OFF `[2026-11-17 10:55 AM CST, main 92ae7490a; user: "build F1 behind the switch, default off"]`
+
+Not loaded and not switched on.
+
+- **Switch.** It is `"feed_game_model": true`, in the NBA processed root's
+  `nba_sim_total_inputs.json`. That is the file which already holds `skip_def_subtraction`
+  and `skip_outs_penalties`. It is read by `_nba_feed_game_model_switch_local`, separately from
+  the other lane's loader, which is untouched (tested). It is re-read per job and applies to NBA
+  only.
+  - Absent, false, unreadable or any other league is today's behaviour: the job and the artifact
+    are byte-identical to F0 (tested with the file absent and with `false`).
+- **Read.** With the switch on, `_game_model_points_local(..., read_pred_columns=True)` falls back
+  to `pred_total` / `pred_margin` when `totals` / `spread_margin` are missing. Each half is
+  independent, and the WNBA names win when both are present.
+  - `market_anchor.game_model_read` appears only when a fallback name was read.
+  - `off_rtg_from_points` stays False for NBA, so the def term is decided by
+    `skip_def_subtraction`, which is true on the fleet. With it false, a fed NBA rating would also
+    get the opponent def subtracted: the double count the 10-06 work measured. Keep it true
+    whenever F1 is on.
+- **Level 4** replays under the same switch (`feed_game_model` in its census). Its `UNFED` alarm
+  clears by itself once the switch is on and the code is loaded.
+- **Reachability** (`tests/test_nba_game_model_feed_switch.py`, 10 tests, through the real
+  per-game loop and the real worker):
+  - Off: ratings 110.6/110.6, `model_margin_raw` 0.0.
+  - On, with `skip_def_subtraction`, no outs or b2b: `model_margin_raw` = the game model's 3.1 and
+    `model_total_raw` = 226.4, both to 1e-9.
+  - The anchored margin differs between off and on, and equals the anchor arithmetic
+    (`_apply_market_anchor_local` scales both means by the total blend, then blends the margin).
+  - WNBA ignores the switch. The 103 neighbouring smart-sim tests are green.
+- **Corpus replay through the REAL `_simulate_quarters_local`** (`C:\tmp\nba_margin0\f1_replay.py`,
+  output `f1_replay.json`).
+  - Inputs: the 197 #818 sims, fleet predictions, the real `_game_model_points_local`, anchor
+    weights pinned to the recorded 0.95 / 0.7, and `skip_def_subtraction` in every arm.
+  - Arm A reproduces all 197 production sims to **5.7e-14**: raw and anchored, margin and total.
+
+  | arm | fed | raw-margin zeros (of 197) | anchored total MAE (192 graded) | bias | Δ vs A [95% CI] | anchored margin MAE |
+  |---|---|---|---|---|---|---|
+  | A unfed, outs on (today) | 0 | 74 | 14.504 | +3.42 | – | 11.082 |
+  | B unfed, outs off | 0 | 177 | 14.127 | +0.57 | −0.377 [−0.779, +0.017] | 11.080 |
+  | C fed (F1 on), outs on | 197 | 0 | 14.811 | +4.34 | +0.307 [−0.068, +0.659] | 11.098 |
+  | D fed (F1 on), outs off | 197 | 1 | 14.387 | +1.52 | −0.118 [−0.568, +0.324] | 11.098 |
+
+  - The MAE per arm matches the arithmetic 2x2 above to the third decimal. The verdict stands:
+    no arm clears 95%, C is the worst, and B has the best point estimate.
+  - With F1 on, the raw margin's correlation with the actual margin is 0.139, against 0.028 today.
+    The anchored margin does not move (the raw weight is 0.05).
+- **To switch it on (the user's call; a betting change; pair it with `skip_outs_penalties`):**
+  1. ff the fleet to `92ae7490a` or later. The NBA props child loads it from disk, no restart.
+  2. Add `"feed_game_model": true` to `~/syndicate-prod/data/nba_source/data/processed/nba_sim_total_inputs.json`.
+  3. `betting_change.py add --kind yes`.
+  - **A flip reaches only sims built afterwards.** The reuse checks do not read the switch, and
+    tipped games are frozen. The next slate (built ~06:00Z) is the first full one.
+  - Then read: `game_model_fed: true` and `game_model_read: [pred_total, pred_margin]` on a sim
+    with mtime after the flip; 0 zeros over a full slate; Level 4's `UNFED` alarm gone.
+  - Then the pre-registered grade (plan item 5), before keeping it on.
+
 ## Leads (recorded, not followed)
 
 - **`TeamContextLocal.form_7` / `form_30` are consumed and never passed** (found by Level 4,
