@@ -575,3 +575,44 @@ The workers' 696 s uptime matches the 3:52 PM full down/up.
 - **ANOMALY:** 1 WORKER TIMEOUT kill at 3:36:36 PM CST, before both loads. Check next: the web role log around 21:36Z for the killed request's route. The 21:37Z probe asks ran 13.98-26.7 s, against 1.81-9.23 s now.
 - **ANOMALY:** new engine-file commit `85af16b35` (3:39 PM CST, experts evidence-row instant, NHL / NCAAF). Check next: its lane's ledger entry. Does it change the experts' reproduction that F2 depends on? It is not loaded on the fleet.
 - **ANOMALY:** new fleet loads at 3:52 PM CST (full down/up -> `91d865fd5`) and 3:56 PM CST (reload-web -> `25fc2e4f0`). The range touches live-path files (`execution_ledger`, `live_refresh_loop`, `game_board_contract`, NBA live tick, cards). Check next: whether either deploy changed what the live join serves. Use the deploys.md `verify:` lines and a next experts reproduction. Watch whether web recycles (5 in 30 min, max anon 960/641.6 MB) settle after the reload.
+
+## Reading 13 (4:35 PM CST)
+
+Probe ran 4:35:11-4:35:44 PM CST (`ask_reading_20261117T223511Z.json`).
+
+**Ask:** 6 of 6 answered, 0 past the 45 s cut-off, median 4.67 s, max 7.80 s. Page 200 in 0.1 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "spread?" | 7.80 | yes | bet_analysis | 2026-11-17T22:08:55Z | 0 |
+| free_text "Lakers vs Celtics" | 5.66 | yes | matchup_analysis | 2026-11-17T22:08:55Z | 0 |
+| free_text "top edges today" | 4.67 | yes | market_summary | 2026-11-17 | 1 |
+| pregame_game_line | 4.58 | yes | bet_analysis | 2026-11-15 | 2 |
+| pregame_prop | 2.19 | yes | bet_analysis | 2026-11-17T22:29:30Z | 7 |
+| live_row (Notre Dame Under 63.5) | 4.09 | yes | bet_analysis | 2026-11-13 | 2 |
+
+A game was live: a `live_row` ask exists. as_of_in_future: 0 of 6.
+
+**Web, 4:05-4:35 PM CST (239 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 4, of which 2 were hard; max anon 986.6 MB against a 641.8 MB limit.
+- Overlay warms: 14, median 14.0 s, 2 over 20 s, 0 over 45 s, 0 over 60 s, max 30.6 s.
+- Requests over 20 s: 1 (`POST /api/intelligence/query`). Over 45 s: 0.
+- Asks from any client: 11, 0 over 45 s, 0 non-200. 0 of 11 were from another client: all were `Python-urllib`, 5 from Reading 12's probe and 6 from this one.
+
+**Host:** load 4.19 / 3.24 / 3.37 on 12 cores; MemAvailable 8,044 MB. Top CPU:
+- soccer artifact build (belgian_pro_league), ni 0, 108%;
+- refresh-worker, ni 0, 100%, 3.5 GB RSS;
+- live-odds-worker, ni 0, 50%;
+- `refresh_nhl_oddsapi`, ni 0, 49%;
+- live_resim_workers, ni 5, about 4% each;
+- gunicorn web, ni 0, 3.6%.
+
+**Engine:**
+- 2a: F2 has 1 run (10:30-11:17 AM CST, NOT PASSED, already recorded at `c765eec64`). No newer run.
+- 2b: `engine-learner-m2-gate-read-1124` is enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 starts `c1a2c029c2a1816f` (Amendment 2). Unchanged.
+- 2d: 0 engine-file commits on origin/main in the last 40 min.
+- 2e: the newest header is 3:56 PM CST, DEPLOY ff + reload-web `91d865fd5` -> `25fc2e4f0` (#827). It falls 39.7 min ago, at the edge of the window. Reading 12 already flagged it, so it is not a new load. No fleet load since then.
+
+No anomaly.
