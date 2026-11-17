@@ -163,3 +163,32 @@ clustered by game. **The price is the ledger's quote at pricing; whether a betto
     True = the user's choice), so dropping the level later is a one-line flip, a refresh-worker restart and a refit.
 - **Money:** every NCAAB order in the November execution-ledger archive is paper (no live-mode row since 11-14 for any
   sport in that file, so live orders are recorded elsewhere and this does not prove none were placed).
+
+## #816 7-day grade, PRE-REGISTERED (2026-11-17 ~12:55 PM CST, user "run the #816 7-day grade"; written before any 11-17 evening tip, with a few 11-17 day games in progress and none graded)
+
+The calibration loaded 2026-11-17 00:04:20Z, so one post-load night (the 11-16 slate's late games) is in. That night is
+known (calibrated under flags 23-40, rail monitor) and is reported DESCRIPTIVELY, outside the registered window.
+
+- **Window:** NCAAB slates 2026-11-17 .. 2026-11-23 (7 nights). WNCAAB is graded only on slates where its phase is
+  calibrated (its gate held it on 11-17); descriptive.
+- **Script:** `scripts/grade_college_total_calibration.py --league ncaab --from 2026-11-17 --to 2026-11-23` (this commit),
+  run on the fleet under refresh-worker's environ on **Mon 2026-11-24 at or after 10:00 AM CST** (scheduled task
+  `college-total-cal-grade-816`). Per slate: the calibration IN FORCE for that slate (newest fit dated before it)
+  applied to every live full-game total row of the slate; the spread-only counterfactual fitted on the same trailing
+  window; each game's rows weigh 1; SE game-clustered, night-clustered printed beside it.
+- **Tests (live unless named):**
+  - **T1** served vs market: mean per-game Brier(served) - Brier(market). PASS if <= 0; FAIL if > 0 with the 90% game-
+    clustered CI above 0.
+  - **T2** served vs the engine: Brier(served) - Brier(raw). PASS if < 0.
+  - **T3** level vs spread only: Brier(served) - Brier(spread_only). RECOMMENDS THE FLIP if > 0 with the 90% game CI
+    above 0 AND the night-clustered mean > 0.
+  - **T4** flags (|served - market| >= 3 pp) by lean: hit - fair per game, pooled. A side FAILS if its 90% CI is
+    entirely below 0.
+  - **T5** pregame at the close: Brier(served) - Brier(market = 0.25). PASS if <= 0.
+- **Verdicts:**
+  - **KEEP (spread + level)** if T1 and T2 pass and T3 does not recommend the flip.
+  - **FLIP TO SPREAD ONLY** (`FIT_LEVEL = False`, refresh-worker restart, refit) if T3 recommends it, or if T1 FAILS
+    while the under side FAILS T4.
+  - **TURN THE CALIBRATION OFF** only if T2 fails (served worse than the engine's own number).
+  - Anything else: **INCONCLUSIVE** -- keep as is and extend by 7 slates under the same rules.
+- Any load that changes the served live total probability inside the window splits it at the load time.
