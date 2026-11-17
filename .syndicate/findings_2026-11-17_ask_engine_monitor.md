@@ -259,3 +259,48 @@ None had as_of_in_future. No `live_row` ask was made, so no live game row was av
 - **ANOMALY:** An F2 result exists, and its two sources disagree: the run summary says "did NOT PASS", while the `f2_verdict.txt` last line says PASS 12/12. Next, the owning session should read run `local_dc76d55c` with list_events to see which verdict is final. The file may hold an earlier pre-run line, or the summary may reflect a later judgement.
 - **ANOMALY:** A new fleet load landed: #821 F1 ON / outs OFF at 11:35 AM CST changes NBA sim totals. Next, check whether the experts' NBA totals reproduction still matches the live join, as #816 did not.
 - **ANOMALY:** refresh-worker (up 115 s) and web (up 124 s) both restarted around 12:03 PM CST. deploys.md has no matching header; the last recorded refresh-worker pid was 4049350, and it is now 4060729. Next, check the supervisor log for the cause (memory recycle or crash), and check whether an MLB/NBA sim was in flight.
+
+## Reading 5 (12:35 PM CST)
+
+Probe file `ask_reading_20261117T183539Z.json` (asks 12:35:43-12:36:11 PM CST; web window from 12:05:39 PM).
+
+**Ask: 6 / 6 answered, 0 / 6 past the 45 s cut-off, median 6.27 s, max 7.24 s.** Page 200 in 0.1 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "What do you think of this spread?" | 4.12 | yes | bet_analysis | 2026-11-17T18:16:24Z (ts) | 0 |
+| free_text "Lakers vs Celtics" | 1.04 | yes | matchup_analysis | 2026-11-17T18:16:24Z (ts) | 0 |
+| free_text "top edges today" | 7.24 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (Gent) | 7.12 | yes | bet_analysis | 2026-11-17 (date) | 5 |
+| pregame_prop (Ismael Boura Over 0.5) | 4.62 | yes | bet_analysis | **2026-11-20 (date, in future)** | 10 |
+| live_row (Under 135.5, Loyola (Chi) Ramblers, NCAAB) | 6.27 | yes | bet_analysis | 2026-11-17T18:16:24Z (ts) | 0 |
+
+A game was live: the `live_row` ask exists (an NCAAB total). The three timestamp answers all carry as_of 18:16:24Z, about 19-20 min old at ask time.
+
+**Web, 12:05-12:36 PM CST (182 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 5, of which 3 hard; max anon 932.8 MB against a 643.5 MB limit.
+- Overlay warms: 18, median 7.17 s, 0 over 45 s, 0 over 60 s, max 17.52 s.
+- Requests over 20 s: 0. Over 45 s: 0.
+- Asks from any client: 11, 0 over 45 s, 0 non-200. 0 of 11 were NOT this probe (all `Python-urllib/3.12`: 5 at 12:05 PM from Reading 4, 6 at 12:35 PM).
+
+**Host:** load 3.40 / 2.69 / 2.89 on 12 cores; MemAvailable 8,651 MB. Top CPU:
+- build_soccer_artifacts epl wk12, 99%, ni 0;
+- refresh-worker, 90%, ni 0, 3,022 MB, up 1,929 s (the 12:03 PM TERM);
+- live-odds-worker, 43%, ni 0, 1,128 MB, up 1,378 s;
+- live_resim_workers, 4.5%, ni 5;
+- gunicorn, 5.3%, ni 0;
+- the probe, 7.1%, ni 19.
+
+The live-odds-worker restarted at 12:13:15 PM CST. The supervisor log reads "exited code=0 after 21751s -- restarting in 5s", just after a 200 MB log rotation. That is a supervised self-exit, not a deploy, and no deploys.md header names it.
+
+**Engine:**
+- 2a: `engine-live-prior-f2-read-1117` has 1 run, succeeded (10:30-11:17 AM CST), summary "did NOT PASS". The `f2_verdict.txt` last line (mtime 11:15 AM) is `F2_VERDICT PASS judged_families=12 failed_families=0 cutoff=2026-11-15T20:00:00Z files=2`. Nothing has changed since Reading 4.
+- 2b: `engine-learner-m2-gate-read-1124` is enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: the `m2_gate.py` sha256 starts `6915bb6a5ecb80f2`, unchanged.
+- 2d: 0 commits on origin/main in the last 40 min touch the five engine files.
+- 2e: one fleet load in the last 40 min: `2026-11-17 18:03:56Z (12:03 PM CST) -- DEPLOY (TERM only, no ff)`. That is a drained refresh-worker TERM at fleet `92ae7490a`, loading todo #824 (lane `ncaab-total-overprojection`). Reading 4 was taken 2 min later, and its block did not name this load.
+
+- **ANOMALY:** `as_of_in_future` is true on the pregame_prop ask (soccer, Ismael Boura Over 0.5, as_of 2026-11-20, date kind). This is the same item Readings 2 and 3 flagged. Check next: whether the fixture date is leaking into `as_of` instead of the data time.
+- **ANOMALY:** An F2 result exists, and its two sources still disagree: the run summary says "did NOT PASS", while the verdict file says PASS 12/12. This is carried from Reading 4. Check next: the owning session reads run `local_dc76d55c` and records which verdict stands before the 11-24 M2 read.
+- **ANOMALY:** New fleet load: the 12:03 PM CST refresh-worker TERM loads #824, the NCAAB totals over-projection fix. It touches live NCAAB totals pricing, the same family where #816 broke the experts' reproduction on 11-16. This reading's live_row ask was an NCAAB total, and it answered normally. Check next: whether the experts/gate reproduction of NCAAB live_resim:totals still matches the live join after 12:03 PM CST.
