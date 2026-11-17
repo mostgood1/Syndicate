@@ -50,7 +50,11 @@ FLEET_BASE_URL = "http://127.0.0.1:10000"
 CT = ZoneInfo("America/Chicago")
 CHIP_SPORTS = "mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,wncaab,soccer"
 QUERY_BODY = {"question": "top edges today", "mode": "recommendation", "timing": "all", "background": True,
-              "force_refresh": False, "slim_aliases": True, "drop_row_diagnostics": True}
+              "force_refresh": False, "slim_aliases": True, "drop_row_diagnostics": True,
+              # The page sends it since 5db26434e (loaded 11-17 12:58 PM CST): the row lists come as references into
+              # `ranked_all`, which the runner's `rehydrateAliases` (the page's own function) rebuilds. Without it the
+              # probe measured a response no page asks for (61.9 MB vs 24.3 MB). `--no-row-refs` reads the old path.
+              "row_refs": True}
 MIN_PP, FRESH_S, STALE_S = 3.0, 120.0, 300.0
 
 
@@ -256,6 +260,8 @@ def main() -> int:
     ap.add_argument("--log-minutes", type=int, default=30)
     ap.add_argument("--rail-date", default=None, help="default: today, Central (the page's default day)")
     ap.add_argument("--no-page", action="store_true", help="skip the 19 MB page fetch; reuse the last served.html")
+    ap.add_argument("--no-row-refs", action="store_true",
+                    help="send the board query WITHOUT row_refs (the pre-5db26434e full response), for an A/B")
     args = ap.parse_args()
     base = args.base_url.rstrip("/")
     host = urllib.parse.urlsplit(base).hostname or ""
@@ -275,7 +281,9 @@ def main() -> int:
         reading["load"].append(fetch(base, "/intelligence", page))
     reading["load"].append(fetch(base, "/api/board/layer2-shortlist", rdir / "shortlist.json"))
     reading["load"].append(fetch(base, f"/api/board/game-chips?sports={CHIP_SPORTS}", rdir / "chips.json"))
-    reading["load"].append(fetch(base, "/api/intelligence/query", rdir / "query.json", body=QUERY_BODY))
+    query_body = {k: v for k, v in QUERY_BODY.items() if not (args.no_row_refs and k == "row_refs")}
+    reading["query_row_refs"] = bool(query_body.get("row_refs"))
+    reading["load"].append(fetch(base, "/api/intelligence/query", rdir / "query.json", body=query_body))
     lr_reads = []
     for i in range(3):
         if i:
