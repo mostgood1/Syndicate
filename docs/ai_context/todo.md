@@ -26,7 +26,7 @@
   - **Grader join gap:** 2 games whose sims carry an NBA.com id were refused `no_espn_event`. A descriptive re-run with them in changes no verdict.
   - **Owed:** the Dec 7 re-grade, scheduled task `nba-segment-regrade-818` (Mon 2026-12-07 1:00 PM CST, weights frozen at 0 / 0.20 / 0.25). The provenance line of `nba_game_book_blend.json` still says "unmeasured"; rewriting it is a fleet data edit and the user's call.
 
-### `#817` — **NFL GAME-LINE QUOTES WERE FILED BY THE UTC CAPTURE DATE, SO FROM 6 PM CST EVERY NFL GAME LINE WENT TO TOMORROW'S SHARD: SNF / MNF / TNF in-play lines (and the end of every late-afternoon game) never reached their own date's in-play overlay or Games Rail. LOADED 2026-11-16 22:31:26Z (fleet ff to `dac4d49f8`, no restart, user "Load it now"); shards MET, MNF reading OWED: `_append_nfl_team_book_quotes` files by Central kickoff date (`kickoff_shard_date`), off switch `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0`** `[2026-11-16, lane nfl-gameline-kickoff-shard, session a64727a8; defect found by layer2-rail-monitor 11-15; task from local_62433e58]`
+### `#817` — **NFL GAME-LINE QUOTES WERE FILED BY THE UTC CAPTURE DATE, SO FROM 6 PM CST EVERY NFL GAME LINE WENT TO TOMORROW'S SHARD: SNF / MNF / TNF in-play lines (and the end of every late-afternoon game) never reached their own date's in-play overlay or Games Rail. LOADED 2026-11-16 22:31:26Z (fleet ff to `dac4d49f8`, no restart, user "Load it now"). VERIFIED ON MNF, GOAL MET 01:40-01:47Z 11-17; lane CLOSED: `_append_nfl_team_book_quotes` files by Central kickoff date (`kickoff_shard_date`), off switch `SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD=0`** `[2026-11-16, lane nfl-gameline-kickoff-shard, session a64727a8; defect found by layer2-rail-monitor 11-15; task from local_62433e58]`
 - **ID:** first written as `#816` (commits `ed63c7611`, `bc0d16116`), but lane `ncaab-total-overprojection` had
   claimed `#816` in `lanes.md` 18 minutes earlier (`1ce76c099`). So this is `#817`, reserved with
   `todo_id_alloc.py` (`dccf27834`). `#816` belongs to them.
@@ -43,10 +43,11 @@
   - test `test_the_nfl_gameline_shard_line_the_writer_prints_survives_blanking` drives the real writer through the real `_run_command`, and it fails with the token removed.
 
   Once loaded, the line reads as `STEP_MARKER name=nfl_oddsapi_refresh ...` in each run's `reports/migration_runs/*/odds_refresh_*/odds_refresh.stderr.txt`, and as `stdout_markers` in the compact step view. Until it is loaded, verify on the rows.
-- **Verification owed (MNF 11-16, 01:15Z 11-17):**
-  - game rows captured >= 00:00Z 11-17 in `2026-11-16.jsonl`, none in `2026-11-17.jsonl`;
-  - `INPLAY_OVERLAY sport=nfl date=2026-11-16` with MNF rows;
-  - NFL game-line rows on `/api/board/live-rail`.
+- **Verification -- MET on MNF** (deploys.md 2026-11-17 01:40:22Z):
+  - **Shards:** 1,386 game rows captured >= 00:00Z 11-17, all in `2026-11-16.jsonl`. 1,111 of them are MNF in-play (866 full-game + 245 quarter/half). `2026-11-17.jsonl` absent.
+  - **Overlay:** 13 `INPLAY_OVERLAY sport=nfl date=2026-11-16` builds 01:00-01:40Z, all published (up to 288 in-play rows / 255 cards). 0 builds for `date=2026-11-17`.
+  - **Games Rail:** 11 of 12 `/api/board/live-rail` polls (01:43:54-01:47:43Z) served 26-30 MNF game-line rows. Before the load, the rail showed NFL as `stale_64664s`.
+  - **NOT this item:** the 12th poll served 0 NFL game rows, because some overlay builds carry only props. Recorded as a lead in `.syndicate/leads.md` for the rail monitor. An offline replay shows game rows do reach the shortlist (71 -> 84 -> 6).
 - **Today's split 11-16 shard: leave it.** Rewriting an append-only shard under the incremental grid reader is the risk, and no reader needs the rows moved (findings).
 - **Follow-up, NOT done:** `fetch_nfl_preseason_odds._append_nfl_preseason_book_quotes` has the same UTC filing. Its reader `nfl/preseason_cards.py` opens grids by the game's UTC start date, so the writer and the reader must move together. Dormant until 2027-08.
 

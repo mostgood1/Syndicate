@@ -168,3 +168,18 @@ During MNF 11-16 (LAC @ BAL, 01:15Z 11-17):
 - `/api/board/live-rail` serves NFL game-line rows for MNF with seen-age at overlay cadence.
 
 Before the load the falsifier is the opposite: MNF in-play rows in `2026-11-17.jsonl`.
+
+## Fleet verification — MET (MNF 11-16, read 00:59-01:47Z 11-17; deploys.md entries 00:20:21Z, 00:59:08Z, 01:40:22Z)
+
+- **The filing line.** It used to be blanked by `refresh_odds_sources`. `69bd95177` allowlisted it (user "Yes, do it here"), and it was loaded by an ff at 00:20:21Z with no restart.
+  - The first NFL run after the ff logged `basis=kickoff_central captured_at=2026-11-17T00:58:22Z rows=2244 shards=2026-11-16:326,2026-11-19:160,2026-11-22:1614,2026-11-23:144 unfiled_no_commence_time=0`.
+  - 1 of 1 such runs carried it, and 0 FAILED lines appeared.
+- **Shards.** 1,386 sportsbook game rows were captured at or after 00:00Z 11-17, all in `2026-11-16.jsonl`.
+  - 1,111 are MNF in-play (866 full-game + 245 quarter/half).
+  - `2026-11-17.jsonl` is absent, so the falsifier is not met.
+- **Overlay.** 13 `INPLAY_OVERLAY sport=nfl date=2026-11-16` builds ran 01:00-01:40Z, all published. 0 ran for `date=2026-11-17`.
+- **Games Rail.** 11 of 12 polls at 20 s intervals (01:43:54-01:47:43Z) served 26-30 MNF game-line rows, across full, q1-q4, h1 and h2. Before the load the rail showed NFL as `stale_64664s`.
+- **Out of scope (lead in `.syndicate/leads.md`).**
+  - Some overlay builds carry only prop cards. The 01:41:11Z build had 172 cards, all props, and the 12th poll found 0 NFL game rows.
+  - An offline replay of the 01:42:30Z grid (`C:\tmp\nflks816\overlay_kind_trace.py`) shows game rows do reach the shortlist: 71 in-play rows -> 84 opportunities -> 6 chosen. Refused: 49 below the value floor, 23 past the game cap, 6 implausible book.
+  - Untested hypothesis: game-row book age crosses the 300 s in-play freshness limit between live-first rounds.

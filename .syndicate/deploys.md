@@ -60668,3 +60668,20 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **fleet:** untouched. No claim, no preflight, nothing loaded; `nba_game_book_blend.json` was not edited.
 - **betting change: no** (loads nothing).
 - **owed:** the Dec 7 re-grade, scheduled task `nba-segment-regrade-818` (Mon 2026-12-07 1:00 PM CST, w frozen at 0 / 0.20 / 0.25).
+
+## 2026-11-17 01:40:22Z (7:40 PM CST 11-16) -- READING (MNF in play; follow-up to the 2026-11-16 22:31:26Z deploy, todo #817, lane `nfl-gameline-kickoff-shard`): **MNF in-play game lines reach the 11-16 shard, the 11-16 in-play overlay and the Games Rail -- MET**
+- **sources (all read-only, nice 19):** `C:\tmp\nflks816\mnf_reading.sh` (output `mnf_reading_0140.txt`), `rail_poll.sh`, `overlay_kind_trace.py`, `rail_trace.py`. MNF LAC @ BAL kicked off 01:15Z 11-17 (7:15 PM CST 11-16).
+- **shards:**
+  - 1,386 sportsbook game rows captured since 00:00Z 11-17, all in `2026-11-16.jsonl` (row `date` field = 11-16 for all 1,386).
+  - 1,111 of them are MNF in-play rows (866 full-game + 245 quarter/half), newest 01:38:49Z.
+  - `2026-11-17.jsonl` is ABSENT. Before the load, every one of these rows went there (the falsifier).
+  - OddsAPI moved MNF's `commence_time` twice (01:15:00Z -> 01:16:19Z -> 01:18:00Z). All three map to 11-16 Central.
+- **overlay:** 13 `INPLAY_OVERLAY sport=nfl date=2026-11-16` builds 01:00-01:40Z, all `published=True`, up to rows_inplay 288 / cards 255. **0** builds for `date=2026-11-17`.
+- **Games Rail** (`/api/board/live-rail`, 12 polls 20 s apart, 01:43:54-01:47:43Z):
+  - **11 of 12 served MNF game-line rows** (26-30 rows, full + q1-q4 + h1/h2; book age p50 136-291 s). `sports.nfl` was 27-197.
+  - Before the load, the rail had NFL as `stale_64664s`: the 11-16 overlay was last written the night before, from misfiled SNF rows.
+- **NOT filing -- recorded as a lead** (`.syndicate/leads.md`, rail monitor's area):
+  - The 12th poll (after the 01:47:27Z build, 197 cards) served 0 NFL game rows, and the 01:41:11Z build held 172 cards, all props.
+  - An offline replay of the 01:42:30Z grid shows game rows reach the shortlist: 71 in-play game rows -> 84 opportunities -> 6 chosen (refused: 49 value floor, 23 game cap, 6 implausible book). So the shard fix is doing its job.
+  - Why some builds carry no game cards is open. Untested guess: game-row book age crossing the 300 s in-play freshness limit between live-first rounds.
+- **Layer 2 board:** not read separately. The rail's rows are built from the same overlay merge and board contract as the board's (`live_rail_rows.board_cards_from_overlay`).
