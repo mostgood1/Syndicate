@@ -633,13 +633,15 @@ def test_situation_block_flows_through_when_supplied():
     """
     shape = football_game_shape(
         _fb_state(),
-        situation={"down": 3, "distance": 7, "yardLine": 12, "possession": "KC"},
+        situation={"down": 3, "distance": 7, "yardLine": 12, "possession": "KC", "isRedZone": True},
     )
     assert shape["situation_available"] is True
     assert shape["down"] == 3
     assert shape["distance"] == 7
     assert shape["yard_line"] == 12
     assert shape["possession_team"] == "KC"
+    # ESPN's own flag (lane `nfl-live-card-situation`): `yardLine` is measured
+    # from the HOME goal line, so it cannot say on its own.
     assert shape["red_zone"] is True
 
 

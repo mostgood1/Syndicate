@@ -83,6 +83,16 @@ SEASONTYPE_REGULAR = 2
 _CACHE_TTL_SECONDS = 20.0
 _FETCH_TIMEOUT_SECONDS = 6.0
 
+# The `situation` fields a live card carries (lane `nfl-live-card-situation`):
+# what `game_chip_detail.live_detail` reads, plus the raw spot and timeouts so a
+# reader can audit them. Every one was present on ESPN's NFL scoreboard on MNF
+# 2026-11-16; `lastPlay` is left out on purpose (a large nested block).
+_CARD_SITUATION_KEYS = (
+    "possession", "down", "distance", "yardLine", "possessionText",
+    "downDistanceText", "shortDownDistanceText", "isRedZone",
+    "homeTimeouts", "awayTimeouts",
+)
+
 _cache: dict[tuple[int, int, int], tuple[float, dict[str, dict[str, Any]]]] = {}
 _cache_lock = threading.Lock()
 
@@ -324,6 +334,28 @@ def attach_nfl_live_game_state(
             values = state.get(side_key)
             if isinstance(values, list) and values:
                 live_state[side_key] = list(values)
+        # DOWN / DISTANCE / WHO HAS THE BALL for the card, in ESPN's own words
+        # (lane `nfl-live-card-situation`), the same two keys NCAAF's card has
+        # carried since `games-rail-full-detail`. Without them
+        # `game_chip_detail.live_detail` fell back to the shape and printed
+        # ESPN's team ID ("33 ball") and the raw home-frame `yardLine` ("at 52"
+        # for LAC at its own 48). Live games only: `_state_from_event` keeps
+        # `situation` only while in progress, so a final carries neither.
+        # Only the fields a reader uses -- not `lastPlay`, which is a large
+        # nested block the board would otherwise ship on every live card.
+        situation = state.get("situation")
+        if live_state["in_progress"] and isinstance(situation, Mapping):
+            live_state["espn_situation"] = {
+                key: situation[key] for key in _CARD_SITUATION_KEYS if key in situation
+            }
+            # ESPN names the team in possession by ID; the side is resolved
+            # against the competitors' ids, never guessed when neither matches.
+            holder = str(situation.get("possession") or "").strip()
+            if holder:
+                if holder == str(state.get("home_team_id") or "").strip():
+                    live_state["possession_side"] = "home"
+                elif holder == str(state.get("away_team_id") or "").strip():
+                    live_state["possession_side"] = "away"
         # GAME SHAPE -- the state this game is in, kept instead of discarded.
         # Lane `game-shape-capture`; contract in `shared/game_shape.py`.
         # Nothing downstream can currently ask WHEN a football projection is

@@ -808,12 +808,18 @@ def _football_situation(situation: Any) -> dict[str, Any]:
         "yard_line": yardline if (yardline is not None and 0 <= yardline <= 100) else None,
         "possession_team": str(possession).strip() if possession is not None and str(possession).strip() else None,
     }
-    # ESPN's `yardLine` is distance-to-opponent-goal on this feed, so <=20 is
-    # the red zone. Emitted only when the yard line parsed -- an absent yard
-    # line must not read as "not in the red zone".
-    out["red_zone"] = (out["yard_line"] is not None and out["yard_line"] <= 20) or None
-    if out["yard_line"] is None:
-        out["red_zone"] = None
+    # RED ZONE IS ESPN'S OWN `isRedZone`, never derived from `yardLine`.
+    # `yard_line` above is ESPN's raw `yardLine`, measured from the HOME team's
+    # goal line, not from the goal the offence is driving at -- measured on MNF
+    # 2026-11-16 (lane `nfl-live-possession-map`): BAL (home) at its own 21
+    # read 21, LAC (away) at its own 48 read 52. Read as distance-to-goal it
+    # flagged a home team backed up deep in its own end and missed one at the
+    # opponent's 15: wrong on 13 of 66 live reads, while `isRedZone` was right
+    # on all 66 (lane `nfl-live-card-situation`). And `possession_team` is
+    # ESPN's team ID, not a name. Absent or not a bool stays None, so an absent
+    # flag never reads as "not in the red zone".
+    flag = situation.get("isRedZone")
+    out["red_zone"] = flag if isinstance(flag, bool) else None
     return out
 
 

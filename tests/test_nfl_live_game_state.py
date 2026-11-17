@@ -296,7 +296,7 @@ def test_the_discarded_situation_block_now_reaches_the_shape():
     """
     index = {"401873275": _state_from_event(
         _situation_event("401873275", "GB", "PIT",
-                         down=3, distance=7, yardLine=12, possession="PIT"))}
+                         down=3, distance=7, yardLine=12, possession="PIT", isRedZone=True))}
     cards = [_card("401873275", "GB", "PIT")]
     attach_nfl_live_game_state(cards, index)
 
@@ -306,6 +306,7 @@ def test_the_discarded_situation_block_now_reaches_the_shape():
     assert shape["distance"] == 7
     assert shape["yard_line"] == 12
     assert shape["possession_team"] == "PIT"
+    # ESPN's own flag (lane `nfl-live-card-situation`), not `yardLine <= 20`.
     assert shape["red_zone"] is True
 
 
