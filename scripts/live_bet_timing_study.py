@@ -27,6 +27,10 @@ is across games; 90% CI = mean +- 1.645 SE):
   (B) market: y - p_market for the HOME / OVER side (positive = the market under-priced home / over). For runs it is
       signed to the RUN side (positive = the side that just ran was under-priced, i.e. the market under-reacted).
 CAVEAT: the price is the ledger's quote at pricing time; whether a bettor could still get it is not measured.
+CONTROL: a record is CLEAN when its quote (`quote_updated_at`) is no older than the last score change in the ESPN
+feed at pricing -- the book had seen the current score. Every cut is repeated on clean records (family *_clean);
+an effect that survives only on stale quotes is an edge nobody can take. FRESH (*_fresh) = clean AND the quote is <= 60 s
+old at pricing, so the clock that ran since the quote is small too.
 """
 from __future__ import annotations
 
@@ -232,6 +236,13 @@ def grade(sport: str, first: str, last: str, ledger_root: str, cache: str) -> di
                 el.append(last_el)
             fh, fa = tl["final_home"], tl["final_away"]
             gid = (day, eid)
+            # wallclock of the latest score change at or before each play (the quote-freshness control)
+            chg, prev, last_chg = [], None, plays[0][0]
+            for p in plays:
+                if prev is not None and (p[3], p[4]) != prev:
+                    last_chg = p[0]
+                prev = (p[3], p[4])
+                chg.append(last_chg)
             for r in recs:
                 at = ts(r.get("recorded_at"))
                 if at is None:
@@ -277,7 +288,12 @@ def grade(sport: str, first: str, last: str, ledger_root: str, cache: str) -> di
                     if win_pts is not None and float(r["line"]) > 0:
                         exp = float(r["line"]) * cfg["run_window"] / reg
                         heat = "hot" if win_pts > 1.3 * exp else "cold" if win_pts < 0.7 * exp else "normal"
-                fam = "alt" if market.endswith("_alt") else "main"
+                q_at = ts(r.get("quote_updated_at"))
+                clean = q_at is not None and q_at.timestamp() >= chg[i]
+                stats["clean" if clean else "stale_or_unknown"] += 1
+                fresh = clean and (at - q_at).total_seconds() <= 60.0
+                stats["fresh60"] += fresh
+                fam0 = "alt" if market.endswith("_alt") else "main"
                 mk = market.replace("_alt", "")
                 cuts = [("all", "all"), ("phase", phase), ("margin", mb)]
                 if mk == "totals":
@@ -290,28 +306,29 @@ def grade(sport: str, first: str, last: str, ledger_root: str, cache: str) -> di
                 else:
                     cuts.append(("run", "run" if run in ("home_run", "away_run") else run))
                 cuts.append(("phase_x_margin", f"{phase}|{mb}"))
-                # (B) market residual for home/over
-                for cut in cuts:
-                    cells_b[(mk, fam, "home_or_over") + cut][gid].append(y - p_mkt)
-                # (B) signed to the run side (spreads/h2h) or the hot/cold direction (totals)
-                if mk != "totals" and run in ("home_run", "away_run"):
-                    s = 1.0 if run == "home_run" else -1.0
-                    cells_b[(mk, fam, "run_side", "run", "run")][gid].append(s * (y - p_mkt))
-                    cells_b[(mk, fam, "run_side", "phase_x_run", phase)][gid].append(s * (y - p_mkt))
-                if abs(edge) >= 3:
-                    lean_hi = edge > 0
-                    won = y if lean_hi else 1.0 - y
-                    fair = p_mkt if lean_hi else 1.0 - p_mkt
-                    side = ("over" if lean_hi else "under") if mk == "totals" else ("home" if lean_hi else "away")
+                for fam in (fam0,) + ((fam0 + "_clean",) if clean else ()) + ((fam0 + "_fresh",) if fresh else ()):
+                    # (B) market residual for home/over
                     for cut in cuts:
-                        cells_a[(mk, fam, side) + cut][gid].append(won - fair)
-                        cells_a[(mk, fam, "any") + cut][gid].append(won - fair)
+                        cells_b[(mk, fam, "home_or_over") + cut][gid].append(y - p_mkt)
+                    # (B) signed to the run side (spreads/h2h) or the hot/cold direction (totals)
                     if mk != "totals" and run in ("home_run", "away_run"):
-                        rel = "with_run" if (lean_hi == (run == "home_run")) else "against_run"
-                        cells_a[(mk, fam, "any", "vs_run", rel)][gid].append(won - fair)
-                    if mk == "totals" and heat in ("hot", "cold"):
-                        rel = "with_heat" if (lean_hi == (heat == "hot")) else "against_heat"
-                        cells_a[(mk, fam, "any", "vs_heat", rel)][gid].append(won - fair)
+                        s = 1.0 if run == "home_run" else -1.0
+                        cells_b[(mk, fam, "run_side", "run", "run")][gid].append(s * (y - p_mkt))
+                        cells_b[(mk, fam, "run_side", "phase_x_run", phase)][gid].append(s * (y - p_mkt))
+                    if abs(edge) >= 3:
+                        lean_hi = edge > 0
+                        won = y if lean_hi else 1.0 - y
+                        fair = p_mkt if lean_hi else 1.0 - p_mkt
+                        side = ("over" if lean_hi else "under") if mk == "totals" else ("home" if lean_hi else "away")
+                        for cut in cuts:
+                            cells_a[(mk, fam, side) + cut][gid].append(won - fair)
+                            cells_a[(mk, fam, "any") + cut][gid].append(won - fair)
+                        if mk != "totals" and run in ("home_run", "away_run"):
+                            rel = "with_run" if (lean_hi == (run == "home_run")) else "against_run"
+                            cells_a[(mk, fam, "any", "vs_run", rel)][gid].append(won - fair)
+                        if mk == "totals" and heat in ("hot", "cold"):
+                            rel = "with_heat" if (lean_hi == (heat == "hot")) else "against_heat"
+                            cells_a[(mk, fam, "any", "vs_heat", rel)][gid].append(won - fair)
     def summarize(cells):
         out = []
         for key, games in cells.items():
