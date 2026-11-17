@@ -532,8 +532,50 @@ def sections_are_disjoint(text, current, rel):
     lane's. Anything else returns None and the caller blocks -- a holder without a
     declaration, or a second lane naming the same section, is a real collision.
     """
-    entries, holders = _section_view(text)
-    return sections_are_disjoint_among(entries, holders, current, rel)
+    entries, _holders = _section_view(text)
+    return sections_are_disjoint_among(entries, _holders_that_can_match(text, rel), current, rel)
+
+
+@functools.lru_cache(maxsize=4)
+def claims_tuple(text):
+    """`tuple(_claims(text))`, walked ONCE per text and shared by every reader in
+    the process. Same safety argument as `_section_view`: the walk is pure, and
+    the key is the text. `check_lane_invariants.claims` and `_section_view`
+    both read it, so a run walks `lanes.md` for claims once, not twice (lane
+    `lane-invariants-speed-2`, 2026-11-17)."""
+    return tuple(_claims(text))
+
+
+@functools.lru_cache(maxsize=4)
+def _holder_index(text):
+    """({basename: ((slug, claim), ...)} for file claims, (directory claims, ...)).
+
+    A FILE claim can match `rel` only when their last path components are equal:
+    every arm of `matches` is equality or a "/"-suffix. A DIRECTORY claim matches
+    by prefix, so it is always a candidate. See `claim_groups` for the same
+    argument.
+    """
+    by_base, dirs = {}, []
+    for slug, claim in claims_tuple(text):
+        if claim.endswith("/"):
+            dirs.append((slug, claim))
+        else:
+            by_base.setdefault(claim.rsplit("/", 1)[-1], []).append((slug, claim))
+    return {k: tuple(v) for k, v in by_base.items()}, tuple(dirs)
+
+
+def _holders_that_can_match(text, rel):
+    """The claims in `text` that can match `rel`: a SUPERSET of those that do.
+
+    `sections_are_disjoint_among` skips every holder that does not match, and its
+    answer does not depend on holder order. So passing these instead of all ~395
+    claims gives the same answer, for 43 calls a run instead of 43 x 395
+    `matches`. A `rel` ending in "/" has no basename, and only directory claims
+    can match it.
+    """
+    by_base, dirs = _holder_index(text)
+    base = "" if rel.endswith("/") else rel.rsplit("/", 1)[-1]
+    return by_base.get(base, ()) + dirs
 
 
 @functools.lru_cache(maxsize=4)
@@ -559,7 +601,7 @@ def _section_view(text):
     `lane-guard` never reaches this. It calls `sections_are_disjoint_among`
     directly, over the entries `lane_claims_source` derives.
     """
-    return tuple(_section_entries(text)), tuple(_claims(text))
+    return tuple(_section_entries(text)), claims_tuple(text)
 
 
 def sections_are_disjoint_among(section_entries, holders, current, rel):
@@ -845,12 +887,31 @@ def claim_groups(by_spelling):
             x = parent[x]
         return x
 
-    for i, a in enumerate(spellings):
-        for b in spellings[i + 1:]:
-            if same_file(a, b):
-                ra, rb = find(a), find(b)
-                if ra != rb:
-                    parent[rb] = ra
+    # ONLY PAIRS THAT CAN BE THE SAME FILE ARE COMPARED (lane
+    # `lane-invariants-speed-2`, 2026-11-17). Comparing every pair cost 58 ms
+    # (124-182 ms under load) for ~350 spellings, about 61,000 pairs.
+    # The pruning keeps every edge:
+    #   * Two FILE spellings (no trailing slash) are the same file only by
+    #     equality or by one being a "/"-suffix of the other, and either way their
+    #     last path components are equal. So they are compared only within one
+    #     basename bucket.
+    #   * A DIRECTORY spelling (trailing slash) matches by prefix, so it is still
+    #     compared with every spelling.
+    # That is the same edge set as before. Union-find gives the same components
+    # whatever order the edges come in, and the result below is built from the
+    # components alone: iterated in sorted order, with sorted names and slugs.
+    buckets = {}
+    for s in spellings:
+        if not s.endswith("/"):
+            buckets.setdefault(s.rsplit("/", 1)[-1], []).append(s)
+    pairs = [(a, b) for group in buckets.values()
+             for i, a in enumerate(group) for b in group[i + 1:]]
+    pairs += [(d, s) for d in spellings if d.endswith("/") for s in spellings if s != d]
+    for a, b in pairs:
+        if same_file(a, b):
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[rb] = ra
 
     grouped = {}
     for s in spellings:

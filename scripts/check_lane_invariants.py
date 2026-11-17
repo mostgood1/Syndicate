@@ -96,6 +96,9 @@ try:
         OPEN_RE,
         _claimable_prefix,
         _claims,
+        # `tuple(_claims(text))`, cached per text, so `claims()` and
+        # `sections_are_disjoint` share ONE walk of lanes.md.
+        claims_tuple,
         _DISCLAIMER_MARKERS,
         # The SAME predicate `lane-guard` permits with, so the report and the
         # enforcement cannot drift into disagreeing about one file.
@@ -178,8 +181,11 @@ def claims(text: str) -> set[tuple[str, str]]:
     to that is the whole point: the moment this function decides anything about
     what a claim IS, the guard and the check are answering different questions
     again and nothing reports it.
+
+    Read through `claims_tuple`, which is `tuple(_claims(text))` cached per text,
+    so `sections_are_disjoint` reuses this walk instead of making its own.
     """
-    return set(_claims(text))
+    return set(claims_tuple(text))
 
 
 def contested_files(claim_set) -> dict[str, list[str]]:
@@ -347,16 +353,7 @@ def bullets_that_end_a_files_block(text):
     return hits
 
 
-def _ledger_text(root: pathlib.Path, name: str) -> str:
-    """One ledger file's text, BOM-stripped. A UTF-8 BOM survives
-    `errors="replace"` and would otherwise glue itself to the first heading."""
-    try:
-        return (root / name).read_text(encoding="utf-8", errors="replace").lstrip("﻿")
-    except OSError:
-        return ""
-
-
-def upstream_lane_slugs(root: pathlib.Path, ref: str = "origin/main"):
+def upstream_lane_slugs(root: pathlib.Path, ref: str = "origin/main", wanted=None):
     """Lane slugs `ref`'s ledger files carry, or None if git cannot answer.
 
     WHY THIS EXISTS `[2026-09-05, lane ledger-repair-invariants]`. The marker
@@ -395,9 +392,37 @@ def upstream_lane_slugs(root: pathlib.Path, ref: str = "origin/main"):
     no file answers, or git fails outright, the result is None. The batch
     returns the raw blob, and so does `git show` here: the bytes were identical
     for all four files, and no `.gitattributes` textconv applies to them.
+
+    `wanted`: THE SLUGS THE CALLER WILL ASK ABOUT (lane `lane-invariants-speed-2`,
+    2026-11-17). Given, `lanes.md` is fetched first. Only if it lacks a wanted
+    slug are the other three fetched, and the result is then the same as
+    without `wanted`. If `lanes.md` holds every wanted slug, the result is
+    `lanes.md`'s slugs alone, a SUBSET. It still answers `slug in result`
+    exactly for every wanted slug, which is the only question the caller asks.
+    That is the usual case: a lane opened from a worktree has its block on
+    origin/main's `lanes.md`. Measured on the primary: `lanes.md` alone took
+    112-136 ms, all four (9 MB) 206-260 ms. A failure in the second fetch gives
+    None: unknown, and the caller keeps the strict verdict.
     """
     names = ("lanes.md", "lanes_closed.md", "lanes_closed_archive.md",
              "lanes_history.md")
+    batches = [names] if not wanted else [names[:1], names[1:]]
+    slugs: set[str] = set()
+    answered = False
+    for batch in batches:
+        got = _upstream_batch(root, ref, batch)
+        if got is None:  # git itself failed: unknown, as one failed batch was
+            return None
+        slugs |= got[0]
+        answered = answered or got[1]
+        if wanted and set(wanted) <= slugs:
+            break
+    return slugs if answered else None
+
+
+def _upstream_batch(root: pathlib.Path, ref: str, names):
+    """(heading slugs, whether any of `names` exists at `ref`) by one
+    `git cat-file --batch`, or None when git itself fails."""
     request = "".join(f"{ref}:.syndicate/{name}\n" for name in names)
     try:
         out = subprocess.run(
@@ -428,8 +453,12 @@ def upstream_lane_slugs(root: pathlib.Path, ref: str = "origin/main"):
         if header[1] != b"blob" or len(body) != size:
             continue
         answered = True
-        slugs |= set(heading_slugs(body.decode("utf-8", "replace").lstrip("﻿")))
-    return slugs if answered else None
+        # Bytes, LF-only line starts: this output is never newline-translated.
+        # See `heading_slugs_in_bytes`.
+        while body.startswith(_BOM):
+            body = body[len(_BOM):]
+        slugs |= set(heading_slugs_in_bytes(body, b"\n"))
+    return slugs, answered
 
 
 # A literal `\n###` lets the regex engine skip ahead by prefix search; the
@@ -449,6 +478,77 @@ def heading_slugs(text: str) -> list[str]:
     the two forms on the ledger files and on edge cases.
     """
     return _HEADING_SLUG_RE.findall("\n" + text)
+
+
+# THE ARCHIVES ARE SCANNED AS BYTES (lane `lane-invariants-speed-2`, 2026-11-17).
+# Reading lanes_closed + archive + history as text cost 99-177 ms on the primary
+# tree: the read was 8-22 ms, UTF-8 decoding ~40 ms, and newline translation
+# 46-105 ms (the files mix CRLF and LF). Finding the headings in the raw bytes
+# took 30-37 ms in all, with the same 1,963 slugs in the same order.
+#
+# EXACT, NOT APPROXIMATE, for three reasons:
+#   * `\s` in a str pattern also matches non-ASCII whitespace (NBSP, U+2028, ...).
+#     A bytes `\s` would not, so the tail below lists the UTF-8 form of every
+#     one of those characters. The test re-derives the list from `re` over all of
+#     Unicode, so a Python that adds one fails it.
+#   * Text mode turns a lone CR into a newline too, so a CR before `###` counts as
+#     a line start wherever the text was read in text mode (`b"\n\r"`).
+#     `git cat-file` output was never translated, so there it is LF alone.
+#   * Slugs are ASCII, and in UTF-8 an ASCII byte is always a character of its
+#     own. Every whitespace form here starts with an ASCII or lead byte, and those
+#     never sit inside another character, so no match can begin mid-character.
+#     A byte `errors="replace"` would turn into U+FFFD stays a non-match in
+#     both forms.
+_STR_WHITESPACE = (
+    "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f \x85\xa0 "
+    "           "
+    "    　"
+)
+_HEADING_TAIL_BYTES_RE = re.compile(
+    rb"###(?:" + b"|".join(re.escape(ch.encode("utf-8")) for ch in _STR_WHITESPACE)
+    + rb")+([A-Za-z0-9._-]+)"
+)
+_BOM = "﻿".encode("utf-8")
+
+
+def heading_slugs_in_bytes(data: bytes, line_starts: bytes) -> list[str]:
+    """`heading_slugs` over the text these bytes decode to, without decoding them.
+
+    A `###` is a heading start at offset 0 or right after a byte in `line_starts`.
+    That is `b"\\n"` for text never newline-translated, and `b"\\n\\r"` for text a
+    text-mode read would have translated. `bytes.find` jumps between `###`
+    occurrences, 2,228 of them in 8.7 MB on the primary tree, and the tail
+    pattern runs only at those. After a hit the search resumes 3 bytes on: the
+    only `###` that could start sooner overlaps this one, so a `#` precedes it,
+    and that is never a line start.
+    """
+    out = []
+    find, match = data.find, _HEADING_TAIL_BYTES_RE.match
+    pos = find(b"###")
+    while pos != -1:
+        if pos == 0 or data[pos - 1] in line_starts:
+            hit = match(data, pos)
+            if hit:
+                out.append(hit.group(1).decode("ascii"))
+        pos = find(b"###", pos + 3)
+    return out
+
+
+def _ledger_bytes(root: pathlib.Path, name: str) -> bytes:
+    """One ledger file's raw bytes, leading BOMs stripped, or b"" if unreadable.
+
+    The BOM has to go because it would otherwise glue itself to the first
+    heading. This replaced `_ledger_text`, which read the file as text
+    (`errors="replace"`, then `.lstrip("\\ufeff")`). The bytes are the same
+    file, before decoding and newline translation.
+    """
+    try:
+        data = (root / name).read_bytes()
+    except OSError:
+        return b""
+    while data.startswith(_BOM):
+        data = data[len(_BOM):]
+    return data
 
 
 def orphaned_lane_markers(text: str, path: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
@@ -479,13 +579,11 @@ def orphaned_lane_markers(text: str, path: str) -> tuple[list[tuple[str, str]], 
     """
     root = pathlib.Path(path).resolve().parent
     live = set(heading_slugs(text))
-    archived = set(
-        heading_slugs(
-            _ledger_text(root, "lanes_closed.md")
-            + _ledger_text(root, "lanes_closed_archive.md")
-            + _ledger_text(root, "lanes_history.md"),
-        )
-    )
+    # The archives are read only when a marker needs them, and as bytes: see
+    # `heading_slugs_in_bytes`. They are the same three files, joined in the same
+    # order as the text read joined them, with CR and LF both line starts as
+    # text mode made them.
+    archived = None
     missing: list[tuple[str, str]] = []
     stale: list[tuple[str, str]] = []
     for marker in sorted(root.glob(".current-lane.*")):
@@ -496,6 +594,13 @@ def orphaned_lane_markers(text: str, path: str) -> tuple[list[tuple[str, str]], 
         # An EMPTY marker is `/lane close` having done its job, not a lane.
         if not slug or slug in live:
             continue
+        if archived is None:
+            archived = set(heading_slugs_in_bytes(
+                _ledger_bytes(root, "lanes_closed.md")
+                + _ledger_bytes(root, "lanes_closed_archive.md")
+                + _ledger_bytes(root, "lanes_history.md"),
+                b"\n\r",
+            ))
         (stale if slug in archived else missing).append((slug, marker.name))
     return missing, stale
 
@@ -614,7 +719,10 @@ def main(argv=None) -> int:
     # `upstream_lane_slugs`: "not in this working copy" and "nowhere at all"
     # need opposite remedies -- pull vs restore -- and only the second is a
     # ledger defect. `None` is UNKNOWN, so everything stays a FAIL.
-    upstream = upstream_lane_slugs(pathlib.Path(args.path).resolve().parent) if orphaned else None
+    upstream = upstream_lane_slugs(
+        pathlib.Path(args.path).resolve().parent,
+        wanted={slug for slug, _marker in orphaned},
+    ) if orphaned else None
     behind: list[tuple[str, str]] = []
     if upstream is not None:
         behind = [(s, m) for s, m in orphaned if s in upstream]
