@@ -4,7 +4,7 @@ Origin: the two 11-17 leads from `board-query-row-refs` (`leads.md`) and that la
 "Left on the table" (`findings_2026-11-17_board_query_row_refs.md`). Brief from session
 `local_bc8d3e61` (the row-refs load owner). Times are Central (CST) unless marked Z.
 
-**Status: ON MAIN `25fc2e4f0`, NOT LOADED.** Loading it is the user's decision (see "State" at the end).
+**Status: LOADED 2026-11-17 21:56:24Z (3:56 PM CST)** -- see "Loaded" at the end. (Written ON MAIN `25fc2e4f0`, NOT LOADED; the load was the user's decision.)
 Read-only on production throughout: every number below comes from the response the rail monitor had
 already recorded. The fleet was never called.
 
@@ -211,3 +211,12 @@ list gains `rationale`).
   - "Showing 1,347 of 2,238 plays", 7 live, rail drawn;
   - the 18 console errors are the known `cdn.nba.com` logo failures.
 - Record: deploys.md 21:56:24Z, BC-038 (no).
+- **Later reading, 23:07:27Z (5:07 PM CST)** -- session 7389580d, read-only, the same body (`read_query.py` with this
+  worktree's decoder). This reading had a live population, which the load reading did not:
+  - `_dropped_row_fields` `["trace", "score_breakdown", "rationale"]`;
+  - **`top_live_opportunities` 0 / 0 / 0 of 197 rows** (against 7 at load);
+  - `top_opportunities` 0 of 4,500, `ranked_all` 0 of 5,619;
+  - 4,298,283 B gzipped, 23,356,829 B uncompressed (no A/B, so no cut figure).
+  - **Time: 37.6 s, and not from this change.** `QUERY_STAGE_MS` 23:07:56Z: `board_read` 18,142 ms (a cold read),
+    every other stage 3-4x its usual value, `drop_row_diagnostics` 1,058 ms (post-load range 240-1,596 ms), total
+    26,997 ms. The twelve post-load queries 21:56-23:08Z ran 1.5-27.0 s server-side, and `board_read` drove the spread.
