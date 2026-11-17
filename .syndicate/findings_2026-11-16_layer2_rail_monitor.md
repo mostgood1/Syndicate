@@ -721,3 +721,94 @@ probability). It is falsified if any served row after the load still carries a r
   shard line (todo 817)".
 - No restart: refresh-worker pid 2953295 unchanged.
 - For the MNF read: the `NFL_GAMELINE_QUOTE_SHARD` line should now land in a role log.
+
+## Reading 13 — Mon 11-16 6:50 PM CST (00:50Z 11-17), full page — the last PRE-load sample for the #816 display fix
+
+**Fleet:**
+- Still `69bd95177`; refresh-worker pid 2953295.
+- The user told the owner "Load it" for `d7c183d8d` (the #816 display fix). The owner session
+  (local_1f10ce63, lane `ncaab-total-overprojection`) holds the refresh-worker claim and was
+  draining from ~00:36Z. I did not load it in parallel (its request).
+
+**Slate: 29 live chips.**
+- NBA 5: HOU @ MIA Q1; CHI @ CLE, ORL @ BOS and MEM @ WAS Q2; PHI @ BKN Q1.
+- NHL 1: MTL @ NYR P1.
+- 23 college games.
+
+**Flags: 15 new shown on 12 cards. 0 false, 0 missed, 6 DARK.** 11-16 total: 56.
+- **NCAAB full-game totals (9):**
+  - 8 unders, calibrated: Iona @ UMBC u140.5 (73.2%, 23.8 pp), Alcorn St @ Maryland u179.5,
+    Prairie View @ Ohio State u142.5, Grambling @ Kentucky u145.5, Jacksonville @ Georgia u165.5,
+    WKU @ Tulsa u154.5, Richmond @ VT u143.5, Tarleton State @ Drake u153.5.
+  - 1 over, **RAW**: Citadel @ Clemson o140.5, 0.598039 = 61/102. The same pre-load display-path
+    gap as reading 12.
+- **NCAAB spreads / moneyline (4):** Iona @ UMBC UMBC -8.5; Grambling @ Kentucky UK -18.5;
+  St. Thomas @ LIU LIU -4.5; Tarleton moneyline.
+- **NBA spreads (2):** CHI @ CLE CHI +6.5 (13.3 pp; ours CHI -3.1); PHI @ BKN BKN +5.5 (3.8 pp).
+- **Display inconsistency (by design, mentioned to the owner):** Richmond @ VT is flagged **UNDER
+  143.5** (calibrated 57.6%) while the card's "ours" reads **146.0**. The #816 "level" moves the
+  probability, but the projected total (`total_mean`) stays raw. A reader sees an under flag next to
+  a projection above the line.
+- **Fade-vs-follow series:**
+  | game | 5:20 PM | 5:41 PM | 6:04 PM | 6:27 PM | 6:50 PM |
+  |---|---|---|---|---|---|
+  | Iona @ UMBC | 141.5 / 145.4 | 134 / 142.7 | 126.5 / 136.5 | 122.5 / 124.6 | **140.5 / 133.3** |
+  - The book has jumped +18 since 6:27, ours +8.7. The flag is now UNDER, again against the move.
+- **Totals direction, flag by flag: 28 unders, 13 overs.** Through 6:27 PM 20 U / 12 O; this reading
+  adds 8 U and 1 O (Citadel).
+- **6 DARK flags.** All were priced 39-109 s before their grid build but were 393-463 s old when
+  served:
+  - Prairie View @ Ohio State OSU -23.5 (9.2 pp);
+  - St. Thomas @ LIU 1H +0.5 (3.3 pp);
+  - WKU @ Tulsa 1H -14.5 (11.2 pp);
+  - Richmond @ VT 1H +9.5 (6.6 pp);
+  - Albany @ Rutgers u129.5 (3.3 pp);
+  - MEM @ WAS 1H o122.5 (10.6 pp).
+  - **The served board was 354 s old** (shortlist written 353 s ago). Over the same 2 minutes, both
+    gunicorn workers were recycled (146 / 118 s old at the read, 78 / 59 s old at the end) and
+    **host load hit 19.5 on 12 cores**.
+  - One sample. Recorded; the web-recycle lead already in `leads.md` covers the mechanism. Not
+    handed off yet: re-read next reading.
+
+**#816 reachability, pre-load:**
+| read | raw | calibrated | other |
+|---|---|---|---|
+| this reading (`rail.json`) | 47 | 49 | — |
+| owner's `/api/board/live-rail` baseline, 00:35Z | 41 | 72 | 5 no-prob |
+
+**NBA:**
+| family | rows | priced <= 120 s |
+|---|---|---|
+| main | 79 | 15 |
+| `_alt` | 901 | 0 |
+
+- Seen age at pricing p50 172 s (one pull).
+- NBA overlay: build p50 30.4 s, p90 55.6 s, **max 80.2 s**; **2 `deferred_slow`**; gap p50 70 s,
+  max 278 s.
+- 3 NBA flags (rows), 1 dark (MEM @ WAS 1H).
+
+**NHL:** 3 rows, 0 priced <= 120 s (P1 just started); overlay 3 builds.
+
+**NCAAB:**
+- 185 rows (1H 95 / 2H 37 / break 53); 60 priced <= 120 s; seen age at pricing p50 133 s.
+- Overlay gap p50 76 s, max 141 s; builds p50 17.0 s, max 41.4 s (all up from earlier readings).
+
+**WNCAAB:** 2 rows; 11 of 16 builds zero-card with rows (the floor).
+
+**Tick gap:** p50 52 s (21-37 s earlier), max 125 s. 0 overlay gaps over 360 s.
+
+**Web merges:** nba / ncaab / wncaab fresh 30 / 30; nhl fresh 6; nfl stale (pregame).
+
+**Load (worst of the day):**
+- **`/intelligence` 25.6 s / 36.6 MB. Query 37.2 s / 80.5 MB. Chips 9.8 s. Live-rail 3.3 s.**
+  Shortlist 2.1 s.
+- Host load 12.8 → 19.5 during the probe. No single process: NFL and NHL odds pulls, an MLS
+  artifact build, both workers, both web workers, and a nice-19 research job
+  (`/mnt/c/tmp/elp/ncaaf_breakdown/breakdown.py`, 116% CPU, 985 MB).
+- This probe's own page + query fetch (117 MB) adds to the web's load. From here, the full page
+  only every ~4th reading.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 29 live chips
+have a live card.
+
+**Restarts:** live-odds-worker 2925378 and refresh-worker 2953295, both unchanged.
