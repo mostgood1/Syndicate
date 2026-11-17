@@ -5410,30 +5410,68 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
 # only the injury/back-to-back adjustments (.syndicate/findings_2026-11-16_nba_margin_raw_zero.md). Feeding the NBA
 # names is F1, a separate user-gated betting change. This block only RECORDS whether the read found anything.
 GAME_MODEL_READ_COLUMNS_LOCAL = ("totals", "spread_margin")
+GAME_MODEL_PRED_COLUMNS_LOCAL = ("pred_total", "pred_margin")
 GAME_MODEL_KNOWN_COLUMNS_LOCAL = ("totals", "spread_margin", "pred_total", "pred_margin")
 GAME_MODEL_UNFED_TAG_LOCAL = "SMART_SIM_GAME_MODEL_UNFED"
+# F1 (todo #821, user 2026-11-17 "build F1 behind the switch, default off"): a key in the same NBA switch file as
+# skip_def_subtraction / skip_outs_penalties (NBA_TOTAL_INPUTS_FILE_LOCAL). ABSENT or false = today (F0, byte-identical).
+# True = the job build falls back to the NBA names, so each team's off_rating comes from the game model's points.
+# Measured before building (findings 2x2, 192 graded games): fed WITH the outs penalties on is the worst arm on the
+# anchored total; pair any switch-on with the skip_outs_penalties decision. Switching it on is a betting change.
+NBA_FEED_GAME_MODEL_KEY_LOCAL = "feed_game_model"
 
 
-def _game_model_points_local(row: Any, num: Any) -> tuple[float | None, float | None, dict[str, Any]]:
-    """(home_mu, away_mu, audit) for one predictions row, read exactly as the job build always has: `totals` and
-    `spread_margin` only, through the caller's own `num` coercion. `audit` is {"game_model_fed": both were read,
-    "game_model_columns": the known game-model columns this row carries with a finite value}. The audit never changes
-    the means."""
+def _nba_feed_game_model_switch_local(*, processed_root: Any, league_code: Any) -> bool:
+    """True only when the NBA processed root's switch file says `"feed_game_model": true`. Re-read per call; NBA only;
+    absent file, absent key, unreadable file or any other league -> False. Never raises."""
+    try:
+        if str(league_code or "").strip().lower() != "nba" or processed_root is None:
+            return False
+        path = Path(processed_root) / NBA_TOTAL_INPUTS_FILE_LOCAL
+        if not path.is_file():
+            return False
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        return bool(raw.get(NBA_FEED_GAME_MODEL_KEY_LOCAL, False)) if isinstance(raw, dict) else False
+    except Exception:
+        return False
+
+
+def _game_model_points_local(row: Any, num: Any, *, read_pred_columns: bool = False) -> tuple[float | None, float | None, dict[str, Any]]:
+    """(home_mu, away_mu, audit) for one predictions row, through the caller's own `num` coercion.
+
+    Off (`read_pred_columns` False, the default): `totals` and `spread_margin` only, exactly as the job build always
+    read. On (F1): each of the two values falls back to the NBA name (`pred_total`, `pred_margin`) when the WNBA name is
+    missing, as `nba/live_tick/tick.py` already does. `audit` is {"game_model_fed": both values were read,
+    "game_model_columns": the known game-model columns this row carries with a finite value}, plus
+    "game_model_read": [the two columns actually read] only when a fallback name was used -- so an off run's audit is
+    identical to F0's. The audit never changes the means."""
     pred_total = num(row.get("totals"))
     pred_margin = num(row.get("spread_margin"))
+    read = list(GAME_MODEL_READ_COLUMNS_LOCAL)
+    if read_pred_columns:
+        if pred_total is None:
+            pred_total, read[0] = num(row.get("pred_total")), "pred_total"
+        if pred_margin is None:
+            pred_margin, read[1] = num(row.get("pred_margin")), "pred_margin"
     fed = pred_total is not None and pred_margin is not None
     home_mu = (0.5 * (pred_total + pred_margin)) if fed else None
     away_mu = (0.5 * (pred_total - pred_margin)) if fed else None
     found = [column for column in GAME_MODEL_KNOWN_COLUMNS_LOCAL if num(row.get(column)) is not None]
-    return home_mu, away_mu, {"game_model_fed": bool(fed), "game_model_columns": found}
+    audit: dict[str, Any] = {"game_model_fed": bool(fed), "game_model_columns": found}
+    if fed and read != list(GAME_MODEL_READ_COLUMNS_LOCAL):
+        audit["game_model_read"] = read
+    return home_mu, away_mu, audit
 
 
 def _game_model_anchor_fields_local(job: Any) -> dict[str, Any]:
     """The job's game-model audit as market_anchor fields. {} for a job built without the audit: absent is not False."""
     if not isinstance(job, dict) or "game_model_fed" not in job:
         return {}
-    return {"game_model_fed": bool(job.get("game_model_fed")),
-            "game_model_columns": [str(column) for column in (job.get("game_model_columns") or [])]}
+    fields = {"game_model_fed": bool(job.get("game_model_fed")),
+              "game_model_columns": [str(column) for column in (job.get("game_model_columns") or [])]}
+    if job.get("game_model_read"):
+        fields["game_model_read"] = [str(column) for column in job.get("game_model_read")]
+    return fields
 
 
 def _report_game_model_unfed_local(jobs: list[dict], *, date_str: str, league_code: str) -> None:
@@ -5888,7 +5926,9 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             date_str=date_str, league=league_code, home=home_tri, away=away_tri,
         )
         # (todo #821 F0) same read as always (totals/spread_margin); the audit records whether it found anything.
-        home_mu, away_mu, game_model_audit = _game_model_points_local(row, _num)
+        # (todo #821 F1) with "feed_game_model": true in the NBA switch file, fall back to pred_total/pred_margin.
+        home_mu, away_mu, game_model_audit = _game_model_points_local(
+            row, _num, read_pred_columns=_nba_feed_game_model_switch_local(processed_root=processed_root, league_code=league_code))
         try:
             home_pace = float(adv_map.get(home_tri, {}).get("pace"))
         except Exception:

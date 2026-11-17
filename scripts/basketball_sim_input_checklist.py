@@ -673,12 +673,13 @@ def _num_like_the_job_build(value: Any) -> float | None:
         return None
 
 
-def game_model_feed_census(sim_root: Path, *, recent: int = GAME_MODEL_RECENT_FILES) -> dict[str, Any]:
+def game_model_feed_census(sim_root: Path, *, recent: int = GAME_MODEL_RECENT_FILES, league: str = "nba") -> dict[str, Any]:
     """Does the game model reach the quarter model's off_rating, measured two ways over the newest `recent`
     predictions_<D>.csv files in `sim_root`:
 
       * INPUT: replay the job build's own read (`_game_model_points_local`, imported, so the column names cannot
-        drift from production) over every row: how many rows it would feed.
+        drift from production) over every row, under the SAME F1 switch the job build reads from `sim_root`
+        (`_nba_feed_game_model_switch_local`): how many rows it would feed.
       * OUTPUT: the smart_sim_<D>_*.json artifacts of the same dates: how many carry market_anchor.game_model_fed and
         how many of those are True. Sims written before todo #821 F0 loaded carry no field and are counted apart.
     """
@@ -687,6 +688,7 @@ def game_model_feed_census(sim_root: Path, *, recent: int = GAME_MODEL_RECENT_FI
 
     files = sorted((m.group(1), p) for p in sim_root.glob("predictions_*.csv")
                    if (m := _PREDICTIONS_FILE_RE.match(p.name)))[-int(recent):]
+    feed_switch = bridge._nba_feed_game_model_switch_local(processed_root=sim_root, league_code=league)
     rows = fed = 0
     found: collections.Counter = collections.Counter()
     unreadable: list[str] = []
@@ -697,7 +699,7 @@ def game_model_feed_census(sim_root: Path, *, recent: int = GAME_MODEL_RECENT_FI
             unreadable.append(f"{path.name}: {type(exc).__name__}")
             continue
         for _, row in df.iterrows():
-            _, _, audit = bridge._game_model_points_local(row, _num_like_the_job_build)
+            _, _, audit = bridge._game_model_points_local(row, _num_like_the_job_build, read_pred_columns=feed_switch)
             rows += 1
             fed += int(bool(audit["game_model_fed"]))
             found.update(audit["game_model_columns"])
@@ -715,7 +717,9 @@ def game_model_feed_census(sim_root: Path, *, recent: int = GAME_MODEL_RECENT_FI
     return {
         "sim_root": str(sim_root),
         "dates": [d for d, _ in files],
-        "read_columns": list(bridge.GAME_MODEL_READ_COLUMNS_LOCAL),
+        "read_columns": list(bridge.GAME_MODEL_READ_COLUMNS_LOCAL)
+        + (list(bridge.GAME_MODEL_PRED_COLUMNS_LOCAL) if feed_switch else []),
+        "feed_game_model": bool(feed_switch),
         "prediction_rows": rows,
         "prediction_rows_fed": fed,
         "columns_present": {c: int(found.get(c, 0)) for c in bridge.GAME_MODEL_KNOWN_COLUMNS_LOCAL},
@@ -773,7 +777,7 @@ def level4_quarter_model_inputs() -> tuple[dict[str, Any], list[str], list[str]]
             notes.append(f"{league}: game-model feed UNMEASURED -- {sim_root} does not exist on this substrate")
             continue
         try:
-            census = game_model_feed_census(sim_root)
+            census = game_model_feed_census(sim_root, league=league)
         except Exception as exc:
             by_league[league] = {"sim_root": str(sim_root), "error": f"{type(exc).__name__}: {exc}"}
             alarms.append(f"LOADER EXCEPTION: {league} game-model feed census raised {type(exc).__name__}: {exc}")
