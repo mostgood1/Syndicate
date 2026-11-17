@@ -301,25 +301,56 @@ def test_launcher_table_is_the_helper_table() -> None:
 
 
 @pytest.mark.parametrize("state", ["redis", "file"])
-def test_launcher_sets_each_marker_under_both_names_to_one_value(tmp_path, state) -> None:
+def test_launcher_sets_only_the_neutral_markers(tmp_path, state) -> None:
+    """Step 3a (user "go ahead with step 3", 2026-11-17): no role env carries a Render-era
+    marker, stray ones from the operator shell included; each neutral marker carries
+    exactly the value its Render twin used to."""
     from scripts import local_production as lp
 
     spec = lp.load_role_spec()
     settings = lp.Settings(home=tmp_path, state=state)
-    stray = {"SYNDICATE_HOSTED": "stray", "SYNDICATE_SERVICE_NAME": "stray", "RENDER_SERVICE_NAME": "stray"}
+    stray = {name: "stray" for name in si.ALL_MARKER_NAMES}
     for role in lp.ROLE_ORDER:
         env, _ = lp.derive_role_env(role, spec, {"SYNDICATE_PUBLIC_URL": "https://x.test"}, settings,
                                     base_env=dict(stray), instance_id=f"local-{role}-1794930464")
-        for neutral, legacy in si.NEUTRAL_TO_RENDER.items():
-            assert env.get(neutral) == env.get(legacy), (role, neutral)
+        assert not (set(si.NEUTRAL_TO_RENDER.values()) | set(si.RENDER_ONLY_INJECTED)) & set(env), role
         assert env["SYNDICATE_SERVICE_NAME"] == env["SYNDICATE_SERVICE_ID"] == f"local-{role}"
         assert env["SYNDICATE_INSTANCE_ID"] == f"local-{role}-1794930464"
         assert env["SYNDICATE_EXTERNAL_URL"] == "https://x.test"
-        assert "SYNDICATE_GIT_BRANCH" not in env and "RENDER_GIT_BRANCH" not in env
+        assert "SYNDICATE_GIT_BRANCH" not in env  # a stray one is stripped, and nothing sets it
         if state == "redis":
-            assert env["SYNDICATE_HOSTED"] == env["RENDER"] == "true"
+            assert env["SYNDICATE_HOSTED"] == "true"
         else:
-            assert "SYNDICATE_HOSTED" not in env and "RENDER" not in env  # a stray one is stripped too
+            assert "SYNDICATE_HOSTED" not in env
+
+
+def test_readers_answer_the_same_on_the_new_launcher_env(monkeypatch, tmp_path) -> None:
+    """The load-bearing readers, given the env the step-3a launcher builds (neutral only),
+    answer exactly what they answer on an old-launcher env (Render names only)."""
+    from scripts import local_production as lp
+    from syndicate import app as app_module
+    from syndicate.features.shared import disk_compaction, ops_refresh, portfolio_auth, source_roots
+    from syndicate.features.shared import request_path_guard as guard
+
+    spec = lp.load_role_spec()
+    settings = lp.Settings(home=tmp_path)
+    readers = {
+        "app": app_module._is_render_web_dyno, "portfolio": portfolio_auth._on_render,
+        "guard": guard._is_render_hosted, "strict": source_roots._strict_hosted_storage_enabled,
+        "compaction": lambda: disk_compaction.disk_compaction_wanted("refresh-worker"),
+        "service": ops_refresh._this_service_identity, "instance": ops_refresh._this_instance_identity,
+    }
+    for role in lp.ROLE_ORDER:
+        env, _ = lp.derive_role_env(role, spec, {}, settings, base_env={}, instance_id=f"local-{role}-1")
+        markers = {k: v for k, v in env.items() if k in si.NEUTRAL_TO_RENDER}
+        answers = {}
+        for style in ("new", "old"):
+            _clear(monkeypatch)
+            for k, v in markers.items():
+                monkeypatch.setenv(k if style == "new" else si.NEUTRAL_TO_RENDER[k], v)
+            answers[style] = {name: read() for name, read in readers.items()}
+        assert answers["new"] == answers["old"], role
+        assert answers["new"]["app"] is True and answers["new"]["compaction"] is True
 
 
 def test_launcher_status_reads_prefer_the_neutral_name(monkeypatch) -> None:
@@ -386,6 +417,7 @@ _ALLOWED = {
     "scripts/replay_diff_gate.py": "pops RENDER from the replay child (pinned above)",
     "scripts/fleet_local.py": "clears RENDER in the rehearsal env (pinned above)",
     "scripts/refresh_mlb_oddsapi.py": "RENDER_EXTERNAL_URL after SYNDICATE_EXTERNAL_URL (pinned above)",
+    "scripts/fleet_role_env_reading.py": "the before/after reading's marker table (pinned in its own test); reads no env",
 }
 
 

@@ -63,10 +63,10 @@ def test_loop_ownership_comes_from_the_spec_per_role(spec, settings):
 def test_redis_state_mode_keeps_production_semantics(spec, settings):
     for role in lp.ROLE_ORDER:
         env, _ = _env(role, spec, settings)
-        assert env["RENDER"] == "true"
+        assert env["SYNDICATE_HOSTED"] == "true" and "RENDER" not in env  # step 3a: neutral name only
         assert env["SYNDICATE_REFRESH_STATE_BACKEND"] == "keyvalue"
         assert env["SYNDICATE_REFRESH_STATE_URL"] == settings.redis_url
-        assert env["RENDER_SERVICE_NAME"] == f"local-{role}"
+        assert env["SYNDICATE_SERVICE_NAME"] == f"local-{role}" and "RENDER_SERVICE_NAME" not in env
         # one bootstrap, run by `up` itself, never three racing ones
         assert env["SYNDICATE_BOOTSTRAP_ON_START"] == "0"
 
@@ -75,7 +75,7 @@ def test_file_state_mode_clears_hosted_flags(spec, tmp_path):
     settings = lp.Settings(home=tmp_path, state="file")
     env, _ = _env("refresh-worker", spec, settings)
     assert env["SYNDICATE_REFRESH_STATE_BACKEND"] == "filesystem"
-    assert "RENDER" not in env
+    assert "RENDER" not in env and "SYNDICATE_HOSTED" not in env
     assert "SYNDICATE_REQUIRE_HOSTED_STORAGE" not in env
 
 
@@ -175,7 +175,7 @@ def test_web_counts_as_render_web_dyno_in_both_state_modes(spec, tmp_path):
     # regardless of its flag -- a second board builder on the same disk.
     for state in ("redis", "file"):
         env, _ = _env("web", spec, lp.Settings(home=tmp_path, state=state))
-        assert env["RENDER_SERVICE_ID"] == "local-web"
+        assert env["SYNDICATE_SERVICE_ID"] == "local-web"
         assert env["SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP"] == "false"
 
 

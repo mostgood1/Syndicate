@@ -54,17 +54,18 @@ Everything not listed is passed through verbatim.
   SYNDICATE_BOOTSTRAP_ON_START  -> 0 in the roles    `up` seeds ONCE, first
   PORT                          -> --port
   SYNDICATE_HOSTED=true, SYNDICATE_SERVICE_NAME / _ID, SYNDICATE_INSTANCE_ID,
-  SYNDICATE_GIT_COMMIT -- each ALSO under its Render-era name (RENDER,
-  RENDER_SERVICE_NAME, ...; `SERVICE_MARKERS`), one value
+  SYNDICATE_GIT_COMMIT -- and, since step 3a (2026-11-17), NOT the Render-era
+  names (RENDER, RENDER_SERVICE_NAME, ...; `SERVICE_MARKERS`) any more
                                 -> set, because the code branches on them:
                                    the request-path compute guard, portfolio
                                    auth (`required` when hosted), disk
                                    compaction, per-service lanes. Without them
                                    the web process quietly behaves like a
                                    developer laptop instead of production.
-                                   Readers prefer the neutral name
-                                   (`service_identity`); the Render names stay
-                                   until a separate decision drops them.
+                                   Readers ask the neutral name
+                                   (`service_identity`); their Render-name
+                                   fallback only serves roles started before
+                                   step 3a, and goes in step 3b.
   SYNDICATE_EXECUTION_MODE / _LIVE_ARMED -> paper, 0
                                    UNLESS `up --allow-live-execution`. Real
                                    money is never armed by a config file alone.
@@ -178,12 +179,14 @@ NEVER_CARRY = ("RENDER_API_KEY",)
 
 # The service markers every role gets, under their NEUTRAL name -> the Render-era
 # name each mirrors (lane `render-config-retirement`, 2026-11-17). Each is set under
-# BOTH names to ONE value; readers ask `service_identity.service_marker(<neutral>)`,
-# which prefers the neutral name and falls back on the old one. The same table as
+# its NEUTRAL name only since step 3a (user "go ahead with step 3", 2026-11-17).
+# Readers ask `service_identity.service_marker(<neutral>)`, which falls back on the
+# old name only for a role started by an older launcher. The same table as
 # `syndicate/features/shared/service_identity.NEUTRAL_TO_RENDER`, pinned by
 # `tests/test_service_marker_readers.py`; spelled out rather than imported because
 # importing `syndicate` installs its global urllib opener, and the supervisor process
-# must not change. Dropping the Render names is step 3: a separate decision.
+# must not change. Deleting the readers' Render-name fallback is step 3b, after a
+# restart has run on this launcher.
 SERVICE_MARKERS: dict[str, str] = {
     "SYNDICATE_HOSTED": "RENDER",
     "SYNDICATE_SERVICE_NAME": "RENDER_SERVICE_NAME",
@@ -193,15 +196,6 @@ SERVICE_MARKERS: dict[str, str] = {
     "SYNDICATE_EXTERNAL_URL": "RENDER_EXTERNAL_URL",
     "SYNDICATE_GIT_BRANCH": "RENDER_GIT_BRANCH",
 }
-
-
-def marker_env(neutral_values: dict[str, str]) -> dict[str, str]:
-    """{neutral: value} -> the same value under the neutral AND the Render-era name."""
-    out: dict[str, str] = {}
-    for name, value in neutral_values.items():
-        out[name] = value
-        out[SERVICE_MARKERS[name]] = value
-    return out
 
 
 def read_marker(env: dict[str, str], neutral: str) -> str | None:
@@ -486,8 +480,11 @@ def derive_role_env(
     # `_is_render_web_dyno()`, and then syndicate/app.py starts the intelligence
     # and live-refresh loops on first request WITHOUT reading their flags --
     # duplicating refresh-worker's board build on the same disk.
-    # Each marker under BOTH its neutral and its Render-era name, one value
-    # (`SERVICE_MARKERS`), in exactly the cases the Render name was set before.
+    # Each marker under its NEUTRAL name only (step 3a, user "go ahead with step 3",
+    # 2026-11-17), in exactly the cases the Render name was set before. Every
+    # reader asks the neutral name first (`service_identity`), measured equal under
+    # either spelling (`tests/test_service_marker_readers.py`); the Render names
+    # are stripped from the base env above, so no role carries them.
     markers: dict[str, str] = {
         "SYNDICATE_SERVICE_NAME": f"local-{role}",
         "SYNDICATE_SERVICE_ID": f"local-{role}",
@@ -501,7 +498,7 @@ def derive_role_env(
         markers["SYNDICATE_EXTERNAL_URL"] = public
     if settings.state == "redis":
         markers["SYNDICATE_HOSTED"] = "true"
-    forced.update(marker_env(markers))
+    forced.update(markers)
     if settings.state == "redis":
         forced.update(
             {
@@ -1412,7 +1409,7 @@ def cmd_up(args: argparse.Namespace) -> int:
                     break
                 item.restarts += 1
                 if item.name in ROLE_ORDER:
-                    item.env.update(marker_env({"SYNDICATE_INSTANCE_ID": f"local-{item.name}-{int(time.time())}"}))
+                    item.env["SYNDICATE_INSTANCE_ID"] = f"local-{item.name}-{int(time.time())}"
                 _spawn(item)
                 _write_pidfile()
             time.sleep(2)
