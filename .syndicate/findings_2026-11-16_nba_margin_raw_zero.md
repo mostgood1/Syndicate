@@ -404,6 +404,85 @@ is a percentile bootstrap that resamples whole tip dates (Central), 2,000 reps, 
 
 **Expected timing.** At about 8 graded games a day, 150 games arrive around 2026-12-06.
 
+## Props read: what F1 + outs-off moves in what NBA SERVES `[2026-11-17 ~1:40 PM CST, lane nba-f1-props-read; user "do the props read too"]`
+
+**Verdict.** Pregame, F1 + outs-off moves almost nothing the board serves:
+
+- Served NBA prop probabilities for **pts, ast, threes, P+A and P+R do not move at all**.
+- **Rebounds** move by 0.06 pp on average (max 1.1 pp).
+- The served **full-game total** moves about 0.5 pp at most.
+- Moneylines and spreads do not move.
+
+The material pathway is the **live re-sim**, which resumes from the moved pregame targets. It is
+sized below and not graded.
+
+**Why, by construction.** The fleet constants were read at 1:2x PM CST.
+
+- **Prop book blend.** `nba_prop_book_blend.json` is enabled and serves
+  `p = sigmoid(logit(p_book) + w * (logit(p_model) - logit(p_book)))`.
+  - `w` is **0** for pts, ast, threes, blk, pa and pr.
+  - `w` is 0.10 for reb, and 0.05 for pra, ra and stl.
+  - Where `w` is 0, the served probability IS the de-vigged book, whatever the sim says.
+- **Prop calibration.** `nba_prop_calibration.json` sets the served mean to
+  `b * minutes * (own + w * (sim_rate - own)) + (1 - b) * own_avg`. So a change in the sim's
+  per-minute rate reaches the served mean scaled by `b * w`:
+  - pts 4.5%, reb 6%, ast 7.5%;
+  - threes 0%: `w` = 0, so only the sim's minutes count.
+- **Game-line book blend.** `nba_game_book_blend.json` gives `w` 0 to `h2h:full` and
+  `spreads:full`, 0.05 to `totals:full`, and 0 to every period.
+
+**Measured, not just argued** (`C:\tmp\nba_margin0\p1_shift.py`, `p1_shift.json`).
+
+- **Sample.** 8 seeded graded games, 11-08..11-15, from the 58 with persisted engine inputs (the
+  fleet `engine_inputs/` pickles, pre-flip, so arm A).
+- **Method.** The real native engine is called directly (no persist hook), 100 draws per arm
+  (production's `n_sims`), with the same seed in both arms.
+  - **D** takes its quarter targets from the real `_simulate_quarters_local` under the D switch
+    file, keeping A's per-quarter split rescaled to D's team totals. Its possessions have the injury
+    pace drag removed, which is `_pace_injury_drag` under `skip_outs_penalties`.
+  - **Validity gate:** the A switch reproduces the persisted targets to **1.4e-14** on 8 of 8 games.
+  - Each player's sim mean then goes through the fleet's own served transform (`own_rates` from the
+    fleet `boxscores_history.csv`; `sd × k`). Then comes a model P(over) at the half-point line next
+    to the A mean, then the fleet's prop blend (`p_book := p_model_A`).
+- **Results** over 147 player rows of 10+ minutes:
+
+  | stat | sim mean D−A (mean / mean abs) | served mean D−A (mean / mean abs / max) | mean abs ΔP model | ΔP served (mean / max) |
+  |---|---|---|---|---|
+  | pts | +0.261 / 0.598 | +0.019 / 0.034 / 0.580 | 0.0028 | **0 / 0** (w 0) |
+  | reb | +0.215 / 0.286 | +0.019 / 0.024 / 0.920 | 0.0056 | 0.0006 / 0.0110 (w 0.10) |
+  | ast | +0.041 / 0.158 | +0.003 / 0.013 / 0.060 | 0.0060 | **0 / 0** (w 0) |
+  | threes | +0.041 / 0.121 | +0.002 / 0.002 / 0.210 | 0.0095 | **0 / 0** (w 0) |
+
+  - The maxima are 100-draw Monte Carlo noise in sim minutes on single players. The averages are the
+    signal.
+  - **In the player sim, team totals rise more than the quarter targets:** +5.2 points on average
+    over the 8 games (−0.7 to +9.7), against +2.4 in targets. Outs-off adds 2.4–3.0 possessions
+    (`poss_A` 98.6–102.3 → `poss_D` 100.8–104.8), and the PBP engine is only "gently" calibrated to
+    its targets.
+  - At `totals:full` w 0.05, a +5-point sim-total shift moves the served full-game total
+    probability by about 0.5 pp (|Δlogit| ≈ 0.44 × 0.05).
+
+**The live pathway.** The NBA live re-sim resumes from the persisted pregame engine inputs
+(`nba/live_resim.py:555`, `engine.simulate_pbp_game_boxscore(rng=rng, **dict(inputs), state=gs)`):
+`quarters`, `target_*_points`, and `cfg` possessions.
+
+- **Size.** Over the 197-sim corpus, F1 + outs-off moves the pregame anchored total by D−A mean
+  **+1.89** (mean abs 2.67, p90 5.21, max 8.71) and the anchored margin by mean abs 0.42 (max 1.43),
+  from `f1_replay.py`, `per_game_A_D`. The live re-sim starts from those targets, with the extra
+  possessions on top.
+- **Damping.** What reaches a live price is reduced by the NBA live margin anchor and the #780
+  probability scale (`live_gameline_join._SPREADS_PROB_SCALE*`, totals `k`). Live moneylines are
+  untempered.
+- **Not measured.** How much of the shift reaches live prices, and whether it helps. The #780 `k`
+  values were fit on unfed sims, so they join the re-fit list (mechanism vs estimator).
+
+**What would change this verdict.**
+
+- Raising any `nba_prop_book_blend.json` or `nba_game_book_blend.json` weight, or refitting
+  `nba_prop_calibration.json`'s `b`/`w`. Re-run `p1_shift.py` if that happens.
+- The pre-registered totals grade (Dec 7) measures the model's anchored total. That is an accuracy
+  read of the engine, not of a price the board serves pregame (5% weight).
+
 ## Leads (recorded, not followed)
 
 - **`TeamContextLocal.form_7` / `form_30` are consumed and never passed** (found by Level 4,

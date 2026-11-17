@@ -1261,6 +1261,10 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     for this arm: anchored total MAE 14.387 vs 14.504 (−0.118 [−0.568, +0.324]). The keep/revert grade is pre-registered
     (first 150 graded post-flip games, ~12-06): `.syndicate/findings_2026-11-16_nba_margin_raw_zero.md`. It reaches only
     sims built after the flip; props move too (outs-off removes the player-sim pace drag).
+  - What it moves in what is SERVED pregame is ~nil `[measured 2026-11-17, 8 graded games, real engine]`: NBA prop
+    probabilities for pts/ast/threes/P+A/P+R are the de-vigged book (book-blend w 0), rebounds move 0.06 pp mean, the
+    full-game total ~0.5 pp (w 0.05), h2h/spreads 0. The live re-sim inherits the moved targets (+1.89 pts mean) and is
+    the material, ungraded pathway.
 ## [basketball-props-refresh-off-vendor] BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verified 2026-10-14, lanes nba-source-cli-native + basketball-games-history-freshness]`
 
 - **Off vendor and on the fleet** (each A/B'd on production data, 0 differences unless noted):
