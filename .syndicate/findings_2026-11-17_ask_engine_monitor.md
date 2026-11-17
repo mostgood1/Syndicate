@@ -658,3 +658,39 @@ No game was live in the probe's rows: no `live_row` ask. as_of_in_future: 0 of 5
 - 2e: the newest header is still 3:56 PM CST (DEPLOY ff + reload-web `91d865fd5` -> `25fc2e4f0`, #827), 71 min ago and already flagged by Reading 12. No fleet load in the last 40 min.
 
 No anomaly.
+
+## Reading 15 (5:35 PM CST)
+
+Probe 23:35:20-23:36:05Z (5:35-5:36 PM CST), read-only, nice 19. Page 200 in 0.08 s; shortlist 200, 200 rows, 2.15 s.
+
+**Ask:** 5 / 5 answered, 0 past the 45 s cut-off, 0 user-visible timeouts; median 10.35 s, max 14.34 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "What do you think of this spread?" | 11.38 | yes | bet_analysis | 23:00:45Z (2087 s old) | 0 |
+| free_text "Lakers vs Celtics" | 0.81 | yes | matchup_analysis | 23:00:45Z (2088 s old) | 0 |
+| free_text "top edges today" | 10.35 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NFL TB h2h) | 14.34 | yes | bet_analysis | 2026-11-15 (date) | 5 |
+| pregame_prop (NFL Stroud U1.5 pass TD) | 2.00 | yes | bet_analysis | 23:11:42Z (1463 s old) | 9 |
+
+No `live_row` ask: no live game row on the shortlist. as_of_in_future: 0 of 5.
+
+**Web, 23:05-23:36Z (5:05-5:36 PM CST), 263 requests:**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 18 (14 hard); max anon 1054.6 MB vs 648.2 MB limit.
+- Overlay warms: 47; median 13.43 s; 12 over 20 s, 1 over 45 s, 1 over 60 s; max 73.42 s.
+- Requests over 20 s: POST /api/intelligence/query 3, GET / 1. Over 45 s: POST /api/intelligence/query 1, GET / 1.
+- Asks from any client: 10, 0 over 45 s, 0 non-200; all 10 are probe traffic (`Python-urllib`; 5 from Reading 14 at 23:06Z, 5 from this one), 0 from other clients. So the >45 s POST /api/intelligence/query is not an Ask row in this log.
+
+**Host:** load 4.83 / 4.09 / 4.10 on 12 cores; MemAvailable 8268 MB. Top CPU: fetch_espn_live_status (ni 0, 100%, transient), refresh-worker (ni 0, 84%, 3451 MB), web gunicorn x2 (ni 0, 68% / 52%, both ~85 s old = fresh recycles), live-odds-worker (ni 0, 62%, 613 s old), live_resim_workers x2 (ni 5, 23% each), probe (ni 19, 3%).
+
+**Engine:**
+- 2a F2: 1 run total (16:30-17:17Z, 10:30-11:17 AM CST, "did NOT PASS"), already on main `c765eec64`; no newer run.
+- 2b `engine-learner-m2-gate-read-1124`: enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c `m2_gate.py` sha256 `c1a2c029c2a1816f...`: matches Amendment 2.
+- 2d engine-file commits on origin/main in the last 40 min: 0.
+- 2e fleet loads in the last 40 min: 2 (23:15:44Z ff + reload-web `25fc2e4f0` -> `64daca46f`, todo #828 board-query serialize-once; 23:22:26Z live-odds-worker TERM at `64daca46f`, todo #829 WNBA live box-score poll skip).
+
+- **ANOMALY:** overlay warm of 73.42 s (> 60 s) in the window. Check next: the web log for which overlay and when; whether it sits with the 23:15:44Z reload-web or a hard recycle (18 recycles, 14 hard, in 30 min).
+- **ANOMALY:** new fleet load 23:15:44Z (5:15 PM CST), ff + reload-web to `64daca46f` (todo #828, board query serialize-once). Web-only display path, not pricing; check next: the 23:30Z deploys.md reading for #828 and whether the >45 s POST /api/intelligence/query is board-query traffic.
+- **ANOMALY:** new fleet load 23:22:26Z (5:22 PM CST), live-odds-worker TERM (todo #829 live-capture half, WNBA box-score poll). Touches the live-capture worker, not the experts' priced families directly; check next: whether the live join's served rows changed after 23:22Z before the next experts reproduction.
