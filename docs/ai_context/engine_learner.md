@@ -29,7 +29,7 @@ against the price you could actually trade. The first smoke run showed this: on 
 by −0.096 nats against a prior log loss of 0.690. So the age is part of the cell, the held-out report is broken out
 by age, and the live gate reads the fresh stratum.
 
-## Pipeline trace (slices 1 and 2)
+## Pipeline trace (slices 1, 2 and 3a)
 
 | hop | file:function | reads | writes |
 |---|---|---|---|
@@ -38,6 +38,7 @@ by age, and the live gate reads the fresh stratum.
 | 2b. event identity | `scripts/engine_learner.py` `load_events` | each slate's DecisionRecords (`decision_record.read_pregame_lines`, else `read_records`): teams + start; for a live event they never listed, the live gameline ledger's teams and first `recorded_at` | nothing |
 | 2c. truth, every other game line | `ChipTruth` + `Chips` | the board's final-score chips, `/api/board/game-chips?date=<Central date>` on the fleet's web (or saved responses, `--chips-dir`) | nothing |
 | 2d. truth, the pregame close | `CloseTruth` | each sport's `book_quotes` shards, the start's Central date and the day before (`decision_policy_paper.collect_closes`) | nothing |
+| 2e. truth, NBA player props (slice 3a) | `NbaPropTruth` + `NbaBox` | `nba_source/data/processed/player_logs.csv` (stats.nba.com; rows dated the day before the first slate through the last, skipped on their date before any stat is read); a live line's game from the first `linescores_<date>.json` holding its ESPN id, a pregame line's from its event's teams (tricodes) and start | nothing |
 | 3. examples | `engine_learner.build_examples` | opinions + truth | in memory: one example per (line, instant), with every expert's Δ |
 | 4. fit | `engine_learner.fit` | training slates | in memory |
 | 5. report | `scripts/engine_learner.py run` | test slates | stdout + `--json` |
@@ -59,7 +60,25 @@ Slice 2's truth rules (`--truth outcome`, every game line except live basketball
   refused (`segment_unscorable`).
 - **Frames.** A LIVE line keeps the live join's frame above. A PREGAME line is in the book's own frame, the one
   `layer2_live_scorecard.grade` and the paper book use: a spread side wins when its margin plus its line is above 0.
-- **Props.** Refused (`prop_outcome_owed`).
+- **Props.** NBA: slice 3a, below. Every other sport's props are refused (`prop_outcome_owed`).
+
+Slice 3a's truth rules (`--truth outcome`, NBA player props, pregame and live), the rule of lane
+`nba-live-prop-grade`'s registered grader (`scripts/nba_live_prop_grade.py`, `f3d30ac4d`), copied:
+
+- **The number.** The market's box-score stats summed (points, rebounds, assists, threes = FG3M, steals, blocks, and
+  the four combos); a double / triple double is how many of points, rebounds, assists, steals and blocks reach 10,
+  against the line. A missing stat is refused (`stat_missing`), never read as 0. Any other market is refused
+  (`prop_market_unscorable`).
+- **The side.** OVER = final > line, UNDER = final < line, equal = push (dropped, counted).
+- **The game.** A live line: its ESPN event id's FIRST linescores file gives the date and both teams (absent: the game
+  is not final, `no_final_score`). A pregame line: its event's teams as NBA tricodes
+  (`nba.live_tick.teams.to_tricode`) and its start's Central date, inside the window. The box game is matched in either
+  orientation (`no_box_game` otherwise).
+- **The player.** The engine's own name key (`nba.live_resim.normalize_name`), which folds `Herb` / `Herbert Jones`
+  and `A.J.` / `AJ`; it must name exactly one player in that game (`player_not_in_box`, `player_ambiguous`). A live
+  line's `inputs.team_side` must name the same team (`team_side_mismatch`).
+- **Decided lines.** A live line whose player already passed it at the tick (`actual_so_far` > line) is refused
+  (`decided_at_tick`): the grader drops them too, and there is nothing to learn from a settled line.
 
 Under `--truth close` (pregame only), the label is the probability of the opinion's side at the close:
 - the last quote at or before the start (within 12 h), at the same line, spreads keyed on the home line
@@ -91,9 +110,12 @@ data, with the code frozen by blob.
 - **Slice 2** adds:
   - the outcome of every other game line: pregame in every sport, live NHL / NFL / NCAAF / WNBA;
   - the pregame close as a second, faster truth (props included).
+- **Slice 3a** adds NBA player-prop outcomes, pregame and live. They are not in the registered M2 gate, whose code is
+  pinned at `981ef14f6`; props reach a later gate.
 
 Still owed, each refused by name and counted until it lands:
-- **Live and pregame player-prop outcomes** (`prop_outcome_owed`). The NBA grader is lane `nba-live-prop-grade`'s.
+- **Player-prop outcomes in every sport but the NBA** (`prop_outcome_owed`): NFL, NCAAF and NHL props have no box
+  score joined yet.
 - **The +300 s mark-out on Kalshi's stored mid** (`kalshi_quote_history`), once slice 5 lands.
 - **Two expert-side gaps (lane `engine-experts`, not the learner).** On 11-09..11-14:
   - every live NCAAF `live_resim` opinion was refused `no_game_match` (28,623);
@@ -185,6 +207,35 @@ Held-out ON (Δ log loss vs the prior, 95% CI by game):
     hundred-thousandths of a nat. So a close-truth gate needs an effect-size floor (or a CLV reading in
     probability points) beside "CI below 0".
   - With the outcome, a live gate on the fresh stratum.
+
+## Fleet dry run, slice 3a, 2026-11-17 (dev data, NOT the gate)
+
+The slice 2 opinions (main's experts at `981ef14f6`, slates 11-09..11-14), the learner from an export of `898e8695a`,
+outcome truth, test from 11-13, nice 19 (28:54 wall, 1.5 GB peak RSS). It ran after lane `nba-live-prop-grade`'s
+registered grade had recorded (`9857611d3`), so no prop outcome was read ahead of it. Box score: 49 games, 1,100 rows,
+11-08..11-14, nothing later.
+
+- **Coverage.** Live NBA props: 256,206 of 256,206 line-instants graded (0 decided at the tick, 0 players missing).
+  Pregame NBA props: 15,910 of 16,734 (824 `player_not_in_box`, players who did not play). `prop_outcome_owed` fell
+  from 354,843 to 76,506 opinions (NFL, NCAAF and NHL props). Examples 564,756 -> 836,872.
+- **The prior's own log loss** on the training slates: live props 0.669, pregame props 0.689 (both below ln 2).
+- **Held out (14 NBA games):**
+
+| group | d log loss (ON) | 95% CI |
+|---|---|---|
+| NBA props live, all ages | -0.0169 | [-0.0263, -0.0085] |
+| NBA props live, prior <= 60 s | +0.0022 | [-0.0005, +0.0053] |
+| NBA props live, prior 60-180 s | -0.0021 | [-0.0054, +0.0015] |
+| NBA props live, prior 180-900 s | -0.0244 | [-0.0375, -0.0126] |
+| NBA props pregame | +0.0027 | [-0.0042, +0.0083] |
+
+  The live gain is all against STALE book quotes, the same shape as the registered prop grade (the expert alone is
+  worse than fresh books in every group; its edge only grows as the books' quote ages). No leaf with n >= 200 is
+  applied; the weight that moves live props sits at a shared ancestor node.
+- **Pooling side effects.** Adding props changed two game-line point estimates through shared nodes, both inside
+  noise and both slightly worse: NBA pregame totals 0 -> +0.0005 [0, +0.0016], NHL pregame spreads 0 -> +0.0043
+  [-0.0073, +0.0175]. Every other game-line group kept its point estimate (the CIs move with the bootstrap's
+  clusters). OFF == prior everywhere (`off_nonzero=0`); REACH 218,459 / 366,302.
 
 ## Running it (read-only)
 
