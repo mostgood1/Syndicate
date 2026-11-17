@@ -216,3 +216,46 @@ Probe 11:36:14-11:38:04 AM CST (17:36-17:38Z), base http://127.0.0.1:10000, page
 - **ANOMALY:** F2 result is in: the run says NOT PASSED; the verdict file says PASS 12/12. Check next: the 11-16 NCAAB totals JOIN mismatch (4,296) has to be fixed in the experts/gate before the 11-24 M2 read.
 - **ANOMALY:** fleet load 11:25 AM CST, ff to `3d3c0a426` + refresh-worker TERM (#790 quote read; #823). It touches the quote read that the experts join. Check next: whether the live join's served quotes changed after 17:25Z.
 - **ANOMALY:** fleet load 11:01 AM CST, ff to `0a60d9e0a` (NCAAF sim-history dedupe), no restart, so web picks it up at its next recycle. Check next: low pricing impact, but note it for the experts' reproduction window.
+
+## Reading 4 (12:06 PM CST)
+
+Probe 18:05:38Z (12:05 PM CST); web window from 11:35 AM CST.
+
+**Ask:** 5/5 answered, 0 past 45 s, median 3.55 s, max 6.94 s. Shortlist 200 rows in 1.15 s; page 200 in 0.05 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "this spread?" | 3.55 | True | bet_analysis | 17:49:32Z (age 971 s) | 0 |
+| free_text "Lakers vs Celtics" | 0.31 | True | matchup_analysis | 17:49:32Z (age 971 s) | 0 |
+| free_text "top edges today" | 6.94 | True | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NBA MIN h2h) | 5.95 | True | bet_analysis | none | 2 |
+| pregame_prop (NBA Quickley PA o21.5) | 2.09 | True | bet_analysis | age 1325 s | 7 |
+
+None had as_of_in_future. No `live_row` ask was made, so no live game row was available to probe.
+
+**Web (11:35 AM-12:05 PM CST, 129 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 5 (3 hard), max anon 945.8 MB vs limit 645.1 MB.
+- Overlay warms: 19, median 10.23 s; 2 over 20 s, 1 over 45 s, 1 over 60 s; max 60.01 s.
+- Requests over 20 s: 2, both `POST /api/syndicate/query`. These are the previous probe's asks at 11:36-11:37 AM CST (28.67 s and 22.48 s). Requests over 45 s: 0.
+- Asks from any client: 11, 0 over 45 s, 0 non-200. All 11 came from `Python-urllib` (this probe's 5 plus Reading 3's 6), so 0 were from other clients.
+
+**Host:** 12 cores. Load average 2.24 / 2.43 / 3.87; MemAvailable 10,928 MB. Top CPU processes:
+- fetch_soccer_history_local (ligue_1), 239%, ni 0;
+- refresh-worker, 120%, ni 0, up 115 s;
+- refresh_odds_sources, 50%, ni 0;
+- live-odds-worker, 45%, ni 0;
+- gunicorn web, 12%, ni 0, up 124 s;
+- live_resim_workers ×2, about 10% each, ni 5.
+
+**Engine:**
+- 2a: `engine-live-prior-f2-read-1117` has 1 run, status succeeded, 10:30-11:17 AM CST. Its summary says "did NOT PASS". But the last line of `f2_verdict.txt` (mtime 11:15 AM CST) reads `F2_VERDICT PASS judged_families=12 failed_families=0 cutoff=2026-11-15T20:00:00Z files=2`.
+- 2b: `engine-learner-m2-gate-read-1124` is enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: The `m2_gate.py` sha256 starts `6915bb6a5ecb80f2`, which is unchanged.
+- 2d: No engine-file commits on origin/main in the last 40 min.
+- 2e: Fleet loads in the last 40 min: 17:34:59Z (11:34 AM CST), a DEPLOY ff `3d3c0a426` -> `92ae7490a` plus a switch flip at 17:35:08Z (todo #821: F1 ON, outs penalties OFF, for NBA sim totals). This touches live NBA total pricing. The 17:25:58Z refresh-worker TERM ff falls just outside the window (40m25s before). Other headers in the window are readings only.
+
+- **ANOMALY:** An overlay warm took 60.01 s, over 60 s. Next, check the web log for which overlay and route, and whether it lines up with the recycles or the refresh-worker restart below.
+- **ANOMALY:** An F2 result exists, and its two sources disagree: the run summary says "did NOT PASS", while the `f2_verdict.txt` last line says PASS 12/12. Next, the owning session should read run `local_dc76d55c` with list_events to see which verdict is final. The file may hold an earlier pre-run line, or the summary may reflect a later judgement.
+- **ANOMALY:** A new fleet load landed: #821 F1 ON / outs OFF at 11:35 AM CST changes NBA sim totals. Next, check whether the experts' NBA totals reproduction still matches the live join, as #816 did not.
+- **ANOMALY:** refresh-worker (up 115 s) and web (up 124 s) both restarted around 12:03 PM CST. deploys.md has no matching header; the last recorded refresh-worker pid was 4049350, and it is now 4060729. Next, check the supervisor log for the cause (memory recycle or crash), and check whether an MLB/NBA sim was in flight.
