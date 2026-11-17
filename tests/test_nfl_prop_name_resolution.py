@@ -29,6 +29,11 @@ _TEAM = {"P-PENIX": "ATL", "P-AJBROWN": "PHI", "P-STBROWN": "DET", "P-KYREN": "L
 def _fixture(monkeypatch):
     monkeypatch.setattr(ps, "_cached_name_candidates", lambda season: _CANDIDATES.get(season, {}))
     monkeypatch.setattr(ps, "player_team_with_prior", lambda season, week, pid: (_TEAM.get(pid), "current_season"))
+    # These tests cover the SHORT-NAME fallback. `resolve_player_id_for_game` tries the roster snapshot first
+    # (`roster_identity`, #804, lru_cached and read from disk), so pin it empty -- the "snapshot absent" case, where
+    # resolution is exactly the short-name path. Unpinned, a checkout whose data/ carries the real 2026 roster (the
+    # nightly ci-suite) resolved "Bijan Robinson" to his real id first: lane ci-suite-red-1116, 2026-11-17.
+    monkeypatch.setattr(ps, "roster_identity", lambda season: ({}, {}))
 
 
 def _resolve(name, teams):

@@ -153,6 +153,7 @@ AMERICAN_TO_PROBABILITY: list[Impl] = [
     Impl("american_to_probability", "scripts.assess_wnba_accuracy", "american_to_prob"),
     Impl("american_to_probability", "scripts.backtest_soccer_anchor_vs_outcomes", "american_to_prob"),
     Impl("american_to_probability", "scripts.measure_exchange_prop_option_value", "implied"),
+    Impl("american_to_probability", "scripts.nfl_segment_skill", "american_to_prob"),
     Impl("american_to_probability", "scripts.prereg_wnba_favourite_lean", "american_to_probability"),
     Impl("american_to_probability", "scripts.refresh_nba_oddsapi_props", "_american_to_probability"),
     Impl("american_to_probability", "scripts.refresh_wnba_oddsapi_props", "_american_to_probability"),
@@ -499,6 +500,9 @@ NOT_REACHABLE: list[tuple[str, str]] = []
 # Converter-SHAPED names that are not scalar prob<->odds converters. Each needs
 # a reason, so that "it isn't one" is a claim someone made and not an omission.
 NOT_A_SCALAR_CONVERTER: dict[str, str] = {
+    # ADDED 2026-11-17 (lane `ci-suite-red-1116`): scripts/nfl_segment_skill.py (fee389971). Its scalar
+    # `american_to_prob` IS registered above.
+    "scripts/nfl_segment_skill.py:devig_pair": "two prices in, one proportionally de-vigged P(home/over) out; not scalar (same shape as devig_home). Its scalar half, `american_to_prob`, IS registered",
     # ADDED 2026-10-16 (lane `ci-suite-red-1015`): the generated MLB live-lens port (329edb1d).
     "syndicate/features/mlb/live_lens_port/app_slice.py:_decimal_ip_from_outs": "pitcher outs -> innings pitched (outs / 3); not a price or a probability",
     "syndicate/features/mlb/live_lens_port/app_slice.py:_normalize_american_odds": "coerces a value to a rounded american int; a parser, not a conversion",
