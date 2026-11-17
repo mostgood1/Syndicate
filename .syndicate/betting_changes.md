@@ -22,8 +22,9 @@ Rows BC-001..BC-011 predate that instant. They are a PARTIAL backfill from deplo
 named on 11-16, plus the football player-exit gates. They never decide the clock. Before 18:15Z 11-16 the register
 makes no completeness claim.
 
-Load times derived from process ages (BC-013..BC-017): live-odds-worker pid 2834332 (first line 18:15:23Z) exited after
-20,383 s and restarted in 5 s, so pid 2925378 started ~23:55:06Z (`ps` etimes agrees, 23:55:10Z). Refresh-worker
+Load times derived from process ages (BC-013..BC-017, ±5 s): live-odds-worker pid 2834332 (first line 18:15:23Z) exited after
+20,383 s and restarted in 5 s, so pid 2925378 started ~23:55:06Z; lane live-player-exit-gate's watcher pins it at 23:55:09Z
+(deploys.md 2026-11-17 00:49Z), which BC-013..015 use. Refresh-worker
 (booted 16:29:24Z) exited after 27,309 s, so pid 2953295 started ~00:04:38Z (etimes: 00:04:37Z). Both are ±5 s.
 
 | id | kind | loaded_at (UTC) | what changed | deploys.md entry | lane |
@@ -40,9 +41,10 @@ Load times derived from process ages (BC-013..BC-017): live-odds-worker pid 2834
 | BC-010 | yes | 2026-11-16T01:28:28Z | NCAAF live player-exit gate + football replaced-QB rule (refresh-worker) | 2026-11-16T01:28:28Z | live-player-exit-gate |
 | BC-011 | yes | 2026-11-16T01:44:49Z | NCAAF in-play entry holds (live-odds-worker routine recycle on db2af02ab) | 2026-11-16T01:44:49Z | live-player-exit-gate |
 | BC-012 | yes | 2026-11-16T18:15:23Z | NBA live player-exit gate (live-odds-worker self-recycle, pid 2834332) | 2026-11-16T18:15:23Z | live-player-exit-gate |
-| BC-013 | yes | 2026-11-16T23:55:06Z | NCAAB/WNCAAB live player-exit gate (ff 18:39:51Z; live-odds-worker recycle, pid 2925378) | 2026-11-16T18:39:51Z | live-player-exit-gate |
-| BC-014 | yes | 2026-11-16T23:55:06Z | NHL live player-exit gate (ff 20:55:22Z; live-odds-worker recycle, pid 2925378) | 2026-11-16T20:55:22Z | live-player-exit-gate |
-| BC-015 | yes | 2026-11-17T00:04:38Z | Soccer live player-exit gate: entry hold 23:55:06Z (live-odds-worker), board skip 00:04:38Z (refresh-worker pid 2953295) | 2026-11-16T21:17:00Z | live-player-exit-gate |
+| BC-013 | yes | 2026-11-16T23:55:09Z | NCAAB/WNCAAB live player-exit gate (ff 18:39:51Z; live-odds-worker recycle, pid 2925378) | 2026-11-16T18:39:51Z | live-player-exit-gate |
+| BC-014 | yes | 2026-11-16T23:55:09Z | NHL live player-exit gate (ff 20:55:22Z; live-odds-worker recycle, pid 2925378) | 2026-11-16T20:55:22Z | live-player-exit-gate |
+| BC-015 | yes | 2026-11-17T00:04:38Z | Soccer live player-exit gate: entry hold 23:55:09Z (live-odds-worker), board skip 00:04:38Z (refresh-worker pid 2953295) | 2026-11-16T21:17:00Z | live-player-exit-gate |
 | BC-016 | yes | 2026-11-16T22:32:09Z | NFL game-line quotes filed by Central kickoff date (#817): MNF in-play rows reach the 11-16 overlay; fresh child of the next NFL lines run | 2026-11-16T22:31:26Z | nfl-gameline-kickoff-shard |
 | BC-017 | yes | 2026-11-17T00:04:38Z | NCAAB per-line total calibration (#816): every live NCAAB total leans under (refresh-worker TERM, pid 2953295) | 2026-11-17T00:04:20Z | ncaab-total-overprojection |
 | BC-018 | no | 2026-11-17T00:20:21Z | NFL shard log line allowlisted in the odds sweep (#817): no filing or behaviour change | 2026-11-17T00:20:21Z | nfl-gameline-kickoff-shard |
+| BC-019 | no | 2026-11-17T00:49:00Z | READING of the 23:55:09Z live-odds-worker recycle that loaded BC-013..BC-015 (already counted); no new change | 2026-11-17T00:49:00Z | live-player-exit-gate |

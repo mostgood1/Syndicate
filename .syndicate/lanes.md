@@ -870,7 +870,10 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main gave 1 SAFE of 7 CLOSED; moved `closed-lane-archive-20261116-1040`. Table and WAIT reasons: `.syndicate/log/2026-11-16.md` 22:4xZ entry.
 
-### betting-change-register — OPEN — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+### betting-change-register — CLOSED 2026-11-17 (GOAL MET: register + CLI + readout clock on main 1021f67c2; fleet clock 0 of 800 = hand count) — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- **GOAL VERDICT `[2026-11-17 00:51Z (6:51 PM CST 11-16)]`: GOAL: MET.** Goal (verbatim): "The live-book readout finds the scale-up gate's clock start by itself: a register of fleet loads that change which live bets are placed, sized, held or exited (user 11-16 "Any betting change"), a CLI to add and resolve entries, a deploys.md scan that lists unclassified loads after the clock start, and the deploy protocol telling every session to record one".
+  - Verification ran: 62 passed / 1 skipped; register seeded with load times from deploys.md + process ages (±5 s); `candidates` 0 since 2026-11-16T18:15Z on main; readout on the 00:49Z fleet payload: clock BC-017 00:04:38Z, 0 of 800 events = hand count 0; non-empty windows match hand counts (63/31, 234/110).
+  - Not covered: a load nobody wrote into deploys.md. Findings § "BETTING-CHANGE REGISTER BUILT".
 - Goal: The live-book readout finds the scale-up gate's clock start by itself: a register of fleet loads that change which live bets are placed, sized, held or exited (user 11-16 "Any betting change"), a CLI to add and resolve entries, a deploys.md scan that lists unclassified loads after the clock start, and the deploy protocol telling every session to record one
 - Files: scripts/betting_change.py (NEW), tests/test_betting_change.py (NEW), .syndicate/betting_changes.md (NEW), scripts/live_book_edge_readout.py, tests/test_live_book_edge_readout.py, CLAUDE.md (the deploy 'Afterwards' paragraph only), docs/ai_context/todo.md (#815 section only), .syndicate/findings_2026-11-16_live_book_edge_readout.md
 - Hypothesis: n/a (build)

@@ -524,5 +524,8 @@ and none exist yet.**
 - **Clock (user 2026-11-16: "Any betting change"):** the 800-event count restarts at any fleet load that changes which live bets are
   placed, sized, held or exited (display/ledger/shadow changes do not). Read 23:50Z 11-16, it stood at ~0 (NBA exit gate loaded ~18:15Z).
   At ~27.5 events/day it needs ~29 days with no betting change. At least 8 such changes landed in 11-03..11-16, so that window forms only
-  through a deliberate pause, which is the user's call. Read it with `--since <last betting change>` (deploys.md).
+  through a deliberate pause, which is the user's call.
+- **The clock is in the ledger (verified 2026-11-17 00:49Z):** `.syndicate/betting_changes.md` (`scripts/betting_change.py`) records
+  each betting change at its LOAD; the readout's gate reads bets submitted after the latest one by default. Clock then: BC-017,
+  2026-11-17T00:04:38Z, 0 of 800. Every loading deploys.md entry since 2026-11-16T18:15Z is classified; a pending load holds the count at 0.
 - Detail: `.syndicate/findings_2026-11-16_live_book_edge_readout.md`; todo #815.

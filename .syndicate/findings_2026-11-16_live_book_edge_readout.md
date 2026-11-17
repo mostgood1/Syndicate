@@ -114,8 +114,8 @@ live bets are placed, how they are sized, or how they are held or exited. Displa
 - **What it implies:** 800 events at ~27.5 a day (357 over 11-03..11-15) is ~29 days with NO betting change. On the observed rate (8 in
   11-03..11-16), that window never forms by itself, so condition 1 can pass only through a deliberate ~30-day pause on live betting
   changes. That is the user's call whenever they want to start one. The "about 2026-12-02" date is withdrawn.
-- **How to read it:** `python scripts/live_book_edge_readout.py --since <date of the last betting change>`. The script cannot find that
-  date by itself: today it means reading deploys.md.
+- **How to read it:** `python scripts/live_book_edge_readout.py`. Since `1021f67c2` (same night) the gate reads the
+  clock from `.syndicate/betting_changes.md` by itself; see § "BETTING-CHANGE REGISTER BUILT".
 
 ## CLV RECONCILED (2026-11-16, same session; user "Yes, reconcile CLV")
 
@@ -279,3 +279,29 @@ python scripts/live_book_edge_readout.py --since 2026-11-03 # one window from th
 - **Gate (PROPOSED): all four measurable conditions FAIL.** The one with a date attached is condition 1: 357 of 800
   events at ~27 events a day is about 16 more days, so the earliest it can pass is about 2026-12-02. That holds only if
   the live policy stays frozen. The results conditions decide whether it passes at all.
+
+## BETTING-CHANGE REGISTER BUILT (2026-11-17 00:51Z / 11-16 6:51 PM CST; user "Yes, build it"), on main `1021f67c2`
+
+- **What it is.**
+  - `.syndicate/betting_changes.md` holds one row per classified deploy.
+  - A `yes` restarts the gate's count at its LOAD time: a TERM, recycle, drained down/up, or the next fresh child. The ff time does not count.
+  - A `yes` that has not loaded is `pending:<roles>`, and the count stays 0 until `resolve` records the load. This fails closed.
+- **Tool.** `scripts/betting_change.py` has `clock`, `candidates`, `add`, `resolve` and `list`.
+  - `candidates` lists deploy-like deploys.md entries since `Classified from:` that have neither a row nor a `betting change: yes|no` line. It exits 1 while any exist.
+- **Readout.** By default the gate reads the bets SUBMITTED after the clock start (`submitted_at`, every order carries it).
+  - It prints the clock, the unclassified loads, and whether origin/main is ahead of the checkout it read.
+  - `--since` and `--no-clock` override it.
+- **Protocol.** CLAUDE.md now says every deploys.md entry that loads code or env carries `- betting change: yes|no`, and a `yes` also gets a register row.
+- **Seed.**
+  - Coverage starts 2026-11-16T18:15:00Z, and every loading entry since then is classified: BC-012..BC-019, `candidates` = 0 on main at push.
+  - BC-001..BC-011 are a PARTIAL backfill: the changes named above plus the football exit gates.
+  - Load times are from deploys.md and from process ages. Live-odds-worker pid 2925378 started at 23:55:09Z (the exit-gate lane's watcher; process age gave ~23:55:06Z). Refresh-worker pid 2953295 started ~00:04:38Z (prior pid exited after 27,309 s). Both are ±5 s.
+- **The clock now:** BC-017, 2026-11-17T00:04:38Z (6:04 PM CST 11-16), the NCAAB per-line total calibration (#816).
+- **Verified on the fleet payload of 00:49Z 11-17 (2,232 orders):**
+  - Clock 0 of 800. A hand count of orders submitted at or after the load is 0; the last submit was 23:35:02Z.
+  - The window logic matches hand counts on non-empty windows of the same payload: since 11-15T00Z, 63 bets / 31 events (hand 63 / 31); since 11-12T18Z, 234 / 110 (hand 234 / 110).
+  - Tests: 62 passed, 1 skipped (the pinned payload test).
+- **Limits, said plainly.**
+  - The register is only as complete as sessions make it. `candidates` catches an unrecorded LOADING entry, not a change nobody wrote into deploys.md. Example: a role's routine recycle that loads an earlier ff, when no one logs it.
+  - The deploy-like filter is a heading heuristic, and the yes/no boundary is a judgement per entry.
+  - The readout reads the register from its own checkout, so it warns when origin/main is ahead.
