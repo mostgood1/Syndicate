@@ -60592,3 +60592,30 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **revert:** fastest, no restart: move `ncaab_source/data/processed/total_prob_calibration_2027_asof_*.json` aside (every row serves raw from the next build; the listing cache is 60 s), but the pregame child rewrites the file after 11:00Z the next day. Lasting: `LIVE_ODDS_WORKER__`/`REFRESH_WORKER__SYNDICATE_COLLEGE_TOTAL_CALIBRATION=off` in `local_production.env` + a drained full down/up, or `git revert 69588d3b3` + a claimed ff + drained refresh-worker TERM.
 - **verify:** `grep -a -c '"total_cal":{' ~/syndicate-prod/data/ncaab_source/data/live_gameline_ledger/live_gameline_ledger_<date>.jsonl` > 0 during a live slate; `[college_total_calibration] FIT league=ncaab` lines from the pregame child after 11:00Z with a new `total_prob_calibration_2027_asof_<yesterday>.json`; the 7-day grade owed in todo #816 (calibrated flags' hit rate by side, live Brier vs market on post-load games).
 - **Claims:** refresh-worker released ~00:17Z after the reachability read.
+
+## 2026-11-17 00:20:21Z (6:20 PM CST 11-16) -- DEPLOY (ff only, no restart): fleet `13ec8f348` -> `69bd95177`, the NFL game-line shard line allowlisted in the odds sweep (todo #817, lane `nfl-gameline-kickoff-shard`) -- **ff MET (head, pid unchanged, token in checkout); the first STEP_MARKER reading is OWED (next NFL lines run; every 150 s once MNF kicks off at 01:15Z)**
+- **decision:** the user answered "Yes, do it here" to "Make the writer's filing line survive on the fleet by allowlisting it?" (11-16 ~6:00 PM CST).
+- **what:**
+  - `NFL_GAMELINE_QUOTE_SHARD` was added to `refresh_odds_sources._STEP_STDOUT_MARKERS`.
+  - The writer's FAILED line (`fetch_nfl_team_odds_local._append_nfl_team_book_quotes`) carries the same token.
+  - The line is no longer blanked. It is re-emitted on stderr as `STEP_MARKER name=nfl_oddsapi_refresh ...` and kept in the step's `stdout_markers`. On the fleet it reads in `reports/migration_runs/<date>/odds_refresh_<stamp>/odds_refresh.stderr.txt`.
+  - No filing or behaviour change: the kickoff-shard filing loaded at 22:31:26Z is untouched.
+- **ride-along (13ec8f348..69bd95177):**
+  - The only code is this change: `scripts/refresh_odds_sources.py`, `scripts/fetch_nfl_team_odds_local.py`, `tests/test_refresh_odds_step_markers.py`. The rest is ledger.
+  - `13ec8f348` itself (the NCAAB lane's #816) was already on the fleet, ff'd by that lane at 00:04:20Z.
+  - I waited for its refresh-worker claim to release (00:17:12Z) before taking mine.
+  - The fleet checkout's 6 modified tracked files are generated runtime files, none touched by the ff.
+- **gates:**
+  - Claim live-odds-worker 00:18:06Z (holder `nfl-gameline-kickoff-shard`, rc 0).
+  - Baseline 00:18:18Z: head 13ec8f348; live-odds-worker pid 2925378; token in the fleet checkout 0; NFL STEP_MARKER lines in the last 2 h 0.
+  - Preflight `--target-commit 69bd95177 --target fleet` from worktree eloquent-stonebraker at origin/main (`83e25c7b6`), with `--expect` fleet_head / pid / marker lines and a baseline for each.
+    - HOLD at 00:19:09Z and 00:19:45Z (3, then 7 live-odds jobs in flight).
+    - **CLEAR** at 00:20:00Z (0 processes enumerated).
+- **ff:** `git fetch github main` then `git merge --ff-only 69bd9517796b91906fd0f9c2cafe73f8d8a6d9ab` at 00:20:21Z. No TERM.
+  - `refresh_odds_sources.py` runs as a fresh child of every odds job, so the next run loads it.
+  - `ops_refresh._refresh_script_module` keeps an lru-cached copy in long-lived roles, but only for `build_refresh_plan`. The allowlist acts in `_run_command`, inside the child.
+- **verify -- ff MET** (read 00:20:30Z, `C:\tmp\nflks816\baseline_marker.sh`): head 69bd95177; live-odds-worker pid 2925378 unchanged; token present in the fleet checkout (3 hits: the tuple + its comment).
+- **verify (OWED):** at least one `odds_refresh.stderr.txt` from a run started after 00:20:21Z carries `STEP_MARKER name=nfl_oddsapi_refresh [odds_book_quotes] NFL_GAMELINE_QUOTE_SHARD basis=kickoff_central ...`, with 0 FAILED markers.
+  - Reading: `C:\tmp\nflks816\marker_reading.sh "2026-11-17 00:20:21"`, watched every 60 s until 02:10Z.
+  - Pre-MNF, NFL lines run only in the pregame sweep (2 runs 23:00Z-00:08Z). Once MNF is live they run every 150 s.
+- **claim:** released after this entry.
