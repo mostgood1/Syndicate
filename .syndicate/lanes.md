@@ -864,6 +864,14 @@ death, never life — do not invert it.
 - Verification: A per-stage table for the 18 long builds and all NBA builds of the 11-16 slate, each stage's share of the outside-overlay time, recorded in todo #790 and the lane; the lever named with a prediction; no code change in this lane without the user's go
 - Blocked by: none
 
+### lane-claims-parse-memo — OPEN — opened 2026-11-17 — session f60eabcb
+- Goal: check_lane_invariants.py >=2x faster (same-instant A/B, primary tree) with byte-identical output from check_lane_invariants.py, check_lane_claims.py and lane_claim_audit.py; todo #822 follow-up
+- Files: `.claude/hooks/lane_claims.py`, `scripts/check_lane_invariants.py`, `tests/test_lane_claims_parse_memo.py` (new)
+- Hypothesis: sections_are_disjoint(text, ...) re-walks all of lanes.md twice per call (_section_entries + _claims), 46 calls per check_lane_invariants run; parsing once per text removes ~90 walks. lane-guard never calls the text form (only sections_are_disjoint_among, on its conflict path), so it should not pay this cost.
+- Falsification test: A same-instant A/B shows <2x, or any of the three tools' stdout differs by one byte, or the claim set on current lanes.md changes as a set.
+- Verification: cmp of the three tools' stdout before/after on the primary tree's lanes.md; existing lane_claims tests; >=5 alternating A/B pairs timed on the primary tree; findings file .syndicate/findings_2026-11-17_lane_claims_parse_memo.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
