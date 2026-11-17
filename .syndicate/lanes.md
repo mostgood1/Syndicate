@@ -1104,6 +1104,14 @@ death, never life — do not invert it.
 - Verification: Findings file tables per sport x market x cut with n games, hit vs fair / residual and 90% CI, written from scripts/live_bet_timing_study.py output on the fleet ledgers joined to ESPN finals and play wallclocks; dates actually covered stated per sport
 - Blocked by: none
 
+### board-query-diag-strip-load — OPEN — opened 2026-11-17 — session e569a6cd-3808-4d13-81bd-53671669f80d
+- Goal: todo #827 LOADED on the fleet (user 2026-11-17 'Load it', then selected 'Carry them (Recommended)' for the ride-alongs f7fb3ed4e paper-page retirement + cc90fb653/91d865fd5 render-config step 2/3a): ff ~/Syndicate 5db26434e -> 25fc2e4f0 and reload-web; the page's /api/intelligence/query (slim_aliases + drop_row_diagnostics + row_refs) is smaller gzipped than the same body read just before, its top_live_opportunities rows carry no trace/score_breakdown/rationale, /intelligence renders with 0 page errors, /api/portfolio/paper answers 410
+- Files: docs/ai_context/todo.md (the #827 item ONLY), .syndicate/findings_2026-11-17_board_query_diag_strip.md (a new Loaded section ONLY)
+- Hypothesis: n/a (a user-approved load of a change measured on a recorded response)
+- Falsification test: After the reload the page's query is not smaller gzipped than the baseline read just before, or top_live rows still carry trace/score_breakdown/rationale, or /intelligence logs a page error, or any route 500s
+- Verification: deploys.md entry with the baseline and post-load readings of the same request (gz bytes, seconds), QUERY_STAGE_MS refs true, a headless /intelligence render with 0 page errors, /api/portfolio/paper 410; betting change: no (BC row)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
