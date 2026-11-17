@@ -60911,3 +60911,23 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **verify (OWED, tonight):** NBA builds with a check due (5 games, tips 00:40-04:10Z 11-18) carry the check outside `build_seconds`; compare with 11-16, where the check cost 3.2-17.5 s inside 10 of 214 NBA builds.
 - **claims:** refresh-worker + live-odds-worker released after this entry.
 
+
+## 2026-11-17 17:32:25Z (11:32 AM CST) -- READING (no ff of mine): #823 option A LOADED on the fleet by the 17:25:58Z ff to `3d3c0a426` (lane `nba-grid-check-after-build`, which recorded `c70674e3b` as a ride-along) -- **ff MET for `c70674e3b` (NFL live quarter/half every lines run); the behaviour reading is OWED at TNF 11-19**
+- **decision:** user "Load it now" in this session (11-17, answering "Load it on the fleet now?"); in the `nba-grid-check-after-build` session the user said "Load with them" after #823 option A `c70674e3b` was named as a rider.
+- **why I did not ff:** at 17:06:36Z my `acquire --service live-odds-worker --holder nfl-live-segment-every-run` returned rc 1. The claim had been taken 0.4 min earlier by `nba-grid-check-after-build`, target `3d3c0a42`. `git merge-base --is-ancestor c70674e3b 3d3c0a42` returned 0 (it contains mine), so I waited for that claim to free (17:32:14Z) rather than move the checkout under another lane. Earlier, 16:38-17:04Z, I waited out `ncaaf-sim-history-order-dedupe`'s refresh-worker claim (its ff 8aea4fe7e -> 0a60d9e0a). I held no claim, so there is nothing to release.
+- **verify -- MET** (read 17:32:25Z, `C:\tmp\nflrail817\baseline_a.sh`):
+  - fleet head `3d3c0a426`;
+  - the checkout's `DEFAULT_LIVE_INTERVAL_SECONDS = {"ncaaf": 600}`;
+  - the fleet venv's `segment_odds_fetch.live_interval_seconds("nfl", env={})` = **0** (ncaaf 600);
+  - live-odds-worker pid 3777750 unchanged (the fetch runs in a fresh child of every odds job, so the next NFL lines run uses it).
+  - Before: 600 / 600 at 17:05:18Z (head `0a60d9e0a`).
+  - No fleet env layer and no running role sets `SYNDICATE_NFL_SEGMENT_LIVE_INTERVAL_SECONDS`.
+- **betting change: no** (this change). NFL quarter/half lines have no live order path:
+  - Kalshi `KXNFL1Q/1H/2Q` are not in `kalshi_catalogue._SERIES_SEGMENT`, so `segment_for_series` refuses them;
+  - on MNF the venue join matched only full-game NFL series (`SEGMENT_MISMATCH_GRID ... matched={full|kalshi|KXNFLGAME, full|kalshi|KXNFLTOTAL, full|polymarket_us|-}`).
+  - It changes the overlay, Layer 2 board, Games Rail and quote capture only.
+  - The 17:25:58Z ff + TERM as a whole is registered by its own lane (for #814).
+- **verify OWED -- TNF 11-19** (kickoff 7:15 PM CST = 01:15Z 11-20): `wsl -- nice -n 19 /home/amyn/.venvs/syndicate/bin/python -I /mnt/c/tmp/nflrail817/nfl_seg_reading.py 2026-11-19 2026-11-20T01:15 2026-11-20T04:30`. Run it the same night: it reads `refresh-worker.log` and `.1` only.
+  - **Expect:** quarter/half capture gaps at the lines-run cadence (MNF full-game runs were 2-3 min apart), 0 gaps > 300 s outside fetch failures; NFL overlay builds without a fresh quarter/half row near 0. **Baseline:** MNF 11-16 under the gate, same script: gaps 610-660 s (17 of 17 > 300 s), 67 of 136 builds, 52% of minutes.
+  - Plus Games Rail polls serving NFL game rows across the game (`C:\tmp\nflks816\rail_poll.sh`, after editing its date).
+  - Plus credits: segment calls x 18 (`SEGMENT_PLAN est_credits=18` per live event), against the ~+430 per live game-hour estimate.
