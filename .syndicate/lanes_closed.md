@@ -16495,3 +16495,9 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 at 04:40Z 11-17 (10:40 PM CST): 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261116-1640`. Table and waits: log/2026-11-16.md.
+
+### closed-lane-archive-20261117-0040 — CLOSED 2026-11-17 (GOAL MET: 9 blocks archived) — opened 2026-11-17 — session d8a2992b-e749-4f11-b4c1-9edf0c731884
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 9 SAFE of 16 CLOSED; 0 worktrees held uncommitted .syndicate/ edits; invariants unchanged vs baseline (same 3 contested files).
+- Moved: portfolio-edge-measurement, nfl-gameline-kickoff-shard, betting-change-register, nba-segment-grade, closed-lane-archive-20261116-1840, betting-change-session-check, session-start-hook-runtime, nba-pregame-h2-ot, nba-margin-raw-zero. Table: .syndicate/log/2026-11-17.md.
