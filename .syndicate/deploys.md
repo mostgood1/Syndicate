@@ -61177,3 +61177,8 @@ Lane `render-config-retirement` (session 267d8859). The Windows host rebooted at
 - **Recurrence risk:** if commit reaches the limit, allocations fail, including the WSL VM's. That is a live-money fleet outage that no watchdog restarts cleanly. Lever, not taken: find what spawns a 48 GB Windows python, and cap it.
 - **Side effect for another lane:** the restart killed the `gate-smooth-family` waiter (`/mnt/c/tmp/score_effect_load/run_3l_when_ready.sh`, armed ~11-14). At 20:08Z it was NOT re-armed (the railload jobs were). Its owner should re-arm it; the script is idempotent.
 - **verify:** none owed by this reading.
+
+## 2026-11-17 20:52Z (2:52 PM CST) -- READING (no deploy): `2148f99cb`'s refresh-worker half is LIVE -- the paper all-dates record is written (lane `portfolio-monitor`; the fix was lane `paper-endpoint-request-path`)
+- **loaded:** by the 19:51:20Z undrained restart (refresh-worker pid 560 on 5db26434e; entry above). Web's half has been live since the 18:58:45Z reload-web.
+- **verify -- MET:** `[paper_settlement] PAPER_ALL_TIME_WRITTEN` at 20:11:30Z (first, ~20 min after the load), 20:23:45Z, 20:35:25Z and 20:45:34Z. That is every 10-12 min, the 10-min throttle plus the settle cadence. 0 `PAPER_ALL_TIME_FAILED`. Latest: rows 51,936, settled 14,606, pending 592.
+- **web half (measured 19:07:37Z, before the restart):** one paper GET returned 200 in 31.4 s on a saturated web, with no WORKER TIMEOUT (findings, FINDING 1 measured). The page is retired on main (`f7fb3ed4e`, not loaded).

@@ -426,3 +426,24 @@ One pass over every portfolio route, before any probe existed:
   expect it after its first settle pass. That line has rows / settled / pending only until `f7fb3ed4e` loads.
 - **Unchanged anomalies:** unreconciled `f8b62e6a`; the resting maker-pilot order (826 min); the late NHL bet
   (17.3 h); the 2 unclassified loads (16:17Z, 17:01Z), handed to their lanes.
+
+## Reading 8 — Tue 11-17 2:52 PM CST (20:52Z), window 56 min
+
+- **Endpoints:** all 7 read 200, the fastest of the day (`live` 0.31 s, `live?on=all` 0.28 s, `/settings`
+  0.00 s). Reading 7's 13.31 s `/settings` was the web's cold start after the restart; it has not recurred.
+  - Web: 0 kills, 0 5xx, 0 browser requests.
+- **Banner:** ok, armed, worker state 37 s old.
+- **Plan (1.2 min old):** board 4,757 -> suggested 87 -> sized 25 -> positions 11.
+  - Refusals: beyond_max_positions 59, below_min_stake 14, below_min_ev_after_fair_noise 2, zero_kelly 1.
+  - Staked share of the ceiling 20.3%.
+- **Execution, 56 min:** 17 live ticks; 3 placed (kalshi 2, polymarket 1); 0 failed; 68 refused
+  `outside_price_band`.
+- **Orders today:** 39 (38 filled, 1 resting). Cap use: kalshi 18.0%, polymarket 13.8%.
+- **The paper all-dates writer works on the fleet** (`2148f99cb`'s worker half, loaded by the 19:51:20Z restart):
+  - `[paper_settlement] PAPER_ALL_TIME_WRITTEN` at 20:11:30, 20:23:45, 20:35:25 and 20:45:34Z: every 10-12 min,
+    0 `PAPER_ALL_TIME_FAILED`.
+  - Latest: 51,936 paper rows, 14,606 settled, 592 pending.
+  - Won / lost / ROI are absent on this line format until `f7fb3ed4e` loads, so the Portfolio Watch tile shows
+    the settled count and dashes.
+- **Unchanged anomalies:** unreconciled `f8b62e6a`; the resting maker-pilot order (880 min); the late NHL bet
+  (18.2 h); the 2 unclassified loads (16:17Z, 17:01Z), with their lanes.
