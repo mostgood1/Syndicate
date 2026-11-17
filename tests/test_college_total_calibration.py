@@ -158,6 +158,51 @@ def test_without_a_calibration_the_pricer_is_unchanged():
     assert a == b and a["total_calibration"] is None and a["model_prob_uncalibrated"] is None
 
 
+# --------------------------------------------------------------------------------------------- display-only path
+
+def _hit(sport="ncaab"):
+    return next(iter(build_live_gameline_index(_snapshot(), sources=("live_resim",), sport=sport).values()))
+
+
+def test_the_display_number_is_calibrated_against_the_rows_market(monkeypatch):
+    """11-17 00:27Z (rail monitor): 61 of 92 served NCAAB rows still carried the raw number through this path."""
+    _with_fit(monkeypatch)
+    engine = agresti_coull_point(0.70, 200)
+    block = lgj.live_display_block(_hit(), _row(), sport="ncaab", basis="quote_too_old")
+    assert block["prob_over"] == pytest.approx(_sig(_logit(MARKET) + CAL.a + CAL.c * (_logit(engine) - _logit(MARKET))), abs=1e-9)
+    assert block["prob_over_uncalibrated"] == pytest.approx(engine, abs=1e-9) and block["total_calibration"]["a"] == CAL.a
+    monkeypatch.setenv(tpc.ENV_SWITCH, "off")                                  # off != on
+    off = lgj.live_display_block(_hit(), _row(), sport="ncaab", basis="quote_too_old")
+    assert off["prob_over"] == pytest.approx(engine, abs=1e-9) and "total_calibration" not in off
+
+
+def test_without_a_market_the_display_shows_no_probability_but_keeps_the_count(monkeypatch):
+    _with_fit(monkeypatch)
+    block = lgj.live_display_block(_hit(), _row(market_prob=None), sport="ncaab", basis="quote_too_old")
+    assert block["prob_over"] is None and block["total_mean"] == pytest.approx(137.2)
+    assert block["prob_withheld"] == "no two-sided market to calibrate against"
+
+
+def test_the_display_number_of_other_sports_is_unchanged(monkeypatch):
+    seen = _with_fit(monkeypatch)
+    block = lgj.live_display_block(_hit("nba"), _row(), sport="nba", basis="x")
+    assert "total_calibration" not in block and seen == []
+
+
+def test_a_stale_quote_row_through_the_join_shows_the_calibrated_number(monkeypatch):
+    """The production caller: a quote past the pricing ceiling is refused, and its Live number comes from the display
+    block -- calibrated now, as the priced rows are."""
+    _with_fit(monkeypatch)
+    stale = dict(_row(), age_seconds=900.0, updated_at=(LANE_AT - timedelta(seconds=900)).isoformat())
+    rows = [stale]
+    _attach(rows)
+    shown = rows[0].get(lgj.LIVE_DISPLAY_KEY)
+    assert "live_gameline" not in rows[0]                                      # refused before pricing
+    assert shown is not None and shown["basis"] == "quote_older_than_live_pricing_ceiling"
+    assert "total_calibration" in shown and shown["prob_over_uncalibrated"] == pytest.approx(agresti_coull_point(0.70, 200))
+    assert shown["prob_over"] < MARKET                                         # the raw 0.70 would have read as an over
+
+
 # --------------------------------------------------------------------------------------------- pregame
 
 PRE = tpc.TotalCalibration(league="ncaab", phase="pregame", as_of=dt.date(2026, 11, 15), a=-0.38, c=0.0, games=221.0)

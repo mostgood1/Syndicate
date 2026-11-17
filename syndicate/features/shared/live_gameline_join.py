@@ -1650,6 +1650,23 @@ def live_display_block(
     if prob is not None:
         prob = scale_prob(prob, full_game_prob_scale(market_key, hit.get("segment") or "full", sport,
                                                      anchored=bool(hit.get("margin_anchored"))))
+    # #816: THE SAME COLLEGE TOTALS CALIBRATION AS THE PRICED PATH, against this row's own market. Measured 11-17
+    # 00:27Z (rail monitor): after the load 61 of 92 served NCAAB full-game total rows still carried the engine's raw
+    # number because they came through here (refused for quote or lane age before pricing), and one flagged an over
+    # at 16.8 pp. With a calibration in force and no two-sided market to anchor it, the row shows NO probability:
+    # the engine's own number is the one the fit found over-confident.
+    calibrated = None
+    if prob is not None and market_key in _TOTALS_MARKETS:
+        cal = college_live_total_calibration(market_key, hit.get("segment") or "full", sport, row.get("commence_time"))
+        if cal is not None:
+            try:
+                fair = float((row.get("projection") or {}).get("market_fair_prob_over"))
+            except (TypeError, ValueError):
+                fair = None
+            engine_prob = prob
+            prob = cal.apply(engine_prob, fair) if fair is not None and 0.0 < fair < 1.0 else None
+            calibrated = {"total_calibration": cal.stamp(), "prob_over_uncalibrated": engine_prob,
+                          **({} if prob is not None else {"prob_withheld": "no two-sided market to calibrate against"})}
     total_mean = hit.get("total_mean") if market_key in _TOTALS_MARKETS else None
     if prob is None and total_mean is None:
         return None
@@ -1662,6 +1679,7 @@ def live_display_block(
         "sims_run": sims,
         "as_of": hit.get("as_of"),
         "lane": hit.get("lane"),
+        **(calibrated or {}),
     }
 
 
