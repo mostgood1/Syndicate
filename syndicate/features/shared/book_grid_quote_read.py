@@ -32,8 +32,20 @@ build also runs the one-pass reference over the same bytes and compares row for 
 reference rows serve that build, and the incremental read is OFF for the rest of the process -- a reducer that
 diverged once has no claim to be trusted between checks.
 
+THE CHECK RUNS AFTER THE BUILD when the caller asks for that (todo #790, lane nba-grid-check-after-build). The
+reference read is the whole shard again: measured on the fleet's 11-16 NBA slate, 3.2-17.5 s (7.0-17.5 s from
+00:35Z, at 61k-104k kept rows) on 10 of 214 NBA builds, 3 of the 18 that crossed the 45 s slow-sport line -- time
+the overlay waited for and the slow-sport schedule counted. Inside `checks_after_build()` a check that falls due is
+not run by the read: the shard is listed, the build line says `verify=deferred`, and the caller runs
+`run_checks_after_build(pending)` once its build clock has stopped. Same check, same cadence (`verified_at` moves
+only when it runs), same bytes: it compares the kept rows, re-parsed from their spans, with the one-pass reference
+over `[0, offset)`, which appends after the build do not touch. What changes on a mismatch: the rows the build
+already served were the incremental ones, so the caller rebuilds that sport at once (the read is off by then).
+`SYNDICATE_BOOK_GRID_CHECK_AFTER_BUILD` 0/false/off/no = the check runs inside the build, as before; ABSENT = after.
+
 Every build prints one `BOOK_GRID_QUOTE_READ` line (mode, new lines, kept rows, seconds), because a read that
-silently fell back to the full path would look exactly like one that never shipped.
+silently fell back to the full path would look exactly like one that never shipped. Every check run after a build
+prints one `BOOK_GRID_QUOTE_READ_CHECK` line.
 """
 
 from __future__ import annotations
@@ -47,6 +59,8 @@ import threading
 import time
 from array import array
 from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, BinaryIO
 
@@ -59,6 +73,7 @@ from syndicate.features.shared.odds_book_quotes import (
 
 ENABLED_ENV = "SYNDICATE_BOOK_GRID_INCREMENTAL_READ"
 VERIFY_SECONDS_ENV = "SYNDICATE_BOOK_GRID_INCREMENTAL_VERIFY_SECONDS"
+CHECK_AFTER_BUILD_ENV = "SYNDICATE_BOOK_GRID_CHECK_AFTER_BUILD"
 DEFAULT_VERIFY_SECONDS = 1800.0
 # Shards a process keeps state for. One per (sport, date) the round builds; the background drain adds other dates.
 MAX_ENTRIES = 24
@@ -82,6 +97,85 @@ def _verify_seconds() -> float:
         return max(0.0, float(raw)) if raw else DEFAULT_VERIFY_SECONDS
     except ValueError:
         return DEFAULT_VERIFY_SECONDS
+
+
+def check_after_build_enabled() -> bool:
+    """On unless the env says 0/false/off/no. ABSENT IS ON: the same check, run once the build's clock stopped."""
+    return str(os.environ.get(CHECK_AFTER_BUILD_ENV) or "").strip().lower() not in _OFF_VALUES
+
+
+# The open `checks_after_build()` scope's list of (sport, date) whose check fell due, or None outside one. A
+# ContextVar, so only the thread (and context) that opened the scope defers: any other reader checks inline.
+_CHECK_SCOPE: ContextVar[list[tuple[str, str]] | None] = ContextVar("book_grid_quote_check_scope", default=None)
+
+
+@contextmanager
+def checks_after_build() -> Iterator[list[tuple[str, str]]]:
+    """Inside, a check that falls due is listed instead of run; pass the list to `run_checks_after_build` once the
+    build's clock has stopped. With `SYNDICATE_BOOK_GRID_CHECK_AFTER_BUILD` off, nothing is deferred and the list
+    stays empty: the read checks inline, as before."""
+    pending: list[tuple[str, str]] = []
+    if not check_after_build_enabled():
+        yield pending
+        return
+    token = _CHECK_SCOPE.set(pending)
+    try:
+        yield pending
+    finally:
+        _CHECK_SCOPE.reset(token)
+
+
+def run_checks_after_build(pending: list[tuple[str, str]]) -> dict[tuple[str, str], str]:
+    """Run each deferred check now. {(sport, date): "match" | "MISMATCH" | "skipped:<why>" | "error"}. Never raises.
+
+    "MISMATCH" means the read is now OFF for the process and the rows the build served were the incremental ones:
+    the caller rebuilds that sport, which then reads one-pass."""
+    results: dict[tuple[str, str], str] = {}
+    for sport, date_str in list(pending):
+        results[(sport, date_str)] = _check_now(sport, date_str)
+    pending.clear()
+    return results
+
+
+def _check_now(sport: str, date_str: str) -> str:
+    started = time.monotonic()
+    kept = rows = "-"
+    key = ""
+    try:
+        path = resolve_book_quotes_path(sport, date_str)
+        key = str(path)
+        if _DISABLED is not None:
+            result = "skipped:disabled"
+        elif path.suffix == ".gz" or not path.is_file():
+            result = "skipped:no_shard"
+        else:
+            with _LOCK:
+                state = _STATES.get(key)
+                if state is None:
+                    result = "skipped:no_state"
+                else:
+                    with open(path, "rb") as handle:
+                        stat = os.fstat(handle.fileno())
+                        identity = (int(stat.st_dev), int(stat.st_ino))
+                        stale = _stale_reason(state, handle, identity, int(stat.st_size))
+                        if stale is not None:
+                            # The next build starts this shard over from byte 0 anyway.
+                            _drop(key)
+                            result = f"skipped:{stale}"
+                        else:
+                            served = _reparse_kept(state, handle)
+                            kept, rows = len(served), state.rows
+                            result, _, _ = _verify(sport, date_str, state, handle, served)
+    except Exception as exc:  # noqa: BLE001 -- a check must never cost the round; its state is dropped instead
+        if key:
+            with _LOCK:
+                _drop(key)  # the next build starts this shard over from byte 0
+        result = "error"
+        print(f"[book_grid] BOOK_GRID_QUOTE_READ_CHECK_ERROR sport={sport} date={date_str} "
+              f"{type(exc).__name__}: {exc}", flush=True)
+    print(f"[book_grid] BOOK_GRID_QUOTE_READ_CHECK sport={sport} date={date_str} result={result} kept={kept} "
+          f"rows={rows} check_s={time.monotonic() - started:.3f} when=after_build", flush=True)
+    return result
 
 
 class _ShardState:
@@ -215,8 +309,15 @@ def _incremental(sport: str, date_str: str, path: Path) -> tuple[list[dict[str, 
         verify_s = 0.0
         count = state.rows
         if reparse_done - state.verified_at >= _verify_seconds():
-            verify, rows, count = _verify(sport, date_str, state, handle, rows)
-            verify_s = time.monotonic() - reparse_done
+            pending = _CHECK_SCOPE.get()
+            if pending is not None:
+                # Due, and the caller runs it after its build clock stops (`checks_after_build`).
+                if (sport, date_str) not in pending:
+                    pending.append((sport, date_str))
+                verify = "deferred"
+            else:
+                verify, rows, count = _verify(sport, date_str, state, handle, rows)
+                verify_s = time.monotonic() - reparse_done
     state.last_used = time.monotonic()
     _report_bad_lines(path, state.bad, state.lines)
     state.reducer.report()
