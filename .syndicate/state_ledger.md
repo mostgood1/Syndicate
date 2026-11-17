@@ -974,15 +974,17 @@ unbounded.
   - Same-instant A/B, 5 pairs on the primary: old 10.9-12.3 s, new 2.7-5.4 s, stdout identical.
   - New and loud: a check killed at the runner's 13 s deadline, or a missing or dead runner, prints in
     DIGEST NOTES instead of reading as a pass.
-  - All nine checks finish in about 1.0 s with each other running (1.04 s median, 7 runs). Critical path:
-    `check_lane_invariants.py`, ~1.0 s, with `check_lane_claims.py` at 0.94 s.
-    `[measured 2026-11-17 10:28 AM CST from the primary tree at 0a60d9e0a, lane lane-claims-checker-speed]`.
-    Two speedups did this, both with byte-identical output:
-    - `39d144d7c` cut `check_lane_invariants.py` from 2.35 s to 0.96 s (on the primary: verified as an
-      ancestor of 0a60d9e0a);
-    - `3eacafa2a` cut `check_lane_claims.py` from 1.85 s to 0.94 s. The primary did NOT have it when measured;
-      the check ran from the worktree.
-    Findings: `findings_2026-11-17_lane_claims_parse_memo.md`, `findings_2026-11-17_lane_claims_checker_speed.md`.
+  - All nine checks finish in about 1.0 s with each other running (1.01 s median, 7 runs). Critical path:
+    `check_lane_claims.py`, 0.84-0.96 s; `check_lane_invariants.py` runs 0.66-0.81 s.
+    `[measured 2026-11-17 11:12 AM CST from the primary tree at 7488a568e, lane lane-invariants-speed-2]`.
+    Three speedups did this, all with byte-identical output:
+    - `39d144d7c` cut `check_lane_invariants.py` from 2.35 s to 0.96 s;
+    - `3eacafa2a` cut `check_lane_claims.py` from 1.85 s to 0.94 s;
+    - `c90cf454e` cut `check_lane_invariants.py` again, from 1.21 s to 0.81 s.
+    The primary at 7488a568e had the first two (both verified as ancestors). The third was not on it yet when
+    measured; that check ran from the worktree.
+    Findings: `findings_2026-11-17_lane_claims_parse_memo.md`, `findings_2026-11-17_lane_claims_checker_speed.md`,
+    `findings_2026-11-17_lane_invariants_speed_2.md`.
   - Tables: `findings_2026-11-16_session_start_runtime.md`.
 
 ---
