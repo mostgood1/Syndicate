@@ -697,3 +697,27 @@ have a live card.
 **Restarts:**
 - refresh-worker **2809282 → 2953295** at 00:04:38Z, the #816 load (recorded above).
 - live-odds-worker 2925378, unchanged.
+
+### #816 reachability anomaly — CAUSE CONFIRMED by the owner, fix on main, NOT loaded (~6:45 PM CST)
+
+**From local_1f10ce63:**
+- **Cause:** a row refused before pricing (quote or lane age, e.g. `quote_older_than_live_pricing_ceiling`)
+  takes its Live number from `live_gameline_join.live_display_block`. That path applied the #780 k but
+  not #816, so it showed the engine's Agresti-Coull fraction: the exact multiples of 1/102 seen here.
+  Priced rows were calibrated, which is why one game mixed both.
+- **Fix on main `d7c183d8d`:** the display block now applies the same calibration against the row's own
+  `market_fair_prob_over`. With a calibration in force and no two-sided market, it shows no
+  probability. Display blocks carry `total_calibration` plus `prob_over_uncalibrated` or
+  `prob_withheld`.
+- Checked here: `d7c183d8d` is on origin/main and NOT in the fleet's `69bd95177`. Loading it is the
+  user's call.
+
+**PREDICTION, registered for after it loads:** served NCAAB full-game total rows stop carrying exact
+k/102 or k/204 values. The raw share falls from 61 of 92 to 0 (rows with no two-sided market carry no
+probability). It is falsified if any served row after the load still carries a raw fraction.
+
+**Fleet event:**
+- Fleet ff `13ec8f348 -> 69bd95177` at 00:20:21Z (6:20 PM CST): "odds sweep: keep the NFL game-line
+  shard line (todo 817)".
+- No restart: refresh-worker pid 2953295 unchanged.
+- For the MNF read: the `NFL_GAMELINE_QUOTE_SHARD` line should now land in a role log.
