@@ -325,3 +325,9 @@ python scripts/live_book_edge_readout.py --since 2026-11-03 # one window from th
   - Both are classified `no` (BC-020, BC-021), and the digest is silent again.
 - **It reaches sessions** when the primary tree fast-forwards to `c5cf64efc`, which `primary_tree_ff.py` does at session start.
 - **LEAD, not fixed:** the whole hook took 11.8-25.4 s over 5 runs in this worktree, and its timeout is 20 s (`.claude/settings.json`). This line adds ~0.65 s. A run over 20 s loses the whole digest, so the hook's total runtime needs its own owner.
+
+## FEE-NET CLV BASIS LOADED (read 2026-11-17 ~16Z, from the refresh-worker log)
+
+- The owed proof-of-load line exists. The 2026-11-17T12:00:39Z tuner run logged `MIN_EV_TUNER mode=shadow date=2026-11-17 cells=95 actions={'hold': 95} ... clv_basis=net pooling=shadow pooled_actions={'hold': 94, 'raise': 1} base=0.0 moves=0`.
+- It is the only `clv_basis` line in `refresh-worker.log` so far, so this is the first run on the fee-net basis since the 11-17 refresh-worker restarts.
+- The tuner is still in shadow mode, so no live stake moved. The pooled shadow `raise` is 1 of 95 cells.

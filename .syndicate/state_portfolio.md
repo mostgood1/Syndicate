@@ -448,11 +448,11 @@ and none exist yet.**
   - Verified: a synthetic raise fires it; the real 10-26 artifact does not; the next watchdog run was clean (deploys `1ed8bb4f`).
 - **Evidence base:** settled paper venue orders only (paper:kalshi + paper:polymarket, 1,176 over 10-02..10-18). The 552 live rows
   are `venue_rebuild` rows with no `ev_pct`. Same-book CLV on venue MLB props is near zero (kalshi 49/266, polymarket 1/95).
-- **CLV basis: FEE-NET by default on main (`6e952af46`, 2026-11-16), NOT LOADED (verified 2026-11-16 21:19Z).** `_clv` nets the venue fee
-  off the recomputed gross CLV (`order_clv.fee_net_clv_pct`; an unknown fee drops the row). `SYNDICATE_MIN_EV_TUNER_CLV_BASIS=gross` restores the
-  old basis; absent = net. The code reached the fleet disk with another lane's 21:17Z ff to `db463b5be`, but refresh-worker pid 2809282 predates it.
-  The fleet runs the GROSS basis until its next restart; proof of load = a `MIN_EV_TUNER ... clv_basis=net` line. The read-only A/B on the
-  fleet's orders changed 0 actions (findings_2026-11-16_live_book_edge_readout.md § "FEE-NET CLV BUILT"; todo #815).
+- **CLV basis: FEE-NET, LOADED on the fleet (verified 2026-11-17 ~16Z from the refresh-worker log).** Main `6e952af46` (2026-11-16). `_clv` nets
+  the venue fee off the recomputed gross CLV (`order_clv.fee_net_clv_pct`; an unknown fee drops the row). `SYNDICATE_MIN_EV_TUNER_CLV_BASIS=gross`
+  restores the old basis; absent = net. Proof of load: the 2026-11-17T12:00:39Z run logged `MIN_EV_TUNER mode=shadow ... cells=95 actions={'hold': 95}
+  ... clv_basis=net pooled_actions={'hold': 94, 'raise': 1} moves=0`, the only `clv_basis` line in the log so far. Still shadow: no live action.
+  The read-only A/B on the fleet's orders before the load changed 0 actions (findings_2026-11-16_live_book_edge_readout.md § "FEE-NET CLV BUILT"; todo #815).
 - Detail: `findings_2026-10-19_min_ev_tuner_backtest.md`; deploys.md 2026-10-19 19:06:01Z; todo #701.
 
 ## [live-plan-empty-funnel] THE LIVE PLAN IS EMPTY BECAUSE THE VENUE'S OWN PRICE IS <= 0 EV AFTER THE TAKER FEE -- NOT A CAP, NOT A CHOSEN GATE `[verified on the fleet 2026-10-19 22:15Z and 2026-10-20 12:33Z, read-only, session 6200a74b]`
