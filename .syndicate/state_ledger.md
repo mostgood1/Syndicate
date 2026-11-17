@@ -974,7 +974,11 @@ unbounded.
   - Same-instant A/B, 5 pairs on the primary: old 10.9-12.3 s, new 2.7-5.4 s, stdout identical.
   - New and loud: a check killed at the runner's 13 s deadline, or a missing or dead runner, prints in
     DIGEST NOTES instead of reading as a pass.
-  - Critical path now: `check_lane_invariants.py`, 1.7 s with the others running.
+  - Critical path: `check_lane_claims.py`, 1.19-1.29 s with the others running, once the primary tree
+    has `39d144d7c` `[measured 2026-11-17 9:53 AM CST, lane lane-claims-parse-memo; the primary was
+    NOT yet fast-forwarded to it then]`. That commit cut `check_lane_invariants.py` from 2.35 s to
+    0.96 s alongside the others, and all nine finish in 1.25 s instead of 2.35 s. Its output is byte-identical
+    (`findings_2026-11-17_lane_claims_parse_memo.md`).
   - Tables: `findings_2026-11-16_session_start_runtime.md`.
 
 ---
