@@ -920,6 +920,14 @@ death, never life — do not invert it.
 - Verification: pytest on the touched tests (deferred inside the scope, inline outside it, env off = inline, a mismatch disables + reports, the check runs on the same bytes after more lines are appended, run_refresh_worker's _build_one runs the check after build_seconds is recorded); after a user-approved load: verify=deferred + BOOK_GRID_QUOTE_READ_CHECK result=match lines, 0 MISMATCH, NBA build_seconds excluding check_s
 - Blocked by: none
 
+### portfolio-monitor — OPEN — opened 2026-11-17 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: A continuous watch of the fleet's portfolio endpoint (127.0.0.1:10000 /portfolio and /api/portfolio/*): endpoint health (status, latency, size, web worker timeouts), the live banner (job, mode, armed, kill switch, worker state age), the plan funnel (rows in -> suggested -> sized -> positions, refusals by reason), order flow (fills, resting, rejects, failures, unknown submits, unreconciled, grade conflicts), settlement lag, cap use, CLV and the scale-up gate's clock -- each measured with a denominator, logged in the findings file, and every anomaly either handed to its owning lane or fixed under its own lane
+- Files: .syndicate/findings_2026-11-17_portfolio_monitor.md (NEW), scripts/portfolio_monitor_probe.py (NEW, read-only probe), tests/test_portfolio_monitor_probe.py (NEW), .syndicate/findings_<date>_portfolio_monitor.md (NEW, one per monitored day)
+- Hypothesis: n/a (monitor; each anomaly it finds gets its own hypothesis, in its own lane, before any test)
+- Falsification test: n/a
+- Verification: The findings file carries a dated Central-time block per reading with rates and denominators; each actionable anomaly names its owner lane or a new lane; a daily summary with per-metric trend after the day's last settlement; a published Portfolio Watch page
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
