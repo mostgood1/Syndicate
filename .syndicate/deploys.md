@@ -60880,3 +60880,21 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `SMART_SIM_GAME_MODEL_UNFED` marker lines after the ff: 0. That was expected, because the allowlist `f252a5969` is not on the fleet.
 - **expect / measured** (vs the 16:26:58Z entry): `nba_sims_with_game_model_fed` 0 -> at least 1 false with `[pred_total, pred_margin]`: **MET** (2). `unfed_marker_lines` 0 -> 0: **MET as predicted**.
 - Built alongside, not loaded: F1 `92ae7490a` (default off, `feed_game_model`; user "build F1 behind the switch, default off").
+
+## 2026-11-17 17:01:55Z (11:01 AM CST) -- FLEET ff 8aea4fe7e -> 0a60d9e0a, NO restart: todo #807 follow-up, the NCAAF sim-history dedupe compares CSV rows in any order (lane `ncaaf-sim-history-order-dedupe`, session 386d4115) -- **LOADED; on disk MET, refresh-worker untouched, 0 tracebacks; the reading (the next same-week NCAAF run logs `sim_history_kept=unchanged`, `sim_history/ncaaf/` stays at 6 files) is OWED at ~06:3xZ 11-18**
+- **User, in session 386d4115's chat:** "Yes, fix it here"; then "Push and load".
+- **What it changes:** `football_segment_distributions.archive_sim_write` compares the CSV rows (less `generated_at`) as a sorted list of canonical strings (`_row_multiset`) instead of an ordered list. Measured cause (deploys.md 2026-11-17 06:38:00Z): the 06:31:45Z wk12 rewrite had 0 of 66 games and 0 of 66 rows changed, but 56 of 66 rows in a new position, and it was kept.
+- **Held first for a ride-along:** at the push, `17ff69398..0a60d9e0a` carried `c4d35b515` (lane `live-player-exit-gate`, todo 814: `commit_portfolio` refuses in-play rows on a game a key player has left; live-odds-worker / portfolio importers), with no load recorded. Not carried: `C:\tmp\propsatomic\wait807.sh` waited until its own lane put it on the fleet (head `c4d35b515` at 16:24Z) and every claim was free (16:30Z; web then at `8aea4fe7e`).
+- **Range `8aea4fe7e..0a60d9e0a`** (11 commits), runtime files: `syndicate/features/shared/football_segment_distributions.py` (this fix) and `scripts/check_lane_invariants.py` (`39d144d7c`, offline lane tooling). vendor/ 0. 0 of 14 dirty fleet files in range. `C:\tmp\propsatomic\ff807.sh` refused any other base or any runtime file off its allowlist.
+- **Why no restart:** refresh-worker runs `scripts/generate_smartsim2_ncaaf_projections.py` as a fresh subprocess (`run_refresh_worker._season_projection_script_args`), and its keeper imports the module lazily; the next run reads the new compare from disk.
+- **gates:**
+  - Claim refresh-worker, holder `ncaaf-sim-history-order-dedupe`, ~16:30Z (rc 0).
+  - Preflight `--target-commit 0a60d9e0a` (fleet), from this worktree at origin/main: HOLD 16:31-16:59Z (a board build in flight, stage portfolio_commit); **CLEAR 16:59:54Z** (`C:\tmp\propsatomic\pf807_loop.sh`).
+  - Baseline 16:59:41Z (`C:\tmp\propsatomic\b807.sh`): head `8aea4fe7e`, `dedupe_fix_on_disk=0`, refresh-worker pid 4027303, live-odds-worker 3777750, 0 tracebacks on every role since 16:00Z, `ncaaf_sim_history_files=6`, 0 `sim_history_error=`.
+- **load:** `git merge --ff-only 0a60d9e0a` at **17:01:55.304Z**.
+- **expect / measured** (read 17:02:16Z, `C:\tmp\propsatomic\after807.out`):
+  - `fleet_checkout_head` 8aea4fe7e -> 0a60d9e0a: **MET**. `dedupe_fix_on_disk` 0 -> 1: **MET**. `refresh_worker_pid` 4027303 unchanged: **MET**.
+  - Tracebacks since the ff: 0 / 0 / 0. In the fleet venv on the fleet checkout (`C:\tmp\propsatomic\imp807.sh`, no writes): the module imports, the new compare calls two reordered rows equal and a changed row different.
+  - **OWED:** the next NCAAF generator run (the wk12 file is 24 h old at ~06:31Z 11-18) logs `sim_history_kept=unchanged` and `sim_history/ncaaf/` stays at 6 files, or, if the content truly changed, keeps a pair that differs from the 06:31:45Z copy. `sim_history_error=` stays 0.
+- **revert:** `git revert 0a60d9e0a` + a claimed fleet ff (no restart, same reason).
+- **Claims:** refresh-worker released right after this entry.
