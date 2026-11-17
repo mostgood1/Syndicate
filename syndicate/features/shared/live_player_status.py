@@ -43,8 +43,17 @@ soccer
     Never a substring test: ``"Penalty - Scored"`` contains "red".
   - the starting keeper (position ``G``) ``subbedOut`` -> out (keeper_change), KEY.
 
-mlb is not ESPN-fed here (statsapi ``feed/live``) and is out of season until
-2027; see the findings file.
+mlb (statsapi ``feed/live``, not ESPN): ``exits_from_mlb_feed``
+  - a STARTER (lineup slot ``battingOrder`` N00, or the team's first pitcher) whose
+    ``Injury Delay`` advisory is followed, within one half-inning, by his
+    replacement -> out (injury), KEY. A position player's replacement is the
+    substitution naming him in ``replacedPlayer``; a pitcher's is his team's next
+    ``pitching_substitution`` (statsapi leaves ``replacedPlayer`` null there).
+  - an ``ejection`` event naming a starter -> out (ejection), KEY. Managers and
+    coaches are ejected far more often and are not in the box's ``players``.
+  - a routine pinch-hitter, defensive replacement or pitching change is NOT an
+    exit: no injury advisory, no ejection. Measured on 183 fleet feeds (2026-06-14
+    .. 10-06): 7 games (3.8%) carried a starter's injury exit; 0 player ejections.
 
 Nothing here does I/O. ``exits_from_espn_summary`` returns an empty status for a
 game that is not in progress, so a stale or pregame payload never refuses.
@@ -66,7 +75,8 @@ FOOTBALL = frozenset({"nfl", "ncaaf"})
 BASKETBALL = frozenset({"nba", "wnba", "ncaab", "wncaab"})
 HOCKEY = frozenset({"nhl"})
 SOCCER = frozenset({"soccer"})
-SUPPORTED_SPORTS = FOOTBALL | BASKETBALL | HOCKEY | SOCCER
+BASEBALL = frozenset({"mlb"})
+SUPPORTED_SPORTS = FOOTBALL | BASKETBALL | HOCKEY | SOCCER | BASEBALL
 
 FOUL_LIMIT = {"nba": 6, "wnba": 6, "ncaab": 5, "wncaab": 5}
 
@@ -590,6 +600,80 @@ def exits_from_nhl_boxscore(boxscore: Mapping[str, Any] | None, *, require_in_pr
                 out.append(PlayerOut("nhl", gid, abbr, name, str(pid) if pid is not None else None,
                                      "goalie_change", True, "boxscore"))
     return GameExitStatus("nhl", gid, True, tuple(sorted(out, key=lambda p: (p.team, p.player))), home, away)
+
+
+_MLB_HALF_ORDER = {"top": 0, "bottom": 1}
+
+
+def _mlb_live(status: Mapping[str, Any]) -> bool:
+    # `abstractGameState` flips to Live at Warmup (learnings): read the detailed state too.
+    return (str(status.get("abstractGameState") or "") == "Live"
+            and str(status.get("detailedState") or "").strip().lower() not in {"warmup", "pre-game"})
+
+
+def exits_from_mlb_feed(feed: Mapping[str, Any] | None, *, require_in_progress: bool = True) -> GameExitStatus:
+    """Starters out of an MLB game for injury or ejection, from one statsapi ``feed/live`` payload."""
+    feed = feed or {}
+    game_data = feed.get("gameData") or {}
+    gid = str(feed.get("gamePk") or (game_data.get("game") or {}).get("pk") or "")
+    gteams = game_data.get("teams") or {}
+    home = str((gteams.get("home") or {}).get("name") or "")
+    away = str((gteams.get("away") or {}).get("name") or "")
+    live = _mlb_live(game_data.get("status") or {})
+    if require_in_progress and not live:
+        return GameExitStatus("mlb", gid, live, (), home, away)
+    box = ((feed.get("liveData") or {}).get("boxscore") or {}).get("teams") or {}
+    starters: dict[int, tuple[str, str, str]] = {}  # id -> (side, name, "batter"|"pitcher")
+    abbr: dict[str, str] = {}
+    for side in ("away", "home"):
+        t = box.get(side) or {}
+        abbr[side] = str((t.get("team") or {}).get("abbreviation") or (gteams.get(side) or {}).get("abbreviation") or side)
+        players = t.get("players") or {}
+        for pobj in players.values() if isinstance(players, Mapping) else ():
+            person = pobj.get("person") or {}
+            bo = str(pobj.get("battingOrder") or "")
+            if person.get("id") and bo.isdigit() and int(bo) % 100 == 0:
+                starters[int(person["id"])] = (side, str(person.get("fullName") or ""), "batter")
+        pitchers = t.get("pitchers") or []
+        if pitchers:
+            pid = int(pitchers[0])
+            pobj = players.get(f"ID{pid}") or {} if isinstance(players, Mapping) else {}
+            starters[pid] = (side, str(((pobj.get("person") or {}).get("fullName")) or ""), "pitcher")
+    # Every action event in feed order, with its half-inning ordinal.
+    events: list[tuple[int, str, Mapping[str, Any]]] = []
+    for play in ((feed.get("liveData") or {}).get("plays") or {}).get("allPlays") or []:
+        about = play.get("about") or {}
+        half = str(about.get("halfInning") or "").lower()
+        ordinal = int(about.get("inning") or 0) * 2 + _MLB_HALF_ORDER.get(half, 0)
+        fielding = "home" if half == "top" else "away"
+        for e in play.get("playEvents") or []:
+            events.append((ordinal, fielding, e))
+    out: dict[int, PlayerOut] = {}
+    injured_at: dict[int, int] = {}
+    for ordinal, fielding, e in events:
+        det = e.get("details") or {}
+        et = str(det.get("eventType") or "")
+        pid = (e.get("player") or {}).get("id")
+        pid = int(pid) if pid else None
+        if et == "game_advisory" and pid in starters and "injury" in str(det.get("description") or "").lower():
+            injured_at[pid] = ordinal
+            continue
+        if et == "ejection" and pid in starters and pid not in out:
+            side, name, _ = starters[pid]
+            out[pid] = PlayerOut("mlb", gid, abbr[side], name, str(pid), "ejection", True, "pbp")
+            continue
+        replaced: list[int] = []
+        rp = (e.get("replacedPlayer") or {}).get("id")
+        if et in ("offensive_substitution", "defensive_substitution") and rp:
+            replaced.append(int(rp))
+        elif et == "pitching_substitution":
+            replaced.extend(p for p, (side, _, role) in starters.items() if role == "pitcher" and side == fielding)
+        for r in replaced:
+            if r in out or r not in injured_at or ordinal - injured_at[r] > 1:
+                continue
+            side, name, _ = starters[r]
+            out[r] = PlayerOut("mlb", gid, abbr[side], name, str(r), "injury", True, "pbp")
+    return GameExitStatus("mlb", gid, True, tuple(sorted(out.values(), key=lambda p: (p.team, p.player))), home, away)
 
 
 _DISPATCH = {}

@@ -60619,3 +60619,14 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - Reading: `C:\tmp\nflks816\marker_reading.sh "2026-11-17 00:20:21"`, watched every 60 s until 02:10Z.
   - Pre-MNF, NFL lines run only in the pregame sweep (2 runs 23:00Z-00:08Z). Once MNF is live they run every 150 s.
 - **claim:** released after this entry.
+
+## 2026-11-17 00:49Z (6:49 PM CST 11-16) -- READING (no deploy): live player-exit gates LOADED on live-odds-worker -- NCAAB, WNCAAB, NHL and the soccer producer (ffs 035b8e95d / 1c5afa2b0 / 9d4e7712b, lane `live-player-exit-gate`), plus NBA tonight
+- **What loaded them:** live-odds-worker's own ~5.5 h self-recycle, not a TERM: pid 2834332 -> **2925378** at 23:55:09Z (watcher `lpeg_recycle_check.sh`: `RECYCLED pid=2925378 etimes=55 head=dac4d49f8 23:56:04Z`). `db463b5be` (the soccer gate) is an ancestor of the loaded head (`git merge-base --is-ancestor` rc 0).
+- **verify -- MET** (`lpeg_wait4.sh`, read 00:49:38Z, `~/syndicate-prod/logs/live-odds-worker.log` since the boot):
+  - `[ncaab_live_resim] PLAYER_EXIT_TICK` x20; last 00:48:00Z `live_games=11 read=11 unreadable=0 ... refused_games=0`.
+  - `[wncaab_live_resim] PLAYER_EXIT_TICK` x25; last 00:48:05Z `live_games=11 read=11 unreadable=0 ... refused_games=0`.
+  - `[nba_live_resim] PLAYER_EXIT_TICK` x10; last 00:48:02Z `live_games=5 read=5 unreadable=0 ... key_players_out=0`.
+  - `[nhl_live_resim] PLAYER_EXIT_TICK` x1; 00:49:13Z `enabled=True read=1 players_out=0 key_players_out=0 refused_games=0`.
+  - `KEY_PLAYER_OUT_REFUSED` 0; lines starting `Traceback` 0.
+- **NOT MET yet:** `[soccer_live_state] PLAYER_EXIT_TICK` x0 -- the line prints only when a league tick read or failed to read an in-play match (`log_tick`), so 0 is consistent with no soccer in play on a Monday evening, not proof of either. The soccer BOARD skip is on refresh-worker and waits for its next natural restart (user 11-16: "Yes, wait for it").
+- **Still owed per the lane goal:** a real mid-game key exit measured per sport (every reading above is the gate running with nothing to refuse).

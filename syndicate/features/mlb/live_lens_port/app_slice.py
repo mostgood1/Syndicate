@@ -13839,7 +13839,7 @@ def _live_mc_prob_over_for(
     return value
 
 
-def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], sim_context: Optional[Dict[str, Any]], market_row: Optional[Dict[str, Any]], *, date_str: Optional[str] = None, live_mc_projection: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], sim_context: Optional[Dict[str, Any]], market_row: Optional[Dict[str, Any]], *, date_str: Optional[str] = None, live_mc_projection: Optional[Dict[str, Any]] = None, live_mc_refusal: Optional[str] = None) -> List[Dict[str, Any]]:
     status = {
         "abstract": str((((snapshot or {}).get("status") or {}).get("abstractGameState") or ((card.get("status") or {}).get("abstract") or ""))),
         "detailed": str((((snapshot or {}).get("status") or {}).get("detailedState") or ((card.get("status") or {}).get("detailed") or ""))),
@@ -13858,7 +13858,12 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
     # compute here and the prop rows now price off the same result, so it must be
     # built once per game and shared -- not once for the lens and again for the
     # props.
-    if not isinstance(live_mc_projection, dict):
+    if live_mc_refusal:
+        # A starter left for injury/ejection and the MC still has him in it (`mlb/live_player_exits.py`):
+        # no lane may carry `live_mc`, so the board join (MLB accepts only `live_mc`/`live_mc_first5`)
+        # withholds every live line of this game.
+        live_mc_projection = None
+    elif not isinstance(live_mc_projection, dict):
         live_mc_projection = _live_mc_projection(snapshot, sim_context, date_str=date_str)
     predictions = card.get("predictions") or {}
     markets = (market_row or {}).get("markets") or {}
@@ -14118,6 +14123,10 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
                 },
             }
         )
+    if live_mc_refusal and is_live:
+        for row in rows:
+            row["liveResimRefusal"] = "key_player_out"
+            row["liveResimRefusalDetail"] = str(live_mc_refusal)
     return rows
 
 
@@ -14321,6 +14330,10 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
     game_line_index = _load_game_line_market_index(d)
     feed_cache: Dict[int, Optional[Dict[str, Any]]] = {}
     games_out: List[Dict[str, Any]] = []
+    # Key-player exit gate (lane live-player-exit-gate): one read per game of the feed this tick loaded.
+    from syndicate.features.mlb import live_player_exits as _exits
+
+    exit_tally = _exits.new_tally()
     counts = {
         "games": 0,
         "live": 0,
@@ -14368,6 +14381,8 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
         shared_live_mc = _live_mc_projection(
             snapshot, sim_context if sim_context.get("found") else None, date_str=str(d)
         )
+        exit_status = _exits.read_exits(game_feed, exit_tally) if status_is_live else None
+        exit_refusal = _exits.record(int(game_pk), exit_status, exit_tally)
         live_prop_rows = [
             _normalize_live_lens_live_prop_row(row, snapshot, card)
             for row in _current_live_prop_rows(
@@ -14381,13 +14396,14 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
             )
             if isinstance(row, dict)
         ]
+        live_prop_rows = _exits.drop_out_player_props(live_prop_rows, exit_status, exit_tally)
         archived_live_prop_rows: List[Dict[str, Any]] = []
         if status_is_final and live_prop_rows:
             archived_live_prop_rows = list(live_prop_rows)
             live_prop_rows = []
         prop_eval_ms_total += (time.perf_counter() - prop_eval_started_at) * 1000.0
         game_lens_started_at = time.perf_counter()
-        game_lens = _build_game_lens(normalized_card, snapshot, sim_context if sim_context.get("found") else None, _game_line_market_for_card(normalized_card, game_line_index), date_str=str(d), live_mc_projection=shared_live_mc)
+        game_lens = _build_game_lens(normalized_card, snapshot, sim_context if sim_context.get("found") else None, _game_line_market_for_card(normalized_card, game_line_index), date_str=str(d), live_mc_projection=shared_live_mc, live_mc_refusal=exit_refusal)
         game_lens_ms_total += (time.perf_counter() - game_lens_started_at) * 1000.0
         if status_is_final:
             counts["final"] += 1
@@ -14429,9 +14445,12 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
                 "trackedProps": tracked_prop_rows,
                 "simContextAvailable": bool(sim_context.get("found")),
                 "snapshotAvailable": bool(snapshot),
+                **({"playersOut": _exits.players_out_rows(exit_status)} if exit_status is not None else {}),
+                **({"liveRefusal": _exits.REASON_KEY_PLAYER_OUT, "liveRefusalDetail": exit_refusal} if exit_refusal else {}),
             }
         )
 
+    _exits.log_tick(exit_tally)
     payload = {
         "date": str(d),
         "generatedAt": _local_timestamp_text(),
@@ -14452,6 +14471,7 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
             "feedFetchCount": int(len(feed_cache)),
         },
         "games": games_out,
+        "playerExits": exit_tally,
     }
 
     if persist:

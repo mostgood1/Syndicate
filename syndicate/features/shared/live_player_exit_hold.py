@@ -27,7 +27,8 @@ from syndicate.features.shared.live_player_status import REASON_KEY_PLAYER_OUT, 
 PUBLISHING_SPORTS: dict[str, str] = {"nfl": "nfl_live_resim.json", "ncaaf": "ncaaf_live_lens.json",
                                      "nba": "nba_live_resim.json", "wnba": "wnba_live_lens.json",
                                      "ncaab": "ncaab_live_resim.json", "wncaab": "wncaab_live_resim.json",
-                                     "nhl": "nhl_live_lens.json", "soccer": "soccer_live_lens.json"}
+                                     "nhl": "nhl_live_lens.json", "soccer": "soccer_live_lens.json",
+                                     "mlb": "mlb_live_lens.json"}
 CACHE_S = 30.0
 
 
@@ -72,6 +73,12 @@ def _team_score(sport: str, entry_name: Any, snap_name: Any) -> int:
     return 0
 
 
+def _nested_name(game: Mapping[str, Any], side: str) -> Any:
+    """MLB's snapshot rows name a team as ``{"home": {"name": ..., "abbr": ...}}``."""
+    team = game.get(side)
+    return (team.get("name") or team.get("abbr")) if isinstance(team, Mapping) else None
+
+
 class ExitHold:
     """`check(sport, home_team, away_team)` -> {"verdict": off|pass|fail|unknown, ...}. Never raises."""
 
@@ -109,8 +116,8 @@ class ExitHold:
         for game in snap["games"]:
             if not isinstance(game, Mapping):
                 continue
-            g_home = game.get("home_name") or game.get("home_code") or game.get("home_team")
-            g_away = game.get("away_name") or game.get("away_code") or game.get("away_team")
+            g_home = game.get("home_name") or game.get("home_code") or game.get("home_team") or _nested_name(game, "home")
+            g_away = game.get("away_name") or game.get("away_code") or game.get("away_team") or _nested_name(game, "away")
             # BOTH teams must name this game, in either order; the weaker side decides the score.
             score = max(min(_team_score(sport, home_team, g_home), _team_score(sport, away_team, g_away)),
                         min(_team_score(sport, home_team, g_away), _team_score(sport, away_team, g_home)))

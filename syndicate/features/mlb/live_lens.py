@@ -495,6 +495,7 @@ def _game_from_report_row(row: dict[str, Any], *, report_date: str, generated_at
         "probable": row.get("probable") if isinstance(row.get("probable"), dict) else {},
         "actual_box_panel": row.get("actual_box_panel") if isinstance(row.get("actual_box_panel"), dict) else {},
         "first1BetSignal": row.get("first1BetSignal") if isinstance(row.get("first1BetSignal"), dict) else {},
+        **{key: row[key] for key in _PLAYER_EXIT_ROW_KEYS if key in row},
         "card_variant": "mlb_main",
         "away": {
             "abbr": str(away.get("abbr") or "AWY").strip() or "AWY",
@@ -943,6 +944,9 @@ def _carry_forward_live_state_lens(report: dict[str, Any], previous_snapshot: di
             and previous_lens
             and not _lens_rows_have_live_state_signal(own_lens)
             and _status_bucket_from_row(row) == "live"
+            # A game refused for a key player out has no `live_mc` lens ON PURPOSE; carrying the last
+            # tick's would publish the price from before he left (lane live-player-exit-gate).
+            and not row.get("liveRefusal")
         ):
             row["gameLens"] = _stamp_live_state_as_of(previous_lens, as_of)
             carried += 1
@@ -1511,6 +1515,9 @@ def _merge_cards_context_into_report(report: dict[str, Any], selected_date: str)
     return merged_report
 
 
+_PLAYER_EXIT_ROW_KEYS = ("playersOut", "liveRefusal", "liveRefusalDetail")
+
+
 def _enhance_card_row_with_live_projection(card_row: dict[str, Any], projection_row: dict[str, Any]) -> dict[str, Any]:
     """Overlay a Monte-Carlo-derived (or previously persisted) row's live
     projection signal onto a card-based row, WITHOUT touching the card
@@ -1639,6 +1646,11 @@ def _enhance_card_row_with_live_projection(card_row: dict[str, Any], projection_
         enhanced["predictions"] = projection_row.get("predictions")
     if not enhanced.get("archivedLiveProps") and isinstance(projection_row.get("archivedLiveProps"), list) and projection_row.get("archivedLiveProps"):
         enhanced["archivedLiveProps"] = projection_row.get("archivedLiveProps")
+    # Key-player exit gate (`mlb/live_player_exits.py`): only the MC tick reads the live feed for exits, so its
+    # verdict rides onto the card row whole -- the hold and the carry-forward below read these.
+    for key in _PLAYER_EXIT_ROW_KEYS:
+        if key in projection_row:
+            enhanced[key] = projection_row[key]
     return enhanced
 
 
