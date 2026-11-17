@@ -830,3 +830,30 @@ have a live card.
   - 0 refresh-worker tracebacks since the restart.
 - **Display note passed to the owner (by design, not a defect):** an UNDER flag can sit beside a
   raw "ours" total above the line (Richmond @ VT u143.5 vs ours 146.0 at 6:50 PM).
+
+### MNF read 1 — LAC @ BAL after kickoff (7:19 PM CST, 01:19Z 11-17) — registered prediction (fix-loaded branch) MET, thinly
+
+**User 11-16 ~6:58 PM CST: "check the MNF lines after kickoff".** A watcher fired on the first in-play
+NFL overlay.
+
+- **Shard:** `nfl_source/tracking/book_quotes/2026-11-16.jsonl` holds **69 rows captured at or after
+  01:15Z** (spreads 26, h2h 25, totals 18), all for kickoff 2026-11-17T01:18Z (MNF), last 01:17:13Z.
+  There is **no `2026-11-17.jsonl`**. The kickoff-date filing holds after 00:00Z.
+- **Overlay:** `INPLAY_OVERLAY sport=nfl date=2026-11-16 rows_inplay=9 opportunities=12 cards=1
+  published=True ... refused={"rows_below_value_floor":11}` at 01:18:56Z, the first in-play NFL build.
+  It carries MNF under 11-16.
+- **Live-rail: 1 LAC @ BAL overlay game-line row** (`source=layer2_inplay_overlay`): totals full
+  under 39.5 at +100, book age 115 s, **no model probability**. Same on 3 reads 01:19:33-01:19:53Z.
+- **Verdict:** the falsifier (0 LAC @ BAL overlay game-line rows) **did not occur, so the prediction
+  is MET.** Before the fix, these rows went to the UTC-dated 11-17 shard, which no 11-16 overlay
+  reads.
+- **Why only 1 row, and no model price:**
+  - `LIVE_GAMELINE_BUILD sport=nfl date=2026-11-16` 01:18:56Z: considered 42, **priceable 0**,
+    withheld 42:
+    - `segment_is_not_full_game` 31: quarter and half lines are never priced, known;
+    - `no_live_gameline_projection` 11.
+  - The first `NFL_LIVE_RESIM` with a live game (live_games 1) came at **01:19:33Z, 37 s after** that
+    build. So the first in-play build had no live projection yet.
+  - Without a model price, the rows carry only market-fair EV, and 11 of 12 fall under the -2% floor:
+    the WNCAAB mechanism. Read 2 (~7:45 PM) checks that full-game lines are priced once the re-sim
+    is attached.
