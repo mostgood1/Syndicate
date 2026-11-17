@@ -60931,3 +60931,36 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **Expect:** quarter/half capture gaps at the lines-run cadence (MNF full-game runs were 2-3 min apart), 0 gaps > 300 s outside fetch failures; NFL overlay builds without a fresh quarter/half row near 0. **Baseline:** MNF 11-16 under the gate, same script: gaps 610-660 s (17 of 17 > 300 s), 67 of 136 builds, 52% of minutes.
   - Plus Games Rail polls serving NFL game rows across the game (`C:\tmp\nflks816\rail_poll.sh`, after editing its date).
   - Plus credits: segment calls x 18 (`SEGMENT_PLAN est_credits=18` per live event), against the ~+430 per live game-hour estimate.
+
+## 2026-11-17 17:34:59Z (11:34 AM CST) -- DEPLOY (ff only, no restart) + SWITCH FLIP 17:35:08Z: fleet `3d3c0a426` -> `92ae7490a`, then todo #821 F1 ON with the outs penalties OFF (`nba_sim_total_inputs.json`; lane `nba-f1-switch-on`, user "On, with outs off") -- **ff MET, flip MET (a fresh process reads both keys); the first post-flip NBA sim reading is OWED**
+- betting change: yes
+- **decision:** the user answered "On, with outs off" to "Switch F1 on?" (11-17 ~11:05 AM CST). To the ride-along question (#824 `3dbe53df0`, default ON, loads at the next refresh-worker restart) the user answered **"Carry it along"**. Session `local_431175b6` had the same request from the user ("Feed + outs off"; "Yes, both on", props named) and stood down so this lane is the only loader.
+- **pre-registration (before the flip):** main `96d9d3a57`, findings § "F1 switched ON with the outs penalties OFF". KEEP / REVERT / re-grade at 300 on the first 150 graded post-flip games, paired vs the reconstructed arm A, date-clustered CI. Due around 12-06.
+- **sequencing:** lane `nba-grid-check-after-build` was deploying `3d3c0a426` (both worker claims, HOLD, then a refresh-worker restart to pid 4049350). I waited for its claims to release (17:32:35Z).
+- **ride-along (3d3c0a426..92ae7490a), code only:**
+  - mine: `syndicate/features/shared/basketball_props_smart_sim.py` (F1 read + switch), `scripts/basketball_sim_input_checklist.py` (Level 4 follows the switch);
+  - **#824 `3dbe53df0`** (lane `ncaab-total-overprojection`, user "Carry it along"): `live_gameline_join.model_behind_score_verdict` refuses a live NCAAB/WNCAAB full-game total whose projected final is below the points scored. Switch `SYNDICATE_LIVE_MODEL_BEHIND_SCORE_GUARD` absent = ON. It is refresh-worker role code: **NOT LOADED by this ff**. It loads at the next refresh-worker restart (the role's loaded commit is `3d3c0a42`). The same commit's `total_prob_calibration.py` spread-only option keeps `FIT_LEVEL` True (default unchanged).
+  - The rest is ledger and tests. `vendor/` is empty.
+- **gates:** claim web 17:33:26Z (holder `nba-f1-switch-on`, rc 0). Baseline 17:33:28Z:
+  - head 3d3c0a426; refresh-worker pid 4049350; live-odds-worker pid 3777750;
+  - switch file `{"skip_def_subtraction": true}` (mtime 2026-10-10 15:06:05Z);
+  - a fresh fleet process cannot read `feed_game_model` (no F1 code; AttributeError at 17:2xZ);
+  - the latest 2 NBA sims fed false with `skip_outs_penalties` false.
+  - Preflight `--service web --target-commit 92ae7490a --target fleet` from this worktree at origin/main `9abb5fb7f`, with `--expect` and a baseline for every field: **CLEAR** 17:34:38Z (0 processes).
+- **ff:** `git fetch github main` then `git merge --ff-only 92ae7490af7c5f0f863c77bb50c0c001441c982c` at **17:34:59.699Z**. No TERM.
+- **flip** (`C:\tmp\nba_margin0\f1_flip.sh`, atomic tmp + mv): `~/syndicate-prod/data/nba_source/data/processed/nba_sim_total_inputs.json`
+  - before: `{"skip_def_subtraction": true}`
+  - after: `{"skip_def_subtraction": true, "skip_outs_penalties": true, "feed_game_model": true}`
+  - flipped at **17:35:08.231Z**.
+  - The file is re-read per job, so the NBA props child (`refresh_nba_oddsapi_props.py`, a fresh child of each odds job) picks it up at its next run.
+  - **Both keys move NBA game totals AND player props.** `feed_game_model` changes the quarter means. `skip_outs_penalties` removes the injury-count penalties from the quarter means and the pace drag in the quarter model and in the player sim (`orchestrator/smart_sim.py` `_pace_injury_drag`).
+  - **A flip reaches only sims built afterwards.** The reuse checks do not read the switch, and tipped games are frozen. Tonight's existing sims are reused unless something else makes them stale. The 11-18 slate (built around 06:00Z) is the first full one.
+- **expect / measured:**
+  - `fleet_checkout_head` 3d3c0a426 -> 92ae7490a: **MET** (17:35:21Z).
+  - `refresh_worker_pid` 4049350 -> 4049350: **MET**. `live_odds_worker_pid` 3777750 -> 3777750: **MET**.
+  - `nba_switch_file` -> all three keys true: **MET** (read back at the flip).
+  - `fresh_process_feed_game_model` unreadable -> True: **MET**. `C:\tmp\nba_margin0\f1_fresh_read.sh` on the fleet checkout + venv: `feed_game_model: True`, `total_inputs {skip_def_subtraction: True, skip_outs_penalties: True}`, WNBA `False`.
+  - `first_post_flip_nba_sim` -> `game_model_fed: true` + `game_model_read: [pred_total, pred_margin]` + `nba_total_inputs.skip_outs_penalties: true` + raw margin off the outs/b2b rule: **OWED**. Watcher `C:\tmp\nba_margin0\f1_watch_sim.sh` (read-only, 120 s, 10 h cap).
+  - The unfed allowlist (`f252a5969`) is now on the fleet: an NBA run that is still unfed would print `STEP_MARKER ... SMART_SIM_GAME_MODEL_UNFED`. With F1 on, 0 are expected.
+- **revert** (one step, no restart): rewrite the file to `{"skip_def_subtraction": true}`. Only sims built afterwards revert.
+- **claim:** web released after this entry.
