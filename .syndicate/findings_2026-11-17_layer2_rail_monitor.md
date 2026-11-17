@@ -171,3 +171,23 @@ no price of ours.
     second region (e.g. `us2`) for WNCAAB in-play might add books, at a credit cost per call.
   - Candidate for local_1f10ce63 (#810), and the user's call. Not measured: which books `us2` would add
     for WNCAAB.
+
+### #824 LOADED (12:03:56 PM CST) — new watch items from its owner
+
+- **What loaded:** the owner local_1f10ce63 restarted refresh-worker (claimed TERM) at **18:03:56Z**, fleet
+  `92ae7490a`; **new pid 4060729** (deploys.md 2026-11-17 18:03:56Z).
+- **What it does:** a live NCAAB/WNCAAB full-game total whose projected final is below the points
+  already scored is refused (no edge, no Live number), reason `model_projected_final_below_points_scored`.
+- **Size:** ~0.5% of priced totals 11-08..11-16, so a handful at most on a full slate.
+- Backlog I-12 status: LOADED.
+- **Each college reading from now on (the owner's request):**
+  1. The count of that reason in `LIVE_GAMELINE_JOIN` `why=` (`C:\tmp\railmon\why824.sh <since>`).
+  2. Any rail totals flag whose "ours" is below the segment's points already scored
+     (`C:\tmp\railmon\c824.py <reading dir>`).
+     - For full-game totals that would be a miss of the guard.
+     - Segment totals are not covered by it; reported separately.
+- **Baselines:**
+  - Since 18:03:56Z: 0 of 14 college `LIVE_GAMELINE_JOIN` lines with the reason.
+  - Reading 1 (12:01 PM, 2 minutes before the load): 0 of 3 college totals flags below the score.
+- College ledger rows now carry `state_home_score` / `state_away_score` / `state_period` /
+  `state_clock_seconds` (the score and clock the re-sim started from), usable to grade the model's lag.
