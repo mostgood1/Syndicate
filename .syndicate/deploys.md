@@ -61075,3 +61075,19 @@ Lane `render-config-retirement` (CLOSED; session 267d8859). It follows the 18:58
   - web `code=5db26434`; both workers `code=92ae7490 (STALE)`, as expected after a web-only reload;
   - one unrelated line: `GET /api/ops/version -> HTTPError 401` (status asks web without a token).
 - **verify:** this table; and at the next `up`, each role's `/proc` environ equal to the pre-`up` one except `RENDER_GIT_COMMIT` / `RENDER_INSTANCE_ID` (owed by whoever runs it; `.syndicate/findings_2026-11-17_render_config_retirement.md` "The load").
+
+## 2026-11-17 19:07:37Z (1:07 PM CST) -- READING (no deploy): ride-along readings and decision quotes for the 18:58:45Z load (todo #826, lane `board-query-row-refs-load`), recorded so nothing is lost
+- **Decision quotes.** The user approved the same ride-alongs in other sessions too:
+  - "Carry it tonight" (rail monitor, `local_62433e58`, for `ac2cbc2fc`);
+  - "carry the launcher change along" (`local_1f10ce63`);
+  - "With next down/up" (`local_c787e775`).
+  - In this session: "Load it", then "Carry both (Recommended)".
+- **`ac2cbc2fc` (launcher)**, read by `local_c787e775` at 19:06:39Z (its own entry, main `24a68c1be`):
+  - the next `up` gives every role exactly its current env except `RENDER_GIT_COMMIT` (web 160/160 keys, refresh-worker 262/262, live-odds-worker 235/235, by sha256 against live /proc environ);
+  - `local_production.py status` at `5db26434e`: rc 0.
+  - The vhdx down/up planner has been told. Its owed post-`up` reading: each role's environ equals the pre-up one except `RENDER_GIT_COMMIT` and `RENDER_INSTANCE_ID`.
+- **`2148f99cb` (paper) reached web.** `local_d7643dac` made an authenticated `GET /api/portfolio/paper?date=2026-11-17` at 19:07:37Z:
+  - 200, 2.38 MB, 31.4 s server-side, with no WORKER TIMEOUT (the old code hung ~177 s);
+  - web was saturated then, so this is not a clean cost reading (`findings_2026-11-17_portfolio_monitor.md`, `13a8ddfac`).
+  - The paper page's retirement `f7fb3ed4e` is on main, NOT on the fleet.
+- **The rail monitor stood down** its planned 5 PM load of the same SHA: the fleet is already at `5db26434e`, so there is nothing to load.
