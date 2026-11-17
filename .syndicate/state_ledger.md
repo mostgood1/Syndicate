@@ -964,6 +964,18 @@ unbounded.
   match (here: roster `local_b2ab05a7`).
 - **The 3-lane cap in policy has no enforcement** — `/lane open` checks file
   collisions only and never counts. Eight lanes are open today.
+- **`session-start.sh` RUNS IN 2.5-5.8 s, NOT 16-25 s: its python checks run SIDE BY
+  SIDE** `[verified 2026-11-17 02:05Z, lane session-start-hook-runtime, 73398cdf4,
+  on the primary tree since the 01:57:41Z ff]`.
+  - Before, it ran 16.1-25.1 s on the primary against its 20 s SessionStart timeout, and 3 of 5 runs
+    went over. A killed hook delivers no digest.
+  - `scripts/session_start_jobs.py` starts all nine checks at once and hands back each exit code and
+    stdout byte-for-byte as `$(python ... | head -c N)` did. One `wc` replaces 30 forks.
+  - Same-instant A/B, 5 pairs on the primary: old 10.9-12.3 s, new 2.7-5.4 s, stdout identical.
+  - New and loud: a check killed at the runner's 13 s deadline, or a missing or dead runner, prints in
+    DIGEST NOTES instead of reading as a pass.
+  - Critical path now: `check_lane_invariants.py`, 1.7 s with the others running.
+  - Tables: `findings_2026-11-16_session_start_runtime.md`.
 
 ---
 
