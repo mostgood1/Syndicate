@@ -48,6 +48,7 @@ that has been wrong three separate times (relpath vs. the worktree, the shared
 marker slot, the `.syndicate`/`.claude` exemption) and is deliberately NOT
 shared, because each caller wants a different answer to it.
 """
+import functools
 import os
 import re
 
@@ -236,16 +237,21 @@ def _mask_backticked(line):
 
     Positions are preserved (same length) so the caller can cut the ORIGINAL
     string at an index found in the mask.
+
+    SPLIT, NOT A CHARACTER LOOP (lane `lane-claims-parse-memo`, 2026-11-17).
+    Splitting on the backtick gives the outside text at even indices and the
+    quoted text at odd ones, an unclosed quote included: it is the last, odd
+    piece. Joining back on the backtick keeps every backtick and the length.
+    That is the per-character toggle this replaced, exactly. The loop was the
+    largest self-time in `check_lane_invariants.py` under cProfile: 1.46 s of
+    5.85 s (2026-11-16) on Files lines that run to several KB.
+    `tests/test_lane_claims_parse_memo.py` compares the two over every line of
+    the ledger files and over edge cases.
     """
-    out = []
-    inside = False
-    for ch in line:
-        if ch == "`":
-            inside = not inside
-            out.append("`")
-        else:
-            out.append("\x00" if inside else ch)
-    return "".join(out)
+    parts = line.split("`")
+    for i in range(1, len(parts), 2):
+        parts[i] = "\x00" * len(parts[i])
+    return "`".join(parts)
 
 
 def _is_disclaimer(line):
@@ -526,7 +532,34 @@ def sections_are_disjoint(text, current, rel):
     lane's. Anything else returns None and the caller blocks -- a holder without a
     declaration, or a second lane naming the same section, is a real collision.
     """
-    return sections_are_disjoint_among(_section_entries(text), _claims(text), current, rel)
+    entries, holders = _section_view(text)
+    return sections_are_disjoint_among(entries, holders, current, rel)
+
+
+@functools.lru_cache(maxsize=4)
+def _section_view(text):
+    """(section entries, claims) for `text`, each parsed ONCE per text.
+
+    WHY (lane `lane-claims-parse-memo`, 2026-11-17). `sections_are_disjoint`
+    is asked once per holder of every contested file, and each call walked all
+    of `lanes.md` twice: once for `_section_entries`, once for `_claims`.
+    `check_lane_invariants.py` made 43 calls on a 563 KB `lanes.md`, so that was
+    86 walks of one unchanged text. In-process, those calls took 1.17-1.59 s of
+    a 2.6 s `main` (x64 python, primary tree). This was the critical path of the
+    session-start hook.
+
+    SAFE TO CACHE because both walkers are pure: they read only `text` and this
+    module's constants, with no I/O and no clock. The key is the text itself, so
+    an edited `lanes.md` is a different key and gets a fresh parse; nothing can
+    serve a stale answer for a changed file. The values are TUPLES, so no caller
+    can mutate the cached copy. `maxsize` is small on purpose: a caller holds
+    one or two texts at a time (the primary copy and origin/main's), and each
+    entry pins its text in memory.
+
+    `lane-guard` never reaches this. It calls `sections_are_disjoint_among`
+    directly, over the entries `lane_claims_source` derives.
+    """
+    return tuple(_section_entries(text)), tuple(_claims(text))
 
 
 def sections_are_disjoint_among(section_entries, holders, current, rel):

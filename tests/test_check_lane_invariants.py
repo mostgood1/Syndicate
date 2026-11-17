@@ -746,20 +746,33 @@ def test_main_exits_nonzero_on_an_orphan(tmp_path, capsys):
 
 
 def _fake_git(monkeypatch, mapping, *, fail=False):
-    """Stand in for `git show <ref>:.syndicate/<file>`.
+    """Stand in for `git cat-file --batch` (and `git show <ref>:.syndicate/<file>`).
 
-    `mapping` is {filename: text}; anything absent returns rc=1, which is what
-    git does for a path that is not in the ref.
+    `mapping` is {filename: text}. A file that is absent is answered the way git
+    answers a path that is not in the ref: `<name> missing` from the batch, rc=1
+    from `git show`. `upstream_lane_slugs` asks through ONE batch since lane
+    `lane-claims-parse-memo` (2026-11-17); the `git show` arm stays for anything
+    else that still asks one file at a time.
     """
     import subprocess as _sp
 
     class _R:
         def __init__(self, rc, out):
-            self.returncode, self.stdout = rc, out
+            self.returncode, self.stdout, self.stderr = rc, out, b""
 
     def run(cmd, **kw):
         if fail:
             raise OSError("git not available")
+        if cmd[1:3] == ["cat-file", "--batch"]:
+            out = b""
+            for spec in kw["input"].decode("utf-8").splitlines():
+                name = spec.rsplit("/", 1)[-1]
+                if name not in mapping:
+                    out += spec.encode("utf-8") + b" missing\n"
+                    continue
+                body = mapping[name].encode("utf-8")
+                out += b"%s blob %d\n%s\n" % (b"0" * 40, len(body), body)
+            return _R(0, out)
         name = cmd[-1].rsplit("/", 1)[-1]
         if name not in mapping:
             return _R(1, b"")

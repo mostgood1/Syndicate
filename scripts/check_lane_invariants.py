@@ -386,26 +386,69 @@ def upstream_lane_slugs(root: pathlib.Path, ref: str = "origin/main"):
     UNKNOWN and the caller must keep the strict verdict; an empty set would
     mean "upstream definitely has nothing", and an unknown that defaults to
     the permissive branch is its own recorded failure mode.
+
+    ONE `git cat-file --batch`, NOT FOUR `git show` CALLS (lane
+    `lane-claims-parse-memo`, 2026-11-17). Every process costs 0.1-0.45 s on
+    this host. Measured on the primary tree: four shows took 409-486 ms and one
+    batch 186-195 ms, for the same ~9 MB. The rule per file is unchanged: a
+    path the batch reports `missing` is skipped, as a failed `git show` was. If
+    no file answers, or git fails outright, the result is None. The batch
+    returns the raw blob, and so does `git show` here: the bytes were identical
+    for all four files, and no `.gitattributes` textconv applies to them.
     """
+    names = ("lanes.md", "lanes_closed.md", "lanes_closed_archive.md",
+             "lanes_history.md")
+    request = "".join(f"{ref}:.syndicate/{name}\n" for name in names)
+    try:
+        out = subprocess.run(
+            ["git", "cat-file", "--batch"],
+            cwd=str(root.parent), input=request.encode("utf-8"),
+            capture_output=True, timeout=60,
+        )
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
     slugs: set[str] = set()
     answered = False
-    for name in ("lanes.md", "lanes_closed.md", "lanes_closed_archive.md",
-                 "lanes_history.md"):
-        try:
-            out = subprocess.run(
-                ["git", "show", f"{ref}:.syndicate/{name}"],
-                cwd=str(root.parent), capture_output=True, timeout=60,
-            )
-        except (OSError, ValueError, subprocess.SubprocessError):
-            return None
-        if out.returncode != 0:
+    data, pos = out.stdout, 0
+    for _name in names:
+        # Each answer is `<oid> <type> <size>\n<content>\n`, or one line
+        # `<name> missing` (or `ambiguous`) with no content after it.
+        newline = data.find(b"\n", pos)
+        if newline < 0:
+            break
+        header = data[pos:newline].rsplit(b" ", 2)
+        pos = newline + 1
+        if len(header) != 3 or not header[2].isdigit():
+            continue
+        size = int(header[2])
+        body = data[pos:pos + size]
+        pos += size + 1
+        if header[1] != b"blob" or len(body) != size:
             continue
         answered = True
-        slugs |= set(re.findall(
-            r"(?m)^###\s+([A-Za-z0-9._-]+)",
-            out.stdout.decode("utf-8", "replace").lstrip("﻿"),
-        ))
+        slugs |= set(heading_slugs(body.decode("utf-8", "replace").lstrip("﻿")))
     return slugs if answered else None
+
+
+# A literal `\n###` lets the regex engine skip ahead by prefix search; the
+# `(?m)^###` form it replaces cannot, and took 4x longer over the ~9 MB of
+# ledger files this module scans twice (measured 2026-11-17: 101 ms against
+# 27 ms on lanes_closed + archive + history). See `heading_slugs`.
+_HEADING_SLUG_RE = re.compile(r"\n###\s+([A-Za-z0-9._-]+)")
+
+
+def heading_slugs(text: str) -> list[str]:
+    """Every `re.findall(r"(?m)^###\\s+([A-Za-z0-9._-]+)", text)` match, in order.
+
+    The same list, because `(?m)^` matches only at the start or right after a
+    `\\n`, and the leading newline added here makes the start one of those.
+    No match can swallow the `\\n###` of the next one, since `#` is in neither
+    `\\s` nor the slug class. `tests/test_lane_claims_parse_memo.py` compares
+    the two forms on the ledger files and on edge cases.
+    """
+    return _HEADING_SLUG_RE.findall("\n" + text)
 
 
 def orphaned_lane_markers(text: str, path: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
@@ -435,10 +478,9 @@ def orphaned_lane_markers(text: str, path: str) -> tuple[list[tuple[str, str]], 
     and never written down. That one fails.
     """
     root = pathlib.Path(path).resolve().parent
-    live = set(re.findall(r"(?m)^###\s+([A-Za-z0-9._-]+)", text))
+    live = set(heading_slugs(text))
     archived = set(
-        re.findall(
-            r"(?m)^###\s+([A-Za-z0-9._-]+)",
+        heading_slugs(
             _ledger_text(root, "lanes_closed.md")
             + _ledger_text(root, "lanes_closed_archive.md")
             + _ledger_text(root, "lanes_history.md"),
