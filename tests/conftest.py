@@ -295,6 +295,26 @@ def _install_college_slate_fetch_block() -> None:
 _install_college_slate_fetch_block()
 
 
+# THE SUITE WAS ASKING PRODUCTION WEB FOR WNBA BOX SCORES `[2026-11-17, lane
+# wnba-boxscore-polling-per-date]`. Both WNBA box clients --
+# `scripts.build_wnba_boxscores.web_base_url` (the settlement pass's
+# `final_player_boxscore`) and `live_lens_loop._wnba_live_box_base_url` (the live
+# capture) -- fall back to the FLEET, http://127.0.0.1:10000, when this variable is
+# unset. A test that builds the candidate pool for a fixture date therefore sent
+# real requests to the live-money fleet's web. Measured in its web.log: every
+# `final_player_boxscore` request for 2026-06-03..06-05, 06-09/10 and 09-09/10
+# (1,976 since 10-31) falls in a test-run window -- 08:16-08:54Z, the nightly
+# suite, ~76 a day -- or in the daytime runs on 11-17 (17-20Z), and none in
+# between. The rail monitor read them as a stuck backfill.
+#
+# Set at IMPORT, not in a fixture, for the reason the two blocks above give:
+# settlement passes run on threads that can outlive the test that started them.
+# Port 9 on loopback refuses at once, so a leaked call fails fast down the
+# clients' own never-raise paths. A test that wants a URL sets its own
+# (`monkeypatch.setenv`) or patches `fetch_via_web` / `fetch`, as the box tests do.
+os.environ["SYNDICATE_WNBA_LIVE_BOX_BASE_URL"] = "http://127.0.0.1:9"
+
+
 @pytest.fixture(autouse=True)
 def _isolate_wnba_cards_context_publish(tmp_path_factory):
     """THE FOURTH INSTANCE, and the first one under `data/` rather than `reports/`.

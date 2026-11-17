@@ -437,6 +437,57 @@ def _wnba_live_box_base_url() -> str:
 	).strip().rstrip("/")
 
 
+def _capture_wnba_live_player_box(date_str: str) -> None:
+	"""One live player-box capture for the date: ask web, store only a non-empty answer. NEVER RAISES.
+
+	Moved out of `_run_live_lens_tick` unchanged (lane wnba-boxscore-polling-per-date)
+	so the per-date skip there is one `if`, and a test can see whether this ran.
+	"""
+	try:
+		from scripts.capture_wnba_live_player_box import fetch as _capture_fetch
+		from scripts.capture_wnba_live_player_box import (
+			artifact_relative_path as _capture_path,
+			summarize as _capture_summarize,
+		)
+		# ALIASED, and that is load-bearing rather than style. `write_json_file`
+		# is imported at module scope. When this body lived inside
+		# `_run_live_lens_tick`, importing it again there bound it as a LOCAL for
+		# the whole enclosing function, so the snapshot write -- which every sport
+		# reaches and which runs BEFORE this for mlb/soccer -- raised
+		# UnboundLocalError.
+		#
+		# MEASURED IN PRODUCTION 2026-08-21 18:49Z, mid-slate:
+		#   latestTick.ok=false, mlb AND soccer both
+		#   "UnboundLocalError: cannot access local variable 'write_json_file'"
+		# No live-lens snapshot was written for ANY sport while two soccer
+		# matches were in play, so every downstream live join read an absent
+		# artifact and correctly reported zero. Kept aliased here too, so the
+		# body can move back without re-learning that.
+		from syndicate.features.shared.refresh_state_store import (
+			data_root as _kv_data_root,
+			write_json_file as _kv_write_json_file,
+		)
+
+		_payload = _capture_fetch(_wnba_live_box_base_url(), date_str)
+		_counts = _capture_summarize(_payload)
+		if _counts["games"] and _counts["players_with_stats"]:
+			_kv_write_json_file(
+				_kv_data_root() / _capture_path(date_str),
+				{"date": date_str, "source": "wnba/api/live_player_boxscore",
+				 "counts": {k: _counts[k] for k in ("games", "players_with_stats")},
+				 "per_game": _counts["per_game"], "payload": _payload},
+			)
+			print(f"[live_lens_loop] WNBA_LIVE_BOX_CAPTURED date={date_str} "
+			      f"games={_counts['games']} players={_counts['players_with_stats']}", flush=True)
+		else:
+			print(f"[live_lens_loop] WNBA_LIVE_BOX_EMPTY date={date_str} "
+			      f"games={_counts['games']} players={_counts['players_with_stats']} "
+			      "-- nothing written", flush=True)
+	except Exception as exc:
+		print(f"[live_lens_loop] WNBA_LIVE_BOX_FAILED date={date_str} "
+		      f"{type(exc).__name__}: {exc}", flush=True)
+
+
 def _is_live_lens_loop_enabled() -> bool:
 	return _env_bool("SYNDICATE_ENABLE_LIVE_LENS_LOOP", default=False)
 
@@ -711,47 +762,32 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 			# which degrades to the pre-phase-4 behaviour and is reported by name
 			# ("producer not wired") rather than as a zero. The capture itself
 			# refuses to store an empty payload, so a quiet slate writes nothing.
+			#
+			# PER-DATE SKIP (lane wnba-boxscore-polling-per-date, 2026-11-17). A
+			# date the WNBA schedule lists NO game on is not asked about: in the
+			# offseason this request was ~1,000-1,160 a day to web, every answer
+			# an empty 199 bytes at 0.7-1.1 s (p50/p90) of a web worker. The
+			# decision is the DATE's (`wnba_slate_verdict`), never the sport's or
+			# the season's, and an UNKNOWN schedule polls exactly as before and
+			# says why -- an unreadable slate must not turn polling off for a
+			# date that has games. Nothing is lost by the skip: the builder below
+			# reads this capture only for the date's games, and there are none.
+			_wnba_slate = None
 			try:
-				from scripts.capture_wnba_live_player_box import fetch as _capture_fetch
-				from scripts.capture_wnba_live_player_box import (
-					artifact_relative_path as _capture_path,
-					summarize as _capture_summarize,
-				)
-				# ALIASED, and that is load-bearing rather than style. `write_json_file`
-				# is already imported at module scope (line 37). Importing it again
-				# HERE binds it as a LOCAL for the whole enclosing function, so the
-				# snapshot write below -- which every sport reaches and which runs
-				# BEFORE this block for mlb/soccer -- raised UnboundLocalError.
-				#
-				# MEASURED IN PRODUCTION 2026-08-21 18:49Z, mid-slate:
-				#   latestTick.ok=false, mlb AND soccer both
-				#   "UnboundLocalError: cannot access local variable 'write_json_file'"
-				# No live-lens snapshot was written for ANY sport while two soccer
-				# matches were in play, so every downstream live join read an absent
-				# artifact and correctly reported zero.
-				from syndicate.features.shared.refresh_state_store import (
-					data_root as _kv_data_root,
-					write_json_file as _kv_write_json_file,
-				)
+				from syndicate.features.wnba.slate_schedule import wnba_slate_verdict as _wnba_slate_verdict
 
-				_payload = _capture_fetch(_wnba_live_box_base_url(), date_str)
-				_counts = _capture_summarize(_payload)
-				if _counts["games"] and _counts["players_with_stats"]:
-					_kv_write_json_file(
-						_kv_data_root() / _capture_path(date_str),
-						{"date": date_str, "source": "wnba/api/live_player_boxscore",
-						 "counts": {k: _counts[k] for k in ("games", "players_with_stats")},
-						 "per_game": _counts["per_game"], "payload": _payload},
-					)
-					print(f"[live_lens_loop] WNBA_LIVE_BOX_CAPTURED date={date_str} "
-					      f"games={_counts['games']} players={_counts['players_with_stats']}", flush=True)
-				else:
-					print(f"[live_lens_loop] WNBA_LIVE_BOX_EMPTY date={date_str} "
-					      f"games={_counts['games']} players={_counts['players_with_stats']} "
-					      "-- nothing written", flush=True)
+				_wnba_slate = _wnba_slate_verdict(date_str)
 			except Exception as exc:
-				print(f"[live_lens_loop] WNBA_LIVE_BOX_FAILED date={date_str} "
-				      f"{type(exc).__name__}: {exc}", flush=True)
+				print(f"[live_lens_loop] WNBA_LIVE_BOX_SLATE_UNKNOWN date={date_str} reason=verdict_failed "
+				      f"{type(exc).__name__}: {exc} -- polling", flush=True)
+			if _wnba_slate is not None and _wnba_slate.skip:
+				print(f"[live_lens_loop] WNBA_LIVE_BOX_SKIPPED date={date_str} {_wnba_slate.log_fields()} "
+				      "-- no request to web", flush=True)
+			elif _wnba_slate is not None and _wnba_slate.unknown:
+				print(f"[live_lens_loop] WNBA_LIVE_BOX_SLATE_UNKNOWN date={date_str} {_wnba_slate.log_fields()} "
+				      "-- polling", flush=True)
+			if _wnba_slate is None or not _wnba_slate.skip:
+				_capture_wnba_live_player_box(date_str)
 		if sport in ("nba", "wnba"):
 			# `#514` Phase B: ATTACK MOMENTUM CAPTURE, basketball's analogue of the
 			# soccer `momentum` block that `poll_soccer_live_state` writes into

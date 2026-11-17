@@ -1123,11 +1123,12 @@ death, never life — do not invert it.
 
 ### wnba-boxscore-polling-per-date — OPEN — opened 2026-11-17 — session efcb7ede-4926-4f3b-9dbd-56c561bae534
 - Goal: Cut the WNBA box-score calls to fleet web (~29% of all web requests over 18 days, 67% today) by deciding per DATE: the live capture and the settlement count skip a date whose season schedule says 0 games; an absent/unreadable schedule polls as before and says so by name; tests stop reaching the live web
-- Files: syndicate/features/wnba/slate_schedule.py (NEW), syndicate/features/shared/live_lens_loop.py (the WNBA live box capture block ONLY), pipeline/intelligence_state.py (_refresh_wnba_boxscores ONLY), tests/conftest.py (one autouse fixture pinning the WNBA box base URLs ONLY), tests/test_wnba_slate_schedule.py (NEW), tests/test_wnba_box_polling_per_date.py (NEW), tests/test_build_wnba_boxscores.py, .syndicate/findings_2026-11-17_wnba_boxscore_polling.md (NEW)
+- Files: syndicate/features/wnba/slate_schedule.py (NEW), syndicate/features/shared/live_lens_loop.py (the WNBA live box capture block ONLY), pipeline/intelligence_state.py (_refresh_wnba_boxscores + its one call in the settlement pass ONLY), tests/conftest.py (one module-level env pin of SYNDICATE_WNBA_LIVE_BOX_BASE_URL ONLY), tests/test_wnba_slate_schedule.py (NEW), tests/test_wnba_box_polling_per_date.py (NEW), tests/test_build_wnba_boxscores.py, .syndicate/findings_2026-11-17_wnba_boxscore_polling.md (NEW), docs/ai_context/todo.md (the #829 entry ONLY)
 - Hypothesis: Two production loops poll web for dates with no WNBA games (live capture ~1,000/day, settlement count ~600/day); the June 03-05 calls are test runs leaking to 127.0.0.1:10000, not a stuck backfill
 - Falsification test: The June count_only requests appear outside test-run windows, or the leak spy finds no test reaching web
 - Verification: Tests: off!=on reachability, 0-game date skipped, game date polled, unknown schedule polls + logs. After a user-approved load: WNBA box-score share of web requests and web recycles per hour, before vs after, in deploys.md
 - Blocked by: none
+- Result (2026-11-17 ~4:15 PM CST): hypothesis CONFIRMED. The June calls are tests: ~76/day in the nightly suite's 08:14-08:58Z shards (ci-checkout) plus daytime test runs; a pytest spy caught test_intelligence_state.py tests reaching final_player_boxscore. The postgame backfill (run_refresh_worker.py:1570) is EXONERATED: it calls ESPN directly with a 30-day window and settles hourly (fleet status: last run 1,602 s ago, 75 dates done). Fix + 24 tests in findings_2026-11-17_wnba_boxscore_polling.md; both reachability tests fail on the pre-change code. todo #829.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

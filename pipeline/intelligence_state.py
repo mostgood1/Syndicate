@@ -5492,8 +5492,18 @@ def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:
 
 
 
-def _refresh_wnba_boxscores(selected_date: str) -> None:
+def _refresh_wnba_boxscores(selected_date: str, *, holds_ungraded_wnba: bool = False) -> None:
     """Produce the WNBA final boxscore artifact for `selected_date`, if needed.
+
+    PER-DATE SKIP FIRST (lane wnba-boxscore-polling-per-date, 2026-11-17). A date
+    the WNBA schedule lists NO game on is not asked about. In the offseason this
+    pass asked web `final_player_boxscore?count_only=1` for today AND yesterday on
+    every run, ~550-770 requests a day, all for slates with nothing on them. The
+    decision is the DATE's (`wnba_slate_verdict`), never the sport's or season's:
+      * an UNKNOWN schedule asks web exactly as before, and says why;
+      * `holds_ungraded_wnba` -- the ledger holds an ungraded WNBA order on this
+        date, which is evidence the slate HAD games -- always asks, and a schedule
+        that disagrees is printed by name rather than believed.
 
     PLACED BESIDE `settle_orders` DELIBERATELY. `wnba_source/data/processed/
     boxscores_<date>.csv` is the only source that can tell WNBA settlement a
@@ -5548,6 +5558,36 @@ def _refresh_wnba_boxscores(selected_date: str) -> None:
         #
         # `count_only` is one scoreboard call and no per-event fetches, so the
         # every-3-minute gate stays cheap.
+        try:
+            from syndicate.features.wnba.slate_schedule import wnba_slate_verdict
+
+            slate = wnba_slate_verdict(selected_date)
+        except Exception as exc:  # noqa: BLE001 -- UNKNOWN: ask web, as before
+            slate = None
+            print(
+                f"[intelligence_state] WNBA_BOXSCORES_SLATE_UNKNOWN date={selected_date}"
+                f" reason=verdict_failed {type(exc).__name__}: {exc} -- asking web",
+                flush=True,
+            )
+        if slate is not None and slate.skip:
+            if not holds_ungraded_wnba:
+                print(
+                    f"[intelligence_state] WNBA_BOXSCORES_COUNT_SKIPPED date={selected_date}"
+                    f" {slate.log_fields()} -- no request to web",
+                    flush=True,
+                )
+                return
+            print(
+                f"[intelligence_state] WNBA_BOXSCORES_SCHEDULE_DISAGREES date={selected_date}"
+                f" {slate.log_fields()} ledger=ungraded_wnba_orders -- asking web",
+                flush=True,
+            )
+        elif slate is not None and slate.unknown:
+            print(
+                f"[intelligence_state] WNBA_BOXSCORES_SLATE_UNKNOWN date={selected_date}"
+                f" {slate.log_fields()} -- asking web",
+                flush=True,
+            )
         base_url = web_base_url()
         try:
             final_games = int(
@@ -8079,8 +8119,13 @@ class IntelligenceStateService:
                     # row. Today and yesterday keep it unconditionally -- a slate
                     # in progress has rows arriving that the ledger cannot know
                     # about yet. `#241`: periodic worker work is never free.
-                    if _settle_date in _dates[:2] or "wnba" in _straggler_sports.get(_settle_date, set()):
-                        _refresh_wnba_boxscores(_settle_date)
+                    #
+                    # `holds_ungraded_wnba` is the ledger's evidence that the slate
+                    # HAD WNBA games; it overrules a schedule that lists none
+                    # (lane wnba-boxscore-polling-per-date).
+                    _holds_wnba = "wnba" in _straggler_sports.get(_settle_date, set())
+                    if _settle_date in _dates[:2] or _holds_wnba:
+                        _refresh_wnba_boxscores(_settle_date, holds_ungraded_wnba=_holds_wnba)
                     settle_orders(_settle_date)
             except Exception as exc:
                 print(f"[intelligence_state] SETTLEMENT_FAILED error={exc}", flush=True)
