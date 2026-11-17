@@ -1,5 +1,44 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#825` — **WNBA QUARTER/HALF RE-GRADE, 2027: re-grade the WNBA's period lines on the 2027 regular season's first three-plus weeks, against the de-vigged book, beside the 2026 grade. Nothing to do before the 2027 season** `[2026-11-17, user "do the WNBA segment re-grade in 2027"; session 69e3a2e5]`
+- **Why.** The user asked for a re-grade of every sport's period lines on 2026-11-16..17. NFL `#752` is on 12-08, NCAAF `#805` and NBA `#818` on 12-07, NCAAB `#763` on 12-08. The WNBA was off-season, and the user chose 2027.
+- **Unlike the NBA, the WNBA board serves its own sim's period probabilities.** NBA periods are served at w = 0 (`#818`). `#820` records that a WNBA h2 flip "changes served h2 probabilities and edges". So a WNBA period grade measures prices the board actually served.
+- **The 2026 grade being re-graded:** `.syndicate/findings_2026-10-02_wnba_lines_props_backtest.md` §2.
+  - Harness: `scripts/backtest_wnba_lines_props.py`, blob `d134467b0f8f`, last changed `09d5795cd`.
+  - Method: as-of re-run, 331 regular-season games, the de-vigged book, game-clustered bootstrap (2,000 reps).
+  - Results, dBrier model - book:
+    - **H1 ML +0.0057 [+0.0004, +0.0105] (loses)**;
+    - H1 spread -0.0001; H1 total +0.0078 [-0.0032, +0.0188];
+    - Q1 and Q4 all straddle 0;
+    - **Q2 total +0.0126 [+0.0042, +0.0213]**, **Q3 total +0.0131 [+0.0046, +0.0211]** (both lose).
+  - Its SERVED arm had only 119 games, because Render's disks were lost. 2027 is the first season whose served artifacts all sit on the fleet disk.
+- **The run, in order:**
+  1. **Pre-register first,** in `.syndicate/findings_<date>_wnba_segment_regrade.md`, committed to main BEFORE any 2027 outcome is read. Include:
+     - the population;
+     - the harness blob (re-run it unchanged, or name every diff);
+     - the predictions, with the 2026 cells above as the priors;
+     - the gates (below).
+  2. **Read what production serves for a WNBA period row at that time** (file:line), as `#818` did for the NBA:
+     - the sim's `score.dist.segments` and any book blend;
+     - `SYNDICATE_WNBA_SIM_H2_INCLUDES_OT` on the fleet (`#820`);
+     - any WNBA profile or blend change since 2026-10-02.
+  3. **Count-only, then grade, once.** PYTHONHASHSEED=0, Idle.
+- **Population.**
+  - 2027 WNBA regular-season games from opening night through the day before the run, with all three of:
+    - (a) a pregame quote on that segment (`captured_at < commence_time`) in the fleet's `wnba_source/tracking/book_quotes/`;
+    - (b) a sim file the board could have served before tip, with mtime strictly before tip (#818's rule: a file written after tip is refused and counted);
+    - (c) a final ESPN linescore.
+  - Segments: h1, h2, q1-q4, as the 2026 grade's ML/spread/total. h2 is settled with OT, per `segment_actuals`.
+  - **Opener plus at least 21 days, else stop.** If the opener was less than 21 days before the run, stop and report, and leave this item open with the date it becomes runnable.
+- **Gates.**
+  - **G1, the verdict of record:** the SERVED period probability vs the de-vigged pregame close, per segment x market, with dBrier and its CI (beats / parity / loses).
+  - **G2:** the as-of re-run arm on the same games, beside 2026's cells. Do H1 ML, Q2 total and Q3 total still lose?
+  - **G3, descriptive:** the sim's mean per quarter against actual, PIT, and OT handling.
+- **What it may change:** nothing by itself. A WNBA `measured_market_skill` entry, a period blend weight, or `#820`'s WNBA flip are each the user's call, with the numbers.
+- **Inputs survive:** `book_quotes` are kept 120 d (floor 60, `artifact_retention.py:221`); `wnba_source/data/processed/` has no retention rule (read 2026-11-17). Re-check at run time.
+- **Siblings:** `#754`, the WNBA 2027 opener's live readings. Read both at the opener.
+- **Scheduled:** one-time task `wnba-segment-regrade-2027`, Mon 2027-06-14 10:00 AM CDT. It refuses by itself if the opener was less than 21 days earlier. A 7-month-ahead task can be lost (an app update wiped the enabled scheduled tasks on 2026-10-28), so **THIS item is the record. If the task is gone, run it by hand.**
+
 ### `#823` — **NFL IN-PLAY GAME CARDS DROP OFF THE GAMES RAIL ABOUT HALF THE TIME: quarter/half lines are fetched every 600 s (`segment_odds_fetch.DEFAULT_LIVE_INTERVAL_SECONDS`, `:324`, the October credit cut) while the in-play overlay keeps only rows seen within 300 s (`book_grid_artifact.py:917`), and each overlay build replaces the last. MNF 11-16: 67 of 136 NFL overlay builds and 100 of 191 minutes (52%) had no fresh quarter/half row; those builds made 0-6 game cards vs 13-30. DECISION OWED (user).** `[2026-11-17, lane nfl-rail-segment-cadence, diagnose only]`
 - **DECISION 2026-11-17 9:5x AM CST: A** (user "A: every lines run"). ON MAIN `c70674e3b` (lane `nfl-live-segment-every-run`): `DEFAULT_LIVE_INTERVAL_SECONDS` drops `"nfl": 600`, so NFL live quarter/half lines are bought on every lines run; `SYNDICATE_NFL_SEGMENT_LIVE_INTERVAL_SECONDS=600` restores the gate; NCAAF unchanged. No fleet layer sets the key (local_production.env, render_env, render.yaml and the running live-odds-worker's environ all checked). 76 tests pass; the reachability test fails under the old default. **NOT LOADED.** It takes effect at the next fleet ff (the fetch is a fresh subprocess, no restart) and only while an NFL game is live: next is TNF Thu 11-19 7:15 PM CST. **Betting change: no** -- NFL quarter/half lines have no live order path (Kalshi KXNFL1Q/1H/2Q are unregistered, so `kalshi_catalogue.segment_for_series` refuses them; on MNF the venue join matched only full-game NFL series); display, overlay and quote capture only. Owed after the load, on TNF: quarter/half capture gaps < 300 s, share of NFL overlay builds with fresh quarter/half rows (MNF 69 of 136), rail polls serving NFL game rows, NFL segment credits per live game-hour (est. ~+430).
 - **Findings:** `.syndicate/findings_2026-11-17_nfl_rail_segment_cadence.md` (mechanism file:line, the 18 capture instants 610-660 s apart, per-build reconstruction, the four builds whose game-card state is known all match, an instrument note on the capped `odds_refresh.stderr.txt`).
