@@ -933,6 +933,14 @@ death, never life — do not invert it.
 - Verification: The findings file carries a dated Central-time block per reading with rates and denominators; each actionable anomaly names its owner lane or a new lane; a daily summary with per-metric trend after the day's last settlement; a published Portfolio Watch page
 - Blocked by: none
 
+### paper-endpoint-request-path — OPEN — opened 2026-11-17 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: /api/portfolio/paper and /portfolio/paper stop doing heavy work in the web request: the date view reads only its own month's archived rows for that date (no whole-shard parse, nothing left in the web worker's parse cache), and the all-time paper record is written by the refresh-worker's settle pass and only read by web; measured on the fleet, a paper GET answers in < 3 s and adds < 150 MB to the web worker, with no WORKER TIMEOUT
+- Files: syndicate/features/shared/execution_ledger.py (ledger_summary + a new ledger_for_date / _summary_of beside it ONLY), syndicate/features/shared/paper_settlement.py (settle_orders' PNL block + new paper all-time read/write helpers ONLY), syndicate/blueprints/intelligence.py (_paper_portfolio_payload ONLY), syndicate/templates/portfolio_paper.html (the all-dates tile line ONLY), tests/test_paper_payload_request_path.py (NEW)
+- Hypothesis: Stated 2026-11-17 ~11:00 AM CST before any change: the paper payload's cost is the two-month full-history read (archived_orders, ~625 MB, cached in the worker) plus re-settling it (settlement_summary x2); reading only the date's rows from its month shard by substring prefilter and reading a worker-written all-time doc cuts the builder to < 2 s and < 150 MB peak increase at nice 19 on the fleet's data
+- Falsification test: The rebuilt builder, profiled on the fleet's data and env at nice 19 for 2026-11-17, takes >= 3 s or raises peak RSS by >= 150 MB over the import baseline; or its date orders / ledger summary differ from the old builder's for the same date (row count, idempotency keys, by_status)
+- Verification: pytest tests/test_paper_payload_request_path.py (equivalence of ledger_for_date vs the old full-history filter on a planted archive incl. re-archived copies and doc-wins; worker writes the paper-only all-time doc; web reads it and degrades to None when absent); an A/B on the fleet data (old vs new builder) for 3 dates; after a web reload, one paper GET timed from the access log with no WORKER TIMEOUT, and the all-time doc's written_at after the refresh-worker loads
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
