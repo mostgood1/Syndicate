@@ -428,11 +428,14 @@ def fetch(base: str, path: str, token: str | None, timeout: float = 60.0) -> tup
 
 LOG_SH = r"""#!/bin/bash
 # $1 = cutoff ISO (lines start with an ISO timestamp). tail bounds the cost.
+# Each role log rotates at 200 MB to <name>.1 (local_production.rotate_running_log). A window that spans a
+# rotation lost its first part on 2026-11-17 (reading 5: live-odds-worker.log began 17:56Z, inside a 50-min
+# window), so the rotated file's tail is read first; the cutoff filter keeps only the window.
 cd ~/syndicate-prod/logs || exit 0
-tail -c 6000000 web.log | grep -a -E 'portfolio|WORKER TIMEOUT' | awk -v c="$1" '$1 >= c'
+{ tail -c 6000000 web.log.1 2>/dev/null; tail -c 6000000 web.log; } | grep -a -E 'portfolio|WORKER TIMEOUT' | awk -v c="$1" '$1 >= c'
 echo '@@WORKERS@@'
 for f in live-odds-worker.log refresh-worker.log; do
-  tail -c 40000000 "$f" | grep -a -E '\[execute_portfolio\] EXECUTED |\[portfolio_commit\] LIVE_PLAN_WRITTEN |\[execution_ledger\] UNRECONCILABLE_ORDER ' | awk -v c="$1" '$1 >= c'
+  { tail -c 40000000 "$f.1" 2>/dev/null; tail -c 40000000 "$f"; } | grep -a -E '\[execute_portfolio\] EXECUTED |\[portfolio_commit\] LIVE_PLAN_WRITTEN |\[execution_ledger\] UNRECONCILABLE_ORDER ' | awk -v c="$1" '$1 >= c'
 done
 """
 

@@ -200,3 +200,85 @@ One pass over every portfolio route, before any probe existed:
   Among them are `c70674e3b` (#823 NFL quarter/half lines every run, recorded at 16:26Z as not
   user-approved) and `3dbe53df0` (#824 college live totals refusal, a betting change of another lane).
   The deploy waits on the user.
+
+## HYPOTHESIS F3 (written 11:25 AM CST, before any log is read for it)
+
+- **Observation (reading 4):** 4 web worker kills today, 15:23:37Z, 16:13:23Z (mine), 16:38:10Z and 16:49:49Z.
+  None was preceded by `WEB_WORKER_MEMORY_RECYCLE` / `WEB_WORKER_DRAINED` for its pid. Each of the 6 kills from
+  10-31 to 11-11 was.
+- **Hypothesis:** a single long request on the worker stops the gthread main loop's heartbeat for 60 s. The
+  candidate is `/api/intelligence/query`: 44,950 ms, 11.5 MB at 16:08:42Z, and `board_read` alone 17.7 s.
+- **Prediction:** in the 120 s before each silent kill, the web log shows the start-side lines of a long request
+  (`QUERY_STAGE_MS` / `INTEL_TRACE` / a `compute in request path` burst) with no matching access line before the kill.
+- **Falsified if:** before at least 2 of the 3 kills not caused by me, there is no such request, or there is
+  only a stream of short requests.
+
+## Reading 4 — Tue 11-17 11:22 AM CST (17:22Z), window 50 min
+
+- **Endpoints:** all 7 read 200, inside budget.
+  - `live` 2.20 s, the slowest yet against its 3 s budget (0.80 / 0.33 / 1.48 s at readings 1-3); `/portfolio` 1.20 s.
+  - Web log: 0 5xx on 10 portfolio requests, 0 from a browser.
+- **Plan:** 29.3 min old, written 16:53Z; earlier plans were about 15 min apart.
+  - Funnel: board 4,818 -> suggested 39 -> sized 25 -> positions 16. Refusals: 11 beyond_max_positions,
+    9 below_min_stake, 2 zero_kelly, 1 below_min_ev_after_fair_noise.
+  - Live plans 16:54Z: kalshi 893 -> 24 placeable -> 5 (829 of 893, 93%, below the net floor);
+    polymarket 428 -> 10 -> 7.
+- **Execution, 50 min:** 12 live ticks, 1 placed (polymarket), 0 failed. Refusals: 52 `outside_price_band`,
+  2 `already_held_other_slate`.
+- **Orders today:** 26 (25 filled, 1 resting). Cap use: kalshi 12.5%, polymarket 11.3%.
+- **Unchanged anomalies:**
+  - the resting maker-pilot order (670 min);
+  - the late NHL bet (14.7 h);
+  - unreconciled `f8b62e6a`;
+  - **2 loads still unclassified** in the betting-change register (16:17Z NFL rebuild, 16:24Z #814 ff). Their
+    lanes have not classified them in the hour since.
+- **NEW: 2 more web worker kills, 16:38:10Z (pid 4032063) and 16:49:49Z (pid 4035235).** Neither was mine.
+
+### F3 tested — hypothesis FALSIFIED; cause still open
+
+- **Base rate:** gunicorn WORKER TIMEOUTs per day were 0, 0, 0, 0, 0 on 11-12..11-16 (~1,550 worker boots).
+  On 11-17 there are 4, all between 15:23:37Z and 16:49:49Z (16:13Z was my paper GET), and **0 in the
+  ~35 min since**. All 4 are "silent while alive": none has a recycle or drain line for its pid.
+- **Prediction tested:** a long request before each kill. In the 120 s before the 15:23, 16:38 and 16:49
+  kills, the only requests are short:
+  - `/wnba/api/live_player_boxscore`, 4.6–7.8 s, with its `compute in request path` ESPN fetches;
+  - `/api/ops/version`, a 401 in under 0.7 s;
+  - one browser `/syndicate` page load.
+  - No `QUERY_STAGE_MS` or intelligence query is in any window. **Falsified.**
+- **A correlation that does not discriminate:** the killed pid logged `COMBINED_BOARD_OVERLAY_WARMER_STARTED`
+  67 s before the 16:38 kill and 74 s before the 16:49 kill. But a warmer starts on nearly every worker (192
+  starts against 193 boots on 11-17; 154 / 154 on 11-16, with 0 kills). The 15:23 worker had started its
+  warmer 31 min earlier.
+- **Status:** cause unknown. Not actionable yet. The probe counts kills every reading; a recurrence opens a lane.
+- **Lead:** what changed on web on 11-17 before 15:23Z. The fleet's ffs today were 15:25:07Z, 16:24Z and 16:27Z,
+  all after the first kill, so their code is not a candidate for the 15:23 kill.
+
+## Reading 5 — Tue 11-17 12:13 PM CST (18:13Z), window 52 min — and an instrument fix
+
+- **INSTRUMENT FIX (probe, this reading):** both worker logs rotated inside the window.
+  - `refresh-worker.log` began at 17:46:09Z and `live-odds-worker.log` at 17:56:08Z. Rotation is at 200 MB to
+    `<name>.1`, by `local_production.rotate_running_log`.
+  - The probe read only the live file, so the first take of this reading counted **3 live ticks per venue**
+    instead of **8**.
+  - The probe now reads the tail of `<name>.1` first, and the cutoff keeps only the window. The two truncated
+    takes are set aside in `C:\tmp\pfmon\readings\superseded.jsonl`.
+  - Readings 1-4 did not span a rotation: the previous ones were 11-16 ~17:38Z and ~11:00Z.
+- **Endpoints:** all 7 read 200, the fastest of the day (`live` 0.31 s, `live?on=all` 0.34 s, `/portfolio` 0.28 s).
+  - Web: **0 worker kills in the window**; the last was 16:49:49Z, now 84 min of none. 0 5xx; 0 browser requests.
+- **Plan (2.7 min old):**
+  - Funnel: board 4,539 -> **suggested 101** (39-42 earlier today) -> sized 25 -> **positions 11** (16 earlier).
+  - Refusals: **beyond_max_positions 72**, below_min_stake 14, `in_play_market_fair` 2 (new reason today),
+    zero_kelly 1, below_min_ev_after_fair_noise 1.
+  - Sim edge on 85 of 101 rows (84%). Staked share of the ceiling 12.7% (23% earlier).
+- **Live plans 18:11Z:**
+  - kalshi: 937 -> 25 placeable -> 7 positions (871 of 937, 93%, below the net floor).
+  - polymarket: 543 -> 18 -> 8 (413 of 543, 76%, below the net floor; 61% earlier).
+- **Execution, 52 min:** 16 live ticks; 5 placed (kalshi 3, polymarket 2); 0 failed.
+  83 refused `outside_price_band`.
+- **Orders today:** 31 (30 filled, 1 resting). Cap use: kalshi 13.8%, polymarket 12.3%.
+- **Worker state** was 304 s old at the first take (limit 900); 48-85 s earlier. Watching.
+- **Anomalies (unchanged):** unreconciled `f8b62e6a`; the resting maker-pilot order (721 min); the late NHL bet
+  (15.6 h); **2 unclassified loads, now ~2 h old.**
+  - If they are still unclassified at the next reading, I will record the 16:24Z #814 refusal as `yes`,
+    pending the refresh-worker load. That is fail-closed: the count holds at 0 until it loads. The 16:17Z NFL
+    rebuild stays the owner's call.
