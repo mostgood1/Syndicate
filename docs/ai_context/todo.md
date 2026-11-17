@@ -1,5 +1,24 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#827` — **THE BOARD QUERY STILL SENT 7.6 MB NOTHING READS. `drop_row_diagnostics` never stripped `top_live_opportunities` (not in `_DIAGNOSTIC_ROW_LISTS`), and `rationale` (4.2 MB over the two top lists) has no reader in any sender of the flag. Both now go: on the fleet's recorded 11-16 response the page's `row_refs` wire falls 33,144,917 -> 25,559,058 B raw, 5,689,938 -> 4,575,384 B gzip-1** `[2026-11-17, lane board-query-diag-strip; the two 11-17 leads from board-query-row-refs]` — ON MAIN `25fc2e4f0`; NOT LOADED (a web reload is the user's call)
+- **Survey before the change, every sender of the flag:**
+  - the senders are `intelligence.html` (+ the five scripts it loads), `build_cheat_sheets.py` (+ `cheat_sheets.py`, `cheat_sheet_record.py`), the rail probe (+ runner, grader) and `verify_layer2_row_parity.py`;
+  - 0 reads of either name in any access form, and 0 generic row consumers;
+  - `watch_clamp_trigger.py` walks generically but never sends the flag;
+  - the cheat sheets' `book_prices` / `fair_method` reads are on `/api/board/layer2-shortlist` rows, not on this payload.
+- **The change:**
+  - `top_live_opportunities` joins `_DIAGNOSTIC_ROW_LISTS`, and `rationale` joins `_UNCONSUMED_ROW_DIAGNOSTICS`, both under the EXISTING flag;
+  - the page's `rehydrateAliases` restores top_live's row aliases;
+  - `row_refs` is unchanged and still lossless.
+- **Equivalence, full response:**
+  - Python decode is byte-identical;
+  - the template's real `rehydrateAliases` under node: on == off with `row_refs`, and every row of the four lists differs only by the declared drops, with 6,528 / 6,528 top_live aliases restored (negative control: HEAD's template misses all 6,528).
+- **Server path** (drop -> encode -> version -> dumps -> gzip): 3.6-4.4 s -> 3.3-4.0 s. The drop costs ~+130 ms.
+- **Tests:** `tests/test_intelligence_query_diag_strip.py` (12; 6 fail on the old code), including a sender scan that fails on any new unsurveyed sender. On the landed code: 157 passed in the 7 payload/template/embed files, 333 in `test_intelligence` + `test_ask_the_syndicate`, and 21 of 22 `tests/js` (the CRLF-only badge lead; it passes on LF).
+- **Load:** an ff of `~/Syndicate` from `5db26434e` (loaded 18:58:45Z) to `25fc2e4f0` + `reload-web`. Betting change: no. That ff carries everything on main after `5db26434e`: list the ride-alongs at load time.
+- **Owed after a load:** the served Content-Length (~5.7 -> ~4.6 MB gzipped), and `_dropped_row_fields` including `rationale`.
+- Findings: `.syndicate/findings_2026-11-17_board_query_diag_strip.md`.
+
 ### `#826` — **THE BOARD QUERY SENT EACH OPPORTUNITY ROW UP TO FOUR TIMES. The page's `/api/intelligence/query` was 80.3 MB raw / 14.4 MB gzipped / 78 s on the fleet 11-16 7:48 PM CST: `ranked_all`, `board_contract.cards`, `top_opportunities` and `top_live_opportunities` carry the same 6,295 rows by `pick_id`. Opt-in `row_refs` sends them once, losslessly: 33.1 MB / 5.7 MB** `[2026-11-17, lane board-query-row-refs; layer2-rail-monitor I-2, user "start the board query de-dup session"]` — ON MAIN `5db26434e`; **LOADED 2026-11-17 18:58:45Z** (user "Load it" + "Carry both"; deploys.md 18:58:45Z, BC-032 no)
 - **Measured on the fleet after the load:**
   - the page's query 11,214,708 -> 4,320,530 B gzipped;
