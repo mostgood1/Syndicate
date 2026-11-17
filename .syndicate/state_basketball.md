@@ -1233,6 +1233,17 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
       (−0.126 vs league, SE 0.192, not proven).
   - Full FITs fit_5bA / fit_5bB COMPLETE 2026-10-23 (109/109 each, 0 errors), NOT YET GRADED (gates pre-registered
     ce11b4e8). NOT enabled.
+- **IN 2026-27 PRODUCTION THE GAME MODEL NEVER REACHES THE RAW, so the "points-derived ratings" premise above does
+  not hold** `[verified 2026-11-16 7:40 PM CST, lane nba-margin-raw-zero, todo #821]`:
+  - The job build reads WNBA's names `totals`/`spread_margin` (`basketball_props_smart_sim.py:5795-5796`). NBA
+    `predictions_<D>.csv` carries `pred_total`/`pred_margin` (41/41 fleet files).
+  - Both teams therefore get `baseline_off_rating` 110.6, and the raw is 110.6 × pace plus the outs/b2b adjustments.
+    That holds on 261/261 fleet NBA sims 10-03..11-16; the WNBA control is 15/15 fed.
+  - `model_margin_raw` is 0.0 whenever outs and b2b are equal (72 of 192 graded; 61% of sims in the week of 11-09,
+    as outs hit the cap of 5).
+  - Served anchored total runs +3.42 low (actual − anchored, 192 games). Feeding the game model with the outs
+    penalties still on is the worst arm.
+  - Nothing changed. F0/F1 is the user's call: `.syndicate/findings_2026-11-16_nba_margin_raw_zero.md`.
 ## [basketball-props-refresh-off-vendor] BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verified 2026-10-14, lanes nba-source-cli-native + basketball-games-history-freshness]`
 
 - **Off vendor and on the fleet** (each A/B'd on production data, 0 differences unless noted):
