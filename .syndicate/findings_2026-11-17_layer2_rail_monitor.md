@@ -220,3 +220,38 @@ after.
 - `.claude/hooks`, `check_lane_invariants.py`, `fleet_secrets_backup.py`, `fleet_env_snapshot.py`:
   tooling, not imported by any running role.
 - **No load until both answers are in.**
+
+- **Ride-along answer, `2148f99cb` (paper-endpoint-request-path, owner session 69d80317 =
+  local_d7643dac, ~12:50 PM CST): "(a) Safe as a ride-along".**
+  - Before the worker's first write, `read_paper_all_time()` returns None and the template prints no
+    all-dates line: no error and no zero.
+  - On the fleet's data (web worker environ, nice 19, read-only), the old and new builders gave
+    identical paper orders, idempotency keys, ledger summary and date settlement for 11-17, 11-16 and
+    10-20. New: 0.5-0.7 s warm, 105-137 MB peak. Old: 5-13 s, 769-1,052 MB.
+  - Worker side, at the next refresh-worker restart: `settle_orders()` writes
+    `reports/intelligence/paper_settlement_all_time.json` (try/except, `PAPER_ALL_TIME_WRITTEN` /
+    `_FAILED`). No restart is needed for this load.
+  - Display only. **The owner asks that the deploy record note that `2148f99cb` reached web**; it
+    will time one `/portfolio/paper` GET afterwards.
+- **Still waiting:** the user's decision on `ac2cbc2fc` (read at `up`, not at `reload-web`, per both
+  owners), and local_c787e775's answer.
+- **Ride-along answer, `ac2cbc2fc` (local_c787e775, 18:39Z):** it is not loading render-config steps 1+2
+  and has no user go either. Don't wait for it. Facts it checked:
+  - **What the ff carries:** `5db26434e` contains step 1 (`ac2cbc2fc`) but not step 2 (`cc90fb653`). An
+    exact-SHA ff cannot leave step 1 out.
+  - **What step 1 changes:** only `scripts/local_production.py`, `scripts/fleet_role_spec.json`,
+    `scripts/fleet_env_snapshot.py`, `scripts/fleet_secrets_backup.py`, and tests. No web worker
+    imports any of them.
+  - **`reload-web` does not run the new env path:** `cmd_reload_web` (`local_production.py:2486-2550`)
+    only HUPs the gunicorn master.
+  - **What would run step-1 code after the ff:**
+    - any `local_production.py` CLI (`status`, `env` incl. preflight's env reads, `doctor`);
+    - the nightly 09:15Z data-backup (its secrets step reads `fleet_env/`);
+    - `ci-run`;
+    - the next `up` (incl. a reboot or WSL-update restart).
+  - **The data is in place:** `fleet_env/` is on the fleet disk, the same as `render_env/` (88 / 182 /
+    148 keys, mode 600). The old and new launcher build identical env (0 keys differ, both state modes).
+  - **New behaviour:** `up` refuses a role with no `fleet_env/<role>.json`. The files exist, so it has
+    no effect today. No betting change.
+  - Whether step 1 rides along is the user's call (the user said "Steps 1+2, load later"). Asked in
+    the next-step box ~12:45 PM CST.
