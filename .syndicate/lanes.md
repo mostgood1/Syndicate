@@ -1096,6 +1096,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_operator_fill_from_venue.py (fields set from the view; outcome/pnl/settled untouched; pre_operator_fill kept; refusals for not-live / not-submitted / ungraded / identity mismatch / no fill / absurd fill / no note); then one run on the fleet: the row reads status=filled contracts=4, /api/portfolio/live unreconciled == 0, and no UNRECONCILABLE_ORDER line for f8b62e6a after the run
 - Blocked by: none
 
+### live-bet-timing-by-game-shape — OPEN — opened 2026-11-17 — session b1d2088f-b4a3-474a-99c8-8fd14e19d2c2
+- Goal: Answer, per sport (NBA, NCAAB, WNCAAB, NFL, NCAAF, NHL; MLB and soccer where the data allows), whether there are game phases / shapes / momentum states where live totals, spreads or moneylines are better to bet: (A) where our live flags beat their price (hit - fair, game-clustered) and (B) where the live market itself is biased against finals -- each by phase of regulation, margin, scoring pace vs the line, and the scoring run just before; READ-ONLY, findings file + a durable script, nothing loaded
+- Files: scripts/live_bet_timing_study.py (NEW), .syndicate/findings_2026-11-17_live_bet_timing.md (NEW)
+- Hypothesis: H1 (phase): flags in the last quarter of regulation beat their price more than flags in the first half (NCAAB 11-16 read: late flags 0.74/0.68). H2 (momentum): the live market OVER-reacts to scoring runs -- after a run, betting AGAINST the run (spread/ML on the team run on; under after a hot scoring window) beats the market. H3 (shape): in lopsided games live totals land under the market (basketball: blowout pace drop).
+- Falsification test: Each H is false for a sport x market if its hit - fair (A) or final-minus-market residual (B) has a 90% game-clustered CI containing 0 or the opposite sign; any cut with fewer than 30 games is reported as INSUFFICIENT, never as support. Multiple cuts: a single bucket clearing its CI is a CANDIDATE to pre-register forward, not a finding.
+- Verification: Findings file tables per sport x market x cut with n games, hit vs fair / residual and 90% CI, written from scripts/live_bet_timing_study.py output on the fleet ledgers joined to ESPN finals and play wallclocks; dates actually covered stated per sport
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
