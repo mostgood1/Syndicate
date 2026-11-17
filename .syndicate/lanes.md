@@ -986,6 +986,14 @@ death, never life — do not invert it.
 - Verification: Targeted pytest of the new and touched test files; a read-only fleet run of 'local_production.py env --unmask' at origin/main and at the lane commit, compared per key by sha256 (values never printed), 0 differing keys for all 3 roles; a source test that fails if any non-test file reads a RENDER* marker except through service_identity.
 - Blocked by: none
 
+### nba-f1-switch-on — OPEN — opened 2026-11-17 — session b44f64ce-a648-4698-9792-51714c8aaecc
+- Goal: todo #821: F1 ON with the outs penalties OFF on the fleet (user 2026-11-17 'On, with outs off'): ff to 92ae7490a (carrying #824 3dbe53df0, user 'Carry it along'), nba_sim_total_inputs.json gains feed_game_model true + skip_outs_penalties true, and the first post-flip NBA pregame sim reads game_model_fed true with game_model_read [pred_total + pred_margin] and skip_outs_penalties true; the keep/revert grade is pre-registered on main before the flip.
+- Files: .syndicate/findings_2026-11-16_nba_margin_raw_zero.md (the F1 switch-on section only), docs/ai_context/todo.md (#821 section only), .syndicate/state_basketball.md (one bullet in [nba-sim-totals-and-strength] only)
+- Hypothesis: n/a (a user-decided switch-on; the effect is graded by the pre-registered rule)
+- Falsification test: The load fails if the first NBA sim written after the flip does not carry game_model_fed true + skip_outs_penalties true, or its raw margin sits on the outs/b2b rule.
+- Verification: deploys.md: ff MET (head 92ae7490a, pids unchanged), switch file read back, first post-flip NBA sim fields as above; BC rows for F1 (yes) and #824 (yes, pending refresh-worker).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
