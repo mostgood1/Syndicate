@@ -849,6 +849,7 @@ death, never life — do not invert it.
 - Moved: `closed-lane-archive-20261117-0240`. Table: .syndicate/log/2026-11-17.md.
 
 ### ncaaf-sim-history-order-dedupe — OPEN — opened 2026-11-17 — session 386d4115-6e7b-47e3-9ff7-be3914d851cb
+- STATUS 2026-11-17 15:30Z (9:30 AM CST): **FIX BUILT AND TESTED, NOT PUSHED** (user "Yes, fix it here"; a push needs the user's OK). `archive_sim_write` now compares the CSV rows as a sorted list of canonical strings (`_row_multiset`). Tests: `tests/test_football_sim_history.py` 16/16 (+4 new; on the old ordered compare the two order tests FAIL, the guards pass), `tests/test_ncaaf_segment_skill.py` 37/37, both at Idle. Read-only on the fleet: the fixed compare calls the two kept wk12 copies equal (old compare: not equal). Committed in session 386d4115's worktree only. Loading needs only a fleet ff (the generator is a subprocess); the next same-week run then logs `sim_history_kept=unchanged`.
 - Goal: todo #807 follow-up: archive_sim_write treats a rewrite whose CSV rows are the same set in a different order as unchanged (no new kept pair), while a real row change is still kept. Done = on main with a shuffled-rows test, and on the fleet the next same-content NCAAF rewrite logs sim_history_kept=unchanged.
 - Files: syndicate/features/shared/football_segment_distributions.py, tests/test_football_sim_history.py
 - Hypothesis: n/a
