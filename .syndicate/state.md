@@ -656,6 +656,7 @@ once this index exists: re-splitting would orphan the parts.
 | [mlb-traditional-doubleheader-join] | A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED PREGAME; THE IN-PLAY FIX I | `state_mlb.md` |
 | [mlb-asof-backtest] | THE MAY–JULY MLB ENGINE BEATS THE DE-VIGGED BOOK IN 0 OF 23 MARKETS (10 WORSE); MOSTLY A LEVEL ERROR, LED BY S | `state_mlb.md` |
 | [mlb-postponed-grading] | A POSTPONED MLB GAME READS abstractGameState "Final", AND A RESCHEDULED gamePk's feed/live IS THE NEW GAME `[v | `state_mlb.md` |
+| [mlb-live-mc-batting-pitcher] | MLB LIVE MC PUTS A PULLED STARTER BACK ON THE MOUND WHEN HIS TEAM BATS (41% of live ticks, +0.069 runs total bias); FIX ON MAIN, DEFAULT OFF, NOT DEPLOYED `[verified 2026-11-16/17, lane mlb-live-mc-batting-pitcher, todo #819]` | `state_mlb.md` |
 | [scheduled-model-evaluation] | MODEL EVALUATION IS SCHEDULED NOW -- a daily Render cron grades the PRICED population per sport x market x seg | `state_model.md` |
 | [settlement-autorun-live-settles-zero] | THE EVALUATION-SETTLEMENT AUTORUN WAS LIVE ALL ALONG AND SETTLED ZERO — the switch was never the blocker, the  | `state_model.md` |
 | [ledger-and-primary-tree] | — MEASURED 2026-09-02, this machine | `state_model.md` |
