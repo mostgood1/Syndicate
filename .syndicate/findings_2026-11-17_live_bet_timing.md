@@ -402,7 +402,7 @@ their falsification were written into the lane (`9326ac378`) before any grading.
 - **Run:** `scripts/live_bet_timing_study.py` (blob `25543aebf51e`), once per sport on the fleet:
   `--from 2026-11-18 --to 2026-12-01 --cache /mnt/c/tmp/livetiming_fwd/tl --json /mnt/c/tmp/livetiming_fwd/<sport>.json`.
   Then `scripts/score_live_bet_timing_forward.py --dir /mnt/c/tmp/livetiming_fwd` (this commit) prints every cell and verdict.
-  Scheduled task `live-bet-timing-forward-830`, **Tue 2026-12-02 10:00 AM CST**.
+  Scheduled task `live-bet-timing-forward-830`, **Wed 2026-12-02 10:00 AM CST**.
 - **Every cell is FRESH-quote** (`main_fresh`: the book had seen the current score and the quote was <= 60 s old),
   game-clustered, with a 90% CI. **< 30 games = INSUFFICIENT.** The scorer fixes the cells and rules:
 

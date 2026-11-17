@@ -172,7 +172,7 @@ known (calibrated under flags 23-40, rail monitor) and is reported DESCRIPTIVELY
 - **Window:** NCAAB slates 2026-11-17 .. 2026-11-23 (7 nights). WNCAAB is graded only on slates where its phase is
   calibrated (its gate held it on 11-17); descriptive.
 - **Script:** `scripts/grade_college_total_calibration.py --league ncaab --from 2026-11-17 --to 2026-11-23` (this commit),
-  run on the fleet under refresh-worker's environ on **Mon 2026-11-24 at or after 10:00 AM CST** (scheduled task
+  run on the fleet under refresh-worker's environ on **Tue 2026-11-24 at or after 10:00 AM CST** (scheduled task
   `college-total-cal-grade-816`). Per slate: the calibration IN FORCE for that slate (newest fit dated before it)
   applied to every live full-game total row of the slate; the spread-only counterfactual fitted on the same trailing
   window; each game's rows weigh 1; SE game-clustered, night-clustered printed beside it.

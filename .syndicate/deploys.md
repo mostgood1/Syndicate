@@ -61266,3 +61266,6 @@ Lane `render-config-retirement` (session 267d8859).
 - **Workers untouched:** refresh-worker 28948 and live-odds-worker 28949 were both alive at ~21:58Z.
 - **Record:** BC-038 (no). Claim web released at ~21:59:40Z.
 - **Not mine to verify:** `/api/portfolio/paper` answers 401 and `/portfolio/paper` answers 302 to the login page without a sign-in. I did not sign in. Lane `paper-page-retirement` verified the 410 and the redirect, signed in, at 21:56Z (entry above).
+
+## 2026-11-17 23:1xZ (5:1x PM CST) -- STAMP CORRECTION (no deploy), lane `ncaab-total-overprojection`: the #816 7-day grade task `college-total-cal-grade-816` runs **Tue** 2026-11-24 10:00 AM CST, not Mon (the 19:56:39Z entry says Mon). The date and task are unchanged.
+- betting change: no
