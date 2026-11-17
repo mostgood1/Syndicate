@@ -60839,3 +60839,20 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Props join LOADED (no action of mine):** refresh-worker pid 4027303 booted ~15:47:45Z (etimes 2190 s at 16:24:15Z), after the peer ff to `17ff69398` at 15:25:07Z (reflog), which carries `884a2928a`. So the board's live props join has refused out players' props since ~9:48 AM CST. Not yet measured on a live out player (none since).
 - **verify (OWED):** the first `portfolio_commit` refusal counts after refresh-worker's next restart carry `key_player_out` only when a live game has a key exit; and a real mid-game exit per sport (the lane goal).
 - **claims:** released after this entry.
+
+## 2026-11-17 16:26:58Z (10:26 AM CST) -- DEPLOY (ff only, no restart): fleet `c4d35b515` -> `8aea4fe7e`, todo #821 F0, the NBA game-model-fed audit (lane `nba-game-model-fed-audit`, user "Load it now") -- **ff MET; the artifact reading (first NBA pregame sim written after the ff carries `market_anchor.game_model_fed: false`) is OWED**
+- betting change: no
+- **decision:** the user answered "Load it now" to "Load F0 onto the fleet now? A fast-forward also carries the unloaded live-player-exit-gate bet refusal (c4d35b515)" (11-17 ~10:15 AM CST).
+- **sequencing:** lane `live-player-exit-gate` was deploying `c4d35b515` itself when I took my claim (its refresh-worker + live-odds-worker claims, preflight HOLD). I waited for its ff (16:24:06Z) and its claim release (~16:25Z), so its change was loaded by its owner and this ff carries only F0.
+- **ride-along (c4d35b515..8aea4fe7e), code only:** `syndicate/features/shared/basketball_props_smart_sim.py` (F0: same read, plus the audit, the `market_anchor` fields and the unfed print) and `scripts/basketball_sim_input_checklist.py` (Level 4). The rest is ledger and tests. `vendor/` is empty.
+  - **Not in this ff, on purpose:** `f252a5969`, which allowlists `SMART_SIM_GAME_MODEL_UNFED` in `refresh_odds_sources._STEP_STDOUT_MARKERS`. Between it and F0 sit `c70674e3b` (#823 option A, NFL quarter/half every lines run: credits and in-play prices), `0a60d9e0a` and `39d144d7c`, which the user had not approved. Until a later ff passes `f252a5969`, the unfed line is printed in the NBA props child and blanked, so `unfed_marker_lines` stays 0. The artifact field is the reading.
+- **gates:** claim web 16:19:36Z (holder `nba-game-model-fed-audit`, rc 0). Baseline 16:26:10Z (`C:\tmp\nba_margin0\f0_read.py`): head c4d35b515; refresh-worker pid 4027303; live-odds-worker pid 3777750; NBA sims carrying `game_model_fed` 0 of 5 (today's); unfed marker lines 0. Preflight `--service web --target-commit 8aea4fe7e --target fleet` from worktree strange-nobel-c1a406 at origin/main `6c4f16415`, with `--expect` and a baseline for every field: **CLEAR** 16:26:31Z (0 processes enumerated). Loaded commits per role at that moment: web and refresh-worker 17ff6939, live-odds-worker d7c183d8.
+- **ff:** `git fetch github main` then `git merge --ff-only 8aea4fe7e4137ad337b81b5c6362246bc5418199` at **16:26:58.670Z**. No TERM.
+  - The NBA pregame smart-sim runs inside `scripts/refresh_nba_oddsapi_props.py`, a fresh child of each odds job, so its next run loads F0 from disk.
+  - Role processes that already imported `basketball_props_smart_sim` keep the old copy until they restart. F0 does not change any value, so that mix is harmless.
+- **expect / measured:**
+  - `fleet_checkout_head` c4d35b515 -> 8aea4fe7e: **MET** (read 16:27:11Z; F0 tokens on disk 4).
+  - `refresh_worker_pid` 4027303 -> 4027303: **MET**. `live_odds_worker_pid` 3777750 -> 3777750: **MET**.
+  - `nba_sims_with_game_model_fed` 0 -> at least 1 `false` with `game_model_columns` [pred_total, pred_margin], on the first NBA pregame sim written after 16:26:58Z: **OWED**. Watcher `C:\tmp\nba_margin0\f0_watch_sim.sh` (read-only, 120 s, 10 h cap) prints the reading.
+  - `unfed_marker_lines` 0 -> 0: expected, since the allowlist is not in this ff.
+- **claim:** web released after this entry.
