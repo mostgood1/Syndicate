@@ -1255,10 +1255,12 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     a `SMART_SIM_GAME_MODEL_UNFED` print, checklist Level 4) is LOADED: fleet ff to `8aea4fe7e` 2026-11-17 16:26:58Z,
     no restart; the first 2 post-load NBA sims read `game_model_fed: false` `[verified 2026-11-17 16:51Z]`.
   - F1 (`"feed_game_model": true` in `nba_sim_total_inputs.json` makes the job build read `pred_total`/`pred_margin`)
-    is on main `92ae7490a`, DEFAULT OFF, not loaded, not switched on. A replay through the real quarter model
-    reproduces production exactly and gives anchored total MAE 14.504 today vs 14.811 with F1 alone and 14.387 with F1 +
-    outs off (no arm clears 95%). Switching it on is the user's call:
-    `.syndicate/findings_2026-11-16_nba_margin_raw_zero.md`.
+    is ON on the fleet WITH THE OUTS PENALTIES OFF since 2026-11-17 17:35:08Z (user "On, with outs off"; switch file
+    `{skip_def_subtraction, skip_outs_penalties, feed_game_model}` all true; code `92ae7490a`). The first 2 post-flip NBA
+    sims read `game_model_fed: true` with raw margins off the outs/b2b rule `[verified 2026-11-17 17:45Z]`. Replay prior
+    for this arm: anchored total MAE 14.387 vs 14.504 (−0.118 [−0.568, +0.324]). The keep/revert grade is pre-registered
+    (first 150 graded post-flip games, ~12-06): `.syndicate/findings_2026-11-16_nba_margin_raw_zero.md`. It reaches only
+    sims built after the flip; props move too (outs-off removes the player-sim pace drag).
 ## [basketball-props-refresh-off-vendor] BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verified 2026-10-14, lanes nba-source-cli-native + basketball-games-history-freshness]`
 
 - **Off vendor and on the fleet** (each A/B'd on production data, 0 differences unless noted):

@@ -60964,3 +60964,14 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The unfed allowlist (`f252a5969`) is now on the fleet: an NBA run that is still unfed would print `STEP_MARKER ... SMART_SIM_GAME_MODEL_UNFED`. With F1 on, 0 are expected.
 - **revert** (one step, no restart): rewrite the file to `{"skip_def_subtraction": true}`. Only sims built afterwards revert.
 - **claim:** web released after this entry.
+
+## 2026-11-17 17:45:20Z (11:45 AM CST) -- READING (no deploy): the owed first-post-flip NBA sim after the 17:35:08Z F1 + outs-off flip (todo #821, lane `nba-f1-switch-on`) -- **MET: the first 2 NBA pregame sims built after the flip read `game_model_fed: true`, `game_model_read: [pred_total, pred_margin]`, `skip_outs_penalties: true`, raw margins off the outs/b2b rule**
+- betting change: no
+- **reading** (`C:\tmp\nba_margin0\f0_read.py 2026-11-17T17:35:08Z`, fired by watcher `f1_watch_sim.sh`): fleet head `92ae7490a`; refresh-worker pid 4049350 and live-odds-worker pid 3777750, both unchanged.
+  - `smart_sim_2026-11-17_MIN_POR.json`, written 17:43:20Z: raw margin **3.402** (16:45Z, before the flip: 1.0), raw total 224.98, anchored margin 1.596, anchored total 226.05.
+  - `smart_sim_2026-11-17_TOR_NYK.json`, written 17:43:54Z: raw margin **−7.890** (before: −0.5), raw total 216.18, anchored margin −4.192, anchored total 215.01.
+  - Both carry `nba_total_inputs {skip_def_subtraction: true, skip_outs_penalties: true}`.
+  - `SMART_SIM_GAME_MODEL_UNFED` marker lines after the flip: 0, as expected with F1 on.
+- **anchor arithmetic check** (`C:\tmp\nba_margin0\f1_anchor_check.py`): each sim's served anchored margin and total recompute exactly from its own recorded raw values, market lines (`props_snapshot_consensus`: MIN_POR 226.5 / −1.5, TOR_NYK 214.5 / +4.0) and weights 0.7 / 0.95. TOR_NYK's anchored margin moved −2.40 -> −4.19 mostly because its consensus spread moved to +4.0; the raw's 0.05 weight accounts for about −0.37 of it.
+- **expect / measured** (vs the 17:34:59Z entry): `first_post_flip_nba_sim` -> `game_model_fed: true` + `game_model_read: [pred_total, pred_margin]` + `skip_outs_penalties: true` + raw margin off the rule: **MET** (2 of 2).
+- **Owed:** the pre-registered keep/revert grade (first 150 graded post-flip games, around 12-06; findings § "F1 switched ON with the outs penalties OFF"). The props read and the re-fit of the calibrated layers are owed separately. #824 goes live at the next refresh-worker restart.
