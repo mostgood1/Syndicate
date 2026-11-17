@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#829` — **WNBA BOX-SCORE POLLS ASKED FLEET WEB ABOUT DATES WITH NO WNBA GAMES: 29,449 of 100,005 web requests (29.4%) 10-31..11-17, 1,614 of 2,408 (67.0%) on 11-17. Now decided PER DATE from `schedule_<YYYY>.csv`; an unknown schedule polls and says why. The June 03-05 calls were TESTS reaching the fleet, not a stuck backfill** `[2026-11-17, lane wnba-boxscore-polling-per-date; rail monitor I-14, user "start the WNBA box-score polling session"]` — ON MAIN (see lane); **NOT LOADED** (the load is the user's call)
+### `#829` — **WNBA BOX-SCORE POLLS ASKED FLEET WEB ABOUT DATES WITH NO WNBA GAMES: 29,449 of 100,005 web requests (29.4%) 10-31..11-17, 1,614 of 2,408 (67.0%) on 11-17. Now decided PER DATE from `schedule_<YYYY>.csv`; an unknown schedule polls and says why. The June 03-05 calls were TESTS reaching the fleet, not a stuck backfill** `[2026-11-17, lane wnba-boxscore-polling-per-date; rail monitor I-14, user "start the WNBA box-score polling session"]` — ON MAIN `920c19e70`; **NOT LOADED** (the load is the user's call)
 - **Callers:**
   - live-odds-worker's live capture (`live_lens_loop._run_live_lens_tick_for_sport` -> `/wnba/api/live_player_boxscore`): ~1,000-1,160 a day, p50 731 ms;
   - refresh-worker's settlement count (`intelligence_state._refresh_wnba_boxscores` -> `/wnba/api/final_player_boxscore?count_only=1`, today + yesterday): ~550-770 a day;

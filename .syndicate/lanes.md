@@ -1129,6 +1129,7 @@ death, never life — do not invert it.
 - Verification: Tests: off!=on reachability, 0-game date skipped, game date polled, unknown schedule polls + logs. After a user-approved load: WNBA box-score share of web requests and web recycles per hour, before vs after, in deploys.md
 - Blocked by: none
 - Result (2026-11-17 ~4:15 PM CST): hypothesis CONFIRMED. The June calls are tests: ~76/day in the nightly suite's 08:14-08:58Z shards (ci-checkout) plus daytime test runs; a pytest spy caught test_intelligence_state.py tests reaching final_player_boxscore. The postgame backfill (run_refresh_worker.py:1570) is EXONERATED: it calls ESPN directly with a 30-day window and settles hourly (fleet status: last run 1,602 s ago, 75 dates done). Fix + 24 tests in findings_2026-11-17_wnba_boxscore_polling.md; both reachability tests fail on the pre-change code. todo #829.
+- ON MAIN `920c19e70` 2026-11-17 ~4:20 PM CST. NOT LOADED; the load (ff of ~/Syndicate + TERM of live-odds-worker and refresh-worker) is the user's call. Code ride-alongs from the fleet's `25fc2e4f0`: engine_experts `85af16b35` (no role imports it), execution_ledger `b96ea17a7` (one new function, operator CLI only), a read-only study script. Owed with or without a load: tonight's suite window (08:14-08:58Z 11-18) with 0 June/September final_player_boxscore requests (ci-checkout follows main).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

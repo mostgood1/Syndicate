@@ -102,7 +102,7 @@ dates that never publish. **They are test runs reaching the live fleet.** There 
 - **Falsification:** June requests outside test-run windows, or no test reaching web.
 - **Result:** CONFIRMED on both counts (above).
 
-## The fix (on main, not loaded)
+## The fix (on main `920c19e70`, not loaded)
 
 **`syndicate/features/wnba/slate_schedule.py` (new): `wnba_slate_verdict(date)`.**
 
