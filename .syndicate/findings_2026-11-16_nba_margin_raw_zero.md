@@ -347,6 +347,63 @@ Not loaded and not switched on.
     with mtime after the flip; 0 zeros over a full slate; Level 4's `UNFED` alarm gone.
   - Then the pre-registered grade (plan item 5), before keeping it on.
 
+## F1 switched ON with the outs penalties OFF: pre-registered keep/revert grade `[written 2026-11-17 ~11:15 AM CST, BEFORE the flip; lane nba-f1-switch-on]`
+
+**Decision.** The user said "On, with outs off", which is arm D. They also said "Carry it along" for
+#824 `3dbe53df0`, which rides the same ff. The fleet switch file becomes
+`{"skip_def_subtraction": true, "skip_outs_penalties": true, "feed_game_model": true}`. The replay
+prior for arm D vs today was −0.118 [−0.568, +0.324] anchored-total MAE (192 games), with no arm
+clearing 95%. This grade decides whether it stays on.
+
+**Population.**
+
+- NBA regular-season games that tip after the first NBA sim written after the flip.
+- The sim on disk at tip must carry `market_anchor.game_model_fed: true` and
+  `nba_total_inputs.skip_outs_penalties: true`. Pregame sims freeze at tip.
+- Games whose sim was built before the flip (reused) are excluded, as are games with no ESPN
+  final.
+- The first **150** graded games by tip time.
+
+**Arms, paired on the same games.**
+
+- **D** is the served `market_anchor.anchored_total`.
+- **A** is today's counterfactual: both ratings at `baseline_off_rating`, outs penalties ON, the
+  same market lines and the recorded weights.
+  - It is rebuilt from the artifact (`pregame_context` outs, b2b and team paces) with the exact
+    arithmetic of `_simulate_quarters_local`. That arithmetic reproduced 197 of 197 production
+    sims to 5.7e-14 (`f1_replay.py`).
+  - **Validity gate:** the same arithmetic must reproduce each graded game's SERVED D raw and
+    anchored total to 1e-9. On any miss the grade is void until the reconstruction is fixed.
+
+**Metric.** `e = |actual final total − anchored total|` per game. Δ = mean(e_D − e_A). The 95% CI
+is a percentile bootstrap that resamples whole tip dates (Central), 2,000 reps, seed 821.
+
+**Rule.**
+
+- **KEEP** if the CI upper bound is < 0.
+- **REVERT** if the CI lower bound is > 0. Reverting means taking both keys out, so the file
+  returns to `{"skip_def_subtraction": true}`.
+- **Otherwise INCONCLUSIVE:** stay on and re-grade once at 300 games with the same rule.
+  Inconclusive at 300 goes to the user with the numbers.
+
+**Reported, not gating.**
+
+- Anchored-total bias for D and A.
+- Anchored-margin MAE. Expected unchanged within ±0.05, since the raw weight is 0.05.
+- The share of raw-margin zeros (expected ≈ 0, against 38% of the replay corpus today).
+- The raw margin's correlation with the actual margin (replay prior: 0.139 vs 0.028).
+
+**Not covered here.**
+
+- **Props.** Outs-off also removes the player-sim pace drag (`orchestrator/smart_sim.py`
+  `_pace_injury_drag`), and the anchored total sets each player sim's target points. A props read
+  is owed separately.
+- **The calibrated layers.** The 0.7/0.95 anchor weights, the NBA prop calibration and the totals
+  calibration were fit on unfed sims. If D is kept, a re-fit is owed (model-engine standard,
+  mechanism vs estimator).
+
+**Expected timing.** At about 8 graded games a day, 150 games arrive around 2026-12-06.
+
 ## Leads (recorded, not followed)
 
 - **`TeamContextLocal.form_7` / `form_30` are consumed and never passed** (found by Level 4,
