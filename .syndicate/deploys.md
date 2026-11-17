@@ -61159,3 +61159,21 @@ Lane `render-config-retirement` (session 267d8859). The Windows host rebooted at
 - **Step 3b's gate is NOT met by this restart.** It needs an `up` at or after `91d865fd5` plus a clean `scripts/fleet_role_env_reading.py` compare, i.e. the vhdx-shrink window. Until then the roles carry only `RENDER*`, and the readers' fallback must stay.
 - betting change: no (step 1 builds the identical env; nothing is placed, sized, held or exited differently). The restart load itself is BC-033 (lane `board-query-row-refs-load`, deploys.md 20:02:54Z); this reading is BC-035.
 - **verify:** this table; the next drained `up` at or after `91d865fd5` owes the snapshot/compare (todo #766).
+
+## 2026-11-17 19:44-19:48Z (1:44-1:48 PM CST) -- READING (no deploy): the HOST was memory-exhausted just before the user's 19:48:57Z Windows restart (lane `vhdx-reclaim`, session e642c483)
+- betting change: no (a reading; the restart's load is BC-033)
+- **What I measured (Windows, read-only), minutes before the restart:**
+  - RAM: 0.0 GB free of 31.6 GB. Commit: 121.7 of 125.0 GB.
+  - Paging: `\Memory\Pages Input/sec` 76,069, `Available MBytes` 0.
+  - Disk: `\PhysicalDisk(_Total)\Current Disk Queue Length` 36-173, with 85-221 MB/s of reads. No process's own I/O counters showed it, which fits paging.
+  - **One Windows `python.exe` (pid 34620) held 48.74 GB private.** The next largest was vmmemWSL at 15.47 GB.
+  - I did not capture 34620's command line before the restart. **Owner: UNKNOWN.** It was not any of this lane's commands, all of which had exited.
+- **After the restart (20:02-20:08Z):** commit 35-45 of 71.6 GB, and free RAM still only 0.9-2.1 GB, with ~2,600-4,000 page-ins/s.
+  - Holding memory: 32 `claude.exe` processes (11.3 GB private), vmmemWSL (14-15 GB), and a second Hyper-V VM (`vmwp` 30408 + `vmmem` 30420, 4.0 GB, started 19:56:02Z, origin not identified).
+- **What it did to scheduled work:** a task at its default priority 7 (low memory and I/O priority) took ~7 min from launch to its first script line (SyndicateVhdxCompact refusal test: process 19:56:02Z, engine ready 19:58:59Z, first log line 20:02:56Z). A medium-integrity foreground PowerShell took 2.0 s at the same time.
+  - The 19:4x runs of the fleet watchdog (also priority 7) ran 3+ min.
+- **This lane's own WSL deletes** (rm at nice 19 / ionice idle, 63.9 GB, 19:33:27-19:37:40Z) finished ~7 min before the thrash readings, and ext4 showed 0 I/O in flight at 19:4xZ. They are not the cause.
+- **Fleet after the restart:** read 20:00:17Z. Supervisor since 19:50:39Z; web 496, refresh-worker 560 and live-odds-worker 561 all up, restarts=0, code=5db26434, healthz 200.
+- **Recurrence risk:** if commit reaches the limit, allocations fail, including the WSL VM's. That is a live-money fleet outage that no watchdog restarts cleanly. Lever, not taken: find what spawns a 48 GB Windows python, and cap it.
+- **Side effect for another lane:** the restart killed the `gate-smooth-family` waiter (`/mnt/c/tmp/score_effect_load/run_3l_when_ready.sh`, armed ~11-14). At 20:08Z it was NOT re-armed (the railload jobs were). Its owner should re-arm it; the script is idempotent.
+- **verify:** none owed by this reading.
