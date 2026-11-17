@@ -116,3 +116,50 @@ close on prior is unbiased per bucket, as built.
   half, <= 5:00 in the 2nd half, any OT), and always when the projected final total is below the points scored; carry
   the model's state score / clock onto the ledger so the rule is graded. Follow-up: re-sim end-of-period games first so
   the model keeps up.
+
+## 2026-11-17 (9:20 AM - 12:30 PM CST): the end-game rule graded before building; #824 built; the level re-graded
+
+Read-only grading of the fleet's NCAAB live-gameline ledgers, slates 11-08..11-16 (the score-change quote basis in force
+throughout), priced full-game rows against ESPN finals and ESPN play wallclocks. Scripts: `C:\tmp\ncal816\endgame\
+grade_guard.py`, `grade_guard2.py`, `grade_qage.py`, `grade_bydate.py`; the model's state score is the last ESPN play at
+or before `live_state_as_of - 20 s`. Flag = |edge_pp| >= 3; hit vs the lean's own de-vigged price, game-weighted, SE
+clustered by game. **The price is the ledger's quote at pricing; whether a bettor could still get it is not measured.**
+
+- **The proposed window rule is FALSIFIED.** Totals flags priced while the board's score differed from the score the
+  model simulated from, inside the last 2:00 of the 1st half / 5:00 of the 2nd / OT: 2,910 records (11.3%), 285 games,
+  flags hit **0.648 vs a 0.533 price (+11.5 +- 1.8 pp)**, overs +10.7 +- 2.9, unders +14.3 +- 2.2. Spreads the same way
+  (+6.9 +- 1.7 pp, 285 games); h2h +4.8 +- 2.8. Judging the window on the clock at pricing instead changes nothing
+  (+11.9 +- 1.7). Refusing them would cut flags that beat their price. Not built.
+- **"The quote saw a basket the model had not" is not a loser either** (a scoring play in (state, quote]): totals
+  window unders +13.0 +- 2.7 pp (221 games), midgame unders +8.5 +- 2.4; spreads and h2h within noise of the rest.
+- **Only the contradiction loses.** Totals by the model's projected final minus the points on the board: **< 0** (the
+  final is below the score): unders **0.430 vs 0.520 (-8.9 +- 5.6 pp, 47 games)**, overs 18 of 18 on lines the game
+  had already passed; 0-3 points: unders +15.3 +- 4.1, overs +18.4 +- 7.1; 3-6, 6-10, 10-20: all +14 to +30. The 11-16
+  read over every ledger date agrees (unders 0.420 +- 0.044, 71 games). 128 graded records, 0.5% of priced totals.
+- **So the end-game solve is the contradiction only (#824, built):** `live_gameline_join.model_behind_score_verdict`
+  refuses a college full-game TOTAL whose projected final is below the board's points, after the quote and lane gates,
+  through `_apply_verdict` (no edge, no Live number, the reason on the ledger). Absent score or projection refuses by
+  name (0 of 28,792 priced records lacked either). Switch `SYNDICATE_LIVE_MODEL_BEHIND_SCORE_GUARD` on (default) /
+  shadow / off. The lane's start state (`projection.homeScore/awayScore/period/clockSeconds`) now reaches every ledger
+  record (`state_home_score`, `state_away_score`, `state_period`, `state_clock_seconds`), so the window question can
+  be re-graded on the real state instead of an ESPN reconstruction.
+  - **What it covers:** Iona @ UMBC (133.3 projected, 137 scored, under 138.5 at -17 pp). **What it does not:** PV @
+    OSU's end-of-half full-game unders (a model 136-182 s behind, not a contradiction): that population beat its price
+    on 11-08..11-16, so nothing here refuses it. One loss does not overturn it; the new state fields will re-grade it.
+- **The level re-graded (it is NOT quote staleness).** Finals minus the live price on priced totals, by quote age at
+  pricing: <= 30 s -6.3 +- 2.6 pp (237 games), 30-60 s -6.1, 60-120 s -5.1, 120-240 s -6.9, > 240 s -4.0. The under
+  lean is there on fresh quotes too.
+  - **By night:** 11-08 +8.5, 11-09 -5.8, 11-10 +2.3, **11-11 -8.5, 11-12 -12.7, 11-13 -7.5, 11-14 -11.8, 11-15
+    -10.2**, 11-16 (pre-load, 7 games) +3.6, **11-16 post-load +9.1 (19 games)**. Night-clustered over the 9 pre-load
+    nights: -4.7 +- 2.5 pp; 6 of 9 below zero; every night since the engine floor (11-11) was -7.5 or lower until 11-16.
+  - **Walk-forward on the fleet, through 11-16 (read-only refit, `C:\tmp\ncal816\wf_compare.py`), live, 188 games:**
+    spread + level **0.2240**, spread only 0.2281, market 0.2296, raw 0.2376. The level won 4 of 5 scored nights and
+    lost 11-16 (0.2558 vs spread-only 0.2322). Pregame: spread only fits c = 0, so it serves the market (0.2500, no
+    edges); spread + level 0.2441.
+  - **The daily refit already moved:** fit file as_of 11-16 (written 11:09:27Z 11-17) live a -0.358 -> **-0.288**,
+    c 0.226; pregame a -0.379 -> -0.317. Tonight's games read it.
+  - **Reading:** the level is supported by four out-of-sample nights against one; my 11-17 00:xx recommendation to drop
+    it rested on that one night. Spread-only is BUILT (`fit(level=False)`, `refresh(level=...)`, `FIT_LEVEL`, default
+    True = the user's choice), so dropping the level later is a one-line flip, a refresh-worker restart and a refit.
+- **Money:** every NCAAB order in the November execution-ledger archive is paper (no live-mode row since 11-14 for any
+  sport in that file, so live orders are recorded elsewhere and this does not prove none were placed).
