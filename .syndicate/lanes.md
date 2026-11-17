@@ -1162,6 +1162,14 @@ death, never life — do not invert it.
 - Verification: scripts/live_bet_timing_study.py blob 25543aebf51e run once per sport on the fleet for 11-18..12-01 by scheduled task live-bet-timing-forward-830 (Wed 12-02 10 AM CST); RESULTS section scores each candidate
 - Blocked by: none
 
+### nfl-live-card-situation — OPEN — opened 2026-11-17 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: The live NFL game card says who has the ball and where in ESPN's own words, as NCAAF's already does: nfl/live_game_state.attach_nfl_live_game_state puts ESPN's raw situation (espn_situation) and the possessing side (possession_side, from situation.possession against the home/away team ids) on live games, so game_chip_detail.live_detail renders e.g. 'BAL ball - 3rd & 12 at BAL 21' instead of falling back to the team's numeric id and a bare yard number; and game_shape's football red_zone comes from ESPN's isRedZone, no longer from yardLine (which is measured from the HOME goal line) read as distance-to-goal. Tests on real MNF 11-16 situations; display only, not a betting change
+- Files: syndicate/features/nfl/live_game_state.py (attach_nfl_live_game_state's live_state block ONLY; the file is also claimed by this session's lane nfl-live-possession-map), syndicate/features/shared/game_shape.py (_football_situation ONLY), tests/test_nfl_live_card_situation.py (NEW)
+- Hypothesis: n/a (fix). Measured 11-16 MNF (66 reads, findings_2026-11-16_nfl_live_total_underprojection.md): game_shape red_zone wrong on 13 (7 false flags, 6 misses), ESPN isRedZone right on all 66; BAL (home) at its own 21 -> yardLine 21, LAC (away) at its own 48 -> yardLine 52
+- Falsification test: n/a
+- Verification: Tests: attach on a real MNF event puts espn_situation + possession_side on the live game; live_detail renders ESPN's text with the team label, not the id; red_zone follows isRedZone on a home possession deep in its own end and in the opponent's red zone; no situation -> no new keys; existing shape/chip/NFL live-state tests pass. Fleet: after the next web load, a live NFL card on the served board shows '<TEAM> ball' (first live NFL game after the load)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
