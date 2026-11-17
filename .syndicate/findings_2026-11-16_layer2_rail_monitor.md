@@ -1277,3 +1277,68 @@ a live card.
 a live card.
 
 **Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
+
+## Reading 19 — Mon 11-16 9:22 PM CST (03:22Z 11-17), full page
+
+**Slate:** 13 live chips.
+- NBA 3: GSW @ NOP Q4; POR @ MIN Q4; PHX @ DEN HALF.
+- NFL LAC @ BAL Q3 5:49.
+- NHL 2: MTL @ NYR P3; VAN @ UTA end P1.
+- NCAAB 5: SE Louisiana @ Texas A&M H2; East Texas A&M @ Oregon State; Long Beach State @ UCLA;
+  Texas Southern @ UC San Diego; Portland State @ Saint Mary's.
+- WNCAAB 2: Arkansas @ Little Rock Q4; Houston Christian @ Utah Q3.
+- Troy @ LSU is final. Its series ended at u191.5 (8:59 PM).
+
+**Flags: 17 shown on 8 cards (28 qualifying rows). 0 false, 0 missed, 1 dark** (Texas Southern @ UCSD
+spread). 11-16 total: 238.
+- **Totals: 12 flags, 9 UNDER / 3 OVER.**
+  - NCAAB full-game, calibrated, all U: SE Louisiana @ Texas A&M u171.5 (15.5 pp), East Texas A&M @
+    Oregon State u171.5, Texas Southern @ UCSD u168.5, Portland State @ Saint Mary's u164.5 (14.3 pp),
+    Long Beach State @ UCLA u139.5 (ours 143.6: the display inconsistency again).
+  - NCAAB segments, RAW: Texas Southern 1H u84.5 and 2H u82.5; Portland State 1H u81.5 (21.4 pp)
+    (U); Long Beach State 2H o76.5 (O).
+  - NBA: GSW @ NOP u210.5 (U); POR @ MIN o207.5 and PHX @ DEN o221.5 (O).
+- **Spreads (5):** NBA MIN -14.5, PHX +4; NCAAB Texas A&M -28.5, UCSD -12.5, Long Beach State 1H +17.5.
+- **Totals direction, flag by flag: 103 unders, 42 overs.** This reading adds 9 U and 3 O.
+
+**MNF (LAC @ BAL, Q3 5:49): the first NFL line priced, but it did not reach the rail.**
+- `NFL_LIVE_RESIM` resims every tick from 03:07Z; it was `uninformative_probability` at 03:01Z.
+- `LIVE_GAMELINE_BUILD` 03:1xZ: considered 64, projected 17, **priceable 1**. Withheld:
+  `no_distribution` 16 (the #780 gate), quote age 4, segments 43. The 1 priced line is the moneyline
+  (only it carries a distribution).
+- **Live-rail 03:23:01Z: 4 NFL rows, 0 with a model probability, no moneyline row.** The priced line
+  did not reach the rail: the overlay's shortlist dropped it (most likely the value floor, which
+  refuses 81-84 NFL rows per build). The rail cannot show MNF flags tonight.
+
+**Live rows:** 529.
+| sport | rows | priced <= 120 s | notes |
+|---|---|---|---|
+| NBA | 385 | 15 | main 75 (15 fresh), `_alt` 310 (0 fresh) |
+| NCAAB | 124 | 47 | 1H 110 |
+| NFL | 11 | 5 | no model price |
+| NHL | 8 | 4 | — |
+| WNCAAB | 1 | 0 | — |
+
+**Overlay (23 min), all 0 over 360 s:**
+| sport | gap p50 / max | build p50 / max | notes |
+|---|---|---|---|
+| NBA | 55 s / 87 s | 14.3 s / 36.6 s | |
+| NCAAB | 50 s / 112 s | — | |
+| WNCAAB | 57 s / 100 s | — | 6 zero-card with rows |
+| NHL | 72 s / 132 s | — | |
+| NFL | 73 s / 148 s | — | |
+
+- 0 `deferred_slow`. Tick gap p50 20 s, max 65 s.
+
+**Web merges:** fresh 56 / 56 for every sport.
+
+**Load:**
+- `/intelligence` 4.1 s / 24.6 MB. **Query 5.6 s** / 61.4 MB. Shortlist 0.83 s; chips 0.03 s;
+  live-rail 0.03 s.
+- Gunicorn workers were 119 s and 100 s old at the read, both alive at the end. Host load 3.0-3.4.
+- **Board:** built 226 s ago; shortlist written 320 s ago.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 13 live chips have
+a live card.
+
+**Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
