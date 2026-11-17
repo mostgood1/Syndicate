@@ -501,3 +501,23 @@ One pass over every portfolio route, before any probe existed:
     (leads: the 15Z slowdown, 21-42 s board / Syndicate queries, the 64 s overlay warm in a web worker).
 - **Unchanged anomalies:** the resting maker-pilot order (934 min); the late NHL bet (19.1 h); 1 unclassified
   load (was 2).
+
+## Reading 10 — Tue 11-17 4:29 PM CST (22:29Z), window 45 min — after the 21:53Z drained down/up
+
+- **The paper retirement is live** (fleet `91d865fd5` since the 21:53Z drained down/up). Read 21:55Z:
+  `/portfolio/paper` 302 -> `/portfolio`; `/api/portfolio/paper` 410; `/portfolio` has no Paper link; book
+  switcher `["live"]`. deploys.md 21:56Z.
+- **The widened paper record line is live:** at 22:19:25Z, `PAPER_ALL_TIME_WRITTEN` 52,033 rows, 14,606 settled,
+  615 pending, **7,362 W / 7,104 L / 58 P, win 50.89%, ROI -1.39%**.
+  - A statistical read, not advice: the paper book, all dates (all simulated, no money), sits about 1.4% under
+    break-even on 14.6k settled order rows. Rows are not independent: the same decision appears at several
+    paper venues, so the true sample is smaller.
+- **Endpoints:** all 7 read 200, the fastest of the day (`live` 0.22 s, `/portfolio` 0.28 s). 0 kills, 0 5xx,
+  0 browser requests.
+- **Banner:** ok, armed, state 333 s. **Ledger:** unreconciled 0 and unknown submits 0, for a second reading.
+- **Plan (3.4 min):** board 4,719 -> suggested 82 -> sized 25 -> positions 7; beyond_max_positions 53,
+  below_min_stake 18.
+- **Execution, 45 min:** 14 live ticks; 5 placed (all kalshi), 0 failed; 76 refused `outside_price_band`.
+  Orders today 50 (49 filled, 1 resting). Cap use: kalshi 20.7%, polymarket 16.0%.
+- **Anomalies (3, unchanged):** the resting maker-pilot order (977 min); the late NHL bet (19.8 h); 1 unclassified
+  load.
