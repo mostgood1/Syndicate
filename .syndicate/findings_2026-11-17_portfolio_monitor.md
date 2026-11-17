@@ -361,3 +361,27 @@ One pass over every portfolio route, before any probe existed:
   not on the fleet until tonight's load.
 - **Unchanged anomalies:** unreconciled `f8b62e6a`; the resting maker-pilot order (772 min); the late NHL bet
   (16.4 h).
+
+## FINDING 1 — the fix measured on the fleet, 1:08 PM CST (19:08Z)
+
+- `2148f99cb`'s web half went live at 18:58:52Z, riding lane `board-query-row-refs-load`'s ff
+  `92ae7490a -> 5db26434e` plus reload-web. The user answered "Carry both"; deploys.md 18:58:45Z, BC-032 `no`.
+- **One authenticated `GET /api/portfolio/paper?date=2026-11-17` at 19:07:37Z:**
+  - 200, 2.38 MB, **31.4 s** server-side (access log 31,375 ms); 908 paper orders; `ledger_error` and
+    `settlement_error` None; `settlement_all_time` None, as expected until refresh-worker loads the writer.
+  - **No WORKER TIMEOUT.** The same request on the old code ran ~177 s at 16:10Z until gunicorn killed its worker.
+- **Not a clean cost reading. The web was saturated during it.** In the same seconds:
+  - `POST /api/intelligence/query` 42,280 ms (11.3 MB);
+  - `POST /api/syndicate/query` 31,978 ms and 21,068 ms;
+  - `GET /intelligence` 9,023 ms;
+  - a `COMBINED_BOARD_OVERLAY_WARMED ... build_s=64.24`;
+  - a hard memory recycle at 19:07:03Z (pid 4075611, anon 823 MB, drained with 1 in flight, exited
+    19:07:42Z, no kill).
+  - With 2 workers x 4 threads, wall time here is mostly waiting on that work. The fleet A/B measured
+    0.5-0.7 s warm and 9.8 s cold-import at nice 19.
+  - **Lane goal "< 3 s": NOT shown on the fleet.** The lane is closed DRIFTED, and the page is retired at the
+    next ff after `f7fb3ed4e`, so I am not re-measuring it.
+- **NEW LEAD for F3 (silent kills), not tested:** the combined-board overlay warmer runs inside web workers and
+  one build took **64.24 s**. Its WARMED line carries no pid, so a warm still running when its worker was killed
+  would leave no line. Next test: `build_s` over the day against the kill times, from warmer STARTED to
+  WARMED / kill.
