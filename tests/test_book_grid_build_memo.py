@@ -130,6 +130,24 @@ def test_the_build_uses_the_memo_and_asks_fewer_questions(monkeypatch):
     assert plain_match > 100 and memo_match * 10 < plain_match, (memo_match, plain_match)
 
 
+def test_each_call_site_asks_its_own_question(monkeypatch):
+    """The equivalence test swaps the memo, not the call sites, so this pins each call site to its own input: a cell's
+    age is its quote's observed stamp, a cell's seen age is its own key's last-seen stamp, and the row's age is the
+    newest observed stamp."""
+    monkeypatch.delenv("SYNDICATE_BOOK_GRID_STALE_BASIS", raising=False)
+    base = {"sport": "ncaaf", "kind": "game", "event_id": "e1", "segment": "full", "market": "totals", "player_name": "",
+            "line": 45.5, "home_team": "Ohio State Buckeyes", "away_team": "Michigan Wolverines",
+            "commence_time": "2026-11-14T20:30:00Z"}
+    over = dict(base, selection="Over", price=-110, bookmaker="draftkings", snapshot_ts="2026-11-14T21:00:00Z")
+    under = dict(base, selection="Under", price=-105, bookmaker="draftkings", snapshot_ts="2026-11-14T21:30:00Z")
+    last_seen = {quote_key(over): "2026-11-14T21:58:30Z", quote_key(under): "2026-11-14T21:55:00Z"}
+    (row,) = build_book_grid([over, under], now=NOW, last_seen=last_seen)
+    cells = row["cells"]["draftkings"]
+    assert (cells["Over"]["age_seconds"], cells["Under"]["age_seconds"]) == (3600.0, 1800.0)
+    assert (cells["Over"]["seen_age_seconds"], cells["Under"]["seen_age_seconds"]) == (90.0, 300.0)
+    assert row["age_seconds"] == 1800.0
+
+
 def test_is_home_matches_the_plain_function_and_keys_on_sport(monkeypatch):
     memo = _BuildMemo({}, NOW)
     for row in ({"selection": "home"}, {"selection": "1"}, {"selection": ""}, {"selection": "AZ", "home_team": "AZ Alkmaar"},
