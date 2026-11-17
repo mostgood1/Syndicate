@@ -49,6 +49,91 @@ over_note() {  # $1=label  $2=cap  $3=text
   return 0
 }
 
+# --- Every python check STARTS HERE, side by side (lane session-start-hook-runtime, 2026-11-16) ---
+#
+# MEASURED 2026-11-16 on the PRIMARY tree, where sessions load this file: 5 untraced runs took
+# 16.1-25.1 s (median 19.3) against the 20 s SessionStart timeout in .claude/settings.json. Three of
+# five went over, and a hook the harness kills delivers NO digest at all, which is the worst outcome
+# this file can have. Per-section xtrace timings (.syndicate/findings_2026-11-16_session_start_runtime.md)
+# put the time in two places:
+#   * the nine python calls ran ONE AFTER ANOTHER. The five coherence checkers alone took 5.5-14 s,
+#     check_lane_invariants 2.7-6.8 s of it (CPU-bound in lane_claims.sections_are_disjoint);
+#   * every helper process is a fork, 0.15-0.45 s each on this host, and the state-size loop forked 30
+#     of them (wc + tr per file): 3.6-13.7 s spent adding up file sizes.
+#
+# So `scripts/session_start_jobs.py` starts EVERY python check at once, here, and hands back each one's
+# exit code and its stdout exactly as `X=$(python ... | head -c N)` used to assign it. Each result is
+# read further down, where its serial call used to stand, so every section still reads top to bottom.
+# The cost is now the SLOWEST check, not the sum. EVERY CHECK STILL RUNS: none dropped, none cached.
+# `--budget-digest` now runs every time; its text is still used only when lanes.md is over its cap.
+#
+# The coherence list lives HERE now (it used to sit in the coherence section below), because the checks
+# start here and one list cannot drift from itself.
+#
+# FAILS OPEN as before: no python leaves every python line off, and a missing check script is skipped,
+# as its `[ -f ]` guard did. NEW, and LOUD on purpose: if the runner is missing or dies, or a check is
+# still running at the runner's 13 s deadline, DIGEST NOTES names it. A check that silently did not run
+# reads as a check that passed, and that is the failure this file exists to prevent.
+COHERENCE_CHECKS=("lane_identity_check.py:lanes.md" \
+                  "check_lane_invariants.py:lanes.md" \
+                  "check_lane_claims.py:lanes.md (claims name no file)" \
+                  "state_key_check.py:state.md" \
+                  "todo_id_reconcile.py --no-history:todo.md")
+declare -A JOB_RC=() JOB_OUT=()
+RUNNER_FD=""
+RUNNER_STATE="off"   # off: no python | missing: no runner script | started | collected
+if command -v python >/dev/null 2>&1; then
+  if [ -f scripts/session_start_jobs.py ]; then
+    JOBS=("census|${LANE_CAP}|scripts/lane_census.py --digest" \
+          "budget|0|scripts/lane_census.py --budget-digest" \
+          "primary_ff|400|scripts/primary_tree_ff.py --digest" \
+          "betting|260|scripts/betting_change.py digest")
+    for c in "${COHERENCE_CHECKS[@]}"; do
+      JOBS+=("${c%%:*}|-1|scripts/${c%%:*}")
+    done
+    exec {RUNNER_FD}< <(exec python scripts/session_start_jobs.py "${JOBS[@]}" </dev/null 2>/dev/null) \
+      && RUNNER_STATE=started
+  else
+    RUNNER_STATE=missing
+    NOTES="${NOTES}[python checks NOT RUN: scripts/session_start_jobs.py is missing] "
+  fi
+fi
+
+# Reads every result, ONCE, at the first place one is needed. It must run in THIS shell, never inside
+# $(...): a subshell's assignments are discarded (see over_note above). The runner ends each run with an
+# `@@END` line; without it the runner died part-way, and that is said, not read as a clean run.
+collect_jobs() {
+  [ "$RUNNER_STATE" = started ] || return 0
+  RUNNER_STATE=collected
+  local k st esc o ended=""
+  while IFS=$'\t' read -r -t 16 -u "$RUNNER_FD" k st esc; do
+    if [ "$k" = "@@END" ]; then ended=1; break; fi
+    printf -v o '%b' "$esc"
+    JOB_RC[$k]=$st
+    JOB_OUT[$k]=$o
+  done
+  exec {RUNNER_FD}<&-
+  [ -n "$ended" ] || NOTES="${NOTES}[python checks: runner ended with no result -- run scripts/session_start_jobs.py by hand] "
+  return 0
+}
+
+# --- File sizes for every size alarm below: ONE wc, not one per file ---
+# The loops below used to run `$(wc -c < "$f" | tr -d ' ')` per file: 30 forks for 15 files, 3.6-13.7 s
+# measured 2026-11-16. Same byte counts, one process. A file wc cannot read keeps no entry and reads as
+# 0, exactly as the old `${SZ:-0}` did.
+declare -A FILE_BYTES=()
+SIZED=()
+for sf in .syndicate/state.md .syndicate/state_*.md .syndicate/lanes.md .syndicate/learnings.md; do
+  case "$sf" in *state_archive*) continue;; esac
+  [ -f "$sf" ] && SIZED+=("$sf")
+done
+if [ "${#SIZED[@]}" -gt 0 ]; then
+  WC_OUT=$(wc -c -- "${SIZED[@]}" 2>/dev/null)
+  while read -r sz name; do
+    [ -n "${name:-}" ] && FILE_BYTES[$name]=$sz
+  done <<< "$WC_OUT"
+fi
+
 # --- Open lanes: a CENSUS, not a truncated sample ---
 #
 # WHAT THIS REPLACED AND WHY, measured 2026-09-08. This block used to emit lane
@@ -78,9 +163,9 @@ over_note() {  # $1=label  $2=cap  $3=text
 # script or a crash leaves the line off rather than blocking a session.
 CENSUS=""
 if [ -f .syndicate/lanes.md ]; then
-  if command -v python >/dev/null 2>&1 && [ -f scripts/lane_census.py ]; then
-    CENSUS=$(python scripts/lane_census.py --digest 2>/dev/null | head -c "$LANE_CAP")
-  fi
+  # The census is the runner's `census` job (`lane_census.py --digest`, cut to LANE_CAP), started at
+  # the top and read under OPEN LANES below, where it is printed. Reading it HERE would wait for every
+  # check before any of the bash work below had started.
 
   # A "### " header with no em-dash has no parseable status and is NOT counted
   # as open. That is the permissive direction, so it has to be visible: this
@@ -155,6 +240,8 @@ esac
 add ""
 
 if [ -f .syndicate/lanes.md ]; then
+  collect_jobs
+  CENSUS=${JOB_OUT[census]-}
   add "--- OPEN LANES ---"
   add "${CENSUS:-(census unavailable)}"
   add "Full list: py -3 scripts/lane_census.py  —  a lead is NOT a lane: /lead \"<one line>\""
@@ -391,7 +478,7 @@ STATE_TOTAL=0
 for sf in .syndicate/state.md .syndicate/state_*.md; do
   case "$sf" in *state_archive*) continue;; esac
   [ -f "$sf" ] || continue
-  SZ=$(wc -c < "$sf" 2>/dev/null | tr -d ' ')
+  SZ=${FILE_BYTES[$sf]:-0}
   STATE_TOTAL=$((STATE_TOTAL + ${SZ:-0}))
   case "$sf" in
     .syndicate/state.md) [ "${SZ:-0}" -gt 120000 ] && BLOAT="${BLOAT}state.md index $((SZ/1024))KB>117KB, ";;
@@ -478,7 +565,7 @@ done
 for f in lanes.md:550000 learnings.md:460000; do
   n=${f%%:*}; cap=${f##*:}
   if [ -f ".syndicate/$n" ]; then
-    SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')
+    SZ=${FILE_BYTES[.syndicate/$n]:-0}
     if [ "${SZ:-0}" -gt "$cap" ]; then
       # WHERE the bytes are, for lanes.md only. Without it this line names a
       # size and no owner, and the LANE ARCHIVE OWED line below reads as its
@@ -492,10 +579,11 @@ for f in lanes.md:550000 learnings.md:460000; do
       # full sentence (~280B) overflows. That form is `--budget`, for a human.
       # FAILS OPEN like every python call here: no python, no script or a
       # non-zero exit leaves this line exactly as it read before.
+      # The runner's `budget` job (`lane_census.py --budget-digest`, started at the top).
       WHERE=""
-      if [ "$n" = "lanes.md" ] && command -v python >/dev/null 2>&1 \
-         && [ -f scripts/lane_census.py ]; then
-        W=$(python scripts/lane_census.py --budget-digest 2>/dev/null)
+      if [ "$n" = "lanes.md" ]; then
+        collect_jobs
+        W=${JOB_OUT[budget]-}
         [ -n "$W" ] && WHERE=" ($W)"
       fi
       BLOAT="${BLOAT}${n} $((SZ/1024))KB>$((cap/1024))KB${WHERE}, "
@@ -522,7 +610,13 @@ done
 # FAILS OPEN, like every other guard here: no python, a missing script, or a
 # crashing checker leaves the line off entirely rather than blocking a session.
 INCOHERENT=""
-if command -v python >/dev/null 2>&1; then
+NOT_FINISHED=""
+if [ "$RUNNER_STATE" != off ]; then
+  # THE LIST IS `COHERENCE_CHECKS`, at the top of this file since 2026-11-16: the checks START there,
+  # side by side, and this loop reads each one's exit code. A non-zero exit still flags the ledger,
+  # exactly as `if ! python scripts/$script` did. A check the runner had to kill at its deadline is NOT
+  # read as either verdict: it goes to DIGEST NOTES as not finished.
+  #
   # check_lane_invariants.py was MISSING from this list until 2026-08-18, and
   # its absence is why `#466` ran unnoticed. lane_identity_check answers "does
   # one slug have two OPEN blocks"; it says nothing about WHERE a block sits or
@@ -542,17 +636,19 @@ if command -v python >/dev/null 2>&1; then
   # guarding nothing. `learnings.md` 2026-08-31 prescribed this exact check
   # ("reject claims whose path is absent from git ls-files") and it was never
   # built; 8 of 44 live claims were in that state when it finally was.
-  for c in "lane_identity_check.py:lanes.md" \
-           "check_lane_invariants.py:lanes.md" \
-           "check_lane_claims.py:lanes.md (claims name no file)" \
-           "state_key_check.py:state.md" \
-           "todo_id_reconcile.py --no-history:todo.md"; do
+  collect_jobs
+  for c in "${COHERENCE_CHECKS[@]}"; do
     script=${c%%:*}; label=${c##*:}
     [ -f "scripts/${script%% *}" ] || continue
-    if ! python scripts/$script >/dev/null 2>&1; then
-      INCOHERENT="${INCOHERENT}${label} (scripts/${script%% *}), "
-    fi
+    rc=${JOB_RC[$script]-}
+    case "$rc" in
+      0) ;;
+      timeout|error) NOT_FINISHED="${NOT_FINISHED}scripts/${script%% *} (${rc}), " ;;
+      ''|missing) ;;   # no result: the runner note above already says why
+      *) INCOHERENT="${INCOHERENT}${label} (scripts/${script%% *}), " ;;
+    esac
   done
+  [ -n "$NOT_FINISHED" ] && NOTES="${NOTES}[coherence checks NOT FINISHED, so not verdicts: ${NOT_FINISHED%, } -- run them by hand] "
 fi
 
 # --- Primary-tree auto fast-forward (lane primary-tree-auto-ff, 2026-11-13) ---
@@ -565,10 +661,9 @@ fi
 # needed (the last run refused or failed, or no run for 24 h); a healthy tree
 # prints nothing. Emitted outside BUDGET, like LEDGER INCOHERENT, for the same
 # reason. Fails open: no python or no script leaves the line off.
-PRIMARY_FF=""
-if command -v python >/dev/null 2>&1 && [ -f scripts/primary_tree_ff.py ]; then
-  PRIMARY_FF=$(python scripts/primary_tree_ff.py --digest 2>/dev/null | head -c 400)
-fi
+# The runner's `primary_ff` job (`primary_tree_ff.py --digest`, cut to 400 B).
+collect_jobs
+PRIMARY_FF=${JOB_OUT[primary_ff]-}
 
 # --- Betting-change register (lane betting-change-session-check, 2026-11-16) ---
 # The scale-up gate's 800-event count restarts at every live-betting change (user
@@ -579,10 +674,8 @@ fi
 # A clean register prints nothing. Emitted outside BUDGET, like PRIMARY_FF, and
 # capped at 240 B (the tool caps itself; head -c is the backstop). ~0.8 s.
 # Fails open: no python or no script leaves the line off.
-BETTING=""
-if command -v python >/dev/null 2>&1 && [ -f scripts/betting_change.py ]; then
-  BETTING=$(python scripts/betting_change.py digest 2>/dev/null | head -c 260)
-fi
+# The runner's `betting` job (`betting_change.py digest`, cut to 260 B).
+BETTING=${JOB_OUT[betting]-}
 # NOT via `add`. The body is hard-capped (`head -c "$BUDGET"`) and this section
 # sits at the tail, so the first version of this line was emitted as
 # "LEDGER INCOHERENT: state.md (scripts/state_key_" -- cut mid-word. This file
@@ -606,7 +699,11 @@ fi
 # --- Emit. Overflow is announced BEFORE the body, because the tail is the
 #     part that gets cut and a truncation warning that gets truncated is worse
 #     than none: it reads as a clean run. ---
-LEN=$(printf '%s' "$BODY" | wc -c | tr -d ' ')
+# Byte length and byte cut taken in the C locale, where ${#} and ${:0:N} count BYTES, as wc -c and
+# head -c did (over_note above says why characters would be wrong). Same numbers, same cut, and four
+# fewer forks than `printf | wc | tr` and `printf | head` (2026-11-16).
+body_bytes() { local LC_ALL=C; LEN=${#BODY}; BODY_CUT=${BODY:0:$BUDGET}; }
+body_bytes
 if [ "${LEN:-0}" -gt "$BUDGET" ]; then
   echo "DIGEST OVERFLOW: ${LEN}B body > ${BUDGET}B budget — tail cut. Trim .syndicate/ or raise BUDGET."
 fi
@@ -615,7 +712,7 @@ fi
 [ -n "$PRIMARY_FF" ] && echo "$PRIMARY_FF"
 [ -n "$BETTING" ] && echo "$BETTING"
 
-printf '%s' "$BODY" | head -c "$BUDGET"
+printf '%s' "$BODY_CUT"
 echo
 echo "=== end digest — full ledger in .syndicate/ ==="
 
