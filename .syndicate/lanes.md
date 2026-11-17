@@ -871,11 +871,6 @@ death, never life — do not invert it.
 - Verification: Replay on the fleet (nice 19, read-only) prints select_shortlist's counters for a WNCAAB build with cards=0; unit test proves INPLAY_OVERLAY carries the counters (off != on); on main; the user decides any load
 - Blocked by: none
 
-### closed-lane-archive-20261116-1640 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session b5197378-9e7e-48f3-a5cc-d4fa03048d24
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness.py --idle-min 240 on origin/main gave 1 SAFE of 7 CLOSED; moved `closed-lane-archive-20261116-1040`. Table and WAIT reasons: `.syndicate/log/2026-11-16.md` 22:4xZ entry.
-
 ### betting-change-register — CLOSED 2026-11-17 (GOAL MET: register + CLI + readout clock on main 1021f67c2; fleet clock 0 of 800 = hand count) — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
 - **GOAL VERDICT `[2026-11-17 00:51Z (6:51 PM CST 11-16)]`: GOAL: MET.** Goal (verbatim): "The live-book readout finds the scale-up gate's clock start by itself: a register of fleet loads that change which live bets are placed, sized, held or exited (user 11-16 "Any betting change"), a CLI to add and resolve entries, a deploys.md scan that lists unclassified loads after the clock start, and the deploy protocol telling every session to record one".
   - Verification ran: 62 passed / 1 skipped; register seeded with load times from deploys.md + process ages (±5 s); `candidates` 0 since 2026-11-16T18:15Z on main; readout on the 00:49Z fleet payload: clock BC-017 00:04:38Z, 0 of 800 events = hand count 0; non-empty windows match hand counts (63/31, 234/110).
@@ -964,6 +959,11 @@ death, never life — do not invert it.
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 at 02:42Z 11-17 (8:42 PM CST): 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261116-1440`. Table and waits: log/2026-11-16.md.
+
+### closed-lane-archive-20261116-2239 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 0ab8ef5c-3950-4dae-80cd-1532b1cf1e06
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 04:40Z 11-17 (10:40 PM CST): 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261116-1640`. Table and waits: log/2026-11-16.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1249,6 +1249,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261116-1040` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session d9334b85-877c-40a4-b4d8-3a4ab232c91f
 - `closed-lane-archive-20261116-1240` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session cd1c7de1-cee6-4e0f-9b75-5b47a6e95740
 - `closed-lane-archive-20261116-1440` — CLOSED 2026-11-16 (GOAL MET: 2 blocks archived) — opened 2026-11-16 — session bbf28575-4057-44ea-bf39-e76eb68ef14c
+- `closed-lane-archive-20261116-1640` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session b5197378-9e7e-48f3-a5cc-d4fa03048d24
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b
