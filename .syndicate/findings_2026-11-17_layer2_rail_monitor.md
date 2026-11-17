@@ -273,3 +273,82 @@ after.
 - **Also, from local_c787e775:** asked "When should steps 1+2 load on the fleet?", the user replied at ~12:48 PM CST: **"With next down/up"**. Consistent with tonight's carry: the ff puts step 1 on disk; `reload-web` builds no env; the nightly backup, preflight env reads and the next drained down/up run it (the user was told this before answering "Carry it tonight"). The before/after readings for steps 1+2 are owed by whoever runs the next drained down/up (todo #766, `findings_2026-11-17_render_config_retirement.md` "The load"), not by this load.
 - **Post-ff check added (local_c787e775):** run `local_production.py status` once after the ff. Its memory-cap line calls `load_role_spec` + `fleet_env/`, so a clean run proves the new spec and snapshot load; a traceback or "no keys for role" is the failure. Send local_c787e775 the ff time; it will then compare each role's launcher-built env with the live `/proc/<pid>/environ` per key by sha256, read-only. It expects only `RENDER_INSTANCE_ID` and `RENDER_GIT_COMMIT` (plus inherited shell keys) to differ.
 - **LOAD OWNERSHIP MOVED (~1:10 PM CST):** lane `board-query-row-refs-load` (session e569a6cd = local_bc8d3e61, the de-dup session) opened on main (`3a24317a4`). The user said "Load it" + "Carry both" in that session. **This monitor stands down from running the load** (no web claim, no ff). It handed over the user's quotes from the other sessions and the asks from local_c787e775 (post-ff `status`, ff time) and local_d7643dac (note `2148f99cb` reached web). After the reload, this monitor reads the rail: query wire size, `_response_row_refs` present, worker ages, 0 detector changes.
+
+## Reading 2 — Tue 11-17 1:07 PM CST (19:07Z), full page — after the I-2 load
+
+### I-2 LOADED by lane `board-query-row-refs-load` (local_bc8d3e61) — measured on the rail
+
+- **Fleet ff `92ae7490a -> 5db26434e` at 12:58:43 PM CST** (fleet reflog). `reload-web` HUP at
+  12:58:46 PM (`web.log`: "Handling signal: hup", new workers 4074414 / 4074415).
+- **It carried** `ac2cbc2fc` (render-config step 1, on disk, inert until the next down/up per the user's
+  "With next down/up") and `2148f99cb` (the paper endpoint).
+- **Same-instant A/B of the page's own query body** (`C:\tmp\railmon\refs_ab.py`, three back-to-back
+  POSTs, read-only):
+
+  | request | wire | raw | `_response_row_refs` | time |
+  |---|---|---|---|---|
+  | `row_refs: true` | **4.38 MB** | **24.25 MB** | present | 17.6 s |
+  | no `row_refs` | 11.37 MB | 61.86 MB | absent | 16.8 s |
+  | `row_refs: true` | 4.39 MB | 24.28 MB | present | 14.9 s |
+
+- **The size cut is −61% on the wire and −61% raw.** Server time did NOT drop: 14.9-17.6 s vs 16.8 s at
+  host load ~10-11. `QUERY_STAGE_MS` (refs true, 19:01:40Z) puts the time in:
+  - `hydrate_and_mirror` 8.8 s;
+  - `version_and_debug` 2.7 s (11.1 s on the 19:07:22Z refs-false request);
+  - `drop_row_diagnostics` 2.6 s;
+  - `slim` 2.1 s;
+  - `row_refs` 1.2 s.
+
+  The win is the client's download and parse, and web memory per response. See I-13 for the server time.
+- **The page sends `row_refs`:** `QUERY_STAGE_MS` at 19:01:40Z shows `"refs": true`.
+- **This monitor's own probe does NOT send it**, so its 28.4 s / 11.35 MB reading below is the refs-off
+  path. The probe will be updated to send `row_refs` and rehydrate through the page's own function
+  (this lane's files).
+- `/portfolio/paper` answered **302** in 0.08 s (a redirect). The 200 check is the load lane's.
+- Teams after the reload: 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated.
+
+### Reading 2
+
+**Slate:** 3 live chips.
+- NCAAB: Hofstra @ Murray State H2 5:45; Houston @ Rutgers H1 16:29.
+- WNCAAB: Murray State @ Oregon Q1.
+
+**Flags: 2 shown on 1 card. 0 false, 0 missed, 0 dark.**
+- Hofstra @ Murray State u152.5 (6.9 pp, calibrated; **ours 154.6, above the line**) and 2H o76.5
+  (6.9 pp).
+
+**Live rows:** 42. NCAAB 39 (17 priced <= 120 s); WNCAAB 3 (1 priced <= 120 s). 2 of 11 markets carry
+no price of ours.
+
+**Overlay (66 min):**
+| sport | builds | gap p50 / max | notes |
+|---|---|---|---|
+| NCAAB | 66 | 52 s / 287 s | **1 `deferred_slow`** |
+| WNCAAB | 65 | 55 s / **373 s** (1 over 360 s) | 7 zero-card builds with rows |
+
+- Tick gap p50 26 s, max 189 s.
+
+**Web merges:** ncaab fresh 71 / 71; wncaab 70 / 71.
+
+**#824:** 0 of 22 college `LIVE_GAMELINE_JOIN` lines since 18:03:56Z carry
+`model_projected_final_below_points_scored`. 0 college totals flags below the points scored (0 of 2).
+
+**Load:**
+- `/intelligence` 10.1 s. Query (refs off) **28.4 s** / 61.7 MB. Shortlist 1.5 s.
+- **Host load 11.1 → 10.6 → 7.5** over the reading. Board built 456 s ago.
+- CPU at 13:11 CST, no single cause: a soccer artifact build (championship, 95%), refresh-worker (95%),
+  web workers (66% + 26%), live-odds-worker (62%), `kalshi_combo_capture` (39%), a nice-19
+  `du -sb syndicate-prod-backup` (42%), a WNBA ESPN live-status fetch (59%) and a WNBA schedule fetch.
+
+**Restarts:**
+- live-odds-worker **3777750 → 4062745**: a routine recycle ("exited code=0 after 21751s", after a 200 MB
+  log rotation).
+- refresh-worker 4060729.
+
+### Improvement hunt, reading 2 — new backlog items
+
+| # | improvement | evidence | owner | next step |
+|---|---|---|---|---|
+| I-13 | **Cache the built query response per board version** instead of rebuilding it on every request | Each page query spends ~15-17 s server-side at host load ~10: `hydrate_and_mirror` 4-9 s, `version_and_debug` 2.7-11 s, `drop_row_diagnostics` 2.6-3.2 s, `slim` 0.6-2.1 s. The board changes every few minutes, but the same 5,100-row response is rebuilt and re-hashed per request. | Board-query area. The `row_refs` work's session local_bc8d3e61 has the context; no open lane on the cache. | Sent to local_bc8d3e61. A session card if it declines. |
+| I-14 | **Offseason WNBA work in November (unverified cost)** | At 13:11 CST a WNBA ESPN live-status fetch (59% CPU) and a WNBA schedule fetch were running; the WNBA season is over. Frequency not measured: the job's lines are not in the role logs. | Unknown | Measure how often these run (job log / supervisor) before calling it waste |
+| I-15 | **The monitor's probe should send `row_refs`** like the page, and rehydrate through the page's function | Since 12:58 PM the probe measures the refs-off path (28.4 s / 61.7 MB), not what users get | This lane | Update `scripts/layer2_rail_monitor_probe.py` + `layer2_rail_monitor_run.mjs`, test, land |
