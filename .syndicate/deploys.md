@@ -60630,3 +60630,12 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `KEY_PLAYER_OUT_REFUSED` 0; lines starting `Traceback` 0.
 - **NOT MET yet:** `[soccer_live_state] PLAYER_EXIT_TICK` x0 -- the line prints only when a league tick read or failed to read an in-play match (`log_tick`), so 0 is consistent with no soccer in play on a Monday evening, not proof of either. The soccer BOARD skip is on refresh-worker and waits for its next natural restart (user 11-16: "Yes, wait for it").
 - **Still owed per the lane goal:** a real mid-game key exit measured per sport (every reading above is the gate running with nothing to refuse).
+
+## 2026-11-17 00:59:08Z (6:59 PM CST 11-16) -- READING (follow-up to the 00:20:21Z deploy, todo #817, lane `nfl-gameline-kickoff-shard`): **the NFL filing line is READABLE on the fleet -- MET**
+- **source:** `C:\tmp\nflks816\marker_reading.sh "2026-11-17 00:20:21"`, read-only, run every 60 s from 00:22Z. Output: `C:\tmp\nflks816\marker_reading_postff.txt`.
+- **runs since the ff:** 87 `odds_refresh.stderr.txt` files are newer than the ff. 1 run had an `nfl_oddsapi_refresh` step, and that 1 carries the marker (1 of 1). 0 FAILED markers.
+- **the line:** `STEP_MARKER name=nfl_oddsapi_refresh [odds_book_quotes] NFL_GAMELINE_QUOTE_SHARD basis=kickoff_central captured_at=2026-11-17T00:58:22.189458+00:00 rows=2244 shards=2026-11-16:326,2026-11-19:160,2026-11-22:1614,2026-11-23:144 unfiled_no_commence_time=0 unfiled_events=-`
+- **what it also shows (the writer's own count):**
+  - The capture came at 00:58:22Z, 38 min AFTER UTC midnight. Its 326 MNF rows went to `2026-11-16`, and nothing went to `2026-11-17`. Before the 22:31:26Z load, every one of those rows went to `2026-11-17.jsonl`.
+  - This is a PREGAME capture (MNF kicks off 01:15Z), so the in-play half is still owed.
+- **still OWED:** the MNF in-play reading at 01:40Z: in-play rows in `2026-11-16.jsonl`, `INPLAY_OVERLAY sport=nfl date=2026-11-16`, and live-rail NFL game lines (`C:\tmp\nflks816\mnf_reading.sh`, watcher armed).
