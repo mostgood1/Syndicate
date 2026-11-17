@@ -44,7 +44,7 @@ def test_order_flow_counts_today_only_and_resting_age():
     assert f["resting_age_min"] == [240.0]
     found = pm.anomalies({"orders_today": f})
     assert "ORDERS failed or rejected today: 1/3 (33.3%)" in found
-    assert any(a.startswith("ORDERS resting > 120 min: 1") for a in found)
+    assert any(a.startswith("ORDERS resting order") and "resting 240 min (> 120)" in a for a in found)
 
 
 def test_settlement_lag_only_counts_started_filled_unsettled():
@@ -152,3 +152,32 @@ def test_the_paper_books_all_dates_record_is_read_from_the_worker_line():
     assert pr["rows"] == 51075 and pr["settled"] == 14605 and pr["win_pct"] == 51.03 and pr["roi_pct"] is None
     assert pr["at"] == "2026-11-17T18:11:00Z"
     assert pm.execution([older], "2026-11-17T18:05:00")["paper_record"] is None  # outside the window
+
+
+def test_a_maker_pilot_post_rests_until_kickoff_without_an_anomaly():
+    """2026-11-17: an NCAAF maker-pilot post (00:12 CST for a 6 PM kickoff) was flagged at every reading by the
+    generic 120-min rule. A pilot post rests on purpose until it fills, the fair moves, or kickoff."""
+    kick = "2026-11-18T00:00:00Z"
+    post = _order(status="submitted", execution_style="maker_pilot", idempotency_key="a1f809cad8ee",
+                  submitted_at="2026-11-17T06:12:20Z", commence_time=kick, reconciled_at="2026-11-17T15:55:00Z")
+    before = pm.order_flow([post], "2026-11-17", NOW)            # 16:00Z, 9 h 48 min resting, kickoff 8 h away
+    assert before["resting"] == 1 and before["resting_overdue"] == []
+    assert not any(a.startswith("ORDERS") for a in pm.anomalies({"orders_today": before}))
+    after = dt.datetime(2026, 11, 18, 0, 15, tzinfo=dt.timezone.utc)
+    late = pm.order_flow([dict(post, reconciled_at="2026-11-18T00:10:00Z")], "2026-11-17", after)
+    assert late["resting_overdue"][0]["why"] == "maker-pilot post still resting 15 min after kickoff"
+    assert "ORDERS resting order a1f809ca (maker_pilot): maker-pilot post still resting 15 min after kickoff" in         pm.anomalies({"orders_today": late})
+
+
+def test_any_resting_order_the_reconciler_stopped_reading_is_flagged():
+    post = _order(status="submitted", execution_style="maker_pilot", submitted_at="2026-11-17T15:00:00Z",
+                  commence_time="2026-11-18T00:00:00Z", reconciled_at="2026-11-17T15:20:00Z")
+    flow = pm.order_flow([post], "2026-11-17", NOW)
+    assert flow["resting_overdue"][0]["why"] == "not reconciled for 40 min"
+
+
+def test_a_taker_order_keeps_the_120_minute_rule():
+    young = _order(status="submitted", submitted_at="2026-11-17T15:00:00Z", reconciled_at="2026-11-17T15:58:00Z")
+    old = _order(status="submitted", submitted_at="2026-11-17T13:00:00Z", reconciled_at="2026-11-17T15:58:00Z")
+    assert pm.order_flow([young], "2026-11-17", NOW)["resting_overdue"] == []
+    assert pm.order_flow([old], "2026-11-17", NOW)["resting_overdue"][0]["why"] == "resting 180 min (> 120)"

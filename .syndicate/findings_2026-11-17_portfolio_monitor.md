@@ -521,3 +521,25 @@ One pass over every portfolio route, before any probe existed:
   Orders today 50 (49 filled, 1 resting). Cap use: kalshi 20.7%, polymarket 16.0%.
 - **Anomalies (3, unchanged):** the resting maker-pilot order (977 min); the late NHL bet (19.8 h); 1 unclassified
   load.
+
+## The "resting maker-pilot order" was a monitor false positive (user "fix the resting maker-pilot order", ~5:00 PM CST)
+
+- **The order:** key `a1f809ca`, `execution_style=maker_pilot`, NCAAF spread, Ball State +10.5 at Ohio
+  (`KXNCAAFSPREAD-26NOV17BALLOHIO-OHIO11`). A $5 post for 11 contracts, submitted 06:12:21Z
+  (`[kalshi_maker_pilot] MAKER_PILOT POST`, `tif=good_till_canceled`, `expiry=1794960000` = 2026-11-18T00:00:00Z
+  = its kickoff, 6 PM CST). 0 of 11 filled.
+  - The reconciler read it at 22:24:17Z (`resting`, `venue_open` True). The live-odds-worker re-priced the
+    ticker on 66 ticks today (`LIVE_PRICE`).
+- **Working as designed:** `cancel_stale_resting_orders` (`execution_ledger.py:4127`) exempts maker-pilot posts
+  from the 900 s stale cancel. A post's life ends in one of three ways: the venue expiry at commence, the
+  kickoff cancel, or the fair-move cancel (`kalshi_maker_pilot.review_resting`, per tick). Nothing was stuck,
+  and nothing was cancelled or changed.
+- **The defect was the probe's generic "resting > 120 min" rule.** Fixed in `scripts/portfolio_monitor_probe.py`
+  (`resting_overdue_reason`):
+  - a maker-pilot post is overdue only if it is still resting more than 10 min after its kickoff;
+  - any resting order is overdue if the reconciler has not read it for 30 min;
+  - other orders keep the 120-min rule.
+  - 3 new tests; 14 pass.
+  - On the 22:29Z payload at its own time: 1 resting, 0 overdue, so no ORDERS anomaly.
+- **Owed:** after 00:10Z, the order reads expired / not resting (Kalshi's own expiry at kickoff). If it is still
+  resting, the probe now flags it by name.

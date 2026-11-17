@@ -129,11 +129,17 @@ def order_flow(orders: Iterable[Mapping[str, Any]], today: str, now: dt.datetime
     """Today's live orders (by selected_date) by status; resting age."""
     todays = [o for o in orders if str(o.get("selected_date") or "") == today and o.get("mode", "live") == "live"]
     status = collections.Counter(str(o.get("status")) for o in todays)
-    resting = []
+    resting, overdue = [], []
     for o in todays:
-        if o.get("status") == "submitted":
-            sub = parse_ts(o.get("submitted_at"))
-            resting.append(round((now - sub).total_seconds() / 60.0, 1) if sub else None)
+        if o.get("status") != "submitted":
+            continue
+        sub = parse_ts(o.get("submitted_at"))
+        age = round((now - sub).total_seconds() / 60.0, 1) if sub else None
+        resting.append(age)
+        why = resting_overdue_reason(o, now, age)
+        if why:
+            overdue.append({"key": str(o.get("idempotency_key") or "")[:8], "style": o.get("execution_style") or "taker",
+                            "age_min": age, "why": why})
     n = len(todays)
     bad = status.get("failed", 0) + status.get("rejected", 0)
     return {
@@ -143,7 +149,36 @@ def order_flow(orders: Iterable[Mapping[str, Any]], today: str, now: dt.datetime
         "failed_or_rejected_rate": round(bad / n, 4) if n else None,
         "resting": len(resting),
         "resting_age_min": sorted((a for a in resting if a is not None), reverse=True),
+        "resting_overdue": overdue,
     }
+
+
+MAKER_KICKOFF_GRACE_MIN = 10.0   # Kalshi expires a pilot post at commence; allow the next reconcile pass
+UNREAD_RESTING_MIN = 30.0        # a resting order the reconciler has not read this long is not being watched
+
+
+def resting_overdue_reason(order: Mapping[str, Any], now: dt.datetime, age_min: float | None) -> str | None:
+    """Why a resting order is a problem, or None while it is resting as designed.
+
+    A MAKER-PILOT post rests ON PURPOSE until it fills, the fair price moves, or kickoff: it is sent
+    `good_till_canceled` with a venue expiry at commence, and `cancel_stale_resting_orders` exempts it from the
+    900 s stale cancel (lane kalshi-maker-pilot). On 2026-11-17 this probe flagged one such post (NCAAF, posted
+    00:12 CST for a 6 PM kickoff) as "resting > 120 min" at every reading; it was working as designed.
+    So a pilot post is overdue only when it is still resting after its kickoff (plus a grace for the reconcile
+    pass), or when the reconciler has stopped reading it. Any other resting order keeps the 120-min rule.
+    """
+    read = parse_ts(order.get("reconciled_at"))
+    if read is not None and (now - read).total_seconds() / 60.0 > UNREAD_RESTING_MIN:
+        return f"not reconciled for {round((now - read).total_seconds() / 60.0)} min"
+    if order.get("execution_style") == "maker_pilot":
+        start = parse_ts(order.get("commence_time"))
+        if start is None:
+            return "maker-pilot post with no commence time"
+        past = (now - start).total_seconds() / 60.0
+        return f"maker-pilot post still resting {round(past)} min after kickoff" if past > MAKER_KICKOFF_GRACE_MIN else None
+    if age_min is not None and age_min > RESTING_OLD_MIN:
+        return f"resting {age_min:.0f} min (> {RESTING_OLD_MIN:.0f})"
+    return None
 
 
 def settlement_lag(orders: Iterable[Mapping[str, Any]], now: dt.datetime, lag_h: float = SETTLE_LAG_H) -> dict[str, Any]:
@@ -390,9 +425,8 @@ def anomalies(reading: Mapping[str, Any]) -> list[str]:
     flow = reading.get("orders_today") or {}
     if flow.get("failed_or_rejected"):
         out.append(f"ORDERS failed or rejected today: {rate(flow['failed_or_rejected'], flow['orders'])}")
-    old = [a for a in flow.get("resting_age_min") or [] if a > RESTING_OLD_MIN]
-    if old:
-        out.append(f"ORDERS resting > {RESTING_OLD_MIN:.0f} min: {len(old)} (oldest {old[0]:.0f} min)")
+    for o in flow.get("resting_overdue") or []:
+        out.append(f"ORDERS resting order {o['key']} ({o['style']}): {o['why']}")
     lag = reading.get("settlement") or {}
     if lag.get("late"):
         oldest = lag["late_rows"][0]
