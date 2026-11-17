@@ -61225,3 +61225,13 @@ Lane `render-config-retirement` (session 267d8859).
   - The other 47 commits are ledger, docs or tests.
 - betting change: no. No reader changes its answer (pinned under either spelling and confirmed above), and the paper retirement touches no live bet. BC row added.
 - **verify:** the compare table above (rc 0); `status` code=91d865fd x3; `/api/ops/version` service fields from the neutral markers. **Step 3b** (delete the readers' `RENDER*` fallback) is now unblocked.
+
+## 2026-11-17 21:56Z (3:56 PM CST) -- READING (no deploy): `f7fb3ed4e` paper-page retirement verified on the fleet, plus `f8b62e6a`'s fill repair holding (lanes `paper-page-retirement`, `stuck-kalshi-fill-repair`)
+- **loaded:** by lane render-config-retirement's drained down/up at 21:53:00Z (fleet 5db26434e -> 91d865fd5; its entry 21:52:41Z, BC-037 `no`). Roles from ~21:53:15Z: web 28883, refresh-worker 28948, live-odds-worker 28949.
+- **verify -- MET (read 21:55Z, web commit 91d865fd5 per /api/ops/version):**
+  - `GET /portfolio/paper?date=2026-11-17`: **302 -> /portfolio** in 0.05 s.
+  - `GET /api/portfolio/paper?date=2026-11-17`: **410** in 0.01 s, `{"ok": false, "retired": "2026-11-17", ...}`; the error names PAPER_ALL_TIME_WRITTEN.
+  - `GET /portfolio`: 200, **no `/portfolio/paper` link** and no "Paper portfolio" text.
+  - `/api/portfolio/books` builtin `["live"]` (was `["live","paper"]`).
+- **OWED (retirement):** the first widened `PAPER_ALL_TIME_WRITTEN` line (won / lost / push / roi_pct / win_pct) from refresh-worker 28948; none yet, 3 min after boot.
+- **verify -- MET (stuck-kalshi-fill-repair):** after the 21:45:02Z operator fill, 0 `UNRECONCILABLE_ORDER key='f8b62e6a…'` lines over live-odds-worker's 4 and refresh-worker's 6 execution passes (across the restart). `/api/portfolio/live` unreconciled 0.
