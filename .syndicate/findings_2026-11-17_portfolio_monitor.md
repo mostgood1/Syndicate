@@ -385,3 +385,44 @@ One pass over every portfolio route, before any probe existed:
   one build took **64.24 s**. Its WARMED line carries no pid, so a warm still running when its worker was killed
   would leave no line. Next test: `build_s` over the day against the kill times, from warmer STARTED to
   WARMED / kill.
+
+## Reading 7 — Tue 11-17 1:58 PM CST (19:58Z), window 55 min — after a Windows restart
+
+- **Fleet event:** Windows was restarted from the Start menu at 13:48:57 CST (System event 1074,
+  StartMenuExperienceHost, on behalf of the signed-in user, reason "Other"); LastBootUpTime 13:50:05.
+  - The fleet was not drained. It came back LIVE by itself: WSL up 13:51:05, web / refresh-worker /
+    live-odds-worker pids 496 / 560 / 561 from ~19:51:20Z, supervisor `LOCAL PRODUCTION UP ... commit=5db26434e310`.
+  - All Claude sessions restarted with it. My 2:01 PM loop wakeup did not fire; this reading was taken by hand.
+- **Balance read failure 1.5 min before the restart:** `[live_odds_worker] VENUE_BALANCES error` at
+  19:47:19Z, Kalshi `balance_auth_error`, Polymarket `balance_path_unknown`. Cause unknown; it preceded the
+  restart click.
+- **Zero caps on the page for ~9 min, display only:**
+  - The new live-odds-worker stamped its execution state at boot, ~19:51:19Z. That was 3 s before its first
+    balance read (19:51:22Z, both ok), so the stamp carried the 19:47 failure: `fail_closed` for both
+    venues, every dollar cap 0.
+  - The page shows the worker's stamp (`read_execution_state`), so `/portfolio` showed zero caps.
+  - The worker's own enforced caps were nonzero at 19:51:54Z and 19:52:21Z (`[execute_portfolio] LIMITS`),
+    and its ticks refused only `outside_price_band`. No live bet was blocked by it.
+  - Healed by the next stamp, 20:00:03Z: caps nonzero, `fail_closed` empty, caps from the 13:51:22 read.
+- **What the restart loaded:**
+  - refresh-worker: 92ae7490a..5db26434e, newly. That is the launcher change, lane tools, the board-query
+    `row_refs` response, and `2148f99cb`'s `write_paper_all_time`. No betting change.
+  - live-odds-worker: d7c183d8d..5db26434e (it had run since the morning). Of the execution files, only
+    `execution_ledger.py` changed (+54, `2148f99cb`, display). #814's MLB entry hold reaches it now; MLB is
+    out of season, so no bet is affected, as BC-022 said.
+  - Recorded in deploys.md as a READING with `betting change: no`, so the register is not blind to it.
+- **Endpoints:**
+  - **`/api/portfolio/settings` 13.31 s** (budget 2 s; 0.0-0.12 s all day), on a web 6.5 min after a cold
+    start. Watching, not acting.
+  - The other six read 200 inside budget (`live` 2.16 s).
+  - Web: 0 kills since the restart; 0 browser requests.
+- **Plan:** 36.5 min old (the refresh-worker restarted mid-cycle). Board 5,100 -> suggested 85 -> sized 25
+  -> positions 11.
+- **Live plan kalshi 19:21Z:** 877 -> 30 placeable -> 9 positions.
+- **Execution, 55 min:** 12 live ticks; 3 placed (kalshi); 0 failed; 64 refused `outside_price_band`.
+- **Orders today:** 36 (35 filled, 1 resting). `unknown_submits` 0 after the restart, so no order was lost
+  mid-submit.
+- **Paper record:** no `PAPER_ALL_TIME_WRITTEN` line yet. The writer is now loaded on the refresh-worker;
+  expect it after its first settle pass. That line has rows / settled / pending only until `f7fb3ed4e` loads.
+- **Unchanged anomalies:** unreconciled `f8b62e6a`; the resting maker-pilot order (826 min); the late NHL bet
+  (17.3 h); the 2 unclassified loads (16:17Z, 17:01Z), handed to their lanes.

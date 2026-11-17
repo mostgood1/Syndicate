@@ -61130,3 +61130,12 @@ Lane `render-config-retirement` (CLOSED; session 267d8859). It follows the 18:58
   - `ac2cbc2fc`: this was the first `up` built by `fleet_role_spec.json` + `fleet_env/`, and it started all three roles. It printed `[web] 1 declared key(s) with no value in any layer: ANTHROPIC_API_KEY`; whether that matches the old launcher is for lane `render-config-retirement` to read.
   - Nothing that places, sizes, holds or exits a live bet, so betting change: no.
 - **Owed by lane `render-config-retirement`:** its post-`up` reading, that each role's /proc environ equals the pre-up one except `RENDER_GIT_COMMIT` / `RENDER_INSTANCE_ID`. It has been told.
+
+## 2026-11-17 19:51:20Z (1:51 PM CST) -- READING (no deploy by a session): Windows restarted from the Start menu, the fleet came back LIVE undrained on 5db26434e (lane `portfolio-monitor`)
+- betting change: no
+- **event:** System event 1074 at 13:48:57 CST (StartMenuExperienceHost, on behalf of the signed-in user, reason "Other"); LastBootUpTime 13:50:05 CST. WSL up 13:51:05; supervisor `LOCAL PRODUCTION UP ... commit=5db26434e310`; web / refresh-worker / live-odds-worker pids 496 / 560 / 561 (etimes 537 s at 20:00:17Z). No `down` first.
+- **loads, newly:**
+  - refresh-worker: 92ae7490a..5db26434e (launcher role spec, lane tools, `row_refs`, and `2148f99cb`'s paper all-dates writer).
+  - live-odds-worker: d7c183d8d..5db26434e. Its execution files changed only in `execution_ledger.py` (+54, display); #814's MLB entry hold (MLB out of season, no bet affected).
+  - Classified `no`: nothing that changes which live bets are placed, sized, held or exited.
+- **portfolio reading:** a balance read failed at 19:47:19Z, before the restart (Kalshi `balance_auth_error`, Polymarket `balance_path_unknown`). The new worker's boot stamp (~19:51:19Z, 3 s before its first good balance read) showed every dollar cap at 0 on `/portfolio` until the 20:00:03Z stamp. The worker's enforced caps were nonzero at 19:51:54Z / 19:52:21Z. `unknown_submits` 0. Detail: `.syndicate/findings_2026-11-17_portfolio_monitor.md` Reading 7.
