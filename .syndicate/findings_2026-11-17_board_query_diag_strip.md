@@ -185,3 +185,29 @@ list gains `rationale`).
   - the served `/api/intelligence/query` Content-Length, ~5.7 -> ~4.6 MB gzipped with `row_refs`;
   - `_dropped_row_fields` lists `rationale`;
   - top_live rows carry no `trace`.
+
+## Loaded `[2026-11-17 21:56:24Z (3:56 PM CST), lane board-query-diag-strip-load]`
+
+- **The load.** User "Load it", then the option "Carry them (Recommended)" for the ride-alongs.
+  - Lane `render-config-retirement` first restarted the fleet onto `91d865fd5` (21:53:00Z), which loaded the ride-alongs.
+  - This lane then ran `git merge --ff-only 25fc2e4f0` at 21:56:24Z and `reload-web` (failures 0, web workers 30025/30026). The workers were not restarted; their code is identical to `91d865fd5`.
+- **Readings** (the page's body plus `row_refs`, `C:\tmp\rowrefs827\read_query.py`):
+
+  | | before (21:55:37Z, `91d865fd5`) | after (21:56:36Z, `25fc2e4f0`) |
+  |---|---|---|
+  | gzipped | 4,429,180 B | **3,962,869 B (89.5%)** |
+  | uncompressed | 24,427,841 B | 21,723,439 B |
+  | time | 11.8 s | 8.9 s |
+  | `top_opportunities` rows carrying `rationale` | 4,500 of 4,500 | **0 of 4,500** |
+  | `top_live_opportunities` rows carrying trace / score_breakdown / rationale | 4 / 4 / 4 of 4 | **0 / 0 / 0 of 7** |
+
+- **Why the cut is 10.5% here, against 19.6% on the recorded 11-16 response:**
+  - top_live had 6,528 rows on that response and had 4-7 at load time, so tonight the cut is mostly `rationale`;
+  - it grows with the number of live rows.
+- `_dropped_row_fields` reads `["trace", "score_breakdown", "rationale"]` (read ~22:01Z).
+- `QUERY_STAGE_MS` at 21:56:43Z: `refs` true, `row_refs` 241.9 ms.
+- **The fleet's `/intelligence` page, headless:**
+  - 0 page errors;
+  - "Showing 1,347 of 2,238 plays", 7 live, rail drawn;
+  - the 18 console errors are the known `cdn.nba.com` logo failures.
+- Record: deploys.md 21:56:24Z, BC-038 (no).

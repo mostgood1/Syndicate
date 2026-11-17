@@ -61235,3 +61235,34 @@ Lane `render-config-retirement` (session 267d8859).
   - `/api/portfolio/books` builtin `["live"]` (was `["live","paper"]`).
 - **OWED (retirement):** the first widened `PAPER_ALL_TIME_WRITTEN` line (won / lost / push / roi_pct / win_pct) from refresh-worker 28948; none yet, 3 min after boot.
 - **verify -- MET (stuck-kalshi-fill-repair):** after the 21:45:02Z operator fill, 0 `UNRECONCILABLE_ORDER key='f8b62e6a…'` lines over live-odds-worker's 4 and refresh-worker's 6 execution passes (across the restart). `/api/portfolio/live` unreconciled 0.
+
+## 2026-11-17 21:56:24Z (3:56 PM CST) -- DEPLOY (ff + reload-web): fleet `91d865fd5` -> `25fc2e4f0`, loading the board-query diagnostic strip (todo #827, lane `board-query-diag-strip-load`) -- **MET: the page's query 4,429,180 -> 3,962,869 B gzipped; `rationale` gone from all 4,500 `top_opportunities` rows, and the 7 `top_live_opportunities` rows carry no trace, score_breakdown or rationale**
+- betting change: no
+- **what:** `25fc2e4f0` is web-only. `drop_row_diagnostics` now also strips `top_live_opportunities`, `rationale` is dropped from every stripped list, and the page restores top_live's row aliases. The only other file over `91d865fd5` is `scripts/probability_differential.py` (`e675aa360`), which no role runs. Worker code is identical to `91d865fd5`.
+- **decision:** the user said "Load it". For the ride-alongs, the user selected the option "Carry them (Recommended)" (the paper retirement `f7fb3ed4e` plus render-config steps 2 + 3a). Those ride-alongs were loaded first by lane `render-config-retirement`'s own drained down/up onto `91d865fd5` at 21:53:00Z (entry 21:52:41Z, BC-037). That lane chose to keep its target and asked this lane to ff + reload-web after it; it released all three claims at 21:55:12Z.
+- **gates:**
+  - claim web at 21:55:2xZ (holder `board-query-diag-strip-load`, ACQUIRED, rc 0);
+  - the ff touches none of the fleet checkout's dirty paths (24 incoming files);
+  - preflight `--service web --target-commit 25fc2e4f0`, run from a worktree at origin/main `d87e34c0f`, with 4 expect/baseline pairs read at 21:55:37Z: **CLEAR 21:56:12Z** (0 processes).
+- **ff + reload** (`C:\tmp\rowrefs827\ff_reload.sh 25fc2e4f0`):
+  - `git merge --ff-only 25fc2e4f0` at **21:56:24Z**;
+  - `local_production.py reload-web`: `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "state": "done"}`;
+  - web workers 28895/28896 -> **30025/30026**, master 28883 unchanged. Done 21:56:26Z.
+- **expect / measured** (each read is the page's own body plus `row_refs`, by `C:\tmp\rowrefs827\read_query.py`; the baseline is from 21:55:37Z, after the 21:53Z up, at `91d865fd5`):
+  - `web_commit` 91d865fd -> 25fc2e4f: **MET**. Fleet HEAD `25fc2e4f0b86`, and the new web workers booted after the ff.
+  - `page_query_wire_bytes` 4,429,180 -> below it: **MET, 3,962,869 B (89.5%)**.
+    - Uncompressed it went 24,427,841 -> 21,723,439 B, and the time 11.8 s -> 8.9 s.
+    - A headless page load at ~21:57Z got 3,971,419 B.
+    - This is a smaller cut than the recorded 11-16 response's 80%, because top_live had 6,528 rows on that response and has 4-7 now. The rest of the cut is `rationale`.
+  - `top_opportunities_rows_with_rationale` 4,500 of 4,500 -> **0 of 4,500: MET**.
+  - `top_live_rows_with_trace_score_breakdown_rationale` 4 of 4 -> **0 of 7: MET**.
+  - In `web.log` at 21:56:43Z, `QUERY_STAGE_MS` reads `"refs": true`, `row_refs` 241.9 ms and `version_and_debug` 871.2 ms. There were 0 `WEB_WORKER_MEMORY_RECYCLE` / Traceback / WORKER TIMEOUT lines from 21:56 to the read.
+  - **The served page.** Headless Chromium opened the fleet's `/intelligence` (`C:\tmp\rowrefs826\fleet_page.py`):
+    - it sent `row_refs: true` and got the query back as a 200;
+    - **0 page errors**;
+    - "Showing 1,347 of 2,238 plays", with 7 live, 2,694 card nodes and the rail drawn;
+    - `_response_row_refs` was gone after the rebuild.
+    - The 18 console errors are all `ERR_HTTP2_PROTOCOL_ERROR`. With the query ABORTED, the same page fails 12 `cdn.nba.com` loads (`failed_resources.py`), so they are logos, not this change.
+- **Workers untouched:** refresh-worker 28948 and live-odds-worker 28949 were both alive at ~21:58Z.
+- **Record:** BC-038 (no). Claim web released at ~21:59:40Z.
+- **Not mine to verify:** `/api/portfolio/paper` answers 401 and `/portfolio/paper` answers 302 to the login page without a sign-in. I did not sign in. Lane `paper-page-retirement` verified the 410 and the redirect, signed in, at 21:56Z (entry above).
