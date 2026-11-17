@@ -1077,6 +1077,14 @@ death, never life — do not invert it.
 - Verification: Before/after: (Get-Item ext4.vhdx).Length + Get-PSDrive C Free in the same command; local_production.py status shows web/refresh-worker/live-odds-worker/redis up with money: LIVE; /healthz 200; recorded in deploys.md; claims released.
 - Blocked by: none (window + every delete need the user's explicit go-ahead)
 
+### nba-f1-props-read — OPEN — opened 2026-11-17 — session b44f64ce-a648-4698-9792-51714c8aaecc
+- Goal: todo #821 props read (user 'do the props read too'): how far F1 + outs-off moves what NBA props (and game lines) SERVE pregame, measured with the real engine and the fleet's own calibration + book-blend constants; the live re-sim pathway sized; written to the findings note, todo #821 and state.
+- Files: .syndicate/findings_2026-11-16_nba_margin_raw_zero.md (the props read section only), docs/ai_context/todo.md (#821 section only), .syndicate/state_basketball.md (one bullet in [nba-sim-totals-and-strength] only)
+- Hypothesis: Pregame served NBA prop and game-line probabilities barely move, because the book blend weights the model 0 to 0.1 and the prop calibration passes 4.5-7.5 percent of a sim rate change; the live re-sim is the material pathway.
+- Falsification test: A served-probability shift above 1 pp on average in any market, or a validity-gate miss.
+- Verification: p1_shift.py on 8 graded games: validity gate <= 1e-9; served shifts reported per stat; findings section on main.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
