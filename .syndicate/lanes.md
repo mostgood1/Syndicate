@@ -903,6 +903,14 @@ death, never life — do not invert it.
 - Verification: pytest on the two segment test files; after the load, on TNF 11-19: quarter/half capture gaps from the shard (expect about one lines-run apart, under 300 s), share of NFL overlay builds with fresh quarter/half rows (was 69 of 136 on MNF), Games Rail polls serving NFL game rows, and the NFL segment credits per live game-hour
 - Blocked by: none
 
+### lane-claims-checker-speed — OPEN — opened 2026-11-17 — session f60eabcb
+- Goal: check_lane_claims.py measurably faster (same-instant A/B on the primary tree, serial and alongside the other session-start checks) with byte-identical stdout and exit code; follow-up of lane-claims-parse-memo, which left it the session-start critical path
+- Files: `scripts/check_lane_claims.py`, `tests/test_check_lane_claims_speed.py` (new)
+- Hypothesis: Measured 2026-11-17 before any change: _near_miss runs difflib.get_close_matches over all 21,556 tracked basenames for each of 18-19 unresolved claims (388,008 candidate checks, 1.2-1.8 s in-process); git ls-files is ~0.3 s, near its process floor. Dropping candidates that fail difflib's own length test (real_quick_ratio) or a C-level upper bound on quick_ratio (characters absent from the claim) cannot change the answer, and cut the stage's CPU 656-703 -> 156-219 ms in a prototype.
+- Falsification test: Any stdout or exit-code difference between old and new on the primary tree, any get_close_matches result that differs on a test population, or no speedup in alternating pairs.
+- Verification: Alternating old/new pairs on the primary tree (serial and concurrent with the other eight checks), stdout + rc compared per pair; existing check_lane_claims tests; new equivalence test; findings file .syndicate/findings_2026-11-17_lane_claims_checker_speed.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
