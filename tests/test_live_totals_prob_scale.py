@@ -57,7 +57,8 @@ def _row(market="totals", line=LINE, *, segment="full", quote_at: datetime = LAN
     sides = ["over", "under"] if market == "totals" else ["home", "away"]
     return {"kind": "game", "market": market, "segment": segment, "line": line, "sides": sides,
             "away_team": AWAY, "home_team": HOME, "age_seconds": 20.0, "updated_at": quote_at.isoformat(),
-            "game": {"state": "live"}, "projection": {"market_fair_prob_over": market_prob}}
+            "game": {"state": "live", "home_score": 70, "away_score": 62},  # #824: a live score below the projection
+            "projection": {"market_fair_prob_over": market_prob}}
 
 
 def _attach(rows, sport):

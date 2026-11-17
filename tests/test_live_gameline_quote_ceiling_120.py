@@ -52,7 +52,8 @@ def _row(market="h2h", line=None, *, age, quote_at: datetime = LANE_AT, market_p
     # re-sim saw) passes it, so only the quote's AGE differs between the priced and the refused row.
     return {"kind": "game", "market": market, "segment": "full", "line": line, "sides": sides,
             "away_team": AWAY, "home_team": HOME, "age_seconds": age, "updated_at": quote_at.isoformat(),
-            "game": {"state": "live"}, "projection": {"market_fair_prob_over": market_prob}}
+            "game": {"state": "live", "home_score": 70, "away_score": 62},  # #824: a live score below the projection
+            "projection": {"market_fair_prob_over": market_prob}}
 
 
 def _attach(rows, sport):

@@ -34,6 +34,10 @@ untouched; only the served probability moves, and the engine's own number is kep
 SWITCH: `SYNDICATE_COLLEGE_TOTAL_CALIBRATION=off` (0 / false / no) serves every line raw, as before; absent = on.
 A league or phase with fewer than MIN_GAMES graded games in the window writes an UNCALIBRATED entry and is served
 raw by name. `scripts/fit_college_total_calibration.py` runs the fit by hand and prints the walk-forward.
+
+SPREAD ONLY (2026-11-17, built, not served): `FIT_LEVEL = False` makes the daily refit fix a = 0 and fit c alone, so no
+line leans by a league-wide level. Re-graded 11-17 through 11-16's slate (findings § "2026-11-17"): live walk-forward
+spread + level 0.2240, spread only 0.2281, market 0.2296; pregame spread only fits c = 0 and serves the market.
 """
 from __future__ import annotations
 
@@ -60,6 +64,12 @@ C_RANGE = (0.0, 1.0)       # 1.0 = trust the model's whole disagreement, as serv
 RIDGE = 1.0                # on `a`, in game-weight units: a level needs games before it moves
 EPS = 0.01
 ENV_SWITCH = "SYNDICATE_COLLEGE_TOTAL_CALIBRATION"
+# WHETHER THE DAILY REFIT FITS THE LEVEL `a` (True, "Spread + level", the user's 2026-11-16 choice) or fixes it at 0
+# and fits the spread `c` alone (False). A code default, not an env key: the fleet builds env once at `up`, and the
+# refit runs in the refresh-worker, so one claimed restart plus a rewritten fit file is what changes it.
+FIT_LEVEL = True
+LEVEL_FITTED = "fitted"
+LEVEL_ZERO = "zero"
 _FILE_RE = re.compile(r"total_prob_calibration_(\d{4})_asof_(\d{8})\.json$")
 
 
@@ -89,6 +99,7 @@ class TotalCalibration:
     cov_ac: float = 0.0
     games: float = 0.0
     source: str = ""
+    level: str = LEVEL_FITTED
 
     def apply(self, p_raw: float, p_mkt: float) -> float:
         lm = _logit(p_mkt)
@@ -107,14 +118,17 @@ class TotalCalibration:
 
     def stamp(self) -> dict[str, Any]:
         return {"phase": self.phase, "as_of": self.as_of.isoformat(), "a": round(self.a, 4), "c": round(self.c, 4),
-                "games": round(self.games, 1), "source": self.source}
+                "games": round(self.games, 1), "source": self.source, "level": self.level}
 
 
 # ------------------------------------------------------------------------------------------------ the fit
 
-def fit(rows: Sequence[tuple[float, float, float, float]]) -> dict[str, Any]:
+def fit(rows: Sequence[tuple[float, float, float, float]], *, level: bool = True) -> dict[str, Any]:
     """Weighted logistic with offset: y ~ sigmoid(off + a + c*x), rows (x, off, y, w). Newton; ridge RIDGE on a, a
-    whisper on c. Returns a, c, their covariance (inverse Hessian, game-weight units) and the clamps applied."""
+    whisper on c. Returns a, c, their covariance (inverse Hessian, game-weight units) and the clamps applied.
+
+    `level=False` (SPREAD ONLY) fixes a = 0 and fits c alone, so a line moves only by its own disagreement with the
+    market and never by a league-wide lean; var_a and cov_ac are then 0."""
     a, c = 0.0, 0.5
     h_aa = h_ac = h_cc = 0.0
     for _ in range(60):
@@ -131,6 +145,12 @@ def fit(rows: Sequence[tuple[float, float, float, float]]) -> dict[str, Any]:
         h_aa += RIDGE
         g_c -= 0.01 * c
         h_cc += 0.01
+        if not level:
+            dc = g_c / h_cc if h_cc > 0.0 else 0.0
+            c += dc
+            if abs(dc) < 1e-10:
+                break
+            continue
         det = h_aa * h_cc - h_ac * h_ac
         if det <= 0.0:
             break
@@ -138,8 +158,11 @@ def fit(rows: Sequence[tuple[float, float, float, float]]) -> dict[str, Any]:
         a, c = a + da, c + dc
         if abs(da) + abs(dc) < 1e-10:
             break
-    det = h_aa * h_cc - h_ac * h_ac
-    var_a, var_c, cov = (h_cc / det, h_aa / det, -h_ac / det) if det > 0 else (0.0, 0.0, 0.0)
+    if level:
+        det = h_aa * h_cc - h_ac * h_ac
+        var_a, var_c, cov = (h_cc / det, h_aa / det, -h_ac / det) if det > 0 else (0.0, 0.0, 0.0)
+    else:
+        var_a, var_c, cov = 0.0, (1.0 / h_cc if h_cc > 0.0 else 0.0), 0.0
     clamped: list[str] = []
     if not A_RANGE[0] <= a <= A_RANGE[1]:
         clamped.append(f"a {a:.3f}")
@@ -148,7 +171,7 @@ def fit(rows: Sequence[tuple[float, float, float, float]]) -> dict[str, Any]:
         clamped.append(f"c {c:.3f}")
         c = min(C_RANGE[1], max(C_RANGE[0], c))
     return {"a": a, "c": c, "var_a": var_a, "var_c": var_c, "cov_ac": cov, "clamped": clamped,
-            "games": sum(w for *_, w in rows), "rows": len(rows)}
+            "games": sum(w for *_, w in rows), "rows": len(rows), "level": LEVEL_FITTED if level else LEVEL_ZERO}
 
 
 def brier(rows: Sequence[tuple[float, float, float, float]], a: float, c: float) -> dict[str, float]:
@@ -179,7 +202,8 @@ def _walk_forward_verdict(wf: Mapping[str, Any]) -> Optional[str]:
     return None
 
 
-def walk_forward(by_date: Mapping[str, Sequence[tuple[float, float, float, float]]], *, min_train: float = 40.0) -> dict[str, Any]:
+def walk_forward(by_date: Mapping[str, Sequence[tuple[float, float, float, float]]], *, min_train: float = 40.0,
+                 level: bool = True) -> dict[str, Any]:
     """Fit on every earlier date, score the next; pooled Brier over the scored dates (game-weighted)."""
     dates = sorted(by_date)
     pooled = {"market": 0.0, "raw": 0.0, "calibrated": 0.0}
@@ -189,7 +213,7 @@ def walk_forward(by_date: Mapping[str, Sequence[tuple[float, float, float, float
         train = [row for d in dates[:i] for row in by_date[d]]
         if sum(w for *_, w in train) < min_train or not by_date[day]:
             continue
-        f = fit(train)
+        f = fit(train, level=level)
         b = brier(by_date[day], f["a"], f["c"])
         w = b["games"]
         for k in pooled:
@@ -291,11 +315,12 @@ def calibration_path(league: str, season: int, as_of: dt.date) -> Path:
 
 
 def refresh(league: str, *, today: dt.date, window_days: int = WINDOW_DAYS, floor: dt.date = FIT_FLOOR,
-            write: bool = True) -> dict[str, Any]:
+            write: bool = True, level: Optional[bool] = None) -> dict[str, Any]:
     """Fit both phases on this season's games dated max(floor, today - window_days) .. today - 1; write the file
-    every game dated after that reads."""
+    every game dated after that reads. `level` None = FIT_LEVEL (the served default); False fits the spread alone."""
     from syndicate.features.ncaab import live_team_model as tm
 
+    level = FIT_LEVEL if level is None else bool(level)
     as_of = today - dt.timedelta(days=1)
     season = tm.espn_season_for(today)
     first = max(floor, as_of - dt.timedelta(days=window_days - 1))
@@ -307,6 +332,7 @@ def refresh(league: str, *, today: dt.date, window_days: int = WINDOW_DAYS, floo
         day += dt.timedelta(days=1)
     payload: dict[str, Any] = {"league": league, "season": season, "as_of": as_of.isoformat(),
                                "window": [dates[0], dates[-1]] if dates else [], "phases": {},
+                               "level": LEVEL_FITTED if level else LEVEL_ZERO,
                                "fitted_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     for phase, builder in (("pregame", pregame_fit_rows), ("live", live_fit_rows)):
         by_date = {d: builder(league, d) for d in dates}
@@ -315,8 +341,8 @@ def refresh(league: str, *, today: dt.date, window_days: int = WINDOW_DAYS, floo
         if games < MIN_GAMES:
             payload["phases"][phase] = {"calibrated": False, "reason": f"{games:.0f} graded games < {MIN_GAMES}", "games": round(games, 1)}
         else:
-            f = fit(rows)
-            wf = walk_forward(by_date)
+            f = fit(rows, level=level)
+            wf = walk_forward(by_date, level=level)
             entry = {**{k: (round(v, 6) if isinstance(v, float) else v) for k, v in f.items()},
                      "in_sample": brier(rows, f["a"], f["c"]), "walk_forward": wf}
             # SELF-GATED ON OUTCOMES (learnings 2026-11-11: a served-distribution change is judged on outcomes): the
@@ -325,7 +351,7 @@ def refresh(league: str, *, today: dt.date, window_days: int = WINDOW_DAYS, floo
             verdict = _walk_forward_verdict(wf)
             payload["phases"][phase] = {"calibrated": verdict is None, **entry, **({"reason": verdict} if verdict else {})}
         entry = payload["phases"][phase]
-        print(f"[college_total_calibration] FIT league={league} phase={phase} as_of={as_of} games={entry.get('games')} "
+        print(f"[college_total_calibration] FIT league={league} phase={phase} as_of={as_of} level={payload['level']} games={entry.get('games')} "
               + (f"a={entry['a']:+.4f} c={entry['c']:.4f}" + (f" clamped={','.join(entry['clamped'])}" if entry.get("clamped") else "")
                  if "a" in entry else "")
               + ("" if entry.get("calibrated") else f" UNCALIBRATED reason={entry.get('reason')!r}"), flush=True)
@@ -398,6 +424,6 @@ def calibration_for(league: str, phase: str, game_date: dt.date, *, env: Optiona
         return TotalCalibration(league=league, phase=phase, as_of=max(found), a=float(entry["a"]), c=float(entry["c"]),
                                 var_a=float(entry.get("var_a") or 0.0), var_c=float(entry.get("var_c") or 0.0),
                                 cov_ac=float(entry.get("cov_ac") or 0.0), games=float(entry.get("games") or 0.0),
-                                source=path.name)
+                                source=path.name, level=str(entry.get("level") or LEVEL_FITTED))
     except (KeyError, TypeError, ValueError):
         return None

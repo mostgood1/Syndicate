@@ -856,6 +856,69 @@ def lane_age_verdict(as_of: Any, now: datetime, sport: Any = None) -> dict[str, 
     return None
 
 
+# A LIVE TOTAL WHOSE PROJECTED FINAL IS BELOW THE POINTS ALREADY SCORED IS NOT PRICED (`#824`, lane
+# ncaab-total-overprojection; user 2026-11-16 "Iona UMBC end game and PV/OSU end of half ... We need to find a solve").
+#
+# The gates above judge the quote and the lane's AGE. Neither sees a model that is behind the SCORE: Iona @ UMBC's
+# lane, 103-257 s old (under the 600 s ceiling), projected a final of 133.3 with 137 already on the board, and its
+# under 138.5 flag (-17 pp) lost. A final below the points scored is impossible, so the row's own data contradicts it.
+#
+# MEASURED, NCAAB fleet ledgers 11-08..11-16, priced full-game totals graded on ESPN finals (`C:\tmp\ncal816\endgame\
+# grade_guard*.py`; findings_2026-11-16_ncaab_total_overprojection.md): 128 graded priced records (0.5%, 50 games)
+# carried a final below the points scored. Their under flags hit 0.430 against a 0.520 price (-8.9 +- 5.6 pp, 47
+# games); the 2026-11-16 read over every ledger date gave 0.420 +- 0.044 (71 games). Their over flags "won" 18 of 18,
+# on lines the game had already passed: prices nobody could still take.
+#
+# NOT REFUSED, ON THE SAME DATA: a lane merely BEHIND the score. Flags priced while the board's score differed from the
+# score the model simulated from, inside the last 2:00 of the first half / 5:00 of the second / OT, hit ABOVE their
+# price (+11.5 +- 1.8 pp, totals, 285 games), and so did projected finals 0-3 points above the score (+15 to +18 pp).
+# Refusing those would cut winners; this guard takes only the contradiction.
+#
+# MEASURED SPORTS ONLY (college basketball: the same lane producer). An absent score or projection REFUSES (`unknown
+# must not default permissive`): 0 of 28,792 priced NCAAB full-game totals records lacked either, so that branch firing
+# is a bug report. Switch `SYNDICATE_LIVE_MODEL_BEHIND_SCORE_GUARD`: `on` (absent, or anything unrecognised) refuses;
+# `shadow` prices as before and counts what it would refuse (`model_behind_score_would_refuse`); `off` skips it.
+MODEL_BEHIND_SCORE_ENV = "SYNDICATE_LIVE_MODEL_BEHIND_SCORE_GUARD"
+REASON_MODEL_BEHIND_SCORE = "model_projected_final_below_points_scored"
+REASON_SCORE_OR_PROJECTION_ABSENT = "row_carries_no_score_or_projected_total"
+_MODEL_BEHIND_SCORE_SPORTS = frozenset({"ncaab", "wncaab"})
+
+
+def model_behind_score_mode(env: Mapping[str, str] | None = None) -> str:
+    """`on` (absent or anything unrecognised), `shadow`, or `off`; a typo can never put the contradiction back on the
+    price."""
+    raw = str((env if env is not None else os.environ).get(MODEL_BEHIND_SCORE_ENV) or "").strip().lower()
+    if raw == "shadow":
+        return "shadow"
+    if raw in {"off", "0", "false", "no"}:
+        return "off"
+    return "on"
+
+
+def model_behind_score_verdict(market: Any, segment: Any, sport: Any, total_mean: Any,
+                               home_score: Any, away_score: Any) -> dict[str, Any] | None:
+    """`None` if the row may be priced; a refusal verdict, shaped like `lane_age_verdict`'s, when a full-game total's
+    projected final is below the points already scored. Other markets, segments and unmeasured sports return None."""
+    if str(market or "").strip().lower() not in _TOTALS_MARKETS:
+        return None
+    if str(segment or "").strip().lower() not in _FULL_GAME_SEGMENTS:
+        return None
+    if str(sport or "").strip().lower() not in _MODEL_BEHIND_SCORE_SPORTS:
+        return None
+    try:
+        projected = float(total_mean)
+        scored = float(home_score) + float(away_score)
+    except (TypeError, ValueError):
+        projected = scored = float("nan")
+    if not (math.isfinite(projected) and math.isfinite(scored)):
+        return {"priceable": False, "withheld_reason": REASON_SCORE_OR_PROJECTION_ABSENT,
+                "model_prob": None, "market_prob": None, "edge_pp": None}
+    if projected < scored:
+        return {"priceable": False, "withheld_reason": REASON_MODEL_BEHIND_SCORE,
+                "model_prob": None, "market_prob": None, "edge_pp": None}
+    return None
+
+
 _TOTALS_MARKETS = frozenset({"totals", "total", "totals_alt", "alternate_totals"})
 _SPREAD_MARKETS = frozenset({"spreads", "run_line", "ats", "spreads_alt", "alternate_spreads"})
 _DIST_MARKETS = _TOTALS_MARKETS | _SPREAD_MARKETS
@@ -1112,6 +1175,13 @@ def live_gameline_from_lens(
             # When the last score change the re-sim saw happened (NCAAB lanes, `#762`); judged by
             # `quote_behind_score_verdict`. Absent on other lanes and older snapshots: the state-fetch rule applies.
             "score_changed_at": lens.get("liveScoreChangedAt"),
+            # THE STATE THE RE-SIM STARTED FROM (NCAAB/WNCAAB publish it on the projection, `ncaab/live_resim.
+            # build_game_lens`): its score, period and clock. Carried to the ledger (#824) so a model that is behind the
+            # board can be graded by how far behind it was; None on every lane that does not publish them.
+            "state_home_score": projection.get("homeScore"),
+            "state_away_score": projection.get("awayScore"),
+            "state_period": projection.get("period"),
+            "state_clock_seconds": projection.get("clockSeconds"),
             "carried_forward": bool(lens.get("liveStateCarriedForward")),
             "lane": lens.get("key"),
             # LINE-SPECIFIC ANALYTIC PROBABILITIES, where the producer publishes
@@ -2359,6 +2429,10 @@ def attach_live_gamelines(
     coverage["lane_age_would_refuse"] = {}
     coverage["lane_age_would_refuse_priced"] = {}
     lane_shadow: list[tuple[Mapping[str, Any], str]] = []
+    # #824's switch (`MODEL_BEHIND_SCORE_ENV`, default on) and, in shadow, what it would have refused, by sport.
+    behind_mode = model_behind_score_mode()
+    coverage["model_behind_score_guard"] = behind_mode
+    coverage["model_behind_score_would_refuse"] = {}
     if not isinstance(grid, (list, tuple)):
         return coverage
 
@@ -2597,6 +2671,19 @@ def attach_live_gamelines(
             continue
 
         projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+        # #824: a full-game total whose projected final is below the points already on the board. After the quote and
+        # lane gates, so they count exactly what they did before. Written through `_apply_verdict`, so the row loses
+        # its edge, carries the reason, and reaches the ledger with the projection and the score that contradict.
+        if behind_mode != "off":
+            behind = model_behind_score_verdict(market_key, segment, hit.get("sport") or sport, hit.get("total_mean"),
+                                                game.get("home_score"), game.get("away_score"))
+            if behind is not None:
+                if behind_mode == "on":
+                    _apply_verdict(row, projection, behind, hit, coverage, sport=sport)
+                    continue
+                key_sport = str(hit.get("sport") or sport or "").strip().lower()
+                would = coverage["model_behind_score_would_refuse"]
+                would[key_sport] = int(would.get(key_sport, 0)) + 1
         if hit.get("segment_margin_unanchored") and market_key not in _TOTALS_MARKETS:
             verdict = {"priceable": False, "withheld_reason": REASON_SEGMENT_MARGIN_UNANCHORED}
             _apply_verdict(row, projection, verdict, hit, coverage, sport=sport)
@@ -2774,6 +2861,9 @@ def _apply_verdict(
         # test below asserts on the VALUES rather than on the keys existing.
         block["progress"] = hit.get("progress")
         block["pregame_home_win_prob"] = hit.get("pregame_home_win_prob")
+        # #824: the score / period / clock the re-sim started from, for the ledger (None where a lane omits them).
+        for state_key in ("state_home_score", "state_away_score", "state_period", "state_clock_seconds"):
+            block[state_key] = hit.get(state_key)
         row["live_gameline"] = block
         updated = dict(projection)
         updated["live_aware"] = True

@@ -134,7 +134,8 @@ def _row(*, market="h2h", line=None, market_prob=0.40, age=20.0, updated_at=None
     sides = ["over", "under"] if market == "totals" else ["home", "away"]
     row = {"kind": "game", "market": market, "segment": "full", "line": line, "sides": sides,
            "away_team": AWAY, "home_team": HOME, "age_seconds": age,
-           "game": {"state": "live"}, "projection": {"market_fair_prob_over": market_prob}}
+           "game": {"state": "live", "home_score": 70, "away_score": 62},  # #824: a live score below the projection
+           "projection": {"market_fair_prob_over": market_prob}}
     if updated_at is not None:
         row["updated_at"] = updated_at
     return row

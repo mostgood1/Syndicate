@@ -476,6 +476,12 @@ def build_records(
                 # is the CALIBRATED probability on such a row and the daily refit reads the engine's, never its own.
                 "model_home_win_prob_uncalibrated": lg.get("model_prob_uncalibrated"),
                 "total_cal": lg.get("total_calibration"),
+                # #824 (same lane, still v7): the score / period / clock the live re-sim started from, beside the board
+                # score below, so a model BEHIND the board is gradable by how far behind; None on lanes without them.
+                "state_home_score": lg.get("state_home_score"),
+                "state_away_score": lg.get("state_away_score"),
+                "state_period": lg.get("state_period"),
+                "state_clock_seconds": lg.get("state_clock_seconds"),
                 "sims_run": lg.get("sims_run"),
                 "live_state_as_of": lg.get("as_of"),
                 "carried_forward": bool(lg.get("carried_forward")),

@@ -66,7 +66,8 @@ def _row(market="totals", segment="full", market_prob=MARKET):
     sides = ["over", "under"] if market == "totals" else ["home", "away"]
     return {"kind": "game", "market": market, "segment": segment, "line": LINE, "sides": sides,
             "away_team": AWAY, "home_team": HOME, "age_seconds": 20.0, "updated_at": LANE_AT.isoformat(),
-            "game": {"state": "live"}, "projection": {"market_fair_prob_over": market_prob}}
+            "game": {"state": "live", "home_score": 70, "away_score": 62},  # #824: a live score below the projection
+            "projection": {"market_fair_prob_over": market_prob}}
 
 
 def _attach(rows, sport="ncaab"):
@@ -258,14 +259,14 @@ def test_walk_forward_scores_each_day_on_a_fit_of_the_days_before():
     assert wf["calibrated"] < wf["raw"]
 
 
-def _write_fit(monkeypatch, tmp_path, *, live_games=300.0):
+def _write_fit(monkeypatch, tmp_path, *, live_games=300.0, level=None):
     monkeypatch.setattr(tpc, "calibration_path", lambda league, season, as_of: tmp_path / f"total_prob_calibration_{season}_asof_{as_of:%Y%m%d}.json")
     # Seeded by the day's NUMBER, never hash(day): str hashes are randomised per process, which made the walk-forward
     # gate (rightly) refuse on some seeds and the test order-dependent.
     monkeypatch.setattr(tpc, "pregame_fit_rows", lambda league, day: _synthetic(150, -0.6, 0.0, seed=int(day[-2:])))
     live = _synthetic(int(live_games / 5), -0.6, 0.3, seed=3)
     monkeypatch.setattr(tpc, "live_fit_rows", lambda league, day: live)
-    return tpc.refresh("ncaab", today=dt.date(2026, 11, 17), floor=dt.date(2026, 11, 11), write=True)
+    return tpc.refresh("ncaab", today=dt.date(2026, 11, 17), floor=dt.date(2026, 11, 11), write=True, level=level)
 
 
 def test_refresh_writes_the_file_the_lookup_reads(monkeypatch, tmp_path):
@@ -376,3 +377,52 @@ def test_a_failed_refit_never_stops_the_sims(monkeypatch, tmp_path, capsys):
 
     out = mod.refresh_total_calibrations(["ncaab"], datetime(2026, 11, 17, 12, tzinfo=timezone.utc), refit=_boom)
     assert out == {"ncaab": "failed"} and "FIT_FAILED league=ncaab ValueError" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------------------------- spread only (level 0)
+# 2026-11-17: the first post-load night ran over (calibrated NCAAB under flags 23-40); the option to serve the SPREAD
+# alone, with the level fixed at 0, so a line moves only by its own disagreement with the market. FIT_LEVEL picks it.
+
+def test_the_served_default_still_fits_the_level():
+    """The user's 2026-11-16 choice ("Spread + level") until they change it; flipping this is a betting change."""
+    assert tpc.FIT_LEVEL is True
+
+
+def test_spread_only_fixes_the_level_at_zero_and_fits_the_share():
+    rows = _synthetic(20000, 0.0, 0.30)
+    f = tpc.fit(rows, level=False)
+    assert f["a"] == 0.0 and f["var_a"] == 0.0 and f["cov_ac"] == 0.0 and f["level"] == tpc.LEVEL_ZERO
+    assert f["c"] == pytest.approx(0.30, abs=0.05) and f["var_c"] > 0
+    both = tpc.fit(rows)
+    assert both["level"] == tpc.LEVEL_FITTED and both["c"] == pytest.approx(f["c"], abs=0.05)
+
+
+def test_spread_only_does_not_absorb_a_real_level_into_the_share():
+    """With a true level of -0.4 the spread-only fit still leaves a at 0; c stays a share, inside its clamp."""
+    f = tpc.fit(_synthetic(20000, -0.40, 0.30), level=False)
+    assert f["a"] == 0.0 and tpc.C_RANGE[0] <= f["c"] <= tpc.C_RANGE[1]
+    cal = tpc.TotalCalibration(league="ncaab", phase="live", as_of=dt.date(2026, 11, 16), a=f["a"], c=f["c"])
+    assert cal.apply(0.5, 0.5) == pytest.approx(0.5, abs=1e-12)                  # no disagreement, no move
+
+
+def test_spread_only_refresh_writes_a_zero_level_the_lookup_serves(monkeypatch, tmp_path):
+    payload = _write_fit(monkeypatch, tmp_path, level=False)
+    assert payload["level"] == tpc.LEVEL_ZERO
+    live = payload["phases"]["live"]
+    assert live["a"] == 0.0 and live["level"] == tpc.LEVEL_ZERO
+    got = tpc.calibration_for("ncaab", "live", dt.date(2026, 11, 17), directory=tmp_path)
+    assert got is not None and got.a == 0.0 and got.level == tpc.LEVEL_ZERO and got.stamp()["level"] == tpc.LEVEL_ZERO
+    assert got.apply(0.62, 0.50) > 0.50                                          # an over disagreement still leans over
+
+
+def test_off_is_not_on_for_the_level_through_the_refresh(monkeypatch, tmp_path):
+    fitted = _write_fit(monkeypatch, tmp_path / "fitted", level=True)
+    zero = _write_fit(monkeypatch, tmp_path / "zero", level=False)
+    assert fitted["phases"]["live"]["a"] < -0.2 and zero["phases"]["live"]["a"] == 0.0   # data built with a = -0.6
+
+
+def test_a_file_written_before_the_level_flag_reads_as_fitted(tmp_path):
+    payload = {"phases": {"live": {"calibrated": True, "a": -0.3, "c": 0.2, "games": 200.0}}}
+    (tmp_path / "total_prob_calibration_2027_asof_20261116.json").write_text(json.dumps(payload), encoding="utf-8")
+    got = tpc.calibration_for("ncaab", "live", dt.date(2026, 11, 17), directory=tmp_path)
+    assert got is not None and got.level == tpc.LEVEL_FITTED
