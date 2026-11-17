@@ -678,13 +678,23 @@ def test_an_unparseable_date_still_renders_without_arrows(paper_env):
     assert payload["next_date"] is None
 
 
-def test_the_all_dates_record_spans_every_slate(paper_env):
+def test_the_all_dates_record_spans_every_slate(paper_env, tmp_path, monkeypatch):
     paper_env["orders"] = [
         _order(idempotency_key="k1", selected_date="2026-08-21", outcome="won",
                pnl_dollars=9.0, fill_stake_dollars=10.0),
         _order(idempotency_key="k2", selected_date=DATE, outcome="lost",
                pnl_dollars=-10.0, fill_stake_dollars=10.0),
     ]
+    # The all-dates record is the worker's since 2026-11-17 (lane
+    # paper-endpoint-request-path): its settle pass writes it from the full
+    # history, and the page only reads it. Isolated, so the write cannot land in
+    # this checkout's reports/.
+    import syndicate.features.shared.execution_ledger as ledger_mod
+    from syndicate.features.shared import paper_settlement
+
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "file")
+    paper_settlement.write_paper_all_time(ledger_mod.full_history_orders(), min_interval_seconds=0)
     payload = _payload(paper_env)
 
     # The day's figure answers "how did Saturday go"; it cannot answer "is this

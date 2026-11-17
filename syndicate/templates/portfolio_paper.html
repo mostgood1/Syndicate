@@ -424,6 +424,7 @@
           all dates: {{ alltime.get('won', 0) }}W-{{ alltime.get('lost', 0) }}L{% if alltime.get('push') %}-{{ alltime.get('push') }}P{% endif %}
           · <span class="{{ 'pos' if (alltime.get('pnl_dollars') or 0) > 0 else ('neg' if (alltime.get('pnl_dollars') or 0) < 0 else '') }}">{{ "%+.2f"|format(alltime.get('pnl_dollars') or 0) }}</span>
           {% if alltime.get('roi_pct') is not none %} · {{ "%+.2f"|format(alltime.get('roi_pct')) }}% ROI{% endif %}
+          {% if p.settlement_all_time_as_of %}<span class="paper-table__sub" title="Written by the refresh worker's settle pass">· as of {{ p.settlement_all_time_as_of[11:16] }} UTC</span>{% endif %}
         </div>
       {% endif %}
     </div>

@@ -163,3 +163,40 @@ One pass over every portfolio route, before any probe existed:
     `yes` pending a refresh-worker load.
   - Effect now: none. The gate count is 0 of 800 either way (0 bets since BC-022). If neither lane classifies
     them by the next readings, I will raise it again.
+
+## FINDING 1 — FIX BUILT (lane `paper-endpoint-request-path`; user "Yes, fix it", ~10:50 AM CST)
+
+- **Change:**
+  - `execution_ledger.ledger_for_date(date)` returns one date's orders (all modes) and its `ledger_summary`
+    from ONE read. It takes the live document plus only that date's lines of its month shard (substring
+    prefilter, then an exact `selected_date` check; last archived copy per identity; the document wins).
+    Nothing enters `_ARCHIVE_PARSE_CACHE`.
+  - The paper builder uses `ledger_for_date` and never calls `full_history_orders()`.
+  - The all-dates paper record (`mode != live`, the same population) is written by the refresh-worker's
+    settle pass (`paper_settlement.write_paper_all_time`, at most every 10 min, logged
+    `[paper_settlement] PAPER_ALL_TIME_WRITTEN`) to `reports/intelligence/paper_settlement_all_time.json`
+    (keyvalue). Web only reads it (`read_paper_all_time`). Before the worker's first write the line is
+    absent (None), never zero.
+  - The template shows "as of HH:MM UTC" on the all-dates line.
+- **A/B on the fleet's data and the web worker's env, nice 19, read-only.** Old = the fleet's code at
+  `8aea4fe7e`; new = this change. Both runs in separate processes.
+
+  | date | paper orders | old s / peak MB | new s / peak MB | orders, keys, ledger summary, date settlement |
+  |---|---|---|---|---|
+  | 2026-11-17 | 813 | 13.12 / 769 | 9.79* / 105 | identical |
+  | 2026-11-16 | 1,560 | 5.06 / 774 | 0.67 / 121 | identical |
+  | 2026-10-20 | 275 | 10.97 / 1,052 | 0.52 / 137 | identical |
+
+  \* The first call in a fresh process includes cold imports (portfolio_commit and the plan reads). A web
+  worker has those warm, so 0.5–0.7 s is the representative cost. The old builder's first call carried the
+  same imports and was still 5–13 s on every date.
+- **Falsification test (written before the change):** >= 3 s warm, or >= 150 MB over baseline, or any
+  difference in orders, keys or summary. **Not met on any of the 3 dates**, so the hypothesis stands.
+- **Tests:** 8 new (`tests/test_paper_payload_request_path.py`). Three existing tests were moved onto the
+  worker write: `test_the_all_dates_record_spans_every_slate`,
+  `test_a_live_order_is_excluded_from_the_paper_all_dates_record` and
+  `test_the_paper_page_shows_archived_rows_for_a_past_date_and_all_time`. Each isolates the reports root.
+- **Not deployed.** A fleet ff to this commit also carries 50 commits since the fleet's head `8aea4fe7e`.
+  Among them are `c70674e3b` (#823 NFL quarter/half lines every run, recorded at 16:26Z as not
+  user-approved) and `3dbe53df0` (#824 college live totals refusal, a betting change of another lane).
+  The deploy waits on the user.

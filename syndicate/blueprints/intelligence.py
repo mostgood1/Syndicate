@@ -4992,8 +4992,7 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         LIVE,
         PAPER,
         execution_mode,
-        full_history_orders,
-        ledger_summary,
+        ledger_for_date,
     )
     from pipeline.execute_portfolio import execution_enabled
 
@@ -5004,15 +5003,18 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         plan = None
 
     orders: list = []
-    all_orders: list = []
     summary: dict = {}
     ledger_error = None
     try:
-        summary = ledger_summary(selected_date)
-        # Kept UNFILTERED alongside the day's slice. The all-dates record is
-        # computed from this one -- reusing the filtered list would have
-        # produced a figure labelled "all dates" that was the selected day's,
-        # which is worse than not showing it at all.
+        # ONE DATE, ONE READ [2026-11-17, lane paper-endpoint-request-path]. This
+        # used to read `full_history_orders()` -- every order of every date, the
+        # whole two-month archive -- to find one date's rows and to settle all
+        # of them for the all-dates line. Measured that day: 24 s and 772 MB per
+        # request, and one GET ran ~177 s until gunicorn killed its web worker.
+        # `ledger_for_date` reads the live document plus only this date's rows of
+        # its month's shard. The all-dates record is now the worker's (below).
+        date_ledger = ledger_for_date(selected_date)
+        summary = date_ledger["summary"]
         # PAPER ORDERS ONLY, and this filter is load-bearing rather than tidy.
         # This page's banner says "Simulated fills only. No money moves, no book
         # is contacted, nothing here is a real wager." A live order rendered
@@ -5022,18 +5024,13 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # `/portfolio/live` redirects). This filter is what keeps them off THIS
         # page, and the merge did not move it -- the wall is between live and
         # SIMULATED, not between live and the user's own real logged bets.
-        # FULL HISTORY: the record cap moves old rows to a disk archive, and
-        # both a past date and the all-dates tile must still find them
-        # [2026-10-08, lane execution-ledger-keyvalue-growth, user-approved loan].
-        all_orders = [
-            order
-            for order in full_history_orders()
-            if str(order.get("mode") or PAPER) != LIVE
-        ]
+        # The archive still answers a past date: the record cap moves old rows
+        # there [2026-10-08, lane execution-ledger-keyvalue-growth], and
+        # `ledger_for_date` reads the date's month shard.
         orders = [
             order
-            for order in all_orders
-            if order.get("selected_date") == selected_date
+            for order in date_ledger["orders"]
+            if str(order.get("mode") or PAPER) != LIVE
         ]
         orders.sort(key=lambda item: str(item.get("submitted_at") or ""), reverse=True)
     except Exception as exc:
@@ -5101,20 +5098,28 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
 
     settlement = None
     settlement_all_time = None
+    settlement_all_time_as_of = None
     settlement_error = None
     try:
-        from syndicate.features.shared.paper_settlement import settlement_summary
+        from syndicate.features.shared.paper_settlement import (
+            read_paper_all_time,
+            settlement_summary,
+        )
 
         settlement = settlement_summary(selected_date, orders=orders)
-        # ACROSS EVERY DATE, from the same orders the ledger already returned.
-        # A per-day figure alone answers "how did Saturday go" and cannot answer
-        # "is this working", which is the question that actually matters -- and
-        # clicking through days one at a time to add them up by eye is not an
-        # answer, it is a chore that produces a guess.
+        # ACROSS EVERY DATE. A per-day figure alone answers "how did Saturday go"
+        # and cannot answer "is this working", which is the question that
+        # actually matters -- and clicking through days one at a time to add them
+        # up by eye is not an answer, it is a chore that produces a guess.
+        #
+        # READ, NOT COMPUTED [2026-11-17, lane paper-endpoint-request-path]: the
+        # refresh-worker's settle pass writes it (`write_paper_all_time`), over
+        # the same population this page used to compute it from. Before the
+        # worker's first write it is None, and the page leaves the line off.
         #
         # AND IT IS THE PAPER BOOK, WHICH IS NOT THE SAME POPULATION AS THE
-        # CREDIBILITY SAMPLE [2026-09-04]. `all_orders` was filtered to
-        # `mode != LIVE` twenty lines up, deliberately and load-bearingly. So
+        # CREDIBILITY SAMPLE [2026-09-04]. The worker filters to `mode != LIVE`,
+        # deliberately and load-bearingly, as this page did. So
         # this number is settled paper ORDER ROWS. It said NFL `orders=1,
         # settled=0` on the same day `portfolio_commit`'s SETTLED_SAMPLE line
         # printed `nfl: 18` -- and both were right, about different things.
@@ -5123,7 +5128,10 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         # one row per DECISION. Do not substitute one for the other; the
         # identity between them is pinned in
         # `tests/test_settled_sample_credibility.py`.
-        settlement_all_time = settlement_summary(None, orders=all_orders)
+        stored_all_time = read_paper_all_time()
+        if stored_all_time is not None:
+            settlement_all_time = stored_all_time["summary"]
+            settlement_all_time_as_of = stored_all_time.get("written_at")
     except Exception as exc:
         # Named, never swallowed into an empty record.
         settlement_error = f"{type(exc).__name__}: {exc}"
@@ -5221,6 +5229,8 @@ def _paper_portfolio_payload(selected_date: str) -> dict:
         "settlement": settlement,
         # Every date this ledger holds, not just the one being viewed.
         "settlement_all_time": settlement_all_time,
+        # When the refresh-worker last wrote it (UTC); None before its first write.
+        "settlement_all_time_as_of": settlement_all_time_as_of,
         # WHAT `settlement_all_time` IS A COUNT OF, said in the payload rather
         # than only in a comment, because the confusion it prevents happened to
         # a reader of the JSON and not to a reader of this file. See the note at

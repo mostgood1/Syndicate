@@ -875,6 +875,18 @@ def settle_orders(
         history = full_history_orders()
         by_date = settlement_summary(normalized, orders=history)
         all_time = settlement_summary(None, orders=history)
+        try:
+            stored = write_paper_all_time(history)
+            if stored is not None:
+                stored_total = (stored.get("summary") or {}).get("total") or {}
+                print(
+                    f"[paper_settlement] PAPER_ALL_TIME_WRITTEN rows={stored['rows']}"
+                    f" settled={stored_total.get('settled')} pending={stored_total.get('pending')}"
+                    f" at={stored['written_at']}",
+                    flush=True,
+                )
+        except Exception as exc:  # noqa: BLE001 -- the page's all-dates line is not worth a settle pass
+            print(f"[paper_settlement] PAPER_ALL_TIME_FAILED error={type(exc).__name__}: {exc}", flush=True)
         for scope, summary in (("date=" + normalized, by_date), ("all_time", all_time)):
             total = summary.get("total") or {}
             # ROI stays ABSENT rather than 0.0 when nothing is settled -- a
@@ -1837,6 +1849,60 @@ def _aggregate(buckets: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     decided = out["won"] + out["lost"]
     out["win_pct"] = round(100.0 * out["won"] / decided, 2) if decided else None
     return out
+
+
+# THE ALL-TIME PAPER RECORD IS WORKER-WRITTEN AND WEB-READ [2026-11-17, lane
+# paper-endpoint-request-path]. `/portfolio/paper` used to build it inside the
+# request: every order of every date (the two-month archive, 51,075 rows /
+# 120 MB on 2026-11-17), settled twice. Profiled that day the builder took 24 s
+# and 772 MB, and one GET ran ~177 s until gunicorn killed its web worker. The
+# settle pass below already holds the full history, so it settles the PAPER rows
+# (the page's population, `mode != live`) once more and stores the result.
+PAPER_ALL_TIME_POPULATION = "paper_mode_order_rows_portfolio_book_all_dates"
+PAPER_ALL_TIME_MIN_INTERVAL_SECONDS = 600.0
+
+
+def paper_all_time_path():
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    # No date token: a dated path gets the keyvalue store's 10-day TTL.
+    return reports_root() / "intelligence" / "paper_settlement_all_time.json"
+
+
+def write_paper_all_time(
+    history: Sequence[Mapping[str, Any]],
+    *,
+    now: datetime | None = None,
+    min_interval_seconds: float = PAPER_ALL_TIME_MIN_INTERVAL_SECONDS,
+) -> dict[str, Any] | None:
+    """Settle the paper book over every date and store it for web. Returns the
+    stored document, or None when the last one is younger than the interval."""
+    from syndicate.features.shared.execution_ledger import LIVE, PAPER
+    from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
+
+    moment = now or datetime.now(timezone.utc)
+    path = paper_all_time_path()
+    if min_interval_seconds > 0:
+        written = _parse_utc((read_json_file(path) or {}).get("written_at"))
+        if written is not None and (moment - written).total_seconds() < min_interval_seconds:
+            return None
+    rows = [order for order in history if str(order.get("mode") or PAPER) != LIVE]
+    doc = {
+        "written_at": moment.isoformat().replace("+00:00", "Z"),
+        "population": PAPER_ALL_TIME_POPULATION,
+        "rows": len(rows),
+        "summary": settlement_summary(None, orders=rows),
+    }
+    write_json_file(path, doc)
+    return doc
+
+
+def read_paper_all_time() -> dict[str, Any] | None:
+    """The worker's stored all-time paper record, or None before the first write."""
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    doc = read_json_file(paper_all_time_path())
+    return dict(doc) if isinstance(doc, Mapping) and isinstance(doc.get("summary"), Mapping) else None
 
 
 def settlement_summary(

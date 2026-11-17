@@ -146,12 +146,20 @@ def test_a_live_order_does_not_reach_the_rendered_paper_page(app_client, live_en
     assert "Test Guard" not in body
 
 
-def test_a_live_order_is_excluded_from_the_paper_all_dates_record(live_env):
+def test_a_live_order_is_excluded_from_the_paper_all_dates_record(live_env, tmp_path, monkeypatch):
     """The all-dates rollup is computed from the unfiltered list, so it is the
-    one place the mode filter is easy to forget."""
+    one place the mode filter is easy to forget. Since 2026-11-17 the worker's
+    settle pass computes it (`write_paper_all_time`) and the page reads it, so
+    the filter is pinned where it now runs."""
+    import syndicate.features.shared.execution_ledger as ledger_mod
+    from syndicate.features.shared import paper_settlement
+
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_REFRESH_STATE_BACKEND", "file")
     live_env["orders"] = [
         _order(outcome="won", pnl_dollars=4.35, fill_stake_dollars=5.0),
     ]
+    paper_settlement.write_paper_all_time(ledger_mod.full_history_orders(), min_interval_seconds=0)
     paper = intelligence_bp._paper_portfolio_payload(DATE)
     assert paper["settlement_all_time"]["total"]["settled"] == 0
 
