@@ -512,3 +512,430 @@ it priced, and the by-time fallback that could see a newer state never fired. Th
 (`6d22b4d6e`, local, lane engine-live-prior) changed NO `live_resim` opinion on 11-09..11-14 and re-dated 1,099 NCAAF
 segment totals. NHL live stays excluded in this gate as a precaution: the pinned code (`981ef14f6`) lacks the fix, and
 its fallback path could still look ahead in the forward window.
+
+## Amendment 2 -- registered 2026-11-17 1:57 PM CST, before any learner output, close or game-line outcome of a test slate is read for this gate
+
+**If the pinned experts fail to match production for a sport on a test slate, that sport's live strata (or its
+pregame strata) drop out. Everything else is still judged.** Until now, one such slate voided the whole read.
+
+The user asked for this on 2026-11-17: "Yes, draft it", answering "Draft M2 gate Amendment 2 so a mismatched market
+drops out instead of voiding the read?". They registered it with "Yes, register it", answering "Register Amendment 2 on main and switch the 11-24 read to it?" (2026-11-17, after the draft and its tests were put in front of them).
+
+**Why.** The registered precondition voids the read (`M2_VERDICT NOT_A_VERDICT`) when the experts fail to reproduce
+production on any test slate. The experts are pinned (`981ef14f6`); production keeps changing:
+- todo #816's per-line NCAAB totals calibration loaded 2026-11-17 00:04:20Z (6:04 PM CST, during the 11-16 slate).
+- F2's experts runner on 11-16 then printed `JOIN ncaab half_point checked=9266 mismatched=4296`; every other count
+  was 0.
+- Two more pricing loads followed on 11-17, inside the window:
+  - todo #821, NBA F1 on with the outs penalties off (17:35:08Z);
+  - todo #824's NCAAB totals fix (18:03:56Z).
+
+  Whether either breaks the pinned experts' match is not measured.
+
+Re-pinning the experts after each load would need a new amendment every time. Any load after the last re-pin would
+still void the read.
+
+**The rule** (in `m2_gate.py`; the diff is below):
+- Each test slate's runner output must still carry its `RESULT` line.
+- Every unit of that line's `alarms_plus_mismatches` must be attributed to a sport and a phase by the runner's own
+  per-sport lines: CHECKLIST, JOIN, FALLBACK_FRAME, PRIOR, SEG_JOIN, SEG_PRIOR. These are every line that adds to the
+  count in the pinned `scripts/engine_experts.py`.
+- A missing `RESULT` line, or a count those lines do not account for, is still `NOT_A_VERDICT`.
+- A sport and phase with any attributed alarm or mismatch on any test slate is `EXCLUDED_REPRODUCTION` for the whole
+  window. Like Amendment 1's exclusions, it is never a pass, is not counted as judged, and is still checked for HARM.
+- Which phase drops:
+  - A live check excludes that sport's live strata. The live checks are JOIN, FALLBACK_FRAME, PRIOR, SEG_JOIN,
+    SEG_PRIOR, and the live, stat_progress and live_segment checklists.
+  - A pregame checklist alarm excludes that sport's pregame strata.
+- The runner prints `EXPERTS <date> reproduction ...` for each slate and `EXCLUDED_REPRODUCTION <sport>|<phase>
+  [<date> <check> <n>; ...]`.
+- The last line gains `excluded_reproduction=[...]`. A PASS still names its strata, and only those may reach M3.
+- The exclusion is by sport and phase, not finer. The runner counts mismatches per sport, not per market, and the
+  learner's held-out JSON has no per-slate strata.
+
+**What this costs, known now.** If the pinned experts repeat F2's 11-16 finding, every NCAAB live stratum drops out:
+h2h, spreads and totals. That includes NCAAB live totals against a fresh prior, the dev run's near miss (hi99
++0.0002). NCAAB pregame stays in. Nothing else is excluded unless the runner attributes a failure to it.
+
+**What has been read inside the test window before this amendment:**
+- F2's experts runner outputs for 11-15 and 11-16 (lane `engine-live-prior`, code `9d6458799`, read 2026-11-17 11:15 AM
+  CST). These are reproduction counts and Kalshi-against-book prices, with no outcomes. The gate's own pinned experts
+  have not run on any test slate.
+- The NBA live-prop grade (lane `nba-live-prop-grade`, registered `89da309e0` on 11-14, run 2026-11-17 9:30 AM CST, in
+  this session). It graded NBA player props on slates 11-11..11-16 against the official box score, so NBA outcomes of
+  the 11-15 and 11-16 slates have been read here.
+  - It judged the stat-progress expert against fresh books, not the learner.
+  - This amendment uses no outcome, and it excludes NBA only if the runner attributes a failure to NBA.
+- No learner output, no close and no game-line outcome of any test slate has been read for this gate.
+
+**Tested** (`C:\tmp\elp\m2gate_kit\amend2\test_amend2.py`, 4 passed):
+- `reproduction()` on the pinned runner's real dev output: 11-13 and 11-14 are clean.
+- `reproduction()` on F2's 11-16 output: `{ncaab|live: JOIN 4296}`, all 4,296 attributed.
+- Synthetic lines for every check type: each lands in the right phase. A short count is unattributed, and an
+  inconsistent `exit` is no `RESULT`.
+- `--rehearse` on the 11-16 dev JSON: every line is identical to the current gate's except the verdict's new suffix.
+  The verdict is still PASS on NCAAF live spreads and totals, fresh.
+- The whole gate on the dev JSON, with the window pointed at the dev test slates (11-13, 11-14):
+  - every slate clean: line for line the same as the current gate;
+  - NCAAB live mismatched on one slate: the current gate prints `NOT_A_VERDICT`. The amended gate excludes the three
+    NCAAB live strata only, still judges NCAAB pregame, and still PASSes NCAAF live;
+  - NCAAF live mismatched: its two passes are excluded and there is no PASS;
+  - an unattributed count, or a slate with no runner output: `NOT_A_VERDICT`, as before.
+- The kit's `code/scripts/engine_experts.py` is the pinned runner: blob `81c5f9e7a253`, the same as `981ef14f6`'s.
+
+**Pins.** `m2_gate.py` is now sha256 `c1a2c029c2a1816fb3f0cbc5d264128a5c3c4fb634d4fb343ea1b6986678e735`. Amendment 1's `6915bb6a...` file is kept beside it as
+`m2_gate.amended1_6915bb6a.py`. read.sh, launch.py, manifest.py, the code export and the six train files are unchanged.
+The read task checks the new hash, and it records the `EXCLUDED_REPRODUCTION` lines.
+
+```diff
+12,13c12,15
+<   - the pinned experts reproduced production on every test slate: each out/experts_out_<date>.txt has
+<     `RESULT date=<date> ... alarms_plus_mismatches=0 exit=0` (every dev slate did on 2026-11-16).
+---
+>   - the pinned experts ran on every test slate: each out/experts_out_<date>.txt has its
+>     `RESULT date=<date> ... alarms_plus_mismatches=<n> exit=<0|1>` line, and (AMENDMENT 2) every one of its <n> is
+>     attributed to a sport and phase by the runner's own per-sport lines (CHECKLIST, JOIN, FALLBACK_FRAME, PRIOR,
+>     SEG_JOIN, SEG_PRIOR). n = 0 is a clean slate, as every dev slate was on 2026-11-16.
+27a30,36
+> AMENDMENT 2 (2026-11-17, before any test-slate outcome, close or learner output is read): a sport whose pinned
+>   experts did NOT reproduce production on ANY test slate (an alarm or mismatch attributed to it there) has every
+>   stratum of that phase EXCLUDED_REPRODUCTION -- a live check excludes its live strata, a pregame checklist alarm its
+>   pregame strata -- never a pass, not counted as judged, still checked for HARM. The rest of the read stands. Why:
+>   production's pricing moves inside the window (todo #816 calibrated NCAAB live totals from 2026-11-17 00:04Z) while
+>   the experts stay pinned, so a mismatch says that sport's opinions are not what production served, and nothing about
+>   any other sport or phase. The learner JSON has no per-slate strata, so one slate excludes the phase for the window.
+54a64,75
+> # AMENDMENT 2 (registered 2026-11-17, before any test-slate outcome, close or learner output is read): every runner
+> # line that adds to RESULT's alarms_plus_mismatches (scripts/engine_experts.py run(), pinned 981ef14f6), with its
+> # sport; the trailing groups are its count. CHECKLIST's kind gives the phase (pregame, else live); the rest are live.
+> REPRO_LINES = (
+>     ("CHECKLIST", re.compile(r"^\s+CHECKLIST (\S+) (pregame|live|stat_progress|live_segment) ok=\S+ alarms=(\d+)")),
+>     ("JOIN", re.compile(r"^\s+JOIN (\S+) half_point checked=\d+ mismatched=(\d+)")),
+>     ("FALLBACK_FRAME", re.compile(r"^\s+FALLBACK_FRAME (\S+) judged=\d+ failed=(\d+)")),
+>     ("PRIOR", re.compile(r"^\s+PRIOR (\S+) checked=\d+ prior_mismatched=(\d+) p_mismatched=(\d+)")),
+>     ("SEG_JOIN", re.compile(r"^\s+SEG_JOIN (\S+) half_point checked=\d+ mismatched=(\d+)")),
+>     ("SEG_PRIOR", re.compile(r"^\s+SEG_PRIOR (\S+) checked=\d+ mismatched=(\d+)")),
+> )
+> RESULT_RE = re.compile(r"^RESULT date=(\S+) opinions=\d+ alarms_plus_mismatches=(\d+) exit=([01])\s*$")
+92a114,137
+> def reproduction(lines, d):
+>     """AMENDMENT 2: (RESULT's alarms_plus_mismatches or None, {(sport, phase): {check: n > 0}}, attributed total)."""
+>     total = None
+>     for line in lines:
+>         m = RESULT_RE.match(line)
+>         if m and m.group(1) == d and (int(m.group(2)) > 0) == (m.group(3) == "1"):
+>             total = int(m.group(2))
+>     fails, attributed = {}, 0
+>     for line in lines:
+>         for check, rx in REPRO_LINES:
+>             m = rx.match(line)
+>             if not m:
+>                 continue
+>             if check == "CHECKLIST":
+>                 phase, n = ("pregame" if m.group(2) == "pregame" else "live"), int(m.group(3))
+>             else:
+>                 phase, n = "live", sum(int(g) for g in m.groups()[1:])
+>             if n:
+>                 cell = fails.setdefault((m.group(1), phase), {})
+>                 cell[check] = cell.get(check, 0) + n
+>                 attributed += n
+>     return total, fails, attributed
+> 
+> 
+118c163,164
+<     if not a.rehearse:  # the experts reproduced production on every test slate (as on every dev slate, 11-16)
+---
+>     excluded = {}  # AMENDMENT 2: (sport, phase) -> ["<date> <check> <n>", ...]
+>     if not a.rehearse:  # the experts ran on every test slate; whatever did not reproduce is attributed, then excluded
+124,128c170,185
+<             ok = any(line.startswith(f"RESULT date={d} ") and " alarms_plus_mismatches=0 " in line
+<                      and line.rstrip().endswith("exit=0") for line in lines)
+<             print(f"EXPERTS {d} reproduction {'clean' if ok else 'NOT CLEAN'}")
+<             if not ok:
+<                 why.append(f"experts {d}: no clean RESULT line")
+---
+>             total, fails, attributed = reproduction(lines, d)
+>             if total is None:
+>                 print(f"EXPERTS {d} reproduction NO RESULT LINE")
+>                 why.append(f"experts {d}: no RESULT line")
+>             elif attributed != total:
+>                 print(f"EXPERTS {d} reproduction UNATTRIBUTED alarms_plus_mismatches={total} attributed={attributed}")
+>                 why.append(f"experts {d}: alarms_plus_mismatches={total} but {attributed} attributed to a sport")
+>             elif not total:
+>                 print(f"EXPERTS {d} reproduction clean")
+>             else:
+>                 for (sport, phase), checks in sorted(fails.items()):
+>                     excluded.setdefault((sport, phase), []).extend(f"{d} {c} {n}" for c, n in sorted(checks.items()))
+>                 print(f"EXPERTS {d} reproduction NOT CLEAN alarms_plus_mismatches={total} -> excluded "
+>                       f"{', '.join(f'{s}|{p}' for s, p in sorted(fails))}")
+>         for (sport, phase), items in sorted(excluded.items()):
+>             print(f"EXCLUDED_REPRODUCTION {sport}|{phase} [{'; '.join(items)}]")
+148c205,207
+<         n_judged += verdict not in ("UNJUDGED", "EXCLUDED_LOOKAHEAD")
+---
+>         elif (k.split("|")[0], phase) in excluded:
+>             verdict = "EXCLUDED_REPRODUCTION"  # AMENDMENT 2: never a pass, never counted as judged; HARM still checked
+>         n_judged += verdict not in ("UNJUDGED", "EXCLUDED_LOOKAHEAD", "EXCLUDED_REPRODUCTION")
+166a226
+>     ex = f" excluded_reproduction=[{', '.join(f'{s}|{p}' for s, p in sorted(excluded))}]"  # AMENDMENT 2
+168c228
+<         print(f"{tag}M2_VERDICT FAIL harm={len(harms)} [{', '.join(harms)}] judged={n_judged} pass={len(passes)}")
+---
+>         print(f"{tag}M2_VERDICT FAIL harm={len(harms)} [{', '.join(harms)}] judged={n_judged} pass={len(passes)}{ex}")
+170c230
+<         print(f"{tag}M2_VERDICT PASS judged={n_judged} pass={len(passes)} [{', '.join(passes)}]")
+---
+>         print(f"{tag}M2_VERDICT PASS judged={n_judged} pass={len(passes)} [{', '.join(passes)}]{ex}")
+172c232
+<         print(f"{tag}M2_VERDICT NOTHING_JUDGED strata={len(judged)}")
+---
+>         print(f"{tag}M2_VERDICT NOTHING_JUDGED strata={len(judged)}{ex}")
+174c234
+<         print(f"{tag}M2_VERDICT FAIL judged={n_judged} pass=0")
+---
+>         print(f"{tag}M2_VERDICT FAIL judged={n_judged} pass=0{ex}")
+```
+
+## `m2_gate.py` as amended twice (sha256 c1a2c029c2a1816fb3f0cbc5d264128a5c3c4fb634d4fb343ea1b6986678e735)
+
+```python
+"""The M2 gate of decision engine #736 (lane engine-learner): one registered verdict over the learner's held-out JSON.
+
+Registered on main BEFORE its data (test slates 2026-11-15..2026-11-22). Applies the rule exactly; no judgment.
+
+Inputs (written by read.sh with the pinned code): out/learner_outcome.{json,txt}, out/learner_close.{json,txt}, both from
+  engine_learner.py run --dates 2026-11-09..2026-11-22 --test-from 2026-11-15 --truth outcome|close
+
+PRECONDITIONS (any failure -> `M2_VERDICT NOT_A_VERDICT <why>`, which goes back to the user):
+  - each JSON: learner engine_learner/1, tau 0.5, dates 2026-11-09..2026-11-22, test_from 2026-11-15;
+  - OFF reproduces the prior (reach.off_nonzero == 0, every OFF delta 0);
+  - SPLIT shared=0, and train games >= 95% of the dev window's games registered below (the dev history still reads);
+  - the pinned experts ran on every test slate: each out/experts_out_<date>.txt has its
+    `RESULT date=<date> ... alarms_plus_mismatches=<n> exit=<0|1>` line, and (AMENDMENT 2) every one of its <n> is
+    attributed to a sport and phase by the runner's own per-sport lines (CHECKLIST, JOIN, FALLBACK_FRAME, PRIOR,
+    SEG_JOIN, SEG_PRIOR). n = 0 is a clean slate, as every dev slate was on 2026-11-16.
+
+JUDGED STRATA (the gate):
+  - LIVE, truth outcome, ON_BY_AGE `sport|family|live|a<=60`: the learner over a FRESH (<= 60 s) prior. The dev run
+    showed live gains mostly against stale priors; correcting staleness is the prior's job, not a learner edge.
+  - PREGAME, truth close, ON `sport|family|pregame` (props included): the learner toward the close.
+  A stratum is judged at >= 30 test games with a CI. hi99 = d + 2.576*se, se = (ci95 hi - ci95 lo) / 3.92 (the
+  bootstrap CI read as normal; 99% because ~20-40 strata are judged).
+  PASS: hi99 < 0 AND d <= -floor. Floors: LIVE outcome 0.001 nats; PREGAME close 0.0002 nats (a soft label makes tiny
+  weights significant: the dev run had 196 cells applied with every group within 0.0001 nats).
+HARM (checked on EVERY ON and ON_BY_AGE key of both truths with >= 30 games): lo99 = d - 2.576*se > 0 AND
+  d >= the truth's floor (outcome 0.001, close 0.0002) -- the same size test a pass must meet.
+AMENDMENT 1 (2026-11-16, before the data): every LIVE stratum of a sport in LOOKAHEAD_EXCLUDED_LIVE (NHL: its
+  evidence rows carry state up to 25 s newer than their tick) is EXCLUDED_LOOKAHEAD -- never a pass, not counted as
+  judged, still checked for HARM.
+AMENDMENT 2 (2026-11-17, before any test-slate outcome, close or learner output is read): a sport whose pinned
+  experts did NOT reproduce production on ANY test slate (an alarm or mismatch attributed to it there) has every
+  stratum of that phase EXCLUDED_REPRODUCTION -- a live check excludes its live strata, a pregame checklist alarm its
+  pregame strata -- never a pass, not counted as judged, still checked for HARM. The rest of the read stands. Why:
+  production's pricing moves inside the window (todo #816 calibrated NCAAB live totals from 2026-11-17 00:04Z) while
+  the experts stay pinned, so a mismatch says that sport's opinions are not what production served, and nothing about
+  any other sport or phase. The learner JSON has no per-slate strata, so one slate excludes the phase for the window.
+VERDICT (last line): any HARM -> FAIL; else any PASS -> PASS <strata>; else no stratum judged -> NOTHING_JUDGED;
+  else FAIL. An unjudged stratum is never a pass. PASS lets M3 (the paper book) consume p_decision for the PASS strata
+  only; anything else keeps the learner shadow-only and goes back to the user.
+
+`--rehearse` skips the window and train-size preconditions (for dev-window JSON) and marks every line REHEARSAL.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+DATES = ("2026-11-09", "2026-11-22")
+TEST_FROM = "2026-11-15"
+TEST_DATES = tuple(f"2026-11-{d}" for d in range(15, 23))
+MIN_GAMES = 30
+Z99 = 2.576
+FLOOR = {"live": 0.001, "pregame": 0.0002}
+FRESH = "a<=60"
+# AMENDMENT 1 (registered 2026-11-16, before the data): a sport whose dev evidence rows carry game state NEWER than
+# their own tick lets an opinion see past the line it is scored against, so its live strata cannot pass. Measured on
+# the dev logs 11-09..11-14 (state `as_of` minus tick `t`, priced rows): NHL 1,839 of 3,307 newer, by up to 25 s.
+# Sub-second elsewhere, kept: NCAAF 318 of 2,800 (<= 0.73 s; those line-instants carry no gain in the dev breakdown),
+# NFL 34 of 34 (<= 0.99 s); NBA, NCAAB, WNCAAB 0.
+LOOKAHEAD_EXCLUDED_LIVE = {"nhl"}
+# AMENDMENT 2 (registered 2026-11-17, before any test-slate outcome, close or learner output is read): every runner
+# line that adds to RESULT's alarms_plus_mismatches (scripts/engine_experts.py run(), pinned 981ef14f6), with its
+# sport; the trailing groups are its count. CHECKLIST's kind gives the phase (pregame, else live); the rest are live.
+REPRO_LINES = (
+    ("CHECKLIST", re.compile(r"^\s+CHECKLIST (\S+) (pregame|live|stat_progress|live_segment) ok=\S+ alarms=(\d+)")),
+    ("JOIN", re.compile(r"^\s+JOIN (\S+) half_point checked=\d+ mismatched=(\d+)")),
+    ("FALLBACK_FRAME", re.compile(r"^\s+FALLBACK_FRAME (\S+) judged=\d+ failed=(\d+)")),
+    ("PRIOR", re.compile(r"^\s+PRIOR (\S+) checked=\d+ prior_mismatched=(\d+) p_mismatched=(\d+)")),
+    ("SEG_JOIN", re.compile(r"^\s+SEG_JOIN (\S+) half_point checked=\d+ mismatched=(\d+)")),
+    ("SEG_PRIOR", re.compile(r"^\s+SEG_PRIOR (\S+) checked=\d+ mismatched=(\d+)")),
+)
+RESULT_RE = re.compile(r"^RESULT date=(\S+) opinions=\d+ alarms_plus_mismatches=(\d+) exit=([01])\s*$")
+# Dev-window games (slates 11-09..11-14, train + test of the 2026-11-16 re-run with the experts on main 981ef14f6).
+DEV_GAMES = {"outcome": 804, "close": 427}  # the 2026-11-16 dev re-fit, train + test games
+TRAIN_SHARE_MIN = 0.95
+SPLIT_RE = re.compile(r"^SPLIT train=\d+ \((\d+) games.*test=\d+ \((\d+) games.*shared=(\d+)")
+
+
+def se_of(ci):
+    lo, hi = ci
+    return None if lo is None or hi is None else (hi - lo) / 3.92
+
+
+def precheck(name, d, txt, rehearse):
+    why = []
+    if d.get("learner") != "engine_learner/1" or d.get("tau") != 0.5:
+        why.append(f"{name}: learner/tau {d.get('learner')}/{d.get('tau')}")
+    if not rehearse and ((d.get("dates") or [None])[0], (d.get("dates") or [None])[-1]) != DATES:
+        why.append(f"{name}: dates {d.get('dates', [])[:1]}..{d.get('dates', [])[-1:]}")
+    if not rehearse and d.get("test_from") != TEST_FROM:
+        why.append(f"{name}: test_from {d.get('test_from')}")
+    if (d.get("reach") or {}).get("off_nonzero") != 0:
+        why.append(f"{name}: OFF moved {d.get('reach', {}).get('off_nonzero')} examples")
+    if any(v.get("delta_log_loss") != 0.0 for v in (d.get("held_out", {}).get("OFF") or {}).values()):
+        why.append(f"{name}: an OFF delta is not 0")
+    m = next((SPLIT_RE.match(line) for line in txt.splitlines() if line.startswith("SPLIT ")), None)
+    if not m:
+        why.append(f"{name}: no SPLIT line")
+    else:
+        train_games, test_games, shared = map(int, m.groups())
+        if shared:
+            why.append(f"{name}: shared={shared}")
+        need = DEV_GAMES.get(name)
+        if not rehearse and (need is None or train_games < TRAIN_SHARE_MIN * need):
+            why.append(f"{name}: train games {train_games} < {TRAIN_SHARE_MIN} x dev {need}")
+        print(f"{'REHEARSAL ' if rehearse else ''}SPLIT {name} train_games={train_games} test_games={test_games} "
+              f"shared={shared} dev_registered={need}")
+    return why
+
+
+def reproduction(lines, d):
+    """AMENDMENT 2: (RESULT's alarms_plus_mismatches or None, {(sport, phase): {check: n > 0}}, attributed total)."""
+    total = None
+    for line in lines:
+        m = RESULT_RE.match(line)
+        if m and m.group(1) == d and (int(m.group(2)) > 0) == (m.group(3) == "1"):
+            total = int(m.group(2))
+    fails, attributed = {}, 0
+    for line in lines:
+        for check, rx in REPRO_LINES:
+            m = rx.match(line)
+            if not m:
+                continue
+            if check == "CHECKLIST":
+                phase, n = ("pregame" if m.group(2) == "pregame" else "live"), int(m.group(3))
+            else:
+                phase, n = "live", sum(int(g) for g in m.groups()[1:])
+            if n:
+                cell = fails.setdefault((m.group(1), phase), {})
+                cell[check] = cell.get(check, 0) + n
+                attributed += n
+    return total, fails, attributed
+
+
+def judge(key, v, floor):
+    games, ci, d = v.get("games", 0), v.get("ci95") or [None, None], v.get("delta_log_loss")
+    se = se_of(ci)
+    if games < MIN_GAMES or se is None:
+        return "UNJUDGED", None
+    hi99 = d + Z99 * se
+    return ("PASS" if hi99 < 0 and d <= -floor else "FAIL"), hi99
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", required=True, help="dir holding learner_{outcome,close}.{json,txt}")
+    ap.add_argument("--rehearse", action="store_true")
+    a = ap.parse_args()
+    tag = "REHEARSAL " if a.rehearse else ""
+    out = Path(a.out)
+    data, txts = {}, {}
+    for t in ("outcome", "close"):
+        try:
+            data[t] = json.loads((out / f"learner_{t}.json").read_text(encoding="utf-8"))
+            txts[t] = (out / f"learner_{t}.txt").read_text(encoding="utf-8", errors="replace")
+        except (OSError, ValueError) as exc:
+            print(f"{tag}M2_VERDICT NOT_A_VERDICT missing/unreadable {t}: {exc}")
+            return 2
+    why = [w for t in ("outcome", "close") for w in precheck(t, data[t], txts[t], a.rehearse)]
+    excluded = {}  # AMENDMENT 2: (sport, phase) -> ["<date> <check> <n>", ...]
+    if not a.rehearse:  # the experts ran on every test slate; whatever did not reproduce is attributed, then excluded
+        for d in TEST_DATES:
+            try:
+                lines = (out / f"experts_out_{d}.txt").read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                lines = []
+            total, fails, attributed = reproduction(lines, d)
+            if total is None:
+                print(f"EXPERTS {d} reproduction NO RESULT LINE")
+                why.append(f"experts {d}: no RESULT line")
+            elif attributed != total:
+                print(f"EXPERTS {d} reproduction UNATTRIBUTED alarms_plus_mismatches={total} attributed={attributed}")
+                why.append(f"experts {d}: alarms_plus_mismatches={total} but {attributed} attributed to a sport")
+            elif not total:
+                print(f"EXPERTS {d} reproduction clean")
+            else:
+                for (sport, phase), checks in sorted(fails.items()):
+                    excluded.setdefault((sport, phase), []).extend(f"{d} {c} {n}" for c, n in sorted(checks.items()))
+                print(f"EXPERTS {d} reproduction NOT CLEAN alarms_plus_mismatches={total} -> excluded "
+                      f"{', '.join(f'{s}|{p}' for s, p in sorted(fails))}")
+        for (sport, phase), items in sorted(excluded.items()):
+            print(f"EXCLUDED_REPRODUCTION {sport}|{phase} [{'; '.join(items)}]")
+    if why:
+        print(f"{tag}M2_VERDICT NOT_A_VERDICT {'; '.join(why)}")
+        return 2
+
+    judged = []  # (key, truth, phase, v)
+    for k, v in sorted(data["outcome"]["held_out"].get("ON_BY_AGE", {}).items()):
+        parts = k.split("|")
+        if len(parts) == 4 and parts[2] == "live" and parts[3] == FRESH:
+            judged.append((k, "outcome", "live", v))
+    for k, v in sorted(data["close"]["held_out"].get("ON", {}).items()):
+        parts = k.split("|")
+        if len(parts) == 3 and parts[2] == "pregame":
+            judged.append((k, "close", "pregame", v))
+
+    passes, n_judged = [], 0
+    for k, t, phase, v in judged:
+        verdict, hi99 = judge(k, v, FLOOR[phase])
+        if phase == "live" and k.split("|")[0] in LOOKAHEAD_EXCLUDED_LIVE:
+            verdict = "EXCLUDED_LOOKAHEAD"  # AMENDMENT 1: never a pass, never counted as judged; HARM still checked
+        elif (k.split("|")[0], phase) in excluded:
+            verdict = "EXCLUDED_REPRODUCTION"  # AMENDMENT 2: never a pass, never counted as judged; HARM still checked
+        n_judged += verdict not in ("UNJUDGED", "EXCLUDED_LOOKAHEAD", "EXCLUDED_REPRODUCTION")
+        if verdict == "PASS":
+            passes.append(f"{k}({t})")
+        print(f"{tag}STRATUM {k} truth={t} games={v.get('games')} lines={v.get('lines')} d_ll={v.get('delta_log_loss')} "
+              f"ci95={v.get('ci95')} hi99={None if hi99 is None else round(hi99, 6)} floor={FLOOR[phase]} -> {verdict}")
+
+    harms = []
+    for t in ("outcome", "close"):
+        for rep in ("ON", "ON_BY_AGE"):
+            for k, v in sorted(data[t]["held_out"].get(rep, {}).items()):
+                se = se_of(v.get("ci95") or [None, None])
+                floor = FLOOR["live"] if t == "outcome" else FLOOR["pregame"]
+                if (v.get("games", 0) >= MIN_GAMES and se is not None and v["delta_log_loss"] - Z99 * se > 0
+                        and v["delta_log_loss"] >= floor):
+                    harms.append(f"{t}:{rep}:{k}")
+                    print(f"{tag}HARM {t} {rep} {k} games={v.get('games')} d_ll={v.get('delta_log_loss')} "
+                          f"ci95={v.get('ci95')}")
+    applied = {t: (data[t].get("reach") or {}).get("applied_cells") for t in data}
+    print(f"{tag}APPLIED_CELLS outcome={applied['outcome']} close={applied['close']}")
+    ex = f" excluded_reproduction=[{', '.join(f'{s}|{p}' for s, p in sorted(excluded))}]"  # AMENDMENT 2
+    if harms:
+        print(f"{tag}M2_VERDICT FAIL harm={len(harms)} [{', '.join(harms)}] judged={n_judged} pass={len(passes)}{ex}")
+    elif passes:
+        print(f"{tag}M2_VERDICT PASS judged={n_judged} pass={len(passes)} [{', '.join(passes)}]{ex}")
+    elif n_judged == 0:
+        print(f"{tag}M2_VERDICT NOTHING_JUDGED strata={len(judged)}{ex}")
+    else:
+        print(f"{tag}M2_VERDICT FAIL judged={n_judged} pass=0{ex}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
