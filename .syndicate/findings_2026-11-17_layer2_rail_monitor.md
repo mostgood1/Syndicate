@@ -443,3 +443,15 @@ flags below the points scored (0 of 1).
   - The load lane voided its restart-spanning window (deploys.md 20:02:54Z, main `2e43d5bd2`).
   - The 19:51Z `up` is classified BC-033 "no" by the load lane. Do not add a second row.
 - **Render-config step 1, verified after the restart's `up`** (local_c787e775, deploys.md "2026-11-17 19:58:28Z", BC-035 no; the load is BC-033): every role's live `/proc` environ (160 / 262 / 235 keys) matches what the old and new launchers build, with **0 keys differing**. `ANTHROPIC_API_KEY` is not new: the old launcher listed the same unset key on web, and the two launchers' unset lists are identical. Steps 2 / 3a are not on the fleet.
+- **I-13 MEASURED, NOT BUILT** (session local_004fdc3e; findings on main `661c80a47`).
+  - The page's 60 s poll got a new response hash 6 of 6 times during live play. Only back-to-back
+    duplicates matched (~4.5% of queries; 2.9 s warm vs 5.7 s).
+  - So a cache keyed on the board version would barely hit. The premise holds only for duplicate
+    requests. No code changed, nothing loaded.
+  - Server time is still the cost; the next lever would be the per-request stages themselves
+    (`hydrate_and_mirror`, `version_and_debug`), not a response cache.
+- **#827 (strip diagnostics from the `top_live` rows, the de-dup follow-up) is ON MAIN `25fc2e4f0`**, NOT
+  loaded.
+  - Recorded response 5.7 → 4.6 MB on the wire.
+  - The fleet runs `5db26434e`, 83 commits behind main, so loading it needs its own ride-along check and
+    the user's decision.
