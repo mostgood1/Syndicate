@@ -527,6 +527,44 @@ def _market_fair_family(row: Mapping[str, Any]) -> str:
     return "other_game"
 
 
+_EXIT_HOLD: Any = None
+
+
+def _refuses_key_player_out(row: Mapping[str, Any]) -> bool:
+    """True for an IN-PLAY row on a game a key player has left, when the sim does not model the exit.
+
+    Lane live-player-exit-gate (todo #814; loan, user 2026-11-17). Reads the SAME published live snapshot as the
+    board's gamelines and the in-play entry hold (`live_player_exit_hold.ExitHold`), so a commit and a gameline
+    cannot disagree about who is out. A game line is refused when the hold fails the game. A prop row is refused
+    only when ITS player is one the hold names; a teammate's prop is left to the props join, which already
+    shows it unpriced if needed. `off` / `pass` / `unknown` never refuse: an unreadable snapshot is the pre-gate
+    behaviour, not a reason to drop every live row. Pregame rows are never read.
+    """
+    from syndicate.features.shared.opportunity_gate import game_state_of
+
+    market_state = str(row.get("market_state") or "").strip().lower()
+    if not (market_state == "live" or row.get("is_live") is True or game_state_of(row) == "live"):
+        return False
+    global _EXIT_HOLD
+    if _EXIT_HOLD is None:
+        from syndicate.features.shared.live_player_exit_hold import ExitHold
+
+        _EXIT_HOLD = ExitHold()
+    try:
+        verdict = _EXIT_HOLD.check(row.get("sport"), row.get("home_team"), row.get("away_team"))
+    except Exception:  # noqa: BLE001 -- the hold never costs a commit
+        return False
+    if verdict.get("verdict") != "fail":
+        return False
+    player = str(row.get("player_name") or "").strip()
+    if not player and str(row.get("kind") or "").strip().lower() != "prop":
+        return True
+    from syndicate.features.shared.live_player_status import normalize_name
+
+    out = {normalize_name(str(p).split(":")[1]) for p in verdict.get("players") or () if str(p).count(":") >= 2}
+    return bool(player) and normalize_name(player) in out
+
+
 def _refuses_in_play_market_fair(row: Mapping[str, Any]) -> bool:
     """True for an in-play row that would otherwise be sized on market fair alone.
 
@@ -1153,6 +1191,9 @@ def commit_portfolio(
         # pricing, for the same reason as the exclusion above: a refused row must
         # not be re-seated, and the counters below describe only rows in scope.
         # See `_in_play_market_fair_allowed` for the measurement.
+        if _refuses_key_player_out(row):
+            refuse("key_player_out", row)
+            continue
         if _refuses_in_play_market_fair(row):
             refuse("in_play_market_fair", row)
             continue
