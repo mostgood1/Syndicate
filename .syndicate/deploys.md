@@ -60699,3 +60699,16 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
 - **Errors in the window** (process-list lines excluded): 0 INPLAY_OVERLAY_FAILED, 0 BOOK_GRID_BUILD_ERROR, 0 tracebacks, 0 import / name / attribute errors; 728 grid ticks.
 - **Verdict:** the lane's goal (name the cause and its lever) is MET and the lever works in production: per-card cost about 10x lower, after a restart too. #790's residual stays OPEN: at 7 live, NBA builds still cross 45 s, so the slow-sport skip makes gaps over 360 s. The time is now the evidence budget plus the grid build outside the overlay, not card cost. Lane `nba-overlay-card-cost` closed.
 
+
+## 2026-11-17 06:38:00Z (12:38 AM CST) -- READING (todo #807, the first same-week NCAAF rewrite on production): **the CONTENT did not change, but the dedupe kept a second wk12 pair anyway -- its CSV compare is order-sensitive and the generator wrote the same 66 rows in a different order. NOT MET as designed; a defect, not a content change**
+- **Watcher:** `C:\tmp\propsatomic\watch807.sh` (user "Yes, arm it", every 10 min from 22:32Z 11-16), reading `C:\tmp\propsatomic\r807.sh`, saved to `C:\tmp\propsatomic\r807_after.out`.
+- **The run:** refresh-worker 06:31:45.902Z `segment_distributions_path=.../ncaaf_source/data/smartsim2_segment_distributions_2026_wk12.json`, then 06:31:45.992Z `sim_history_kept=.../smartsim2_segment_distributions_2026_wk12.20261117T063145Z.json.gz`. `sim_history_error=` 0. Kept pair = live (sha `675baa89d4bc` CSV, `c50b2b0944ee` sidecar). `sim_history/ncaaf/` now 6 files (wk11 x1, wk12 x2).
+- **What differs between the two wk12 copies** (`C:\tmp\propsatomic\d807.py`, `C:\tmp\propsatomic\d807b.py`, read-only, nice 19):
+  - Sidecar: only top-level `generated_at`. `games`: 66 = 66 keys, **0 of 66 games differ** (deep compare).
+  - CSV: 66 = 66 rows, same `game_id` set, 0 duplicates; keyed by `game_id` and less `generated_at`, **0 rows differ**, and the rows are equal as a multiset. Compared by position, 56 of 66 rows differ: **the row ORDER changed.**
+- **Cause:** `football_segment_distributions.archive_sim_write` (`syndicate/features/shared/football_segment_distributions.py:462-465`) tests `prior_rows == _csv_rows_less_stamp(csv_bytes)`, two ordered lists of dicts. The generator's row order is not stable between runs, so a content-identical rewrite reads as changed. The tests pinned `unchanged` on a repeat with the same order only.
+- **What it means:**
+  - **#807's question is answered for wk12 day 1 -> day 2: a week's daily rewrite did NOT change content.** One pair of days, one week, so not yet a rule. Per the todo, if this holds, #805's as-of refusals were conservative.
+  - **Grading is unaffected:** the grader takes each game's last kept write before kickoff, and the redundant copy holds the same numbers. Cost: a redundant ~60 KB pair per daily rewrite (<= ~0.4 MB a week).
+  - **Fix (not built):** compare the CSV rows order-insensitively (keyed by `game_id`, or sorted), with a test that writes the same rows shuffled. That is a code change: the user's call.
+- **Claims:** none; read-only.
