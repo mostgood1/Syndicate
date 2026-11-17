@@ -455,3 +455,55 @@ flags below the points scored (0 of 1).
   - Recorded response 5.7 → 4.6 MB on the wire.
   - The fleet runs `5db26434e`, 83 commits behind main, so loading it needs its own ride-along check and
     the user's decision.
+
+## Reading 4 — Tue 11-17 2:35 PM CST (20:35Z)
+
+**Fleet:** `5db26434e`, stable since the 19:50Z `up` (refresh-worker 560, live-odds-worker 561). Host
+load 1.9.
+
+**Slate:** 3 live chips.
+- NCAAB: Rutgers @ Houston H2 13:26.
+- WNCAAB: Pepperdine @ Nevada Q4; Murray State @ Oregon Q4.
+
+**Flags: 4 shown on 2 cards. 0 false, 0 missed, 0 dark.**
+- NCAAB Rutgers @ Houston: HOU −16.5 (6.9 pp); u153.5 (**18.7 pp**, calibrated, ours 149.4); 2H u76.5
+  (6.1 pp).
+- WNCAAB Murray State @ Oregon u178.5 (16.0 pp, raw, ours 175.7).
+
+**Live rows:** 38. NCAAB 18 (5 priced <= 120 s); WNCAAB 20 (7 priced <= 120 s). 2 of 8 markets carry
+no price of ours.
+
+**Overlay (37 min), 0 gaps over 360 s:**
+| sport | builds | gap p50 / max | zero-card with rows |
+|---|---|---|---|
+| NCAAB | 44 | 50 s / 102 s | **18** |
+| WNCAAB | 40 | 51 s / 154 s | 1 |
+
+- **All 18 NCAAB zero-card builds are the value floor:** `refused={"rows_below_value_floor":N}` with N
+  equal to the opportunities (9-20). This is the decided behaviour (the user: "Keep the floor"). NCAAB
+  builds with cards published 15-17 (`refused` floor 22-24, implausible book 1).
+- 0 `deferred_slow`. Tick gap p50 33 s, max 138 s.
+
+**Web merges:** fresh 50 / 50.
+
+**Load (warm again):**
+- **Query 9.2 s / 4.47 MB wire / 24.7 MB raw** (`row_refs`). Shortlist 0.78 s; chips 0.86 s; live-rail
+  0.06 s.
+- Gunicorn workers 546 s and 304 s old.
+- **Board:** built 80 s ago. **Query snapshot 1,112 s old**: the state loop refreshed it after the
+  restart (6,214 s at 1:58 PM).
+
+**#824:** 0 of 16 college `LIVE_GAMELINE_JOIN` lines since 19:58Z with the reason; 0 college totals
+flags below the points scored (0 of 3).
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated.
+
+**Restarts:** none since the 19:50Z `up`.
+
+### Improvement hunt, reading 4
+
+- **I-14 parked (low value).** The WNBA work visible in the role logs is the intelligence overview
+  pass (`OVERVIEW_SPORT_BEGIN sport=wnba` → `_END` in ~0.3 s, 0 games): negligible. The ESPN WNBA
+  live-status fetch seen at 13:11 is not logged per run, so its frequency stays unmeasured. Not worth
+  more time without a cost signal.
+- **I-13 measured, not built; #827 on main, not loaded:** recorded above.
