@@ -350,3 +350,38 @@ A game was live: the `live_row` ask exists. as_of_in_future: 0 / 6. Three answer
 - **ANOMALY:** An F2 result exists and its two sources still disagree: the run summary says "did NOT PASS", the verdict file says PASS 12/12. Carried from Readings 4-5. Check next: the owning session reads run `local_dc76d55c` and records which verdict stands before the 11-24 M2 read.
 - **ANOMALY:** New engine-file commit `ea723a9d9` (learner slice 3a, NBA player-prop outcomes). Check next: that it does not change `m2_gate.py`'s inputs or the frozen M2 population before 11-24.
 - **ANOMALY:** New fleet load: 12:58 PM CST ff `92ae7490a -> 5db26434e` + reload-web (#826 row_refs, plus `ac2cbc2fc` and `2148f99cb`). It is web-side (board query), not a live-pricing change as named. Check next: whether the Ask latency jump (median 6.3 s -> 23.5 s) tracks the reload or only the host load.
+
+## Reading 7 (1:56 PM CST)
+
+**Ask:** 6/6 answered, 0 past the 45 s cut-off, median 20.1 s, max 35.95 s (live_row). All 200, all ok, 0 `as_of_in_future`. Page 200 in 0.94 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "this spread?" | 26.98 | yes | bet_analysis | 2026-11-17T18:16:24Z | 0 |
+| free_text "Lakers vs Celtics" | 0.90 | yes | matchup_analysis | 2026-11-17T18:16:24Z | 0 |
+| free_text "top edges today" | 13.61 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (Jazz @ LA U109.5) | 19.63 | yes | bet_analysis | 2026-11-15 (date) | 2 |
+| pregame_prop (McBride U1.5) | 20.10 | yes | bet_analysis | 2026-11-17T17:43:54Z | 7 |
+| live_row (Murray St) | 35.95 | yes | bet_analysis | 2026-11-17T18:16:24Z | 0 |
+
+A game was live (a `live_row` ask existed).
+
+**Web, 1:26-1:56 PM CST (62 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 3, all 3 hard, max anon 1008.8 MB vs limit 636.6 MB.
+- Overlay warms: 8, median 27.72 s, 6 over 20 s, 1 over 45 s, 1 over 60 s, max 91.51 s.
+- Requests over 20 s: 4 (`POST /api/syndicate/query` 3, `POST /api/intelligence/query` 1); over 45 s: 0.
+- Asks from any client: 6, 0 over 45 s, 0 non-200; 0 of 6 were NOT this probe's (all `Python-urllib/3.12`).
+
+**Host (12 cores):** load 9.50 / 6.08 / 2.82 (1/5/15 min), MemAvailable 9392 MB. Top CPU: refresh-worker 113% ni 0; gunicorn web worker 106% ni 0 (28 s old); `railload/pivotprof.py` 96.5% ni 19; live-odds-worker 50.6% ni 0; `refresh_nhl_oddsapi.py` 31.6% ni 0; second gunicorn worker 21.5% ni 0; live_resim_workers 14.5% ni 5.
+
+**Engine:**
+- 2a: `engine-live-prior-f2-read-1117`: 1 run, status succeeded (started 10:30 AM, last activity 11:17 AM CST), its summary: "did NOT PASS". `f2_verdict.txt` (38 lines, mtime 11:15 AM CST) last line: `F2_VERDICT PASS judged_families=12 failed_families=0 cutoff=2026-11-15T20:00:00Z files=2`.
+- 2b: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 starts `c1a2c029c2a1816f`, not `6915bb6a5ecb80f2`. The file was rewritten 1:58 PM CST (13995 bytes); `m2gate_kit/amend2/` holds `AMENDMENT2_DRAFT.md` (header still has `__TIME__` / `__YES__` placeholders), `amendment2.diff` (1:56 PM) and a same-size `m2_gate.py` (1:32 PM).
+- 2d: 0 engine-file commits on origin/main in the last 40 min.
+- 2e: newest deploys.md headers are 1:06/1:07 PM CST READINGs; newest load is the 12:58 PM CST ff + reload-web (#826, `row_refs`), ~58 min before this reading. No fleet load in the last 40 min.
+
+- **ANOMALY:** overlay warm 91.51 s (> 60 s), with 3 hard memory recycles (max anon 1008.8 MB vs 636.6 MB). Check next: the web role log for the warm's route and whether it ran beside a recycle; does it recur in the next reading?
+- **ANOMALY:** M2 gate hash changed (`c1a2c029...` ≠ `6915bb6a...`), the file rewritten at 1:58 PM CST, apparently by Amendment 2 (draft still unfilled: `__TIME__`, `__YES__`). Check next: the lane owner confirms the user registered Amendment 2, the draft's placeholders are filled, and the M2 task prompt's expected hash is updated before 11-24.
+- **ANOMALY:** F2 result in. The run summary says "did NOT PASS", but `f2_verdict.txt`'s last line says `PASS ... failed_families=0`. Check next: read the F2 run's session (local_dc76d55c) and the whole verdict file to settle which is the recorded verdict.
