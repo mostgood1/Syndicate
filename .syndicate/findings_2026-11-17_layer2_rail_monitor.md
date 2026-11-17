@@ -354,3 +354,11 @@ no price of ours.
 | I-15 | **The monitor's probe should send `row_refs`** like the page, and rehydrate through the page's function | Since 12:58 PM the probe measures the refs-off path (28.4 s / 61.7 MB), not what users get | This lane | Update `scripts/layer2_rail_monitor_probe.py` + `layer2_rail_monitor_run.mjs`, test, land |
 
 - **I-15 DONE (~1:16 PM CST):** `scripts/layer2_rail_monitor_probe.py` now sends `row_refs: true` like the page (`--no-row-refs` reads the old path), and its runner rebuilds the lists through the page's own `rehydrateAliases`. **off != on, back to back at 1:14 PM:** the same rail (111 cards, 4 live, 1 flag, teams identical; live-rail rows 44 / 47, 40 s apart); query 4.73 MB wire / 25.9 MB raw / 11.5 s (refs) vs 12.08 MB / 65.2 MB / 12.4 s (no refs). From reading 3 on, the probe's query load is what the page gets.
+
+- **I-2, the load lane's own record (local_bc8d3e61; deploys.md "2026-11-17 18:58:45Z", main `ea6aab2e2`; lane CLOSED `46a2bcbbc`):**
+  - web claim 18:54:47Z; preflight CLEAR 18:58:02Z; ff 18:58:45Z; `reload-web` 18:58:52Z (0 failures); claim released 19:05Z.
+  - Baseline: the page's query at 18:56:07Z, 11,214,708 B gz, **136.6 s** (web saturated).
+  - After, at 18:59:08Z: 4,320,530 B gz (38.5%), 23.98 MB raw, 200 in 18.1 s. `version_and_debug` 1,968 ms (7.4-7.9 s before).
+  - Headless `/intelligence`: 0 page errors, 2,600 card nodes, rail drawn.
+  - `2148f99cb` (paper): its owner measured 200 in 31.4 s, no WORKER TIMEOUT. `cc90fb653` and the paper retirement `f7fb3ed4e` are NOT on the fleet.
+  - **Owed to this monitor:** `WEB_WORKER_MEMORY_RECYCLE` per query request after the load vs before (28 recycles 16:00-18:59Z). Note that open browser tabs keep the old page JS (no `row_refs`, ~11 MB a poll) until reloaded.
