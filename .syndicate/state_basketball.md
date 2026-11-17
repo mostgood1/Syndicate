@@ -1251,7 +1251,10 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     as outs hit the cap of 5).
   - Served anchored total runs +3.42 low (actual − anchored, 192 games). Feeding the game model with the outs
     penalties still on is the worst arm.
-  - Nothing changed. F0/F1 is the user's call: `.syndicate/findings_2026-11-16_nba_margin_raw_zero.md`.
+  - Nothing changed in served numbers. F0 (behaviour-neutral: `market_anchor.game_model_fed` + `game_model_columns`,
+    a `SMART_SIM_GAME_MODEL_UNFED` print, checklist Level 4) is on main `8aea4fe7e` 2026-11-17, NOT LOADED; until it
+    is, no fleet sim carries the field (0 of 103 NBA sims 11-04..11-17). F1 is the user's call:
+    `.syndicate/findings_2026-11-16_nba_margin_raw_zero.md`.
 ## [basketball-props-refresh-off-vendor] BASKETBALL PROPS REFRESHES: vendored uses retired path by path; WNBA history now tracks the schedule `[verified 2026-10-14, lanes nba-source-cli-native + basketball-games-history-freshness]`
 
 - **Off vendor and on the fleet** (each A/B'd on production data, 0 differences unless noted):

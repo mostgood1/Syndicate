@@ -236,8 +236,62 @@ standard asks for, whichever way F1 goes.
 5. **Pre-registered grade, owed before keeping it on.** Anchored total MAE/bias vs served on
    the next ≥ 150 regular-season games, date-clustered CI, with the outs decision recorded.
 
+## F0 built `[2026-11-17 9:38 AM CST, main 8aea4fe7e, lane nba-game-model-fed-audit; user: "Build F0 here"]`
+
+Behaviour-neutral, and **not loaded**: it reaches the fleet only with an ff of `~/Syndicate`
+plus a refresh-worker restart.
+
+- **The read is unchanged.** `_game_model_points_local` (just above
+  `_smart_sim_run_date_local`) reads `totals`/`spread_margin` through the job build's own
+  `_num`, exactly as before, and also returns an audit. The job build calls it in place
+  of the four inline lines.
+- **The artifact.** Each pregame job carries `game_model_fed` and `game_model_columns`. The
+  worker copies them into `market_anchor` (`_game_model_anchor_fields_local`). A job without
+  them adds nothing: absent is not False.
+- **The print.** `SMART_SIM_GAME_MODEL_UNFED league= date= unfed= of= read= found= games=`
+  is printed once per run that has an unfed job, with `flush=True`. A fully fed run prints
+  nothing.
+- **Checklist Level 4** (`scripts/basketball_sim_input_checklist.py`):
+  - **Structural.** Over `dataclasses.fields(TeamContextLocal)`, it compares the fields the
+    quarter model consumes (AST of `_simulate_quarters_local` + `_adjustments_local`) with
+    the fields every `TeamContextLocal(...)` call in `_smart_sim_worker_run_local` passes.
+    A positive control drops `off_rating` from the builder and must alarm.
+  - **Data.** It replays the bridge's own `_game_model_points_local` over the newest 14
+    `predictions_<D>.csv` in each league's sim root, and counts `market_anchor.game_model_fed`
+    on that window's sims.
+  - **Root.** WNBA's sim root is `wnba_source/data/processed`, not the `source_artifacts`
+    copy that Levels 1-3 read.
+- **Neutrality, measured in the tests.**
+  - The real run-date loop (worker stubbed) gives an NBA-named row `game_model_fed: false`
+    and 110.6/110.6, which pins today's numbers. A WNBA-named row gives ratings from the
+    means.
+  - The REAL worker writes `market_anchor`. The pre-existing anchor fields are identical
+    with and without the audit, including `model_margin_raw == 0.0` for equal outs/b2b.
+  - Test counts: `tests/test_nba_game_model_fed_audit.py` 12,
+    `tests/test_basketball_sim_input_checklist_level4.py` 9. The 95 neighbouring smart-sim
+    tests and Level 0 are green.
+- **Fleet reading of Level 4** (read-only, 9:36 AM CST, worktree code against
+  `~/syndicate-prod/data`):
+  - **NBA, 0 of 103 predictions rows fed** (14 dates, 11-04..11-17). `pred_total` 103,
+    `pred_margin` 103, `totals`/`spread_margin` 0, so the `UNFED` alarm fires.
+  - **WNBA control: 15 of 15 fed** (10-01..10-31).
+  - **Sims:** 0 of 103 NBA and 0 of 14 WNBA carry the field yet (they were written before
+    the load).
+- **Owed after a load:** the first NBA `smart_sim_*.json` with mtime > the load shows
+  `game_model_fed: false` and `game_model_columns: ["pred_total", "pred_margin"]`, and the
+  refresh-worker log shows one `SMART_SIM_GAME_MODEL_UNFED league=nba` line per run.
+
 ## Leads (recorded, not followed)
 
+- **`TeamContextLocal.form_7` / `form_30` are consumed and never passed** (found by Level 4,
+  2026-11-17).
+  - They feed the quarter means (`_adjustments_local`: +0.5·form_7, +0.25·form_30) and the
+    quarter sigma (the stress term in `_simulate_quarters_local`).
+  - Neither `TeamContextLocal(...)` call in `_smart_sim_worker_run_local` passes them, so both
+    are always None, for NBA and WNBA alike.
+  - Same shape as this defect: a mechanism that exists in code and is inert in production.
+    Wiring them would be a mechanism change on a calibrated engine, so it needs a re-fit
+    (model-engine standard). Not done.
 - The **NBA game model's margin barely follows its own `elo_diff`** (0.24 vs elo↔market
   0.81). The fleet appears to run the sklearn fallback (`cli.py:966-985`), so the NPU
   predictor may be unavailable. This is a game-model question for the NBA owners.
