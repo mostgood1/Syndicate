@@ -155,9 +155,14 @@ def test_live_placer_refuses_first_and_records_the_guard(_live_env, verdict, pla
         assert rec["guards"]["check_order"] == {"verdict": "not_reached"}
 
 
-def test_paper_loop_refuses_the_booking_so_no_live_order_is_tried():
+def test_paper_loop_refuses_the_booking_so_no_live_order_is_tried(monkeypatch):
     """Reachability through the real paper loop (the NBA moneyline harness of test_inplay_entries_paper):
     the same pass books with the hold passing and books nothing -- and never calls on_book -- with it failing."""
+    # The harness's own env (its autouse `_env`), set here, not inherited from the machine: without an OddsAPI
+    # key the loop fetches no books and never signals, so this passed only where the shell had a real key
+    # (Windows) and failed under the fleet's Linux venv (nightly ci-suite 11-16, reported by the fleet-watcher).
+    monkeypatch.delenv("SYNDICATE_INPLAY_ENTRIES_PAPER", raising=False)
+    monkeypatch.setenv("ODDS_API_KEY", "test-key-not-real")
     T0 = 1_761_000_000.0
     tick = "KXNBAGAME-26OCT22CHIMIL-MIL"
     upd = ip._iso(T0 - 10)
