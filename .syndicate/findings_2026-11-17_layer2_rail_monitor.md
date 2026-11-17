@@ -507,3 +507,64 @@ flags below the points scored (0 of 3).
   live-status fetch seen at 13:11 is not logged per run, so its frequency stays unmeasured. Not worth
   more time without a cost signal.
 - **I-13 measured, not built; #827 on main, not loaded:** recorded above.
+
+## Reading 5 — Tue 11-17 3:28 PM CST (21:28Z), full page — the afternoon lull
+
+**Fleet:** `5db26434e`; refresh-worker 560 (up 5,401 s); live-odds-worker 561. Host load 1.9.
+
+**Slate:** 0 live chips. The early college games are final; the evening wave starts ~5 PM.
+
+**Flags:** 0 shown, 0 false, 0 missed, 0 dark. 0 live rows.
+
+**Overlay (53 min):** NCAAB 69 builds, gap max 134 s; WNCAAB 24 builds, gap max 87 s (9 zero-card with
+rows, the floor). 0 over 360 s. 0 `deferred_slow`.
+
+**Load:**
+- `/intelligence` 7.0 s / 23.5 MB. **Query 2.8 s / 4.60 MB wire / 25.3 MB raw** (`row_refs`, nothing
+  live). Shortlist 0.8 s; chips 0.02 s.
+- Board built 186 s ago; query snapshot 1,556 s.
+
+**#824:** 0 of 34 college join lines since 20:35Z with the reason; 0 flags.
+
+**Teams:** 0 defects.
+
+**Restarts:** none.
+
+### I-2 recycle reading, the clean post-restart window so far (19:52-21:27Z, 1.58 h; `recycle.py`)
+
+| requests | queries (`row_refs` / full) | recycles (hard) | per query | per hour | requests per recycle (median) | anon MB at recycle (median) |
+|---|---|---|---|---|---|---|
+| 273 | 18 (11 / 7) | 19 (18) | 1.06 | 12.0 | **10** | 878 |
+
+- **Reading:** recycles track ALL requests (~1 per 10), not the board query (19 recycles for 18
+  queries). So the query's −61% is not the main memory driver, which leads to I-14 below.
+- The final number comes at the daily summary, over the evening slate.
+
+### Improvement hunt, reading 5
+
+**I-14 RE-OPENED with a count: ~70% of the web's requests in November are WNBA box-score calls, in the
+WNBA offseason.**
+- **Measured:** web route mix since 19:51:31Z (273 requests):
+  - `GET /wnba/api/final_player_boxscore` 120;
+  - `GET /wnba/api/live_player_boxscore` 70;
+  - `POST /api/syndicate/query` 22;
+  - `POST /api/intelligence/query` 19;
+  - `GET /api/board/live-rail` 9.
+  - All 190 WNBA calls come from Python-urllib (the fleet's own scripts).
+- **Per day:** 1,790 (11-14), 1,626 (11-15), 1,858 (11-16), 1,947 (11-17).
+- **`live_player_boxscore?date=2026-11-17`:** every 1-2 min, an empty 199-byte answer, **0.8-5.1 s each**.
+  - Caller: `scripts/capture_wnba_live_player_box.py`, via the WNBA live-lens loop
+    (`syndicate/features/shared/live_lens_loop.py`, `syndicate/features/wnba/live_lens.py`). It refuses
+    to store an empty capture but polls anyway.
+- **`final_player_boxscore?...&count_only=1`:** repeatedly for **2026-06-03 (28), 06-04 (37), 06-05 (9)**,
+  plus 11-16 (20) and 11-17 (22).
+  - Caller: the refresh-worker's WNBA postgame backfill (`scripts/run_refresh_worker.py` ~1600-1640 →
+    `build_wnba_boxscores.build_date`).
+  - It retries a date whose box was never published (`_WNBA_BOX_REBUILD_MAX_ATTEMPTS`).
+  - The three June dates look stuck. The loop never drains to its hourly stamp, so it re-asks them
+    every few minutes.
+
+| # | improvement | evidence | owner | next step |
+|---|---|---|---|---|
+| I-14 | **Stop offseason WNBA polling:** the live box-score capture with no WNBA games on the date, and the postgame backfill stuck on 06-03..06-05. Per line / per date, never a sport switch: skip a date with 0 scheduled games, and stop retrying a date whose box cannot publish. | Above. ~1,900 web requests a day, 70% of web traffic since the restart; live calls 0.8-5.1 s each, for nothing. | No open lane found (WNBA live / postgame code) | Proposed as a session card |
+| I-16 | **A scheduled full-form reader** | Python-urllib full-form (11.3-11.6 MB) `/api/intelligence/query` POSTs at a 15-minute cadence: 20:07:30, 20:22:10, 20:37:09, 20:52:12, 21:07:10, 21:22:11Z (:07 / :22 / :37 / :52). | Unknown (likely another session's scheduled monitor) | Name the caller: scheduled-task prompts that POST the query |
