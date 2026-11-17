@@ -282,3 +282,17 @@ One pass over every portfolio route, before any probe existed:
   - If they are still unclassified at the next reading, I will record the 16:24Z #814 refusal as `yes`,
     pending the refresh-worker load. That is fail-closed: the count holds at 0 until it loads. The 16:17Z NFL
     rebuild stays the owner's call.
+
+## FINDING 1 — the fix's route to the fleet (12:2x PM CST)
+
+- The fleet is now at `92ae7490a` (read ~18:2xZ), so `c70674e3b` (#823) and `3dbe53df0` (#824), the
+  ride-alongs I was holding the deploy for, are already on the fleet.
+- Lane `board-query-row-refs` (session "Layer 2 Game Rail monitor") has user approval to load
+  `92ae7490a -> 5db26434e` tonight, not before ~5 PM CST: an exact-SHA ff plus reload-web. That range contains
+  `2148f99cb`, and its session asked whether my fix is safe as a ride-along.
+- **Answered (a), safe:** before refresh-worker loads the writer, web's `settlement_all_time` is None and the
+  template prints no all-dates line, with no error and no zero. Every other part of the page was identical in
+  the fleet A/B. The record appears after the first settle pass on new code. Betting change: no.
+- I flagged `ac2cbc2fc` (launcher role spec) to them as another ride-along; it is read at `up`, not at reload.
+- **Owed after their load:** one `/portfolio/paper` GET timed from the web access log with no WORKER TIMEOUT,
+  and `PAPER_ALL_TIME_WRITTEN` after refresh-worker's next restart.
