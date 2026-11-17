@@ -957,6 +957,14 @@ death, never life — do not invert it.
 - Verification: Both tests pass under ~/.venvs/syndicate/bin/python in a full-suite-order run locally, then the next nightly ci-suite log (~/syndicate-prod/logs/job-ci-suite.log) lists neither as a NEW FAILURE.
 - Blocked by: none
 
+### ask-engine-monitor — OPEN — opened 2026-11-17 — session e32fef1a-01e8-4afe-a284-01acd3728545
+- Goal: A continuous watch, from this session, of Ask the Syndicate on the fleet (127.0.0.1:10000: the /syndicate page and POST /api/syndicate/query from every surface) and of the AI decision engine's build (#736: lanes engine-learner, engine-live-prior, engine-experts -- their scheduled reads, registered gates, kits and shadow runs): every anomaly -- Ask failures, latency against the pages' 45 s cut-off, web worker kills and stalls, answer shape and staleness; engine read outcomes, gate and kit integrity, evidence and opinion coverage -- measured with a denominator, logged in the findings file, and either handed to its owning lane or fixed under its own lane
+- Files: .syndicate/findings_2026-11-17_ask_engine_monitor.md (NEW), scripts/ask_monitor_probe.py (NEW probe), tests/test_ask_monitor_probe.py (NEW)
+- Hypothesis: written 2026-11-17 10:59 AM CST before the falsification reading: Ask itself is cheap (0.5-7.5 s on a free web worker, 6 timed asks 10:53 AM); it fails (past the pages' 45 s cut-off, or killed by gunicorn's 60 s WORKER TIMEOUT) when its worker is stalled by in-process board work -- the combined-board overlay warmer (pipeline/intelligence_state.py, 20-67 s rebuilds today) or POST /api/intelligence/query (63 over 20 s today) -- on a CPU-saturated host; a free-text ask (/syndicate) and a board-row ask (Layer 2) are hit alike
+- Falsification test: an Ask over 45 s with no overlay warm and no request over 20 s on any web worker inside its window; or, on a quiet host, free-text asks taking more than twice as long as board-row asks across >= 10 pairs
+- Verification: The findings file carries a dated Central-time block per reading with rates and denominators; each actionable anomaly names its owner lane or a new lane; a daily summary with per-metric trend
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
