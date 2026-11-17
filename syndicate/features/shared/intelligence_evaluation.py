@@ -49,10 +49,10 @@ SCHEMA_VERSION = 1
 # record/grade/settle mechanics each independently working: the ledger
 # never survived long enough to accumulate overlap.
 # reports_root() honours SYNDICATE_REPORTS_ROOT/SYNDICATE_STATE_ROOT and
-# only falls back to a repo-relative path when NOT hosted (RENDER unset),
-# which is exactly this file's old behaviour for local dev/tests -- so this
-# change is a no-op locally and only changes anything on Render, where it
-# was actually broken.
+# only falls back to a repo-relative path when NOT hosted (SYNDICATE_HOSTED
+# unset; `RENDER` before 2026-11-17), which is exactly this file's old
+# behaviour for local dev/tests -- so this change is a no-op locally and only
+# changed anything in production (then Render), where it was actually broken.
 DEFAULT_LEDGER_PATH = reports_root() / "intelligence" / "evaluation_ledger.jsonl"
 DEFAULT_LEDGER_CHUNK_ROOT = DEFAULT_LEDGER_PATH.parent / "evaluation_ledger_chunks"
 DEFAULT_LEDGER_INDEX_PATH = DEFAULT_LEDGER_CHUNK_ROOT / "index.json"

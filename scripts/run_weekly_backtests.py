@@ -1,7 +1,9 @@
 """Weekly backtests for the `model-scorecard` cron (lane `model-scorecard-cron`, 2026-09-17).
 
-The cron runs from a FRESH CLONE of main: no persistent disk, no `.env`, 2 GB
-RAM, `RENDER=true`, `ADMIN_TOKEN` in the environment. Every backtest that can
+Since 2026-09-30 the cron is the fleet's `model-scorecard` scheduled job
+(`scripts/local_production.py` `SCHEDULED_JOBS`). It was designed for Render's cron,
+which ran from a FRESH CLONE of main: no persistent disk, no `.env`, 2 GB RAM,
+`RENDER=true`, `ADMIN_TOKEN` in the environment. Every backtest that can
 run under those conditions is run here, one at a time, each as its own
 subprocess with a timeout, and the results land in one dated report:
 

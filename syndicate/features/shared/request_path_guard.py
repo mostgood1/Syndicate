@@ -13,27 +13,26 @@ logger = logging.getLogger(__name__)
 
 class ComputeInRequestPathError(RuntimeError):
     """Raised when heavy intelligence compute is about to run inside a live
-    web request on a hosted (Render) deployment. See
+    web request on the hosted production fleet. See
     refuse_if_compute_in_request_path.
     """
 
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
-# Opt-in flags. Either one being TRUE means hosted. `SYNDICATE_HOSTED` is the
-# neutral name of `RENDER` (`service_identity`, 2026-11-17): it is read first and
-# `RENDER` only when it is absent; the fleet sets both to one value.
+# Opt-in flags. Either one being TRUE means hosted. `scripts/local_production.py`
+# sets `SYNDICATE_HOSTED=true` on every fleet role (`service_identity`). It was named
+# `RENDER` until 2026-11-17, when the Render names stopped being set or read.
 _HOSTED_FLAGS = ("SYNDICATE_HOSTED", "SYNDICATE_REQUIRE_HOSTED_STORAGE")
 
-# Injected by the Render RUNTIME, not by the service's env-var config, and so
-# not deletable from the dashboard. Verified 2026-09-04 against the live web
-# dyno's own `/api/ops/version`, which reports its own environment:
-# RENDER_SERVICE_NAME='syndicate-an21',
-# RENDER_INSTANCE_ID='srv-d88ahvrbc2fs73eodu30-7cff65c8c4-68pvq',
-# RENDER_EXTERNAL_URL='https://syndicate-an21.onrender.com' -- while NONE of
-# them appear among that service's 76 user-defined env vars. Presence alone is
-# the signal; these carry identifiers, not booleans. Since 2026-11-17 each is read
-# under its neutral name first (`service_identity`); the fleet sets both spellings.
+# Identity markers: presence alone is the signal; they carry identifiers, not
+# booleans. The fleet launcher sets them on every role as forced keys, after every
+# env layer, so no env file can drop them. HISTORY: on Render (retired 2026-09-30)
+# the RUNTIME injected them under `RENDER_*` names, outside the service's env-var
+# config -- verified 2026-09-04 on the web dyno's own `/api/ops/version`
+# (`RENDER_SERVICE_NAME='syndicate-an21'`, an `srv-...` instance id, the public
+# `onrender.com` URL; none among its 76 user-defined vars). The `RENDER_*` names
+# have been neither set nor read since 2026-11-17 (`service_identity`).
 _HOSTED_MARKERS = ("SYNDICATE_SERVICE_ID", "SYNDICATE_INSTANCE_ID", "SYNDICATE_SERVICE_NAME", "SYNDICATE_EXTERNAL_URL")
 
 
@@ -174,11 +173,12 @@ def _is_render_hosted() -> bool:
        `RENDER=false` disarmed the guard outright even with
        `SYNDICATE_REQUIRE_HOSTED_STORAGE=true`. A value that says "not hosted"
        must not also suppress the key that says "hosted".
-    2. **The injected markers are consulted.** Arming used to be able to rest on
+    2. **The identity markers are consulted.** Arming used to be able to rest on
        `SYNDICATE_REQUIRE_HOSTED_STORAGE` alone -- a key whose NAME is about
        storage, so a plausible thing for someone to tidy away, and deleting it
        would have silently downgraded this HARD gate to warn-only and restored
-       `#98`. The markers cannot be deleted from the dashboard.
+       `#98`. The markers are forced keys in the fleet launcher, so no env file
+       can remove them (on Render they were runtime-injected).
 
     This is hardening with no production behaviour change: the guard was already
     refusing on web (348 events on 2026-08-27, a branch unreachable unless this
@@ -206,9 +206,9 @@ def refuse_if_compute_in_request_path(operation: str) -> None:
 
     refresh-worker is a plain script with no Flask app, so
     has_request_context() is always False there -- this can only ever fire
-    for a real HTTP request being served by a web dyno, regardless of which
-    Render service happens to be running the code. Local dev (not
-    render-hosted) keeps the previous warn-only behavior so a developer
+    for a real HTTP request being served by web, regardless of which fleet
+    role happens to be running the code. Local dev (not hosted) keeps the
+    previous warn-only behavior so a developer
     running the app directly, with no separate worker process, is
     unaffected.
     """

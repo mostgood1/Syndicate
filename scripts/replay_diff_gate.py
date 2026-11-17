@@ -829,9 +829,9 @@ def _child_env(scratch: Path) -> dict[str, str]:
         env.pop(name, None)
     for name in CREDENTIAL_ENV:
         env.pop(name, None)
-    # `RENDER=1` makes `data_root()` raise instead of falling back, which is
-    # right on Render and wrong here -- the fixture root is set explicitly.
-    # The hosted marker (`SYNDICATE_HOSTED`; `RENDER` until 2026-11-17, `service_identity`).
+    # The hosted marker (`SYNDICATE_HOSTED`; `RENDER` until 2026-11-17, `service_identity`)
+    # makes `data_root()` raise instead of falling back, which is right in
+    # production and wrong here -- the fixture root is set explicitly.
     env.pop("SYNDICATE_HOSTED", None)
     env.pop("SYNDICATE_REQUIRE_HOSTED_STORAGE", None)
     env["SYNDICATE_DATA_ROOT"] = str(scratch)

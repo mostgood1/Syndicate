@@ -26,8 +26,9 @@ THERE IS NO RENDER FALLBACK ANY MORE `[2026-11-15, lane render-retirement]`. Unt
 a "Render host" (`RENDER` set, `SYNDICATE_LOCAL_PRODUCTION` unset) fell back to
 `https://syndicate-an21.onrender.com`. Render has been suspended since 2026-09-30 and
 the user said on 2026-11-15 that it should not be used or needed for anything, so the
-only fallback is the fleet. The fleet's roles still carry `RENDER=true` as a MARKER
-(CLAUDE.md); it no longer changes what this resolves to.
+only fallback is the fleet. A leftover `RENDER` variable no longer changes what this
+resolves to (and since 2026-11-17 no fleet role carries one; the hosted marker is
+`SYNDICATE_HOSTED`).
 
 A script's own `--base-url` flag still beats all of this: the flag's argparse
 default is what this function returns.

@@ -404,9 +404,10 @@ def _parse_utc_datetime(value: object) -> datetime | None:
 #:
 #: `source_artifacts` is the one that matters in production and was missing.
 #: LOCALLY the orchestrator passes `data/ncaaf_source/source_artifacts` as
-#: `--artifact-root` and the CSVs sit directly in it; ON RENDER
-#: `_local_source_artifact_root` drops that segment and passes
-#: `/opt/render/project/data/ncaaf_source`, where the same files are one level
+#: `--artifact-root` and the CSVs sit directly in it; HOSTED (the fleet,
+#: and Render before it) `_local_source_artifact_root` drops that segment and passes
+#: `$SYNDICATE_DATA_ROOT/ncaaf_source` (`~/syndicate-prod/data/ncaaf_source` on
+#: the fleet; `/opt/render/project/data/...` on Render), where the same files are one level
 #: down under `source_artifacts/`. So the layout differs by environment and
 #: only the hosted one was unsearched.
 _PREDICTION_SEARCH_DIRS = ("data", "", "source_artifacts")

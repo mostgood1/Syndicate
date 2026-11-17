@@ -50,17 +50,17 @@ from syndicate.features.shared.service_identity import service_marker
 
 
 def _render_web_dyno() -> bool:
-    # RENDER is injected by Render on every service type (web *and* background
-    # workers), so it can't distinguish "am I the request-serving web dyno"
+    # SYNDICATE_HOSTED is set on every fleet role (web *and* the workers; Render
+    # injected it as RENDER), so it can't distinguish "am I the request-serving web dyno"
     # from "am I a worker script calling into this module directly" -- that
     # ambiguity let worker-side snapshot builders (refresh_nba_oddsapi_props.py's
     # _export_live_snapshot_artifacts calling build_live_state_payload) take the
     # "just return whatever's cached" branch meant only for actual web requests,
     # so a stale snapshot got read back and rewritten forever instead of ever
     # being recomputed. Same root cause and fix as WNBA (see wnba/cards.py).
-    # SYNDICATE_WEB_DYNO is an explicit, unambiguous override set only on the
-    # web service in render.yaml; fall back to the old heuristic when unset
-    # (local dev, other hosts).
+    # SYNDICATE_WEB_DYNO is an explicit, unambiguous override: true on web and
+    # false on both workers (`scripts/fleet_role_spec.json`); fall back to the
+    # old heuristic when unset (local dev, other hosts).
     explicit = str(os.environ.get("SYNDICATE_WEB_DYNO") or "").strip().lower()
     if explicit:
         return explicit in {"1", "true", "yes", "on"}

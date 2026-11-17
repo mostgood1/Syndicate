@@ -259,11 +259,11 @@ def derive_env(
         # `assert_refresh_state_backend_ready` raises "Local state backend not
         # allowed in multi-service deployment" (`refresh_state_store.py:316`)
         # whenever `SYNDICATE_REQUIRE_HOSTED_STORAGE` is truthy, and production
-        # sets it to `true` on all three services. Clearing `RENDER` alone is
-        # not enough; the predicate is an OR of the two.
+        # sets it to `true` on all three services. Clearing `SYNDICATE_HOSTED`
+        # alone is not enough; the predicate is an OR of the two.
         #
         # This is a legitimate forced override rather than a workaround: the
-        # assertion exists because on Render the three services do NOT share a
+        # assertion exists because on Render the three services did NOT share a
         # disk, so a file backend would silently give each its own state. On one
         # laptop they DO share it, which is the condition the assertion is
         # protecting, so declaring that is telling the truth. With

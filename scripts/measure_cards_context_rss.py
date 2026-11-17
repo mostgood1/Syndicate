@@ -264,7 +264,7 @@ def main() -> int:
         return _parity(args.date)
 
     # The worker path is the subject. `_render_web_dyno()` decides which half of
-    # this module runs, and on Render every service sets RENDER*, so the
+    # this module runs, and every fleet role sets SYNDICATE_HOSTED, so the
     # explicit override is the only unambiguous way to select it -- see
     # `_render_web_dyno`'s own comment.
     os.environ["SYNDICATE_WEB_DYNO"] = "0"

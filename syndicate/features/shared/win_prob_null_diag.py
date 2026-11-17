@@ -120,9 +120,8 @@ def _now_iso() -> str:
 
 
 def _commit() -> str | None:
-    # `SYNDICATE_GIT_COMMIT` first, then `RENDER_GIT_COMMIT` (`service_identity`). This read
-    # them the other way round until 2026-11-17; nothing set the neutral one then, and the
-    # launcher now sets both to one value, so the answer is unchanged.
+    # `SYNDICATE_GIT_COMMIT` (`service_identity`), set by the fleet launcher on every role.
+    # Until 2026-11-17 this read `RENDER_GIT_COMMIT` first; that name is no longer set.
     from syndicate.features.shared.service_identity import service_marker
 
     value = str(service_marker("SYNDICATE_GIT_COMMIT") or "").strip()

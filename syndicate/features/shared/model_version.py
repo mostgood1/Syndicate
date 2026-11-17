@@ -11,7 +11,7 @@ moment it's recorded is what makes that question answerable later, by
 joining ledger records to git history on this one field.
 
 Mirrors syndicate.blueprints.ops._build_version_payload's own env-var-first
-resolution (RENDER_GIT_COMMIT -> git rev-parse -> "unknown"), duplicated
+resolution (SYNDICATE_GIT_COMMIT -> git rev-parse -> "unknown"), duplicated
 rather than imported because that helper depends on Flask's current_app
 and only runs inside a request; this needs to be callable from worker code
 (where recording actually happens -- pipeline/intelligence_state.py) with

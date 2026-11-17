@@ -183,8 +183,8 @@ def _pull_or_refuse(token: str) -> int:
             # THE MESSAGE, NOT JUST THE TYPE. The first cron run printed four
             # bare `RuntimeError`s and nothing else, and the message named the
             # fix outright: "SYNDICATE_DATA_ROOT must be set when hosted storage
-            # is required." `refresh_state_store.data_root()` RAISES on Render
-            # (where `RENDER` is set) rather than falling back to REPO_ROOT/data
+            # is required." `refresh_state_store.data_root()` RAISES when hosted
+            # (`SYNDICATE_HOSTED`; `RENDER` on Render) rather than falling back to REPO_ROOT/data
             # the way it does locally -- so the pull worked on a laptop and could
             # not work on a cron, and my own handler discarded the sentence that
             # said so. An exception type is a category; the message is the

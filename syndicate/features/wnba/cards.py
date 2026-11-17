@@ -93,8 +93,8 @@ def _cache_put_context(cache_key: tuple[Any, ...], result: dict[str, Any]) -> No
 
 
 def _render_web_dyno() -> bool:
-    # RENDER / RENDER_EXTERNAL_URL / RENDER_SERVICE_ID are injected by Render
-    # on every service type (web *and* background workers), so they can't
+    # SYNDICATE_HOSTED / _EXTERNAL_URL / _SERVICE_ID are set on every fleet role
+    # (web *and* the workers; Render injected them as RENDER*), so they can't
     # distinguish "am I the request-serving web dyno" from "am I a worker
     # script calling into this module directly" -- that ambiguity previously
     # made worker-side snapshot builders (e.g. _export_live_snapshot_artifacts
@@ -102,8 +102,9 @@ def _render_web_dyno() -> bool:
     # the "just return whatever's cached" branch below meant only for actual
     # web requests, so a stale snapshot got read back and rewritten forever
     # instead of ever being recomputed. SYNDICATE_WEB_DYNO is an explicit,
-    # unambiguous override set only on the web service in render.yaml; fall
-    # back to the old heuristic when it's unset (local dev, other hosts).
+    # unambiguous override: true on web and false on both workers
+    # (`scripts/fleet_role_spec.json`); fall back to the old heuristic when
+    # it's unset (local dev, other hosts).
     explicit = str(os.environ.get("SYNDICATE_WEB_DYNO") or "").strip().lower()
     if explicit:
         return explicit in {"1", "true", "yes", "on"}

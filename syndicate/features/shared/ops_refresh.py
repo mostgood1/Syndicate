@@ -415,8 +415,9 @@ def _this_service_identity() -> str:
 
 
 def _this_instance_identity() -> str:
-    # RENDER_SERVICE_ID/NAME are stable across a redeploy (same service,
-    # fresh container) -- RENDER_INSTANCE_ID changes every time. Found via a
+    # SYNDICATE_SERVICE_ID/NAME (`local-<role>`) are stable across a restart
+    # (same role, fresh process tree) -- SYNDICATE_INSTANCE_ID is re-stamped at
+    # every spawn (on Render: every redeploy's fresh container). Found via a
     # real production bug: after a redeploy, a stale "running" manifest from
     # the previous container generation still matched on service identity,
     # so _refresh_run_still_active fell into the same-service pid-liveness
@@ -541,8 +542,8 @@ def _refresh_lane_key(explicit_lane: str | None = None) -> str:
     if explicit_lane:
         return str(explicit_lane).strip() or _LEGACY_REFRESH_LANE_KEY
     # SYNDICATE_REFRESH_LANE is a stable, human-readable override (set per
-    # service in render.yaml) preferred over the opaque RENDER_SERVICE_ID/NAME
-    # fallback -- it lets code hardcode a known lane name (e.g. the
+    # role in scripts/fleet_role_spec.json) preferred over the opaque
+    # SYNDICATE_SERVICE_ID/NAME fallback -- it lets code hardcode a known lane name (e.g. the
     # external-runner queue below, which always belongs to refresh-worker
     # regardless of which service actually calls launch_refresh_run).
     configured = str(os.environ.get("SYNDICATE_REFRESH_LANE") or "").strip()
@@ -654,8 +655,8 @@ def _refresh_run_still_active(manifest: dict[str, Any], *, run_summary: dict[str
         return age_seconds < _refresh_run_max_runtime_seconds()
 
     if same_service:
-        # RENDER_SERVICE_ID stays the SAME across a redeploy (fresh
-        # container, same service) -- RENDER_INSTANCE_ID does not. A pointer
+        # SYNDICATE_SERVICE_ID stays the SAME across a restart (fresh
+        # process tree, same role) -- SYNDICATE_INSTANCE_ID does not. A pointer
         # recorded by a previous instance can never still be running here:
         # its whole process tree is gone. Checking pid liveness/cmdline
         # instead (as the code below does) is unsafe in this specific case --
@@ -669,7 +670,7 @@ def _refresh_run_still_active(manifest: dict[str, Any], *, run_summary: dict[str
             return False
 
     # Same service and instance (or identity unknown, e.g. local dev without
-    # RENDER_SERVICE_ID) -- a real, verifiable liveness check is possible.
+    # SYNDICATE_SERVICE_ID) -- a real, verifiable liveness check is possible.
     if not _pid_is_running(pid):
         return False
     # launcherCommand (not command) is what was actually Popen'd under this

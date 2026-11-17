@@ -59,7 +59,8 @@ covers the pregame QUARTER model, which runs before the player sim and which
 nothing audited: its TeamContextLocal fields (consumed vs passed by the
 builder) and whether the game model's predicted points reach off_rating.
 
-RENDER IS THE SUBSTRATE OF RECORD (`model_engine_standard.md` Sec 3b). Levels
+THE FLEET IS THE SUBSTRATE OF RECORD (`model_engine_standard.md` Sec 3b; it was
+Render until 2026-09-30). Levels
 1-3 here read the LOCAL mirror (`data/{wnba,nba}_source/data/processed/`)
 because that is what is reachable from this checkout; every population number
 below is a statement about the checkout, not about production, and says so.

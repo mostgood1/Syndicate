@@ -126,7 +126,7 @@ def _bootstrap_soccer_player_seed_files() -> None:
     # cycle producing real match-level sims (team ratings/history ARE
     # present) but zero player projections, with no error anywhere to catch.
     # Root cause: refresh_odds_sources.py's soccer steps resolve
-    # --source-root to the RENDER PERSISTENT DISK
+    # --source-root to the PERSISTENT DATA DISK
     # (_local_source_bundle_root -> SYNDICATE_DATA_ROOT/soccer_source), not
     # the git checkout -- and unlike web (syndicate/app.py's
     # _bootstrap_render_data, gated the same way), refresh-worker (a plain
@@ -4224,8 +4224,8 @@ def _job_belongs_elsewhere(entry: Path, own_service: str) -> bool:
     """True only when the job's environ positively names a DIFFERENT service.
 
     Unreadable, or no service name on either side, is False: count it. The name is
-    `SYNDICATE_SERVICE_NAME`, else `RENDER_SERVICE_NAME` (`service_identity`; a job
-    started before the launcher set the neutral name carries only the old one).
+    `SYNDICATE_SERVICE_NAME` (`service_identity`), which the fleet launcher sets on
+    every role and every job inherits.
     """
     if not own_service:
         return False
@@ -4266,7 +4266,7 @@ def _running_job_process_count(proc_root: Path | None = None) -> int | None:
     `/init` and kept counting for 27+ min.
 
     A job inherits its role's environment, and that survives reparenting. So a
-    job whose `RENDER_SERVICE_NAME` names ANOTHER service is not ours. A job
+    job whose `SYNDICATE_SERVICE_NAME` names ANOTHER service is not ours. A job
     whose environ cannot be read, or that carries no name, still counts: unknown
     must not read low, because low is the direction that spawns. With no name of
     our own (a bare local run) nothing is filtered, which is the old behaviour.

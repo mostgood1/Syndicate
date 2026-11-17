@@ -36,25 +36,25 @@ full picture in one run.
 
 THE STEPS RUN WITH THE FLEET'S SERVICE MARKERS SCRUBBED (`SYNDICATE_HOSTED` and the rest;
 Render's injected `RENDER*` names until 2026-11-17) -- see `_step_env()`, and it
-is load-bearing rather than tidying. `RENDER` is injected on every Render
-service type, cron jobs included, so a suite running ON a cron trips every
-production branch gated on it and ends up measuring its own host. Measured
-2026-09-08: this cron reported `Ran 386 tests ... FAILED (failures=18,
-errors=21)` for a commit that is `OK (skipped=2)` off Render, and setting
-`RENDER=true` on a laptop reproduced both counts exactly.
+is load-bearing rather than tidying. A production host marks every process it
+runs, scheduled jobs included, so a suite running ON it trips every production
+branch gated on the marker and ends up measuring its own host. Measured
+2026-09-08 on Render's `ci-suite` cron (where `RENDER` was injected): `Ran 386
+tests ... FAILED (failures=18, errors=21)` for a commit that is `OK (skipped=2)`
+off Render, and setting `RENDER=true` on a laptop reproduced both counts exactly.
 
 **A red step here has to mean "main is red" and nothing else, because that
 sentence is this job's entire product.** A host that silently changes the
 answer is therefore not a nuisance, it is the one failure mode that makes the
 whole job worse than having no job -- it manufactures the alarm it exists to
 raise. Scrubbing is also what keeps the promise made four paragraphs up: GitHub
-runners have no `RENDER`, so this is what makes the cron run `ci.yml`'s
+runners carry no service marker, so this is what makes the cron run `ci.yml`'s
 experiment rather than a neighbouring one.
 
 Do NOT fix a recurrence by adding the specific `SYNDICATE_*` override that
 silences it. That was tried first here: `SYNDICATE_WEB_DYNO=0` moved 18/21 to
-4/19 and stalled, because it answers one of nineteen bare-`RENDER` reads across
-ten files, and the next one along (`refresh_state_store.data_root()`) fails in
+4/19 and stalled, because it answered one of nineteen bare-`RENDER` reads across
+ten files (2026-09-08), and the next one along (`refresh_state_store.data_root()`) fails in
 a completely different shape -- a `RuntimeError`, not an assertion.
 
     py -3 scripts/run_ci_suite.py
@@ -173,25 +173,25 @@ def _step_env() -> dict[str, str]:
 
     THE TESTS WERE MEASURING THE HOST. Measured 2026-09-08 on the `ci-suite`
     cron: `Ran 386 tests ... FAILED (failures=18, errors=21)` where the same
-    commit is `OK (skipped=2)` off Render. `RENDER` is injected on every Render
+    commit is `OK (skipped=2)` off Render. `RENDER` was injected on every Render
     service type -- web, worker AND cron job -- so a suite running ON a cron
-    trips every production branch gated on it. Setting `RENDER=true` locally
-    reproduced the cron's counts exactly.
+    tripped every production branch gated on it, as `SYNDICATE_HOSTED` does on
+    the fleet now. Setting `RENDER=true` locally reproduced the cron's counts exactly.
 
     WHY SCRUBBING AND NOT `SYNDICATE_WEB_DYNO=0` ON THE SERVICE. That was the
     first fix tried and it is a per-symptom one: it moved 18/21 to 4/19 and
-    stopped, because it addresses ONE of nineteen bare-`RENDER` reads across
+    stopped, because it addressed ONE of nineteen bare-`RENDER` reads across
     ten files. The next one along is `refresh_state_store.data_root()`, which
     escalates a missing `SYNDICATE_DATA_ROOT` into a `RuntimeError` only when
-    the host says Render. Feeding that chain the roots it wants would make the
+    the host says hosted. Feeding that chain the roots it wants would make the
     suite pass by making it test a THIRD configuration -- neither this repo's
     tests nor production.
 
     WHY THIS IS THE FAITHFUL CHOICE, not just the convenient one: this file's
     whole contract is that its steps are `ci.yml`'s verbatim, "so that a
     divergence between the two is a diff rather than a discovery". GitHub
-    runners have no `RENDER`. Scrubbing it is what makes the cron run the SAME
-    experiment as CI; inheriting it is the silent divergence.
+    runners carry no service marker. Scrubbing them is what makes the cron run
+    the SAME experiment as CI; inheriting them is the silent divergence.
 
     A test that genuinely wants the hosted branch should set the variable
     itself -- `patch.dict(os.environ, ...)` -- which is what a test asserting

@@ -66,8 +66,8 @@ def _metric_lookup(metrics: list[dict[str, Any]], label: str) -> str | None:
 
 
 def _render_web_dyno() -> bool:
-    # RENDER / RENDER_EXTERNAL_URL / RENDER_SERVICE_ID are injected by Render
-    # on every service type (web *and* background workers), so they can't
+    # SYNDICATE_HOSTED / _EXTERNAL_URL / _SERVICE_ID are set on every fleet role
+    # (web *and* the workers; Render injected them as RENDER*), so they can't
     # distinguish "am I the request-serving web dyno" from "am I a worker
     # script calling into this shared module". This is used across every
     # sport's card board (see should_include_simulation_contract below), so
@@ -75,9 +75,9 @@ def _render_web_dyno() -> bool:
     # simulation_contract build meant to happen off the request path, for
     # every sport that uses this shared contract layer. Same root cause and
     # fix as the per-sport copies (wnba/cards.py, nba/cards.py, mlb/cards.py).
-    # SYNDICATE_WEB_DYNO is an explicit, unambiguous override set only on the
-    # web service in render.yaml; fall back to the old heuristic when unset
-    # (local dev, other hosts).
+    # SYNDICATE_WEB_DYNO is an explicit, unambiguous override: true on web and
+    # false on both workers (`scripts/fleet_role_spec.json`); fall back to the
+    # old heuristic when unset (local dev, other hosts).
     explicit = str(os.environ.get("SYNDICATE_WEB_DYNO") or "").strip().lower()
     if explicit:
         return explicit in {"1", "true", "yes", "on"}
