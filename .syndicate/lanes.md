@@ -1079,6 +1079,14 @@ death, never life — do not invert it.
 - Verification: p1_shift.py on 8 graded games: validity gate <= 1e-9; served shifts reported per stat; findings section on main.
 - Blocked by: none
 
+### board-query-serialize-once — OPEN — opened 2026-11-17 — session 040e8c3d-1561-4a9c-b821-873fd0ac1343
+- Goal: On main: /api/intelligence/query serialises the board payload ONCE -- the bytes it hashes for response_hash/version are the bytes it sends (no second json_safe walk + json.dumps in jsonify); response bytes identical to the old path for the same payload; server off switch SYNDICATE_QUERY_SERIALIZE_ONCE=off restores the old path
+- Files: syndicate/blueprints/intelligence.py (_versioned_query_response + a new serialise-once response helper beside it + the versioned-response build and jsonify return on the four exits of intelligence_query_api + the QUERY_STAGE_MS print ONLY), tests/test_intelligence_query_serialize_once.py (NEW), .syndicate/findings_2026-11-17_board_query_response_cache.md
+- Hypothesis: The query's post-stage jsonify repeats the json_safe walk and json.dumps that version_and_debug already did for the hash (~24 MB wire payload), so hashing the sent bytes removes one full walk + one dump per request (I-13 lead a)
+- Falsification test: On the recorded fleet response, the new path's response bytes differ from the old path's in any byte, or it saves < 20% of the old version+serialise time, or peak memory rises
+- Verification: pytest: byte equality off vs on over the recorded fixture + a NaN payload, a reachability test that the large payload never passes through the provider's dumps when on; local timing on a fleet-recorded response (old vs new, repeats); findings section; load is the user's call
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
