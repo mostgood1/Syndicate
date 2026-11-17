@@ -61312,3 +61312,43 @@ Lane `render-config-retirement` (session 267d8859).
   - **783 ms saved (47%)**.
 - **Owed:** a second production series once the host is quieter and the web workers are warm, against a fresh pre-style baseline of the same conditions. That series decides the lane's verdict. Also the `WEB_WORKER_MEMORY_RECYCLE` rate per query against 21:57-23:15Z (19 recycles in 78 min, pre-existing; the new exit's tracemalloc peak is 30 MB lower).
 - **Record:** BC row (no). Claim web released after this entry.
+
+## 2026-11-17 23:22:26Z (5:22 PM CST) -- DEPLOY (TERM only, no ff): claimed live-odds-worker TERM at fleet `64daca46f`, loading todo #829's live-capture half: the WNBA live box-score poll skips a date the schedule lists no game on (lane `wnba-boxscore-polling-per-date`, user "Load it") -- **reachability MET: the first tick after the restart printed `WNBA_LIVE_BOX_SKIPPED date=2026-11-17 reason=schedule_has_no_games`, and web has had 0 `live_player_boxscore` requests since**
+- betting change: no. On a date with no WNBA game there is nothing for the live box to feed. On a game date the code path is the old one, unchanged.
+- **decision:** the user said "Load it" to "Load #829 onto the fleet now?". The load named before that question was an ff of `~/Syndicate` plus TERMs of live-odds-worker and refresh-worker.
+- **No ff of mine.** Lane `board-query-serialize-once-load` ff'd `25fc2e4f0` -> `64daca46f` at 23:15:44Z with reload-web only. It listed `920c19e70` as a ride-along that "loads at their next restart" (entry above). This TERM is that load for live-odds-worker.
+- **What loads on live-odds-worker (`91d865fd5`, its 21:53Z code, to `64daca46f`), code only:**
+  - mine: `live_lens_loop.py`, which asks `wnba_slate_verdict` before the capture, and `wnba/slate_schedule.py`;
+  - render-config step 3b `f1a278ed8` (`service_identity.py`). That lane is CLOSED GOAL MET, and every role has carried the neutral markers since the 21:53Z drained up;
+  - `execution_ledger.operator_fill_from_venue` `b96ea17a7`: one new function, inert unless its CLI runs;
+  - engine experts `85af16b35`: no role imports it;
+  - the web request path (`blueprints/intelligence.py`, `response_row_refs.py` docstring);
+  - `local_production.py`, which loads only at the next `up`;
+  - scripts no role runs.
+  - `vendor/` is empty.
+  - `betting_change.py list` showed no pending `yes`.
+- **gates:**
+  - claim live-odds-worker 23:08:33Z (holder `wnba-boxscore-polling-per-date`, ACQUIRED, rc 0). refresh-worker was HELD by `ncaaf-grid-build-speed` (0.1 min old), so I waited and did not force it.
+  - Baseline 23:20:27Z (`C:\tmp\wnba_boxpoll\baseline829.sh`): head `64daca46f`, slate gate on disk 3, live-odds-worker pid 28949 (env commit `91d865fd5`); since 23:07:33Z, 8 `live_player_boxscore`, 8 `WNBA_LIVE_BOX_EMPTY`, 0 SKIPPED.
+  - Preflight `--service live-odds-worker --target fleet --target-commit 64daca46f`, from my worktree at origin/main, with 4 expect/baseline pairs:
+    - HOLD at 23:20:35Z and 23:21:09Z (odds jobs in flight);
+    - **CLEAR 23:21:16Z**: the TERM script aborted at 23:21:43Z because my gap check counted the permanent `live_resim_workers` servers as jobs, and I fixed it to count only `run_refresh_odds_job.py`;
+    - **CLEAR 23:22:14Z**, then the TERM.
+- **TERM** (`C:\tmp\wnba_boxpoll\term_low829.sh 64daca46f`):
+  - head checked `64daca46f`; 0 odds jobs at the TERM;
+  - `kill -TERM 28949` at **23:22:26.552Z**;
+  - the worker finished its pass and exited gracefully (`before_exit` 23:24:57Z, 2.5 min);
+  - NEW pid **52087**, first seen 23:25:10.300Z.
+  - The script's 60 s respawn wait timed out before the exit; a read-only wait saw it.
+- **expect / measured** (read 23:25:18-23:26Z):
+  - `live_odds_worker_pid` 28949 -> new: **MET** (52087).
+  - `wnba_live_box_skipped_lines` 0 -> >=1 per tick: **MET**. The first tick at 23:25:18.247Z printed `WNBA_LIVE_BOX_SKIPPED date=2026-11-17 reason=schedule_has_no_games games=0 schedule=schedule_2026.csv schedule_rows=374 -- no request to web`.
+  - `wnba_live_box_web_requests` -> 0 on 2026-11-17: **MET so far** (0 since 23:25:10Z).
+  - Tracebacks on the new worker: 0.
+  - `live_odds_loaded_commit` -> `64daca46f`: **NOT READABLE that way.** The role's `SYNDICATE_GIT_COMMIT` still reads `91d865fd5`, because it is stamped into the env at `up`, not at a role respawn. The SKIPPED line is the proof the new code runs, since no code before `920c19e70` can print it.
+- **Owed:**
+  - the refresh-worker half (`WNBA_BOXSCORES_COUNT_SKIPPED`), at the next refresh-worker restart: mine when its claim frees, or another lane's;
+  - then the before/after WNBA share of web requests and web recycles per hour, over comparable windows;
+  - the nightly suite window 08:14-08:58Z 11-18, with 0 June/September `final_player_boxscore` requests.
+- **revert:** `git revert 920c19e70`, ff, then a claimed TERM of live-odds-worker. There is no env switch, by design.
+- **claim:** live-odds-worker released after this entry.
