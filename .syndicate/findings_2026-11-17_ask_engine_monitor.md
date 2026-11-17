@@ -179,3 +179,40 @@ made, then fixed. A date-only `as_of` is now reported as a date, with no age.
 
 **Learner slice 3a** (NBA prop outcomes): built locally (`d2609efd1` + `0a6c2e5d7`); dev reading in reading 1's
 status block. Not pushed.
+
+## Reading 3 (11:38 AM CST)
+
+Probe 11:36:14-11:38:04 AM CST (17:36-17:38Z), base http://127.0.0.1:10000, page 200 in 0.22 s, shortlist 200 rows in 2.51 s.
+
+**Ask:** 6/6 answered, 0/6 past the 45 s cut-off, median 18.78 s, max 29.95 s. All 200, all ok. A game was live (a `live_row` ask exists: NCAAB Hofstra @ Murray St, h1 Over 66.5).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "this spread?" | 29.95 | yes | bet_analysis | 15:58:10Z (age 5,914 s) | 0 |
+| free_text "Lakers vs Celtics" | 15.70 | yes | matchup_analysis | 15:58:10Z (age 5,930 s) | 0 |
+| free_text "top edges today" | 22.52 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (soccer Gent h2h) | 18.78 | yes | bet_analysis | 2026-11-17 (date) | 5 |
+| pregame_prop (soccer Boura SOT o0.5) | 6.61 | yes | bet_analysis | **2026-11-20 (date, in future)** | 10 |
+| live_row (ncaab totals h1) | 10.46 | yes | bet_analysis | 2026-11-13 (date) | 2 |
+
+**Web, 11:06-11:38 AM CST (104 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 9 (8 hard), max anon 1,036.3 MB vs limit 649.1 MB.
+- Overlay warms: 41, median 15.14 s, 14 over 20 s, 1 over 45 s, 1 over 60 s, max 77.09 s.
+- Requests over 20 s (14): POST /api/intelligence/query 9, GET / 2, POST /api/syndicate/query 2, GET /api/board/game-chips 1. Over 45 s (7): /api/intelligence/query 4, GET / 2, game-chips 1.
+- Asks from any client: 14, 0 over 45 s, 0 non-200. 0 of 14 from a non-`Python-urllib` agent (6 are this probe; 8 at 11:11-11:12 AM CST are another urllib client, all 1.4-9.5 s).
+
+**Host:** load 7.98 / 8.19 / 8.25 on 12 cores; MemAvailable 8,551 MB. Top CPU: refresh-worker 116% (ni 0, 2,158 MB, up 698 s), build_soccer_artifacts epl wk12 98% (ni 0), build_cheat_sheets 93% (ni 19), live-odds-worker 45% (ni 0), gunicorn x2 21% / 17% (ni 0), live_resim_workers 12% (ni 5).
+
+**Engine:**
+- 2a F2 task `engine-live-prior-f2-read-1117`: 1 run, succeeded (10:30-11:17 AM CST), summary "did NOT PASS". `f2_verdict.txt` last line: `F2_VERDICT PASS judged_families=12 failed_families=0 cutoff=2026-11-15T20:00:00Z files=2` (the families pass; the NOT PASSED is the 11-16 NCAAB totals JOIN mismatch, per `c765eec64`).
+- 2b `engine-learner-m2-gate-read-1124`: enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c `m2_gate.py` sha256 `6915bb6a5ecb80f2...`: unchanged.
+- 2d Engine-file commits on origin/main in the last 40 min: none.
+- 2e Fleet loads in the last 40 min: 17:01:55Z (11:01 AM CST) ff `8aea4fe7e`->`0a60d9e0a`, no restart (#807 NCAAF sim-history dedupe); 17:25:58Z (11:25 AM CST) ff `0a60d9e0a`->`3d3c0a426` + refresh-worker TERM (#790 lever (i), incremental quote read self-check; also loaded #823 option A).
+
+- **ANOMALY:** overlay warm of 77.09 s (> 60 s). Check next: which overlay and whether it lines up with the 11:25 AM refresh-worker restart or the soccer build's CPU.
+- **ANOMALY:** `as_of_in_future` true on the pregame_prop ask (soccer Le Havre @ Troyes, as_of 2026-11-20, date kind). Check next: whether that date is the match date (fixture 11-20) leaking into as_of rather than the data time.
+- **ANOMALY:** F2 result is in: the run says NOT PASSED; the verdict file says PASS 12/12. Check next: the 11-16 NCAAB totals JOIN mismatch (4,296) has to be fixed in the experts/gate before the 11-24 M2 read.
+- **ANOMALY:** fleet load 11:25 AM CST, ff to `3d3c0a426` + refresh-worker TERM (#790 quote read; #823). It touches the quote read that the experts join. Check next: whether the live join's served quotes changed after 17:25Z.
+- **ANOMALY:** fleet load 11:01 AM CST, ff to `0a60d9e0a` (NCAAF sim-history dedupe), no restart, so web picks it up at its next recycle. Check next: low pricing impact, but note it for the experts' reproduction window.
