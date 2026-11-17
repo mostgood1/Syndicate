@@ -730,6 +730,47 @@
   function rehydrateAliases(payload) {
     if (!payload || typeof payload !== "object") return;
 
+    // ROW REFERENCES FROM THE API (`row_refs`, lane board-query-row-refs, 2026-11-17).
+    // The query sent each opportunity row up to four times: measured on the fleet
+    // 11-16 7:48 PM CST, 80.3 MB with ranked_all 23.9, the board contract's cards
+    // 23.1, top_opportunities 21.4 and top_live_opportunities 11.9 MB, all the same
+    // rows by pick_id. With `row_refs` the server sends those lists as indices into
+    // `ranked_all` plus a per-row patch (`syndicate/features/shared/response_row_refs.py`)
+    // and leaves each one `null` in place. Row n is rebuilt by walking `order`: the
+    // patch's value, else the base row's unless row n drops that key.
+    //
+    // FIRST, before the per-row aliases below, because those restore `game_pk` /
+    // `market_key` / `selection` onto every list including the rebuilt ones, exactly
+    // as they would have on the flag-off lists. The rebuilt payload is
+    // JSON.stringify-identical to the flag-off one, key order included
+    // (tests/test_intelligence_query_row_refs.py runs this function under node).
+    const responseRowRefs = payload._response_row_refs;
+    if (responseRowRefs && typeof responseRowRefs === "object") {
+      delete payload._response_row_refs;
+      const own = Object.prototype.hasOwnProperty;
+      Object.keys(responseRowRefs).forEach(function (path) {
+        const spec = responseRowRefs[path] || {};
+        const source = payload[spec.from];
+        if (!Array.isArray(source) || !Array.isArray(spec.index) || !Array.isArray(spec.order)) return;
+        const patches = Array.isArray(spec.patch) ? spec.patch : [];
+        const drops = spec.drop && typeof spec.drop === "object" ? spec.drop : {};
+        const rows = spec.index.map(function (i, n) {
+          const base = typeof i === "number" && source[i] && typeof source[i] === "object" ? source[i] : {};
+          const patch = patches[n] && typeof patches[n] === "object" ? patches[n] : null;
+          const dropped = Array.isArray(drops[n]) ? drops[n] : null;
+          const row = {};
+          spec.order.forEach(function (key) {
+            if (patch && own.call(patch, key)) row[key] = patch[key];
+            else if (own.call(base, key) && !(dropped && dropped.indexOf(key) >= 0)) row[key] = base[key];
+          });
+          return row;
+        });
+        const dot = path.indexOf(".");
+        if (dot < 0) payload[path] = rows;
+        else if (payload[path.slice(0, dot)] && typeof payload[path.slice(0, dot)] === "object") payload[path.slice(0, dot)][path.slice(dot + 1)] = rows;
+      });
+    }
+
     // PER-ROW aliases, rebuilt BEFORE the early return below, because a payload
     // can carry these without carrying any top-level alias at all.
     //
@@ -6062,6 +6103,12 @@
       // like the same kind of thing and is deliberately NOT dropped, because
       // `renderScoreParts` (~:3085) reads it.
       drop_row_diagnostics: true,
+      // Lane board-query-row-refs: send each opportunity row ONCE. The lists that
+      // repeat `ranked_all` arrive as references plus a per-row patch and
+      // `rehydrateAliases` rebuilds them, identical to the flag-off lists, before
+      // anything reads them. Measured on the fleet's 11-16 response: 80.3 -> 33.1 MB
+      // raw, 14.4 -> 5.7 MB gzipped. A server without the flag ignores it.
+      row_refs: true,
     };
     // Only forward state.date to the server when it's a deliberate override
     // (URL deep link or the free-text date input) -- day-tab clicks set

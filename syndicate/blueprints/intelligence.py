@@ -532,6 +532,33 @@ def _drop_unconsumed_row_diagnostics(response: Any) -> Any:
     return slim
 
 
+def _row_refs_wire_payload(payload: Any, response_payload: Any) -> Any:
+    """The copy to SERIALISE when the caller sent `row_refs` (lane board-query-row-refs).
+
+    `top_opportunities`, `top_live_opportunities` and `board_contract.cards` go as
+    references into `ranked_all` plus a per-row patch -- measured on the fleet's
+    11-16 response, 80.3 -> 33.1 MB raw and 14.4 -> 5.7 MB gzipped. See
+    `syndicate/features/shared/response_row_refs.py`.
+
+    RETURNS A SEPARATE OBJECT, AND ONLY THE SERIALISER MAY READ IT. The debug
+    fields (`candidate_count` is `len(top_opportunities)`) and the stage log keep
+    reading `response_payload`, which this never mutates. Opt-in; the server's off
+    switch is `SYNDICATE_QUERY_ROW_REFS=off`; absent honours the request.
+    """
+    from syndicate.features.shared.response_row_refs import encode_row_refs, row_refs_requested
+
+    if not row_refs_requested(payload):
+        return response_payload
+    try:
+        from flask import current_app
+
+        # The provider's own setting decides the rebuilt rows' key order.
+        sort_keys = bool(getattr(current_app.json, "sort_keys", True))
+    except RuntimeError:  # no app context: Flask's default provider sorts
+        sort_keys = True
+    return encode_row_refs(response_payload, sort_keys=sort_keys)
+
+
 def _alias_slim_requested(payload: Any) -> bool:
     """Only slim when the caller asks. Absent means NO.
 
@@ -2831,7 +2858,9 @@ def intelligence_query_api():
             if _row_diagnostics_drop_requested(payload):
                 response_payload = _drop_unconsumed_row_diagnostics(response_payload)
             _stage("drop_row_diagnostics")
-            versioned_response = _versioned_query_response(response_payload)
+            _wire_payload = _row_refs_wire_payload(payload, response_payload)
+            _stage("row_refs")
+            versioned_response = _versioned_query_response(_wire_payload)
             versioned_response.update(_debug_state_fields(response_payload, source="combined_board_window"))
             _stage("version_and_debug")
             # Rows carried, so a slow request can be read against its SIZE
@@ -2848,6 +2877,7 @@ def intelligence_query_api():
                 "[intelligence] QUERY_STAGE_MS " + json.dumps(
                     {"rows": _rows, "slim": bool(_slim_asked),
                      "drop": bool(_row_diagnostics_drop_requested(payload)),
+                     "refs": _wire_payload is not response_payload,
                      "limit": payload.get("limit"), "stages": _stage_ms,
                      "total_ms": round(sum(_stage_ms.values()), 1)},
                     sort_keys=True),
@@ -2907,7 +2937,7 @@ def intelligence_query_api():
                         response_payload, requested=_slim_asked)
                 if _row_diagnostics_drop_requested(payload):
                     response_payload = _drop_unconsumed_row_diagnostics(response_payload)
-                versioned_response = _versioned_query_response(response_payload)
+                versioned_response = _versioned_query_response(_row_refs_wire_payload(payload, response_payload))
                 versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
                 versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
                 _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
@@ -2981,7 +3011,7 @@ def intelligence_query_api():
                     response_payload, requested=_slim_asked)
             if _row_diagnostics_drop_requested(payload):
                 response_payload = _drop_unconsumed_row_diagnostics(response_payload)
-            versioned_response = _versioned_query_response(response_payload)
+            versioned_response = _versioned_query_response(_row_refs_wire_payload(payload, response_payload))
             versioned_response.update(_debug_state_fields(response_payload, source="snapshot_read"))
             versioned_response["selected_date"] = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
             _LOGGER.info("BETTING_BOARD_REFRESH_CANDIDATE_COUNT", extra={"selected_date": versioned_response.get("selected_date"), "candidate_count": _response_candidate_count(response_payload), "source": "query_api"})
