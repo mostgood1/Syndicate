@@ -372,6 +372,15 @@ Afterwards: record the MEASUREMENT in `.syndicate/deploys.md`, then
 `deploy_claim.py release --service <svc>`. `verify:` is the field that matters —
 name the READING that proves it worked, not the thing you will watch.
 
+**Every deploys.md entry that loads code or env says `- betting change: yes|no`**
+`[2026-11-16, user: "Any betting change"]`. A betting change is anything that changes
+which live bets are placed, sized, held or exited; it restarts the scale-up gate's
+800-event count. For `yes`, also run `python scripts/betting_change.py add --kind yes
+--loaded-at <UTC the ROLE picked it up> ...`; for an ff-only deploy that has not loaded,
+use `--pending <roles>`, then `resolve` it at the load. While a `yes` is pending, the
+gate counts 0. `betting_change.py candidates` lists unclassified loads
+(`.syndicate/betting_changes.md`).
+
 **Why the coordinator role was retired.** One session owned every deploy. A
 session can be archived, and that one was — with two requests queued into it and
 `deploy/grants/` empty, while the guard gated on `session_id in coordinator.id`.

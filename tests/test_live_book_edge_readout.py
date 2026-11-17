@@ -228,12 +228,97 @@ def test_main_reads_a_saved_payload_and_writes_json(tmp_path, capsys):
     payload = tmp_path / "live.json"
     payload.write_text(json.dumps({"orders": [_order(i, outcome="won" if i % 2 else "lost") for i in range(8)]}))
     out = tmp_path / "report.json"
-    assert R.main(["--payload-json", str(payload), "--as-of", "2026-11-15", "--json", str(out)]) == 0
+    assert R.main(["--payload-json", str(payload), "--as-of", "2026-11-15", "--no-clock", "--json", str(out)]) == 0
     text = capsys.readouterr().out
     assert "LIVE BOOK EDGE READOUT" in text and "SCALE-UP GATE" in text
     report = json.loads(out.read_text())
     assert report["orders_read"] == 8
     assert report["windows"][1]["window"] == "last 30" and report["windows"][1]["bets"] == 8
+
+
+# --- the gate's clock (user 11-16: "Any betting change") ------------------------------
+
+_CLOCK = {"start": "2026-11-17T00:04:38Z", "change_id": "BC-017", "what": "a change", "pending": False, "unclassified": 0}
+
+
+def _timed(i, submitted, **kw):
+    return _order(i, submitted_at=submitted, date="2026-11-17", **kw)
+
+
+def test_utc_reads_the_venue_nanosecond_stamps():
+    assert R._utc("2026-11-16T04:24:35.729507346Z").microsecond == 729507
+    assert R._utc("2026-11-17T00:04:38Z").hour == 0 and R._utc("") is None and R._utc("nope") is None
+
+
+def test_the_clock_moves_the_gate_onto_bets_submitted_after_the_load():
+    orders = [
+        _timed(1, "2026-11-17T00:04:37.999Z"),  # one instant before the load: old rules
+        _timed(2, "2026-11-17T00:04:38Z"),
+        _timed(3, "2026-11-17T03:00:00.123456789Z", outcome="lost"),
+    ]
+    off = R.build_report(orders, as_of="2026-11-17")
+    on = R.build_report(orders, as_of="2026-11-17", clock=_CLOCK)
+    assert off["clock"] is None and off["focus"]["window"] == "last 30"
+    assert on["focus"]["window"] == "since BC-017"
+    assert on["clock"]["events"] == 2 and on["clock"]["need"] == 800
+    assert on["windows"][-1]["window"] == "since BC-017" and on["windows"][-1]["bets"] == 2
+    assert on["gate"]["conditions"][0]["reading"].startswith("2 events")  # off != on
+    assert off["gate"]["conditions"][0]["reading"].startswith("3 events")
+
+
+def test_a_bet_with_no_submit_time_never_counts():
+    report = R.build_report([_timed(1, ""), _timed(2, "2026-11-17T01:00:00Z")], as_of="2026-11-17", clock=_CLOCK)
+    assert report["clock"]["events"] == 1 and report["clock"]["bets_without_submit_time"] == 1
+
+
+def test_since_wins_over_the_clock():
+    report = R.build_report([_timed(1, "2026-11-17T01:00:00Z")], as_of="2026-11-17", since="2026-11-01", clock=_CLOCK)
+    assert report["clock"] is None and report["focus"]["window"] == "since 2026-11-01"
+
+
+_REGISTER = """Classified from: `2026-11-16T18:15:00Z`
+
+| id | kind | loaded_at (UTC) | what changed | deploys.md entry | lane |
+|---|---|---|---|---|---|
+| BC-001 | yes | 2026-11-17T00:04:38Z | a change | 2026-11-17T00:04:20Z | l |
+"""
+
+
+_DEPLOYS = "## 2026-11-17 00:04:20Z -- FLEET ff a -> b + refresh-worker TERM\n"
+
+
+def _main_files(tmp_path, register_text, deploys_text=_DEPLOYS):
+    payload = tmp_path / "live.json"
+    payload.write_text(json.dumps({"orders": [_timed(1, "2026-11-17T01:00:00Z"), _timed(2, "2026-11-16T12:00:00Z")]}))
+    reg = tmp_path / "betting_changes.md"
+    reg.write_text(register_text, encoding="utf-8")
+    dep = tmp_path / "deploys.md"
+    dep.write_text(deploys_text, encoding="utf-8")
+    return ["--payload-json", str(payload), "--as-of", "2026-11-17", "--register", str(reg), "--deploys", str(dep)]
+
+
+def test_main_reads_the_register_and_prints_the_clock(tmp_path, capsys):
+    out = tmp_path / "r.json"
+    assert R.main([*_main_files(tmp_path, _REGISTER), "--json", str(out)]) == 0
+    text = capsys.readouterr().out
+    assert "CLOCK" in text and "1 of 800 events" in text and "WARNING" not in text
+    assert json.loads(out.read_text())["clock"]["change_id"] == "BC-001"
+
+
+def test_main_says_when_a_load_is_pending_or_a_deploy_is_unclassified(tmp_path, capsys):
+    pending = _REGISTER.replace("2026-11-17T00:04:38Z", "pending:refresh-worker")
+    deploys = "## 2026-11-17 02:00:00Z -- FLEET ff b -> c + live-odds-worker TERM\n"
+    assert R.main(_main_files(tmp_path, pending, deploys)) == 0
+    text = capsys.readouterr().out
+    assert "PENDING a load, so the count is 0" in text
+    assert "WARNING: 1 deploys.md load(s)" in text
+
+
+def test_main_without_a_register_reads_the_last_30_days(tmp_path, capsys):
+    args = _main_files(tmp_path, _REGISTER)
+    args[args.index("--register") + 1] = str(tmp_path / "missing.md")
+    assert R.main(args) == 0
+    assert "FOCUS: last 30" in capsys.readouterr().out
 
 
 # --- the pinned fleet reading ----------------------------------------------------

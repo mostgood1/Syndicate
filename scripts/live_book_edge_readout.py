@@ -1,8 +1,9 @@
 """Does the LIVE book have an edge? Measured at the price paid, net of fees, event-clustered.
 
-    python scripts/live_book_edge_readout.py                      # read the fleet now
+    python scripts/live_book_edge_readout.py                      # read the fleet now; the gate reads the clock
     python scripts/live_book_edge_readout.py --as-of 2026-11-15   # windows ending that slate date
-    python scripts/live_book_edge_readout.py --since 2026-11-03   # one window from a policy change
+    python scripts/live_book_edge_readout.py --since 2026-11-03   # one window from a slate date instead
+    python scripts/live_book_edge_readout.py --no-clock           # the gate reads the last 30 days
     python scripts/live_book_edge_readout.py --payload-json saved.json --json out.json
 
 Lane `portfolio-edge-measurement`, todo #815. The user asked on 2026-11-16 "when can we start to increase
@@ -20,9 +21,12 @@ mostly favourites and alt lines, so a 57% win rate can lose. This reads the same
 - **Stake quartiles and sizing paths.** A dollar ROI below the flat ROI means stake size is hurting. On 2026-11-16
   the top quartile was mostly the live $5-$10 stake band (10-20..11-02), a ~10x multiplier.
 - **The scale-up gate, ADOPTED by the user 2026-11-16 ("Adopt as drafted")**
-  (findings_2026-11-16_live_book_edge_readout.md). No live stake or cap rises until it passes. This script
-  reports each condition over the window it is given. It cannot know whether the policy was frozen over that
-  window: pass `--since` the date of the last change to the live policy.
+  (findings_2026-11-16_live_book_edge_readout.md). No live stake or cap rises until it passes.
+- **The gate's clock** (user 2026-11-16: "Any betting change"): the gate reads the bets SUBMITTED after the last
+  live-betting change LOADED on the fleet, from `.syndicate/betting_changes.md` (`scripts/betting_change.py`). While a
+  change is pending its load the count is 0. The readout also counts deploys.md entries nothing has classified yet:
+  any of them may be a later change, so a non-zero count means the clock may start later than shown. `--since` or
+  `--no-clock` override it.
 
 PINNED (2026-11-16 fleet payload, as of 2026-11-15, last 30 = 10-17..11-15): 1,526 bets / 641 events,
 $3,006.48 staked, −$218.64, ROI −7.27 ± 2.84%, excess wins −32.5 (z −1.72). `tests/test_live_book_edge_readout.py`
@@ -41,7 +45,7 @@ import math
 import sys
 import urllib.request
 from dataclasses import asdict, dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -79,6 +83,7 @@ class Bet:
     clv_net: float | None  # gross less the fee; None when the fee is unknown
     fee_pp: float | None
     close_implied: float | None
+    submitted_at: str = ""  # when the order went to the venue; the gate's clock counts from it
 
 
 def _as_float(value: Any) -> float | None:
@@ -142,6 +147,7 @@ def bets_from_orders(orders: Iterable[Mapping[str, Any]]) -> list[Bet]:
                 clv_net=clv_net,
                 fee_pp=fee_pp,
                 close_implied=close_implied,
+                submitted_at=str(order.get("submitted_at") or ""),
             )
         )
     return out
@@ -329,18 +335,71 @@ def default_windows(as_of: str) -> list[tuple[str, str, str]]:
     ]
 
 
-def build_report(orders: Iterable[Mapping[str, Any]], *, as_of: str | None = None, since: str | None = None) -> dict[str, Any]:
+def _utc(value: str | None) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    text = text[:-1] + "+00:00" if text.endswith("Z") else text
+    head, dot, rest = text.partition(".")
+    if dot:  # the venue stamps up to nanoseconds; fromisoformat takes microseconds
+        digits = rest[: len(rest) - len(rest.lstrip("0123456789"))]  # the fraction only, not the offset
+        text = f"{head}.{digits[:6]}{rest[len(digits):]}"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo else None
+
+
+def clock_bets(bets: Sequence[Bet], start: str) -> tuple[list[Bet], int]:
+    """Bets submitted at or after `start`, and how many carry no readable submit time (they never count)."""
+    since = _utc(start)
+    if since is None:
+        raise ValueError(f"clock start {start!r} is not a UTC instant")
+    kept, unknown = [], 0
+    for bet in bets:
+        moment = _utc(bet.submitted_at)
+        if moment is None:
+            unknown += 1
+        elif moment >= since:
+            kept.append(bet)
+    return kept, unknown
+
+
+def build_report(
+    orders: Iterable[Mapping[str, Any]],
+    *,
+    as_of: str | None = None,
+    since: str | None = None,
+    clock: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """`clock` (from `read_clock`: start, change_id, what, pending, unclassified) moves the gate onto the bets
+    submitted after the last live-betting change. `since` wins over it."""
     bets = bets_from_orders(orders)
     if as_of is None:
         dates = sorted(b.date for b in bets if b.date)
         as_of = dates[-1] if dates else date.today().isoformat()
     windows = [("since " + since, since, as_of)] if since else default_windows(as_of)
-    # The gate and the breakdowns read ONE window: --since, else the last 30 days.
-    label, start, end = windows[0] if since else windows[1]
-    focus = window_bets(bets, start, end)
+    rows = [{"window": n, "from": a, "to": b, **(summarize(window_bets(bets, a, b)) or {})} for n, a, b in windows]
+    clock_info = None
+    if clock and not since:
+        focus, unknown = clock_bets(bets, clock["start"])
+        label, start, end = f"since {clock['change_id']}", clock["start"], "now"
+        rows.append({"window": label, "from": start, "to": end, **(summarize(focus) or {})})
+        clock_info = {
+            **{k: clock.get(k) for k in ("start", "change_id", "what", "pending", "unclassified", "ledger")},
+            "events": (summarize(focus) or {}).get("events", 0),
+            "need": GATE_MIN_EVENTS,
+            "bets_without_submit_time": unknown,
+        }
+    else:
+        # The gate and the breakdowns read ONE window: --since, else the last 30 days.
+        label, start, end = windows[0] if since else windows[1]
+        focus = window_bets(bets, start, end)
     return {
         "as_of": as_of,
-        "windows": [{"window": n, "from": a, "to": b, **(summarize(window_bets(bets, a, b)) or {})} for n, a, b in windows],
+        "windows": rows,
+        "clock": clock_info,
         "focus": {"window": label, "from": start, "to": end},
         "clv": clv_summary(focus),
         "stake_quartiles": stake_quartiles(focus),
@@ -382,6 +441,20 @@ def render(report: Mapping[str, Any]) -> str:
     lines = [f"LIVE BOOK EDGE READOUT  as of slate {report['as_of']}  (ROI net of fees; +- = 1 event-clustered SE)"]
     for w in report["windows"]:
         lines.append(f"  {w['window']:14s} {w['from']}..{w['to']}  {_fmt(w)}")
+    c = report.get("clock")
+    if c:
+        state = "PENDING a load, so the count is 0" if c.get("pending") else f"{c['events']} of {c['need']} events"
+        lines.append(f"\nCLOCK (user 11-16: any betting change restarts it): {state}")
+        lines.append(f"  starts {c['start']} at {c['change_id']}: {c['what']}")
+        if c.get("unclassified"):
+            lines.append(
+                f"  WARNING: {c['unclassified']} deploys.md load(s) since coverage are unclassified -- the clock may start"
+                " later. Run: python scripts/betting_change.py candidates"
+            )
+        if c.get("bets_without_submit_time"):
+            lines.append(f"  {c['bets_without_submit_time']} decided bets carry no readable submitted_at (never counted)")
+        if c.get("ledger"):
+            lines.append(f"  ledger: {c['ledger']}")
     f = report["focus"]
     lines.append(f"\nFOCUS: {f['window']} ({f['from']}..{f['to']})")
     lines.append("  CLV by close scope (probability points):")
@@ -410,12 +483,61 @@ def render(report: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _ledger_note() -> str:
+    """Which checkout the register and deploys.md were read from, and whether origin/main is ahead (no fetch)."""
+    import subprocess
+
+    def git(*cmd: str) -> str:
+        try:
+            done = subprocess.run(["git", "-C", str(ROOT), *cmd], capture_output=True, text=True, timeout=20)
+        except (OSError, subprocess.SubprocessError):
+            return ""
+        return done.stdout.strip() if done.returncode == 0 else ""
+
+    head = git("rev-parse", "--short", "HEAD")
+    behind = git("rev-list", "--count", "HEAD..origin/main")
+    note = f"{ROOT} at {head or '?'}"
+    if behind and behind != "0":
+        note += f"; origin/main is {behind} commit(s) ahead as last fetched -- pull before trusting the clock"
+    return note
+
+
+def read_clock(register: Path, deploys: Path) -> dict[str, Any] | None:
+    """The gate's clock from the betting-change register, or None when there is no register or no change in it."""
+    if not register.exists():
+        print(f"no betting-change register at {register}: the gate reads the last 30 days", flush=True)
+        return None
+    scripts = str(ROOT / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import betting_change as bc
+
+    changes, coverage = bc.parse_register(register.read_text(encoding="utf-8"))
+    start = bc.clock_start(changes)
+    if start is None:
+        return None
+    unclassified = None
+    if coverage and deploys.exists():
+        unclassified = len(bc.candidates(changes, deploys.read_text(encoding="utf-8"), coverage))
+    return {
+        "start": start.start,
+        "change_id": start.change.id,
+        "what": start.change.what,
+        "pending": start.pending,
+        "unclassified": unclassified,
+        "ledger": _ledger_note(),
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--payload-json", help="a saved /api/portfolio/live payload instead of reading the fleet")
     parser.add_argument("--base-url", help="default: scripts/_base_url.py (the fleet)")
     parser.add_argument("--as-of", help="last slate date in every window (default: the latest decided bet)")
-    parser.add_argument("--since", help="one window from this slate date (e.g. the last live-policy change)")
+    parser.add_argument("--since", help="one window from this slate date instead of the clock")
+    parser.add_argument("--no-clock", action="store_true", help="the gate reads the last 30 days, not the clock")
+    parser.add_argument("--register", default=str(ROOT / ".syndicate" / "betting_changes.md"))
+    parser.add_argument("--deploys", default=str(ROOT / ".syndicate" / "deploys.md"))
     parser.add_argument("--json", help="also write the report as JSON here")
     args = parser.parse_args(argv)
 
@@ -424,7 +546,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         orders, source = list(payload.get("orders") or []), args.payload_json
     else:
         orders, source = fetch_live_orders(args.base_url)
-    report = build_report(orders, as_of=args.as_of, since=args.since)
+    clock = None if (args.since or args.no_clock) else read_clock(Path(args.register), Path(args.deploys))
+    report = build_report(orders, as_of=args.as_of, since=args.since, clock=clock)
     report["source"] = source
     report["orders_read"] = len(orders)
     print(f"source {source}: {len(orders)} live orders", flush=True)
