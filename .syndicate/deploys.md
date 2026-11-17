@@ -60712,3 +60712,38 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - **Grading is unaffected:** the grader takes each game's last kept write before kickoff, and the redundant copy holds the same numbers. Cost: a redundant ~60 KB pair per daily rewrite (<= ~0.4 MB a week).
   - **Fix (not built):** compare the CSV rows order-insensitively (keyed by `game_id`, or sorted), with a test that writes the same rows shuffled. That is a code change: the user's call.
 - **Claims:** none; read-only.
+
+## 2026-11-17 14:52Z (8:52 AM CST 11-17) -- READING, no deploy: todo #780's post-load grade against finals -- **NCAAB spreads tempering HELPS (-0.002 +- 0.002, 146 g); NCAAF totals/spreads INCONCLUSIVE (54 g, one Saturday slate); every NBA tempered cell INSUFFICIENT (29/21/8 g); board B: NCAAB h2h WORSE THAN MARKET, all others NO DIFFERENCE or INSUFFICIENT**
+- **Scheduled task:** `live-780-postload-grade-1117` (user "Yes, schedule it", 2026-11-14). Read-only; nothing changed, restarted or deployed.
+- **Loads still in the fleet checkout** (`~/Syndicate`, `git merge-base --is-ancestor`): YES `0f6e4a723` (120 s quote ceiling), YES `89e2d2a0c` (live totals scale), YES `273a4a599` (live spreads scale).
+- **Grader is the one fixed 11-14 ~9:15 PM CST:** sha256 prefixes `post_load_grade.py` 04b84c2cf2f3db9a, `live_totals_grade.py` be754fe41ee8cca2 -- both match.
+- **Rule (fixed 11-14, applied as written):** population = ledger rows (segment full) recorded after the last load that changed their market, matched to ESPN finals, one row per (event_id, live_state_as_of, line). A = Brier(served) - Brier(unscaled) on k != 1 rows, game-clustered 95% CI: INSUFFICIENT < 30 games; HELPS if upper < 0; HURTS (= FALSIFIED) if lower > 0; else INCONCLUSIVE. B = priced served model - market Brier: BEATS MARKET if upper < 0; WORSE THAN MARKET if lower > 0; else NO DIFFERENCE; INSUFFICIENT < 30 games. Realised edge and quote-age bins reported, not judged.
+- **Command:** `wsl -d Ubuntu-24.04 -- bash -c 'nice -n 19 python3 /mnt/c/tmp/livegrade/grade780/post_load_grade.py </dev/null > /mnt/c/tmp/livegrade/grade780/grade_1117.out 2>&1'` -- rc 0, run 8:46 AM CST, ledger dates <= 2026-11-16. Output `C:\tmp\livegrade\grade780\grade_1117.out` (read whole; ends in SUMMARY, no traceback).
+- **Population** (ledger dates; states; games with a unique final / dropped):
+  - NCAAB totals: 11-13..11-16; 21,554 states; 146 / 19. NCAAB spreads: 11-13..11-16; 16,353; 146 / 19. NCAAB h2h: 11-11..11-16; 2,705; 201 / 31.
+  - WNCAAB totals: 11-13..11-16; 2,722; 44 / 4. spreads: 11-13..11-16; 2,018; 35 / 4. h2h: 11-11..11-16; 395; 51 / 5.
+  - NBA totals: 11-13..11-16; 3,252; 29 / 2. spreads: 11-13..11-16; 2,773; 29 / 2 (k 1.57 on 21 g, k 2.02 on 8 g). h2h: 11-11..11-16; 895; 43 / 2.
+  - NCAAF totals: 11-13, 11-14, 11-15; 9,330; 57 / 2. spreads: 11-13, 11-14, 11-15; 9,341; 57 / 2. h2h: 11-11..11-15; 2,810; 61 / 2.
+  - Drop share at most 13% (NCAAB h2h 31 of 232): no sport crosses the one-third instrument threshold.
+  - **NCAAF rests on ledger dates 11-13, 11-14 and 11-15** -- the 11-15 file holds the late Saturday kickoffs past midnight UTC, so effectively the one Saturday 11-14 slate plus Friday 11-13. No 11-16 NCAAF rows (no Sunday/Monday games), as expected.
+- **A (tempering), from SUMMARY, beside the fit's prediction:**
+  - NCAAB spreads k 1.34: -0.002 +- 0.002 / 146 g -> **HELPS** (fit -0.003 +- 0.003). The upper end rounds to 0.000 at 3 dp; the grader's unrounded check put it below 0. Marginal.
+  - NCAAF totals k 2.48: -0.009 +- 0.017 / 54 g -> INCONCLUSIVE (fit -0.015 +- 0.006).
+  - NCAAF spreads k 1.8: -0.004 +- 0.010 / 54 g -> INCONCLUSIVE (fit -0.006 +- 0.004).
+  - NBA totals k 2.16: -0.009 +- 0.011 / 29 g -> INSUFFICIENT (one game short) (fit -0.006 +- 0.005).
+  - NBA spreads k 1.57 (margin anchor): -0.006 +- 0.007 / 21 g -> INSUFFICIENT (fit -0.006 +- 0.007).
+  - NBA spreads k 2.02: +0.008 +- 0.019 / 8 g -> INSUFFICIENT (fit -0.006 +- 0.007).
+  - No cell HURTS. Every point estimate is negative (tempering helps) except NBA spreads k 2.02 on 8 games.
+- **B (board, priced rows), from SUMMARY:**
+  - NCAAB totals +0.011 +- 0.016 / 146 g NO DIFFERENCE; NCAAB spreads -0.004 +- 0.010 / 146 g NO DIFFERENCE; **NCAAB h2h +0.012 +- 0.011 / 168 g WORSE THAN MARKET**.
+  - WNCAAB totals +0.051 +- 0.052 / 43 g, spreads +0.046 +- 0.054 / 34 g, h2h +0.001 +- 0.042 / 41 g: all NO DIFFERENCE.
+  - NBA totals +0.004 +- 0.019 / 29 g INSUFFICIENT; spreads k 1.57 +0.007 +- 0.026 / 21 g INSUFFICIENT; spreads k 2.02 -0.027 +- 0.039 / 8 g INSUFFICIENT; h2h -0.010 +- 0.034 / 43 g NO DIFFERENCE.
+  - NCAAF totals -0.018 +- 0.021 / 54 g, spreads -0.016 +- 0.025 / 54 g, h2h -0.012 +- 0.031 / 54 g: all NO DIFFERENCE.
+  - Reported, not judged: WNCAAB totals 90-120 s bin model-mkt +0.101 +- 0.049; NCAAF totals/spreads 90-120 s bins -0.030 +- 0.019 / -0.030 +- 0.023 (better than the market at the oldest quotes).
+- **Against the 11-14 instrument check** (`dryrun_1114.out`, partial population, not the grade): NCAAF totals A -0.001 +- 0.018 / 36 g INCONCLUSIVE -> now -0.009 +- 0.017 / 54 g INCONCLUSIVE; NCAAF totals B -0.021 +- 0.021 BEATS MARKET -> now -0.018 +- 0.021 NO DIFFERENCE (the dry-run's BEATS was on in-progress games and did not hold). NCAAF spreads A +0.001 +- 0.011 INCONCLUSIVE -> -0.004 +- 0.010 INCONCLUSIVE; B NO DIFFERENCE -> NO DIFFERENCE. NCAAB spreads A -0.005 +- 0.003 / 93 g HELPS -> -0.002 +- 0.002 / 146 g HELPS (smaller, still HELPS). NCAAB h2h B +0.020 +- 0.011 WORSE -> +0.012 +- 0.011 WORSE. NBA: 10 g INSUFFICIENT -> 29 / 21 / 8 g INSUFFICIENT.
+- **Side finding (host):** C: was at 100% (1.5 GB free of 952 GB) at 8:47 AM CST: `git worktree add` failed with "No space left on device", so this reading used a sparse `.syndicate/`-only worktree. The fleet's WSL disk lives on C:. Not investigated here (read-only task).
+- **Still owed:**
+  - NCAAF A cells INCONCLUSIVE on one Saturday slate: later looks are already scheduled -- 11-22, 11-29, 12-06, 1-03 (bowl season, NCAAF only) and 1-26 (CFP semifinals and title game, NCAAF only).
+  - NBA A cells INSUFFICIENT (29 / 21 / 8 games): totals crosses 30 at the next NBA night; spreads k 1.57 needs ~9 more games; k 2.02 has 8 games, plausibly because the k 1.57 anchor took over NBA spreads from 11-14 (not checked), so that cell may never reach 30.
+  - NCAAB h2h is WORSE THAN MARKET (untempered, k 1): not #780's tempering, but a board finding for whoever owns live h2h.
+- **betting change:** no (reading only). **Claims:** none.
