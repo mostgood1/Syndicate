@@ -112,3 +112,61 @@ A cache that omitted either would freeze live columns or lane assignments for it
   - **(b) A short dedupe window, 10-15 s,** keyed on flags + the combined board's identity + the live-artifact
     mtimes. It is only worth building if multi-client traffic grows. I-16 (scripts should send `row_refs`) is
     the related item.
+
+## Lead (a) built: serialise once (lane `board-query-serialize-once`, user "Build serialize-once") -- ON MAIN `64daca46f`, NOT LOADED
+
+`[2026-11-17 ~4:35 PM CST, session local_004fdc3e]`
+
+**The change.** `_versioned_query_json_response` (`syndicate/blueprints/intelligence.py`) replaces
+`_versioned_query_response` + `jsonify` on the four exits of `intelligence_query_api`:
+- it walks the wire payload with `_json_safe_value` once and `json.dumps` it once, with the app
+  provider's own settings (`default`, `ensure_ascii`, `sort_keys`, compact separators);
+- it hashes those bytes for `version` / `response_hash`;
+- it dumps the small envelope through the provider, with a uuid placeholder as `response`, and
+  splices the payload bytes in (the placeholder must occur exactly once).
+
+Fallbacks to the old exit: `SYNDICATE_QUERY_SERIALIZE_ONCE=off` (absent = on; on the fleet, env is
+built only at `up`), a provider that is not Flask's default kind, and pretty-printing (debug mode).
+`QUERY_STAGE_MS` gains `"serialize_once"`. Its `version_and_debug` stage now covers the whole
+serialisation; under the old exit, the `jsonify` half ran after the timer stopped.
+
+**Correction to lead (a) above.** It said the change "changes the `version` values". It does not,
+for any payload in which nothing needs a JSON `default`, and the fleet's does not. The provider's
+dump of the payload is the same string the old hash was taken over. Measured: the new `version` ==
+the version the fleet served for the same response. Only a non-native value (e.g. a `datetime`)
+would move it, and then it hashes the bytes actually sent.
+
+**Measured on a fleet page response** (`C:\tmp\i13\serialize_bench.py`): the page's own body,
+fetched 2026-11-17 21:46:25Z, 4,432,490 B gzipped / 24,446,438 B payload, saved as
+`C:\tmp\i13\page_query_20261117T2200Z.json.gz`. One process, the arms alternated, Idle priority.
+
+| | old exit | new exit |
+|---|---|---|
+| response bytes | 24,446,956 | 24,446,956, **identical** |
+| `version` | the served hash | the same |
+| median, 10 runs each, quiet CPU | **2,259 ms** (hash part 1,080 + `jsonify` part 1,004) | **950 ms** (856-1,214) |
+| median, 5 runs each, under a parallel test run | 3,482 ms | 2,177 ms |
+| tracemalloc peak | 109.9 MB | 79.4 MB |
+
+Falsification (lane block) not met: 0 bytes differ, 58% saved (the bar was 20%), and the peak fell.
+The new exit costs about what the old hash alone cost, so post-load `version_and_debug` should stay
+near its pre-load median, while the ~1.0-1.3 s the old `jsonify` spent after the timer disappears.
+
+**Tests:** `tests/test_intelligence_query_serialize_once.py`, 14 tests.
+- **Reachability, off != on:** the `QUERY_STAGE_MS` field follows the switch, and when on the
+  provider never dumps more than the 5 KB envelope.
+- **Bytes:** identical to the old exit through the route (page body, slim+drop, no flags) and
+  through the helper (NaN/Infinity, non-ASCII, placeholder look-alikes).
+- **Hash:** the old hash on the recorded board, and a hash of the response bytes sent.
+- **Fallbacks:** pretty-print, and a `response` key in the envelope fields.
+
+Beside it, all passing: 199 tests in the neighbouring query suites, and the 51 query-route tests in
+`test_intelligence.py`. The full `test_intelligence.py` exceeded a 25-minute timeout at ~32%, with
+0 failures by then.
+
+**Owed after a load** (todo `#828`):
+- `QUERY_STAGE_MS` `"serialize_once": true`;
+- `version_and_debug` within noise of its pre-load median (read it just before the load);
+- the page query's client-side seconds against a pre-load series, same body, several samples (this
+  endpoint's run-to-run spread is ~4.8 s, so 1 s needs a series, not a pair);
+- the served `version` still matching across the reload when the board has not moved.
