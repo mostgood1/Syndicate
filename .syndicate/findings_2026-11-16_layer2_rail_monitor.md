@@ -938,3 +938,113 @@ a live card.
 **Restarts:**
 - refresh-worker 2953295 → **3101432** at 00:55:46Z (the #816 display fix, recorded above).
 - live-odds-worker 2925378, unchanged.
+
+### MNF read 2 — 7:46 PM CST (01:46Z): the lines reach the rail, but NONE carries a model price (a known guard)
+
+- **Live-rail: 30 LAC @ BAL rows, all `source=layer2_inplay_overlay`, all with
+  `live_model_probability` = None.**
+  - Full-game: 8 totals.
+  - Segments: 1H totals 6, Q1 totals 5, Q3 totals 3, Q4 totals 2, 2H totals 2, Q2 total 1,
+    Q1 / Q3 spreads 1 each, 1H moneyline 1.
+  - By 7:48 PM, 17 rows (Q1 3:53).
+- **Overlay:** 18 `INPLAY_OVERLAY nfl date=2026-11-16` builds since 01:15Z. The last ones show
+  `rows_inplay=237 opportunities=307-310 cards=189` and
+  `refused={"rows_below_value_floor":81-84,"rows_implausible_book":19,"rows_uninformative_ev":18}`.
+- **`LIVE_GAMELINE_BUILD nfl 2026-11-16`, every build 01:37-01:45Z:** considered 70-71, **priceable
+  0**. Withheld by reason: `no_live_gameline_projection` 26-27 (full game) and
+  `segment_is_not_full_game` 44.
+- **Why there is no projection:** `NFL_LIVE_RESIM` sees the game (`live_games 1`, live player stats
+  attached) but `live_resimmed 0`, `refusals_by_reason {"game_final":13,"uninformative_probability":1}`.
+  - The guard is `syndicate/features/nfl/live_resim.py:581-588`, `UNINFORMATIVE_BAND = (0.35, 0.65)`
+    (line 172). A live home-win probability inside the band refuses the WHOLE re-sim: totals and
+    spreads lose their projection too, not only the moneyline.
+  - The guard is deliberate ("Remove this guard when that gate exists") and already recorded:
+    `findings_2026-11-15_nfl_live_width_fit.md:40`, and this monitor's 11-15 findings (SNF, MIN @ GB,
+    MIA @ IND).
+  - Since 00:00Z 11-16: `live_resimmed` 0 on 142 of 143 NFL_LIVE_RESIM ticks.
+- **My read-2 expectation ("full-game lines priced once the re-sim attached") was WRONG.** The
+  re-sim attaches but refuses a close game. The registered prediction (overlay game-line rows on the
+  rail) stays MET.
+- Consequence: no MNF flag can show while the game is inside the band. Not handed off: it is a known,
+  deliberate guard. Whether its blast radius should be limited to the moneyline is a product and
+  engine question for the NFL live-engine lanes.
+
+## Reading 15 — Mon 11-16 7:48 PM CST (01:48Z 11-17) — the slowest board of the day; NBA rows go dark
+
+**Slate:** 35 live chips.
+- NBA 7: HOU @ MIA HALF; CHI @ CLE Q3; GSW @ NOP Q2; ORL @ BOS Q3; MEM @ WAS Q3; POR @ MIN Q2;
+  PHI @ BKN Q2.
+- NFL LAC @ BAL Q1 3:53; NHL MTL @ NYR P2.
+- 26 college games.
+
+**Flags: 51 shown on 23 cards (127 qualifying rows). 0 false, 0 missed. 70 DARK rows / 27 dark
+markets.** 11-16 total: 139.
+- **Dark = NBA, mostly `spreads_alt`.** They were priced 79-118 s before their grid build but served
+  318-357 s old. E.g. ORL @ BOS alt spreads -14.5 / -13.5 / -6.5 / -5.5 at 16.5-17.4 pp; MEM @ WAS
+  +6.5.
+  - NBA overlay: builds p50 **57.7 s**, p90 90.3 s, max **101.8 s**; **4 `deferred_slow`**; gap p50
+    139 s, max 374 s, **2 gaps over 360 s**.
+  - This is the slow-sport cadence cost: NFL/NBA decision still owed by the user, owner
+    local_208683f1.
+  - **NBA alts are priced fresh now:** 466 of 802 `_alt` rows priced <= 120 s, vs 0 at 6:27-7:21 PM.
+    Many go dark only because the overlay serves them ~4-5 min after pricing.
+  - The NBA flags that are shown sit at 273-291 s of their 300 s limit.
+- **NCAAB full-game totals (11), all UNDER and calibrated:** Grambling u149.5, St. Thomas u149.5,
+  Jacksonville u170.5, Richmond u154.5, WKU u147.5, EKU u119.5, Tarleton u153.5, Western Illinois
+  u154.5, Columbia u121.5, Central Arkansas u162.5, SE Louisiana @ Texas A&M u166.5.
+- **WNCAAB totals (3), all UNDER and RAW** (out of #816's scope):
+  - Troy @ LSU u177.5, 78.9% vs 49.4%, 29.6 pp;
+  - Michigan @ Central Michigan u146.5, 18.7 pp;
+  - Arkansas @ UALR u142.5, 20.7 pp.
+- **NBA totals (13):**
+  - 8 OVER: MEM @ WAS full o250.5 and Q4 o51.5; ORL @ BOS full o209.5 and 2H o113.5; PHI @ BKN Q4
+    o50.5; POR @ MIN o222.5; GSW @ NOP 1H o92.5 and Q2 o46.5.
+  - 5 UNDER: HOU @ MIA full u221.5 and Q4 u66.5; PHI @ BKN full u239.5 and Q3 u52.5; GSW @ NOP
+    u204.5.
+- **Others:**
+  - NCAAB spreads and moneylines (8; Tarleton moneyline raw);
+  - NHL MTL @ NYR moneyline (raw, uncalibrated sport);
+  - NBA spreads (11), largest GSW @ NOP NOP -22.5 at 22.6 pp and HOU @ MIA MIA -23.5 at 22.5 pp.
+- **Totals direction, flag by flag: 63 unders, 25 overs.** Through 7:21 PM 44 U / 17 O; this reading
+  adds 19 U (11 NCAAB, 3 WNCAAB, 5 NBA) and 8 O (all NBA).
+
+**Live rows:** 1,255.
+| sport | rows | priced <= 120 s | split |
+|---|---|---|---|
+| NBA | 928 | 519 | 126 main (53 fresh), 802 `_alt` (466 fresh); 1H 489 / 2H 307 / break 132 |
+| NCAAB | 285 | 82 | 1H 54 / 2H 173 / break 58 |
+| WNCAAB | 24 | 8 | — |
+| NFL | 17 | 6 | no model price |
+| NHL | 1 | 1 | — |
+
+- 827 rows older than 300 s now. 21 of 145 markets carry no price of ours (NFL).
+
+**Overlay (27 min):**
+| sport | builds | gap p50 / max | build p50 / max | notes |
+|---|---|---|---|---|
+| NBA | 7 | 139 s / 374 s | 57.7 s / 101.8 s | 2 gaps over 360 s |
+| NFL | 18 | 80 s / 211 s | 12.7 s / 76.0 s | |
+| NHL | 15 | 84 s / 295 s | — | 9 zero-card with rows |
+| NCAAB | 19 | 63 s / 202 s | 16.8 s / 34.1 s | |
+| WNCAAB | 16 | 112 s / 193 s | — | |
+
+- Only NBA has gaps over 360 s in this window, so the other sports' >360 s gaps at 7:21 PM were the
+  restart.
+- Tick gap p50 35 s, max 141 s.
+
+**Web merges:** all fresh 43 / 43 (nba, nhl, nfl, ncaab, wncaab).
+
+**Load:**
+- **Query 78.3 s / 80.3 MB, the slowest of two days.** Shortlist 4.6 s; chips 0.44 s; live-rail
+  0.14 s.
+- Gunicorn workers were 159 s and 109 s old at the read. **Both were replaced during the 2-minute
+  probe** (105 s and 19 s old at the end). Host load 6.0 → 4.7: not host contention. The cold-worker
+  lead in `leads.md` again.
+- **Board: shortlist written 1,287 s (21 min) ago, build 1,186 s old.** That is the
+  board build's interpreter-lock convoy with 7 NBA games live, lane `nba-overlay-card-cost`'s
+  measurement tonight. The live rows come from the overlay, not the shortlist.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 35 live chips have
+a live card.
+
+**Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
