@@ -572,3 +572,33 @@ a live card.
 - **live-odds-worker pid 2834332 → 2925378**, a routine recycle (supervisor: "exited code=0 after
   20383s", after a 200 MB log rotation).
 - refresh-worker pid 2809282, unchanged.
+
+### Fleet event — #816 college totals calibration LOADED, refresh-worker restarted (6:04 PM CST)
+
+**Source:** a message from the starting session (local_1f10ce63) and deploys.md 2026-11-17 00:04:20Z.
+- Fleet ff `dac4d49f8 -> 13ec8f348` at 00:04:20Z.
+- A drained, claimed refresh-worker TERM: new pid **2953295** at 00:04:38Z.
+
+**Reading 11 (00:04:14Z) is entirely PRE-load.**
+
+**By design, after the load (user "Spread + level"):**
+- Every live NCAAB full-game total is calibrated toward the market, minus a fitted level.
+- Per the lane's ledger, priceable live NCAAB full-game totals with |edge| >= 3 went from
+  101 over / 116 under (23:20-00:04Z) to 0 over / 156 under (from 00:06Z).
+- WNCAAB is unchanged.
+
+**PRE-REGISTERED, at the lane's request, before any 11-16 final is read:** tonight's flag grade
+splits NCAAB flags at **00:04:38Z**: before = uncalibrated engine, after = `total_cal`. The
+fade-vs-follow split is reported within each half.
+
+**`146f956cb` is on the fleet, carried by this range (closed lane `wncaab-overlay-zero-cards`).** The
+first readings of `INPLAY_OVERLAY ... refused=` (33 overlay lines 00:04:38Z-00:27Z):
+| sport | cards | refused |
+|---|---|---|
+| WNCAAB | 0-1 | `rows_below_value_floor` 15-23 |
+| NCAAB, first post-restart build | 390 | 68 below the floor + 31 `rows_implausible_book` |
+| NCAAB, later builds | 183-205 | 198-237 below the floor + 22-25 implausible book + 1 `rows_uninformative_ev` |
+
+- The roughly halved NCAAB card count, with the floor refusals tripling, matches the calibration
+  pulling over-side value under the -2% floor.
+- The NBA overlay-cost lane was told about the restart. Its 23:00-05:00Z reading spans it.
