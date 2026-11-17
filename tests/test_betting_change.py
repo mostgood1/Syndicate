@@ -193,3 +193,53 @@ def test_cli_candidates_exits_nonzero_while_anything_is_unclassified(tmp_path, c
     base, _ = _files(tmp_path)
     assert B.main([*base, "candidates"]) == 1
     assert "3 unclassified deploy entries since 2026-11-16T18:15:00Z" in capsys.readouterr().out
+
+
+# --- the session-start digest line (lane betting-change-session-check) ----------------
+
+_NOW = datetime(2026, 11, 17, 6, 0, tzinfo=timezone.utc)
+
+
+def test_digest_is_silent_when_the_register_is_whole():
+    changes, coverage = B.parse_register(REGISTER)
+    classified = [
+        *changes,
+        *(B.Change(f"BC-1{i:02d}", "no", ts, "x", ts, "l") for i, ts in enumerate(
+            ["2026-11-17T00:20:21Z", "2026-11-17T02:00:00Z", "2026-11-17T04:00:00Z"]
+        )),
+    ]
+    assert B.digest_line(classified, coverage, DEPLOYS, now=_NOW) == ""
+
+
+def test_digest_names_unclassified_loads_with_the_newest():
+    changes, coverage = B.parse_register(REGISTER)
+    line = B.digest_line(changes, coverage, DEPLOYS, now=_NOW)
+    assert line.startswith("BETTING CHANGES: 3 deploys.md load(s) unclassified, newest 2026-11-17T04:00Z")
+    assert line.endswith("run: python scripts/betting_change.py candidates")
+    assert len(line) <= B.DIGEST_CAP
+
+
+def test_digest_flags_a_pending_load_only_once_it_is_stale():
+    fresh = B.Change("BC-010", "yes", "pending:live-odds-worker", "x", "2026-11-17T00:00:00Z", "l")
+    stale = B.Change("BC-011", "yes", "pending:refresh-worker", "y", "2026-11-16T12:00:00Z", "l")
+    assert B.digest_line([fresh], None, None, now=_NOW) == ""  # 6 h: a recycle may still be coming
+    line = B.digest_line([fresh, stale], None, None, now=_NOW)
+    assert "pending its load: BC-011 18 h" in line and "BC-010" not in line
+
+
+def test_digest_stays_under_its_cap_with_many_stale_pendings():
+    many = [B.Change(f"BC-{i:03d}", "yes", "pending:r", "x" * 50, "2026-11-10T00:00:00Z", "l") for i in range(1, 9)]
+    line = B.digest_line(many, None, None, now=_NOW)
+    assert "+5 more" in line and len(line) <= B.DIGEST_CAP and line.endswith("candidates")
+
+
+def test_cli_digest_never_fails_and_says_when_the_register_is_broken(tmp_path, capsys):
+    base, reg = _files(tmp_path)
+    assert B.main([*base, "digest"]) == 0
+    assert "3 deploys.md load(s) unclassified" in capsys.readouterr().out
+    reg.write_text(REGISTER.replace("| BC-002 | no |", "| BC-002 | maybe |"), encoding="utf-8")
+    assert B.main([*base, "digest"]) == 0
+    assert "does not parse" in capsys.readouterr().out
+    missing = ["--register", str(tmp_path / "none.md"), "--deploys", str(tmp_path / "none2.md")]
+    assert B.main([*missing, "digest"]) == 0
+    assert capsys.readouterr().out == ""

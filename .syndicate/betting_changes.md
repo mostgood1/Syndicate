@@ -48,3 +48,5 @@ Load times derived from process ages (BC-013..BC-017, ±5 s): live-odds-worker p
 | BC-017 | yes | 2026-11-17T00:04:38Z | NCAAB per-line total calibration (#816): every live NCAAB total leans under (refresh-worker TERM, pid 2953295) | 2026-11-17T00:04:20Z | ncaab-total-overprojection |
 | BC-018 | no | 2026-11-17T00:20:21Z | NFL shard log line allowlisted in the odds sweep (#817): no filing or behaviour change | 2026-11-17T00:20:21Z | nfl-gameline-kickoff-shard |
 | BC-019 | no | 2026-11-17T00:49:00Z | READING of the 23:55:09Z live-odds-worker recycle that loaded BC-013..BC-015 (already counted); no new change | 2026-11-17T00:49:00Z | live-player-exit-gate |
+| BC-020 | no | 2026-11-17T00:55:46Z | #816 display-path fix: the Live number on NCAAB rows refused BEFORE pricing is calibrated (display only; refresh-worker restart pid 3101432 loaded live_gameline_join.py only) | 2026-11-17T00:55:46Z | ncaab-total-overprojection |
+| BC-021 | no | 2026-11-17T00:59:08Z | READING: the NFL filing log line is readable on the fleet (#817) | 2026-11-17T00:59:08Z | nfl-gameline-kickoff-shard |

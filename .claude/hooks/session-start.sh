@@ -569,6 +569,20 @@ PRIMARY_FF=""
 if command -v python >/dev/null 2>&1 && [ -f scripts/primary_tree_ff.py ]; then
   PRIMARY_FF=$(python scripts/primary_tree_ff.py --digest 2>/dev/null | head -c 400)
 fi
+
+# --- Betting-change register (lane betting-change-session-check, 2026-11-16) ---
+# The scale-up gate's 800-event count restarts at every live-betting change (user
+# 2026-11-16: "Any betting change"), read from `.syndicate/betting_changes.md`. A
+# load nobody classified leaves that clock wrong with nothing saying so. ONE line
+# prints when a deploys.md load since the register's coverage start is unclassified,
+# a `yes` has been pending its load for over 12 h, or the register does not parse.
+# A clean register prints nothing. Emitted outside BUDGET, like PRIMARY_FF, and
+# capped at 240 B (the tool caps itself; head -c is the backstop). ~0.8 s.
+# Fails open: no python or no script leaves the line off.
+BETTING=""
+if command -v python >/dev/null 2>&1 && [ -f scripts/betting_change.py ]; then
+  BETTING=$(python scripts/betting_change.py digest 2>/dev/null | head -c 260)
+fi
 # NOT via `add`. The body is hard-capped (`head -c "$BUDGET"`) and this section
 # sits at the tail, so the first version of this line was emitted as
 # "LEDGER INCOHERENT: state.md (scripts/state_key_" -- cut mid-word. This file
@@ -599,6 +613,7 @@ fi
 [ -n "$NOTES" ] && echo "DIGEST NOTES: ${NOTES}"
 [ -n "$INCOHERENT" ] && echo "LEDGER INCOHERENT: ${INCOHERENT%, } — the file's own rules are being broken; run it before trusting what the file says."
 [ -n "$PRIMARY_FF" ] && echo "$PRIMARY_FF"
+[ -n "$BETTING" ] && echo "$BETTING"
 
 printf '%s' "$BODY" | head -c "$BUDGET"
 echo

@@ -2,6 +2,7 @@
 
     python scripts/betting_change.py clock            # where the clock starts, and which change set it
     python scripts/betting_change.py candidates       # deploys.md entries since coverage that nothing classifies
+    python scripts/betting_change.py digest           # the session-start line: prints only when a human is needed
     python scripts/betting_change.py add --kind yes --loaded-at 2026-11-17T00:04:38Z \
         --what "NCAAB per-line total calibration" --deploy "2026-11-17 00:04:20Z" --lane ncaab-total-overprojection
     python scripts/betting_change.py add --kind yes --pending live-odds-worker --what "..." --deploy "..." --lane ...
@@ -252,6 +253,40 @@ def describe_clock(clock: ClockStart | None) -> str:
     return f"CLOCK: starts {clock.start} ({_cst(clock.start)}) at {c.id}: {c.what}"
 
 
+# The session-start digest line (lane betting-change-session-check). An ff-only `yes` normally waits a role's
+# recycle (live-odds-worker ~5.5 h); 12 h pending means its load was most likely missed, not still coming.
+STALE_PENDING_HOURS = 12.0
+DIGEST_CAP = 240
+_DIGEST_TAIL = " -- the gate's clock may be wrong; run: python scripts/betting_change.py candidates"
+
+
+def digest_line(changes: Sequence[Change], coverage: str | None, deploys_text: str | None,
+                now: datetime | None = None) -> str:
+    """ONE line when the register needs a human, '' when it is clean. Read by `.claude/hooks/session-start.sh`."""
+    moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    parts = []
+    if coverage and deploys_text is not None:
+        found = candidates(changes, deploys_text, coverage)
+        if found:
+            newest = max(row["deploy"] for row in found)
+            parts.append(f"{len(found)} deploys.md load(s) unclassified, newest {newest[:16]}Z")
+    stale = []
+    for c in changes:
+        if c.kind != KIND_YES or not c.pending:
+            continue
+        since = parse_utc(c.deploy) if c.deploy else None
+        hours = None if since is None else (moment - since).total_seconds() / 3600.0
+        if hours is None or hours > STALE_PENDING_HOURS:
+            stale.append(f"{c.id}" + ("" if hours is None else f" {int(hours)} h"))
+    if stale:
+        more = f" +{len(stale) - 3} more" if len(stale) > 3 else ""
+        parts.append(f"pending its load: {', '.join(stale[:3])}{more}")
+    if not parts:
+        return ""
+    head = "BETTING CHANGES: " + "; ".join(parts)
+    return head[: DIGEST_CAP - len(_DIGEST_TAIL)] + _DIGEST_TAIL
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--register", default=str(REGISTER_PATH))
@@ -260,6 +295,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("clock", help="where the gate's clock starts")
     sub.add_parser("list", help="every row")
     sub.add_parser("candidates", help="deploys.md entries since coverage that nothing classifies")
+    sub.add_parser("digest", help="one line for the session-start digest, only when a human is needed; exits 0")
     add = sub.add_parser("add", help="classify one deploys.md entry")
     add.add_argument("--kind", choices=(KIND_YES, KIND_NO), required=True)
     when = add.add_mutually_exclusive_group()
@@ -274,6 +310,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     register = Path(args.register)
+    if args.cmd == "digest":
+        # Never blocks a session: a missing register prints nothing; a register that does not parse says so,
+        # because a broken register would otherwise leave the gate's clock wrong in silence.
+        if not register.exists():
+            return 0
+        try:
+            changes, coverage = parse_register(register.read_text(encoding="utf-8"))
+        except ValueError as exc:
+            print(f"BETTING CHANGES: {register.name} does not parse ({str(exc)[:120]}) -- fix it"[:DIGEST_CAP])
+            return 0
+        deploys = Path(args.deploys)
+        line = digest_line(changes, coverage, deploys.read_text(encoding="utf-8") if deploys.exists() else None)
+        if line:
+            print(line)
+        return 0
     text = register.read_text(encoding="utf-8")
     changes, coverage = parse_register(text)
 
