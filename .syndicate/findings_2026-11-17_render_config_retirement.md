@@ -203,7 +203,18 @@ scan flags a direct read.
 - `local_production.cmd_backup_and_secrets`'s docstring still says `render_env/`: outside the
   borrowed sections.
 
-## The load (OWED — the user's go)
+## The load (DECIDED 2026-11-17 ~12:48 PM CST, 18:48Z — user: "With next down/up")
+
+Steps 1+2 ride on the NEXT drained full `down`/`up` done for any reason; there is no dedicated
+restart. Until then a fleet ff carries the code to disk only. `reload-web` (`cmd_reload_web`,
+`local_production.py:2486-2550`) only HUPs the gunicorn master and never builds env, and a role
+TERM reuses the supervisor's env. What runs the new launcher code from disk before that `up`:
+CLI runs (`status`, `env` -- incl. `deploy_preflight` -- `doctor`), the nightly `data-backup`
+(its secrets step reads `fleet_env/`) and `ci-run`. All read `fleet_env/`, which exists
+(re-checked 18:39:29Z: SAME, 88 / 182 / 148 keys). The board-query de-dup ff
+(`92ae7490a` -> `5db26434e`) carries step 1 (`ac2cbc2fc`) but not step 2 (`cc90fb653`).
+
+The down/up that loads them:
 
 Steps 1+2 reach the fleet only at a drained full `down` + `Start-ScheduledTask
 SyndicateLocalProduction`, from an ff to a SHA that carries both. **Restarting
