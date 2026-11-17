@@ -5323,6 +5323,8 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
                 if job.get("market_line_source"):
                     anchor_record["market_line_source"] = job.get("market_line_source")
                     anchor_record["market_line_as_of"] = job.get("market_line_as_of")
+                # (todo #821 F0) whether the game model reached this sim's team ratings, and which columns it found.
+                anchor_record.update(_game_model_anchor_fields_local(job))
                 out["market_anchor"] = anchor_record
         except Exception:
             pass
@@ -5399,6 +5401,58 @@ def _smart_sim_worker_run_local(job: dict) -> dict:
         return {"status": "wrote", "home": home_tri, "away": away_tri, "out_path": str(out_path)}
     except Exception as exc:
         return {"status": "failed", "home": home_tri, "away": away_tri, "out_path": out_path_s, "error": str(exc)}
+
+
+# --- todo #821 F0: does the game model reach the quarter model? (lane nba-game-model-fed-audit; behaviour-neutral) ---
+# The pregame job build turns the game model's predicted total and margin (predictions_<D>.csv) into each team's
+# off_rating. It reads WNBA's column names. NBA's predictions carry pred_total/pred_margin instead (41 of 41 fleet files,
+# 2026-11-16), so on NBA the read finds nothing and both teams fall back to baseline_off_rating: the raw margin is then
+# only the injury/back-to-back adjustments (.syndicate/findings_2026-11-16_nba_margin_raw_zero.md). Feeding the NBA
+# names is F1, a separate user-gated betting change. This block only RECORDS whether the read found anything.
+GAME_MODEL_READ_COLUMNS_LOCAL = ("totals", "spread_margin")
+GAME_MODEL_KNOWN_COLUMNS_LOCAL = ("totals", "spread_margin", "pred_total", "pred_margin")
+GAME_MODEL_UNFED_TAG_LOCAL = "SMART_SIM_GAME_MODEL_UNFED"
+
+
+def _game_model_points_local(row: Any, num: Any) -> tuple[float | None, float | None, dict[str, Any]]:
+    """(home_mu, away_mu, audit) for one predictions row, read exactly as the job build always has: `totals` and
+    `spread_margin` only, through the caller's own `num` coercion. `audit` is {"game_model_fed": both were read,
+    "game_model_columns": the known game-model columns this row carries with a finite value}. The audit never changes
+    the means."""
+    pred_total = num(row.get("totals"))
+    pred_margin = num(row.get("spread_margin"))
+    fed = pred_total is not None and pred_margin is not None
+    home_mu = (0.5 * (pred_total + pred_margin)) if fed else None
+    away_mu = (0.5 * (pred_total - pred_margin)) if fed else None
+    found = [column for column in GAME_MODEL_KNOWN_COLUMNS_LOCAL if num(row.get(column)) is not None]
+    return home_mu, away_mu, {"game_model_fed": bool(fed), "game_model_columns": found}
+
+
+def _game_model_anchor_fields_local(job: Any) -> dict[str, Any]:
+    """The job's game-model audit as market_anchor fields. {} for a job built without the audit: absent is not False."""
+    if not isinstance(job, dict) or "game_model_fed" not in job:
+        return {}
+    return {"game_model_fed": bool(job.get("game_model_fed")),
+            "game_model_columns": [str(column) for column in (job.get("game_model_columns") or [])]}
+
+
+def _report_game_model_unfed_local(jobs: list[dict], *, date_str: str, league_code: str) -> None:
+    """One line per run when any job's game-model read found nothing; silent when every job is fed. print(flush=True)
+    because logger.info never reached the role logs. Never raises."""
+    try:
+        unfed = [job for job in jobs if job.get("game_model_fed") is False]
+        if not unfed:
+            return
+        found = [c for c in GAME_MODEL_KNOWN_COLUMNS_LOCAL if any(c in (job.get("game_model_columns") or []) for job in unfed)]
+        games = ",".join(f"{job.get('home_tri')}_{job.get('away_tri')}" for job in unfed[:8])
+        print(
+            f"{GAME_MODEL_UNFED_TAG_LOCAL} league={str(league_code or 'nba').strip().lower()} date={date_str} "
+            f"unfed={len(unfed)} of={len(jobs)} read={'/'.join(GAME_MODEL_READ_COLUMNS_LOCAL)} "
+            f"found={','.join(found) or 'none'} games={games}{',...' if len(unfed) > 8 else ''}",
+            flush=True,
+        )
+    except Exception:
+        pass
 
 
 def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str: str, n_sims: int, seed: int | None, max_games: int | None, overwrite: bool, pbp: bool = True, workers: int | None = None, roster_mode: str = "historical", out_prefix: str = "smart_sim", league_code: str = "nba", only_matchups: set[tuple[str, str]] | None = None) -> dict:
@@ -5833,10 +5887,8 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             market_total, home_spread, fresh_anchor_lines.get((home_tri, away_tri)),
             date_str=date_str, league=league_code, home=home_tri, away=away_tri,
         )
-        pred_total = _num(row.get("totals"))
-        pred_margin = _num(row.get("spread_margin"))
-        home_mu = (0.5 * (pred_total + pred_margin)) if (pred_total is not None and pred_margin is not None) else None
-        away_mu = (0.5 * (pred_total - pred_margin)) if (pred_total is not None and pred_margin is not None) else None
+        # (todo #821 F0) same read as always (totals/spread_margin); the audit records whether it found anything.
+        home_mu, away_mu, game_model_audit = _game_model_points_local(row, _num)
         try:
             home_pace = float(adv_map.get(home_tri, {}).get("pace"))
         except Exception:
@@ -5915,7 +5967,10 @@ def _smart_sim_run_date_local(*, processed_root: Path, raw_root: Path, date_str:
             "home_rest_days": home_rest_days,
             "away_rest_days": away_rest_days,
             **anchor_line_stamp,
+            **game_model_audit,
         })
+
+    _report_game_model_unfed_local(jobs, date_str=str(date_str), league_code=str(league_code or "nba"))
 
     env_workers = None
     try:

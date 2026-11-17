@@ -52,9 +52,12 @@ WHY THIS IS NOT A COPY OF ANY OF THEM.
      check called the deleted `_import_real_smart_sim_module_local` and raised
      AttributeError, so the published report stopped on 2026-10-10.
 
-CONSUMED + UNPOPULATED is still the alarm. Exit 1 on any Level 0-2 alarm.
-Level 3 (optional calibration artifacts) is reported but does not fail the
-gate on its own -- see the Level 3 docstring for why.
+CONSUMED + UNPOPULATED is still the alarm. Exit 1 on any Level 0-2 or Level 4
+alarm. Level 3 (optional calibration artifacts) is reported but does not fail
+the gate on its own -- see the Level 3 docstring for why. Level 4 (todo #821)
+covers the pregame QUARTER model, which runs before the player sim and which
+nothing audited: its TeamContextLocal fields (consumed vs passed by the
+builder) and whether the game model's predicted points reach off_rating.
 
 RENDER IS THE SUBSTRATE OF RECORD (`model_engine_standard.md` Sec 3b). Levels
 1-3 here read the LOCAL mirror (`data/{wnba,nba}_source/data/processed/`)
@@ -72,8 +75,11 @@ from __future__ import annotations
 
 import argparse
 import ast
+import collections
+import dataclasses
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -128,6 +134,10 @@ LEAGUES: dict[str, dict[str, Any]] = {
         # Real coverage measured from boxscores_history.csv: 2026-04-25 .. 2026-07-07.
         "priors_as_of": "2026-07-08",
         "advanced_as_of": "2026-07-08",
+        # Level 4 only: where the pregame smart-sim run reads predictions_<D>.csv and writes smart_sim_*.json. NOT
+        # processed_root above. Measured on the fleet 2026-11-17: wnba_source/data/processed holds 17 predictions files
+        # and 22 sims (newest 10-31); source_artifacts/data/processed holds 1 and 88 (newest 07-15).
+        "sim_root": _data_root() / "wnba_source/data/processed",
     },
     "nba": {
         # NOTE the different sub-path from wnba above (no `source_artifacts/`) --
@@ -141,6 +151,8 @@ LEAGUES: dict[str, dict[str, Any]] = {
         # (NBA season/finals window before the summer gap).
         "priors_as_of": "2026-05-25",
         "advanced_as_of": "2026-05-25",
+        # Level 4: the same directory (fleet 2026-11-17: 42 predictions files, 266 sims, newest 11-17).
+        "sim_root": _data_root() / "nba_source/data/processed",
     },
 }
 
@@ -541,6 +553,239 @@ def level3_calibration_artifacts() -> tuple[dict[str, Any], list[str]]:
 
 
 # --------------------------------------------------------------------------
+# Level 4 -- the pregame QUARTER model's team inputs (todo #821)
+# --------------------------------------------------------------------------
+# Levels 1-2 audit the player sim's inputs. The quarter model (`_simulate_quarters_local`) runs BEFORE the player sim
+# and its means set the player sim's target points, but nothing audited what it reads: a `TeamContextLocal` per team,
+# built by the pregame worker from a job dict. That gap hid todo #821: the job build reads the game model's predicted
+# total/margin under WNBA's column names, NBA's predictions carry pred_total/pred_margin, and every NBA sim ran both
+# teams at baseline_off_rating (261 of 261 fleet NBA sims, 10-03..11-16). Every field held a valid-looking 110.6.
+QUARTER_MODEL_CONSUMERS = ("_simulate_quarters_local", "_adjustments_local")
+QUARTER_MODEL_BUILDER = "_smart_sim_worker_run_local"
+GAME_MODEL_RECENT_FILES = 14
+_PREDICTIONS_FILE_RE = re.compile(r"^predictions_(\d{4}-\d{2}-\d{2})\.csv$")
+
+
+def _team_context_field_names() -> list[str]:
+    from syndicate.features.shared.basketball_props_smart_sim import TeamContextLocal
+
+    return [f.name for f in dataclasses.fields(TeamContextLocal)]
+
+
+def _team_context_slots() -> set[str]:
+    """`GameInputsLocal` fields that hold a `TeamContextLocal` (home, away), from dataclasses.fields()."""
+    from syndicate.features.shared.basketball_props_smart_sim import GameInputsLocal
+
+    return {f.name for f in dataclasses.fields(GameInputsLocal) if "TeamContextLocal" in str(f.type)}
+
+
+def consumed_team_context_fields(bridge_source: str) -> dict[str, list[str]]:
+    """{field: [consumer functions]} for the `TeamContextLocal` fields the quarter model READS.
+
+    The field list comes from dataclasses.fields(); consumption from the AST of each consumer: an attribute load
+    `<ctx>.<field>` or a literal `getattr(<ctx>, "<field>", ...)`, where `<ctx>` is a parameter annotated
+    `TeamContextLocal` or a name bound from `<inputs>.home` / `<inputs>.away`. Never a name grep.
+    """
+    fields = set(_team_context_field_names())
+    slots = _team_context_slots()
+    tree = ast.parse(bridge_source)
+    out: dict[str, list[str]] = collections.defaultdict(list)
+    for fn_name in QUARTER_MODEL_CONSUMERS:
+        fn = _find_function(tree, fn_name)
+        if fn is None:
+            continue
+        ctx_names = {a.arg for a in [*fn.args.args, *fn.args.kwonlyargs]
+                     if a.annotation is not None and "TeamContextLocal" in ast.unparse(a.annotation)}
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Attribute) and node.value.attr in slots:
+                ctx_names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+
+        def _is_ctx(expr: ast.AST) -> bool:
+            if isinstance(expr, ast.Name):
+                return expr.id in ctx_names
+            return isinstance(expr, ast.Attribute) and expr.attr in slots   # inp.home.<field>
+
+        seen: set[str] = set()
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Load) and node.attr in fields and _is_ctx(node.value):
+                seen.add(node.attr)
+            elif (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "getattr"
+                  and len(node.args) >= 2 and _is_ctx(node.args[0])):
+                name = _literal_str(node.args[1])
+                if name in fields:
+                    seen.add(name)
+        for name in sorted(seen):
+            out[name].append(fn_name)
+    return dict(out)
+
+
+def populated_team_context_fields(bridge_source: str) -> tuple[list[str], int]:
+    """(fields EVERY `TeamContextLocal(...)` call in the pregame builder passes by keyword, number of such calls).
+    A field a call does not pass holds its dataclass default on every pregame sim."""
+    tree = ast.parse(bridge_source)
+    fn = _find_function(tree, QUARTER_MODEL_BUILDER)
+    if fn is None:
+        return [], 0
+    calls = [n for n in ast.walk(fn)
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "TeamContextLocal"]
+    if not calls:
+        return [], 0
+    passed = [{kw.arg for kw in c.keywords if kw.arg} for c in calls]
+    return sorted(set.intersection(*passed)), len(calls)
+
+
+def team_context_structural_alarms(bridge_source: str) -> tuple[dict[str, Any], list[str]]:
+    consumed = consumed_team_context_fields(bridge_source)
+    populated, n_calls = populated_team_context_fields(bridge_source)
+    alarms: list[str] = []
+    if not consumed:
+        alarms.append(f"LEVEL 4 READ NOTHING: no TeamContextLocal field read found in {QUARTER_MODEL_CONSUMERS} -- "
+                      "the quarter model was restructured and this checklist is blind to it.")
+    if n_calls == 0:
+        alarms.append(f"LEVEL 4 READ NOTHING: no TeamContextLocal(...) call in {QUARTER_MODEL_BUILDER} -- "
+                      "the pregame builder was restructured and this checklist is blind to it.")
+    unfed = sorted(set(consumed) - set(populated)) if consumed and n_calls else []
+    for name in unfed:
+        alarms.append(
+            f"STRUCTURALLY UNFED: TeamContextLocal.{name} is read by {', '.join(consumed[name])} but no "
+            f"TeamContextLocal(...) call in {QUARTER_MODEL_BUILDER} passes it -- it holds its dataclass default on "
+            f"every pregame sim, regardless of data.")
+    data = {
+        "fields": _team_context_field_names(),
+        "consumed": consumed,
+        "populated_by_builder": populated,
+        "builder_calls": n_calls,
+        "consumed_not_populated": unfed,
+        "populated_not_consumed": sorted(set(populated) - set(consumed)),
+    }
+    return data, alarms
+
+
+def _num_like_the_job_build(value: Any) -> float | None:
+    """Copy of `_smart_sim_run_date_local`'s inner `_num` (a closure there, so it cannot be imported)."""
+    import numpy as np
+    import pandas as pd
+
+    try:
+        numeric = float(pd.to_numeric(value, errors="coerce"))
+        return numeric if np.isfinite(numeric) else None
+    except Exception:
+        return None
+
+
+def game_model_feed_census(sim_root: Path, *, recent: int = GAME_MODEL_RECENT_FILES) -> dict[str, Any]:
+    """Does the game model reach the quarter model's off_rating, measured two ways over the newest `recent`
+    predictions_<D>.csv files in `sim_root`:
+
+      * INPUT: replay the job build's own read (`_game_model_points_local`, imported, so the column names cannot
+        drift from production) over every row: how many rows it would feed.
+      * OUTPUT: the smart_sim_<D>_*.json artifacts of the same dates: how many carry market_anchor.game_model_fed and
+        how many of those are True. Sims written before todo #821 F0 loaded carry no field and are counted apart.
+    """
+    import pandas as pd
+    from syndicate.features.shared import basketball_props_smart_sim as bridge
+
+    files = sorted((m.group(1), p) for p in sim_root.glob("predictions_*.csv")
+                   if (m := _PREDICTIONS_FILE_RE.match(p.name)))[-int(recent):]
+    rows = fed = 0
+    found: collections.Counter = collections.Counter()
+    unreadable: list[str] = []
+    for _, path in files:
+        try:
+            df = pd.read_csv(path)
+        except Exception as exc:
+            unreadable.append(f"{path.name}: {type(exc).__name__}")
+            continue
+        for _, row in df.iterrows():
+            _, _, audit = bridge._game_model_points_local(row, _num_like_the_job_build)
+            rows += 1
+            fed += int(bool(audit["game_model_fed"]))
+            found.update(audit["game_model_columns"])
+    sims = with_field = sims_fed = 0
+    for date, _ in files:
+        for sim_path in sim_root.glob(f"smart_sim_{date}_*.json"):
+            sims += 1
+            try:
+                anchor = json.loads(sim_path.read_text(encoding="utf-8")).get("market_anchor") or {}
+            except Exception:
+                continue
+            if isinstance(anchor, dict) and "game_model_fed" in anchor:
+                with_field += 1
+                sims_fed += int(bool(anchor.get("game_model_fed")))
+    return {
+        "sim_root": str(sim_root),
+        "dates": [d for d, _ in files],
+        "read_columns": list(bridge.GAME_MODEL_READ_COLUMNS_LOCAL),
+        "prediction_rows": rows,
+        "prediction_rows_fed": fed,
+        "columns_present": {c: int(found.get(c, 0)) for c in bridge.GAME_MODEL_KNOWN_COLUMNS_LOCAL},
+        "unreadable": unreadable,
+        "sims": sims,
+        "sims_with_field": with_field,
+        "sims_fed": sims_fed,
+    }
+
+
+def _pct(part: int, whole: int) -> float:
+    return round(100.0 * part / whole, 1) if whole else 0.0
+
+
+def game_model_feed_alarms(league: str, census: dict[str, Any]) -> tuple[list[str], list[str]]:
+    alarms: list[str] = []
+    notes: list[str] = []
+    dates = census["dates"]
+    window = f"{dates[0]}..{dates[-1]}" if dates else "no dates"
+    rows, fed = census["prediction_rows"], census["prediction_rows_fed"]
+    present = ", ".join(f"{c} {n}" for c, n in census["columns_present"].items())
+    if rows < MIN_ROWS_FOR_A_RATE:
+        notes.append(f"{league}: game-model feed UNMEASURED -- {rows} predictions rows in {census['sim_root']} ({window})")
+    elif fed < POPULATION_FLOOR * rows:
+        alarms.append(
+            f"UNFED: {league} quarter-model off_rating -- the job build's game-model read "
+            f"({'/'.join(census['read_columns'])}) found values on {_pct(fed, rows)}% of {rows} predictions rows over "
+            f"{len(dates)} dates ({window}); columns present: {present}. Both teams then run at baseline_off_rating "
+            f"(todo #821).")
+    sims, with_field, sims_fed = census["sims"], census["sims_with_field"], census["sims_fed"]
+    if with_field >= MIN_ROWS_FOR_A_RATE and sims_fed < POPULATION_FLOOR * with_field:
+        alarms.append(
+            f"UNFED: {league} smart_sim artifacts -- market_anchor.game_model_fed is true on {_pct(sims_fed, with_field)}% "
+            f"of {with_field} sims ({window}).")
+    elif sims and with_field == 0:
+        notes.append(f"{league}: market_anchor.game_model_fed absent on all {sims} sims ({window}) -- written before "
+                     "todo #821 F0 loaded; the INPUT replay above is the reading until it does.")
+    return alarms, notes
+
+
+def level4_quarter_model_inputs() -> tuple[dict[str, Any], list[str], list[str]]:
+    bridge_source = BRIDGE_PATH.read_text(encoding="utf-8")
+    structural, alarms = team_context_structural_alarms(bridge_source)
+    notes: list[str] = []
+    # Positive control: the same check over a builder that stops passing off_rating must alarm, or Level 4 is blind.
+    blinded = re.sub(r"off_rating=home_off_rtg,\s*", "", bridge_source, count=1)
+    if blinded == bridge_source or "off_rating" not in team_context_structural_alarms(blinded)[0]["consumed_not_populated"]:
+        alarms.append("LEVEL 4 BLIND: dropping off_rating from the builder's TeamContextLocal(...) call did not trip "
+                      "the structural check (the call changed shape) -- Level 4 cannot fail as written")
+    by_league: dict[str, Any] = {}
+    for league, cfg in LEAGUES.items():
+        sim_root = Path(cfg.get("sim_root") or cfg["processed_root"])
+        if not sim_root.is_dir():
+            by_league[league] = {"sim_root": str(sim_root), "error": "UNMEASURED: directory does not exist here"}
+            notes.append(f"{league}: game-model feed UNMEASURED -- {sim_root} does not exist on this substrate")
+            continue
+        try:
+            census = game_model_feed_census(sim_root)
+        except Exception as exc:
+            by_league[league] = {"sim_root": str(sim_root), "error": f"{type(exc).__name__}: {exc}"}
+            alarms.append(f"LOADER EXCEPTION: {league} game-model feed census raised {type(exc).__name__}: {exc}")
+            continue
+        by_league[league] = census
+        a, n = game_model_feed_alarms(league, census)
+        alarms.extend(a)
+        notes.extend(n)
+    return {"structural": structural, "game_model_feed": by_league}, alarms, notes
+
+
+# --------------------------------------------------------------------------
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json", type=Path, default=None)
@@ -613,6 +858,27 @@ def main() -> int:
         for name, ok in present.items():
             print(f"      {'present' if ok else 'ABSENT ':8s} {name}")
 
+    print("\nLEVEL 4 -- PREGAME QUARTER-MODEL TEAM INPUTS (TeamContextLocal + the game-model feed, todo #821)")
+    print("-" * 84)
+    l4_data, l4_alarms, l4_notes = level4_quarter_model_inputs()
+    alarms.extend(l4_alarms)
+    notes.extend(l4_notes)
+    s4 = l4_data["structural"]
+    print(f"  consumed by {'/'.join(QUARTER_MODEL_CONSUMERS)} : {sorted(s4['consumed'])}")
+    print(f"  passed by every TeamContextLocal(...) in {QUARTER_MODEL_BUILDER} ({s4['builder_calls']} calls) : "
+          f"{s4['populated_by_builder']}")
+    print(f"  consumed, not passed : {s4['consumed_not_populated']}")
+    for league, info in l4_data["game_model_feed"].items():
+        print(f"\n  {league.upper()}  sim_root={info.get('sim_root')}")
+        if "error" in info:
+            print(f"      ERROR: {info['error']}")
+            continue
+        d = info["dates"]
+        print(f"      dates: {len(d)} ({d[0] + '..' + d[-1] if d else '-'})")
+        print(f"      predictions rows fed: {info['prediction_rows_fed']} of {info['prediction_rows']} "
+              f"(read {'/'.join(info['read_columns'])}; present {info['columns_present']})")
+        print(f"      sims: {info['sims']}  carrying game_model_fed: {info['sims_with_field']}  fed: {info['sims_fed']}")
+
     print("\n" + "=" * 84)
     print("SUBSTRATE: Levels 1-3 read the LOCAL MIRROR under data/{wnba,nba}_source/. "
           "Per CLAUDE.md / model_engine_standard.md Sec3b this is a lossy, periodically "
@@ -641,6 +907,7 @@ def main() -> int:
         "level1_player_priors": l1_data,
         "level2_team_advanced": l2_data,
         "level3_calibration_artifacts": l3_data,
+        "level4_quarter_model_inputs": l4_data,
         "alarms": alarms,
         "notes": notes,
         "status": "fail" if alarms else "pass",
