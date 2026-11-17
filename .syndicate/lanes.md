@@ -1042,6 +1042,14 @@ death, never life — do not invert it.
 - Verification: pytest on every touched test file plus the portfolio suites (auth, books, live page, ledger archive, paper settlement): /portfolio/paper -> 302 /portfolio, /api/portfolio/paper -> 410, no 500 anywhere; grep shows no remaining code reference to the removed routes, template, script or helpers; after a fleet load, /portfolio renders with no Paper link and the book switcher lists Kalshi + Polymarket and the manual books
 - Blocked by: none
 
+### board-query-row-refs-load — OPEN — opened 2026-11-17 — session e569a6cd-3808-4d13-81bd-53671669f80d
+- Goal: todo #826 LOADED on the fleet (user 2026-11-17 'Load it', then 'Carry both' for the ride-alongs ac2cbc2fc launcher and 2148f99cb paper endpoint): ff ~/Syndicate 92ae7490a -> 5db26434e and reload-web; the served /api/intelligence/query with the page's body (slim_aliases + drop_row_diagnostics + row_refs) carries _response_row_refs and is ~60% smaller on the wire than the same body's baseline, web.log QUERY_STAGE_MS shows refs true, /intelligence renders with 0 page errors, and /portfolio/paper still answers 200
+- Files: docs/ai_context/todo.md (the #826 item ONLY), .syndicate/findings_2026-11-17_board_query_row_refs.md
+- Hypothesis: n/a (a user-approved load of a change measured on a recorded response)
+- Falsification test: After the reload the served query with row_refs carries no _response_row_refs, or its gzipped size is not below 0.5x the baseline read just before, or /intelligence logs a page error, or /portfolio/paper stops answering 200
+- Verification: deploys.md entry with the baseline (gz bytes, seconds, refs absent) and the post-load readings of the same request, QUERY_STAGE_MS refs true, a headless /intelligence render with 0 page errors, /portfolio/paper 200; betting change: no (BC entry if the tool requires)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
