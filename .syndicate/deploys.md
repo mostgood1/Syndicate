@@ -60856,3 +60856,14 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - `nba_sims_with_game_model_fed` 0 -> at least 1 `false` with `game_model_columns` [pred_total, pred_margin], on the first NBA pregame sim written after 16:26:58Z: **OWED**. Watcher `C:\tmp\nba_margin0\f0_watch_sim.sh` (read-only, 120 s, 10 h cap) prints the reading.
   - `unfed_marker_lines` 0 -> 0: expected, since the allowlist is not in this ff.
 - **claim:** web released after this entry.
+
+## 2026-11-17 16:5xZ (10:5x AM CST) -- READING (no deploy): the FIRST REAL exit refusal on the fleet -- WNCAAB foul-out, one tick (lane `live-player-exit-gate`, todo #814)
+- **Source:** `~/syndicate-prod/logs/live-odds-worker.log`, live-odds-worker pid 2925378 (gates loaded at its 23:55:09Z 11-16 self-recycle); read 16:44-16:50Z 11-17 with `C:\tmp\lpeg\lpeg_refusal_scan.sh` and `lpeg_0312.sh`.
+- **The refusal:** event 401927467 (ARK vs LR, WNCAAB):
+  - 03:10:32Z `PLAYER_OUT team=ARK player='Grace McCallop' reason=foul_out key=True` -> tick `refused_games=0` (modelled, priced).
+  - 03:12:34Z adds `team=LR player='Talia Kemp' reason=foul_out key=True` -> tick 03:12:34.772Z `players_out=2 key_players_out=2 refused_games=1`. The box showed her 5th foul before the engine state carried it, so the exit was unmodelled for that tick and the game's live lane was refused `key_player_out`.
+  - 03:14:37Z Kemp absent from the box's out list (feed flicker) -> `refused_games=0`.
+  - 03:16:40Z both listed, `refused_games=0`: the engine state now carries Kemp's fouls, modelled, priced again (user 11-16 rule, "No, keep pricing").
+- **Whole slate since the load (23:55Z..):** 16 distinct key foul-outs (ncaab 6, wncaab 10); 1 refusal tick in total, the one above; 0 `KEY_PLAYER_OUT_REFUSED` lines elsewhere; 0 tracebacks earlier at 00:49Z.
+- **What this does and does not show:** the producer half refuses a real exit the engine does not (yet) model, within one tick, and lifts it when the engine catches up. NOT read: the served board row or `commit_portfolio` for that tick (not recoverable from logs after the fact). NOT yet seen: an exit the engine never models (injury, ejection, NHL goalie change, soccer keeper change, MLB starter injury). A background watcher on both worker logs (every 120 s, 48 h, from 16:44Z) is waiting for one.
+- **Lane goal:** still NOT MET (per sport, on an unmodelled exit, with the board side read).
