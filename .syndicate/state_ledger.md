@@ -974,11 +974,15 @@ unbounded.
   - Same-instant A/B, 5 pairs on the primary: old 10.9-12.3 s, new 2.7-5.4 s, stdout identical.
   - New and loud: a check killed at the runner's 13 s deadline, or a missing or dead runner, prints in
     DIGEST NOTES instead of reading as a pass.
-  - Critical path: `check_lane_claims.py`, 1.19-1.29 s with the others running, once the primary tree
-    has `39d144d7c` `[measured 2026-11-17 9:53 AM CST, lane lane-claims-parse-memo; the primary was
-    NOT yet fast-forwarded to it then]`. That commit cut `check_lane_invariants.py` from 2.35 s to
-    0.96 s alongside the others, and all nine finish in 1.25 s instead of 2.35 s. Its output is byte-identical
-    (`findings_2026-11-17_lane_claims_parse_memo.md`).
+  - All nine checks finish in about 1.0 s with each other running (1.04 s median, 7 runs). Critical path:
+    `check_lane_invariants.py`, ~1.0 s, with `check_lane_claims.py` at 0.94 s.
+    `[measured 2026-11-17 10:28 AM CST from the primary tree at 0a60d9e0a, lane lane-claims-checker-speed]`.
+    Two speedups did this, both with byte-identical output:
+    - `39d144d7c` cut `check_lane_invariants.py` from 2.35 s to 0.96 s (on the primary: verified as an
+      ancestor of 0a60d9e0a);
+    - `3eacafa2a` cut `check_lane_claims.py` from 1.85 s to 0.94 s. The primary did NOT have it when measured;
+      the check ran from the worktree.
+    Findings: `findings_2026-11-17_lane_claims_parse_memo.md`, `findings_2026-11-17_lane_claims_checker_speed.md`.
   - Tables: `findings_2026-11-16_session_start_runtime.md`.
 
 ---
