@@ -1148,7 +1148,15 @@ death, never life — do not invert it.
 - Verification: Tests: two event ids give different seed sets and different margin draws; the same id reproduces bit-identically across calls and across a fresh interpreter (PYTHONHASHSEED varied); no id == the old seeds 1..N bit-identically; live_state_from_row carries event_id from the normalised row; seed_basis named. Then the existing NFL live re-sim test files pass. Fleet: after a load (user's call), live_resim rows carry seed_basis=event
 - Blocked by: none
 
-### board-query-serialize-once-load — OPEN — opened 2026-11-17 — session 040e8c3d-1561-4a9c-b821-873fd0ac1343
+### board-query-serialize-once-load — CLOSED 2026-11-17 5:35 PM CST (GOAL MET on the second series: loaded 23:15:44Z, serialize_once 29/29, version = hash of sent bytes 14/14, page query median 6.4 -> 4.9 s, /intelligence 0 page errors) — opened 2026-11-17 — session 040e8c3d-1561-4a9c-b821-873fd0ac1343
+- **GOAL VERDICT `[2026-11-17 5:35 PM CST]`: MET, with one clause met only on the second series.** Every clause has a reading:
+  - `serialize_once` true on 29 of 29 post-load queries;
+  - `version` == the hash of the bytes received on 14 of 14, and a back-to-back pair matched;
+  - `/intelligence`: 0 page errors;
+  - page query seconds: series 1 (23:16-23:19Z, workers just booted, 2 memory recycles, busy host) median 9.8 s WAS worse than pre's 6.4 s, which the falsification test names. Series 2 (23:25-23:28Z) median 4.9 s.
+  - The after-stage time fell ~1.6 -> ~0.6 s, and `version_and_debug` rose 973 -> ~1,180 ms: net ~0.8 s, matching the fleet-Python A/B (1,665 -> 882 ms).
+  - My preflight expectation for `version_and_debug` ("within noise") was wrong: the stage now holds the whole serialisation.
+  - deploys.md 23:15:44Z + 23:30Z, BC-039 (no). Claim web released 23:24:41Z.
 - Goal: todo #828 LOADED on the fleet (user 2026-11-17 'Load it', after the ride-alongs were listed: render-config 3b f1a278ed8, WNBA #829 920c19e70, operator fill b96ea17a7, engine experts 85af16b35): ff ~/Syndicate 25fc2e4f0 -> 64daca46f and reload-web; QUERY_STAGE_MS carries serialize_once true on the page's query, the served version hashes the response bytes sent and a back-to-back pair matches, the page query's seconds are not worse than a pre-load series of the same body, /intelligence renders with 0 page errors
 - Files: docs/ai_context/todo.md (the #828 item ONLY), .syndicate/findings_2026-11-17_board_query_response_cache.md (a new Loaded section ONLY)
 - Hypothesis: n/a (a user-approved load of a change measured on a fleet-recorded response)

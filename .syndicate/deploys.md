@@ -61352,3 +61352,23 @@ Lane `render-config-retirement` (session 267d8859).
   - the nightly suite window 08:14-08:58Z 11-18, with 0 June/September `final_player_boxscore` requests.
 - **revert:** `git revert 920c19e70`, ff, then a claimed TERM of live-odds-worker. There is no env switch, by design.
 - **claim:** live-odds-worker released after this entry.
+
+## 2026-11-17 23:30Z (5:30 PM CST) -- READING (no deploy): the board query's serialize-once, second production series after the 23:15:44Z load (todo #828, lane `board-query-serialize-once-load`) -- **MET: page query median 6.4 s pre -> 4.9 s; the time after the stages fell ~1.6 s -> ~0.6 s while `version_and_debug` rose 973 -> ~1,180 ms, net ~0.8 s, matching the fleet-Python A/B (783 ms)**
+- betting change: no (reading only; the load is BC-039)
+- **Series 2** (`C:\tmp\i13\read_series.py post2`, the page's own body, 6 reads 30 s apart, 23:24:59-23:27:58Z, web workers 3-5 min old, host load ~3.6-4.0):
+  - 3.95 / 6.76 / 5.17 / 4.66 / 4.45 / 8.94 s, **median 4.9 s** (pre 23:11-23:14Z: median 6.4 s; series 1 right after the reload: 9.8 s);
+  - `version` == sha256 of the `response` bytes received: 6 of 6;
+  - **time after the stages** (client seconds minus the matching `QUERY_STAGE_MS` total), matched by start time and row count: **0.23-0.92 s, median ~0.6 s**. Pre: 1.1-2.2 s, median ~1.6 s. That is where the old `jsonify` ran.
+  - `version_and_debug` over the 10 queries in that window: 892-3,382 ms, **median ~1,180 ms** (pre 973). The +~200 ms is the new exit doing the whole serialisation inside the stage (fleet-Python A/B: 882 vs the old hash part's 674 ms).
+  - Series 1's 9.8 s ran in the first 4 minutes on freshly booted workers, with cold board caches and two memory recycles.
+- **Back-to-back pair** 23:30:07Z / 23:30:13Z: the same `version` `a43bb6155589`, the same 23,062,892 B.
+- **The served page**, headless Chromium on the fleet's `/intelligence` at ~23:29Z (`C:\tmp\rowrefs826\fleet_page.py`):
+  - the query 200 with `row_refs: true` and Content-Length 4,262,528;
+  - **0 page errors**;
+  - "Showing 1,351 of 2,459 plays", 43 live, 2,702 card nodes, the rail drawn, no leftover `_response_row_refs`;
+  - the 14 console errors are all `ERR_HTTP2_PROTOCOL_ERROR`, the `cdn.nba.com` logos (21:56:24Z entry).
+- **web.log 23:15:44-23:29:50Z:** 0 Traceback, 0 WORKER TIMEOUT, 0 SIGKILL. By ~23:31Z there were 29 queries, all with `"serialize_once": true`, including the one sent without `slim_aliases` / `row_refs`.
+- **Memory recycles, not attributable:**
+  - 8 `WEB_WORKER_MEMORY_RECYCLE` in 14 min against 26 queries: 0.57 a minute, 0.31 a query;
+  - pre (21:57-23:15Z): 19 in 79 min against 25 queries: 0.24 a minute, 0.76 a query;
+  - my own probes packed 13 queries into the post window, so the two rates point opposite ways. This stays with todo #826's owed recycle reading, over a normal-traffic window.

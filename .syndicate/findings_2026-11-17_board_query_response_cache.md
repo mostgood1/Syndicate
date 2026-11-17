@@ -170,3 +170,25 @@ Beside it, all passing: 199 tests in the neighbouring query suites, and the 51 q
 - the page query's client-side seconds against a pre-load series, same body, several samples (this
   endpoint's run-to-run spread is ~4.8 s, so 1 s needs a series, not a pair);
 - the served `version` still matching across the reload when the board has not moved.
+
+## Loaded 2026-11-17 23:15:44Z (lane `board-query-serialize-once-load`, user "Load it") -- MET on the second series
+
+`[2026-11-17 ~5:32 PM CST]` ff `25fc2e4f0` -> `64daca46f` + `reload-web`, BC-039 (no). Entries: `deploys.md` 23:15:44Z (the load) and 23:30Z (the second series).
+
+- **Reachability:** every post-load query logs `"serialize_once": true` (29 of 29 to ~23:31Z).
+- **Correctness:**
+  - `version` == sha256 of the `response` bytes received on 14 of 14 post-load reads (both series and the pair);
+  - a back-to-back pair returned the same `version` and the same 23,062,892 B;
+  - 0 Traceback / WORKER TIMEOUT / SIGKILL;
+  - the fleet's `/intelligence` renders with 0 page errors.
+- **The change's own cost, on the fleet's Python** (same host, same 24.4 MB payload, alternated, nice 19): 1,665 -> 882 ms median, 783 ms saved (47%).
+- **Production, page query (the page's own body, 6 reads 30 s apart each):**
+
+  | series | when | median s | after-stage s (median) | `version_and_debug` ms (median) |
+  |---|---|---|---|---|
+  | pre | 23:11-23:14Z | 6.4 | ~1.6 | 973 |
+  | post 1 | 23:16-23:19Z, workers just booted + 2 recycles | 9.8 | ~1.3 | 1,852 |
+  | post 2 | 23:25-23:28Z | **4.9** | **~0.6** | ~1,180 |
+
+  "After-stage" is the client's seconds minus the matching `QUERY_STAGE_MS` total; the old `jsonify` ran there. `version_and_debug` rose as it should (it now holds the whole serialisation; my preflight expectation of "within noise" was wrong). The series are small and the endpoint is noisy (spread 2.9-10.4 s pre), so the decomposition, not the medians alone, is the evidence.
+- **Not attributable yet:** the web memory-recycle rate (pre 0.24/min and 0.76/query; post 0.57/min and 0.31/query, with my probes packing the post window). It stays with todo #826's owed recycle reading.
