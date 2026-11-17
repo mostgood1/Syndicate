@@ -1120,3 +1120,93 @@ a live card.
 a live card.
 
 **Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
+
+## Reading 17 — Mon 11-16 8:36 PM CST (02:36Z 11-17)
+
+**Slate:** 25 live chips.
+- NBA 5: HOU @ MIA Q4; GSW @ NOP Q3; POR @ MIN Q3; PHX @ DEN end Q1; PHI @ BKN end Q3.
+- NFL LAC @ BAL Q2 1:05.
+- NHL 2: MTL @ NYR end P2; VAN @ UTA P1.
+- 17 college games.
+
+**Flags: 47 shown on 13 cards (162 qualifying rows). 0 false, 0 missed, 0 dark.** 11-16 total: 209.
+- **NBA: 36 flags (148 qualifying rows).**
+  - NBA `_alt` priced fresh again: 511 of 761 rows priced <= 120 s.
+  - NBA builds p50 20.6 s, max 45.2 s; **0 `deferred_slow`**; gap max 86 s. The cadence keeps up at
+    5 games.
+- **PRE-REGISTERED here, before any NBA final is read: NBA TAIL flags.** Several NBA flags sit on
+  deep alt lines where our live distribution is far wider than the book's:
+  | game | flag | model | book | ours |
+  |---|---|---|---|---|
+  | POR @ MIN | u199.5 | 27.3% | 3.8% | 217.7 |
+  | GSW @ NOP | u203.5 | 37.2% | 12.7% | 215.0 |
+  | PHX @ DEN | u208.5 | 38.3% | 30.1% | 220.7 |
+  - These are not flipped sides: the side is the lean, and the tail is fatter than the market's (#780
+    k widening).
+  - Tonight's grade splits NBA flags by book fair: TAIL (fair < 0.20 or > 0.80) vs BODY (0.20-0.80).
+    Each half's hit rate and Brier against the book, game-clustered.
+- **Totals: 25 flags, 16 UNDER / 9 OVER.**
+  - NCAAB full-game, calibrated, 2 U: Tarleton @ Drake u158.5 (17.2 pp); East Texas A&M @ Oregon
+    u150.5.
+  - NCAAB 2H, RAW (outside #816's full-game scope): Western Illinois u75.5, Columbia u78.5 (U);
+    Montana o73.5 (O).
+  - WNCAAB, RAW, 3 U: Troy @ LSU u180.5 (21.7 pp), Michigan @ Central Michigan u136.5, Arkansas @
+    UALR u147.5.
+  - NBA 9 U: HOU @ MIA full / 2H / Q4; POR @ MIN full / 2H / Q3; GSW @ NOP full / Q3; PHX @ DEN full.
+  - NBA 8 O: PHI @ BKN full / 2H / Q4; POR @ MIN Q4; GSW @ NOP Q4; PHX @ DEN 1H / Q2 / Q4.
+- **Spreads and moneylines (22):** NBA 19, e.g. GSW @ NOP NOP -23.5 (22.0 pp), HOU @ MIA Q4 MIA
+  -3.5 (21.1 pp), POR @ MIN MIN -12.5 (20.3 pp). NCAAB Minnesota -37.5 and Columbia moneyline;
+  WNCAAB UALR moneyline.
+- **Totals direction, flag by flag: 89 unders, 36 overs.** This reading adds 16 U (4 NCAAB,
+  3 WNCAAB, 9 NBA) and 9 O (1 NCAAB, 8 NBA).
+
+**MNF (LAC @ BAL, Q2 1:05): still 0 priced.**
+- 25 NFL rows on live-rail, 6 priced <= 120 s by the book, 0 flags.
+- `NFL_LIVE_RESIM` resimmed again at **02:33:52Z** (refusals only `game_final`). The other ticks
+  02:18-02:28Z were `uninformative_probability`.
+- **Even with a projection, 0 lines price.** `LIVE_GAMELINE_BUILD` projected 19-20, priceable 0,
+  withheld by reason:
+  - `live_resim_published_no_distribution_for_this_market` 18-19;
+  - `quote_older_than_live_pricing_ceiling` 8-9;
+  - `prob_interval_swamps_edge` 1;
+  - segments 34.
+- **Known and deliberate:** `findings_2026-11-15_nfl_live_width_fit.md`. NFL live totals and spreads
+  have never priced: `nfl/live_resim.py` withholds `marginDist` / `totalRunsDist` because the
+  2026-09-27 grade found NFL live margins ~35-40% too narrow (#780 width fit pending). Only the NFL
+  moneyline can price live, and the uninformative band refuses it in a close game. So MNF shows lines
+  but cannot flag. Not handed off.
+
+**Live rows:** 1,102.
+| sport | rows | priced <= 120 s | split |
+|---|---|---|---|
+| NBA | 953 | 595 | 2H 518 / break 435 |
+| NCAAB | 102 | 22 | 1H 13 / 2H 89 |
+| NFL | 25 | 6 | no model price |
+| WNCAAB | 19 | 8 | — |
+| NHL | 3 | 2 | — |
+
+- 358 rows older than 300 s now. 24 of 98 markets carry no price of ours.
+
+**Overlay (23 min), all 0 over 360 s:**
+| sport | gap p50 / max | build p50 / max | notes |
+|---|---|---|---|
+| NBA | 63 s / 86 s | 20.6 s / 45.2 s | |
+| NCAAB | 67 s / 129 s | — | |
+| WNCAAB | 77 s / 143 s | — | |
+| NHL | 61 s / 189 s | — | 5 of 17 zero-card with rows |
+| NFL | 80 s / 140 s | 10.1 s / 39.4 s | |
+
+- 0 `deferred_slow`. Tick gap p50 18 s, max 82 s.
+
+**Web merges:** fresh 66 / 66 for every sport.
+
+**Load:**
+- **Query 9.1 s** / 74.3 MB. Shortlist 0.75 s; chips 1.8 s; live-rail 0.08 s.
+- Gunicorn workers were 258 s and 34 s old at the read. The 258 s worker was recycled during the probe
+  (a new one was 25 s old at the end). Host load 3.0.
+- **Board:** built 84 s ago; shortlist written 84 s ago.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 25 live chips have
+a live card.
+
+**Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
