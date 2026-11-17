@@ -19,9 +19,11 @@ neither edited nor pushed.
 | step | state |
 |---|---|
 | 1. launcher stops reading `render.yaml` and `render_env/` | **ON MAIN `ac2cbc2fc`.** The fleet's `fleet_env/` exists (migrated 17:24:08Z). The launcher builds a byte-identical env from it (measured below). It takes effect on the fleet at the next `up` that runs this code. |
-| 2. neutral `SYNDICATE_*` markers; every reader prefers them | **ON MAIN** (commit in the lane block). The launcher sets both spellings to one value at its next `up`. Until then every reader falls back to the `RENDER*` names the running roles carry, so the answer is the same. |
+| 2. neutral `SYNDICATE_*` markers; every reader prefers them | **ON MAIN `cc90fb653`.** The launcher sets both spellings to one value at its next `up`. Until then every reader falls back to the `RENDER*` names the running roles carry, so the answer is the same. |
 | 3. stop setting `RENDER*`; delete the fallbacks | **NOT STARTED — the user's decision** (below). |
 | fleet load (a drained full `down`/`up`) | **NOT DONE — the user's go.** Plan and readings below. |
+
+**Tests (2026-11-17, 6 workers at Idle, 12:12-12:27 PM CST):** every test file that mentions a `RENDER*` marker (44, the new ones included) plus `test_request_path_guard.py`: **2050 passed, 36 skipped, 0 failed**; 146 passed again on the rebased tree. A first serial run at normal priority hit its 30-minute timeout at 41% with no failure.
 
 ## Step 1 — the role spec and the env snapshot
 
