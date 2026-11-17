@@ -492,3 +492,83 @@ a live card.
 have a live card.
 
 **Restarts:** live-odds-worker pid 2834332 and refresh-worker pid 2809282, both unchanged.
+
+## Reading 11 — Mon 11-16 6:04 PM CST (00:04Z 11-17), full page
+
+**Slate: 18 live chips.**
+- **NCAAB 9:**
+  - Iona @ UMBC H2 16:23; Alcorn St @ Maryland HALF; Prairie View @ Ohio State H1 5:15.
+  - Six tipped at 6 PM: EKU @ Kent State, WKU @ Tulsa, Grambling @ Kentucky, Citadel @ Clemson,
+    Richmond @ Virginia Tech, Jacksonville @ Georgia.
+- **WNCAAB 9:** one at HALF, three in Q3, two in Q2, three in Q1.
+- NBA not live yet (6:10 tips).
+
+**Flags: 10 shown on 5 cards (20 qualifying rows). 0 false, 0 missed, 0 dark.** 11-16 total: 26.
+
+| game | market | side | model | fair | gap | our line | priced |
+|---|---|---|---|---|---|---|---|
+| Alcorn St @ Maryland | full spread | MD -45.5 | 53.3% | 48.9% | 4.4 pp | MD -47.9 | 71 s |
+| Iona @ UMBC | full spread | UMBC -1.5 | 61.8% | 50.0% | 11.8 pp | UMBC -5.0 | 107 s |
+| Iona @ UMBC | full total | o126.5 | 78.9% | 51.1% | 27.8 pp | 136.5 | 42 s |
+| Iona @ UMBC | 2H total | o73.5 | 66.2% | 49.4% | 16.7 pp | 79.6 | 110 s |
+| Prairie View @ Ohio St | 1H total | u67.5 | 57.4% | 48.4% | 8.9 pp | 66.6 | 112 s |
+| Richmond @ Virginia Tech | full total | o147.5 | 69.1% | 48.8% | 20.4 pp | 156.4 | 40 s |
+| Richmond @ Virginia Tech | moneyline | RICH | 24.0% | 10.7% | 13.3 pp | — | 29 s |
+| Richmond @ Virginia Tech | 1H total | o69.5 | 64.7% | 50.5% | 14.2 pp | 74.8 | 76 s |
+| Citadel @ Clemson | full total | o139.5 | 63.2% | 50.4% | 12.8 pp | 145.3 | 42 s |
+| Citadel @ Clemson | 1H total | o65.5 | 63.7% | 53.0% | 10.7 pp | 69.0 | 113 s |
+
+- **The fade-vs-follow series** (book total vs our total at each reading, for the pre-registered split):
+  | game | 5:20 PM | 5:41 PM | 6:04 PM |
+  |---|---|---|---|
+  | Iona @ UMBC | 141.5 / 145.4 | 134 / 142.7 | 126.5 / 136.5 |
+  - The book has fallen 15 points since 5:20 and ours 8.9. The flag is still OVER, against the move.
+- Totals direction across 11-16 flags so far, recounted flag by flag: **11 unders, 9 overs (20 totals
+  flags)**. The 6 PM tips add overs in the first minutes.
+  - **Correction:** reading 10's "9 unders, 3 overs" was miscounted. Through 5:41 PM it was 10 unders,
+    3 overs.
+
+**Live rows:** 95 (NCAAB 94, WNCAAB 1).
+| sport | phase | rows | priced <= 120 s | flags |
+|---|---|---|---|---|
+| NCAAB | 1H | 62 | 25 | 13 |
+| NCAAB | 2H | 18 | 8 | 6 |
+| NCAAB | break | 14 | 2 | 1 |
+| WNCAAB | 1H | 1 | 1 | 0 |
+
+- NCAAB seen age at pricing p50 64 s, p90 199 s. 34 rows are older than 300 s now. 4 of 25 markets
+  carry no price of ours. Live-rail: 128 rows on 3 reads.
+- **The 41,657 s maximum priced age is 4 pregame `layer2_shortlist` rows**: Richmond @ VT and Citadel @
+  Clemson spreads, book unmoved 2,304-41,657 s, our look 45-5,570 s old. They sat on live cards whose
+  games had tipped ~2 min before the read; the overlay had not yet replaced them. None flagged (the
+  edge needs a <= 120 s price). Expected at tip; not handed off.
+- **WNCAAB:** 9 live games, 1 live-rail row. This is the decided floor plus thin in-play coverage
+  (5:41 PM replay). Overlay: 7 of 25 builds zero-card with rows.
+
+**Overlay (23 min), both 0 over 360 s:**
+| sport | builds | gap p50 | gap max | rows_inplay last |
+|---|---|---|---|---|
+| NCAAB | 30 | 38 s | 98 s | 198 |
+| WNCAAB | 25 | 43 s | 236 s | 11 |
+
+**Builds:**
+- NCAAB p50 8.2 s, p90 16.4 s, max 36.6 s (rising with 9 games live).
+- NBA p50 11.1 s, max 17.5 s (pregame); NFL 1.7 / 27.3 s.
+- 0 `deferred_slow`. Tick gap p50 25 s, max 106 s.
+
+**Web merges:** ncaab and wncaab fresh 22 / 22; nfl stale (pregame).
+
+**Load:**
+- **`/intelligence` 13.2 s** / 24.1 MB, the slowest page today (1.5-6.8 s before). **Query 10.3 s** /
+  64.5 MB. Shortlist 1.1 s; chips 0.6 s; live-rail 0.03 s.
+- Gunicorn workers were 250 s and 51 s old at the read, no recycle during the probe. Host load rose
+  from 2.6 to 5.5 during the probe.
+- **Board:** build 128 s old; shortlist written 162 s ago.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 18 live chips have
+a live card.
+
+**Restarts:**
+- **live-odds-worker pid 2834332 → 2925378**, a routine recycle (supervisor: "exited code=0 after
+  20383s", after a 200 MB log rotation).
+- refresh-worker pid 2809282, unchanged.
