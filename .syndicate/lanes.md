@@ -1153,6 +1153,14 @@ death, never life — do not invert it.
 - Verification: deploys.md entry with a pre-load series (seconds, gz bytes, version_and_debug) and the same post-load series, QUERY_STAGE_MS serialize_once true, a headless /intelligence render with 0 page errors; betting change: no (BC row)
 - Blocked by: none
 
+### live-bet-timing-forward — OPEN — opened 2026-11-17 — session b1d2088f-b4a3-474a-99c8-8fd14e19d2c2
+- Goal: Forward-test the 2026-11-17 live-timing candidates C1-C6 (findings_2026-11-17_live_bet_timing.md) on slates 2026-11-18..2026-12-01 with the pre-registered tests and verdict rules; each candidate HOLDS / FAILS / INSUFFICIENT; READ-ONLY, nothing loaded
+- Files: .syndicate/findings_2026-11-17_live_bet_timing.md (the pre-registration + RESULTS sections ONLY), docs/ai_context/todo.md (the #830 entry ONLY), scripts/score_live_bet_timing_forward.py (NEW)
+- Hypothesis: C1-C6 as written in the findings file's candidate list, made exact in its PRE-REGISTERED section before any 11-18 game
+- Falsification test: Per candidate, in the PRE-REGISTERED section: a 90% game-clustered CI on the registered FRESH-quote cell; < 30 games = INSUFFICIENT, never support
+- Verification: scripts/live_bet_timing_study.py blob 25543aebf51e run once per sport on the fleet for 11-18..12-01 by scheduled task live-bet-timing-forward-830 (Tue 12-02 10 AM CST); RESULTS section scores each candidate
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

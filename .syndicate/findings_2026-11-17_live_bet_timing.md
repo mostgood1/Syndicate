@@ -394,3 +394,40 @@ their falsification were written into the lane (`9326ac378`) before any grading.
            flags against_run  |  -31.2+-12.8   4g.  -29.3+-11.8   4g.  -34.0+-13.5   4g. |
            mkt run-side y-p   |                                                      |  +26.1+- 4.1   6g.  +26.8+-10.0   5g.  +30.6+-11.9   5g.
 ```
+
+## Forward test, PRE-REGISTERED (todo #830, lane `live-bet-timing-forward`; user "Register them", 2026-11-17 ~5:10 PM CST, before any 11-18 game)
+
+- **Window:** ledger slates **2026-11-18 .. 2026-12-01** (14 nights) for NCAAB, NCAAF, WNCAAB, NBA, NFL and NHL. Nothing from
+  the discovery window (through 11-16) or the 11-17 slate (in play when this was written) is in it.
+- **Run:** `scripts/live_bet_timing_study.py` (blob `25543aebf51e`), once per sport on the fleet:
+  `--from 2026-11-18 --to 2026-12-01 --cache /mnt/c/tmp/livetiming_fwd/tl --json /mnt/c/tmp/livetiming_fwd/<sport>.json`.
+  Then `scripts/score_live_bet_timing_forward.py --dir /mnt/c/tmp/livetiming_fwd` (this commit) prints every cell and verdict.
+  Scheduled task `live-bet-timing-forward-830`, **Tue 2026-12-02 10:00 AM CST**.
+- **Every cell is FRESH-quote** (`main_fresh`: the book had seen the current score and the quote was <= 60 s old),
+  game-clustered, with a 90% CI. **< 30 games = INSUFFICIENT.** The scorer fixes the cells and rules:
+
+| cand | claim | cell(s) | rule |
+|---|---|---|---|
+| C1 | college flags earn late | NCAAB totals 90-100%; NCAAB spreads 75-90%; NCAAF spreads 75-90% and 90-100%; NCAAF totals 75-90% | CI > 0, and the mean above the same market's 0-25% cell |
+| C2 | totals: unders yes, overs no | under flags NCAAB / NCAAF / WNCAAB; over flags NCAAB / NCAAF | unders CI > 0; overs CI contains 0 |
+| C2x | NCAAB games ahead of the line's pace: the over is under-priced | market y - p, totals, pace "ahead" | CI > 0 (did NOT clear on fresh in discovery; registered as the weakest) |
+| C3 | ride the run (NCAAB) | totals flags with the heat; spreads flags with the run | CI > 0, and the mean above the matching "against" cell |
+| C4 | pro live ML over-prices home | NHL and NFL market y - p, home, h2h | CI < 0 |
+| C4r | WNCAAB live ML under-prices home | WNCAAB market y - p, home, h2h | CI > 0 |
+| C5 | NCAAB model ML flags lose early | h2h flags, 0-25% of regulation | CI < 0 |
+| C6 | NBA has no fresh-quote edge | totals flags and spreads flags, all | CI contains 0 |
+
+- **Verdict per candidate:**
+  - HOLDS: every cell meets its rule.
+  - FAILS: a cell's CI sits on the wrong side of 0.
+  - INSUFFICIENT: any cell has < 30 games. NFL is likely, at ~2 weeks of games; it is then re-run on a longer window under the same rules.
+  - NOT CONFIRMED: otherwise.
+- **Loads inside the window:** list every fleet load 11-18..12-01 that changes live pricing or flags for a registered
+  sport x market. Score the cells on each side of the load as well as pooled.
+  - Known risk: the #816 7-day grade (11-24) may flip `FIT_LEVEL`, which changes which NCAAB total flags exist.
+  - A candidate HOLDS only if no side with >= 30 games reverses its sign.
+- **Nothing is changed by this test.** A HOLDS makes a candidate eligible for a user decision, e.g. a rail cue for late
+  college flags or a per-row refusal keyed on the row's own state. It is never a market-wide switch: the user's rule is
+  that every line is its own decision.
+- **Scorer smoke run** on the discovery JSONs (in-sample, so expected to pass): C1-C6 and C4r HOLDS, C2x NOT CONFIRMED. It
+  proves only that the scorer reads the right cells.
