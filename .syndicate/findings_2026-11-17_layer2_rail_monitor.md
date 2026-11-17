@@ -269,3 +269,4 @@ after.
   8. Record in deploys.md (naming `ac2cbc2fc` and `2148f99cb` as carried), then release the claim.
 - If the fleet head has moved past `92ae7490a` by then, re-run the ride-along check on the new range
   first.
+- **Also, relayed by local_1f10ce63:** the user typed in that session at ~12:4x PM CST 11-17: **"carry the launcher change along"**, answering the same question. The deploys.md entry quotes both: "Carry it tonight" (this session) and "carry the launcher change along" (local_1f10ce63).
