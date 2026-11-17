@@ -1012,6 +1012,14 @@ death, never life — do not invert it.
 - Verification: deploys.md: ff MET (head 92ae7490a, pids unchanged), switch file read back, first post-flip NBA sim fields as above; BC rows for F1 (yes) and #824 (yes, pending refresh-worker).
 - Blocked by: none
 
+### nba-f1-grade-schedule — OPEN — opened 2026-11-17 — session b44f64ce-a648-4698-9792-51714c8aaecc
+- Goal: todo #821 records the scheduled keep/revert grade task nba-f1-outs-off-grade-1207 (Mon 2026-12-07 9:00 AM CST) so the grade is not owned by the task alone.
+- Files: docs/ai_context/todo.md (#821 section only)
+- Hypothesis: n/a (ledger note)
+- Falsification test: n/a
+- Verification: the #821 header names the task and the by-hand fallback, on origin/main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
