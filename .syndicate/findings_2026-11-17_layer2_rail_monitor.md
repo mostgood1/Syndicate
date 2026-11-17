@@ -191,3 +191,32 @@ no price of ours.
   - Reading 1 (12:01 PM, 2 minutes before the load): 0 of 3 college totals flags below the score.
 - College ledger rows now carry `state_home_score` / `state_away_score` / `state_period` /
   `state_clock_seconds` (the score and clock the re-sim started from), usable to grade the model's lag.
+
+### I-2 load — user 11-17 ~12:40 PM CST: "Load it tonight" (answering "Load the board-query de-dup onto the fleet?")
+
+**What turns it on:**
+- The page template sends `row_refs: true`; the server honours it. The off switch is
+  `SYNDICATE_QUERY_ROW_REFS=off`.
+- It works in both directions: an old cached page gets the full response, and a new page on an old
+  server gets the full response.
+- So it takes effect with an ff plus `reload-web`.
+
+**The plan:** an exact-SHA ff `92ae7490a -> 5db26434e`, then `reload-web` (a rolling HUP), at or after
+~5 PM CST, behind a web claim and preflight. Measure the page's query bytes and seconds before and
+after.
+
+**Ride-along check** (`92ae7490a..5db26434e`, 21 commits; runtime files):
+- **`ac2cbc2fc`, render-config-retirement step 1** (`scripts/local_production.py` reads
+  `fleet_role_spec.json` + `fleet_env/`):
+  - The lane closed; the owner verified 0 env keys differ.
+  - But **the user said "Steps 1+2, load later"**.
+  - The ff would put it on the fleet's disk, live at the next `up`. **User decision asked**;
+    "Remove Render's config and markers from the fleet" (local_c787e775) also asked.
+- **`2148f99cb`, paper-endpoint-request-path** (`/portfolio/paper` reads a worker-written all-dates
+  record):
+  - The lane is open and not loaded.
+  - After `reload-web` the new web code would run before refresh-worker writes that record.
+  - **The owner was asked** (local_d7643dac) whether it is safe as a ride-along.
+- `.claude/hooks`, `check_lane_invariants.py`, `fleet_secrets_backup.py`, `fleet_env_snapshot.py`:
+  tooling, not imported by any running role.
+- **No load until both answers are in.**
