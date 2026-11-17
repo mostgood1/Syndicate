@@ -79,3 +79,57 @@ def test_an_api_key_in_a_failed_steps_stderr_is_masked(module):
     assert "SECRETVALUE123" not in view["stderr_tail"]
     assert "apiKey=***" in view["stderr_tail"]
     assert "regions=us" in view["stderr_tail"]  # only the credential is masked
+
+
+def test_the_nfl_gameline_shard_line_the_writer_prints_survives_blanking(module, capsys, monkeypatch, tmp_path):
+    """Lane `nfl-gameline-kickoff-shard` (todo #817, 2026-11-16). The NFL game-line writer
+    prints which shard basis ran and the rows per shard date; at the 22:31Z load that line
+    was blanked here, so the load could be verified only on the shard rows. This drives the
+    REAL writer (filing line, then its FAILED line) and feeds what it printed through the
+    real `_run_command`, so a renamed token on either side fails here."""
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("SYNDICATE_WEB_PUBLISH_URL", raising=False)
+    monkeypatch.delenv("SYNDICATE_NFL_GAMELINE_QUOTES_KICKOFF_SHARD", raising=False)
+    path = Path(__file__).resolve().parents[1] / "scripts" / "fetch_nfl_team_odds_local.py"
+    spec = importlib.util.spec_from_file_location("test_refresh_odds_step_markers_nfl_writer", path)
+    writer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(writer)
+    from datetime import datetime, timezone
+
+    stamp = "2026-11-17T01:40:00Z"
+    mnf = {"id": "mnf-lac-bal", "sport_key": "americanfootball_nfl", "commence_time": "2026-11-17T01:15:00Z",
+           "home_team": "Baltimore Ravens", "away_team": "Los Angeles Chargers",
+           "bookmakers": [{"key": "draftkings", "title": "DraftKings", "last_update": stamp, "markets": [
+               {"key": "h2h", "last_update": stamp, "outcomes": [
+                   {"name": "Baltimore Ravens", "price": -150}, {"name": "Los Angeles Chargers", "price": 130}]}]}]}
+    in_play = datetime(2026, 11, 17, 1, 40, tzinfo=timezone.utc)
+
+    assert writer._append_nfl_team_book_quotes([mnf], now=in_play)["shards"] == {"2026-11-16": 2}
+    import syndicate.features.shared.odds_book_quotes as obq
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("disk gone")
+
+    monkeypatch.setattr(obq, "bucket_quote_rows_by_kickoff_date", _boom)
+    assert writer._append_nfl_team_book_quotes([mnf], now=in_play) is None
+    printed = capsys.readouterr().out
+    filing, failed = [text for text in printed.splitlines() if "NFL_GAMELINE_QUOTE_SHARD" in text]
+    assert "basis=kickoff_central" in filing and "shards=2026-11-16:2" in filing
+    assert "FAILED" in failed and "disk gone" in failed
+
+    step = module.RefreshStep(name="nfl_oddsapi_refresh", phases=("live",), cwd=Path("."),
+                              command=("python", "refresh_nfl_oddsapi.py"), env_updates=None, description="t")
+    completed = subprocess.CompletedProcess(args=list(step.command), returncode=0,
+                                            stdout=f"noise\n{printed}more noise\n", stderr="")
+    with patch.object(module.subprocess, "run", return_value=completed), \
+            patch.object(module, "_log_memory", return_value=None), \
+            patch.object(module, "_dump_child_runtime_state", return_value=None), \
+            patch.object(module, "_record_step_in_sim_ledger", return_value=None), \
+            patch.object(module, "_step_rss_cap_mb", return_value=None):
+        result = module._run_command(step)
+    err = capsys.readouterr().err
+    assert f"STEP_MARKER name=nfl_oddsapi_refresh {filing.strip()}" in err
+    assert f"STEP_MARKER name=nfl_oddsapi_refresh {failed.strip()}" in err
+    module._compact_step_result(result)
+    assert result["stdout"] == ""
+    assert module._compact_step_result_view(result)["stdout_markers"] == [filing.strip(), failed.strip()]

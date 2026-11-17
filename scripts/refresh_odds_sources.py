@@ -2814,7 +2814,15 @@ def _record_step_in_sim_ledger(step: RefreshStep, *, started: str, finished: str
 # `STEP_END` (which does persist, in `odds_refresh.stderr.txt`), and carried as
 # `stdout_markers` in the compact step view. An ALLOWLIST, so the payload cannot
 # grow with whatever a child happens to print.
-_STEP_STDOUT_MARKERS = ("SOCCER_CONFIRMED_LINEUPS",)
+#
+# `NFL_GAMELINE_QUOTE_SHARD` (lane `nfl-gameline-kickoff-shard`, todo #817,
+# 2026-11-16): `fetch_nfl_team_odds_local._append_nfl_team_book_quotes` prints one
+# line per NFL lines run -- which shard basis ran (kickoff_central / utc_capture),
+# rows per shard date, and how many rows had no kickoff and were left unfiled --
+# and one `... FAILED NFL_GAMELINE_QUOTE_SHARD ...` line if the append raised.
+# Measured at the 22:31Z 11-16 load: 0 such lines readable on the fleet, so the
+# load could only be verified on the shard rows. One line per step, under the caps.
+_STEP_STDOUT_MARKERS = ("SOCCER_CONFIRMED_LINEUPS", "NFL_GAMELINE_QUOTE_SHARD")
 _STEP_MARKER_MAX_LINES = 64
 _STEP_MARKER_MAX_CHARS = 300
 

@@ -362,7 +362,9 @@ def _append_nfl_team_book_quotes(
         )
         return summary
     except Exception as exc:
-        print(f"[odds_book_quotes] nfl team odds append FAILED {type(exc).__name__}: {exc}", flush=True)
+        # The token makes this line survive refresh_odds_sources' stdout blanking
+        # (_STEP_STDOUT_MARKERS), so a failed append is readable on the fleet.
+        print(f"[odds_book_quotes] nfl team odds append FAILED NFL_GAMELINE_QUOTE_SHARD {type(exc).__name__}: {exc}", flush=True)
         return None
 
 
