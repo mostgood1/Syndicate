@@ -1145,6 +1145,14 @@ death, never life — do not invert it.
 - Verification: Tests: two event ids give different seed sets and different margin draws; the same id reproduces bit-identically across calls and across a fresh interpreter (PYTHONHASHSEED varied); no id == the old seeds 1..N bit-identically; live_state_from_row carries event_id from the normalised row; seed_basis named. Then the existing NFL live re-sim test files pass. Fleet: after a load (user's call), live_resim rows carry seed_basis=event
 - Blocked by: none
 
+### board-query-serialize-once-load — OPEN — opened 2026-11-17 — session 040e8c3d-1561-4a9c-b821-873fd0ac1343
+- Goal: todo #828 LOADED on the fleet (user 2026-11-17 'Load it', after the ride-alongs were listed: render-config 3b f1a278ed8, WNBA #829 920c19e70, operator fill b96ea17a7, engine experts 85af16b35): ff ~/Syndicate 25fc2e4f0 -> 64daca46f and reload-web; QUERY_STAGE_MS carries serialize_once true on the page's query, the served version hashes the response bytes sent and a back-to-back pair matches, the page query's seconds are not worse than a pre-load series of the same body, /intelligence renders with 0 page errors
+- Files: docs/ai_context/todo.md (the #828 item ONLY), .syndicate/findings_2026-11-17_board_query_response_cache.md (a new Loaded section ONLY)
+- Hypothesis: n/a (a user-approved load of a change measured on a fleet-recorded response)
+- Falsification test: After the reload QUERY_STAGE_MS lacks serialize_once true, or the page query's median seconds over a series is worse than the pre-load series, or the served version is not the hash of the response bytes sent, or /intelligence logs a page error, or any route 500s
+- Verification: deploys.md entry with a pre-load series (seconds, gz bytes, version_and_debug) and the same post-load series, QUERY_STAGE_MS serialize_once true, a headless /intelligence render with 0 page errors; betting change: no (BC row)
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
