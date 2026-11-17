@@ -236,11 +236,37 @@ refresh-worker kills an in-flight MLB sim**, so the load needs the deploy claim 
   returns the same value, and job counting is test-pinned under every child spelling. If a
   reading shows any reader changed, that is a falsification, and the answer becomes `yes`.
 
-## Step 3 — the decision this lane does not make
+## Step 3 — APPROVED 2026-11-17 (user "go ahead with step 3", relayed verbatim by the parent session); 3a ON MAIN `91d865fd5`, 3b waits for a restart
 
-Stop setting the `RENDER*` names in `derive_role_env`, and delete the fallback half of
-`service_marker` plus the six allowlisted sites. Prerequisites: a load of steps 1+2 with the
-readings above, and a grep showing no tool reads `RENDER*` from a role's environ
-(`_pipeline_diag`, `check_deploy_safety`, `deploy_preflight`, `execution_watchdog`; none
-did at `ac2cbc2fc`). Risk if done wrong: the H1/H2/S defaults above. Each is silent, on a
-live-money fleet.
+**Sequencing.** The running roles carry ONLY the `RENDER*` names: no `up` has run step 2's
+launcher; the supervisor has been pid 308 since before it.
+- **3a — on main, safe now.** `derive_role_env` sets only the neutral markers. Until the
+  next `up` the roles keep `RENDER*`, and step 2's readers fall back to it. After the `up`
+  they carry only the neutral names, which those readers prefer; the answers are pinned
+  equal under either spelling. So **one drained `down`/`up` loads steps 1+2+3a together.**
+  A role restart re-stamps `SYNDICATE_INSTANCE_ID` only.
+- **3b — NOT on main until that `up` has run and its reading is clean.** It deletes the
+  fallback half of `service_marker`, the Render half of the tables, and the allowlisted
+  scrubber entries. It needs no restart of its own: its readers then find the neutral
+  names the roles carry. Pushed any EARLIER, an ff + `reload-web` would give web neither
+  name, which means a second board builder, the request-path guard off, and workers counting
+  each other's jobs.
+
+**The restart's reading** (`scripts/fleet_role_env_reading.py`, new in 3a):
+1. Before `down`: `python3 scripts/fleet_role_env_reading.py snapshot --out ~/syndicate-prod/run/env_before.json`.
+2. After `up`: `python3 scripts/fleet_role_env_reading.py compare --before ~/syndicate-prod/run/env_before.json`.
+
+It compares per-key sha256 of each role's `/proc` environ and prints names only. Exit 0
+means the only changes were:
+- `RENDER*` removed and `SYNDICATE_*` added;
+- the stable twins (`HOSTED`, `SERVICE_NAME` / `_ID`) carrying the same values;
+- the per-`up` instance id and commit.
+
+Exit 3 names anything else.
+Dry run on the live fleet at 19:4xZ (snapshot, then compare with no `up` between them): OK,
+160 / 262 / 235 keys, file mode 600, no values.
+
+**Who reads `RENDER*` from a role's environ besides the code above:** none on main
+(source scan). A STALE checkout's `local_production.py status` reads `RENDER_GIT_COMMIT`
+only. After the `up` it shows no loaded commit, which is display only; preflight runs from
+origin/main.
