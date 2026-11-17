@@ -1342,3 +1342,62 @@ spread). 11-16 total: 238.
 a live card.
 
 **Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
+
+## Reading 20 — Mon 11-16 9:46 PM CST (03:46Z 11-17) — the first MNF flag
+
+**Slate:** 8 live chips.
+- NBA PHX @ DEN Q3; NFL LAC @ BAL Q4 11:45; NHL VAN @ UTA P2.
+- NCAAB 4: East Texas A&M @ Oregon State H2; Long Beach State @ UCLA; Texas Southern @ UCSD;
+  Portland State @ Saint Mary's (all H1 late).
+- WNCAAB Houston Christian @ Utah Q4.
+
+**Flags: 15 shown on 5 cards (56 qualifying rows). 0 false, 0 missed, 0 dark.** 11-16 total: 253.
+- **MNF: the first flag of the game.** LAC @ BAL **moneyline LAC, model 89.0% vs book fair 73.1%,
+  16.0 pp**, priced 7.7 s before the read, 91 s old at the read.
+  - `LIVE_GAMELINE_JOIN sport=nfl` 03:42:57Z: priceable 1, display 2. `sources_seen
+    {pregame 13, live_resim 1}`.
+  - So the registered MNF prediction is met twice over: overlay game lines from kickoff, and a priced
+    moneyline flag in Q4. To be graded on the final.
+  - The other NFL lines stay unpriced (the #780 distribution gate: `no_distribution` 17).
+- **Totals: 11 flags, 4 UNDER / 7 OVER.**
+  - NCAAB full-game, calibrated, U: East Texas A&M @ Oregon State u177.5 (13.3 pp); Long Beach State
+    @ UCLA u145.5 (ours **150.8**, 5.3 above the line: the display inconsistency, again); Portland
+    State @ Saint Mary's u157.5.
+  - NCAAB segments, RAW: East Texas A&M 2H u83.5 (U); Long Beach State 1H o69.5 and 2H o77.5;
+    Portland State 1H o75.5 (O).
+  - NBA PHX @ DEN, O: full o242.5, a **TAIL** line (model 29.7% vs book 11.8%, ours 228.4); 2H o116.5;
+    Q3 o60.5; Q4 o51.5.
+- **Spreads and moneylines (4):** the NFL moneyline above; NBA PHX -6.5 (20.4 pp), Q3 -0.5, Q4 +2.5.
+- **Totals direction, flag by flag: 107 unders, 49 overs.** This reading adds 4 U and 7 O.
+
+**Live rows:** 232.
+| sport | rows | priced <= 120 s | split |
+|---|---|---|---|
+| NBA | 155 | 114 | main 30 (18 fresh), `_alt` 125 (96 fresh) |
+| NCAAB | 60 | 18 | — |
+| NFL | 15 | 4 | — |
+| NHL | 2 | 2 | — |
+
+**Overlay (24 min), all 0 over 360 s:**
+| sport | gap p50 / max | build p50 / max | notes |
+|---|---|---|---|
+| NBA | 58 s / 88 s | 12.5 s / 26.4 s | |
+| NFL | 55 s / 142 s | — | |
+| NCAAB | 61 s / 126 s | — | |
+| NHL | 58 s / 160 s | — | 2 zero-card with rows |
+
+- 0 `deferred_slow`. Tick gap p50 21 s, max 93 s.
+
+**Web merges:** fresh 57 / 57 for nba, nhl, nfl and ncaab. WNCAAB stale 36 / 57: its earlier games
+ended (expected).
+
+**Load:**
+- **Query 4.2 s** / 52.1 MB. Shortlist 0.58 s; chips 0.16 s; live-rail 0.02 s.
+- Gunicorn workers were 283 s and 218 s old at the read. The 283 s worker was recycled during the
+  probe. Host load 2.7-3.3.
+- **Board:** built 84 s ago; shortlist written 176 s ago.
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 8 live chips have
+a live card.
+
+**Restarts:** live-odds-worker 2925378 and refresh-worker 3101432, both unchanged.
