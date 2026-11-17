@@ -476,3 +476,28 @@ One pass over every portfolio route, before any probe existed:
 - **Root cause stays possible:** an in-play IOC that venue settlement grades before reconcile reads its fill.
   This is the first in 2,282 live orders. The operator path is the documented exit; a reconcile change that
   fills in venue-graded rows would be its own lane.
+
+## Reading 9 — Tue 11-17 3:46 PM CST (21:46Z), window 62 min
+
+- **Endpoints:** all 7 read 200, inside budget (`/portfolio` 1.34 s, `plan` 0.86 s). 0 5xx; 0 browser requests.
+- **Ledger:** unreconciled **0** (was 1 at every reading until the 21:45:02Z operator fill); unknown submits 0.
+- **F4 verify (partial):** refresh-worker ran 6 execution passes after 21:45:02Z with **0**
+  `UNRECONCILABLE_ORDER` lines for `f8b62e6a`. Its last was 21:33:01Z. live-odds-worker had not run a pass since
+  the write (its last line was 21:43:21Z); it is checked next reading.
+- **Banner:** ok, armed, state 335 s. **Plan (1.6 min):** board 4,581 -> suggested 96 -> sized 25 ->
+  positions 13; beyond_max_positions 67.
+- **Execution, 62 min:** polymarket 9 live ticks, 5 placed, 0 failed, 48 refused `outside_price_band`.
+  Orders today 41. Cap use: kalshi 18.3%, polymarket 15.9%.
+- **Paper record (21:46:10Z):** 52,007 rows, 14,606 settled, 612 pending.
+- **NEW: a 5th silent web worker kill, 21:36:36Z, pid 19708** (after the restart). It has no recycle or drain
+  line, like the 4 earlier today.
+  - Its 120-s window again holds only short requests: `/wnba/api/live_player_boxscore` 3.1 s, `/syndicate`.
+  - **Tested and NOT discriminating:** `/wnba/api/live_player_boxscore` (a `compute in request path` ESPN
+    fetch). It sat in 4 of 5 kill windows, but it is polled every ~75 s (414 requests since 12Z), so it sits in
+    every window.
+  - **A shift worth keeping:** its mean duration was ~0.7 s per hour at 12-14Z and 1.2-2.6 s from 15Z on. The web
+    slowed around the hour the kills began (15:23Z).
+  - **F3 is outside the portfolio endpoint:** it is web capacity, which hurts every route. It needs its own lane
+    (leads: the 15Z slowdown, 21-42 s board / Syndicate queries, the 64 s overlay warm in a web worker).
+- **Unchanged anomalies:** the resting maker-pilot order (934 min); the late NHL bet (19.1 h); 1 unclassified
+  load (was 2).
