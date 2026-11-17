@@ -135,3 +135,31 @@ real number.
 - The season-phase source production reads (`season_phase_for_date`) and `nba_game_book_blend.json`, for the record.
 - Linescores: ESPN NBA scoreboard, cached to `linescores.json` in the run directory.
 - Run directory: `C:\tmp\nba_seg\` (new).
+
+## COUNT-ONLY (2026-11-16 6:46 PM CST, before any outcome was read) — session 24d2e336, lane `nba-segment-grade`
+
+- **Grader on main BEFORE the graded run:** `scripts/nba_segment_skill.py` blob `d43e9de2d4d7`, commit `43aa06ec6`
+  (pushed 6:56 PM CST). Tests `tests/test_nba_segment_skill.py` (5 pass: bridge, as-of refusal, phase/window
+  refusals, count-only reads no box, G2 tie rule).
+- It imports `nfl_segment_skill.py` (blob `020cb082b5a9`) **unchanged** for `iter_quotes`, `consensus_markets`,
+  `segment_outcome`, `grade`, `clustered_ci`, `brier`. No copy, so no diff to report.
+- **Copy** (read-only, `wsl -- bash /mnt/c/tmp/nba_seg/copy.sh`, 00:45:50Z..00:46:31Z): 27 quote files (10-20 ..
+  11-16; the fleet has no 10-19 or 11-03 file, and 11-15 / 11-16 were still `.jsonl`), 197 sims 10-20 .. 11-15
+  (`cp -p`; Windows mtime and size match the fleet `stat` for 197 of 197, manifest `smart_sim_fleet_stat.tsv`), 29
+  `game_cards_<d>.csv` (10-19 .. 11-16), 28 phase scoreboards, `nba_game_book_blend.json`.
+  - **Not in the registration's Data list, and needed to follow it:** production's bridge
+    (`load_nba_game_projections`) finds a game's sim through `game_cards_<d>.csv`, so those were copied too.
+- **Population (count-only reads no box, so it is conditions (a) + (b)):**
+
+| | games | game x segment x market |
+|---|---|---|
+| quoted (pregame, main markets, six segments) | 205 | 3,690 |
+| refused `outside_window` | 8 | 144 |
+| refused `sim_written_after_tip` | 3 | 54 |
+| **eligible** | **194** | **3,492** (1,164 per family) |
+
+  - Every eligible game carries all 18 segment x market cells. No refusal for phase, bridge, histogram or model.
+  - 25 slate dates, 10-21 .. 11-15 (2 to 15 games each). The 3 as-of refusals are 3 of 197 sims: the 10-20 slate's
+    three games (no 10-20 game is eligible, and 10-20 has 3 sims; the tip freeze went live 10-21 11:56 AM CT). So the
+    "more than half refused" clause does not apply.
+  - The eligible sims were written 2.0 to 1,296 minutes before tip (median 70).
