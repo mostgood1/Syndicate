@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#826` — **THE BOARD QUERY SENT EACH OPPORTUNITY ROW UP TO FOUR TIMES. The page's `/api/intelligence/query` was 80.3 MB raw / 14.4 MB gzipped / 78 s on the fleet 11-16 7:48 PM CST: `ranked_all`, `board_contract.cards`, `top_opportunities` and `top_live_opportunities` carry the same 6,295 rows by `pick_id`. Opt-in `row_refs` sends them once, losslessly: 33.1 MB / 5.7 MB** `[2026-11-17, lane board-query-row-refs; layer2-rail-monitor I-2, user "start the board query de-dup session"]` — ON MAIN; NOT LOADED (a web reload is the user's call)
+### `#826` — **THE BOARD QUERY SENT EACH OPPORTUNITY ROW UP TO FOUR TIMES. The page's `/api/intelligence/query` was 80.3 MB raw / 14.4 MB gzipped / 78 s on the fleet 11-16 7:48 PM CST: `ranked_all`, `board_contract.cards`, `top_opportunities` and `top_live_opportunities` carry the same 6,295 rows by `pick_id`. Opt-in `row_refs` sends them once, losslessly: 33.1 MB / 5.7 MB** `[2026-11-17, lane board-query-row-refs; layer2-rail-monitor I-2, user "start the board query de-dup session"]` — ON MAIN `5db26434e`; NOT LOADED (a web reload is the user's call)
 - **No row was an exact copy**, so references alone would have lost data.
   - top rows add ~10 keys, among them `rationale`.
   - cards lack the logos, and 498 differ in `gate`.

@@ -4,7 +4,7 @@ Origin: layer2-rail-monitor backlog **I-2** (`findings_2026-11-17_layer2_rail_mo
 User 11-17 ~11:0x AM CST: "start the board query de-dup session".
 Times are Central (CST) unless marked Z.
 
-**Status: ON MAIN, NOT LOADED.** Loading it is the user's decision: an ff plus `reload-web`, with no env
+**Status: ON MAIN `5db26434e` (ledger `2e638ee61`), NOT LOADED.** Loading it is the user's decision: an ff plus `reload-web`, with no env
 change. Read-only on production throughout: every measurement below runs on a response the monitor had
 already recorded. The fleet was never called.
 
