@@ -894,6 +894,14 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 SAFE = 2; moved `render-retirement`, `closed-lane-archive-20261116-1240` to lanes_closed.md (1 pointer each). 7 CLOSED deferred (owners/blocks < 240m, or a missing transcript). Table + Part B in log/2026-11-16.md.
 
+### betting-change-session-check — OPEN — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: Every session start shows one line when the betting-change register needs a human (deploys.md loads nobody classified, or a yes pending its load for over 12 h), and nothing when it is clean (user 11-16 "Yes, add it")
+- Files: .claude/hooks/session-start.sh (one BETTING CHANGES line emitted next to PRIMARY_FF only), scripts/betting_change.py, tests/test_betting_change.py, docs/ai_context/todo.md (#815 section only)
+- Hypothesis: n/a (build)
+- Falsification test: n/a (build); reachability: the hook run in this worktree prints the line with one register row removed and prints nothing with the register intact
+- Verification: tests pass; the hook run end to end prints the line when a row is removed and nothing when the register is whole; the hook still exits 0 with the script missing
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
