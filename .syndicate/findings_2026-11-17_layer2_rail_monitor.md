@@ -895,3 +895,92 @@ the points scored (0 of 3).
 | I-18 | **A deploy drain can freeze the board for its whole 2.5 h lifetime** once the worker has acked and gone idle. Lead: an idle-acked drain with no TERM should alarm after N minutes, or expire well under 2.5 h. | Above: requested 23:09:26Z, acked idle, board held 16+ min of the evening wave, expiry 01:39:26Z. | `check_deploy_safety.py --drain` (to name the lane at the summary); the holder now | First, the holder's TERM. Then measure how long past drains sat acked-idle. |
 | I-19 | **Live cards show a pregame shortlist quote as the market's book** when no in-play row exists for that market (6 of 28 live markets, up to 7.2 h old). | Above. | Rail lane (local_208683f1), or a display decision for the user | Count it every reading tonight; find whether the card marks it as pregame. |
 | — | Flipped card (Liberty / SIU): the odds feed and ESPN disagree on home/away. Totals only, no price depends on it. | Above. | Rail team-card matching | Count it every reading; any side market on such a card would matter. |
+
+## Reading 10 — Tue 11-17 5:50 PM CST (23:50Z), full page — the drain is over; the evening board build runs 9 min
+
+**The r9 anomaly is CLOSED.**
+- The holder (local_208683f1) **cleared the drain at 23:33:29Z** after a ~24 min hold. It said odds-refresh
+  child jobs kept starting under the drained worker, so the idle window never came.
+- A today board published 23:39:54Z (`LAYER2_TODAY_CADENCE ran=yes age_before_s=1980`).
+- It re-drained at ~23:40:30Z for one 300 s attempt, then **ABORTED the load at 23:46Z; nothing loaded**
+  (`5f70b8af3`). The drain key reads `cleared`. refresh-worker is still pid 28948 on `91d865fd5`.
+- **Board gap: the today board went 23:02:14Z → 23:39:54Z (37.7 min) without a publication.**
+- Next today board: 23:49:40Z (2,768 candidates).
+- **I-18 refined:** the drain stops the board but not the odds-refresh child jobs, so a preflight that waits
+  for 0 jobs may never clear in the live evening. The holder now caps its wait at 5 min and will message
+  the monitor before draining again.
+
+**Fleet:** web `64daca46f`; live-odds-worker 52087 (`64daca46f` code); refresh-worker 28948 (`91d865fd5`).
+Host load 2.4-4.4.
+
+**Slate:** 12 live chips. NCAAB 5 (Lipscomb @ Purdue tipped); NCAAF Eastern Michigan @ Western Michigan
+Q2; WNCAAB 6. NBA/NHL not yet live.
+
+**Flags: 6 shown, 0 false, 0 missed, 0 dark.**
+- NCAAB Notre Dame @ Florida u164.5, 8.1 pp; ours 163.3, agrees.
+- NCAAB St. Peter's @ UMass Lowell UML −1.5, 7.7 pp; ours UML −2.5.
+- NCAAB Marist @ Army u149.5, 5.6 pp; **ours 151.6, on the other side (I-17)**.
+- NCAAF Eastern Michigan +21.5, 6.5 pp; ours EM +19.9.
+- NCAAF o55.5, 6.0 pp; ours 60.2.
+- **WNCAAB Tennessee St @ Louisville u162.5, 32.4 pp**: model 0.8235 = 14/17, a raw sim-count fraction
+  (WNCAAB stays raw under #816's gate), vs fair 0.500; ours 152.7. Priced 84 s. Grade it at the final.
+- **I-17 this reading: 1 of 3 college totals flags contradicts its "ours".**
+
+**Live rows: 111.** 37 priced <= 120 s; 32 over 300 s; priced age p50 178 s, max 866 s.
+- 10 of 32 markets carry no price of ours.
+- **I-19: 6 live markets carry only pregame-shortlist rows**, all checked within 102-155 s of the read (the
+  board had just rebuilt):
+  - St. Peter's @ UMass Lowell ML SPU −108;
+  - SIU @ Liberty spread SIU +4.5 and ML LIB −220;
+  - Marist @ Army ML MRST +290;
+  - WNCAAB NKU @ EKU ML EKU −9,900 and Fordham @ Campbell ML FOR −1,900.
+  - Reading 9's 7.2 h Marist spread is gone.
+
+**Team cards:** 0 flipped this reading (SIU @ Liberty at HALF); det1 / det2 / det3 0 / 0 / 0; 0 chip-less.
+
+**Overlay (23 min).** 0 gaps over 360 s; 0 `deferred_slow`.
+
+| sport | builds | gap p50 / max | build s p50 / max |
+|---|---|---|---|
+| NCAAB | 21 | 66 s / 88 s | 6.6 / 31.2 |
+| WNCAAB | 23 | 57 s / 103 s | 2.4 / 8.8 |
+| NCAAF | 16 | 75 s / 165 s | 2.0 / 8.8 |
+
+- **Ticks:** 43, gap p50 30 s, max 96 s. Web merges fresh 52 / 52 / 52.
+- **NCAAB builds over 20 s:** 4 (23:35:10 31.2 s, 23:36:02 20.3 s, 23:47:00 30.0 s, 23:47:37 23.5 s). Only 1
+  had background work in the tick. **Reading 7's background-sharing lead is CLOSED:** 2 of 3 (r9) and 3 of 4
+  (r10) slow builds had none. They fit I-20 below.
+
+**Load:**
+- `/intelligence` **11.3 s** / 4.72 MB wire / 24.7 MB raw (6.0 s at r7).
+- **Query 3.7 s / 4.31 MB wire / 23.3 MB raw.**
+- Shortlist 1.0 s; chips 0.56 s; live-rail 0.02-0.06 s (121-122 rows).
+- Board built 85 s ago; query snapshot 2,385 s.
+
+**#824:** 0 of 6 college `LIVE_GAMELINE_JOIN` lines since 23:27Z carry the reason. 0 college totals flags below
+the points scored (0 of 3).
+
+### Improvement hunt, reading 10
+
+**I-20: in the live evening the Layer 2 board build runs 5-16 min against its 300 s today cadence.** Every
+stage slows together and the process CPU equals the wall time.
+
+**Measured** (`BOARD_BUILD_TIMING` and `BUILD_SPAN_EXIT`, refresh-worker.log):
+
+| build | wall | cpu | intelligence overview | shortlist | portfolio commit | tail |
+|---|---|---|---|---|---|---|
+| 22:41:56-22:43:18Z (calm) | 82 s | 84 s | 1.4 s | 51 s | 12.6 s | ~15 s |
+| 23:04:42-23:13:09Z (the 11-18 board, 253 candidates) | 522 s | 569 s | 51 s | 368 s | 17 s | ~75 s |
+| 23:40:47-23:49:39Z | 542 s | 601 s | **42 s (30×)** | **204 s (4×)** | **123 s (10×)** | ~180 s |
+
+- **Monday evening the same:** 100-200 s until 23:50Z, then 345 / 395 / **942** / 592 / 739 / 559 s from
+  00:16 to 02:05Z, then 160-335 s.
+- **The mechanism is known: the interpreter-lock convoy.** Lane nba-overlay-card-cost, CLOSED 11-16, found
+  that the refresh-worker runs at the one-core ceiling all day, so the board-build thread shares one
+  interpreter with the live book-grid / overlay tick. `off_cpu_pct` −9 to −11 tonight says the process is
+  busy, not waiting. That lane's lever (check once per build, `a39058946`) is loaded; the convoy itself stays.
+- **Cost:** in the live evening the pregame board, its shortlist cadence and the board-loop portfolio refresh
+  every ~9-16 min, not every ~3 min. The NCAAB grid builds stretch too: 20-31 s, against a 5-7 s p50.
+- **Lever (not built):** run the board build and the live tick in separate processes, so they stop sharing one
+  interpreter. Architectural, so it is a session of its own.
+- **Owner:** none open. The convoy lane is closed, and no todo item proposes the split.
