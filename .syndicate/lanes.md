@@ -911,6 +911,14 @@ death, never life — do not invert it.
 - Verification: Alternating old/new pairs on the primary tree (serial and concurrent with the other eight checks), stdout + rc compared per pair; existing check_lane_claims tests; new equivalence test; findings file .syndicate/findings_2026-11-17_lane_claims_checker_speed.md
 - Blocked by: none
 
+### nba-grid-check-after-build — OPEN — opened 2026-11-17 — session f48ddc8c-a5b1-4f45-8c93-2f027730c0eb
+- Goal: todo #790 lever (i), user 11-17 'Yes, both': the incremental quote read's 30-min self-check (one-pass reference read + row-for-row compare, 3.2-17.5 s on 10 NBA builds of 11-16) runs AFTER the book-grid build clock stops (grid + overlay written), so it no longer counts toward build_seconds / the slow-sport skip or delays the overlay; same check, same 30-min cadence, same bytes; a MISMATCH still turns the read off for the process and rebuilds that sport at once from the one-pass read; off switch env; tests incl. off != on; on main; the load is the user's call
+- Files: syndicate/features/shared/book_grid_quote_read.py, tests/test_book_grid_quote_read.py, tests/test_book_grid_check_after_build.py
+- Hypothesis: n/a (a build; the measurement is lane nba-grid-outside-overlay's: verify_s 3.2-17.5 s inside 10 of 214 NBA builds, 3 of the 18 >= 45 s)
+- Falsification test: After a load: a build line with verify=deferred is not followed by one BOOK_GRID_QUOTE_READ_CHECK line for the same shard; or the checks per shard per hour fall below ~2; or NBA build_seconds on check builds does not drop by about that build's check_s
+- Verification: pytest on the touched tests (deferred inside the scope, inline outside it, env off = inline, a mismatch disables + reports, the check runs on the same bytes after more lines are appended, run_refresh_worker's _build_one runs the check after build_seconds is recorded); after a user-approved load: verify=deferred + BOOK_GRID_QUOTE_READ_CHECK result=match lines, 0 MISMATCH, NBA build_seconds excluding check_s
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
