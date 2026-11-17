@@ -29,7 +29,7 @@ this is the microscope.
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
 from typing import Any
 
@@ -203,14 +203,16 @@ def _started(rows: Iterable[Mapping[str, Any]], now: datetime) -> bool:
 
 
 def _capture_index(rows: Iterable[Mapping[str, Any]], last_seen: Mapping[str, str] | None, *,
-                   now: datetime) -> tuple[dict[tuple[str, str], float], dict[str, float]]:
-    """(book, event) -> that book's freshest seen-age on the event; event -> the freshest seen-age of any book."""
+                   now: datetime, memo: "_BuildMemo | None" = None) -> tuple[dict[tuple[str, str], float], dict[str, float]]:
+    """(book, event) -> that book's freshest seen-age on the event; event -> the freshest seen-age of any book.
+
+    `memo` (`build_book_grid`'s, same `last_seen` and `now`) only caches the stamp parse; the answer is the same."""
     by_book: dict[tuple[str, str], float] = {}
     by_event: dict[str, float] = {}
     if not last_seen:
         return by_book, by_event
     for row in rows:
-        seen = _seen_age_seconds(row, last_seen, now=now)
+        seen = memo.seen(row) if memo is not None else _seen_age_seconds(row, last_seen, now=now)
         if seen is None:
             continue
         book = str(row.get("bookmaker") or "").strip()
@@ -306,8 +308,10 @@ def _better(price: int, than: int | None) -> bool:
     return than is None or price > than
 
 
-def _canonical_line(row: Mapping[str, Any]) -> float | None:
+def _canonical_line(row: Mapping[str, Any], *, is_home: Callable[[Mapping[str, Any]], bool] | None = None) -> float | None:
     """The market instance's line, stated from ONE perspective (away / over).
+
+    `is_home` (default `_row_selection_is_home`) lets `build_book_grid` pass its per-build memo of the same answer.
 
     #262. Spreads are signed per side, so `away +1.5` + `home -1.5` is one
     market and `away -1.5` + `home +1.5` is a DIFFERENT one. The previous anchor
@@ -356,7 +360,7 @@ def _canonical_line(row: Mapping[str, Any]) -> float | None:
     line = _line_value(row)
     if line is None:
         return None
-    return -line if _row_selection_is_home(row) else line
+    return -line if (is_home or _row_selection_is_home)(row) else line
 
 
 def _row_selection_is_home(row: Mapping[str, Any]) -> bool:
@@ -387,6 +391,65 @@ def _row_selection_is_home(row: Mapping[str, Any]) -> bool:
         return bool(teams_match(row.get("sport") or "soccer", selection, home_team))
     except Exception:
         return False
+
+
+class _BuildMemo:
+    """ONE `build_book_grid` call's answers to three questions it used to recompute per row.
+
+    WHY (lane ncaaf-grid-build-speed, todo #809, 2026-11-17). With the anchor index loaded, cProfile of the pivot on
+    the fleet's 11-14 NCAAF shard (124,344 kept rows) put `_seen_age_seconds` at 20% (240,846 calls) and
+    `_canonical_line` -> `_row_selection_is_home` -> `teams_match` at 12% (124,344 calls). Most of those calls repeat
+    an answer already computed in the same build:
+      * a stamp's age: every quote a pull observed carries that pull's one `captured_at`, so last-seen stamps
+        repeat across thousands of keys, and each was re-parsed by `datetime.fromisoformat`;
+      * the home side: `_row_selection_is_home` reads only `selection`, `home_team` and `sport`, and one game's
+        rows share a handful of those triples, each sent to `teams_match` again.
+
+    Content-keyed, never identity-keyed: `_freshest_per_book_side` copies the rows it keeps, so the cell loop never
+    sees the objects `_capture_index` saw, and an `id()` key could also be reused by a later copy.
+
+    Same answers by construction: each cached value is the plain function's own result for the same inputs, under
+    the build's fixed `now` and `last_seen`. It lives for one build, so a changed alias table or a new stamp is
+    seen by the next one.
+    """
+
+    __slots__ = ("_last_seen", "_now", "_quote_key", "_ages", "_home")
+
+    def __init__(self, last_seen: Mapping[str, str] | None, now: datetime) -> None:
+        self._last_seen = last_seen
+        self._now = now
+        try:
+            from syndicate.features.shared.odds_book_quotes import quote_key
+        except Exception:
+            quote_key = None
+        self._quote_key = quote_key
+        self._ages: dict[str, float | None] = {}
+        self._home: dict[tuple[Any, Any, Any], bool] = {}
+
+    def age(self, stamp: str) -> float | None:
+        """`_age_seconds(stamp, now=<the build's now>)`."""
+        try:
+            return self._ages[stamp]
+        except KeyError:
+            value = self._ages[stamp] = _age_seconds(stamp, now=self._now)
+            return value
+
+    def seen(self, row: Mapping[str, Any]) -> float | None:
+        """`_seen_age_seconds(row, <the build's last_seen>, now=<the build's now>)`."""
+        if not self._last_seen or self._quote_key is None:
+            return None
+        return self.age(str(self._last_seen.get(self._quote_key(row)) or ""))
+
+    def is_home(self, row: Mapping[str, Any]) -> bool:
+        """`_row_selection_is_home(row)`, keyed on the three fields it reads."""
+        key = (row.get("selection"), row.get("home_team"), row.get("sport"))
+        try:
+            return self._home[key]
+        except KeyError:
+            value = self._home[key] = _row_selection_is_home(row)
+            return value
+        except TypeError:  # an unhashable field value: answer it directly, uncached
+            return _row_selection_is_home(row)
 
 
 def _freshest_per_book_side(rows: Iterable[Mapping[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
@@ -837,7 +900,9 @@ def build_book_grid(
     must treat as UNKNOWN rather than as fresh or as stale.
     """
     now = now or datetime.now(timezone.utc)
-    materialised = [row for row in rows or () if isinstance(row, Mapping)]
+    # Stamp ages, seen ages and the home side, answered once per distinct input for this build (`_BuildMemo`).
+    memo = _BuildMemo(last_seen, now)
+    materialised =[row for row in rows or () if isinstance(row, Mapping)]
     # Before grouping: an event whose home/away changed upstream mid-day is put back to ONE orientation, so a side
     # label means the same team in every row (`orient_events_to_latest`).
     materialised, oriented_events, oriented_rows, dropped_venue_rows = orient_events_to_latest(materialised)
@@ -857,7 +922,7 @@ def build_book_grid(
 
     own_capture = _stale_basis_is_seen() and _stale_basis_is_own_capture()
     book_capture, event_capture = (
-        _capture_index((row for group in instances.values() for row in group), last_seen, now=now)
+        _capture_index((row for group in instances.values() for row in group), last_seen, now=now, memo=memo)
         if own_capture else ({}, {})
     )
 
@@ -874,7 +939,7 @@ def build_book_grid(
         line_index = _line_candidate_index(group)
         seen_anchors: set[float | None] = set()
         for anchor in group:
-            anchor_key = _canonical_line(anchor)
+            anchor_key = _canonical_line(anchor, is_home=memo.is_home)
             if anchor_key in seen_anchors:
                 continue
             seen_anchors.add(anchor_key)
@@ -896,8 +961,8 @@ def build_book_grid(
                     "price": _price(row.get("price")),
                     "line": row.get("line"),
                     "observed_at": _observed_at(row) or None,
-                    "age_seconds": _age_seconds(_observed_at(row), now=now),
-                    "seen_age_seconds": _seen_age_seconds(row, last_seen, now=now),
+                    "age_seconds": memo.age(_observed_at(row)),
+                    "seen_age_seconds": memo.seen(row),
                 }
 
             # Per-cell staleness FIRST, because #S1b's best/consensus selection
@@ -1224,7 +1289,7 @@ def build_book_grid(
                     "best": best,
                     "consensus": consensus,
                     "updated_at": newest,
-                    "age_seconds": _age_seconds(newest or "", now=now),
+                    "age_seconds": memo.age(newest or ""),
                     # THE SECOND CLOCK, AT ROW LEVEL (`#366`).
                     #
                     # This module has computed `seen_age_seconds` per CELL since
