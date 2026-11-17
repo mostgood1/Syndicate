@@ -363,3 +363,63 @@ no price of ours.
   - `2148f99cb` (paper): its owner measured 200 in 31.4 s, no WORKER TIMEOUT. `cc90fb653` and the paper retirement `f7fb3ed4e` are NOT on the fleet.
   - **Owed to this monitor:** `WEB_WORKER_MEMORY_RECYCLE` per query request after the load vs before (28 recycles 16:00-18:59Z). Note that open browser tabs keep the old page JS (no `row_refs`, ~11 MB a poll) until reloaded.
 - **I-13 update (~1:25 PM CST):** local_bc8d3e61 declined it (its lanes are closed; it is new work), giving 6 design notes: mirror `_slim_embedded_board_payload`'s once-per-window embed cache; key on the request flags + `sort_keys`, not only the board version; keep `timestamp` / `selected_date` / debug per request; cache gzipped bytes (~4.4 MB) rather than the ~24 MB dict; check `LAST_RESULT` readers; `response_hash` equality as the per-line-neutral test. **Proposed as a session card, "Cache the built board query response per board version" (task_ab023c09).** Also from it: `local_c787e775`'s post-ff reading at 19:06:39Z gave `status` rc 0 with every role's env identical except `RENDER_GIT_COMMIT` (deploys.md 19:06:39Z).
+
+## FLEET EVENT — host restart 1:48:57 PM CST (19:48:57Z)
+
+- **Cause:** Windows event 1074, StartMenuExperienceHost on behalf of the user, "Other (Unplanned)",
+  restart. Host up again at 1:50:05 PM.
+- **`SyndicateLocalProduction` brought the fleet back** (`supervisor.log`): "LOCAL PRODUCTION UP ...
+  state=redis port=10000 commit=5db26434e310", **money LIVE**.
+  - web pid 496 (/healthz 200), **refresh-worker pid 560**, **live-odds-worker pid 561**.
+  - Redis AOF already on; bootstrap rc 0.
+  - One launcher line: "[web] 1 declared key(s) with no value in any layer: ANTHROPIC_API_KEY".
+    Believed pre-existing (Ask LLM off by decision); flagged to local_c787e775.
+- **This `up` is the first to run render-config step 1 (`ac2cbc2fc`) from disk.** It is the user's "next
+  down/up", but NOT drained, so the step-1 readings are owed against it (local_c787e775 told ~1:57 PM).
+- Anything in flight on the workers at 1:48 PM was killed by the restart.
+
+## Reading 3 — Tue 11-17 1:58 PM CST (19:58Z), full page — 8 minutes after the restart
+
+**Slate:** 3 live chips.
+- NCAAB: Rutgers @ Houston H1 0:30.
+- WNCAAB: Pepperdine @ Nevada HALF; Murray State @ Oregon HALF.
+
+**Flags: 1 shown. 0 false, 0 missed, 0 dark.**
+- WNCAAB Murray State @ Oregon u178.5 (13.2 pp, raw; ours 174.3).
+
+**Live rows:** 28. NCAAB 18 (5 priced <= 120 s); WNCAAB 10 (3 priced <= 120 s).
+
+**Overlay (48 min), the restart outage included:**
+| sport | builds | gap p50 / max | gaps over 360 s |
+|---|---|---|---|
+| NCAAB | 27 | 48 s / **849 s** | 2 |
+| WNCAAB | 26 | 57 s / **829 s** | 2 |
+
+- Worker tick gap max **1,328 s**. All of it spans the 1:48-1:52 PM outage. 0 `deferred_slow`.
+
+**Web merges:** fresh 28 / 28.
+
+**Load, cold after the restart:**
+- `/intelligence` **42.7 s** / 22.5 MB. **Query 29.1 s / 4.38 MB wire / 24.25 MB raw** (`row_refs`, I-15
+  probe). Shortlist 2.2 s; chips 1.5 s.
+- Gunicorn workers 432 s old (all three since the `up`). Host load 9.5 at 7 minutes up.
+- **Board:** built 218 s ago. Query snapshot 6,214 s old: watch whether the state loop refreshes it
+  after the restart.
+
+**#824:** 0 of 8 college `LIVE_GAMELINE_JOIN` lines since 19:07Z with the reason; 0 college totals
+flags below the points scored (0 of 1).
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated.
+
+### I-2 owed reading — web memory recycles per query (sent to local_bc8d3e61)
+
+| window | recycles | query POSTs (`row_refs`) | all requests | per hour | per query |
+|---|---|---|---|---|---|
+| before, 16:00-18:58:46Z | 28 | 25 (0) | 550 | 9.4 | 1.12 |
+| after, 18:58:46-19:48:50Z | 11 | 13 (5) | 190 | 13.2 | 0.85 |
+
+- **Not measurable yet.** 8 of the 13 post-load query POSTs still asked for the full response: 3 were
+  this monitor's own A/B, the rest likely open tabs on the old page JS.
+- Recycled workers ran anon 650-980 MB after 5-20 requests.
+- From the 19:50Z restart, every worker is fresh and browsers likely load the new page. **Tonight's slate
+  is the clean window:** recycles per hour and per `row_refs` query, read at the daily summary.
