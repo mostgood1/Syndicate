@@ -1059,6 +1059,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_intelligence_query_diag_strip.py (off != on for top_live and rationale through the real route, size), tests/test_intelligence_query_row_refs.py, tests/test_intelligence_query_payload.py, the template node harnesses (tests/js); one-off before/after on C:/tmp/railmon/readings/20261117T014841Z/query.json (raw + gzip-1, with and without row_refs, equivalence) written to the findings
 - Blocked by: none
 
+### vhdx-reclaim — OPEN — opened 2026-11-17 — session e642c483-46e7-412a-bbc7-74a480327c97
+- Goal: The WSL ext4.vhdx (C:\Users\tempadmin\AppData\Local\wsl\{66e66dd8-...}\ext4.vhdx, 355,279,568,896 B / 330.9 GiB at 2026-11-17 12:52 CST, NOT sparse) is measurably smaller after one user-approved drained fleet window (down + wsl --shutdown + compact); the fleet is back up LIVE and verified; before/after vhdx size + C: free recorded in deploys.md (betting change: no). WSL scratch deleted only from a delete list the user approved.
+- Files: none (ledger-only: this block + a deploys.md entry; WSL scratch outside the repo)
+- Hypothesis: n/a (operational). Expected reclaim = vhdx 330.9 GiB minus ext4 used 272.3 GiB (df 11-17 18:53Z) = ~58 GiB, plus any approved scratch deletes; / is mounted with discard, so freed blocks should already be unmapped for compact.
+- Falsification test: vhdx Length and C: free unchanged after compact => the unmap path did not reach the VHDX (then fstrim + re-compact, or sparse, as a separate user decision).
+- Verification: Before/after: (Get-Item ext4.vhdx).Length + Get-PSDrive C Free in the same command; local_production.py status shows web/refresh-worker/live-odds-worker/redis up with money: LIVE; /healthz 200; recorded in deploys.md; claims released.
+- Blocked by: none (window + every delete need the user's explicit go-ahead)
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
