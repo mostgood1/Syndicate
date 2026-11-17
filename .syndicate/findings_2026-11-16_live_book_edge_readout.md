@@ -305,3 +305,23 @@ python scripts/live_book_edge_readout.py --since 2026-11-03 # one window from th
   - The register is only as complete as sessions make it. `candidates` catches an unrecorded LOADING entry, not a change nobody wrote into deploys.md. Example: a role's routine recycle that loads an earlier ff, when no one logs it.
   - The deploy-like filter is a heading heuristic, and the yes/no boundary is a judgement per entry.
   - The readout reads the register from its own checkout, so it warns when origin/main is ahead.
+
+## SESSION-START CHECK ADDED (2026-11-17 01:08Z; user "Yes, add it"), on main `c5cf64efc`
+
+- `scripts/betting_change.py digest` prints ONE line, at most 240 B, only when the register needs a human:
+  - a deploys.md load since `Classified from:` is unclassified;
+  - a `yes` has been pending its load for more than 12 h (an ff-only change normally waits a role's ~5.5 h recycle);
+  - or the register does not parse.
+  A clean register prints nothing.
+- `.claude/hooks/session-start.sh` emits that line next to the primary-tree ff line, outside the digest BUDGET and before the body, so a long body cannot cut it. It fails open: no python or no script leaves the line off.
+- **Verified end to end**, with the hook run in this worktree (`SYNDICATE_PRIMARY_FF=off`):
+  - register intact: no line, rc 0;
+  - BC-019 removed: `BETTING CHANGES: 1 deploys.md load(s) unclassified, newest 2026-11-17T00:49Z -- ...`;
+  - script missing: no line, rc 0.
+  - 25 tests in `tests/test_betting_change.py`.
+- **First real catch, before the push:** on main after the rebase, the digest named 2 unclassified loads by other lanes.
+  - 00:55:46Z: the #816 display-path fix, which changes the Live number on rows refused before pricing (display only).
+  - 00:59:08Z: a #817 reading.
+  - Both are classified `no` (BC-020, BC-021), and the digest is silent again.
+- **It reaches sessions** when the primary tree fast-forwards to `c5cf64efc`, which `primary_tree_ff.py` does at session start.
+- **LEAD, not fixed:** the whole hook took 11.8-25.4 s over 5 runs in this worktree, and its timeout is 20 s (`.claude/settings.json`). This line adds ~0.65 s. A run over 20 s loses the whole digest, so the hook's total runtime needs its own owner.

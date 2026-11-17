@@ -897,7 +897,10 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness --idle-min 240 SAFE = 2; moved `render-retirement`, `closed-lane-archive-20261116-1240` to lanes_closed.md (1 pointer each). 7 CLOSED deferred (owners/blocks < 240m, or a missing transcript). Table + Part B in log/2026-11-16.md.
 
-### betting-change-session-check — OPEN — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+### betting-change-session-check — CLOSED 2026-11-17 (GOAL MET: digest line on main c5cf64efc; hook verified intact / row removed / script missing) — opened 2026-11-16 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- **GOAL VERDICT `[2026-11-17 01:08Z (7:08 PM CST 11-16)]`: GOAL: MET.** Goal (verbatim): "Every session start shows one line when the betting-change register needs a human (deploys.md loads nobody classified, or a yes pending its load for over 12 h), and nothing when it is clean (user 11-16 "Yes, add it")".
+  - Hook run end to end in the worktree: intact -> no line; BC-019 removed -> one BETTING CHANGES line naming the 00:49Z load; script missing -> no line, rc 0. 25 tests pass.
+  - Lead left: the hook's total runtime is 11.8-25.4 s against its 20 s timeout (5 runs; this line adds ~0.65 s).
 - Goal: Every session start shows one line when the betting-change register needs a human (deploys.md loads nobody classified, or a yes pending its load for over 12 h), and nothing when it is clean (user 11-16 "Yes, add it")
 - Files: .claude/hooks/session-start.sh (one BETTING CHANGES line emitted next to PRIMARY_FF only), scripts/betting_change.py, tests/test_betting_change.py, docs/ai_context/todo.md (#815 section only)
 - Hypothesis: n/a (build)
