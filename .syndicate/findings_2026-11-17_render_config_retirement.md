@@ -236,6 +236,20 @@ refresh-worker kills an in-flight MLB sim**, so the load needs the deploy claim 
   returns the same value, and job counting is test-pinned under every child spelling. If a
   reading shows any reader changed, that is a falsification, and the answer becomes `yes`.
 
+**STEP 3b ON MAIN `f1a278ed8` (pushed 2026-11-17 before 22:28Z, 4:28 PM CST): no code reads a `RENDER*` marker.**
+- What went:
+  - the readers' fallback, the Render half of the marker tables, `marker_env`;
+  - the Render scrub entries (`run_ci_suite` `RENDER_INJECTED_ENV`; `replay_diff_gate` / `fleet_local` `RENDER`);
+  - `RENDER_EXTERNAL_URL` in `refresh_mlb_oddsapi`.
+- What remains, by design:
+  - the launcher strips stray `RENDER*` names from the operator's shell;
+  - `fleet_role_env_reading.py` keeps the transition table behind `--render-markers-step3` and is strict by default;
+  - `RENDER_URL`, an operator variable set nowhere;
+  - `RENDER_API_KEY` in `NEVER_CARRY`.
+- The source scan allows exactly those 2 files. The test proves legacy == neither for every reader.
+- 28 other test files set the neutral names. Regression: 2057 passed; 3 job-count failures (an f-string the conversion missed) fixed and re-run green; one order-dependent teardown ERROR from `game_chip_publisher`'s daemon thread, marker-independent (lead).
+- No restart was needed: every role already carried only the neutral names.
+
 **STEPS 2 + 3a LOADED, 21:53:00Z (3:53 PM CST):** a drained down/up at `91d865fd5`, timed by the user ("When live games end"). Every role now carries ONLY the neutral markers: the compare shows the 5 `RENDER*` removed, the 5 `SYNDICATE_*` added with the stable twins hash-equal, and nothing else changed except `WSL_INTEROP`, WSL's per-launch socket path. The neutral-only readers answered correctly: keyvalue backend on both workers, web's version fields `local-web`, `status` code=91d865fd, 0 Tracebacks. deploys.md 21:52:41Z, BC-037 `no`. Step 3b is unblocked.
 
 **STEP 1 LIVE, 19:50:39Z (1:50 PM CST):** the host rebooted, and `SyndicateLocalProduction`'s undrained `up` at `5db26434e` was the first on the new launcher. Reading at 19:58:28Z: each role's live env (160 / 262 / 235 keys) equals both launchers' build, 0 keys differ (deploys.md, BC-035 `no`; the load itself is BC-033). Markers are still `RENDER*` only; step 2 / 3a are not on the fleet.
