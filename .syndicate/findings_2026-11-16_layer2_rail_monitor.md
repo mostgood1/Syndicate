@@ -602,3 +602,95 @@ first readings of `INPLAY_OVERLAY ... refused=` (33 overlay lines 00:04:38Z-00:2
 - The roughly halved NCAAB card count, with the floor refusals tripling, matches the calibration
   pulling over-side value under the -2% floor.
 - The NBA overlay-cost lane was told about the restart. Its 23:00-05:00Z reading spans it.
+
+## Reading 12 — Mon 11-16 6:27 PM CST (00:27Z 11-17)
+
+**Slate:** 23 live chips.
+- NBA 3, all Q1: CHI @ CLE, ORL @ BOS, MEM @ WAS.
+- NCAAB 10 (including St. Thomas @ LIU); WNCAAB 10.
+- NHL not live yet.
+
+**Flags: 15 new shown on 13 cards. 0 false, 0 missed, 0 dark.** 11-16 total: 41.
+- **NCAAB full-game totals (8):**
+  - 7 unders, all calibrated-looking (`total_cal`, below): Iona @ UMBC u122.5 (58.1%),
+    Alcorn St @ Maryland u170.5, Jacksonville @ Georgia u158.5, St. Thomas @ LIU u147.5,
+    WKU @ Tulsa u159.5, Grambling @ Kentucky u145.5, EKU @ Kent State u150.5. Model 59.9-62.3%,
+    gaps 7.0-12.3 pp.
+  - 1 over: **Richmond @ Virginia Tech o139.5, model 67.6% (69/102, RAW) vs fair 50.9%, 16.8 pp.**
+- **NCAAB spreads (2):** Prairie View @ Ohio State OSU -23.5 (9.2 pp); Richmond @ VT VT -14.5 (3.7 pp).
+- **WNCAAB (1):** Albany @ Rutgers u129.5 (3.3 pp).
+- **NBA (4):** MEM @ WAS u235.5 (5.9 pp; ours 231.0); CHI @ CLE o237.5 (5.7 pp; ours 244.4);
+  CHI moneyline (12.5 pp); ORL @ BOS o198.5 (14.1 pp; ours 213.6).
+- Fade-vs-follow series:
+  | game | 5:20 PM | 5:41 PM | 6:04 PM | 6:27 PM |
+  |---|---|---|---|---|
+  | Iona @ UMBC | 141.5 / 145.4 | 134 / 142.7 | 126.5 / 136.5 | 122.5 / 124.6, now UNDER |
+- Totals direction across 11-16 totals flags, counted flag by flag: **19 unders, 12 overs.**
+
+### ANOMALY — the #816 calibration reaches about 1/3 of the served NCAAB full-game total rows (handed to local_1f10ce63)
+
+- Served overlay rows (`source=layer2_inplay_overlay`, grid 00:27:30Z, `live_model_probability`):
+  - **31 of 92 calibrated-looking, 61 raw.** Raw = an exact multiple of 1/102 or 1/204, the live
+    re-sim's count.
+  - Pre-load control, reading 11 at 00:04:14Z: **39 of 39 raw.**
+- Both kinds sit inside one game and one build. Richmond @ VT:
+  - o139.5 = 0.67647 (69/102), u139.5 = 33/102, o141.5 = 61/102;
+  - but o142.5 = 0.4231829 (calibrated).
+- Iona @ UMBC: 122.5 calibrated (o 0.41906 / u 0.580943); 118 / 119.5 / 120.5 raw.
+- **Effect:** the rail flagged a full-game NCAAB over on a raw row (Richmond o139.5). The lane
+  reported 0 over leans in its ledger after the load.
+- Guess, not verified: the calibration reaches only the line the join prices from the ledger, and
+  other books' lines take the raw distribution by another path.
+- **Handed to local_1f10ce63** (which relayed the #816 load, lane `ncaab-total-overprojection`) at
+  ~6:35 PM CST, with the data path. Nothing changed here.
+
+### NBA live (#811, slow-sport rule)
+
+- **Rows:** 857 (115 main, 742 `_alt`).
+  | family | rows | priced <= 120 s |
+  |---|---|---|
+  | main | 115 | 25 |
+  | `_alt` | 742 | 0 |
+  - Seen age at pricing p50 212 s (a single 212 s pull for every alt row).
+  - As #811 expects: its 60 s pulls refresh main lines only.
+- **NBA overlay (16 builds):** build p50 24.6 s, p90 42.0 s, **max 60.5 s**. **1 `deferred_slow`.**
+  Gap p50 49 s, **max 235 s**, 0 over 360 s. rows_inplay 2,551.
+- NBA flags: 4 shown (17 qualifying rows), 0 dark.
+
+### Rest of the reading
+
+**Live rows:** 1,045.
+| sport | rows | priced <= 120 s | seen at pricing p50 |
+|---|---|---|---|
+| NBA | 857 | 25 | 212 s |
+| NCAAB | 187 | 41 | 147 s |
+| WNCAAB | 1 | 1 | — |
+- NCAAB by phase: 1H 149 / 2H 28 / break 10. 513 rows older than 300 s now (mostly NBA alt).
+- Live-rail: 1,049-1,054 rows.
+
+**Overlay (23 min), all 0 over 360 s:**
+| sport | gap p50 | gap max | build time p50 / max | zero-card with rows |
+|---|---|---|---|---|
+| NCAAB | 55 s | 123 s | 7.9 s / 22.3 s | 0 |
+| WNCAAB | 59 s | 125 s | — | 11 of 20 (the floor) |
+
+- NFL builds 2.7 / 68.7 s; NHL p50 2.5 s; soccer 8.5 / 27.7 s.
+- Tick gap p50 21 s, max 111 s.
+
+**Web merges:** ncaab and wncaab fresh 34 / 34; nba fresh 27; nfl stale (pregame).
+
+**Load:**
+- **Query 16.7 s / 82.2 MB** (NBA live adds ~18 MB). Shortlist 1.0 s; chips 0.97 s; live-rail 0.31 s /
+  1.0 MB.
+- Gunicorn workers were 432 s and 121 s old at the read. The 432 s worker was recycled during the
+  probe (a new one was 16 s old at 18:28:02). Host load 5.5 (7.8 over 5 min).
+- **Board: shortlist written 828 s ago, build 788 s old** (78-555 s in earlier readings). The board
+  build is slow with NBA live; noted, not handed off (the convoy is lane `nba-overlay-card-cost`'s
+  reading tonight).
+
+**Teams:** 0 chip-less, det1 / det2 / det3 0 / 0 / 0, 0 flipped, 0 truncated. All 23 live chips
+have a live card.
+
+**Restarts:**
+- refresh-worker **2809282 → 2953295** at 00:04:38Z, the #816 load (recorded above).
+- live-odds-worker 2925378, unchanged.
