@@ -255,3 +255,17 @@ after.
     no effect today. No betting change.
   - Whether step 1 rides along is the user's call (the user said "Steps 1+2, load later"). Asked in
     the next-step box ~12:45 PM CST.
+- **User 11-17 ~12:55 PM CST: "Carry it tonight"**, answering "Carry the launcher change you deferred
+  along with tonight's de-dup update?". So the I-2 load carries `ac2cbc2fc` (render-config step 1)
+  and `2148f99cb` (paper endpoint).
+- **Load plan:** at the first tick at or after 5:00 PM CST:
+  1. Run from a worktree at origin/main.
+  2. Baseline the page query's bytes and seconds and the fleet head `92ae7490a`.
+  3. `deploy_claim.py acquire --service web --holder layer2-rail-monitor` (gate on the exit code).
+  4. `deploy_preflight.py --service web --target-commit 5db26434e --expect ... --baseline ...`.
+  5. Fleet ff to exactly `5db26434e`.
+  6. `local_production.py reload-web`.
+  7. Verify the page query is about 5.7 MB on the wire and the response carries `_response_row_refs`.
+  8. Record in deploys.md (naming `ac2cbc2fc` and `2148f99cb` as carried), then release the claim.
+- If the fleet head has moved past `92ae7490a` by then, re-run the ride-along check on the new range
+  first.
