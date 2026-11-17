@@ -1,5 +1,16 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#828` — **THE BOARD QUERY SERIALISED ITS ~24 MB PAYLOAD TWICE: once to hash it for `version`, then again in `jsonify` to send it. It now hashes the bytes it sends. On a fleet page response (24,446,438 B, 11-17 21:46Z) the bytes and `version` are identical to the old exit's, the median is 2,259 -> 950 ms (10 alternated runs) and the tracemalloc peak is 109.9 -> 79.4 MB** `[2026-11-17, lane board-query-serialize-once; rail monitor I-13 lead a; user "Build serialize-once"]` — ON MAIN `64daca46f`; NOT LOADED (a web reload is the user's call)
+- **Why not the I-13 cache:** the page's 60 s poll got a new `response_hash` 6 of 6 times (quotes, book ages and gate are merged at read time), so a version-keyed cache would hit only duplicates (~4.5% of queries). Findings: `.syndicate/findings_2026-11-17_board_query_response_cache.md`.
+- **The change:** `_versioned_query_json_response` on the four exits of `intelligence_query_api`. Off switch `SYNDICATE_QUERY_SERIALIZE_ONCE=off` (absent = on; env is built only at `up`). It falls back to the old exit for a non-default JSON provider or pretty-printing. `QUERY_STAGE_MS` gains `"serialize_once"`, and `version_and_debug` now covers the whole serialisation.
+- **Tests:** `tests/test_intelligence_query_serialize_once.py` (14: reachability, byte equality through the route and the helper, the hash, the fallbacks), plus 199 neighbouring query tests and the 51 query-route tests in `test_intelligence.py`.
+- **Load:** an ff of `~/Syndicate` to `64daca46f` (or later) + `reload-web`. Betting change: no. The ff carries everything on main after the fleet's SHA; list the ride-alongs at load time.
+- **Owed after a load:**
+  - `QUERY_STAGE_MS` `"serialize_once": true`;
+  - `version_and_debug` within noise of its pre-load median (read just before the load);
+  - the page query's client-side seconds against a pre-load series, same body, several samples (the endpoint's run-to-run spread is ~4.8 s);
+  - `version` unchanged across the reload while the board is unmoved.
+
 ### `#829` — **WNBA BOX-SCORE POLLS ASKED FLEET WEB ABOUT DATES WITH NO WNBA GAMES: 29,449 of 100,005 web requests (29.4%) 10-31..11-17, 1,614 of 2,408 (67.0%) on 11-17. Now decided PER DATE from `schedule_<YYYY>.csv`; an unknown schedule polls and says why. The June 03-05 calls were TESTS reaching the fleet, not a stuck backfill** `[2026-11-17, lane wnba-boxscore-polling-per-date; rail monitor I-14, user "start the WNBA box-score polling session"]` — ON MAIN `920c19e70`; **NOT LOADED** (the load is the user's call)
 - **Callers:**
   - live-odds-worker's live capture (`live_lens_loop._run_live_lens_tick_for_sport` -> `/wnba/api/live_player_boxscore`): ~1,000-1,160 a day, p50 731 ms;
