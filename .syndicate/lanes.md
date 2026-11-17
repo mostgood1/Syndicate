@@ -848,11 +848,6 @@ death, never life — do not invert it.
 - STATUS 2026-11-16 (7:40 PM CST): DIAGNOSED + SIZED + FIX BUILT, NOT ON MAIN (user decision owed). Defect CONFIRMED (unit test: a starter pulled after 38 pitches records outs in >= 90% of sims; the engine honours a set batting-side id, so the fix is caller-only). Fleet feeds (161 Final games, 12,042 PA-start ticks): 41% of ticks in the state (49% in the 6th, 95% from the 8th). 260 ticks x 300 sims x 3 arms: off over-projects the remaining total by 0.069 runs (~4 se), net RMS 0.85 pp home WP overall, 2.3-3.4 pp after an early exit / inning <= 5; when the actual starter != the roster starter (40 of 260) a pitcher who never pitched takes the mound in 88% of sims. Fix (`MLB_LIVE_MC_BATTING_SIDE_PITCHER`, absent = OFF) on branch claude/serene-archimedes-3396b0. Findings: .syndicate/findings_2026-11-16_mlb_live_mc_batting_pitcher.md; todo #819.
 - Blocked by: none
 
-### closed-lane-archive-20261116-2040 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 45d8ff17-6e51-467f-8f9e-188751b071a5
-- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
-- Files: none (ledger-only)
-- Verdict: GOAL MET. owner_liveness --idle-min 240 at 02:42Z 11-17 (8:42 PM CST): 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261116-1440`. Table and waits: log/2026-11-16.md.
-
 ### closed-lane-archive-20261116-2239 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 0ab8ef5c-3950-4dae-80cd-1532b1cf1e06
 - Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
 - Files: none (ledger-only)
@@ -863,6 +858,12 @@ death, never life — do not invert it.
 - Files: none (ledger-only)
 - Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 9 SAFE of 16 CLOSED; 0 worktrees held uncommitted .syndicate/ edits; invariants unchanged vs baseline (same 3 contested files).
 - Moved: portfolio-edge-measurement, nfl-gameline-kickoff-shard, betting-change-register, nba-segment-grade, closed-lane-archive-20261116-1840, betting-change-session-check, session-start-hook-runtime, nba-pregame-h2-ot, nba-margin-raw-zero. Table: .syndicate/log/2026-11-17.md.
+
+### closed-lane-archive-20261117-0240 — CLOSED 2026-11-17 (GOAL MET: 1 block archived) — opened 2026-11-17 — session 78e0d55f-1b71-42e7-a0d1-807141bc07b7
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness.py --idle-min 240 read 1 SAFE of 8 CLOSED; owner worktree had no .git (no uncommitted edits possible); invariants unchanged vs baseline (same 3 contested files).
+- Moved: closed-lane-archive-20261116-2040. Table: .syndicate/log/2026-11-17.md.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
@@ -1152,6 +1153,7 @@ death, never life — do not invert it.
 - `closed-lane-archive-20261116-1440` — CLOSED 2026-11-16 (GOAL MET: 2 blocks archived) — opened 2026-11-16 — session bbf28575-4057-44ea-bf39-e76eb68ef14c
 - `closed-lane-archive-20261116-1640` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session b5197378-9e7e-48f3-a5cc-d4fa03048d24
 - `closed-lane-archive-20261116-1840` — CLOSED 2026-11-16 (GOAL MET: 2 blocks archived) — opened 2026-11-16 — session 26b8d60d-e7f3-43e2-b291-2a1d14a9a8f5
+- `closed-lane-archive-20261116-2040` — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 45d8ff17-6e51-467f-8f9e-188751b071a5
 - `closing-stamp-is-detection-time` — closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pi → `lanes_closed.md`.
 - `club-maps-fleet-rollout` — CLOSED — opened 2026-09-24, closed 2026-09-24 — session 16da93b3-0e56-4617-857a-6705b02ff912
 - `clv-departures-ceiling` — CLOSED 2026-10-22 (GOAL MET) — opened 2026-10-22 — session d0d9f2f7-836b-4304-afcd-0f858eeff69b

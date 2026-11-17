@@ -16462,3 +16462,8 @@ Slugs: book-grid-own-capture-staleness, closed-lane-archive-20261019-1006, ev-ov
 - Falsification test: Any fleet NBA sim whose model_margin_raw differs from 0.5*(away_outs-home_outs)+0.8*(away_b2b-home_b2b) by >1e-9, or any NBA predictions file carrying spread_margin; the WNBA control (spread_margin present) must come out OFF that rule.
 - Verification: Rule reproduces 197/197 copied sims and 261/261 fleet NBA sims 10-03..11-16; 72/72 zeros = equal outs+b2b; WNBA control 15/15 off-rule; findings note written with 2x2 counterfactual (feed x outs penalties) on 192 graded games.
 - Blocked by: none
+
+### closed-lane-archive-20261116-2040 — CLOSED 2026-11-16 (GOAL MET: 1 block archived) — opened 2026-11-16 — session 45d8ff17-6e51-467f-8f9e-188751b071a5
+- Goal: archive CLOSED lane blocks whose owners are idle, verified, ledger-only
+- Files: none (ledger-only)
+- Verdict: GOAL MET. owner_liveness --idle-min 240 at 02:42Z 11-17 (8:42 PM CST): 1 SAFE of 15 CLOSED; moved `closed-lane-archive-20261116-1440`. Table and waits: log/2026-11-16.md.
