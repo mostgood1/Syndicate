@@ -277,6 +277,27 @@ plan. Record it with `scripts/betting_change.py add --kind yes` at the load.
 5. Rollback = remove the line + another drained `down`/`up` (the switch is read at boot). A child-only restart
    (`kill -TERM <child pid>`) is NOT a rollback; it only reloads board code.
 
+## LOADED 2026-11-18 08:30:50Z (2:30 AM CST) — deploys.md entry of that instant, BC-042 yes
+
+- **Sequence:** the grid lane gave up (07:55Z), the I-17 TERM ran (08:02:54Z) and its claim was released (08:22:28Z). Then:
+  - claims on all three roles at 08:23:27Z;
+  - drain CLEAR at 08:28:44Z;
+  - env key at 08:28:52Z;
+  - env snapshot;
+  - JOINT preflight CLEAR at 08:30:40Z;
+  - ff to `09eddabf2` and `down` at 08:30:50-08:31:23Z;
+  - `Start-ScheduledTask` at ~08:31:29Z;
+  - undrain at 08:32Z.
+- **Boot, in order** (refresh-worker pid 429499): `BOARD_PROCESS_MODE mode=process`, `CHIP_PUBLISHER_THREAD_STARTED` (parent), `BOARD_PROCESS_STARTED pid=429539 attempt=1`, `BOARD_PROCESS_CHILD_BOOT ... dry_run=0`, `BOARD_PROCESS_CHILD_READY` at 08:31:34.219Z.
+- **Env compare OK:** only refresh-worker gained `SYNDICATE_BOARD_BUILD_PROCESS`. The child carries chips=0, sim tick owner=false and memory root=parent.
+- **The child's builds (quiet hours, NOT the reading):** 166.2 / 133.8 / 108.7 / 111.3 s. The first wrote the 11-18 shortlist and LIVE_PLAN for all four venues.
+- **Drain, live** (step 3 of the design's "drain keeps working"):
+  - CLEAR ~90 s after the request;
+  - the child logged `DEFERRED_BOARD_BUILD reason=deploy_drain_requested`;
+  - it resumed after the undrain.
+- **Safety so far:** 1 child; 0 `BOARD_PROCESS_EXITED`, 0 `LEASE_WAIT`, 0 Traceback. RSS at 08:45Z was parent 742 + child 2,446 MB, and the supervisor's role-tree reading includes the child.
+- **Owed:** the 11-18 6-10 PM CST reading (00:00-04:00Z 11-19) against baseline B above. Also: the role-tree RSS max over that window, and the child count on 3 reads.
+
 ## Open
 
 - DONE 06:40Z: the fixed-work benchmark (evening 1.67x calm, above) and B for metrics 1-5 (above).

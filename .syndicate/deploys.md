@@ -61588,3 +61588,67 @@ Lane `render-config-retirement` (session 267d8859).
 - **Owed:**
   - the live speed effect, expected to be small: replay CPU NCAAF 7.3 -> 6.6 s, NBA 5.5 -> 5.1 s, NCAAB 1.7 -> 1.5 s. The prediction it was loaded under: `ncaab_build_seconds_median` no higher at a like shard size, and 0 build errors;
   - the Saturday 11-21 NCAAF reading (task `ncaaf-grid-pivot-reading-1121`, 11:30 PM CST). Its prompt now names the memo and lane `layer2-board-process-split`'s board-process switch as confounds for P1.
+
+## 2026-11-18 08:30:50Z (2:30 AM CST) -- DEPLOY (drained full down/up + ff 3920a2d4d -> 09eddabf2 + env key): the board build runs in its own process, `REFRESH_WORKER__SYNDICATE_BOARD_BUILD_PROCESS=1` (todo #832, lane `layer2-board-process-split`) -- **LOADED; boot, env, drain and harm checks MET; the live-evening reading is OWED (pre-registered)**
+- betting change: **yes** -- the portfolio plan's cadence follows the board build. live-odds-worker executes that plan, and the board loop now runs in a child process. Loaded at refresh-worker's boot, `2026-11-18T08:31:33Z`.
+- **User decisions (verbatim, typed in this session, 2026-11-17 CST):**
+  - "Yes, switch it on": ON tonight by env key + a drained full down/up after the late loads.
+  - "go ahead when grid lane is done".
+  - Peer relays of the same decision were not counted as approval.
+- **Sequencing.**
+  - Lane `ncaaf-grid-build-speed` gave up at 07:55:24Z with nothing loaded.
+  - The I-17 task (lane `ncaab-total-overprojection`) TERMed refresh-worker at 08:02:54Z and released its claim at 08:22:28Z.
+  - This load started after both, at 08:23Z.
+- **Ride-alongs** (`3920a2d4d..09eddabf2`, 25 commits; identical for all three roles):
+  - Every role was running `3920a2d4d`. Web had recycled at 07:30:56Z, live-odds-worker booted at 05:06:31Z, and refresh-worker booted at 08:03:01Z; the fleet ff to `3920a2d4d` was at 01:46:27Z.
+  - Runtime changes are this lane's 4 files only: `pipeline/board_build_process.py`, the boot call site in `scripts/run_refresh_worker.py`, `scripts/check_deploy_safety.py` (`SERVICE_CHILD_CMDLINE_MARKERS`) and the test.
+  - Two standalone research scripts that no role imports: `momentum_lag_study.py` and `trader_follow_study.py`.
+  - The rest is ledger.
+- **Gates.**
+  - Claims (holder `layer2-board-process-split`, TTL 90 min) on refresh-worker / web / live-odds-worker at 08:23:27-28Z, rc 0 each.
+  - Drain under the worker's environ (`C:\tmp\l2split\load\drain.sh drain 1800`): **CLEAR at 08:28:44Z**. It waited on a 1,525 s refresh-worker odds child job and a soccer build.
+  - Env key appended to `~/syndicate-prod/local_production.env` at 08:28:52Z (backup `.bak-boardsplit-20261118T082852Z`, mode 600). `local_production.py env --role refresh-worker` printed `SYNDICATE_BOARD_BUILD_PROCESS=1`.
+  - `fleet_role_env_reading.py snapshot` taken BEFORE the down: web 160 / refresh-worker 262 / live-odds-worker 235 keys.
+  - Preflight from this worktree at origin/main, `--target fleet --target-commit 09eddabf253d...`:
+    - refresh-worker ran with 4 expect/baseline pairs: `fleet_checkout_head` 3920a2d4d -> 09eddabf2, `board_process_mode_lines_since_boot` 0 -> >=1, `board_child_count` 0 -> 1, `switch_in_refresh_worker_environ` 0 -> 1.
+    - web and live-odds-worker ran with `--no-expectation` (no runtime change for those roles).
+    - **JOINT CLEAR at 08:30:40Z**, on round 2. Round 1 at 08:29:05Z read HOLD on refresh-worker (3 jobs) and live-odds-worker (1 job).
+- **Load.**
+  - `C:\tmp\l2split\load\ff_down.sh 3920a2d4d 09eddabf253d...`: it confirmed HEAD was `3920a2d4d`, fetched `github main`, found 0 dirty overlaps, ran `git merge --ff-only 09eddabf253d...` (reflog 08:30:50Z), set `watchdog_no_autostart`, and ran `down` from 08:30:50Z to 08:31:23Z (rc 0).
+  - `Start-ScheduledTask SyndicateLocalProduction` at ~08:31:29Z (web booted its workers at 08:31:29.786Z). Supervisor 429414 started at 08:31:31Z. `/healthz` returned 200 at 08:31:36Z.
+  - Undrained the new refresh-worker at 08:32:0xZ (`DRAIN_CLEARED`). The `watchdog_no_autostart` marker was removed and its absence checked.
+- **expect / measured** (read 08:31:36-08:37:07Z):
+  - `fleet_checkout_head` 3920a2d4d -> 09eddabf2: **MET** (`status` shows `code=09eddabf` on web 429429, refresh-worker 429499 and live-odds-worker 429500; refresh-worker's `SYNDICATE_GIT_COMMIT`=09eddabf2).
+  - `board_process_mode_lines_since_boot` 0 -> >=1: **MET**. Boot lines, in order:
+    - `BOARD_PROCESS_MODE mode=process parent=429499` at 08:31:33.479Z;
+    - `CHIP_PUBLISHER_THREAD_STARTED` in the parent;
+    - `INTELLIGENCE_LOOP_START_RESULT started=True`;
+    - `BOARD_PROCESS_STARTED pid=429539 parent=429499 attempt=1`;
+    - `BOARD_PROCESS_CHILD_BOOT ... role_booted_at=1794990693 dry_run=0`;
+    - `BOARD_PROCESS_CHILD_READY pid=429539` at 08:31:34.219Z.
+  - `board_child_count` 0 -> 1: **MET**. Exactly one `python -m pipeline.board_build_process --serve` (pid 429539, ppid 429499); 1 again at 08:45:35Z.
+  - `switch_in_refresh_worker_environ` 0 -> 1: **MET**.
+  - Env reading (`compare --expect-added SYNDICATE_BOARD_BUILD_PROCESS`): **COMPARE OK**, exit 0.
+    - The key was added on refresh-worker only.
+    - All three roles changed only `SYNDICATE_GIT_COMMIT`, `SYNDICATE_INSTANCE_ID` and `WSL_INTEROP`.
+  - Child env carries `SYNDICATE_GAME_CHIP_PUBLISH_ENABLED=0`, `SYNDICATE_MLB_SIM_TICK_OWNER=false` and `SYNDICATE_LOCAL_MEMORY_ROOT_PID=429499`.
+  - **The child's first build:**
+    - `LAYER2_TODAY_CADENCE ran=yes` at 08:33:00Z, then `LAYER2_SHORTLIST date=2026-11-18 rows=4451` at 08:35:25Z.
+    - `LIVE_PLAN_WRITTEN` for kalshi / novig / prophetx / polymarket at 08:36:46-49Z.
+    - `BOARD_BUILD_TIMING wall_s=166.2 cpu_s=110.9 ok=True` at 08:37:06Z.
+    - The next builds took 133.8 / 108.7 / 111.3 s. These are quiet-hour builds, NOT the reading.
+  - `check_deploy_safety` lists the child under the worker's own servers ("not jobs"): `pid=429539 ... pipeline.board_build_process --serve`. It still reads a board build in flight from the shared log.
+  - **The drain works with the board in the child.** I re-tested it while still holding the claims:
+    - drain requested at 08:43:4xZ;
+    - the parent acked, and `board_build` went from in_flight to idle;
+    - **CLEAR in ~90 s**;
+    - the child logged `DEFERRED_BOARD_BUILD reason=deploy_drain_requested` at 08:44:50Z;
+    - undrained at 08:45:14Z, and the child resumed: a build span at 08:45:52Z, `BOARD_BUILD_TIMING` 111.3 s at 08:47:40Z.
+  - Harm, 08:31:30-08:47:53Z: 0 Traceback, 0 `BOOK_GRID_BUILD_ERROR`, 0 `BOARD_PROCESS_EXITED`, 0 `BOARD_PROCESS_LEASE_WAIT`.
+  - RSS at 08:45:35Z: parent 742 MB, child 2,446 MB. The supervisor counts the child in the role tree (the status `rss=1844 MB` at 08:31Z = parent 728 + child 1,111). The role cap is 7,168 MB; the registered safety bound is 6,144 MB.
+- **OWED:** the first live evening, 6-10 PM CST (00:00-04:00Z on 11-19).
+  - The pre-registered 5-metric reading against baseline B is in `.syndicate/findings_2026-11-17_layer2_board_process_split.md`. B is: wall p50 253.4 s, today shortlist gap p50 363 s, LIVE_PLAN gap p50 351 s, grid NCAAB 13.8 s / NBA 19.7 s.
+  - Comparability: live count at 7 PM CST, and the fixed-work bench within 15% of 0.1664.
+  - Safety: role-tree RSS max, never two children, 0 unplanned exits.
+  - **Rollback** = remove the env line and do a drained full `down`/`up`. TERMing the child only reloads board code.
+- Confound for other lanes' readings on 11-18: this up also restarted web and live-odds-worker, and re-ran refresh-worker 28 min after the I-17 TERM. Lane `ncaaf-grid-build-speed`'s 11-21 reading already names this switch as a P1 confound.
