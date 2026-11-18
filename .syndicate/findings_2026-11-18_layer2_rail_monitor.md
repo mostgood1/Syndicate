@@ -372,3 +372,28 @@ lane `nba-midnight-bootstrap-hold`, user "Load it now", **BC-052, outside a wind
 **Team cards:** 0 defects.
 
 **Dashboard:** row 6, the 1:14 PM and 3:02 PM loads, and I-25 marked loaded.
+
+## Reading 7 — Wed 11-18 3:44 PM CST (21:44Z)
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 3.1.
+
+**Slate: 2 live,** both WNCAAB: Utah St @ BYU Q2 and New Hampshire @ Yale Q1.
+- Flags: 1 shown, 0 false, 0 missed, 0 dark. P1: 1 college totals flag, 0 contradictions. P6: 0. #824: 0.
+- Live rows: 3, 2 priced <= 120 s.
+
+**Board: 7 builds, median 266 s, max 353 s, 1 over 300 s** (shortlist span max 196 s), at host load ~3.
+- This is creeping up before the evening (r5 163 s, r6 166 s).
+- P2 measures from 5:30 PM with host load beside each build.
+
+**Overlay:** 0 gaps over 360 s (max WNCAAB 73 s). Web merges 30, 14 stale (WNCAAB 13, NCAAB 1). WNCAAB games tipped mid-window.
+
+**Live odds lane:** 14 launched, 2 refused (12.5%). Live runs 103-158 s; pregame 232 s.
+- Look-ahead 445 s (soccer 244 s, against 1,189-2,225 s this morning).
+- **An NHL odds child was 359 s old at the read**, under the 600 s watch line. It is a pregame run, before the 6:30 PM games.
+
+**Load:** query 12.2 s; shortlist 1.9 s. Today's board was 331 s old.
+
+**Team cards:** 0 defects.
+
+**Dashboard:** row 7. I-26 is marked as the user's choice: fix day 1, retire day 2, queued for the 11-24 window. I-24 has an
+alternative-source session working.
