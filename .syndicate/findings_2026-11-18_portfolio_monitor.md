@@ -45,3 +45,40 @@ and their fixes. Same probe (`scripts/portfolio_monitor_probe.py`), same page (P
 - **Refresh-worker not restarted yet.** pid 28948 has been up since 21:53Z 11-17, and the fleet head is `3920a2d4d`
   at 07:14:22Z. The `ncaaf-grid-build-speed` load window opened 07:10Z.
 - **Endpoints:** all 7 read 200, all under 0.25 s. 0 kills.
+
+## Reading 28 — Wed 11-18 1:45 AM CST (07:45Z), window 32 min
+
+- **Clean apart from the gate's clock.**
+- **Plan 2.2 min old.** 45 suggested -> 25 sized -> 20 positions, ceiling used 44.0%.
+- **Execution, 32 min:** 10 live ticks, 3 placed (kalshi 2, polymarket 1), 0 failed.
+  - Orders today 13: 11 filled, 2 resting at 63.1 and 57.8 min. Neither is overdue: maker-pilot posts are exempt
+    until kickoff, and 5 `maker_pilot_held` refusals confirm posts are working.
+  - Unreconciled 0. Cap use: kalshi 10.2%, polymarket 3.3%.
+- **Refresh-worker still not restarted** (pid 28948 up 35,341 s at 07:45:09Z, fleet head `3920a2d4d`).
+  - A drain was requested at 07:14Z: 2 `DEFERRED_BOARD_BUILD reason=deploy_drain_requested` and `DRAIN_HOLD
+    stage=mlb_sim_tick`, then released. Plan writes resumed, newest 07:43:01Z.
+  - deploys.md on main has no load entry since 01:46Z.
+  - Read as: lane `ncaaf-grid-build-speed`'s 1:10 AM attempt has not loaded yet (its own deadline for an entry is
+    08:30Z). Not this lane's to act on. The board-split load is sequenced after it.
+- **Endpoints:** all 7 read 200, all under 0.4 s. 0 kills.
+
+## Reading 29 — Wed 11-18 2:16 AM CST (08:16Z), window 31 min
+
+- **The refresh-worker restarted at 08:02:56Z (2:02 AM CST)**, at fleet head `3920a2d4d`. Web, live-odds-worker and
+  the supervisor were not restarted.
+  - The supervisor says: `[refresh-worker] exited code=0 after 36594s -- restarting in 5s`, then
+    `CLAIMED_RESTART code=0 holder=ncaab-total-overprojection`. So this is the I-17 lane's claimed TERM, not the
+    `ncaaf-grid-build-speed` attempt; deploys.md 07:55Z says that one "GAVE UP, NOTHING LOADED".
+  - It loads what is at the head: I-17 `923869cf3`, the per-build memo, and **BC-041's NFL seeds `ee47c930a`, a
+    betting change**.
+  - BC-041 still reads `pending:refresh-worker` on main. The gate clock starts only when the loading lane runs
+    `betting_change.py resolve`. Owed by that lane, not this one; re-checked next reading.
+  - **The board-process split is NOT loaded** (head is still `3920a2d4d`, not >= `09eddabf2`). Its drained
+    `down`/`up` is still to come.
+- **Plan across the restart:** last commit before it 07:58:13Z, first after it 08:10:05Z, a **12-min gap**. Plan 0.7
+  min old at the reading.
+  - 44 suggested -> 25 sized -> 21 positions, ceiling used 47.0%.
+- **Execution, 31 min:** 12 live ticks, 3 placed, 0 failed.
+  - Orders today 16: 14 filled, 2 maker posts resting (94.2 and 88.9 min, exempt until kickoff).
+  - Unreconciled 0. Cap use: kalshi 10.7%, polymarket 4.7%.
+- **Endpoints:** all 7 read 200, all under 0.3 s. 0 kills.
