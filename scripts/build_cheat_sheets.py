@@ -706,11 +706,13 @@ def fetch_board_cards(base_url: str) -> list[dict[str, Any]]:
 
     `row_refs` (lane `cheat-sheet-picks-row-refs`, 2026-11-17, layer2-rail-monitor backlog I-16): the cards travel as
     references into `ranked_all` plus a per-row patch, and `decode_row_refs` -- the page's own `rehydrateAliases`, in
-    Python -- rebuilds them before anything reads them. MEASURED on the fleet 2026-11-18 02:40Z, one board state
-    (both flag-off reads hashed the same): 69,000,099 -> 24,516,064 B per call, 17.6 / 12.6 s -> 4.8 s. That is the
-    wire: Python-urllib sends no Accept-Encoding, so this client was never gzipped. The 6,045 rebuilt cards, and the
-    whole rebuilt response, were identical to the flag-off read with key order included. A server that ignores the
-    flag (`SYNDICATE_QUERY_ROW_REFS=off`, or one that predates it) sends the full lists, and the rebuild is a no-op.
+    Python -- rebuilds them before anything reads them. MEASURED on the fleet 2026-11-18, through this function:
+    12,848,512 -> 4,521,512 B per call on the wire (02:55Z; `import syndicate` installs `http_compression`'s gzip
+    opener, so this client is gzipped), and 69,000,099 -> 24,516,064 B for web to serialise (02:40Z, one board
+    state: both flag-off reads hashed the same), 12.5-17.8 s -> 4.3-4.8 s. On that state the 6,045 rebuilt cards,
+    and the whole rebuilt response, were identical to the flag-off read with key order included. A server that
+    ignores the flag (`SYNDICATE_QUERY_ROW_REFS=off`, or one that predates it) sends the full lists, and the
+    rebuild is a no-op.
 
     Encoded cards that did not rebuild RAISE, so they take the path a failed read already takes: `main_picks_only`
     leaves every sheet as it was, and `main_build` builds without the board, as it does today when the read fails.

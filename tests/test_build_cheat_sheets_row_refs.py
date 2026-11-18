@@ -1,8 +1,8 @@
 """The cheat sheets' board pull asks for `row_refs` and rebuilds the cards (lane cheat-sheet-picks-row-refs, 2026-11-17).
 
 `SyndicateCheatSheetPicks` pulls the board query every 15 minutes, and the full build pulls it too. Measured on the
-fleet 2026-11-18 02:40Z, on one board state: 69,000,099 B per call without the flag, 24,516,064 B with it. This
-client sends no Accept-Encoding, so those bytes are the wire.
+fleet 2026-11-18, through `fetch_board_cards`: 12,848,512 -> 4,521,512 B per call on the wire (gzip, from the opener
+`import syndicate` installs), and 69,000,099 -> 24,516,064 B for web to serialise (one board state).
 
 The picks must not move -- every line is its own decision -- so these tests hold the rebuilt cards, and the picks
 built from them, to the flag-off read with key order included. The data is the recorded fleet slice
