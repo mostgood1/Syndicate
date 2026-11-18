@@ -61546,7 +61546,7 @@ Lane `render-config-retirement` (session 267d8859).
 - **Learned:** at 1:10 AM CST refresh-worker's odds jobs also run 14+ min, so a 300 s drain cap is too short at this hour as well. The evening abort (deploys.md 2026-11-17 23:46Z) found the same.
 
 ## 2026-11-18 08:02:54Z (2:02 AM CST) -- DEPLOY (TERM only, no ff): refresh-worker restart at fleet `3920a2d4d`, loading I-17's calibrated college total `923869cf3` (refresh-worker half) + NFL re-sim event-id seeds `ee47c930a` (BC-041) (lane `ncaab-total-overprojection`, scheduled task `i17-calibrated-total-load-1118`) -- **LOADED; harm checks MET; the I-17 rail check and the NFL seeding reading are OWED**
-- betting change: **yes** -- BC-041 (`ee47c930a` NFL live re-sim seeds, run by `run_refresh_worker._run_nfl_live_resim_tick`), resolved at the new refresh-worker boot `2026-11-18T08:03:01Z`. I-17 itself is display only.
+- betting change: yes -- BC-045 for this entry (2026-11-18; same load as BC-041 (`ee47c930a` NFL live re-sim seeds, run by `run_refresh_worker._run_nfl_live_resim_tick`), resolved at the new refresh-worker boot `2026-11-18T08:03:01Z`. I-17 itself is display only.)
 - **User decisions (verbatim, 2026-11-17 CST):** "A: calibrated total"; "load it when tests pass"; "Try now anyway" (the 01:08Z attempt, ABORTED); "Schedule 1:50 AM"; "Yes, carry it" (the NFL seeds). Grid memo: "Load it now" / "Load all now".
 - **Why this lane loaded it:** the plan was that lane `ncaaf-grid-build-speed`'s 1:10 AM CST script (`C:\tmp\railload\grid809_night2.sh`) would do the restart.
   - Attempt 1 (07:10Z) acquired the claim, but its drain did not CLEAR in 300 s (a board build and odds/soccer child jobs were in flight), so it backed off at 07:15Z.
