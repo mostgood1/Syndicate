@@ -76,6 +76,10 @@ CLOSE_MIN_BOOKS = 3
 COMPLETED_AFTER_S = 6 * 3600.0
 CONTROL_LEAD_S = 7200.0                # control arm: a book's price 2 h before start
 DELAY_WINDOW_S = 600.0
+CONFIRM_MIN_S, CONFIRM_MAX_S = 300.0, 900.0   # arm B (fanduel-lead-forward): a re-read >= 5 min later
+# O'Brien-Fleming two-look boundaries, two-sided alpha 0.05 (z at look 1, look 2).
+OBF_BOUNDARY = {1: 2.797, 2: 1.977}
+FORWARD_LEADER = "fanduel"
 BOOT_N = 2000
 BOOT_SEED = 20261117
 THETAS = (0.01, 0.02, 0.03, 0.05)
@@ -269,8 +273,11 @@ def boot_ci(pairs: list[tuple[str, float]], n: int = BOOT_N, seed: int = BOOT_SE
             c_ += a[1]
         stats.append(s / c_)
     stats.sort()
-    return {"n": count, "clusters": k, "mean": total / count,
-            "lo": stats[int(0.025 * n)], "hi": stats[int(0.975 * n) - 1]}
+    mean = total / count
+    se = statistics.pstdev(stats)
+    return {"n": count, "clusters": k, "mean": mean,
+            "lo": stats[int(0.025 * n)], "hi": stats[int(0.975 * n) - 1],
+            "se": se, "z": (mean / se) if se > 0 else None}
 
 
 def process_shard(root: str, sport: str, shard: str, path: str, now: float, theta_min: float,
@@ -362,7 +369,7 @@ def process_shard(root: str, sport: str, shard: str, path: str, now: float, thet
         close = {s: statistics.median(v) for s, v in close_fairs.items() if len(v) >= CLOSE_MIN_BOOKS}
 
         # ---- control arm: every sportsbook price 2 h before start ----
-        if want_outcome and close:
+        if want_outcome and close and (acc["detected_after"] is None or ct >= acc["detected_after"]):
             tc = ct - CONTROL_LEAD_S
             for book, sides in books.items():
                 if book in EXCHANGES:
@@ -443,6 +450,10 @@ def process_shard(root: str, sport: str, shard: str, path: str, now: float, thet
                         ikey = (sport, ev, gkey, s, bbook)
                         if ikey in acc["seen"]:
                             continue
+                        if acc["detected_after"] is not None and t < acc["detected_after"]:
+                            # Forward reads (lane fanduel-lead-forward): a detection before the registration
+                            # instant is not counted and does not consume the bet's first detection.
+                            continue
                         if reason:
                             # Counted, not kept: a later detection of the same bet may still qualify.
                             acc["excluded"][(venue, reason, move >= theta_min and "any")] += 1
@@ -455,6 +466,7 @@ def process_shard(root: str, sport: str, shard: str, path: str, now: float, thet
                             "laggard": bbook, "venue": venue, "move": move,
                             "dec_l_old": dec_l_old, "dec_l_new": new_vals[s], "dec_b": d_b,
                             "ev_pred": ev_pred, "lead_min": (ct - t) / 60.0, "co_movers": co,
+                            "t_detect": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t)),
                             "excluded": reason, "has_close": s in close, "has_pin_close": bool(pin_close and s in pin_close),
                         }
                         nxt = sd_b.next_change_after(t)
@@ -477,6 +489,31 @@ def process_shard(root: str, sport: str, shard: str, path: str, now: float, thet
                                     inst["delayed_dec"] = d2
                                     if d2 is not None and s in close:
                                         inst["ev_close_delayed"] = close[s] * d2 - 1.0
+                                    break
+                                j += 1
+                            # STILL-THERE entry (lane fanduel-lead-forward, arm B): the first fetch B answered
+                            # for this event at least CONFIRM_MIN_S and at most CONFIRM_MAX_S after the move,
+                            # before the start. OddsAPI's copy of a book is at most ~4.7 min old (p99 by book,
+                            # worst Bovada; FanDuel 1.8; NBA/NFL/NHL 11-12..11-15), so a fetch >= 5 min on that
+                            # still shows B's old price is a re-read of the book, not the same stale copy. Bet only if B is at or better than the
+                            # entry price then; "moved" / "gone" / "no_fetch" are no bet.
+                            inst["confirm_status"] = "no_fetch"
+                            j = bisect.bisect_left(hb_times, t + CONFIRM_MIN_S)
+                            while j < len(hb_times) and hb_times[j] - t <= CONFIRM_MAX_S and hb_times[j] <= ct:
+                                evs, bks = hb_by_cap[hb_ordered[j][1]]
+                                if bbook in bks and ev in evs:
+                                    t3 = hb_times[j]
+                                    d3 = sd_b.at(t3, alive_from=t3)
+                                    inst["confirm_min"] = (t3 - t) / 60.0
+                                    if d3 is None:
+                                        inst["confirm_status"] = "gone"
+                                    elif d3 + 1e-9 < d_b:
+                                        inst["confirm_status"] = "moved"
+                                    else:
+                                        inst["confirm_status"] = "confirmed"
+                                        inst["confirm_dec"] = d3
+                                        if s in close:
+                                            inst["ev_close_confirmed"] = close[s] * d3 - 1.0
                                     break
                                 j += 1
                         acc["instances"].append(inst)
@@ -573,6 +610,61 @@ def summarize(acc: dict, theta: float, want_outcome: bool) -> dict:
     return out
 
 
+FORWARD_MIN_EVENTS_LOOK1 = 200
+
+
+def forward_read(acc: dict, theta: float, look: int | None) -> dict:
+    """The registered read of lane `fanduel-lead-forward`
+    (`.syndicate/findings_2026-11-17_fanduel_lead_forward_preregistration.md`).
+
+    Arm A: the in-sample FanDuel cell's exact definition (primary instance, leader == fanduel), EV vs the
+    consensus close at the move's fetch. Arm B: the same bets, entered only if B still quotes the entry price or
+    better at the first fetch it answered 5..15 min later, EV at that price. z = mean / bootstrap SE (event
+    clusters). Boundaries are O'Brien-Fleming for two looks (2.797, 1.977). `look=None` labels a prior read.
+    """
+    inst = acc["instances"]
+    base = [i for i in inst if i["venue"] == "sportsbook" and i["leader_venue"] == "sportsbook"
+            and not i["excluded"] and i["move"] >= theta and i["has_close"]]
+    fd = [i for i in base if i["leader"] == FORWARD_LEADER]
+    pairs = lambda xs, f: [(i["cluster"], i[f]) for i in xs if i.get(f) is not None]
+    a = boot_ci(pairs(fd, "ev_close"))
+    b = boot_ci(pairs(fd, "ev_close_confirmed"))
+    out = {
+        "look": look, "boundary_z": OBF_BOUNDARY.get(look) if look else None,
+        "arm_A_replication": a, "arm_B_still_there_5_15min": b,
+        "arm_B_status": dict(collections.Counter(i.get("confirm_status") for i in fd)),
+        "arm_B_same_bets_at_move_fetch": boot_ci([(i["cluster"], i["ev_close"]) for i in fd
+                                                  if i.get("ev_close_confirmed") is not None]),
+        "context_all_leaders_primary": boot_ci(pairs(base, "ev_close")),
+        "fd_by_sport": {sp: boot_ci(pairs([i for i in fd if i["sport"] == sp], "ev_close"))
+                        for sp in sorted({i["sport"] for i in fd})},
+        "detection_window": [min((i["t_detect"] for i in fd), default=None), max((i["t_detect"] for i in fd), default=None)],
+    }
+    if not look:
+        return out
+    bound = OBF_BOUNDARY[look]
+    if look == 1 and a["clusters"] < FORWARD_MIN_EVENTS_LOOK1:
+        out["verdict"] = f"LOOK1_SKIPPED (arm A has {a['clusters']} events < {FORWARD_MIN_EVENTS_LOOK1}); read again at look 2"
+        return out
+    a_real = a["z"] is not None and a["z"] >= bound
+    b_real = b["z"] is not None and b["z"] >= bound
+    a_futile = a["hi"] is not None and a["hi"] < 0
+    if a_real and b_real:
+        verdict = "PROCEED: A and B both cross the boundary -> design an outcome-graded feed test"
+    elif a_real and look == 1:
+        verdict = "A REAL (stop A); B not yet -> read B again at look 2"
+    elif a_real:
+        verdict = "REAL_NOT_ACTIONABLE: A crosses, B does not -> no feed; the result is a prior for the steam expert"
+    elif a_futile:
+        verdict = "KILL: arm A's 95% CI upper bound < 0 -> the FanDuel lead was chance"
+    elif look == 1:
+        verdict = "CONTINUE: neither boundary nor futility -> read at look 2"
+    else:
+        verdict = "KILL: arm A misses the look-2 boundary -> the FanDuel lead was not shown"
+    out["verdict"] = verdict
+    return out
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--pass", dest="which", choices=("population", "outcome"), required=True)
@@ -582,10 +674,15 @@ def main(argv=None) -> int:
     ap.add_argument("--e-min", type=float, default=0.01, help="minimum predicted EV vs the mover's new fair")
     ap.add_argument("--now", default=None, help="ISO instant treated as now (default: wall clock)")
     ap.add_argument("--out", default=None, help="write the summary (+ instances for outcome) here")
+    ap.add_argument("--detected-after", default=None,
+                    help="ISO instant: count only detections at or after it (forward reads; control = events starting after it)")
+    ap.add_argument("--forward-look", type=int, choices=(1, 2), default=None,
+                    help="apply the fanduel-lead-forward look's boundary and print its verdict")
     args = ap.parse_args(argv)
     now = parse_ts(args.now) if args.now else time.time()
     want_outcome = args.which == "outcome"
     acc = {
+        "detected_after": parse_ts(args.detected_after) if args.detected_after else None,
         "coverage": collections.defaultdict(lambda: {"shards": 0, "rows": 0, "pregame_rows": 0, "shards_with_completed_pregame": 0,
                                                      "dates": set(), "dates_with_heartbeat": set(), "dates_with_last_seen": set(),
                                                      "events": set()}),
@@ -599,8 +696,11 @@ def main(argv=None) -> int:
             _TS_CACHE.clear()
         print(f"[momentum_lag_study] {sport} done at +{time.time() - t0:.0f}s instances={len(acc['instances'])}", file=sys.stderr, flush=True)
     summary = summarize(acc, args.theta, want_outcome)
+    if want_outcome:
+        summary["fanduel_forward"] = forward_read(acc, args.theta, args.forward_look)
     summary["params"].update({"pass": args.which, "now": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
-                              "e_min": args.e_min, "root": args.root, "elapsed_s": round(time.time() - t0, 1)})
+                              "e_min": args.e_min, "root": args.root, "elapsed_s": round(time.time() - t0, 1),
+                              "detected_after": args.detected_after, "forward_look": args.forward_look})
     text = json.dumps(summary, indent=1, default=str)
     print(text)
     if args.out:
