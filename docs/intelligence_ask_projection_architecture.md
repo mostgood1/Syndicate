@@ -115,7 +115,7 @@ Background worker loop:
 - `IntelligenceStateService._background_loop()` waits for queued payloads, runs the routed pipeline, and writes the latest snapshot state
 - `self._interval_seconds` defaults to 30 seconds and is bounded to at least 10 seconds
 
-Render worker loop:
+Refresh-worker loop (the fleet's `refresh-worker` role):
 - [scripts/run_refresh_worker.py](../scripts/run_refresh_worker.py)
 - Default poll interval is 30 seconds through `SYNDICATE_REFRESH_WORKER_POLL_SECONDS`
 - The worker loops forever unless `--run-once` is used

@@ -8,7 +8,7 @@ This workspace now includes a set of task-specific Copilot skills for planning, 
 - `syndicate-parlay-design-assistant`: design and validate parlay parsing, filtering, and correlation logic.
 - `syndicate-live-lens-debugger`: debug live payload, hydration, and stale-state issues.
 - `syndicate-readiness-auditor`: audit migration-gate blockers, advanced inputs, and artifact coverage.
-- `syndicate-deployment-verifier`: check local-versus-Render parity and stale deploy concerns.
+- `syndicate-deployment-verifier`: check local-versus-production parity (production is the local WSL fleet at `http://127.0.0.1:10000`; Render is retired) and stale deploy concerns.
 
 ## Sport-level analyst skills
 - `syndicate-mlb-statcast-analyst`: MLB Statcast-backed matchup and prop analysis.

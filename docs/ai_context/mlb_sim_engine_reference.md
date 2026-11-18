@@ -57,9 +57,13 @@ Publishing a new artifact changes nothing on any date whose `roster_objs/`
 already exist — the build that would read it never runs.
 
 **Procedure for landing any new input:**
-1. publish the input artifact to the mounted disk;
+1. publish the input artifact to the data root (`SYNDICATE_DATA_ROOT`; on the
+   fleet, the one shared disk `~/syndicate-prod/data`);
 2. **rebuild rosters** — set **`SYNDICATE_MLB_ROSTER_REBUILD_DATE=<YYYY-MM-DD>`**
-   on refresh-worker and let that date's sim run.
+   on refresh-worker and let that date's sim run. On the fleet `[2026-11-17]`
+   that is `REFRESH_WORKER__SYNDICATE_MLB_ROSTER_REBUILD_DATE=<YYYY-MM-DD>` in
+   `~/syndicate-prod/local_production.env`, then a drained full `down` + `up`:
+   env is built only at `up`, and a role restart reuses the old env.
 
    **Until 2026-08-18 this step was IMPOSSIBLE in production**, and this document
    asserted it anyway. `run_mlb_daily_sim_job.py` built a hardcoded command of
@@ -86,17 +90,20 @@ already exist — the build that would read it never runs.
    **first sim on a NEW DATE rebuilds for free.**
 3. run `sim_input_checklist.py --publish` and confirm the field left the FAIL list.
 
-   **THIS IS THE ONLY VERIFICATION WITH A PATH OFF THE WORKER, and that is not a
+   **THE CHECKLIST REPORT IS THE VERIFICATION OF RECORD, and that is not a
    style preference.** The sim job is spawned with its stdout redirected to a
-   FILE — `live_refresh_loop.py:2784-2790` sets
-   `popen_kwargs["stdout"] = open(log_path, "wb")` — so **nothing the job prints
-   reaches Render's log collector.** On 2026-08-19 I spent twenty minutes
-   watching the logs API for a line the wrapper prints on every run; it can never
-   appear there. Verifying an input by grepping Render logs for a sim-job print
-   is checking a channel the line cannot reach, and it will always look like
-   failure. The checklist REPORT is allowlisted and published, so it is readable
-   remotely; the on-disk sim log is not, absent an ops endpoint that tails it.
-   No such endpoint exists today;
+   FILE — `live_refresh_loop.py:2952-2957` `[re-read 2026-11-17]` opens
+   `log_path` under `_mlb_sim_log_dir()` (`SYNDICATE_MLB_SIM_LOG_DIR`, else
+   `<tempdir>/syndicate_mlb_sim_logs`) and sets `popen_kwargs["stdout"]` to it —
+   so **nothing the job prints reaches refresh-worker's role log**
+   (`~/syndicate-prod/logs/refresh-worker.log`, what `scripts/fleet_logs.py`
+   reads). On 2026-08-19 I spent twenty minutes watching Render's logs API
+   (retired with Render, 2026-09-30) for a line the wrapper prints on every run;
+   it can never appear there. Verifying an input by grepping the role log for a
+   sim-job print is checking a channel the line cannot reach, and it will always
+   look like failure. The checklist REPORT is allowlisted and published, so it is
+   readable through `/api/ops/artifacts/*`; the sim log is a file on the fleet
+   host that no ops endpoint serves;
 4. only then measure effect.
 
 Skipping (2) produces a confident "shipped" followed by a flat measurement.

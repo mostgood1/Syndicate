@@ -13,7 +13,7 @@ The external endpoint behavior is the contract to preserve unless the task expli
 
 This skill is also the incident-response workflow for repeated board failures. Use it when the live surface is stale, empty, queued-only, or returning 502 during deploy transitions.
 
-Before relying on live Render for diagnosis, first try to reproduce the issue in a local Render-emulated environment that matches the deployed runtime as closely as possible: same env vars, same worker/web split, same data roots or mounted disk layout, and the same disabled or enabled background loops where applicable. Treat that local setup as the preferred place to reach a Render-runtime-equivalent state before widening the investigation.
+Before relying on the live fleet for diagnosis, first try to reproduce the issue in a local fleet-equivalent run that matches the fleet's runtime as closely as possible: the same role env (built at `up` from `scripts/fleet_role_spec.json` -> `~/syndicate-prod/fleet_env/<role>.json` -> `~/syndicate-prod/local_production.env` -> forced keys, a later layer winning; `python3 scripts/local_production.py env --role <role>` prints it with secrets masked), the same worker/web split, a `SYNDICATE_DATA_ROOT` laid out like the fleet's one shared disk (`~/syndicate-prod/data`), and the same disabled or enabled background loops where applicable. Run it with paper money only: the fleet's own env trades live money. `scripts/fleet_local.py` is the rehearsal harness that forces paper mode and replays the network. Treat that local setup as the preferred place to reach a fleet-equivalent state before widening the investigation. `[2026-11-17]` This step used to say "Render-emulated"; Render was retired on 2026-09-30.
 
 ## Auto-Troubleshoot Triggers
 
@@ -21,7 +21,7 @@ If any of the following are observed, immediately switch into incident-mode trou
 - `/versionz` does not match the latest pushed commit.
 - `/healthz` is 200 but `/api/intelligence/status` still shows `candidate_count: 0` or `state_last_updated: null`.
 - `/api/intelligence/query` is 200 but the board renders empty or `board_input` logs show zero cards.
-- `/intelligence` or `/api/intelligence/status` returns 502 while the deploy dashboard says the service is live.
+- `/intelligence` or `/api/intelligence/status` returns 502 while the fleet supervisor reports web up (`python3 scripts/local_production.py status` in the fleet checkout).
 - Logs show candidate generation happening upstream, but the visible board contract is empty.
 - The board becomes empty again after a deploy that was supposed to be a fix.
 
@@ -30,9 +30,9 @@ When triggered, do all of the following automatically:
 2. Check the live board, query, and status endpoints with cache-busting request URLs.
 3. Map the failure to one primary bucket: deploy mismatch, request-path timeout, worker ownership/queue issue, cache/snapshot freshness, response-shape/alias drift, or template hydration.
 4. Inspect the smallest owning layer that can explain the symptom and stop after the first falsifiable local hypothesis.
-5. Reproduce the issue in the local Render-emulated environment first if the symptom depends on runtime shape, startup behavior, disk state, or worker/web parity.
+5. Reproduce the issue in the local fleet-equivalent run first if the symptom depends on runtime shape, startup behavior, disk state, or worker/web parity.
 6. Prefer a self-heal if it is safe: refresh queued state, restore missing aliases, or fall back to the best valid cached snapshot.
-7. If the fix would block the web dyno, do not compute inline; hand off to the worker and return quickly.
+7. If the fix would block the web role, do not compute inline; hand off to the worker and return quickly.
 
 # System intent
 
@@ -45,7 +45,7 @@ The intelligence system should be evolved behind the endpoint through modular la
 - structured output mapping
 - formatting / response assembly
 
-The system should self-heal when possible, but never by blocking the web dyno long enough to trigger Render timeouts.
+The system should self-heal when possible, but never by blocking the web role long enough to trip its gunicorn worker timeout (`GUNICORN_TIMEOUT`), which surfaces as a 502 or a timeout at `http://127.0.0.1:10000`.
 
 # Core rules
 
@@ -59,10 +59,10 @@ The system should self-heal when possible, but never by blocking the web dyno lo
 4. Do not mix formatting with analysis logic.
 5. Do not bypass structured output when returning endpoint responses.
 6. Do not make unreviewed breaking changes to request or response shapes.
-7. Any endpoint change must be grounded in repository code that Render will deploy.
+7. Any endpoint change must be grounded in repository code on `main`, which is what the fleet deploys. Pushing to `main` ships nothing by itself: a fleet deploy is an exact-SHA `git merge --ff-only <sha>` in `~/Syndicate`, then `local_production.py reload-web` for web.
 8. Treat a healthy `/healthz` as necessary but not sufficient; `/versionz`, `/api/intelligence/status`, `/api/intelligence/query`, and `/intelligence` must also agree.
 9. If the request path can compute safely and quickly, prefer a populated response over an empty shell.
-10. If the request path would exceed the Render timeout ceiling, stop computing inline and hand off to the worker or cached path.
+10. If the request path would exceed web's gunicorn timeout (`GUNICORN_TIMEOUT`), stop computing inline and hand off to the worker or cached path.
 
 # Required workflow
 
@@ -76,7 +76,7 @@ The system should self-heal when possible, but never by blocking the web dyno lo
    - response-shape / alias issue
    - template hydration issue
 4. Inspect `intelligence.py` and surrounding pipeline modules.
-5. Reproduce the issue locally in the Render-emulated environment when the failure may depend on deploy runtime, disk layout, env vars, worker ownership, or startup timing.
+5. Reproduce the issue locally in the fleet-equivalent run when the failure may depend on deploy runtime, disk layout, env vars, worker ownership, or startup timing.
 6. Identify whether the requested feature belongs in:
    - router
    - pipeline
@@ -88,7 +88,7 @@ The system should self-heal when possible, but never by blocking the web dyno lo
    - endpoint contract
    - pipeline logic
    - structured output
-10. Validate using the local Render-emulated path first when available, then the same live request path the UI uses.
+10. Validate using the local fleet-equivalent path first when available, then the same live request path the UI uses.
 11. Summarize changed files, the failure bucket, and any contract impact explicitly.
 
 If the same failure has recurred across multiple deploys, perform the auto-troubleshoot sequence above before editing code so the incident is diagnosed as a system problem, not just a one-off bug.
@@ -101,7 +101,7 @@ If the same failure has recurred across multiple deploys, perform the auto-troub
 
 # Failure matrix
 
-- `502` on `/versionz`, `/intelligence`, or `/api/intelligence/status`: treat as deploy or runtime failure first, not a board-shape problem.
+- `502` on `/versionz`, `/intelligence`, or `/api/intelligence/status`: treat as deploy or runtime failure first, not a board-shape problem. On the fleet that is web at `http://127.0.0.1:10000` (a gunicorn worker recycle or starvation): check `/healthz` and read web's log with `py -3 scripts/fleet_logs.py --service web --text <substring> --start <UTC ISO8601>`.
 - `healthz 200` but `status candidate_count: 0` / `state_last_updated: null`: treat as stale snapshot, worker, or persistence failure.
 - `query 200` but board still empty: inspect response assembly, board contract shaping, and `top_opportunities` / `recommendations` aliases.
 - `candidate_generation > 0` in logs but zero board cards: inspect response filtering, archived/final visibility rules, or alias hydration.
@@ -111,7 +111,7 @@ If the same failure has recurred across multiple deploys, perform the auto-troub
 # Self-heal rules
 
 1. If deploy parity is wrong, stop and fix the deploy first.
-2. If the request path is slow enough to threaten the Render timeout, return a cached or queued response and let the worker own recompute.
+2. If the request path is slow enough to threaten web's gunicorn timeout, return a cached or queued response and let the worker own recompute.
 3. If the board contract would otherwise collapse to an empty visible list, preserve the best available recommendations and surface the archived/final state instead of hiding everything.
 4. If status is stale but the worker can refresh, queue a refresh and return the best safe snapshot.
 5. If response aliases drift, restore the canonical aliases (`top_opportunities`, `recommendations`, `board_contract`) before changing UI code.
@@ -125,7 +125,7 @@ If the same failure has recurred across multiple deploys, perform the auto-troub
 - pipeline modules
 - router modules
 - response models / formatter
-- `render.yaml`
+- `scripts/fleet_role_spec.json` and `docs/ai_context/local_production_runbook.md` (each role's declared env and how the fleet runs; `render.yaml` is read by nothing since 2026-11-17)
 - `scripts/run_refresh_worker.py`
 - deployment/version endpoints
 - tests covering intelligence behavior

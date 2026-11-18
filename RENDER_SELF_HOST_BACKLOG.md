@@ -1,5 +1,10 @@
 # Render Self-Host Backlog
 
+> **`[2026-11-17]` A Render-era record.** Render billing-suspended all three services on
+> 2026-09-30 and is retired. Production is the local WSL fleet (`scripts/local_production.py`,
+> runbook `docs/ai_context/local_production_runbook.md`), whose workers generate artifacts onto
+> one shared data root. Read this file as the plan it was, not as current instructions.
+
 This backlog translates [RENDER_SELF_HOST_REFACTOR_PLAN.md](RENDER_SELF_HOST_REFACTOR_PLAN.md) into an execution sequence. The goal is not to make Syndicate merely deployable on Render. The goal is to make it self-refreshing and operationally complete on Render without external source repos.
 
 ## Current hosted boundary

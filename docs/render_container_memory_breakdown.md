@@ -1,5 +1,15 @@
 # Render Container Memory Breakdown
 
+> **`[2026-11-17]` What is true now.** This is the record of a Render-era investigation. Render
+> billing-suspended all three services on 2026-09-30 and is retired, so the "next Render run"
+> steps below can no longer be taken. Production is the local WSL fleet
+> (`scripts/local_production.py up`; runbook `docs/ai_context/local_production_runbook.md`):
+> there is no container and no cgroup limit. Each role's memory gates measure its process-tree
+> RSS against `SYNDICATE_LOCAL_MEMORY_LIMIT_MB`, which defaults to the old Render plan (web 2048,
+> refresh-worker 4096, live-odds-worker 2048). The `ALL_PROCESS_MEMORY` / `CONTAINER_MEMORY` lines
+> still reach each role's log (`~/syndicate-prod/logs/<role>.log`); read them with
+> `py -3 scripts/fleet_logs.py`.
+
 ## Purpose
 This document tracks the process-level accounting investigation for the Render odds-refresh container.
 

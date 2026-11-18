@@ -76,7 +76,7 @@ Current root-cause ledger:
 - Excluded until explained: downstream readers, hydration, routing, and UI
 
 ### Evidence Buckets
-Keep board-candidate failures and Render startup failures in separate evidence buckets.
+Keep board-candidate failures and web startup failures in separate evidence buckets.
 
 BOARD ROOT CAUSE STATUS
 - Status: active
@@ -84,15 +84,16 @@ BOARD ROOT CAUSE STATUS
 - Current hypothesis: intelligence candidate generation is improperly coupled to home-page visibility filtering
 - Next evidence must either strengthen this hypothesis or directly falsify it
 
-RENDER 502 STATUS
+WEB 502 STATUS
 - Status: active
 - Strongest evidence: /health, /versionz, and /intelligence all return 502
 - Current hypothesis: service-wide startup/runtime failure that still needs a traceback or startup log
 - Unknowns: startup exception, env mismatch, backend configuration issue, deployment issue, runtime crash location
+- Where to look `[2026-11-17]`: production is the local WSL fleet (Render, where this bucket was opened as "Render 502", was retired on 2026-09-30). A 502 or timeout is web at `http://127.0.0.1:10000` (a gunicorn worker recycle or starvation). Check `/healthz` and read web's log with `py -3 scripts/fleet_logs.py --service web --text <substring> --start <UTC ISO8601>`.
 
 Rules:
 - Evidence does not migrate between buckets.
-- A startup/runtime exception belongs only to the Render 502 bucket unless it directly proves the board coupling.
+- A startup/runtime exception belongs only to the web 502 bucket unless it directly proves the board coupling.
 - A candidate-count shift belongs only to the board bucket unless it directly proves startup failure.
 - Do not replace one active hypothesis with the other.
 

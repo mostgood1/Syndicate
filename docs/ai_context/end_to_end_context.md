@@ -1,15 +1,22 @@
 # Syndicate End-to-End Context
 
 > **Purpose.** This is the single orientation document for how Syndicate actually runs as a
-> living system — how work moves between **local ↔ git ↔ Render**, how the **web/worker split**
-> serves it, and how every feature subsystem (artifacts, board contract, simulation,
-> intelligence, evaluation, Ask-the-Syndicate) fits together. Read this first when you need to
-> code an improvement or diagnose a production bug fast. It is a map, not a substitute for the
-> deep docs it links to.
+> living system — how work moves between **local ↔ git ↔ the production fleet**, how the
+> **web/worker split** serves it, and how every feature subsystem (artifacts, board contract,
+> simulation, intelligence, evaluation, Ask-the-Syndicate) fits together. Read this first when you
+> need to code an improvement or diagnose a production bug fast. It is a map, not a substitute for
+> the deep docs it links to.
 >
-> **Baseline:** written against `main` @ `bef3a026`, Python 3.11.9, Render blueprint in
-> `render.yaml`. When a specific line number is cited, treat it as a *starting point that may
-> drift* — verify the symbol still exists before relying on it.
+> **Baseline:** written against `main` @ `bef3a026`, Python 3.11.9, when production was a Render
+> blueprint (`render.yaml`). When a specific line number is cited, treat it as a *starting point
+> that may drift* — verify the symbol still exists before relying on it.
+>
+> **`[2026-11-17]` Production is the local WSL fleet, not Render.** Render billing-suspended all
+> three services on 2026-09-30 and is retired (`docs/ai_context/render_retirement.md`). Since then
+> `scripts/local_production.py up` runs web, refresh-worker, live-odds-worker and a local Redis on
+> this Windows machine's WSL, on ONE shared disk (`~/syndicate-prod/data`). Runbook:
+> `docs/ai_context/local_production_runbook.md`. §0, §1, §2.3, §2.5, §3.4 and §6–§9 were rewritten
+> for the fleet (lane `render-name-cleanup`); the Render-era layout is kept in §1.3 as history.
 
 **Golden rule that explains 80% of the architecture:** *the web service does no heavy
 computation; workers write artifacts, the web reads them.* If you internalize only one thing,
@@ -20,24 +27,25 @@ make it this. Everything below is a consequence.
 ## 0. The 60-second mental model
 
 ```
-                         ┌──────────────────────── RENDER (live source of truth) ─────────────────────────┐
-                         │                                                                                 │
-  The Odds API ─────────▶│  live-odds-worker ──┐                                                           │
-  ESPN / StatsAPI  ──────▶│  refresh-worker  ──┼─▶ writes artifacts to its own 50GB disk                  │
-                         │      (heavy compute) │       + POSTs "hot" artifacts ──▶ syndicate (web)        │
-                         │                      │       + shared coordination via ──▶ syndicate-refresh-   │
-                         │                      │                                       state (Redis/KV)   │
-                         │  syndicate (web) ◀───┘  reads artifacts, hydrates, serves HTML/JSON. NO compute │
-                         │      │  gunicorn wsgi:application, /healthz                                       │
-                         └──────┼──────────────────────────────────────────────────────────────────────────┘
-                                │  (2) GitHub Action pulls hot artifacts back over HTTP (daily 06:00 UTC)
-                                ▼
-  (1) You push code ──▶  GITHUB (mostgood1/Syndicate, branch main)  ──(3) manual/​hook deploy──▶ Render
-                          • git = code transport + artifact BACKUP snapshot, NOT the live data path
+                ┌──────── THE FLEET (WSL on the Windows host; live source of truth) ───────┐
+                │  `scripts/local_production.py up` supervises every role below            │
+  The Odds API ▶│  live-odds-worker ──┐                                                    │
+  ESPN/StatsAPI▶│  refresh-worker  ──┼─▶ write artifacts to the ONE shared data root       │
+                │    (heavy compute)  │    `~/syndicate-prod/data` (SYNDICATE_DATA_ROOT)   │
+                │                     │  + shared state via ──▶ local Redis (keyvalue)     │
+                │  web ◀──────────────┘  reads the same data root, hydrates, serves.       │
+                │     NO compute. gunicorn wsgi:application, 127.0.0.1:10000, /healthz     │
+                │  nightly `data-backup` job: snapshot of data root + Redis                │
+                └───────────────────────────────▲──────────────────────────────────────────┘
+                                                │ (2) deploy: exact-SHA `git merge --ff-only <sha>`
+                                                │     in `~/Syndicate`, then reload-web / role TERM /
+                                                │     drained down+up (claim + preflight gated)
+  (1) You push code ──▶  GITHUB (mostgood1/Syndicate, branch main) — pushing ships NOTHING by itself
+                          • git = code transport + a lossy cold-start MIRROR of data, NOT the live data path
                           • CI runs `unittest tests.test_archives` on push/PR
                                 ▲
                                 │  git pull / push
-                          LOCAL (Windows, `py -3 app.py`, Flask dev server, filesystem state)
+                          LOCAL (Windows dev checkout, `py -3 app.py`, Flask dev server, filesystem state)
                           • full pipeline CAN run here (daily_update*.ps1) but normally doesn't
                           • local is a dev + validation mirror, never assumed complete
 ```
@@ -46,14 +54,18 @@ Three environments, three different jobs:
 
 | Environment | Role | Compute? | State backend | "Truth"? |
 |---|---|---|---|---|
-| **Local** (Windows) | Develop, run gate/tests, optionally regenerate | Yes (dev-only) | filesystem (`reports/`, `data/`) | No — a mirror; assume incomplete |
-| **Git** (GitHub) | Transport code; **snapshot/backup** of artifacts | CI only (archive tests) | git-tracked files | No — a durable backup |
-| **Render** | Serve users + **own daily generation** | Workers only | Redis KV + per-service disks | **Yes** — the live source of truth |
+| **Local** (Windows dev checkout) | Develop, run gate/tests, optionally regenerate | Yes (dev-only) | filesystem (`reports/`, `data/`) | No — a mirror; assume incomplete |
+| **Git** (GitHub) | Transport code; lossy cold-start **mirror** of artifacts | CI only (archive tests) | git-tracked files | No — a lossy mirror |
+| **The fleet** (WSL, production since 2026-09-30) | Serve users + **own daily generation** | Workers only | local Redis (keyvalue) + one shared disk | **Yes** — the live source of truth |
 
-> **Memory anchor** (`memory/project_render_source_of_truth.md`): *Render is source of truth; the
-> local checkout is never assumed complete. Check prod before diagnosing a "data gap."* The daily
-> GitHub Action **pulls** hot artifacts *from* Render and commits them to git — data flows
-> Render→git, not git→Render, for the runtime bundles.
+> **Memory anchor** (`memory/project_fleet_is_source_of_truth.md`): *the fleet's
+> `~/syndicate-prod/data` is the source of truth, not the checkout, git or Render; the local
+> checkout is never assumed complete. Check prod (`http://127.0.0.1:10000`) before diagnosing a
+> "data gap."* Data flows production→git, not git→production, for the runtime bundles (the one
+> exception is the seed-only copy at `up`, §1.5). Until 2026-09-30 a daily GitHub Action pulled
+> hot artifacts from Render into git; that pull was retired 2026-11-15 because a GitHub runner
+> cannot reach the fleet. The git mirror is refreshed on the fleet host (`scripts/mirror_pull.py`,
+> `scripts/refresh_<sport>_source_mirror.ps1`).
 
 ---
 
@@ -63,12 +75,13 @@ Three environments, three different jobs:
 
 - **Run:** `py -3 app.py` → `app.run(debug=True, use_reloader=False)` — a single-process Flask dev
   server. No gunicorn, no workers, no Redis.
-- **State:** with no `RENDER`/hosted env vars set, `refresh_state_store` resolves to the
-  **filesystem** backend; roots default to `<repo>/data` and `<repo>/reports`.
+- **State:** with no hosted env vars set (`SYNDICATE_HOSTED`, `SYNDICATE_REQUIRE_HOSTED_STORAGE`),
+  `refresh_state_store` resolves to the **filesystem** backend; roots default to `<repo>/data` and
+  `<repo>/reports`.
 - **What local is for:** writing code; running the migration gate / archive tests / browser smoke;
   optionally regenerating artifacts via the PowerShell daily-update wrappers. Local **can** run the
   entire pipeline (`scripts/daily_update*.ps1`, `refresh_and_gate.ps1`) but in the current operating
-  model that is a *fallback*, not the norm — Render owns daily generation.
+  model that is a *fallback*, not the norm — the fleet's workers own daily generation.
 - **The `run-syndicate` skill** launches the app + a headless browser to prove pages actually
   render. Prefer it over guessing for UI verification.
 
@@ -76,10 +89,12 @@ Three environments, three different jobs:
 
 Git plays **two** roles, and conflating them causes confusion:
 
-1. **Code transport.** Normal: branch off `main`, PR, merge. `autoDeploy: false` in `render.yaml`,
-   so **merging to `main` does not deploy** — deploys are manual or hook-triggered.
-2. **Artifact backup snapshot.** The `data/**` and `reports/**` trees are git-tracked. They are a
-   *durable backup* of what Render generated, refreshed by the daily backup Action (§1.4). This is
+1. **Code transport.** Normal: branch off `main`, PR, merge. **Merging to `main` does not
+   deploy**: the fleet ships a commit only when someone fast-forwards its checkout to that exact
+   SHA (§1.3).
+2. **Artifact mirror.** The `data/**` and `reports/**` trees are git-tracked. They are a *lossy
+   cold-start mirror* of what production generated (each family synced on its own schedule; see
+   CLAUDE.md), refreshed from the fleet host (§1.4). This is
    why `git status` on this repo is perpetually noisy with modified JSON/JSONL/CSV under
    `data/` and `reports/` — those are regenerated artifacts, not hand edits. **Do not** treat that
    churn as meaningful diffs, and don't hand-edit generated artifacts.
@@ -90,11 +105,50 @@ suite — shared rank/game transport parity across MLB/NBA/NCAAB/NCAAF/NFL/NHL/W
 This is the single automated gate on code changes; the fuller `migration_gate.py` is a *local*
 pre-push tool, not wired into CI.
 
-### 1.3 Render (production — the live system)
+### 1.3 The fleet (production — the live system) `[2026-11-17]`
 
-`render.yaml` (a Render **Blueprint**; there is no Procfile/Dockerfile/app.json) defines **four
-resources**. All compute services are `env: python`, `plan: standard`, `autoDeploy: false`,
-`buildCommand: pip install -r requirements.txt`.
+Production is the local WSL fleet (runbook: `docs/ai_context/local_production_runbook.md`).
+`scripts/local_production.py up` supervises four processes on this Windows machine's WSL:
+
+| Role | Start command | Disk | Loops it runs |
+|---|---|---|---|
+| **`web`** | `gunicorn wsgi:application` (`/healthz`, `http://127.0.0.1:10000`) | the shared data root | none by default (compute offloaded) |
+| **`refresh-worker`** | `python scripts/run_refresh_worker.py` | the shared data root | intelligence-state loop; MLB sim; look-ahead; reconciliation; weekly-sports autorun |
+| **`live-odds-worker`** | `python scripts/run_live_odds_refresh_worker.py` | the shared data root | live-odds refresh loop; live-lens loop |
+| local Redis | `redis-server`, started or reused by `up` | — | — (shared coordination, keyvalue backend) |
+
+- **One shared disk.** All three roles read and write `~/syndicate-prod/data`
+  (`SYNDICATE_DATA_ROOT`). Workers write artifacts there and web reads them from there.
+  `SYNDICATE_WEB_PUBLISH_URL` is removed by the launcher, so the worker→web publish path
+  (`artifact_publisher.py`, `POST /api/ops/artifacts/publish`) skips cleanly as a no-op. On one
+  disk it would be harmful: the receiver `os.replace`s the very file a worker is appending to.
+- **Shared state** (refresh manifests, run history, per-lane indexes, intelligence-state queue) →
+  the local Redis (`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`). The roles share a disk, but with
+  `SYNDICATE_HOSTED=true` the workers refuse a file backend, so the rule stands.
+- **Env** is built at every `up` from layers, a later one winning: `scripts/fleet_role_spec.json`
+  → `~/syndicate-prod/fleet_env/<role>.json` → `~/syndicate-prod/local_production.env`
+  (`ROLE__KEY` for one role) → the launcher's forced keys. `render.yaml` is not read by anything,
+  and editing it changes nothing on the fleet. Env changes need a drained full `down`/`up`.
+- **Service markers.** The launcher sets `SYNDICATE_HOSTED=true`, `SYNDICATE_SERVICE_NAME` /
+  `SYNDICATE_SERVICE_ID=local-<role>`, `SYNDICATE_INSTANCE_ID` and `SYNDICATE_GIT_COMMIT` on every
+  role, read through `service_identity.service_marker`. The code branches on them (§2.5).
+- **Memory.** Each role's `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` defaults to its old Render plan (web
+  2048, refresh-worker 4096, live-odds-worker 2048); `memory_observability` measures the role's
+  process-tree RSS against it.
+- **Scheduled jobs.** The supervisor runs `SCHEDULED_JOBS` (`scripts/local_production.py`): the
+  former Render dashboard crons, `data-backup`, and fleet-only jobs added since.
+- **Logs.** Each role writes `~/syndicate-prod/logs/<role>.log`; read them with
+  `py -3 scripts/fleet_logs.py` (`scripts/render_logs.py` is a compatibility shim).
+- **Deploys.** Pushing to `main` ships nothing. A fleet deploy is an exact-SHA
+  `git merge --ff-only <sha>` in `~/Syndicate` (remote `github`), then `local_production.py
+  reload-web` (web), a role TERM (a worker; the supervisor restarts it) or a drained full
+  `down` + `up` (env change). Each is gated by `scripts/deploy_claim.py acquire` plus a
+  `scripts/deploy_preflight.py` CLEAR within 15 minutes, enforced by `.claude/hooks/deploy-guard.py`;
+  measurements go in `.syndicate/deploys.md`.
+
+**History: what Render ran (retired 2026-09-30).** `render.yaml` (a Render **Blueprint**; there is
+no Procfile/Dockerfile/app.json) defined **four resources**. All compute services were
+`env: python`, `plan: standard`, `autoDeploy: false`, `buildCommand: pip install -r requirements.txt`.
 
 | Resource | Type | Start command | Disk | Loops it runs |
 |---|---|---|---|---|
@@ -103,58 +157,71 @@ resources**. All compute services are `env: python`, `plan: standard`, `autoDepl
 | **`live-odds-worker`** | worker | `python scripts/run_live_odds_refresh_worker.py` | own 50GB (same path) | live-odds refresh loop; live-lens loop |
 | **`syndicate-refresh-state`** | keyvalue (Redis/Valkey) | managed | — | — (shared coordination) |
 
-Critical Render constraint: **a persistent disk attaches to exactly one service** — the three
-compute services each mount their *own* 50GB disk at the same path, so they **cannot** share files.
-Cross-service coordination therefore happens two ways:
+Render's constraint was that **a persistent disk attaches to exactly one service** — the three
+compute services each mounted their *own* 50GB disk at the same path, so they **could not** share
+files. Cross-service coordination therefore happened two ways:
 
 - **Shared state** (refresh manifests, run history, per-lane indexes, intelligence-state queue) →
-  the **Redis KV** service. `syndicate-refresh-state.connectionString` is injected as
+  the **Redis KV** service. `syndicate-refresh-state.connectionString` was injected as
   `SYNDICATE_REFRESH_STATE_URL` into all three compute services; all set
-  `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`.
-- **Hot artifacts** (the freshly generated per-sport files the web must serve) → workers **POST**
+  `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`. (The fleet keeps this through its local Redis.)
+- **Hot artifacts** (the freshly generated per-sport files the web must serve) → workers **POSTed**
   them to the web service at `POST /api/ops/artifacts/publish` (auth `Bearer ADMIN_TOKEN`, allowlist
-  via `is_hot_artifact_relative_path`), and pull via `GET /api/ops/artifacts/export`.
-  `SYNDICATE_WEB_PUBLISH_URL=https://syndicate-an21.onrender.com` on both workers.
-  Implemented in `syndicate/features/shared/artifact_publisher.py`; web endpoints in
-  `syndicate/blueprints/ops.py`.
+  via `is_hot_artifact_relative_path`), and pulled via `GET /api/ops/artifacts/export`, with
+  `SYNDICATE_WEB_PUBLISH_URL` set to the Render web URL on both workers. Implemented in
+  `syndicate/features/shared/artifact_publisher.py`; web endpoints in `syndicate/blueprints/ops.py`.
+  (On the fleet the URL is unset and the publish is a no-op, above.)
 
-**Web URL:** `https://syndicate-an21.onrender.com`. **Deploy IDs** for scripted API calls live in
-`deploy_ids.json` (`srv-…`/`dep-…` per service).
+The Render web URL was `syndicate-an21.onrender.com` (suspended; never target it). `deploy_ids.json`
+still holds the Render `srv-…`/`dep-…` IDs per service; nothing reads them since the Render deploy
+scripts were deleted 2026-11-15.
 
-### 1.4 The daily cycle — who generates, who commits, who deploys
+### 1.4 The daily cycle — who generates, who backs up, who deploys
 
-`.github/workflows/daily-update.yml` (cron `0 6 * * *` UTC + manual `workflow_dispatch`), on
-`windows-latest`, has **two mutually exclusive paths** gated by the `run_full_pipeline` input:
+**Generation** is the fleet's workers, continuously (§2.5), writing onto the shared data root.
+Nothing in GitHub generates or deploys production data.
 
-- **Default = "backup-only"** (`run_full_pipeline != 'true'`): does **not** regenerate anything.
-  It `GET {base_url}/api/ops/artifacts/export` (base `https://syndicate-an21.onrender.com`,
-  `Authorization: Bearer ADMIN_TOKEN`), writes the pulled hot artifacts under `data/`, and commits
-  as `github-actions[bot]`. **No redeploy** — the data is already live on Render. This path
-  encodes the current reality: *"Render workers own the daily generation."*
-- **Full pipeline = manual fallback** (`run_full_pipeline == 'true'`): runs
-  `scripts/daily_update.ps1` / `daily_update_in_season.ps1` locally-in-CI, commits outputs, then
-  **triggers a Render web redeploy** via `secrets.RENDER_WEB_DEPLOY_HOOK_URL`.
+**Durability** is the fleet's own nightly `data-backup` job (`scripts/local_production.py backup`):
+a hard-linked snapshot of the data root plus a Redis dump, and an off-disk archive (runbook §4).
+The git `data/**` mirror is refreshed on the fleet host with `scripts/mirror_pull.py` or
+`scripts/refresh_<sport>_source_mirror.ps1`.
+
+**Deploys** are the exact-SHA fast-forwards in §1.3. Nothing deploys on a merge, a cron or a hook.
+
+`.github/workflows/daily-update.yml` is `workflow_dispatch` only (its schedule was removed
+2026-08-20). History: its default "backup-only" path pulled hot artifacts from the Render web
+service over `GET /api/ops/artifacts/export` and committed them as `github-actions[bot]`; that path
+was retired 2026-11-15 and now fails fast, because a GitHub runner cannot reach the fleet. Its
+Render redeploy step (`RENDER_WEB_DEPLOY_HOOK_URL`) was removed 2026-09-07. The only path left is
+**full pipeline = manual fallback** (`run_full_pipeline == 'true'`): it runs
+`scripts/daily_update.ps1` / `daily_update_in_season.ps1` on the runner and commits outputs.
 
 Always-run test gates in that workflow: `tests.test_daily_update_smoke` (soft), a
 `tests.test_migration_gate` active-sport gate, and a batch of daily-update contract regressions.
 
 **So the end-to-end lifecycle of a betting number is:**
 ```
-live-odds-worker fetches odds ─▶ refresh_odds_sources.py generates candidates+artifacts on worker disk
-   ─▶ worker POSTs hot artifacts to web  ─▶ web serves them to users (live)
-   ─▶ (next 06:00 UTC) GitHub Action pulls them from web ─▶ commits to git as the backup snapshot
+live-odds-worker fetches odds ─▶ refresh_odds_sources.py generates candidates+artifacts on the shared data root
+   ─▶ web reads them from the same disk ─▶ web serves them to users (live)
+   ─▶ (nightly) `data-backup` snapshots the data root; the git mirror is refreshed by hand from the fleet host
 ```
 
-### 1.5 Startup bootstrap (how a fresh Render dyno gets its data)
+### 1.5 Startup bootstrap (how a fresh data root gets its data)
 
-Every service sets `SYNDICATE_BOOTSTRAP_ON_START=1`. On boot, `syndicate/app.py::_bootstrap_render_data`
-runs `scripts/bootstrap_data_root.main`, which syncs the git-committed `data/**` and `reports/**`
-seed trees into the mounted disk (`SYNDICATE_DATA_ROOT=/opt/render/project/data`). On the **web
-dyno** this runs in a daemon thread that sleeps 20s and takes an atomic
-`O_CREAT|O_EXCL` lock at `<data_root>/.bootstrap_sync.lock` — because `WEB_CONCURRENCY=2` means two
-gunicorn workers each import the app with no `--preload`, and a synchronous bootstrap would 502 the
-health check. This is the one place git→Render data flow still happens: the committed backup is the
-**seed** a cold dyno starts from before the workers refresh it live.
+**On the fleet** `[2026-11-17]`: `up` runs the bootstrap **once**, before any role starts, and
+forces `SYNDICATE_BOOTSTRAP_ON_START=0` inside the roles. It is the same seed-only copy of the
+checkout's `data/**` and `reports/**` mirror into `~/syndicate-prod/data`; existing files are
+never overwritten. **History (Render, retired 2026-09-30):**
+
+Every service set `SYNDICATE_BOOTSTRAP_ON_START=1`. On boot, `syndicate/app.py`'s bootstrap hook
+(`_bootstrap_render_data` at the time) ran `scripts/bootstrap_data_root.main`, which synced the
+git-committed `data/**` and `reports/**` seed trees into the mounted disk
+(`SYNDICATE_DATA_ROOT=/opt/render/project/data`). On the **web dyno** this ran in a daemon thread
+that slept 20s and took an atomic `O_CREAT|O_EXCL` lock at `<data_root>/.bootstrap_sync.lock` —
+because `WEB_CONCURRENCY=2` meant two gunicorn workers each imported the app with no `--preload`,
+and a synchronous bootstrap would 502 the health check. That was the one place git→Render data
+flow happened: the committed mirror was the **seed** a cold dyno started from before the workers
+refreshed it live.
 
 ---
 
@@ -208,8 +275,9 @@ artifacts**, then `jsonify`/`render_template`. Canonical examples:
 - `intelligence.py intelligence_status_api()` → `read_latest_intelligence_state(...)`; if stale, it
   only **queues** a refresh (`_safe_queue_intelligence_state_refresh`) for the worker — never runs
   `build_intelligence_overview` inline.
-The heavy compute lives in §2.5 loops and in `scripts/`+`pipeline/` jobs. On Render web dynos the
-loops are disabled entirely, which is what structurally enforces the golden rule.
+The heavy compute lives in §2.5 loops and in `scripts/`+`pipeline/` jobs. On the hosted web role
+(the fleet's `web`, which carries `SYNDICATE_HOSTED=true`) the loops are disabled entirely, which is
+what structurally enforces the golden rule.
 
 ### 2.4 Ops blueprint (`syndicate/blueprints/ops.py`) — the control plane
 
@@ -233,9 +301,12 @@ These are your **first-line production debugging tools** — see §7.
 
 ### 2.5 Background loops (worker-owned)
 
-Both start from `syndicate/app.py::_start_background_loops`; on a Render web dyno they start **only**
-if `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is truthy (it isn't on web), so the web
-tier normally runs neither.
+Both start from `syndicate/app.py::_start_background_loops`; on a hosted web role (a service marker
+such as `SYNDICATE_HOSTED=true` is set, as the fleet launcher does for every role) they start
+**only** if `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is truthy (it isn't on web), so
+the web tier normally runs neither. Without the markers, web starts them on its first request
+whatever their flags say, and you get a second board builder on the shared disk — so never strip
+the markers.
 
 - **Intelligence-state loop** (`pipeline/intelligence_state.py`,
   `start_intelligence_state_background_loop`) — runs on **refresh-worker**. Daemon thread
@@ -312,9 +383,11 @@ Mirror scripts `scripts/refresh_<sport>_source_mirror.ps1` populate the bundle. 
 
 ### 3.4 Shared state store — `syndicate/features/shared/refresh_state_store.py`
 
-The seam that makes the multi-service Render deploy coherent.
+The seam that makes the multi-process deploy coherent (built for Render's per-service disks; the
+fleet keeps it, against its local Redis).
 - **Backend selection:** explicit `SYNDICATE_REFRESH_STATE_BACKEND` wins; else if hosted
-  (`RENDER`/`SYNDICATE_REQUIRE_HOSTED_STORAGE`) **and** a URL present → `keyvalue`, else `filesystem`.
+  (`SYNDICATE_HOSTED`/`SYNDICATE_REQUIRE_HOSTED_STORAGE`) **and** a URL present → `keyvalue`, else
+  `filesystem`.
   `assert_refresh_state_backend_ready` **hard-fails** a hosted multi-service deploy that tries to use
   a local file backend.
 - **filesystem:** atomic temp-file + `os.replace`; JSON under `<repo>/reports/`.
@@ -541,18 +614,23 @@ if a snapshot exists calls `generate_briefing()`.
 
 ## 6. Environment variable reference (the load-bearing ones)
 
+Prod values are the fleet's `[2026-11-17]`. Each role's env is layered (§1.3), and the role spec
+`scripts/fleet_role_spec.json` is shadowed by the later layers. `py -3 scripts/local_production.py
+env --role <role>` prints what the next `up` builds for a role (secrets masked); a running role's
+env is its `/proc/<pid>/environ` (env is built only at `up`).
+
 | Var | Controls | Prod value / default |
 |---|---|---|
-| `SYNDICATE_REFRESH_STATE_BACKEND` | shared-state backend | `keyvalue` on all 3 services; local → `filesystem` |
-| `SYNDICATE_REFRESH_STATE_URL` (`REDIS_URL` fallback) | KV connection | injected from `syndicate-refresh-state` |
+| `SYNDICATE_REFRESH_STATE_BACKEND` | shared-state backend | `keyvalue` on all 3 roles (forced by the launcher); local dev → `filesystem` |
+| `SYNDICATE_REFRESH_STATE_URL` (`REDIS_URL` fallback) | KV connection | the fleet's local Redis (forced by the launcher) |
 | `SYNDICATE_REQUIRE_HOSTED_STORAGE` | force hosted mode (data/reports roots mandatory) | `true` on all 3 |
-| `RENDER` | platform flag (also flips hosted on) | set by Render |
-| `SYNDICATE_BOOTSTRAP_ON_START` | sync committed seed → mounted disk on boot | `1` all 3 |
+| `SYNDICATE_HOSTED`, `SYNDICATE_SERVICE_NAME` / `_ID`, `SYNDICATE_INSTANCE_ID`, `SYNDICATE_GIT_COMMIT` | service markers: flip hosted on, gate web's loops, request-path guard, per-service lanes; read via `service_identity.service_marker` | set by `local_production.py` on every role (`_NAME`/`_ID` = `local-<role>`). The Render-era `RENDER*` names are gone since 2026-11-17 |
+| `SYNDICATE_BOOTSTRAP_ON_START` | sync committed seed → data root on boot | `0` inside the roles (forced); `up` seeds once (§1.5) |
 | `SYNDICATE_WEB_DYNO` | mark web process (async-locked bootstrap; skip heavy sim-contract) | web `true`, workers `false` |
-| `SYNDICATE_DATA_ROOT` / `SYNDICATE_REPORTS_ROOT` / `SYNDICATE_STATE_ROOT` | data/reports roots | `/opt/render/project/data[/reports]` |
-| `SYNDICATE_<SPORT>_SOURCE_ROOT` | per-sport source tree | `/opt/render/project/data/<sport>_source` |
-| `SYNDICATE_ARTIFACT_ROOT_<SPORT>` | optional published bundle for ingest | **not set in render.yaml** (deployment-specific) |
-| `SYNDICATE_WEB_PUBLISH_URL` | worker→web artifact push/pull base | `https://syndicate-an21.onrender.com` on workers |
+| `SYNDICATE_DATA_ROOT` / `SYNDICATE_REPORTS_ROOT` / `SYNDICATE_STATE_ROOT` | data/reports roots | `~/syndicate-prod/data`, shared by all 3 roles (spec: `{data_root}`, `{data_root}/reports`) |
+| `SYNDICATE_<SPORT>_SOURCE_ROOT` | per-sport source tree | `~/syndicate-prod/data/<sport>_source` (spec: `{data_root}/<sport>_source`) |
+| `SYNDICATE_ARTIFACT_ROOT_<SPORT>` | optional published bundle for ingest | not declared in the role spec (deployment-specific) |
+| `SYNDICATE_WEB_PUBLISH_URL` | worker→web artifact push/pull base | **removed** by the launcher: one shared disk, so publishing is a no-op (`--publish-loopback` restores it against local web) |
 | `ADMIN_TOKEN` / `SYNDICATE_ADMIN_TOKEN` | ops-endpoint + publish auth | generated on web, shared to workers |
 | `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` | intelligence loop | web/live-odds `false`, refresh-worker `true` |
 | `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP` | live-odds loop | **only** live-odds-worker `true` |
@@ -561,9 +639,10 @@ if a snapshot exists calls `generate_briefing()`.
 | `SYNDICATE_REFRESH_LAUNCH_MODE` | how ops launches refresh (`detached_subprocess`/`manifest_only`/`external_runner`) | `detached_subprocess` |
 | `SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS` | intel loop interval / freshness SLA | 30 (min 10) |
 | `SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS` | live loop base interval | 60 (adaptive idle) |
-| `SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS` | periodic self-exit (Render restarts → cache reset) | 21600 (6h ±10%) |
-| `ODDS_API_KEY` | The Odds API | **hardcoded in render.yaml** ⚠ (see §8) |
-| `ANTHROPIC_API_KEY` | Ask-the-Syndicate LLM | `sync:false` (set in dashboard; absent → snapshot-only) |
+| `SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS` | periodic self-exit (the supervisor restarts the role → cache reset) | 21600 (6h ±10%) |
+| `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` | the role's memory ceiling for the headroom gates (no cgroup on the fleet) | defaults to the old Render plan: web 2048, refresh-worker 4096, live-odds-worker 2048 |
+| `ODDS_API_KEY` | The Odds API | **hardcoded in `render.yaml` and in `scripts/fleet_role_spec.json`** ⚠ (see §8) |
+| `ANTHROPIC_API_KEY` | Ask-the-Syndicate LLM | no value in the role spec (`sync_false`); comes from the role's `fleet_env/` snapshot or `local_production.env`; absent → snapshot-only |
 | `SYNDICATE_ASK_MODEL` / `_LLM_MAX_CALLS` / `_LLM_WINDOW_SECONDS` | Ask model + rate limit | `claude-haiku-4-5` / 30 / 600 |
 | `WEB_CONCURRENCY`, `GUNICORN_*` | gunicorn tuning | web workers=2; timeout 60/30/5 |
 | `TZ`, `PYTHON_VERSION` | timezone, python | `America/Chicago`, `3.11.9` |
@@ -581,10 +660,12 @@ Odds sources → candidate gen → artifact gen → artifact storage → artifac
 ```
 
 Triage checklist for a "missing data" / "empty board" symptom:
-1. **Which environment?** Render is truth. A local gap usually means nothing (local isn't refreshed).
-   Reproduce against `https://syndicate-an21.onrender.com` before touching code.
+1. **Which environment?** The fleet is truth. A local gap usually means nothing (local isn't
+   refreshed). Reproduce against the fleet at `http://127.0.0.1:10000` before touching code
+   (`scripts/_base_url.py` resolves the URL and the admin token).
 2. **Is it pipeline / runtime / deployment?** (per `runtime_infrastructure.md`)
-   - pipeline-level → data never generated (check worker logs, `refresh_status`, manifests);
+   - pipeline-level → data never generated (check worker logs with `py -3 scripts/fleet_logs.py`,
+     `refresh_status`, manifests);
    - runtime-level → data generated but not consumed (check readers/contract);
    - deployment-level → web/worker split or a stale rollout.
 3. **Ops endpoints (admin-token gated) are your instruments:**
@@ -608,15 +689,21 @@ or `refresh_odds_sources.py --dry-run --json` (resolve the command plan without 
 
 ## 8. Known sharp edges, gotchas & tech debt
 
-- **⚠ `ODDS_API_KEY` is hardcoded in `render.yaml`** (committed to git). Treat as a real secret-hygiene
-  issue: rotate it and move to a dashboard-only `sync:false` var. (Do not paste the value into logs,
-  PRs, or docs.)
-- **The three compute disks are NOT shared.** Any instinct to "write a file on the worker and read it
-  on the web" is wrong — it must go through KV (state) or the publish/export HTTP path (artifacts).
+- **⚠ `ODDS_API_KEY` is hardcoded in `render.yaml`, and since 2026-11-17 in
+  `scripts/fleet_role_spec.json` (frozen from it)**, both committed to git. Treat as a real
+  secret-hygiene issue: rotate it and keep it only in the fleet's own env
+  (`~/syndicate-prod/local_production.env` or the `fleet_env/` snapshot). (Do not paste the value
+  into logs, PRs, or docs.)
+- **Shared state still goes through KV.** On the fleet all three roles share one disk, so a worker's
+  artifact on the data root IS what web reads. Shared mutable state (manifests, run history, queues)
+  still goes through the keyvalue store, and the worker→web publish path stays OFF: on one disk it
+  would `os.replace` a file a worker is appending to. (On Render, retired 2026-09-30, the three disks
+  were not shared, which is why both seams exist.)
 - **Git churn is noise.** `data/**` and `reports/**` diffs are regenerated artifacts. Don't review
   them as code; don't hand-edit generated artifacts; don't `git add -A` blindly.
-- **`autoDeploy:false`** — merging to `main` does not deploy. Deploys are the full-pipeline Action's
-  hook or a manual Render deploy.
+- **Merging to `main` does not deploy.** A fleet deploy is an exact-SHA `git merge --ff-only <sha>` of
+  `~/Syndicate` behind a deploy claim and a CLEAR preflight (§1.3), and it ships ALL of `main` up to
+  that SHA. Nothing deploys from a GitHub Action or a hook.
 - **Fail-closed on KV read errors.** Several gates (look-ahead, refresh concurrency) deliberately treat
   a transient KV read failure as "unknown," *not* as "never happened / nothing running." Preserve that
   semantics (`read_json_file_result` returns `(payload, read_ok)`) when editing those paths.
@@ -625,14 +712,16 @@ or `refresh_odds_sources.py --dry-run --json` (resolve the command plan without 
   1800MB); MLB sim ownership was moved to refresh-worker to isolate it; live-odds-worker self-recycles
   every ~6h. `pandas==2.2.2`, `onnxruntime==1.22.0` are pinned for a reason — don't bump casually.
 - **NBA serving is fully local; WNBA is ~90% local** — the NBA HTTP source-app fallback was removed
-  (`35e0b4d5`; `render.yaml`'s `SYNDICATE_NBA_SOURCE_APP_FALLBACK` blocks are dead config). WNBA's
+  (`35e0b4d5`; the `SYNDICATE_NBA_SOURCE_APP_FALLBACK` keys in `render.yaml` and
+  `scripts/fleet_role_spec.json` are dead config). WNBA's
   residual coupling is the in-repo vendored app loaded in-process for a few live exports, plus the
   vendored `cards-parity.js` frontend (`wnba/source_proxy.py` is a static-asset rewriter, not a
   network proxy). The migration direction is still to eliminate these; don't add new ones.
 - **Repo-root clutter** — the `tmp_*` scratch, `ops_state_check*.json`, `ops_status.json`, and
   `prod_final_check.html` debug dumps were removed (see cleanup below); `.gitignore` covers
-  `tmp_*.{log,json,py,txt,xml}` to stop recurrence. **`deploy_ids.json`** is intentionally kept —
-  it holds the Render `srv-…`/`dep-…` IDs for scripted deploys. The 51 former root `*_report.md` files
+  `tmp_*.{log,json,py,txt,xml}` to stop recurrence. **`deploy_ids.json`** still holds the Render
+  `srv-…`/`dep-…` IDs that the Render deploy scripts used; nothing reads it since those scripts were
+  deleted 2026-11-15 (`docs/ai_context/render_retirement.md`). The 51 former root `*_report.md` files
   (`smartsim_*`, `ncaaf_*`, `nfl_*`, `soccersim_*`) were relocated to `docs/reports/` (substantive
   committed analysis reports, not dead code); the six `scripts/build_ncaaf_*_snapshot.py` generators
   that write those reports were repointed to `docs/reports/`.
@@ -653,13 +742,14 @@ or `refresh_odds_sources.py --dry-run --json` (resolve the command plan without 
 | Topic | Doc |
 |---|---|
 | The load-bearing web/worker rule | `docs/ai_context/runtime_execution_model.md`, `worker_architecture.md` |
-| Render hosting model | `docs/ai_context/runtime_infrastructure.md`, `docs/render_data_authority.md`, `docs/render_container_memory_breakdown.md` |
+| Production hosting (the fleet) | `docs/ai_context/local_production_runbook.md`, `docs/ai_context/runtime_infrastructure.md` |
+| Render hosting model (retired 2026-09-30; record) | `docs/ai_context/render_retirement.md`, `docs/render_data_authority.md`, `docs/render_container_memory_breakdown.md` |
 | Data flow (system) | `docs/ai_context/data_flow_system.md`, `daily_pipeline.md` |
 | Simulation internals | `docs/ai_context/simulation_system.md`, `simulation_engine_map.md`, `simulation_adapter_design.md`, `simulation_timing.md`, `simulation_patterns.md`, `simulation_gaps.md` |
 | Intelligence layer call graph | `docs/intelligence_call_graph_reference.md`, `docs/intelligence_execution_paths_and_polling.md`, `docs/intelligence_ask_projection_architecture.md` |
 | Board / betting-board assessment | `docs/intelligence_betting_board_assessment.md` |
 | Daily-update control plane | `docs/daily_update_control_plane.md`, `docs/daily_update_workflow.md`, `docs/shared_refresh_hydration_contract.md` |
-| Self-host roadmap | `RENDER_SELF_HOST_BACKLOG.md`, `RENDER_SELF_HOST_REFACTOR_PLAN.md` |
+| Self-host roadmap (Render-era; record) | `RENDER_SELF_HOST_BACKLOG.md`, `RENDER_SELF_HOST_REFACTOR_PLAN.md` |
 | Phased migration plan | `docs/syndicate_world_class_implementation_plan.md`, `docs/syndicate_world_class_execution_backlog.md` |
 | Debug playbook / fix log | `docs/debug_playbook.md`, `docs/fix_notes_log.md` |
 | Operational reference (long) | `README.md`, `CLAUDE.md` |

@@ -1,15 +1,21 @@
-# Runtime Execution Model (Render vs Workers)
+# Runtime Execution Model (Web vs Workers)
+
+> `[2026-11-17]` This doc used to say "Render" for the web service. Production has been the
+> local WSL fleet since 2026-09-30 (Render is retired; runbook
+> `docs/ai_context/local_production_runbook.md`): `scripts/local_production.py up` runs web,
+> refresh-worker, live-odds-worker and a local Redis on one shared disk, `~/syndicate-prod/data`.
+> The rule itself is unchanged.
 
 ## Core Rule
 
-Render should perform **no heavy computation**.
+The web service should perform **no heavy computation**.
 
 All simulation, aggregation, and data processing should be handled by:
-- GitHub Actions (scheduled jobs)
-- background workers
+- scheduled jobs (the fleet supervisor's `SCHEDULED_JOBS` in `scripts/local_production.py`)
+- background workers (refresh-worker, live-odds-worker)
 - offline pipelines
 
-Render is only responsible for:
+The web service is only responsible for:
 - reading precomputed artifacts
 - hydrating UI responses
 - minimal transformation for display
@@ -33,7 +39,7 @@ Produces:
 
 ---
 
-### Runtime Layer (Render)
+### Runtime Layer (Web)
 
 Runs:
 - route handlers
@@ -41,8 +47,7 @@ Runs:
 - UI rendering
 
 Consumes:
-- precomputed artifacts
-- repo-local read-only mirrors for the public web service
+- precomputed artifacts, read from the shared data root the workers write
 - live-lens snapshots (if available)
 
 Must NOT:
@@ -51,8 +56,9 @@ Must NOT:
 - recompute probabilities heavily
 
 Deployment shape:
-- the public web service is stateless
-- the worker owns disk-backed writes, refresh jobs, and mutable hosted state
+- the web service is stateless
+- the workers own disk-backed writes, refresh jobs, and mutable hosted state (shared state goes
+  through the keyvalue store, the fleet's local Redis)
 
 ---
 
@@ -73,7 +79,7 @@ SimulationEngine should:
 - run in background jobs
 - produce outputs stored in artifacts
 
-Render should:
+The web service should:
 - display simulation outputs
 - optionally trigger lightweight, scoped enrichments only when necessary
 
@@ -90,7 +96,7 @@ If data is missing at runtime:
 
 ## Risk (if violated)
 
-If Render is used for compute:
+If the web service is used for compute:
 - performance degrades
 - results become inconsistent
 - debugging becomes non-deterministic
@@ -104,6 +110,6 @@ Daily pipeline produces:
 → full simulation_contract
 → fully enriched inputs + outputs
 
-Render consumes:
-→ simulation_contract and read-only mirrors
+The web service consumes:
+→ simulation_contract and the artifacts the workers wrote
 → no recomputation required on the web service

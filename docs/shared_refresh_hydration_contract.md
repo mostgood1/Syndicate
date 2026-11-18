@@ -109,5 +109,5 @@ When validating the contract, confirm the following:
 
 - [Daily Update Control Plane](daily_update_control_plane.md)
 - [NBA and WNBA source fallback runbook](nba_wnba_source_fallback_runbook.md)
-- [Render Data Authority](render_data_authority.md)
+- [Render Data Authority](render_data_authority.md) (Render-era record; its 2026-11-17 note says what holds on the fleet)
 - [Fix Notes Log](fix_notes_log.md)

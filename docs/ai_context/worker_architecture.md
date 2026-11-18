@@ -1,8 +1,13 @@
 # Worker Architecture (Background Compute Layer)
 
+> `[2026-11-17]` This doc used to say "Render" for the web service. Production has been the
+> local WSL fleet since 2026-09-30 (Render is retired; runbook
+> `docs/ai_context/local_production_runbook.md`), so it now says **web**: the fleet's `web` role,
+> served at `http://127.0.0.1:10000`. The rule itself is unchanged.
+
 ## Core Principle
 
-All heavy computation MUST run in background workers, not in Render.
+All heavy computation MUST run in background workers, not in the web service.
 
 Workers are responsible for generating and updating all artifacts used at runtime.
 
@@ -22,8 +27,9 @@ Workers handle:
 
 ## Worker Types
 
-### 1. Scheduled Workers (GitHub Actions)
-- run on a schedule (daily, hourly, etc.)
+### 1. Scheduled Workers (the fleet supervisor's `SCHEDULED_JOBS`)
+- run on a schedule (daily, hourly, etc.) from `scripts/local_production.py`; GitHub Actions no
+  longer generate artifacts (`daily-update.yml` is manual-only)
 - generate baseline artifacts for each sport
 - build initial simulation_contract outputs
 
@@ -45,19 +51,19 @@ Workers write:
 → simulation_contract
 → enriched game context
 
-Render reads:
+Web reads:
 
-→ repo-local artifacts for read-only serving on the web service
-→ worker-persisted artifacts and state from the mounted disk when present
+→ the artifacts the workers wrote, on the shared data root (`~/syndicate-prod/data` on the fleet)
+→ shared state from the keyvalue store (the fleet's local Redis)
 
 ---
 
 ## Key Rule
 
-Workers write → Render reads
+Workers write → web reads
 
 There must be NO path where:
-Render recomputes heavy logic synchronously
+web recomputes heavy logic synchronously
 
 ---
 
@@ -68,7 +74,7 @@ SimulationEngine:
 - outputs are persisted
 - results reused by runtime
 
-Render:
+Web:
 - never runs full simulation
 - only consumes outputs
 - the web service stays stateless, while the worker owns disk-backed writes and refresh jobs
@@ -81,7 +87,7 @@ Raw Data
 → Worker
 → Simulation + enrichment
 → artifact (stored)
-→ Render
+→ web
 → UI / intelligence
 
 ---
@@ -92,7 +98,7 @@ Workers ensure:
 - artifacts are up-to-date
 - live updates are captured
 
-Render:
+Web:
 - selects correct artifact version
 - does not regenerate it
 
@@ -102,7 +108,7 @@ Render:
 
 If data is missing:
 
-Render:
+Web:
 - shows degraded UI
 
 Workers:
@@ -121,7 +127,7 @@ Workers should emit:
 
 ## Risk if Violated
 
-If computation leaks into Render:
+If computation leaks into web:
 - CPU spikes
 - slow requests
 - inconsistent results vs pipeline

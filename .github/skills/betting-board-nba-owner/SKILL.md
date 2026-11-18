@@ -2,13 +2,15 @@
 name: betting-board-nba-owner
 description: >-
   Use for the Syndicate NBA betting board when the task involves the board's objective,
-  troubleshooting, Render parity, cache hydration, query/status routes, response shape,
+  troubleshooting, fleet parity, cache hydration, query/status routes, response shape,
   or overall functionality for NBA live and pregame lanes.
 ---
 
 # NBA Betting Board Owner Skill
 
 Use this skill when the user wants the NBA betting board fixed, debugged, verified, or improved end to end.
+
+Production is the local WSL fleet at `http://127.0.0.1:10000` `[since 2026-09-30; Render is retired]`. "Fleet parity" below means the local result matches what the fleet serves.
 
 ## Objective
 Own the NBA betting board as a product surface, not just a route.
@@ -17,7 +19,7 @@ The board should:
 - show the current NBA board contract clearly
 - surface live and pregame lanes
 - hydrate from the best available cached or computed state
-- remain stable on Render and locally
+- remain stable on the production fleet and locally
 - degrade safely when cache or worker state is stale
 
 ## Scope
@@ -25,7 +27,7 @@ This skill applies to work on:
 - `/nba`
 - NBA cards, games, and betting-board responses
 - cache, snapshot, and worker parity for NBA board content
-- Render deploy verification for the NBA board surface
+- fleet deploy verification for the NBA board surface
 - troubleshooting empty, stale, or partially hydrated NBA board states
 
 ## Operating Principles
@@ -41,16 +43,16 @@ This skill applies to work on:
 3. Confirm whether the response is empty, stale, queued, or computed.
 4. Determine whether the worker, cache, or request path owns the failure.
 5. Verify the visible NBA board shape matches what the template expects.
-6. Reproduce the issue in a local Render-emulated environment when the symptom could depend on runtime behavior, startup timing, disk mounts, env vars, or worker/web split behavior.
+6. Reproduce the issue in a local fleet-equivalent run (same worker/web split, same role env, a data root laid out like `~/syndicate-prod/data`, paper money only) when the symptom could depend on runtime behavior, startup timing, the shared data root, env vars, or worker/web split behavior.
 7. Validate locally with the same request path the UI uses after the runtime-equivalent environment check.
 
 ## Validation Expectations
 When changing the NBA board, validate at least one of:
-- local Render-emulated runtime reproduction when the issue is tied to startup, disk, env, or worker parity
+- local fleet-equivalent runtime reproduction when the issue is tied to startup, disk, env, or worker parity
 - local Flask test-client flow for `/nba`
 - NBA API or board route checks
 - targeted regression tests for the touched slice
-- Render version/status parity when deploy behavior is involved
+- fleet version/status parity (`/versionz` and the status route at `http://127.0.0.1:10000`) when deploy behavior is involved
 
 ## Guardrails
 - Do not widen scope into unrelated sports modules unless the NBA board surface depends on them.

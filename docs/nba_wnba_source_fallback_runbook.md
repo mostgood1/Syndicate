@@ -10,6 +10,14 @@
 > of `vendor/wnba_betting_repo/app.py`, not a network fetch, and
 > `wnba/source_proxy.py` is a static-asset rewriter. Keep this file only as
 > history of the recovery it once described; do not follow it for new work.
+>
+> **`[2026-11-17]` Render is retired too.** Render billing-suspended all three
+> services on 2026-09-30; production is the local WSL fleet
+> (`docs/ai_context/local_production_runbook.md`). The "Render web service",
+> standalone `onrender.com` source apps and Render disk layout below describe
+> that era. On the fleet an env change is a `~/syndicate-prod/local_production.env`
+> edit plus a drained full `down`/`up`, and logs are read with
+> `py -3 scripts/fleet_logs.py`.
 
 This runbook completes NBA/WNBA recovery on Syndicate Render by wiring Syndicate to the working standalone source apps.
 
@@ -46,7 +54,7 @@ Compatibility envs are also supported:
 - `NBA_BETTING_CRON_TOKEN`, `WNBA_BETTING_CRON_TOKEN`
 - `CRON_TOKEN`
 
-## Required Render env setup (Syndicate web service)
+## Required Render env setup (Syndicate web service) — historical, Render retired 2026-09-30
 
 Set these env vars on the Syndicate Render web service:
 

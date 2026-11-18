@@ -14,4 +14,4 @@ API → Transform → State → Props → Render
 - undefined data
 - incorrect field names
 - blocked rendering condition
-- API mismatch on Render
+- API mismatch between local and production (the fleet, `http://127.0.0.1:10000`; Render is retired)

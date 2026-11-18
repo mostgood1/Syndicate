@@ -7,8 +7,10 @@
 >
 > **Read `model_engine_standard.md` first.** Every number below is `[measured on
 > this checkout]` unless marked `[production, dated]`. Per that standard's Sec3b,
-> claims about production must name Render as the substrate; this session could
-> not reach it live (see Sec 0b) so most numbers here are checkout-only and say so.
+> claims about production must name production as the substrate (Render when
+> this was written; the local WSL fleet at `http://127.0.0.1:10000` since
+> 2026-09-30, Render retired); this session could not reach it live (see Sec 0b)
+> so most numbers here are checkout-only and say so.
 
 ---
 
@@ -58,10 +60,15 @@ are byte-identical to the vendor originals', checked by AST, not by eye.
 
 ---
 
-## 0b. RENDER IS THE SUBSTRATE OF RECORD. Read `model_engine_standard.md` Sec3b first.
+## 0b. PRODUCTION IS THE SUBSTRATE OF RECORD. Read `model_engine_standard.md` Sec3b first.
+
+`[2026-11-17]` Production was Render when this section was written. Since
+2026-09-30 it is the local WSL fleet: read it at `http://127.0.0.1:10000`
+(`scripts/_base_url.py` resolves the URL and the admin token). The 2026-08-18
+attempt below is history.
 
 **Attempted and could not complete.** `curl https://syndicate-an21.onrender.com/`
-returned **HTTP 502** at the time this lane ran (2026-08-18), and
+(Render, retired 2026-09-30) returned **HTTP 502** at the time this lane ran (2026-08-18), and
 `/api/ops/artifacts/export` on the same host 502'd identically — the web
 service was down for reasons outside this lane's scope (not diagnosed here;
 not a basketball-model-owner file). Every population number in Secs 3-5 below
@@ -94,9 +101,13 @@ different but consistent: see Sec 2 below):
 ```
 scripts/refresh_wnba_oddsapi_props.py / refresh_nba_oddsapi_props.py   (daily props refresh)
   smart_sim_n_sims = max(1, _env_int("REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS", 500))
-      REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = "100" in render.yaml:1017-1018
-      (comment there: cut from a higher value under live-odds-worker OOM
-      pressure -- 2048MB container observed at 100%)
+      REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS = "100", declared for live-odds-worker
+      in scripts/fleet_role_spec.json [2026-11-17; frozen from render.yaml:1017-1018,
+      which nothing reads]. The role's fleet_env/ snapshot shadows the declared
+      value; `local_production.py env --role live-odds-worker` prints the
+      effective one.
+      (render.yaml's comment, Render era: cut from a higher value under
+      live-odds-worker OOM pressure -- 2048MB container observed at 100%)
   -> basketball_props_smart_sim.export_props_predictions_with_smart_sim_local()   (:5157)
     -> _smart_sim_worker_init_local / _smart_sim_worker_run_local              (:4282)
       -> _build_local_smart_sim_module(processed_root, league_code)            (:765)
@@ -360,12 +371,13 @@ confirming the cache-hit path still short-circuits correctly and this isn't a
 rebuild-every-call regression. `tests/test_basketball_props_smart_sim_advanced_stats.py`
 (5/5) unaffected.
 
-**Not yet true in production**: this fix is code-only in this checkout. Until
+**Not yet true in production** (as of 2026-08-18, when production was Render,
+retired 2026-09-30; the follow-up is todo.md `#468`): this fix is code-only in this checkout. Until
 it's committed and `refresh-worker` is deployed (behind the two-lock deploy
 protocol), Render's mounted disk keeps building/serving the pre-fix stale
 files, and the git-tracked mirror under `data/wnba_source/source_artifacts/
 data/processed/` — deliberately left untouched rather than hand-edited to
-"look" fixed, per CLAUDE.md's Render-is-truth rule — will keep showing the old
+"look" fixed, per CLAUDE.md's production-is-truth rule — will keep showing the old
 12-column schema, and `scripts/basketball_sim_input_checklist.py` will keep
 reading its Level 2 WNBA alarm, until the fix deploys, a smart-sim run rebuilds
 a cached path for real, and the mirror-refresh script pulls the corrected file
@@ -481,6 +493,10 @@ recorded as an open item (Sec6) rather than fixed, per the lane's scope.
    declared config, not a live read, and this session could not reach the
    live `/v1/services/<id>/env-vars` API (502). Two independent sources
    agreeing is treated here as strong, not certain, evidence.
+   `[2026-11-17]` That API was Render's and is retired with it. On the fleet
+   the live reading is the role's env as built at `up`
+   (`python3 scripts/local_production.py env --role live-odds-worker`,
+   secrets masked); `render.yaml` is read by nothing.
 
 ---
 

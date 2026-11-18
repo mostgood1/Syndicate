@@ -559,7 +559,8 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   self-generation means this sport's runtime behavior does not depend on a
   push deploy the way MLB's roster-artifact reuse trap does — but the elo/xG
   allowlist and `goals_per_60` fix still need a normal code deploy to reach
-  Render like any other `.py` change.
+  Render (production on 2026-08-18; retired 2026-09-30, now the local WSL fleet)
+  like any other `.py` change.
 - **Did** build a real market-comparison backtest (reference doc §8, full
   report `docs/reports/hockeysim_market_backtest_report.md`) — the instrument
   that answers "does this show an edge," distinct from every calibration
@@ -583,10 +584,12 @@ forward as a standing caveat in the reference doc §7, not re-litigated here.
   §8b) rather than stopping at the thin local mirror — per CLAUDE.md's own
   standing rule to check production before concluding data is missing. Added
   `--source production`/`both`, pulling every date `/nhl/api/cards/dates`
-  lists from `https://syndicate-an21.onrender.com` (a public route, no admin
-  token), confirmed non-circular for this route specifically by reading its
-  own payload fields (`source_path` points at the real `predictions_<date>.csv`
-  on Render's disk). **Found a second real bug the same way as the first**:
+  lists from production — then `https://syndicate-an21.onrender.com` (Render,
+  retired 2026-09-30); the script's `--base-url` now defaults to the fleet,
+  `http://127.0.0.1:10000`, via `scripts/_base_url.py` `[2026-11-17]` — (a
+  public route, no admin token), confirmed non-circular for this route
+  specifically by reading its own payload fields (`source_path` points at the
+  real `predictions_<date>.csv` on Render's disk, 2026-08-18). **Found a second real bug the same way as the first**:
   `lookahead_applied` does not mean live/circular adjustment as its name
   suggests — verified against every cached response, it means "requested
   date had no games, served the next date that does." An early draft

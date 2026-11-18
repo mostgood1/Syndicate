@@ -1,5 +1,22 @@
 # Render Data Authority
 
+> **`[2026-11-17]` What is true now.** Render billing-suspended all three services on
+> 2026-09-30 and is retired. Production is the local WSL fleet
+> (`scripts/local_production.py up`; runbook `docs/ai_context/local_production_runbook.md`).
+> This doc is kept as the record of the Render-era contract. On the fleet:
+>
+> - There is ONE data root, `~/syndicate-prod/data` (`SYNDICATE_DATA_ROOT`), shared by web,
+>   refresh-worker and live-odds-worker. Web reads the same disk the workers write; it does not
+>   serve from the repo-local `data/` tree. The `/opt/render/project/data` paths below became
+>   `{data_root}` placeholders, expanded to `~/syndicate-prod/data` at `up`.
+> - The sport roots are `{data_root}/<sport>_source` for every role, and reports live under the
+>   data root (`SYNDICATE_REPORTS_ROOT`).
+> - The env contract is the fleet's layers: `scripts/fleet_role_spec.json` →
+>   `~/syndicate-prod/fleet_env/<role>.json` → `~/syndicate-prod/local_production.env` → forced
+>   keys. `render.yaml` is not read by anything.
+> - The resolution order, compatibility, WNBA identity, `/healthz` and odds-control-plane rules
+>   below still apply, with "Render" read as "production".
+
 Render's mounted disk is the runtime source of truth for Syndicate write paths and worker-owned refresh jobs. The web service can read from the checked-in repo data tree when it does not need to mutate hosted state.
 
 ## Required layout
@@ -79,6 +96,7 @@ That means the intelligence endpoints are Render-scoped for reads, but they are 
 
 ## Related code
 
-- [render.yaml](../render.yaml)
+- [scripts/fleet_role_spec.json](../scripts/fleet_role_spec.json) and [scripts/local_production.py](../scripts/local_production.py) (the fleet's env and data root)
+- [render.yaml](../render.yaml) (Render-era; not read since 2026-11-17)
 - [shared source-root helpers](../syndicate/features/shared/source_roots.py)
 - [bootstrap data root](../scripts/bootstrap_data_root.py)

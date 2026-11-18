@@ -92,12 +92,14 @@ wiring it in is adding mechanisms to a calibrated engine. See §5.
 
 ---
 
-## 0b. RENDER IS THE SOURCE OF TRUTH FOR THIS ENGINE. Read `model_engine_standard.md` §3b first.
+## 0b. PRODUCTION IS THE SOURCE OF TRUTH FOR THIS ENGINE. Read `model_engine_standard.md` §3b first.
 
-**Every number in this document that describes production was read from Render** —
-the served payload, the live env-vars API, or the deployed blob's content. Where a
+**Every number in this document that describes production was read from production** —
+Render when this was written (2026-08-18; retired 2026-09-30): the served payload,
+Render's env-vars API, or the deployed blob's content. Where a
 number came from a local checkout it is labelled as such and is a statement about
-the checkout only.
+the checkout only. Production is now the local WSL fleet at `http://127.0.0.1:10000`
+`[2026-11-17]`; the table below gives the fleet reading for each question.
 
 **This engine is where that rule was earned.** Twice in one session a local read
 produced a confident, wrong, published claim:
@@ -111,12 +113,12 @@ produced a confident, wrong, published claim:
 
 | question | command |
 |---|---|
-| what the board serves | `curl -s "https://syndicate-an21.onrender.com/ncaaf/api/cards?week=1"` |
+| what the board serves | `curl -s "http://127.0.0.1:10000/ncaaf/api/cards?week=1"` |
 | whether the model reached it | `.games[].predictions.home_mean` non-null on that payload |
 | whether the board truncated | `.board_row_counts` on that payload (`truncated`, `dropped`) |
-| whether an input artifact exists | `/api/ops/artifacts/export?path=...` with `ADMIN_TOKEN` |
-| whether a key is set | live `/v1/services/<id>/env-vars`, paginated — **not `render.yaml`** |
-| which code is live | the **content** of the deployed blob, never ancestry from `main` |
+| whether an input artifact exists | `/api/ops/artifacts/export?path=...` on the fleet, with the admin token `scripts/_base_url.py` resolves (the repo `.env` token is Render-era and rejected) |
+| whether a key is set | the role's env as built at `up`: `python3 scripts/local_production.py env --role <role>` (secrets masked) — **not `render.yaml`**, which nothing reads, and not `scripts/fleet_role_spec.json` alone, which the `fleet_env/` snapshot shadows |
+| which code is live | the commit the ROLE loaded (web: `/versionz`; `scripts/deploy_preflight.py` reads each role's), and the content at that SHA — never ancestry from `main`, and never the fleet checkout's HEAD, which an ff moves before any role reloads |
 
 **Known gap:** NCAAF's `recommendations_summary/week_N.json` — the artifact the
 board renders from — is **not in `HOT_ARTIFACT_PATTERNS`**, so it cannot be read
@@ -317,7 +319,7 @@ checkout.** The checklist's level-2 message now says so in the failure text.
 `smartsim_reasons` is `[]` on every one. **The NCAAF board renders and shows no
 model output at all.**
 
-**The cause is one absent env var.** `CFBD_API_KEY` is ABSENT on all three Render
+**The cause is one absent env var** (2026-08-18, Render). `CFBD_API_KEY` is ABSENT on all three Render
 services (enumerated from the live `/v1/services/<id>/env-vars`, not from
 `render.yaml`). `generate_smartsim2_ncaaf_projections.py:57` raises on it, so the
 autorun dies before fetching a single game and the projection artifact is never
@@ -340,8 +342,12 @@ loop — it is not burning worker cycles.
 confirmed present by content in the deployed blob (`00e9a49f`), not by ancestry.
 
 Deploy request filed: `.syndicate/deploy/requests/20260818T154432Z-football-model-owner.md`.
-Env-only, one key, one service. **`render.yaml` must not be touched** — that
-fires `blueprint_sync`.
+Env-only, one key, one service. **`render.yaml` must not be touched** — on
+2026-08-18 that fired `blueprint_sync` (Render, retired 2026-09-30).
+`[2026-11-17]` On the fleet `render.yaml` is read by nothing, and the deploy guard
+refuses a push of it. An env change is an edit to
+`~/syndicate-prod/local_production.env` (global, or `ROLE__KEY` for one role)
+followed by a drained full `down` + `up`, because env is built only at `up`.
 
 ### FIXED: the board was capping the slate at 16 — an NFL-shaped number
 
@@ -381,7 +387,9 @@ reach.
 carries `board_row_counts` (`runtime_rows`/`distinct_matchups`, `limit`,
 `truncated`, `dropped`, `source`), present **whether or not** it truncated, so
 "not truncated" is a reading rather than an absent key. A bite also prints
-`NCAAF_BOARD_TRUNCATED` to web's stdout, which Render does collect.
+`NCAAF_BOARD_TRUNCATED` to web's stdout, which the fleet keeps in
+`~/syndicate-prod/logs/web.log` `[2026-11-17; Render's log collector until 2026-09-30]`:
+`py -3 scripts/fleet_logs.py --service web --text NCAAF_BOARD_TRUNCATED --start <UTC ISO8601>`.
 
 This doubles as the instrument for a question that could not be answered from
 outside: with the summary artifact unallowlisted and no local copy, "does the
@@ -588,7 +596,7 @@ to every reader.** Now published as `generated_at` + `projection_provenance`.
 
 **No `smartsim2*` or `*_projections_*.csv` pattern exists in
 `HOT_ARTIFACT_PATTERNS` at all.** Every football board renders from an artifact
-that cannot be audited on Render — which forces exactly the local guessing §3b
+that cannot be audited on production through `/api/ops/artifacts/*` — which forces exactly the local guessing §3b
 forbids. **Allowlisting these is owed work.**
 
 ### OPEN — cover and over/under probabilities are 0% on both NFL boards

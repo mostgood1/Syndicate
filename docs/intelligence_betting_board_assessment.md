@@ -8,12 +8,14 @@ The board is already a real cross-sport decision surface, not just a card list. 
 
 ## Recent changes
 
-The most recent hosted-runtime work changed how the board is deployed and populated on Render without changing the visible board contract.
+> `[2026-11-17]` The hosting described in this section is Render's, which was suspended on 2026-09-30 and is retired. Production is the local WSL fleet (`docs/ai_context/local_production_runbook.md`): web, refresh-worker and live-odds-worker share ONE data root, `~/syndicate-prod/data`, so web reads the artifacts the workers wrote rather than a repo-local tree, and shared state still goes through the keyvalue store (the fleet's local Redis). The board contract changes below are unaffected.
+
+The hosted-runtime work of that period changed how the board was deployed and populated on Render without changing the visible board contract.
 
 - The default board query now preserves explicit recommendation mode for generic prompts like "top edges today" so the board path does not collapse into explanation mode.
 - The intelligence state worker now computes fresh state before persisting it instead of only re-reading cached snapshots.
-- The Render web service now reads the checked-in repo `data/` and `reports/` trees, while the `orchestrator-worker` keeps the persistent disk for refresh and write paths.
-- The Render contract and regression checks were updated so the repo documents the stateless web service / disk-backed worker split explicitly.
+- The Render web service read the checked-in repo `data/` and `reports/` trees, while the `orchestrator-worker` kept the persistent disk for refresh and write paths.
+- The Render contract and regression checks were updated so the repo documented the stateless web service / disk-backed worker split explicitly.
 
 These changes were made to keep the betting board functional while avoiding the Render runtime split-brain that appeared when the web service and worker both tried to share the same disk-backed deployment shape.
 

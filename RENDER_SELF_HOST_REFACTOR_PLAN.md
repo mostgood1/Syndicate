@@ -1,5 +1,10 @@
 # Render Self-Host Refactor Plan
 
+> **`[2026-11-17]` A Render-era record.** Render billing-suspended all three services on
+> 2026-09-30 and is retired. Production is the local WSL fleet (`scripts/local_production.py`,
+> runbook `docs/ai_context/local_production_runbook.md`), whose workers generate artifacts onto
+> one shared data root. Read this file as the plan it was, not as current instructions.
+
 This document answers the stricter question behind Render readiness: what still has to change before Syndicate can refresh itself on Render without external source repos.
 
 For the execution-ordered version of this plan, use [RENDER_SELF_HOST_BACKLOG.md](RENDER_SELF_HOST_BACKLOG.md). This file remains the architectural overview; the backlog file is the implementation tracker.

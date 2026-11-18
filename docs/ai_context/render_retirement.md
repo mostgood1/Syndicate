@@ -19,8 +19,8 @@ called the Render API and was deleted, the commit that last held it (to read it:
 | `render_deploy.py` | triggered a Render deploy | `ab43454d8` | an exact-SHA `git merge --ff-only <sha>` of `~/Syndicate`, then `local_production.py reload-web` / a role TERM / a drained `down`+`up` (CLAUDE.md "Production is the WSL fleet") |
 | `render_env_set.py` | set one env var on one Render service | `5357d52a2` | edit `~/syndicate-prod/local_production.env` (`ROLE__KEY` for one role), then a drained full `down`/`up` |
 | `render_events.py` | read Render service events (kills, deploys, restarts) | `3e0cb05fb` | `local_production.py status` (restarts, loaded commit) and the supervisor's `exited code=` lines in `~/syndicate-prod/logs/` |
-| `snapshot_render_env.py` | dated env snapshots of each Render service | `66b668952` | `~/syndicate-prod/render_env/<role>.json` is the fleet's own copy (taken once, 2026-10-01). `local_production.py import-render-env`, which called this, was removed too |
-| `oom_band_report.py` | refresh-worker OOM signature from Render events + logs | `c911d0219` | `scripts/render_logs.py` (fleet logs by default) on `CONTAINER_MEMORY` / `ALL_PROCESS_MEMORY` lines; `memory_observability` |
+| `snapshot_render_env.py` | dated env snapshots of each Render service | `66b668952` | `~/syndicate-prod/fleet_env/<role>.json` is the fleet's own copy (taken once, 2026-10-01; moved out of `render_env/` on 2026-11-17, lane `render-config-retirement`). `local_production.py import-render-env`, which called this, was removed too |
+| `oom_band_report.py` | refresh-worker OOM signature from Render events + logs | `c911d0219` | `scripts/fleet_logs.py` (the fleet's role logs; `render_logs.py` is its shim) on `CONTAINER_MEMORY` / `ALL_PROCESS_MEMORY` lines; `memory_observability` |
 | `slate_band_anon_report.py` | live-slate anon-memory band from Render events + logs | `e7a915ebf` | same as above |
 | `ratchet_sample.py` | sampled refresh-worker memory via Render metrics/logs | `5536c4a8b` | same as above |
 | `check_worker_memory_gate.py` | Render memory gate and deploy-window criteria | `48a0eb5dd` | same as above; deploy windows come from `deploy_preflight.py` (fleet by default) |
@@ -76,4 +76,13 @@ every `onrender.com` fallback repointed at `http://127.0.0.1:10000`).
   because another lane's test file patches those names. Delete them when it drops the patches.
 - **Lists that strip `RENDER_API_KEY`** from child processes (`local_production.py
   NEVER_CARRY`, `run_ci_suite.py`, `replay_diff_gate.py`, `fleet_local.py`) are protective.
-- **`render_logs.py`** keeps its name (about 50 references): it reads the fleet's own logs.
+- **`render_logs.py`** is now `scripts/fleet_logs.py` `[2026-11-17, lane render-name-cleanup]`.
+  It reads the fleet's own logs (`~/syndicate-prod/logs/<role>.log`). `scripts/render_logs.py`
+  stays as a compatibility shim, because about 50 ledger entries and scripts call it by that name.
+- **The other Render-named code names were renamed the same day** (lane render-name-cleanup):
+  `_is_render_web_dyno` / `_render_web_dyno` -> `_is_web_role`, `_render_hosted_request` ->
+  `_is_hosted_request`, `_on_render` and `_is_render_hosted` -> `_is_hosted`,
+  `_bootstrap_render_data` -> `_bootstrap_hosted_data`, `_normalize_render_base_url` ->
+  `_normalize_base_url` (and `RENDER_URL` dropped from its lookup). The version payloads serve
+  `service_name` / `instance_id` / `external_url` with the `render_*` keys kept as deprecated
+  twins. Full list, consumers and what was left: `.syndicate/findings_2026-11-17_render_name_cleanup.md`.

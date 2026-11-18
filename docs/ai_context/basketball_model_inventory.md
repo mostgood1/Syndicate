@@ -19,7 +19,7 @@ league, driven through a single shared Syndicate bridge:**
 | supporting | `events.py` (possession engine), `quarters.py` (quarter-target sim), `connected_game.py` (rotation/minutes modelling, largest single file in either package) — same three names in both vendored trees |
 | entry point | `simulate_smart_game()` |
 | granularity | possession -> quarter -> game, with Dirichlet-weighted rotation/minutes modelling |
-| config | `SmartSimConfig(n_sims=2000 default, use_pbp=True, priors_days_back=21, roster_mode)` — production runs `n_sims=100` (`REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS`, `render.yaml:1017-1018`; confirmed on real production artifacts 2026-08-15, see reference doc Sec0b/Sec7) |
+| config | `SmartSimConfig(n_sims=2000 default, use_pbp=True, priors_days_back=21, roster_mode)` — production runs `n_sims=100` (`REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS`, declared `"100"` for live-odds-worker in `scripts/fleet_role_spec.json` `[2026-11-17]`, frozen from `render.yaml:1017-1018`, which nothing reads; the role's `fleet_env/` snapshot shadows it; confirmed on real production artifacts 2026-08-15, Render era, see reference doc Sec0b/Sec7) |
 
 **NCAAB has no sim engine.** Confirmed by grep across
 `syndicate/features/ncaab/` for `simulate_smart_game|smart_sim|sim_engine|monte

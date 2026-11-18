@@ -319,7 +319,7 @@ places orders. `logger.info` does not reach Render's collector — these are all
 `print(..., flush=True)`.
 
 ```bash
-py -3 scripts/render_logs.py --service live-odds-worker --text "ORDERS_READ" --start 2026-08-28T00:00:00Z --tail 6 --width 900
+py -3 scripts/fleet_logs.py --service live-odds-worker --text "ORDERS_READ" --start 2026-08-28T00:00:00Z --tail 6 --width 900
 ```
 
 | line | settles |

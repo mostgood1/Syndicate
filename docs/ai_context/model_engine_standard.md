@@ -96,11 +96,14 @@ this is not obvious from the code.
 Measured failure: MLB pitch splits lived in a `DiskCache` under
 `vendor/mlb_bettingv2/data/cache/` (that tree has since been deleted), which is **gitignored** *and* inside Render's
 **ephemeral repo checkout**. It could never ship with a deploy, and anything
-written there is destroyed by the next one.
+written there is destroyed by the next one. The same holds on the fleet
+`[2026-11-17]`: its roles read `~/syndicate-prod/data`, not a checkout, so a
+cache outside `SYNDICATE_DATA_ROOT` never reaches production.
 
 Requirements for every engine input:
 
-- **Disk-backed**, resolved through `SYNDICATE_DATA_ROOT` (the mounted disk),
+- **Disk-backed**, resolved through `SYNDICATE_DATA_ROOT` (the fleet's shared
+  data root, `~/syndicate-prod/data`),
   never a path relative to the source tree.
 - **Allowlisted**, or it cannot be read through `/api/ops/artifacts/*` at all —
   in `HOT_ARTIFACT_PATTERNS` if web must SERVE it, or
@@ -119,7 +122,11 @@ just a publish.** Every engine must document its equivalent reuse flag.
 
 ---
 
-## 3b. MANDATORY: NAME YOUR SUBSTRATE. RENDER IS THE SOURCE OF TRUTH; NOTHING MAY RELY ON AN UNVERIFIED LOCAL READ.
+## 3b. MANDATORY: NAME YOUR SUBSTRATE. PRODUCTION IS THE SOURCE OF TRUTH; NOTHING MAY RELY ON AN UNVERIFIED LOCAL READ.
+
+`[2026-11-17]` Production is the local WSL fleet, not Render (Render was
+suspended 2026-09-30 and is retired). This heading said "RENDER" until
+2026-11-17, and substrate 1 below was labelled `render`; both now name the fleet.
 
 **`[user directive, 2026-08-18]` — this applies to every engine, every audit,
 every backtest, and every gate.**
@@ -151,7 +158,7 @@ A claim that does not name its substrate is not yet a claim.**
 |---|---|---|
 | does the model output reach users? | the **served payload** (`GET /<sport>/api/cards?...`) | a local artifact file |
 | does an input artifact exist? | `/api/ops/artifacts/export?path=...` | `ls data/<sport>_source/` |
-| is a config key set? | live `/v1/services/<id>/env-vars`, paginated | `render.yaml` |
+| is a config key set? | the RUNNING role's env (`/proc/<pid>/environ`; env is built only at `up`, so `local_production.py env --role <role>` shows what the NEXT `up` would build) | `render.yaml` (not read by anything), or `scripts/fleet_role_spec.json` alone (shadowed by the later layers) |
 | which code is running? | the **content** of the deployed blob | ancestry from `main` |
 | would this code change the artifact? | a **replay-diff** on a verified mirror, citing its manifest id | a local run on whatever is on disk |
 
@@ -164,8 +171,12 @@ from a mirror that was PARTIAL and whose partiality was invisible, not from
 locality as such. So a local substrate is admissible exactly when it can be
 checked, and inadmissible otherwise, which is what it always was.
 
-**1. PRODUCTION (`render`).** The served payload, `/api/ops/artifacts/*`, the
-live env-vars API. The only substrate that can answer *what is true right now*.
+**1. PRODUCTION (`fleet`).** The served payload at `http://127.0.0.1:10000`,
+`/api/ops/artifacts/*`, each role's running env. The only substrate that can
+answer *what is true right now*. `[2026-11-17]` This label was `render` until
+2026-11-17, and ledger entries cite `render` as a substrate: read such a
+citation as "production at the time of the reading" (Render until 2026-09-30,
+the fleet after).
 
 **2. A VERIFIED LOCAL MIRROR (`mirror:<manifest_id>`).** Admissible only when
 all three hold, and the claim must carry the id:
@@ -253,8 +264,8 @@ corroboration instead of as a measurement of a different subject.
   them. A gate that cannot tell the two apart must assume checkout and report
   UNMEASURED; **unknown does not get the permissive branch.**
 - **Every model input must be in an artifact allowlist**, or it cannot be read
-  through `/api/ops/artifacts/*` — which means it cannot be audited on Render at
-  all, and every question about it falls back to the local guess this rule
+  through `/api/ops/artifacts/*` — which means it cannot be audited in
+  production at all, and every question about it falls back to the local guess this rule
   forbids. Measured: NCAAF's `recommendations_summary/week_N.json` — **the
   artifact its board renders from** — is not allowlisted, so its row count was
   unanswerable from outside and had to be instrumented in the payload instead.
@@ -334,8 +345,9 @@ Before an engine is considered production-ready:
       `EXPORT_ONLY_ARTIFACT_PATTERNS` if it must only be AUDITABLE and
       MIRRORABLE. Unallowlisted = unauditable; wrong list = a publish that
       should never have happened (§3b)
-- [ ] **Every claim names its substrate** — `render`, `mirror:<manifest_id>`, or
-      `checkout` — and `checkout` is never a claim (§3b)
+- [ ] **Every claim names its substrate** — `fleet` (`render` before
+      2026-11-17), `mirror:<manifest_id>`, or `checkout` — and `checkout` is
+      never a claim (§3b)
 - [ ] **Any local claim cites a manifest id that `verify` passes TODAY**, and
       states the dates it covers (§3b)
 - [ ] **A replay-diff for the producer**, if its output is an artifact anyone

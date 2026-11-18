@@ -1467,7 +1467,7 @@ measurement before leaning on it for props at scale.
 ## 5. Genuinely absent (not merely unfed) — 0 alarms, `scripts/nhl_sim_input_checklist.py` reports a full PASS
 
 `[measured against this checkout: 9 mirrored dates 2026-06-02..2026-07-09,
-10 team-sides, 297 players — per §7, UNMEASURED against Render, not 0%,
+10 team-sides, 297 players — per §7, UNMEASURED against production, not 0%,
 until checked there]`
 
 Every field this document originally tracked as genuinely absent now has a real producer:
@@ -1516,20 +1516,34 @@ same formulation.
 
 ## 7. Standing caveat on production — a genuine architectural difference from MLB
 
-MLB's pattern is worker-computes → `HOT_ARTIFACT_PATTERNS` push → web-reads.
-**NHL's is not**, and this matters when reading anything above against a
+`[2026-11-17]` **On the fleet the separate-disk half of this caveat no longer
+applies.** The first two bullets describe Render as read on 2026-08-18, where each
+service had its own disk. Since 2026-09-30 production is the local WSL fleet: all
+roles share one disk, `~/syndicate-prod/data`, and publishing is a no-op
+(`SYNDICATE_WEB_PUBLISH_URL` is unset), so web reads the files the workers write,
+for MLB and NHL alike. `HOT_ARTIFACT_PATTERNS` still decides what
+`/api/ops/artifacts/*` will serve, so allowlisting is still how an input is
+audited. `SYNDICATE_NHL_SOURCE_CLI_GENERATION` is declared `false` for
+refresh-worker and live-odds-worker in `scripts/fleet_role_spec.json` (frozen from
+`render.yaml`, which nothing reads); the effective value is whatever the role's
+`fleet_env/` snapshot or `local_production.env` sets
+(`python3 scripts/local_production.py env --role <role>`).
+
+MLB's pattern on Render was worker-computes → `HOT_ARTIFACT_PATTERNS` push → web-reads.
+**NHL's was not**, and this matters when reading anything above against a
 production question:
 
 - `predictions_{date}.csv` matches **no** `HOT_ARTIFACT_PATTERNS` entry
   (checked programmatically against all 122 patterns) — by MLB's logic this
   would mean the file can never reach the web service. **It does anyway**:
   confirmed live 2026-08-18, `syndicate-an21.onrender.com/nhl/api/cards?date=2026-06-09`
+  (Render, retired 2026-09-30)
   served real, non-placeholder projected scores (`"Carolina Hurricanes 5.7 |
   Vegas Golden Knights 5.9"`) sourced from `/opt/render/project/data/nhl_source/data/processed/predictions_2026-06-09.csv`
   — web's **own** disk path (`syndicate-data-web`, a separate Render disk from
   refresh-worker's `syndicate-data-refresh-worker` — confirmed in `render.yaml`).
 - The likely mechanism, from code (not yet fully traced to a single call
-  site): `render.yaml` sets `SYNDICATE_NHL_SOURCE_CLI_GENERATION` on multiple
+  site): `render.yaml` set `SYNDICATE_NHL_SOURCE_CLI_GENERATION` on multiple
   services (default enabled per `refresh_nhl_oddsapi.py::_source_cli_generation_enabled`),
   and `projection.py`'s own docstring notes the projection is "pure math
   (stdlib only, no numpy / pandas / network) so it is trivially unit-testable
@@ -1607,10 +1621,12 @@ data, not that the engine has or lacks an edge.
 
 **§8b — pulled from production instead, per CLAUDE.md's own standing rule** ("don't diagnose
 missing data from the local checkout — check production first"). Added `--source production`/`both`:
-pulls every date `/nhl/api/cards/dates` currently lists from `https://syndicate-an21.onrender.com`
+pulls every date `/nhl/api/cards/dates` currently lists from production (`--base-url`, default the
+fleet `http://127.0.0.1:10000` via `scripts/_base_url.py` `[2026-11-17]`; it was
+`https://syndicate-an21.onrender.com` when this was written on 2026-08-18, Render retired 2026-09-30)
 (a public route, no admin token), confirmed non-circular for this specific route by reading its own
 payload fields (`lookahead_applied=False`, `using_sample_data=False`, `source_path` pointing at the
-real `predictions_<date>.csv` on Render's disk). Moneyline + total odds parse cleanly from a
+real `predictions_<date>.csv` on Render's disk, 2026-08-18). Moneyline + total odds parse cleanly from a
 `"Moneyline and total board"` panel; puck-line American odds are not exposed by this route at all
 (confirmed against several non-null-EV dates), so `--source both` recovers puck-line coverage from
 local files, deduped against production.

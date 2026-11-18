@@ -6,25 +6,35 @@ verified against current code on 2026-08-03, not assumed from the
 2026-08-02 assessment doc's own list (which got some of this wrong; see
 the notes under each item).
 
+> `[2026-11-17]` Production is the local WSL fleet, not Render (Render was
+> suspended 2026-09-30 and is retired; runbook
+> `docs/ai_context/local_production_runbook.md`). Items 1 and 2 were written
+> for Render's env. On the fleet, `render.yaml` is not read and there is no
+> dashboard: a key is changed in `~/syndicate-prod/local_production.env`
+> (global, or `ROLE__KEY` for one role, e.g. `WEB__SYNDICATE_ACTIVE_SPORTS`)
+> and takes effect at the next drained full `down`/`up`, behind the deploy
+> claims and preflight. The current value is NOT recorded here: read the
+> running role's env before acting.
+
 ## Manual steps needed
 
-1. **`SYNDICATE_ACTIVE_SPORTS` env var (Render, web service).** Gates
+1. **`SYNDICATE_ACTIVE_SPORTS` env var (web).** Gates
    which sports appear on the home command-center overview
    (`syndicate/blueprints/home.py:519-526`, `_active_sport_slugs()` ->
    `build_home_overview`). Defaults to `"mlb,wnba"` in code
-   (`syndicate/app.py:273-274`) and is **not currently set at all in
-   render.yaml** -- confirmed by grep. Set it to include `nfl,ncaaf`
+   (`syndicate/app.py:273-274`) and was **not set at all in render.yaml**
+   on 2026-08-03 -- confirmed by grep. Set it to include `nfl,ncaaf`
    (and whatever else should show) before their seasons start, or NFL/
    NCAAF simply won't appear on the home dashboard even once real games
-   exist. This is a config-only change (Render dashboard env var), no
-   deploy needed for the value to take effect on next restart -- but per
-   [[project_render_env_needs_deploy]], a restart alone does NOT
-   re-inject a *newly added* env var reliably; use the single-key
-   endpoint then deploy, per that memory's established workflow.
+   exist. This is a config-only change: on the fleet, a `local_production.env`
+   edit plus a drained full `down`/`up` (a role restart reuses the old env).
+   (On Render it was a dashboard env var, and per
+   [[project_render_env_needs_deploy]] a restart alone did not re-inject a
+   newly added var; that workflow is retired with Render.)
 
-2. **`WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN` (Render, all
-   services).** Currently `"false"` in `render.yaml` -- the entire NFL/
-   NCAAF/NCAAB odds-refresh autorun is off in production right now. This
+2. **`WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN` (all roles).** It was
+   `"false"` in `render.yaml` on 2026-08-03 -- the entire NFL/NCAAF/NCAAB
+   odds-refresh autorun was off in production then. This
    is a real decision with OddsAPI call-budget implications (5M cap, see
    [[project_oddsapi_call_budget]]), not something to flip silently.
    Decide when to turn it on (some lead time before Aug 29 to validate
@@ -64,8 +74,8 @@ the notes under each item).
 
 ## Cross-check before relying on this doc
 
-This list reflects what was true 2026-08-03. Before the actual rollout,
-re-verify item 1 and 2's current render.yaml/Render-dashboard state
-directly rather than trusting this doc, the same way this session found
-the original assessment's own hygiene list had several claims that no
-longer held up when actually checked.
+This list reflects what was true 2026-08-03. Before acting on it,
+re-verify item 1 and 2's current state on the fleet (the running role's
+env; `render.yaml` is not read) rather than trusting this doc, the same
+way this session found the original assessment's own hygiene list had
+several claims that no longer held up when actually checked.

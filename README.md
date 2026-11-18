@@ -1,7 +1,6 @@
 # Syndicate
 
 [![CI](https://github.com/mostgood1/Syndicate/actions/workflows/ci.yml/badge.svg)](https://github.com/mostgood1/Syndicate/actions/workflows/ci.yml)
-[![Render Blueprint](https://img.shields.io/badge/Render-Blueprint-46E3B7?logo=render&logoColor=white)](https://github.com/mostgood1/Syndicate/blob/main/render.yaml)
 
 Syndicate is the new unified multi-sport app that will eventually replace the separate sport-specific frontends.
 
@@ -67,28 +66,27 @@ py -3 -m pip install -r requirements.txt
 py -3 app.py
 ```
 
-## Render deploy
+## Production: the local fleet `[2026-11-17]`
 
-This repo is ready to deploy to Render as a Blueprint-backed Flask app using [render.yaml](render.yaml).
+Production does not run on Render. Render billing-suspended all three services on 2026-09-30 and is retired (lanes `render-retirement` 2026-11-15 and `render-config-retirement` 2026-11-17; the record is [docs/ai_context/render_retirement.md](docs/ai_context/render_retirement.md)). Production is the local WSL "fleet" on the operator's Windows machine. Runbook, including first-time setup of a fleet host: [docs/ai_context/local_production_runbook.md](docs/ai_context/local_production_runbook.md).
 
-Current hosted boundary:
+- `scripts/local_production.py up` supervises web, `refresh-worker`, `live-odds-worker` and a local Redis on ONE shared disk, `~/syndicate-prod/data` (`SYNDICATE_DATA_ROOT`). The same script has `status`, `down`, `backup` and `env --role <role>` (the role's derived env, secrets masked).
+- Production reads go to `http://127.0.0.1:10000`. [scripts/_base_url.py](scripts/_base_url.py) resolves the URL and the admin token.
+- Logs: each role writes `~/syndicate-prod/logs/<role>.log`. Read them with `py -3 scripts/fleet_logs.py` (`scripts/render_logs.py` is kept as a compatibility shim).
+- Each role's `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` defaults to its old Render plan: web 2048, refresh-worker 4096, live-odds-worker 2048 (`local_production.env` can override it).
+- Scheduled jobs: the supervisor runs `SCHEDULED_JOBS` from `scripts/local_production.py` (the former Render dashboard crons, `data-backup`, and fleet-only jobs added since).
+- The web/worker split is unchanged: web reads precomputed artifacts only, and the workers compute.
 
-- The web app itself is deployable on Render now.
-- The hosted ops control plane and refresh-status backend are now Render-safe: the blueprint defines a web service, a background worker, and a shared Render Key Value instance for refresh manifests and logs.
-- The per-sport ingest boundary is now hosted-safe across MLB, NBA, NHL, NFL, WNBA, NCAAF, and NCAAB: each module can import from a neutral artifact bundle or an already mirrored local bundle instead of requiring a sibling source checkout during ingest.
-- Syndicate is still not fully self-refreshing on Render because some artifact generation remains source-owned for sports outside the active NBA/WNBA props lane. NBA and WNBA props refresh now run through Syndicate-owned runners and local SmartSim/prediction helpers; the remaining hosted blockers are the broader non-props generation commands for other sports and the wider deployment wiring.
+Deploying:
 
-Render setup:
+- Pushing to `main` ships nothing. A fleet deploy is an exact-SHA `git merge --ff-only <sha>` in the fleet checkout `~/Syndicate` (its GitHub remote is `github`), then `local_production.py reload-web` for web, a role TERM for a worker (the supervisor restarts it), or a drained full `down` + `up` for an env change.
+- Each step is gated: an unexpired `scripts/deploy_claim.py acquire` held by your lane, plus a `scripts/deploy_preflight.py` CLEAR within 15 minutes for the exact SHA. `.claude/hooks/deploy-guard.py` enforces both. Record the measurement in `.syndicate/deploys.md`. The full protocol is in `CLAUDE.md` ("Before any deploy").
 
-1. In Render, choose New + and create a Blueprint instance from the GitHub repo `mostgood1/Syndicate`.
-2. Let Render read [render.yaml](render.yaml), which now defines three resources:
-  - `syndicate`: the public Flask web service that reads the repo-local `data/` and `reports/` trees.
-  - `refresh-worker`: the background worker that polls for queued refresh jobs and owns the refresh state contract.
-  - `live-odds-worker`: the live odds refresh worker used for the separate odds loop.
-  - `syndicate-refresh-state`: the shared Render Key Value instance used for refresh state and logs.
-3. Set `ADMIN_TOKEN` in Render if you want the protected ops/status endpoints enabled for the deployed instance.
-4. Deploy the Blueprint and verify that the web service, refresh worker, live odds worker, and keyvalue service become healthy.
-5. Verify the root page plus any needed public module routes from the web service.
+Env:
+
+- Each role's env is built at `up` from layers, a later one winning: `scripts/fleet_role_spec.json` -> `~/syndicate-prod/fleet_env/<role>.json` -> `~/syndicate-prod/local_production.env` (`ROLE__KEY` for one role) -> the launcher's forced keys. To change env, edit `local_production.env` and run a drained full `down`/`up`. A role restart reuses the old env.
+- [render.yaml](render.yaml) is not read by anything. Editing it changes nothing on the fleet, and the deploy guard refuses a push that carries it.
+- The launcher sets `SYNDICATE_HOSTED=true`, `SYNDICATE_SERVICE_NAME` / `SYNDICATE_SERVICE_ID=local-<role>`, `SYNDICATE_INSTANCE_ID` and `SYNDICATE_GIT_COMMIT` on every role. Code reads them through `syndicate/features/shared/service_identity.service_marker`, and branches on them (web's request-path guard, which role owns a loop), so do not strip them. The Render-era `RENDER*` names are gone since 2026-11-17.
 
 Hosted state overrides:
 
@@ -101,19 +99,18 @@ Hosted state overrides:
 - `SYNDICATE_ARTIFACT_ROOT_NHL`: optional published NHL artifact bundle root used by [scripts/refresh_nhl_source_mirror.ps1](scripts/refresh_nhl_source_mirror.ps1) during ingest mode. When set, Syndicate can import NHL processed, live-lens, team-odds, and props artifacts from that neutral bundle path.
 - `SYNDICATE_ARTIFACT_ROOT_WNBA`: optional published WNBA artifact bundle root used by [scripts/refresh_wnba_source_mirror.ps1](scripts/refresh_wnba_source_mirror.ps1) during ingest mode. When set, Syndicate can import WNBA processed, raw, and live-lens artifacts from that neutral bundle path.
 - `SYNDICATE_STATE_ROOT`: optional fallback root for reports-style state when `SYNDICATE_REPORTS_ROOT` is not set. This is mainly useful when the hosted runtime mounts one persistent state directory and you want Syndicate to treat it as the reports root.
-- `SYNDICATE_REQUIRE_HOSTED_STORAGE`: set this to `true` in hosted environments to make Syndicate fail fast if `SYNDICATE_DATA_ROOT` or `SYNDICATE_REPORTS_ROOT` is missing. Render now uses this as an app requirement so the web service and worker do not fall back to repo-local paths.
-- `SYNDICATE_REFRESH_STATE_BACKEND`: controls how refresh manifests, recent run history, stdout/stderr payloads, and the latest daily-update manifest are stored. Defaults to `filesystem`. Set it to `keyvalue` for a shared Redis or Render Key Value-backed state store that both the web service and worker can read.
+- `SYNDICATE_REQUIRE_HOSTED_STORAGE`: set this to `true` in hosted environments to make Syndicate fail fast if `SYNDICATE_DATA_ROOT` or `SYNDICATE_REPORTS_ROOT` is missing. Every fleet role declares it (`scripts/fleet_role_spec.json`), so no role falls back to repo-local paths.
+- `SYNDICATE_REFRESH_STATE_BACKEND`: controls how refresh manifests, recent run history, stdout/stderr payloads, and the latest daily-update manifest are stored. Defaults to `filesystem`. Set it to `keyvalue` for a shared Redis-backed state store that web and the workers can all read. The fleet uses `keyvalue` against its local Redis.
 - `SYNDICATE_REFRESH_STATE_URL`: connection URL used when `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`. `REDIS_URL` is also accepted as a fallback.
 - `SYNDICATE_REFRESH_STATE_NAMESPACE`: optional key prefix for the shared refresh-state backend. Defaults to `syndicate`.
 - `SYNDICATE_REFRESH_LAUNCH_MODE`: controls how the ops refresh endpoint launches work. Defaults to `detached_subprocess`, which preserves the current local behavior. Set it to `manifest_only` or `external_runner` when a hosted deployment should only record queued refresh manifests and let an external runner or worker pick them up. In those queued modes the persisted run manifests now include an explicit `externalRunner` contract describing the command plus status file paths the worker should own.
 
-Blueprint defaults:
+Fleet defaults (declared in `scripts/fleet_role_spec.json` and shadowed by the later env layers; `local_production.py env --role <role>` prints the env the next `up` builds for a role, and a running role's env is its `/proc/<pid>/environ`):
 
-- The checked-in [render.yaml](render.yaml) sets `SYNDICATE_REFRESH_LAUNCH_MODE=manifest_only` on the hosted services so the ops refresh endpoint records queued work instead of spawning a local refresh subprocess on Render.
-- The checked-in [render.yaml](render.yaml) sets `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` on the web service.
-- The checked-in [render.yaml](render.yaml) wires `SYNDICATE_REFRESH_STATE_URL` from the Render Key Value service connection string.
-- The checked-in [render.yaml](render.yaml) points the web service at the repo-backed `data/` and `reports/` trees, while the worker keeps the mounted disk for write paths and refresh jobs.
-- The checked-in [render.yaml](render.yaml) intentionally does not hardcode any `SYNDICATE_ARTIFACT_ROOT_*` values. Published bundle locations are deployment-specific, so set the matching artifact-root overrides on the worker when you want hosted ingest to pull from neutral artifact bundles instead of the repo-backed `data/` tree.
+- Every role declares `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` and `SYNDICATE_REQUIRE_HOSTED_STORAGE=true`, and the launcher points `SYNDICATE_REFRESH_STATE_URL` at the local Redis.
+- All three roles read and write the same `SYNDICATE_DATA_ROOT` (`~/syndicate-prod/data`). The launcher removes `SYNDICATE_WEB_PUBLISH_URL`, so worker-to-web publishing is a no-op on one shared disk.
+- `SYNDICATE_REFRESH_LAUNCH_MODE` is declared per role in the spec; read the effective value with `env --role`.
+- Published bundle locations are deployment-specific: set a `SYNDICATE_ARTIFACT_ROOT_*` override in `local_production.env` when ingest should pull from a neutral artifact bundle instead of the data root.
 
 When the site is running in one of those queued hosted modes, a worker can pick up the latest queued refresh contract with:
 
@@ -130,14 +127,14 @@ That runner script claims the queued manifest, marks it `running`, and executes 
 
 [scripts/run_refresh_worker.py](scripts/run_refresh_worker.py) is the long-running worker entrypoint for hosted environments. It polls the latest queued manifest and invokes [scripts/run_queued_refresh_job.py](scripts/run_queued_refresh_job.py) whenever the ops control plane records a new `pending_external` refresh run. Use `SYNDICATE_REFRESH_WORKER_POLL_SECONDS` to control the polling interval when the default 15-second loop is not appropriate.
 
-Important Render constraint:
+Shared state store:
 
-- Render persistent disks are attached to only one service instance and cannot be shared between the web service and a background worker.
-- Because of that single-service disk limit, a self-refreshing Render deployment should use the shared state backend in [syndicate/features/shared/refresh_state_store.py](syndicate/features/shared/refresh_state_store.py) with `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` instead of trying to share a local `reports/` disk between web and worker.
+- On Render (retired 2026-09-30) each service had its own persistent disk, so web and the workers could not share a `reports/` tree. That is why shared state goes through [syndicate/features/shared/refresh_state_store.py](syndicate/features/shared/refresh_state_store.py) with `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`.
+- The fleet's roles share one disk, but the code still assumes the keyvalue store: with `SYNDICATE_HOSTED=true` the workers refuse a file backend, so `up` starts (or reuses) a local Redis.
 - The current refresh-state abstraction now supports both the default filesystem mode and a shared Key Value mode for refresh manifests, recent run history, stdout/stderr log payloads, and the latest daily-update manifest.
 - `SYNDICATE_DATA_ROOT` is still separate from the shared refresh-state backend. Public mirrored artifacts and per-sport source data are still file-backed, so the remaining self-hosting work is now about deployment wiring and broader artifact ownership rather than only report-state sharing.
 
-These overrides are part of the self-hosting path. They are not required for the current read-only repo-backed Render deployment, but they are now supported by the ops/status layer so hosted refresh state can move onto durable storage without changing the public ops endpoints.
+On the fleet these overrides come from the env layers above. A developer machine running `py -3 app.py` needs none of them and falls back to the repo-local `data/` and `reports/` trees.
 
 Hosted smoke checklist:
 
@@ -145,10 +142,10 @@ Hosted smoke checklist:
 2. Open `/ops/odds-refresh` with the admin token and confirm the page loads without filesystem-state errors.
 3. If the deployment should ingest published bundles, set the relevant `SYNDICATE_ARTIFACT_ROOT_*` overrides on both the web service and the worker, then verify a dry-run refresh plan shows `artifact_bundle_or_existing_mirror` and includes `-SourceArtifactRoot` for the configured sports.
 4. Trigger one dry-run refresh from the ops surface and confirm the web status moves to `pending_external`, then `running`, then `finished` or `failed` as the worker picks it up.
-5. Restart or redeploy the web service and confirm the latest refresh status still appears, proving that refresh state is coming from Key Value instead of the web filesystem.
+5. Reload web (`local_production.py reload-web`, behind the deploy claim and preflight) and confirm the latest refresh status still appears, proving that refresh state is coming from the keyvalue store instead of the web filesystem.
 6. Treat any sport-level refresh failure as an artifact-generation ownership issue, not a refresh-state or worker-wiring failure, unless the status itself fails to update.
 
-If the goal is a self-refreshing hosted instance rather than a repo-backed read-only deployment, start with [RENDER_SELF_HOST_BACKLOG.md](RENDER_SELF_HOST_BACKLOG.md) for the execution order and use [RENDER_SELF_HOST_REFACTOR_PLAN.md](RENDER_SELF_HOST_REFACTOR_PLAN.md) for the architectural rationale behind that backlog.
+[RENDER_SELF_HOST_BACKLOG.md](RENDER_SELF_HOST_BACKLOG.md) and [RENDER_SELF_HOST_REFACTOR_PLAN.md](RENDER_SELF_HOST_REFACTOR_PLAN.md) are the Render-era plan for making a hosted instance self-refreshing. Read them as a record: Render is retired, and on the fleet the workers generate artifacts onto the shared data root.
 
 ## GitHub automation
 
@@ -216,7 +213,7 @@ The central tool is intentionally an orchestrator, not a new fetcher. It reuses 
 
 That keeps Syndicate aligned with the existing source models for pregame and live odds, while the mirror scripts now also copy the refreshed odds artifacts that those refreshes produce.
 
-For the required Render data-root contract, mounted disk layout, and fallback order, see [docs/render_data_authority.md](docs/render_data_authority.md).
+For the data-root contract and fallback order, see [docs/render_data_authority.md](docs/render_data_authority.md). It was written for Render's per-service disks; on the fleet every role shares `~/syndicate-prod/data`.
 
 For NHL specifically, source mode now generates `scoreboard.csv`, team odds, and player-props lines directly inside [scripts/refresh_nhl_oddsapi.py](scripts/refresh_nhl_oddsapi.py) and writes them into the local or published artifact bundle root. Passing `--source-root` is now optional and only backfills extra processed or live-lens artifacts when needed for compatibility runs.
 
@@ -236,7 +233,7 @@ Supported override variables follow the same pattern: `SYNDICATE_SOURCE_ROOT_MLB
 
 Those variables are also respected when you run the per-sport mirror scripts directly, for example [scripts/refresh_mlb_source_mirror.ps1](scripts/refresh_mlb_source_mirror.ps1) or [scripts/refresh_nba_source_mirror.ps1](scripts/refresh_nba_source_mirror.ps1), so path overrides stay consistent across the whole refresh pipeline.
 
-If the goal is a self-refreshing Render deployment instead of a read-only site backed by prebuilt mirrors, see [RENDER_SELF_HOST_REFACTOR_PLAN.md](RENDER_SELF_HOST_REFACTOR_PLAN.md). That plan documents the remaining refresh wiring and the exact refactors needed before Syndicate can refresh itself from its own local bundles.
+[RENDER_SELF_HOST_REFACTOR_PLAN.md](RENDER_SELF_HOST_REFACTOR_PLAN.md) records the refresh wiring and refactors that were planned for a self-refreshing Render deployment (Render retired 2026-09-30).
 
 Each unattended run now writes a timestamped artifact bundle under [reports](reports) by default. That bundle includes the per-sport mirror refresh outputs, the gate console output, and persisted `migration_gate_report.json` plus `migration_gate_report.txt` files. Use `-ArtifactsDir` on [scripts/refresh_and_gate.ps1](scripts/refresh_and_gate.ps1) or `--write-dir` on [scripts/migration_gate.py](scripts/migration_gate.py) if you want those reports written somewhere else.
 

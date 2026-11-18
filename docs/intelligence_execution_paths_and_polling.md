@@ -2,10 +2,14 @@
 
 This note documents the current execution paths that reach the three intelligence entrypoints and the polling loops that can drive them.
 
-Render deployment note:
-- the public web service is stateless and reads the repo-local `data/` and `reports/` trees for read-only response shaping
-- the `orchestrator-worker` owns the mounted disk and background refresh/write paths
-- the Render Key Value backend remains the shared refresh-state store for both surfaces
+Deployment note `[2026-11-17]` (production is the local WSL fleet; Render, which this note
+described before, was suspended 2026-09-30 and is retired):
+- the web service is stateless and reads the artifacts the workers wrote, on the shared data root
+  `~/syndicate-prod/data`, for read-only response shaping
+- refresh-worker (which runs the intelligence-state loop) and live-odds-worker own the background
+  refresh/write paths
+- the keyvalue backend (the fleet's local Redis) remains the shared refresh-state store for both
+  surfaces
 
 ## Persistence boundary for intelligence state
 

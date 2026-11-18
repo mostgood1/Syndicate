@@ -142,7 +142,7 @@ relabelled as goals/assists per 90.
 ## The gate
 
     python scripts/prop_evidence_checklist.py
-    python scripts/prop_evidence_checklist.py --base-url https://syndicate-an21.onrender.com \
+    python scripts/prop_evidence_checklist.py --base-url http://127.0.0.1:10000 \
         --sports mlb,wnba,nfl,ncaaf --sample 8 --json reports/prop_evidence/<date>.json
 
 1. every `"title"` literal in the Ask data module maps to a layer;
