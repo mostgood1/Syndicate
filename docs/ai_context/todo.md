@@ -1,5 +1,22 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#831` — **FORWARD READ OWED: FanDuel-led stale-book bets, pre-registered (lane `fanduel-lead-forward`). LOOK 1 on or after 2026-12-16; LOOK 2 on or after 2027-01-13. Read-only; nothing to deploy.**
+- **Why:**
+  - The OddsJam-Momentum question ("bet a book still on the number another book just left") was KILLED on 10-25..11-17 data: -2.60% vs the close [-2.71, -2.47], 31,345 bets (`findings_2026-11-17_momentum_lag_study.md`).
+  - Its leader = FanDuel cell read +0.85% [+0.38, +1.32], but it was 1 of about 40 cells.
+  - The forward test decides whether it is real (arm A) and still there 5..30 min later (arm B): `findings_2026-11-17_fanduel_lead_forward_preregistration.md`.
+- **Run each look from a checkout of main** whose `scripts/momentum_lag_study.py` matches the registration commit, inside WSL at Idle:
+  - `nice -n 19 ionice -c3 python3 scripts/momentum_lag_study.py --pass outcome --sports nba,nhl,nfl,ncaaf,ncaab,soccer,mlb,wnba --theta 0.02 --e-min 0.01 --detected-after 2026-11-18T06:00:00Z --now <LOOK_NOW> --forward-look <1|2> --out ~/fanduel_forward/look<1|2>`
+  - The look's `<LOOK_NOW>`: 1 = `2026-12-16T12:00:00Z`; 2 = `2027-01-13T12:00:00Z`.
+  - About 9 min each; max RSS about 460 MB.
+- **Read `fanduel_forward.verdict`** and apply the registration. O'Brien-Fleming z >= 2.797 / 1.977.
+  - KILL if arm A's 95% CI upper bound is below 0.
+  - PROCEED needs A and B both to cross.
+  - Look 1 is skipped if arm A has fewer than 200 events.
+- **Write each look to `.syndicate/findings_fanduel_lead_forward_reads.md`.** Close the lane at the final verdict.
+  - On KILL or REAL_NOT_ACTIONABLE, note the result where the decision engine's steam expert is planned.
+- **Do not** look at forward data before look 1. Do not change the bet definition. A bug fix is a dated amendment to the registration, committed before the read.
+
 ### `#832` — **THE LAYER 2 BOARD BUILD RAN 2-14x SLOWER IN THE LIVE EVENING BECAUSE IT SHARED ONE INTERPRETER LOCK WITH THE BOOK-GRID TICK AND THE VENUE ODDS LOOP: in the 165.6 s 11-18 overview stage (7:51-7:54 PM CST 11-17) the board thread got 0.19 of a core (tick 0.41, venue odds loop 0.36, runqueue wait ~0.03). A switch that runs the board loop in its own process is ON MAIN `09eddabf2`, NOT LOADED** `[2026-11-17, lane layer2-board-process-split, rail monitor I-20]`
 - **Measured** (fleet, read-only, nice 19; findings `.syndicate/findings_2026-11-17_layer2_board_process_split.md`):
   - per-thread `/proc` + `schedstat`: 11-16 evening, 24 builds, board share median 0.58 (0.38-0.53 in the 345-942 s builds); tonight's sampled stages 0.19-0.46;
