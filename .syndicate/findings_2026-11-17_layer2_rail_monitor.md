@@ -1565,3 +1565,40 @@ totals flags below the points scored.
 **Load:** query 3.75 s / 4.18 MB / 22.7 MB; **shortlist 6.2 s**; chips 2.3 s; live-rail 0.08-1.0 s.
 
 **Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less.
+
+## Reading 18 — Tue 11-17 9:35 PM CST (03:35Z 11-18), full page — the late window
+
+**Fleet:** unchanged. Web `3920a2d4d`; live-odds-worker 52087; refresh-worker 28948. Host load 4.0-5.1.
+
+**I-22:**
+- **Fix on main** `2ae0c646a` (todo #838, lane odds-lane-sport-deadline), NOT loaded; the load is put to the user in
+  that session. The session measured the stall as `collect_slate_inputs` on the NHL STATS REST API
+  (`api.nhle.com/stats/rest`: 6 uncached calls per team, 28 teams).
+- **Correction to readings 15-17:** they named api-web.nhle.com. api.nhle.com shares its IPs (104.16.144/145.251),
+  so the socket could not tell them apart.
+- **The lane now:** no NHL odds child running at 03:35Z. The 02:48:06Z run held until ~03:14Z. Sweeps since 03:06Z:
+  15 launched, **6 refused**, down from 8 of 9.
+
+**Slate: 17 live chips.**
+- NCAAB 8, including the West games just started: UNLV @ Kansas, UC Irvine @ Stanford, Seattle U @ CBU.
+- NHL 4 (Dallas @ Vegas and Calgary @ San Jose in P1).
+- WNCAAB 4 (Washington @ Washington St Q1).
+- NBA 1 (Portland @ Minnesota Q4).
+
+**Flags: 14 shown, 0 false, 0 missed, 3 dark** (2 markets). I-17 (P > 0.5): NCAAB 3 of 8 contradict "ours".
+
+**Live rows: 210.** 59 priced <= 120 s; 121 over 300 s; priced age p50 200 s. NBA 47 rows, 2 priced <= 120 s.
+
+**Overlay (29 min): 0 gaps over 360 s** (max NHL 225 s). Ticks 44, gap max 108 s, 0 `deferred_slow`. Web merges
+stale 7 of 62, all NCAAF: the last NCAAF game is ending.
+
+**Board:** 882 s (03:11:01Z), then **601 s** (03:30:07Z: overview 51 s, shortlist 359 s, portfolio 86 s). The next
+build's overview took 2.2 s: the evening load is easing.
+
+**Load (full page):** `/intelligence` 10.3 s / 4.22 MB wire / 22.7 MB raw; query 4.0 s / 3.63 MB / 20.3 MB;
+shortlist 4.7 s; chips 0.05 s; live-rail 0.02-0.22 s.
+
+**#824:** 0 of 6 college join lines since 03:06Z carry the reason. 0 of 9 college totals flags below the points
+scored.
+
+**Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less.
