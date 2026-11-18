@@ -427,3 +427,24 @@ alternative-source session working.
 **Load (full page):** **`/intelligence` 22.1 s** (r4 9.0 s, r1 4.6 s); query 6.9 s; shortlist 2.4 s.
 
 **Team cards:** 0 defects.
+
+## Reading 9 — Wed 11-18 4:55 PM CST (22:55Z)
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 2.5-3.1.
+
+**Slate: 7 live.**
+- Flags: 0 shown, 0 false, 0 missed, 0 dark. P1, P6 and #824: 0.
+- Live rows: 11, 4 priced <= 120 s (college row ages are lower bounds per #844).
+
+**Board: 5 builds, wall 176 / 238 / 247 / 253 / 276 s, median 247 s, 0 over 300 s.** CPU per build 150-246 s, at load ~3.
+- **L-d point:** at 4:55 PM `build_soccer_artifacts.py --league championship --date 2026-11-24` (a date 6 days out) ran at nice 0, 96% CPU, beside
+  the board child (74%).
+- Also on the CPU: `redis-aof-rewrite` at 98% (3 s old).
+
+**Overlay:** 0 gaps over 360 s (max NCAAB 70 s); ticks 100, gap max 52 s; web merges 42, 0 stale.
+
+**Live odds lane:** 16 launched, 4 refused (20%). Live run 56 s. No odds child older than 16 s.
+
+**Load:** query 13.6 s; shortlist 1.5 s. Today's board was 284 s old.
+
+**Team cards:** 0 defects.
