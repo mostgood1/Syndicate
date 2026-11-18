@@ -118,11 +118,13 @@ The 95-100% row matches the engine read exactly. By true state age, 95-100% read
 
 ## 7. Load plan (the user's decision; nothing loaded)
 
+**DO NOT LOAD BEFORE 2026-11-22 ENDS (decision-engine session local_898e5510, 2026-11-18 ~11**:40 AM CST, relayed as an addition to this lane's brief): M2's test window (11-15..11-22) and the learner study's re-run window both end then, and holding keeps them on the re-sims they started with. After that a load still needs the user's own yes and is a betting change (`scripts/betting_change.py`); M3 tags each bet with its live re-sim version (`findings_2026-11-17_m3_paper_book.md` Addendum 5), so a load after 11-22 does not confound M3.
+
 **Shadow first**, as the lane-age gate did (2026-11-07):
 - An ff to the wiring commit loads the shadow tally only: prices are unchanged, and each build that has a would-refuse prints a `LIVE_ENDGAME_FRESHNESS` line.
 - After one live evening's reading, the user decides `on`: a code-default flip plus an ff, or `LIVE_ODDS_WORKER__` / `REFRESH_WORKER__` env plus a drained `down`/`up`.
 
-**Betting change:** `no` while shadow. `on` changes no LIVE order today (the executor refuses in play), but it changes the paper books' in-play bets and the board's late-game edges. Classify it at the load.
+**Betting change: yes** (the decision-engine session's classification, 11-18; the conservative one). Shadow changes no price; `on` changes no LIVE order today (the executor refuses in play) but changes the paper books' in-play bets and the board's late-game edges.
 
 ## 8. Leads (not this item)
 
