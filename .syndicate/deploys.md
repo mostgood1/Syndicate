@@ -61921,3 +61921,41 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 ## 2026-11-18 18:35Z (12:35 PM CST) -- CORRECTION (no deploy) to the 18:20Z reading (lane `odds-lane-sport-deadline`)
 - That entry's last bullet, "soccer 259 s against their stated expectation of <= 130 s", compared the wrong quantity. The soccer lane's bound was pre-registered per SIM step (`soccer_*_artifacts`), not for soccer's whole turn. My figure came from a peer message that said "soccer".
 - Re-derived from run `odds_refresh_20261118_180720`: the 10 `soccer_*_artifacts` steps sum to **45 s**. The other soccer steps sum to 214 s (schedule, odds, props), and the 10 failed Understat steps account for 14 s of that. The soccer lane reads its own P2 as MET (45 s against its 62 s bound for 2 matches). Everything else in the 18:20Z entry stands.
+
+## 2026-11-18 19:14:22Z (1:14 PM CST) -- web: a HARD memory recycle waits for the other worker's replacement `db6a395ed` (lane `web-silent-worker-kills`, widened on the user's answer "Yes, fix it here" to "Fix the double hard-recycle hole in this lane?") -- **LOADED on web; the effect reading is owed**
+- betting change: **no**.
+  - The load changes when a web worker recycles for memory. Nothing in it places, sizes, holds or exits a bet.
+  - The runtime ride-alongs in `640c6d4fd..db6a395ed` (84 commits) are all OFF or shadow at their defaults:
+    - #836 live end-game freshness (`3a04f43b0`, `18d036bef`, `52e68382a`): absent = shadow, which records and refuses nothing;
+    - the NBA live total anchor (`88193c0a7`): default OFF;
+    - the soccer Understat outage guard (`09f8540a6`, `5a7cc60d2`): naming default ON, "betting change no, tested equal to OFF"; cooldown default OFF.
+  - No fleet env layer sets `SYNDICATE_LIVE_ENDGAME_FRESHNESS`, `SYNDICATE_NBA_LIVE_TOTAL_ANCHOR*`, `SYNDICATE_UNDERSTAT_OUTAGE*` or `SYNDICATE_ENGINE_EXPERTS_OFF` (read 19:1xZ).
+  - The workers load all of it at their next restart, still at the defaults.
+- **The change** (`gunicorn.conf.py` `decide_recycle`):
+  - A hard recycle (anon >= limit + 150 MB) within `SYNDICATE_WEB_WORKER_HARD_RECYCLE_SPACING_SECONDS` (30 s; <= 0 restores the old behaviour) of another worker's recycle now returns `deferred_hard`. It re-checks on EVERY request, not every 5th, and goes on the first request after the window.
+  - Over `SYNDICATE_WEB_WORKER_EMERGENCY_MARGIN_MB` (600) above the hard limit it goes at once.
+  - Proof lines:
+    - `WEB_MEMORY_GUARD_ARMED` carries `hard_spacing_s` / `emergency_margin_mb`;
+    - a held worker logs `WEB_WORKER_MEMORY_RECYCLE_DEFERRED` with `"hard": true`;
+    - its later `WEB_WORKER_MEMORY_RECYCLE` carries `hard_deferred_s`, and every recycle line carries `emergency`.
+  - Tests: 32 passed / 2 skipped on Windows, 34 passed on the fleet's Linux Python, including off != on and an 18:48Z replay.
+- **Why:**
+  - At 18:48:01.6Z and 18:48:03.3Z both workers hard-recycled (971 / 994 MB). Their replacements booted 18:48:09.4Z and 18:48:31.0Z, so web had no booted worker for ~6 s and one for ~28 s. The portfolio monitor's reads stalled 4-12 s.
+  - Such doubles (< 30 s apart, from different workers) ran 2-59 a day 11-05..11-18, every one hard; 24 on 11-18 up to 19:13Z.
+  - The hard bypass dates from Render's single 2 GiB container. On the fleet the web role has no memory cap of its own (cgroup `memory.max` = max; the VM has 15.7 GB, 6.4 GB available at 19:0xZ).
+  - Findings: `.syndicate/findings_2026-11-18_web_silent_worker_kills.md`, "Recycle storm and the double-recycle hole".
+- **Gates:**
+  - claim web 19:13:32Z (holder `web-silent-worker-kills`, ACQUIRED, rc 0);
+  - baseline 19:13:44Z: fleet head `640c6d4fd`, healthz 200, 0 `WEB_MEMORY_GUARD_ARMED` lines with `hard_spacing_s`, 24 doubles on 11-18, 0 hard deferrals;
+  - preflight `--service web --target-commit db6a395ed --betting-change no`, from a worktree at origin/main `5a3653df4`, 4 expect/baseline pairs: **CLEAR 19:14:05Z**. Other roles: refresh-worker `d1e14be4`, live-odds-worker `2ae0c646`.
+- **ff + reload** (scratchpad `wsk_ff_reload2.sh db6a395ed4ee448685fe03ffa8821d64482f1943`):
+  - `git merge --ff-only` at **19:14:22Z** (`640c6d4fdb2c` -> `db6a395ed4ee`). None of the checkout's 6 dirty paths was among the 44 incoming files.
+  - `RELOAD_WEB {"elapsed_s": 4.0, "failures": 0, "healthz_ok_last": true, "max_latency_s": 0.21}`.
+  - Workers 220351/222744 -> **223519/223520**; master 23074 unchanged.
+- **expect / measured:**
+  - `fleet_head` 640c6d4fd -> db6a395ed: **MET** (`after db6a395ed4ee 19:14:22Z`).
+  - `armed_hard_spacing_s` absent -> 30: **MET, 2 of 2 new workers** (`"hard_spacing_s": 30`, `"emergency_margin_mb": 600`). The stall dump is still armed, 2 of 2.
+  - `healthz` 200 -> 200: **MET** (3 reload probes; 19:14:54Z 4.9 ms).
+  - Harm check 19:14:22-19:14:54Z: 0 `WEB_MEMORY_GUARD_ERROR`, 0 Traceback, 0 `WORKER TIMEOUT`, 0 dumps. Only 32 s so far.
+  - `double_hard_recycles_lt30s_non_emergency_per_day` 24 -> 0: **OWED.**
+- **verify:** the reading is scratchpad `wsk_pairs.py` over `WEB_WORKER_MEMORY_RECYCLE {` lines since 19:14:22Z: `double_lt30s` should be 0 apart from `"emergency": true` lines. The first `WEB_WORKER_MEMORY_RECYCLE_DEFERRED` with `"hard": true` should be followed by that pid's recycle with `hard_deferred_s` < ~35 and no `WORKER TIMEOUT`.
