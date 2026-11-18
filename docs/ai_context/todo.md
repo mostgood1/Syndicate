@@ -47,14 +47,15 @@
 - **Knob:** the NBA live re-sim's pregame total or scoring rate. Anchor it to the market's pregame total, or scale it about -1%.
 - **Verify:** the same scripts give a 0-25% gap within +/-0.5 pts. Kit `C:\tmp\elp\engine_read` (`totals_ladder.py`, `ladder_analysis.py`, `staleness.py`).
 
-### `#833` — **THE CHEAT SHEETS' 15-MINUTE BOARD PULL TOOK THE WHOLE 69 MB QUERY. `SyndicateCheatSheetPicks` (and the full build) now ask for `row_refs` and rebuild the cards: 69,000,099 -> 24,516,064 B per call, identical cards** `[2026-11-17, lane cheat-sheet-picks-row-refs; layer2-rail-monitor I-16]` — ON MAIN `aaff7fb04`; **NOT LOADED** (next fleet ff, the user's decision)
-- **Why:** `scripts/build_cheat_sheets.py` `fetch_board_cards` POSTed `/api/intelligence/query` with no `row_refs`. Python-urllib sends no Accept-Encoding, so each call took the whole body. Web's workers recycle on memory about once every 10 requests. The task runs 96 times a day.
-- **Measured on the fleet 2026-11-18 02:40Z, one board state** (both flag-off reads hashed `5d40df14`): 69,000,099 B / 17.6 and 12.6 s flag off; 24,516,064 B / 4.8 s with `row_refs`.
-- **Identical:** the 6,045 rebuilt cards and the whole rebuilt response, key order included; `build_picks` over the fleet's 11-17 sheets gave the same 12 picks. 6 tests in `tests/test_build_cheat_sheets_row_refs.py`.
+### `#833` — **THE CHEAT SHEETS' 15-MINUTE BOARD PULL TOOK THE FULL-FORM QUERY. `SyndicateCheatSheetPicks` (and the full build) now ask for `row_refs` and rebuild the cards: 12.8 -> 4.5 MB per call on the wire, 69.0 -> 24.5 MB for web to serialise, identical cards** `[2026-11-17, lane cheat-sheet-picks-row-refs; layer2-rail-monitor I-16]` — ON MAIN `aaff7fb04` (+ docstring `598981f93`); **NOT LOADED** (next fleet ff, the user's decision)
+- **Why:** `scripts/build_cheat_sheets.py` `fetch_board_cards` POSTed `/api/intelligence/query` with no `row_refs`, 96 times a day for the picks runs alone. Web's workers recycle on memory about once every 10 requests.
+- **Measured on the fleet 2026-11-18:**
+  - wire, through `fetch_board_cards` itself (gzip, from the opener `import syndicate` installs): 12,848,512 -> 4,521,512 B (02:55Z); the task's own calls 00:07-02:52Z were 12.4-14.8 MB;
+  - serialised by web, on one board state (both flag-off reads hashed `5d40df14`, 02:40Z): 69,000,099 -> 24,516,064 B; server time 12.5-17.8 s -> 4.3-4.8 s.
+- **Identical** at that state: the 6,045 rebuilt cards and the whole rebuilt response, key order included; `build_picks` over the fleet's 11-17 sheets gave the same 12 picks. 6 tests in `tests/test_build_cheat_sheets_row_refs.py`.
 - **Owed after the ff** (a script, so the next scheduled run picks it up; no restart; betting change: no):
-  - the picks log's `CHEAT_SHEET_PICKS done cards=N` equals the board's card count;
-  - web.log's Python-urllib query responses are ~24 MB, not ~69 MB, at :07 / :22 / :37 / :52.
-- **Not taken:** `Accept-Encoding: gzip` (24.5 -> 4.6 MB, for ~0.22 s of web CPU per call, on loopback).
+  - the picks log's `CHEAT_SHEET_PICKS done cards=N` is in line with the board's card count;
+  - web.log's Python-urllib query responses at :07 / :22 / :37 / :52 are ~4.5 MB, not ~13 MB.
 
 ### `#831` — **FORWARD READ OWED: FanDuel-led stale-book bets, pre-registered (lane `fanduel-lead-forward`). LOOK 1 on or after 2026-12-16; LOOK 2 on or after 2027-01-13. Read-only; nothing to deploy.**
 - **Why:**

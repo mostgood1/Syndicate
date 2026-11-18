@@ -3519,3 +3519,14 @@ as a verdict.
 - **Measured:** 76 of 76 NHL overlay builds split exactly at 300 s of the newest oddsapi prop capture's age (`is_inplay_fresh_row`). The sweep's own prop capture gap had a median of 335 s, so 6 of 14 gaps before any hang already crossed it. A gap that "had no drop" was one whose builds happened to land inside 300 s of a capture. The long runs made it worse; they were not the threshold.
 - **Second instance in one day:** NFL quarter/half lines at 600 s against the same 300 s (todo `#823`, morning 11-17).
 - **Rule:** for every live line family, compare its capture cadence (p50 AND p90, per source) with the window that reads it (`SYNDICATE_INPLAY_OVERLAY_MAX_PRICE_AGE_SECONDS`, 300). A family captured on ONE clock (NHL props: no Kalshi/Polymarket second source) leaves the board all at once when that clock lapses; a game line survives on any fresh book. Read the age at each build, not the gap between runs.
+
+## 2026-11-17 — OVERTURNED (same session): "the cheat-sheet picks pull is never gzipped (Python-urllib sends no Accept-Encoding)" — `import syndicate` installs a gzip opener; my harness skipped the import, so it measured a transport the real caller never uses `[lane cheat-sheet-picks-row-refs, session 2d6612ed]`
+- **What was believed:** a bare urllib script sending `fetch_board_cards`' exact body got 69,000,099 B with no Content-Encoding. So I wrote that 69 MB was this client's wire, and that the rail monitor's 11-15 MB figure was a size the client never received. That went into a docstring on main, the lane and the todo.
+- **Measured:**
+  - web.log's `%(b)s` for the task's own calls tonight: 12.4-14.8 MB;
+  - through `fetch_board_cards` itself: 12,848,512 B old, 4,521,512 B new.
+  - The cause: `syndicate/__init__.py` installs `http_compression.install_http_compression()`, a global opener that asks for gzip and decodes it. Every script that imports a `syndicate` module inherits it, and my script imported nothing from `syndicate`.
+- **Rule:**
+  - Measure a caller's bytes or latency by calling the caller's OWN function, or by importing what it imports. A re-typed copy of its request is not the caller.
+  - A repo-wide import side effect (`install_opener`, a patched socket, a sitecustomize) changes the transport without appearing at the call site.
+  - Before writing a client-side reading down, check it against the server's log for the caller's real runs.
