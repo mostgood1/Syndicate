@@ -313,3 +313,215 @@ The kit `C:\tmp\elp\m3_kit`. Each file's sha256 as stored; the `code/` files are
 - **Not pinned yet:** the nightly runner and its scheduled task. They are created after M2's 11-24 verdict and pinned
   in a further addendum before the first M3 slate's data is read.
 - A change to any file above before the first slate needs a new addendum; after it, an amendment.
+
+## Addendum: the nightly runner, pinned 2026-11-17 7:43 PM CST (before any M3 slate's data is read)
+
+Built after "Yes, build it", answering "Build the nightly runner now, ready for 11-24?". It is the registered steps in
+order and nothing else; the source is below. Each morning it does this:
+- M2's verdict: no file means WAITING; anything but `M2_VERDICT PASS` means NO_M3, which goes back to the user.
+- Once: save the fit and check it. A failed check writes STOP_fit.
+- Each slate from 11-24 that the in-play recorder logged `DONE`: the pinned experts (M3's live sports only), then the
+  replay. A night with no DONE two days later is RECORDER_MISSING, counted with no bets.
+- `gate --count-only`, and the look itself only when one is due.
+
+**Dev rehearsal** (`rehearse_nightly.sh`, 7:06 to 7:41 PM CST on the fleet, nice 19; REHEARSAL):
+- the fit check passed (622 rows);
+- the frozen experts were re-run fresh on 11-13 and 11-14 and reproduced production with 0 mismatches (11-14:
+  91,333 NCAAF opinions);
+- the 11-14 replay produced the same 1,125 bet rows as the first rehearsal, identical row by row (A1 416, A2 709);
+- `M3_NO_LOOK_DUE`: 54 games is short of L1.
+
+| Kit file (`C:\tmp\elp\m3_kit`) | sha256 |
+|---|---|
+| `m3_nightly.py` | `fa97ac1dad06e66fd68a5d86755d3d5e49e557793589156c391d9556e41319f9` |
+| `run_nightly.sh` | `0aab46bad4c5bc21f6910f808258a16900e8ab6395570b61c8b445c06d6c3747` |
+| `m3_nightly_live.json` | `135d824f810e7cc9abaa6f64b31319db7d5e5051d5576c4963000ca60d7e3db8` |
+| `task_prompt_nightly.md` | `8f1421fb34ee695cee801fa2a48ff40f523bb945bae16ca641c79730fb652c8f` |
+| `rehearse_nightly.sh` | `2df0658f5b2f889392596172f18b0f908c75ff03ccdf4146de721ec4e78a6312` |
+| `m3_nightly_rehearse.json` | `8ed6b5c2a12d680335a2d260b7b4d0a31917f11db995d0553bb25ea3b83f28b3` |
+| `m3_launch.py` | `d1bec7637517c5e5413ba4040b980e4fc8beffd6f422b89ce2e7d02cb3c0f423` |
+
+- The task prompt was fixed before pinning: an early exit (WAITING / NO_M3 / NO_LIVE_ARM / STOPPED / ERROR) ends the
+  morning's wait, because those exits print no `end` line.
+- **The scheduled task itself is created in a turn the user types**, from `task_prompt_nightly.md` exactly as pinned.
+- A change to any file above before the first slate needs a new addendum; after it, an amendment.
+
+### `m3_nightly_live.json`
+
+```json
+{
+  "first_slate": "2026-11-24",
+  "last_slate": null,
+  "rehearse": false,
+  "m2_kit": "/mnt/c/tmp/elp/m2gate_kit",
+  "verdict": "/mnt/c/tmp/elp/m2gate_kit/out/m2_verdict.txt",
+  "read_learner_json": "/mnt/c/tmp/elp/m2gate_kit/out/learner_outcome.json",
+  "learner_args": ["run", "--opinions-dir", "/mnt/c/tmp/elp/m2gate_kit/train,/mnt/c/tmp/elp/m2gate_kit/test",
+                   "--dates", "2026-11-09..2026-11-22", "--test-from", "2026-11-15", "--truth", "outcome"],
+  "recorder_dir": "/mnt/c/tmp/inplay_{date}",
+  "recorder_log": "/mnt/c/tmp/inplay_nightly.log",
+  "out": "/mnt/c/tmp/elp/m3_kit/live"
+}
+```
+
+### `m3_nightly.py` (sha256 fa97ac1dad06e66fd68a5d86755d3d5e49e557793589156c391d9556e41319f9)
+
+```python
+"""M3's nightly runner (decision engine #736, lane engine-paper-m3). READ-ONLY on the fleet; run at nice 19.
+
+Registered rule: .syndicate/findings_2026-11-17_m3_paper_book.md. This runner only orders the registered steps:
+  0. M2's verdict: no file -> WAITING; anything but `M2_VERDICT PASS` -> NO_M3 (goes back to the user). A REHEARSAL
+     line counts only in a rehearsal config.
+  1. once: the fit -- re-run the M2 read's own learner command through `save-fit`, then `check-fit` against the read's
+     JSON. A failed check writes STOP_fit and nothing further runs until the user decides.
+  2. each slate from `first_slate` to yesterday (Central) not yet processed, once the in-play recorder logged
+     `DONE <date>` (a night with no DONE two days later is processed as RECORDER_MISSING: no bets, counted):
+     the pinned experts runner (the M2 kit's launch.py, M3's live sports only), then `replay`.
+  3. `gate --count-only`; only if a look is due, `gate` (the look is taken once and recorded in looks.json).
+It prints COUNTS ONLY until a look is due. Usage: m3_nightly.py <config.json> [--today YYYY-MM-DD]
+"""
+import json
+import os
+import subprocess
+import sys
+from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+KIT = os.path.dirname(os.path.abspath(__file__))
+PY = sys.executable
+CT = ZoneInfo("America/Chicago")
+RECORDER_SPORTS = ("nba", "nhl", "nfl", "ncaaf")
+
+
+def say(out, line):
+    stamp = datetime.now(timezone.utc).astimezone(CT).strftime("%Y-%m-%d %I:%M %p CT")
+    text = f"{stamp} {line}"
+    print(text, flush=True)
+    with open(os.path.join(out, "nightly.log"), "a", encoding="utf-8") as fh:
+        fh.write(text + "\n")
+
+
+def run(cmd, stdout_path):
+    with open(stdout_path, "w", encoding="utf-8") as fh:
+        return subprocess.run(["nice", "-n", "19", *cmd], stdout=fh, stderr=subprocess.STDOUT).returncode
+
+
+def last_line(path):
+    lines = [x for x in open(path, encoding="utf-8", errors="replace").read().splitlines() if x.strip()]
+    return lines[-1] if lines else ""
+
+
+def recorder_done(log_path):
+    done = set()
+    if os.path.exists(log_path):
+        for line in open(log_path, encoding="utf-8", errors="replace"):
+            parts = line.split()
+            if len(parts) >= 3 and parts[1] == "DONE":
+                done.add(parts[2])
+    return done
+
+
+def main():
+    cfg_path = sys.argv[1]
+    cfg = json.load(open(cfg_path, encoding="utf-8"))
+    today = sys.argv[sys.argv.index("--today") + 1] if "--today" in sys.argv else \
+        datetime.now(timezone.utc).astimezone(CT).date().isoformat()
+    out = cfg["out"]
+    rehearse = bool(cfg.get("rehearse"))
+    tag = "REHEARSAL " if rehearse else ""
+    for sub in ("bets", "opinions", "experts", "logs"):
+        os.makedirs(os.path.join(out, sub), exist_ok=True)
+    m2 = cfg["m2_kit"]
+    m3 = [PY, os.path.join(KIT, "m3_launch.py")]
+    rh = ["--rehearse"] if rehearse else []
+    say(out, f"{tag}M3_NIGHTLY start today={today} config={os.path.basename(cfg_path)}")
+
+    # 0. M2's verdict
+    if not os.path.exists(cfg["verdict"]):
+        say(out, f"{tag}M3_NIGHTLY WAITING m2_verdict_missing {cfg['verdict']}")
+        return 0
+    vline = last_line(cfg["verdict"])
+    is_pass = vline.startswith("M2_VERDICT PASS ") or (rehearse and vline.startswith("REHEARSAL M2_VERDICT PASS "))
+    if not is_pass:
+        say(out, f"{tag}M3_NIGHTLY NO_M3 verdict={vline[:200]!r}")
+        return 0
+    live = sorted({item.split("|")[0] for item in vline.split("[", 1)[1].split("]", 1)[0].split(", ")
+                   if "|live|" in item} & set(RECORDER_SPORTS))
+    if not live:
+        say(out, f"{tag}M3_NIGHTLY NO_LIVE_ARM (no PASS live stratum in a recorded sport) verdict={vline[:200]!r}")
+        return 0
+    if os.path.exists(os.path.join(out, "STOP_fit")):
+        say(out, f"{tag}M3_NIGHTLY STOPPED fit check failed earlier; see logs/check_fit.txt")
+        return 0
+
+    # 1. the fit, once
+    fit = os.path.join(out, "fit_outcome.npz")
+    if not os.path.exists(fit):
+        rerun = os.path.join(out, "learner_outcome_rerun.json")
+        rc = run([*m3, "save-fit", "--out", fit, "--", *cfg["learner_args"], "--json", rerun],
+                 os.path.join(out, "logs", "save_fit.txt"))
+        say(out, f"{tag}M3_NIGHTLY save-fit rc={rc}")
+        if rc != 0 or not os.path.exists(fit):
+            say(out, f"{tag}M3_NIGHTLY ERROR save-fit rc={rc}")
+            return 1
+        rc = run([*m3, "check-fit", *rh, "--fit", fit, "--read-json", cfg["read_learner_json"], "--rerun-json", rerun],
+                 os.path.join(out, "logs", "check_fit.txt"))
+        say(out, f"{tag}M3_NIGHTLY check-fit rc={rc} {last_line(os.path.join(out, 'logs', 'check_fit.txt'))[:200]}")
+        if rc != 0:
+            open(os.path.join(out, "STOP_fit"), "w").write(today + "\n")
+            os.replace(fit, fit + ".failed")
+            return 0
+
+    # 2. each slate not yet processed
+    done = recorder_done(cfg["recorder_log"])
+    d = date.fromisoformat(cfg["first_slate"])
+    stop = min(date.fromisoformat(today) - timedelta(days=1),
+               date.fromisoformat(cfg["last_slate"]) if cfg.get("last_slate") else date.max)
+    while d <= stop:
+        ds = d.isoformat()
+        report = os.path.join(out, "bets", f"report_{ds}.json")
+        if not os.path.exists(report):
+            folder = cfg["recorder_dir"].format(date=ds)
+            if ds in done:
+                opinions = os.path.join(out, "opinions", f"opinions_{ds}.jsonl")
+                exp_out = os.path.join(out, "experts", f"experts_out_{ds}.txt")
+                rc = run([PY, os.path.join(m2, "launch.py"), "experts", "run", "--date", ds, "--sports", ",".join(live),
+                          "--opinions", opinions], exp_out)
+                say(out, f"{tag}M3_NIGHTLY experts {ds} sports={','.join(live)} rc={rc} {last_line(exp_out)[:160]}")
+                rc = run([*m3, "replay", *rh, "--date", ds, "--opinions", opinions, "--experts-out", exp_out,
+                          "--fit", fit, "--verdict", cfg["verdict"], "--recorder", folder,
+                          "--out-dir", os.path.join(out, "bets")], os.path.join(out, "logs", f"replay_{ds}.txt"))
+                for line in open(os.path.join(out, "logs", f"replay_{ds}.txt"), encoding="utf-8", errors="replace"):
+                    if "M3_SLATE" in line:
+                        say(out, line.strip())
+                if rc != 0:
+                    say(out, f"{tag}M3_NIGHTLY ERROR replay {ds} rc={rc}")
+                    return 1
+            elif d <= date.fromisoformat(today) - timedelta(days=3):
+                json.dump({"date": ds, "slate_refused": "RECORDER_MISSING: no DONE line two days after the slate"},
+                          open(report, "w"))
+                say(out, f"{tag}M3_SLATE {ds} RECORDER_MISSING (no bets, counted)")
+            else:
+                say(out, f"{tag}M3_NIGHTLY {ds} waiting for the recorder's DONE line")
+                break
+        d += timedelta(days=1)
+
+    # 3. counts; a look only when due
+    gate = [*m3, "gate", *rh, "--bets-dir", os.path.join(out, "bets"), "--state", os.path.join(out, "looks.json"),
+            "--today", today]
+    run([*gate, "--count-only"], os.path.join(out, "logs", "gate_count.txt"))
+    lines = [x.strip() for x in open(os.path.join(out, "logs", "gate_count.txt"), encoding="utf-8") if "M3_" in x]
+    for line in lines:
+        say(out, line)
+    if any("M3_LOOK_DUE" in x for x in lines) and not rehearse:
+        run(gate, os.path.join(out, "logs", f"gate_look_{today}.txt"))
+        for line in open(os.path.join(out, "logs", f"gate_look_{today}.txt"), encoding="utf-8"):
+            if "M3_" in line:
+                say(out, line.strip())
+    say(out, f"{tag}M3_NIGHTLY end")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
