@@ -607,3 +607,15 @@ One pass over every portfolio route, before any probe existed:
   9 `axis_held_live`, 6 `game_started`.
 - **Orders today:** 54. Ledger: unreconciled 0, unknown submits 0. Cap use: polymarket 17.6%.
 - **Settlement:** 7 started bets unsettled, 1 late. The late one is the NHL both-sides case; score grader due 02:40Z.
+
+## Reading 14 — Tue 11-17 6:59 PM CST (00:59Z 11-18), window 32 min
+
+- **Endpoints:** all 7 read 200, inside budget. 0 kills, 0 5xx. **Banner:** ok, armed, state 297 s.
+- **Plan (3.7 min):** board 4,835 -> suggested 110 -> sized 25 -> positions 7; `in_play_market_fair` 31 (games live).
+  Ceiling used 12.0%. Live plans 00:56Z: kalshi 743 -> 34 placeable -> 4; polymarket 548 -> 25 -> 4.
+- **Execution, 32 min:** 8 live ticks, 0 placed, 0 failed (22 `outside_price_band`, 1 `game_started`).
+- **Ledger:** unreconciled 0, unknown submits 0. Orders today 54. Settlement: 26 started-and-unsettled (games in
+  progress), 1 late (the NHL both-sides case).
+- **Register:** the 23:46Z "DEPLOY ATTEMPT ABORTED, NOTHING LOADED" entry (lane `ncaaf-grid-build-speed`) was a
+  heuristic false positive; classified `no` (BC row added). 1 unclassified load remains (16:17Z NFL rebuild,
+  with its lane).
