@@ -2894,16 +2894,23 @@ The window of the 0 is ONE nightly and ~19 h; recurrence would show as `candidat
 PASS in isolation in the ci-checkout under the scrubbed env (so: order leakage inside a chunk, leaking test unidentified; the log carries no tracebacks). Redis memory (930 MB, `maxmemory` unset)
 is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.4 MB each, two builds per date, ~9-day TTL), daily backup rdb flat at 252-288 MB over 10-16..10-22.
 
-## [board-build-process-split] THE LAYER 2 BOARD BUILD SHARES ONE INTERPRETER LOCK WITH THE BOOK-GRID TICK AND THE VENUE ODDS LOOP; SINCE 2026-11-18 08:31Z THE BOARD LOOP RUNS IN ITS OWN PROCESS ON THE FLEET (SWITCH ON) `[verified 2026-11-18 08:47Z, lane layer2-board-process-split, todo #832]`
+## [board-build-process-split] THE LAYER 2 BOARD BUILD SHARES ONE INTERPRETER LOCK WITH THE BOOK-GRID TICK AND THE VENUE ODDS LOOP; SINCE 2026-11-18 08:31Z THE BOARD LOOP RUNS IN ITS OWN PROCESS ON THE FLEET (SWITCH ON) `[verified 2026-11-18 17:16Z, lane layer2-board-process-split, todo #832]`
 
 - **Measured** (fleet, per-thread `/proc` + `schedstat`, nice 19): refresh-worker's board loop (thread `syndicate-intelligence-state-loop`; tid 29001 on pid 28948) got **0.19 of a core** over the 165.6 s 11-18 overview stage (01:51:46-01:54:32Z = 7:51-7:54 PM CST 11-17); the main thread (book-grid / overlay tick) 0.41, the venue odds loop 0.36, process 1.02, runqueue wait ~0.03 per thread. 11-16 evening, 24 builds: board share median 0.58. Findings `.syndicate/findings_2026-11-17_layer2_board_process_split.md`.
 - **The switch:** `SYNDICATE_BOARD_BUILD_PROCESS` on refresh-worker, `pipeline/board_build_process.py`, on main since `09eddabf2` (2026-11-18 02:16Z). Absent = the identical in-thread starter.
-  - **ON since the drained full `down`/`up` at 2026-11-18 08:30:50Z** (deploys.md, BC-042 yes): `REFRESH_WORKER__SYNDICATE_BOARD_BUILD_PROCESS=1` is in `local_production.env`, and the fleet is at `09eddabf2`.
+  - **ON since the drained full `down`/`up` at 2026-11-18 08:30:50Z** (deploys.md, BC-042 yes): `REFRESH_WORKER__SYNDICATE_BOARD_BUILD_PROCESS=1` is in `local_production.env`; loaded at `09eddabf2` (later ffs by other lanes moved the fleet on; the board-process code is unchanged).
+  - **It survives restarts (measured 17:16Z):** refresh-worker restarted 4 times after the load (`role_restarts.jsonl`), and the child came back each time (`BOARD_PROCESS_STARTED ... attempt=1`, then `CHILD_READY`), with 0 `BOARD_PROCESS_EXITED` and 0 Traceback 12:30-17:30Z.
+    - 12:37Z vhdx-reclaim (WSL restart);
+    - 14:05Z nhl-inplay-props-drop (drained down/up);
+    - 14:42Z #816 (TERM);
+    - 15:39Z nba-grid-lean-chips (TERM).
+  - At 17:16Z the child's RSS was 3,486 MB (2,446 at 08:45Z), and the role's `container_memory_mb` was 4,717.
   - refresh-worker (pid 429499 at the load) runs the tick, the venue odds loop and the chip publisher.
   - The board loop runs in ONE child, `python -m pipeline.board_build_process --serve` (pid 429539 at the load). The supervisor counts it in the role tree; RSS was parent 742 / child 2,446 MB at 08:45Z.
   - `check_deploy_safety` lists the child under the worker's own servers. A drain reaches CLEAR, and the child logs `DEFERRED_BOARD_BUILD reason=deploy_drain_requested` (measured 08:43-08:45Z).
   - TERMing the child only restarts it, with backoff. Rollback = remove the env line + a drained full `down`/`up`.
   - The first live evening's reading is OWED (findings § PRE-REGISTERED PREDICTION, baseline B).
+    - Scheduled task `board-split-first-evening-reading-1118` takes it at 10:15 PM CST 11-18, and commits from the session-independent worktree `C:\tmp\syndicate-sessions\layer2-board-process-split`.
 - **The host is a second, separate cost:** Windows read 100% busy at 56-64% of nominal clock (1,920-2,188 of 3,417 MHz, Snapdragon X1E80100, on AC) at 7:36 and 8:05 PM CST 11-17, with vmmemwsl 3.9-6.4 cores and MsMpEng 1.0-2.4. Inside WSL that shows as clock, not runqueue wait. A WSL-side process appending to `/mnt/c` every second raised MsMpEng ~2.4 -> ~1.1 cores when stopped: write samplers to WSL-native paths.
 
 ## [odds-lane-sport-deadline] ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE; A PER-SPORT DEADLINE + DEFERRED NHL GENERATION IS ON MAIN `2ae0c646a` AND LOADED (fleet ff 2026-11-18 13:47:14Z); THE SLOW-API READING IS OWED `[verified 2026-11-18 13:56Z, lane odds-lane-sport-deadline, todo #838]`
