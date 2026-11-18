@@ -197,5 +197,13 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
   the 600 MB emergency margin none of them would have gone at once.
 - Owed: doubles since 19:14:22Z, which should be 0 apart from `"emergency": true` recycles, and the first hard hold's
   `hard_deferred_s`. Entry: deploys.md 19:14:22Z.
+- Reading 1, 21:31:49Z (3:31 PM CST): the first hard hold behaved as designed.
+  - 21:30:09Z pid 264694 recycled; its replacement booted 21:30:11.9Z.
+  - 21:30:14Z pid 253224 (1,021.5 MB, 381 MB over its limit) was held 4.8 s after that recycle, kept serving, and went
+    31.0 s later on its next request, with 0 abandoned. Its replacement booted 21:30:50.4Z.
+  - Without the hold it would have gone 2.2 s after the first replacement booted, the 18:48Z shape.
+  - Since the load: 0 doubles under 30 s in 10 recycles (~2.9 expected at 11-18's pre-load rate, P(0) ~ 0.06). Also
+    0 WORKER TIMEOUT, 0 dumps, 0 guard errors.
+  - Still owed: the 11-19 full-day count.
 - Correction: the lane status said the widening happened at "19:30Z". The fleet clock read 19:13:44Z at the baseline, so it
   was ~19:05Z.

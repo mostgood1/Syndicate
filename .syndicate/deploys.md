@@ -61959,6 +61959,20 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Harm check 19:14:22-19:14:54Z: 0 `WEB_MEMORY_GUARD_ERROR`, 0 Traceback, 0 `WORKER TIMEOUT`, 0 dumps. Only 32 s so far.
   - `double_hard_recycles_lt30s_non_emergency_per_day` 24 -> 0: **OWED.**
 - **verify:** the reading is scratchpad `wsk_pairs.py` over `WEB_WORKER_MEMORY_RECYCLE {` lines since 19:14:22Z: `double_lt30s` should be 0 apart from `"emergency": true` lines. The first `WEB_WORKER_MEMORY_RECYCLE_DEFERRED` with `"hard": true` should be followed by that pid's recycle with `hard_deferred_s` < ~35 and no `WORKER TIMEOUT`.
+- **reading 1, 2026-11-18 21:31:49Z (3:31 PM CST), 2 h 17 min after the load** (scratchpad `wsk_hold_watch.sh` and `wsk_verify2.sh 2026-11-18T19:14:22`):
+  - First hard hold: **MET.**
+    - 21:30:09.340Z pid 264694 hard-recycled (970.6 MB, limit 647.0). It drained with 0 abandoned, and its replacement 268065 booted 21:30:11.923Z.
+    - 21:30:14.088Z pid 253224, at 1,021.5 MB (limit 640.0, 381 MB over; the emergency line is 1,390 MB), logged `WEB_WORKER_MEMORY_RECYCLE_DEFERRED` with `"hard": true` and `last_recycle_age_s` 4.8.
+    - It kept serving and recycled on its next request, 21:30:45.067Z: `hard_deferred_s` 31.0, `last_recycle_age_s` 35.7. It drained with 0 abandoned / 0 in flight; replacement 268195 booted 21:30:50.370Z.
+    - So 268065 had been booted for 33 s before 253224 left. Without the hold, 253224 would have gone 2.2 s after 268065 booted: the 18:48Z shape.
+  - `double_lt30s` since 19:14:22Z: **0 of 10 recycles** (9 hard, 0 emergency).
+    - Before: 24 in the 19.2 h of 11-18 up to 19:13Z (1.25 an hour), so ~2.9 were expected in these 2.29 h; P(0 | 2.9) ~ 0.06. This is not yet a per-day reading.
+  - Harm since 19:14:22Z: 0 `WORKER TIMEOUT`, 0 stall dumps, 0 `WEB_MEMORY_GUARD_ERROR`, 0 Traceback; 12 boots, 12 of 12 armed with `hard_spacing_s` 30; healthz 200.
+  - Heartbeat sampler (`wsk_hb_sampler.py`, 1 Hz): one gap around the hold, 21:30:47-49Z, peak 5.0 s.
+    - Its last heartbeat (~21:30:44.7Z) is 1 s before 253224 exited, and it ended when 268195 booted.
+    - Read as the exited worker's file, held until the master reaped and respawned (4.7 s), not a stall of the serving worker 268065. Believed, not proven: the sampler does not record a pid per inode.
+    - Hour 20Z: max heartbeat age 4.0 s, 4 gaps >= 3 s.
+  - **Owed:** the 11-19 full-day count (UTC day) against 11-18's 24 before the load.
 ## 2026-11-18 20:22Z (2:22 PM CST) -- READING (no deploy by this lane): the soccer Understat outage guard's NAMING half `5a7cc60d2` (todo #841, lane `understat-fetch-failures`; user "Load it now" to "Load the naming half on the fleet now (ff to 5a7cc60d2, betting change no)?") reached the fleet as a ride-along of lane `web-silent-worker-kills`'s ff `640c6d4fd` -> `db6a395ed` at 19:14:22Z (BC-051) -- **P1 MET 52 of 52, P2 MET, P3 MET, P5 MET; P4 (recovery) owed**
 - betting change: **no**. This entry loads nothing; the load is BC-051 (`no`), which lists this guard as a ride-along.
   - Naming sends the same requests and writes the same bytes as OFF under 7 responses x 2 kinds (`tests/test_understat_fetch.py`, 46 of 46).
