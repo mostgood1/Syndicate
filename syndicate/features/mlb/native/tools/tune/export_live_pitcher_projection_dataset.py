@@ -17,7 +17,25 @@ if _SYNDICATE_ROOT not in sys.path:
     sys.path.insert(0, _SYNDICATE_ROOT)
 
 
-from syndicate.features.mlb.native.tools.eval.sync_render_live_lens_history import _env_first, _infer_render_base_url, sync_render_live_lens_history
+from syndicate.features.mlb.native.tools.eval.sync_fleet_live_lens_history import (
+    LIVE_LENS_SYNC_DIRNAME,
+    _env_first,
+    _infer_fleet_base_url,
+    sync_fleet_live_lens_history,
+)
+
+# `--source` value for the payloads synced from the fleet into `data/live_lens/render_sync/`.
+# It was `render-sync` until 2026-11-17 (lane mlb-native-fleet-names); that value is still
+# accepted everywhere and means the same thing.
+FLEET_SYNC_SOURCE = "fleet-sync"
+_LEGACY_SOURCE_NAMES = {"render-sync": FLEET_SYNC_SOURCE}
+SOURCE_CHOICES = (FLEET_SYNC_SOURCE, "local", "both", *_LEGACY_SOURCE_NAMES)
+
+
+def _normalize_source(value: Any, default: str = "both") -> str:
+    """Lower-cased `--source`, with the legacy `render-sync` mapped to `fleet-sync`."""
+    normalized = str(value or "").strip().lower() or str(default)
+    return _LEGACY_SOURCE_NAMES.get(normalized, normalized)
 
 
 def _read_json(path: Path) -> Any:
@@ -158,10 +176,10 @@ def _resolve_sync_window(live_lens_dir: Path, *, min_date: str = "", max_date: s
     if str(min_date).strip():
         start_date = dt.date.fromisoformat(str(min_date).strip())
     else:
-        render_sync_dir = live_lens_dir / "render_sync"
+        sync_dir = live_lens_dir / LIVE_LENS_SYNC_DIRNAME
         existing_dates: List[dt.date] = []
-        if render_sync_dir.exists():
-            for path in render_sync_dir.glob("live_lens_reports_*.json"):
+        if sync_dir.exists():
+            for path in sync_dir.glob("live_lens_reports_*.json"):
                 token = path.stem.replace("live_lens_reports_", "")
                 try:
                     existing_dates.append(dt.date.fromisoformat(_slug_to_date(token)))
@@ -173,33 +191,33 @@ def _resolve_sync_window(live_lens_dir: Path, *, min_date: str = "", max_date: s
     return start_date, end_date
 
 
-def _maybe_sync_render_history(
+def _maybe_sync_fleet_history(
     live_lens_dir: Path,
     *,
     source: str,
-    sync_render: bool,
+    sync_fleet: bool,
     min_date: str = "",
     max_date: str = "",
-    render_base_url: str = "",
-    render_cron_token: str = "",
-    render_timeout_seconds: int = 45,
+    fleet_base_url: str = "",
+    fleet_cron_token: str = "",
+    fleet_timeout_seconds: int = 45,
     require_archive: bool = True,
 ) -> Optional[Dict[str, Any]]:
-    normalized = str(source or "").strip().lower()
-    if normalized not in {"render-sync", "both"} or not bool(sync_render):
+    normalized = _normalize_source(source, default="")
+    if normalized not in {FLEET_SYNC_SOURCE, "both"} or not bool(sync_fleet):
         return None
-    base_url = str(render_base_url or "").strip() or _infer_render_base_url()
-    token = str(render_cron_token or "").strip() or _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
+    base_url = str(fleet_base_url or "").strip() or _infer_fleet_base_url()
+    token = str(fleet_cron_token or "").strip() or _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
     if not base_url or not token:
-        raise RuntimeError("render-sync source requested but Render base URL or cron token is unavailable for auto-sync")
+        raise RuntimeError("fleet-sync source requested but the fleet base URL or cron token is unavailable for auto-sync")
     start_date, end_date = _resolve_sync_window(live_lens_dir, min_date=min_date, max_date=max_date, exclude_today=True)
-    return sync_render_live_lens_history(
+    return sync_fleet_live_lens_history(
         base_url=base_url,
         cron_token=token,
         start_date=start_date,
         end_date=end_date,
-        timeout_seconds=int(render_timeout_seconds),
-        out_dir=(live_lens_dir / "render_sync"),
+        timeout_seconds=int(fleet_timeout_seconds),
+        out_dir=(live_lens_dir / LIVE_LENS_SYNC_DIRNAME),
         overwrite=True,
         require_archive=bool(require_archive),
     )
@@ -299,11 +317,11 @@ def _build_projection_row(
     return row
 
 
-def _iter_render_sync_projection_rows(live_lens_dir: Path, props: Set[str], *, include_pregame: bool = False) -> Iterable[Dict[str, Any]]:
-    render_sync_dir = live_lens_dir / "render_sync"
-    if not render_sync_dir.exists():
+def _iter_fleet_sync_projection_rows(live_lens_dir: Path, props: Set[str], *, include_pregame: bool = False) -> Iterable[Dict[str, Any]]:
+    sync_dir = live_lens_dir / LIVE_LENS_SYNC_DIRNAME
+    if not sync_dir.exists():
         return
-    for sync_path in sorted(render_sync_dir.glob("live_lens_reports_*.json")):
+    for sync_path in sorted(sync_dir.glob("live_lens_reports_*.json")):
         try:
             payload = _read_json(sync_path)
         except Exception:
@@ -340,7 +358,7 @@ def _iter_render_sync_projection_rows(live_lens_dir: Path, props: Set[str], *, i
                 snapshot=snapshot,
                 game_state=game_state,
                 team_side=archive_row.get("teamSide"),
-                source_name="render_sync_archive",
+                source_name="fleet_sync_archive",
             )
             if row:
                 yield _with_reason_enrichment(row)
@@ -446,12 +464,12 @@ def _iter_projection_rows(live_lens_dir: Path, props: set[str], *, include_prega
 
 
 def _collect_projection_rows(live_lens_dir: Path, props: Set[str], *, source: str, include_pregame: bool) -> List[Dict[str, Any]]:
-    normalized = str(source or "both").strip().lower() or "both"
+    normalized = _normalize_source(source)
     rows: List[Dict[str, Any]] = []
     seen: Set[str] = set()
     iterators: List[Iterable[Dict[str, Any]]] = []
-    if normalized in {"render-sync", "both"}:
-        iterators.append(_iter_render_sync_projection_rows(live_lens_dir, props, include_pregame=include_pregame))
+    if normalized in {FLEET_SYNC_SOURCE, "both"}:
+        iterators.append(_iter_fleet_sync_projection_rows(live_lens_dir, props, include_pregame=include_pregame))
     if normalized in {"local", "both"}:
         iterators.append(_iter_projection_rows(live_lens_dir, props, include_pregame=include_pregame))
     for iterator in iterators:
@@ -470,13 +488,13 @@ def main() -> int:
     parser.add_argument("--out", default="data/eval/live_pitcher_projection_dataset.jsonl", help="Output dataset path (.jsonl or .csv).")
     parser.add_argument("--props", default="outs,strikeouts", help="Comma-separated pitcher prop keys to export.")
     parser.add_argument("--include-pregame", action="store_true", help="Include first-seen rows that do not have live-state context yet.")
-    parser.add_argument("--source", choices=("render-sync", "local", "both"), default="both", help="Dataset source: Render-synced payloads, local registry artifacts, or both with Render sync preferred.")
-    parser.add_argument("--sync-render", choices=("on", "off"), default="on", help="Auto-refresh render_sync history before using render-sync sources.")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="both", help="Dataset source: fleet-synced payloads, local registry artifacts, or both with the fleet sync preferred. render-sync is the old name of fleet-sync.")
+    parser.add_argument("--sync-fleet", "--sync-render", dest="sync_fleet", choices=("on", "off"), default="on", help="Auto-refresh the synced fleet history before using fleet-sync sources (--sync-render is the old name).")
     parser.add_argument("--min-date", default="", help="Optional lower date bound used to scope auto-sync range.")
     parser.add_argument("--max-date", default="", help="Optional upper date bound used to scope auto-sync range.")
-    parser.add_argument("--render-base-url", default="", help="Optional Render base URL for auto-sync.")
-    parser.add_argument("--render-cron-token", default="", help="Optional Render cron token for auto-sync.")
-    parser.add_argument("--render-timeout-seconds", type=int, default=45, help="Timeout for Render auto-sync requests.")
+    parser.add_argument("--fleet-base-url", "--render-base-url", dest="fleet_base_url", default="", help="Optional base URL for auto-sync (defaults to MLB_BETTING_BASE_URL, BASE_URL or SYNDICATE_BASE_URL, else the local fleet; --render-base-url is the old name).")
+    parser.add_argument("--fleet-cron-token", "--render-cron-token", dest="fleet_cron_token", default="", help="Optional cron token for auto-sync (--render-cron-token is the old name).")
+    parser.add_argument("--fleet-timeout-seconds", "--render-timeout-seconds", dest="fleet_timeout_seconds", type=int, default=45, help="Timeout for fleet auto-sync requests (--render-timeout-seconds is the old name).")
     args = parser.parse_args()
 
     props = {token.strip().lower() for token in str(args.props or "").split(",") if token.strip()}
@@ -484,21 +502,22 @@ def main() -> int:
         raise SystemExit("No props requested.")
 
     live_lens_dir = Path(str(args.live_lens_dir)).resolve()
-    sync_summary = _maybe_sync_render_history(
+    source = _normalize_source(args.source)
+    sync_summary = _maybe_sync_fleet_history(
         live_lens_dir,
-        source=str(args.source or "both"),
-        sync_render=str(args.sync_render or "on") == "on",
+        source=source,
+        sync_fleet=str(args.sync_fleet or "on") == "on",
         min_date=str(args.min_date or ""),
         max_date=str(args.max_date or ""),
-        render_base_url=str(args.render_base_url or ""),
-        render_cron_token=str(args.render_cron_token or ""),
-        render_timeout_seconds=int(args.render_timeout_seconds or 45),
+        fleet_base_url=str(args.fleet_base_url or ""),
+        fleet_cron_token=str(args.fleet_cron_token or ""),
+        fleet_timeout_seconds=int(args.fleet_timeout_seconds or 45),
         require_archive=True,
     )
     rows = _collect_projection_rows(
         live_lens_dir,
         props,
-        source=str(args.source or "both"),
+        source=source,
         include_pregame=bool(args.include_pregame),
     )
     out_path = Path(str(args.out)).resolve()
@@ -523,7 +542,7 @@ def main() -> int:
         "parsedGameStateRows": sum(1 for row in rows if bool(row.get("game_state_parsed"))),
     }
     if isinstance(sync_summary, dict):
-        summary["renderSync"] = {
+        summary["fleetSync"] = {
             "startDate": sync_summary.get("startDate"),
             "endDate": sync_summary.get("endDate"),
             "archiveOkCount": sync_summary.get("archiveOkCount"),

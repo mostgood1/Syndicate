@@ -16,7 +16,13 @@ if _SYNDICATE_ROOT not in sys.path:
     sys.path.insert(0, _SYNDICATE_ROOT)
 
 
-from syndicate.features.mlb.native.tools.tune.export_live_pitcher_projection_dataset import _collect_projection_rows, _maybe_sync_render_history
+from syndicate.features.mlb.native.tools.tune.export_live_pitcher_projection_dataset import (
+    FLEET_SYNC_SOURCE,
+    SOURCE_CHOICES,
+    _collect_projection_rows,
+    _maybe_sync_fleet_history,
+    _normalize_source,
+)
 
 
 def _safe_float(value: Any) -> Optional[float]:
@@ -174,16 +180,17 @@ def _leave_one_out(rows: Sequence[Dict[str, Any]], feature_names: Sequence[str],
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Fit a simple Render-backed live pitcher strikeouts correction layer.")
+    parser = argparse.ArgumentParser(description="Fit a simple fleet-backed live pitcher strikeouts correction layer.")
     parser.add_argument("--live-lens-dir", default="data/live_lens")
-    parser.add_argument("--source", choices=("render-sync", "local", "both"), default="render-sync")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default=FLEET_SYNC_SOURCE, help="fleet-sync, local or both (render-sync is the old name of fleet-sync).")
     parser.add_argument("--min-date", default="")
     parser.add_argument("--max-date", default="")
     parser.add_argument("--exclude-today", action="store_true")
-    parser.add_argument("--sync-render", choices=("on", "off"), default="on")
-    parser.add_argument("--render-base-url", default="")
-    parser.add_argument("--render-cron-token", default="")
-    parser.add_argument("--render-timeout-seconds", type=int, default=45)
+    # The --render-* / --sync-render spellings are the pre-2026-11-17 names, kept as aliases.
+    parser.add_argument("--sync-fleet", "--sync-render", dest="sync_fleet", choices=("on", "off"), default="on")
+    parser.add_argument("--fleet-base-url", "--render-base-url", dest="fleet_base_url", default="")
+    parser.add_argument("--fleet-cron-token", "--render-cron-token", dest="fleet_cron_token", default="")
+    parser.add_argument("--fleet-timeout-seconds", "--render-timeout-seconds", dest="fleet_timeout_seconds", type=int, default=45)
     parser.add_argument("--l2", type=float, default=1.0)
     parser.add_argument("--out", default="data/eval/live_pitcher_strikeouts_correction.json")
     args = parser.parse_args()
@@ -193,22 +200,23 @@ def main() -> int:
     if bool(args.exclude_today) and not max_date:
         max_date = (dt.date.today() - dt.timedelta(days=1)).isoformat()
 
-    sync_summary = _maybe_sync_render_history(
+    source = _normalize_source(args.source, default=FLEET_SYNC_SOURCE)
+    sync_summary = _maybe_sync_fleet_history(
         live_lens_dir,
-        source=str(args.source or "render-sync"),
-        sync_render=str(args.sync_render or "on") == "on",
+        source=source,
+        sync_fleet=str(args.sync_fleet or "on") == "on",
         min_date=str(args.min_date or ""),
         max_date=max_date,
-        render_base_url=str(args.render_base_url or ""),
-        render_cron_token=str(args.render_cron_token or ""),
-        render_timeout_seconds=int(args.render_timeout_seconds or 45),
+        fleet_base_url=str(args.fleet_base_url or ""),
+        fleet_cron_token=str(args.fleet_cron_token or ""),
+        fleet_timeout_seconds=int(args.fleet_timeout_seconds or 45),
         require_archive=True,
     )
 
     rows = _collect_projection_rows(
         live_lens_dir,
         {"strikeouts"},
-        source=str(args.source or "render-sync"),
+        source=source,
         include_pregame=False,
     )
     filtered: List[Dict[str, Any]] = []
@@ -237,7 +245,7 @@ def main() -> int:
         "ok": True,
         "model_type": "ridge_linear_error_correction",
         "prop": "strikeouts",
-        "source": str(args.source or "render-sync"),
+        "source": source,
         "rows": len(rows),
         "date_window": {
             "min_date": min(str(row.get("date") or "") for row in rows),
@@ -261,7 +269,7 @@ def main() -> int:
         ],
     }
     if isinstance(sync_summary, dict):
-        artifact["renderSync"] = {
+        artifact["fleetSync"] = {
             "startDate": sync_summary.get("startDate"),
             "endDate": sync_summary.get("endDate"),
             "archiveOkCount": sync_summary.get("archiveOkCount"),

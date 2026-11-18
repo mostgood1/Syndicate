@@ -4105,7 +4105,7 @@ if (Test-SportEnabled 'MLB') {
             '--sims', [string]$runtimePolicy.MLB.simsPerGame,
             '--workers', [string]$runtimePolicy.MLB.workers,
             '--git-push', 'off',
-            '--validate-render-frontend', 'off',
+            '--validate-fleet-frontend', 'off',
             '--build-next-day', 'on'
         )
         WorkingDirectory = $mlbEngineRoot

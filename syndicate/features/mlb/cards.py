@@ -692,15 +692,18 @@ def _lineup_health_summary(lineups_path: Path | None, lineups_doc: dict[str, Any
 def _workflow_summary(ops_report_path: Path | None, ops_report_doc: dict[str, Any] | None) -> dict[str, Any]:
     warnings = list((ops_report_doc or {}).get("warnings") or []) if isinstance(ops_report_doc, dict) else []
     raw_errors = list((ops_report_doc or {}).get("errors") or []) if isinstance(ops_report_doc, dict) else []
+    # daily_update.py says "fleet frontend validation failed" since 2026-11-17 (lane
+    # mlb-native-fleet-names); ops reports written before then say "render frontend ...".
+    validation_prefixes = ("fleet frontend validation failed:", "render frontend validation failed:")
     validation_errors = [
         str(msg)
         for msg in raw_errors
-        if str(msg).strip().lower().startswith("render frontend validation failed:")
+        if str(msg).strip().lower().startswith(validation_prefixes)
     ]
     errors = [
         str(msg)
         for msg in raw_errors
-        if not str(msg).strip().lower().startswith("render frontend validation failed:")
+        if not str(msg).strip().lower().startswith(validation_prefixes)
     ]
     sims_per_game = None
     stages = (ops_report_doc or {}).get("stages") if isinstance(ops_report_doc, dict) else None

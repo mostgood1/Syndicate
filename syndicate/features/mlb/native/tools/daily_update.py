@@ -1535,9 +1535,17 @@ def _fetch_live_lens_reports_payload(
 # Production since 2026-09-30: the local WSL fleet (`scripts/local_production.py`).
 _FLEET_BASE_URL = "http://127.0.0.1:10000"
 
+# The on-disk directory under `data/live_lens/` that the prior-day live-lens sync writes.
+# Its name is historical (Render, retired 2026-09-30) and is KEPT on purpose: it lives on the
+# fleet's data root, `artifact_publisher.py`'s allowlists and the mirror/refresh scripts name
+# it, and a new name would split the history or need a migration on the fleet (lane
+# mlb-native-fleet-names, 2026-11-17). Same value as
+# `eval/sync_fleet_live_lens_history.LIVE_LENS_SYNC_DIRNAME`.
+_LIVE_LENS_SYNC_DIRNAME = "render_sync"
 
-def _infer_render_base_url() -> str:
-    """Base URL for the live-lens sync and the frontend smoke. The name is historical.
+
+def _infer_fleet_base_url() -> str:
+    """Base URL for the live-lens sync and the frontend smoke.
 
     An explicit env var wins, else the local fleet. It used to fall back to
     `https://<first render.yaml name:>.onrender.com`, which was the keyvalue store's
@@ -1547,7 +1555,7 @@ def _infer_render_base_url() -> str:
     return str(explicit) if explicit else _FLEET_BASE_URL
 
 
-def _normalize_render_base_url(value: str) -> str:
+def _normalize_base_url(value: str) -> str:
     base_url = str(value or "").strip()
     if not base_url:
         return ""
@@ -1558,7 +1566,7 @@ def _normalize_render_base_url(value: str) -> str:
 
 def _prior_day_live_lens_stage(args: argparse.Namespace, date_str: str) -> Dict[str, Any]:
     slug = str(date_str).strip().replace("-", "_")
-    default_sync_path = (_DATA_DIR / "live_lens" / "render_sync" / f"live_lens_reports_{slug}.json").resolve()
+    default_sync_path = (_DATA_DIR / "live_lens" / _LIVE_LENS_SYNC_DIRNAME / f"live_lens_reports_{slug}.json").resolve()
     sync_out_arg = str(getattr(args, "live_lens_sync_out", "") or "").strip()
     sync_out_path = _resolve_path_arg(sync_out_arg, default=default_sync_path)
     live_lens_dir = (_DATA_DIR / "live_lens").resolve()
@@ -1575,15 +1583,15 @@ def _prior_day_live_lens_stage(args: argparse.Namespace, date_str: str) -> Dict[
 
     payload: Dict[str, Any] = {}
     if stage["sync_requested"]:
-        base_url = _normalize_render_base_url(
-            str(getattr(args, "live_lens_base_url", "") or "").strip() or _infer_render_base_url()
+        base_url = _normalize_base_url(
+            str(getattr(args, "live_lens_base_url", "") or "").strip() or _infer_fleet_base_url()
         )
         token = str(getattr(args, "live_lens_cron_token", "") or "").strip() or _env_first(
             "MLB_BETTING_CRON_TOKEN",
             "MLB_CRON_TOKEN",
             "CRON_TOKEN",
         )
-        stage["render_base_url"] = str(base_url or "")
+        stage["base_url"] = str(base_url or "")
         if base_url and token:
             try:
                 payload = _fetch_live_lens_reports_payload(
@@ -1595,7 +1603,7 @@ def _prior_day_live_lens_stage(args: argparse.Namespace, date_str: str) -> Dict[
                 _ensure_dir(sync_out_path.parent)
                 _write_json(sync_out_path, payload)
                 stage["status"] = "ok"
-                stage["source"] = "render_api"
+                stage["source"] = "fleet_api"
                 stage["synced_report_path"] = _relative_path_str(sync_out_path)
             except urllib.error.HTTPError as exc:
                 stage["status"] = "warning"
@@ -1622,7 +1630,7 @@ def _prior_day_live_lens_stage(args: argparse.Namespace, date_str: str) -> Dict[
         latest_report = _load_json_if_exists(local_report_path)
         if latest_report:
             stage["used_local_report"] = True
-            if str(stage.get("source") or "") != "render_api":
+            if str(stage.get("source") or "") != "fleet_api":
                 stage["source"] = "local_files"
             source_label = "Local live-lens report"
 
@@ -1631,7 +1639,7 @@ def _prior_day_live_lens_stage(args: argparse.Namespace, date_str: str) -> Dict[
         if local_registry_doc:
             registry_summary = _summarize_live_lens_registry_doc(local_registry_doc, date_str=str(date_str))
             stage["used_local_registry"] = True
-            if str(stage.get("source") or "") not in {"render_api", "local_files"}:
+            if str(stage.get("source") or "") not in {"fleet_api", "local_files"}:
                 stage["source"] = "local_files"
 
     if latest_report or registry_summary:
@@ -1661,25 +1669,25 @@ def _refresh_live_pitcher_corrections_stage(args: argparse.Namespace, *, max_dat
         stage["reason"] = "refresh_live_pitcher_corrections=off"
         return stage
 
-    base_url = _normalize_render_base_url(
-        str(getattr(args, "live_lens_base_url", "") or "").strip() or _infer_render_base_url()
+    base_url = _normalize_base_url(
+        str(getattr(args, "live_lens_base_url", "") or "").strip() or _infer_fleet_base_url()
     )
     token = str(getattr(args, "live_lens_cron_token", "") or "").strip() or _env_first(
         "MLB_BETTING_CRON_TOKEN",
         "MLB_CRON_TOKEN",
         "CRON_TOKEN",
     )
-    stage["render_base_url"] = str(base_url or "")
+    stage["base_url"] = str(base_url or "")
 
     commands = {
         "outs": [
             sys.executable,
             str((_NATIVE_ROOT / "tools" / "tune" / "fit_live_pitcher_outs_correction.py").resolve()),
             "--source",
-            "render-sync",
+            "fleet-sync",
             "--max-date",
             str(max_date_str),
-            "--render-timeout-seconds",
+            "--fleet-timeout-seconds",
             str(int(getattr(args, "live_lens_timeout_seconds", 45) or 45)),
             "--out",
             str((_DATA_DIR / "eval" / "live_pitcher_outs_correction.json").resolve()),
@@ -1688,10 +1696,10 @@ def _refresh_live_pitcher_corrections_stage(args: argparse.Namespace, *, max_dat
             sys.executable,
             str((_NATIVE_ROOT / "tools" / "tune" / "fit_live_pitcher_strikeouts_correction.py").resolve()),
             "--source",
-            "render-sync",
+            "fleet-sync",
             "--max-date",
             str(max_date_str),
-            "--render-timeout-seconds",
+            "--fleet-timeout-seconds",
             str(int(getattr(args, "live_lens_timeout_seconds", 45) or 45)),
             "--out",
             str((_DATA_DIR / "eval" / "live_pitcher_strikeouts_correction.json").resolve()),
@@ -1699,10 +1707,10 @@ def _refresh_live_pitcher_corrections_stage(args: argparse.Namespace, *, max_dat
     }
     if base_url:
         for cmd in commands.values():
-            cmd.extend(["--render-base-url", str(base_url)])
+            cmd.extend(["--fleet-base-url", str(base_url)])
     if token:
         for cmd in commands.values():
-            cmd.extend(["--render-cron-token", str(token)])
+            cmd.extend(["--fleet-cron-token", str(token)])
 
     if not base_url or not token:
         stage["status"] = "skipped"
@@ -1769,7 +1777,7 @@ def _refresh_live_pitcher_corrections_stage(args: argparse.Namespace, *, max_dat
     return stage
 
 
-def _run_render_frontend_validation_stage(
+def _run_fleet_frontend_validation_stage(
     args: argparse.Namespace,
     *,
     date_str: str,
@@ -1781,30 +1789,30 @@ def _run_render_frontend_validation_stage(
         "date": str(date_str),
         "season": int(season),
     }
-    if str(getattr(args, "validate_render_frontend", "on") or "on") != "on":
-        stage["reason"] = "validate_render_frontend=off"
+    if str(getattr(args, "validate_fleet_frontend", "on") or "on") != "on":
+        stage["reason"] = "validate_fleet_frontend=off"
         return stage
 
     expected_commit_value = str(expected_commit or "").strip()
     if not expected_commit_value:
-        stage["reason"] = "render validation skipped because no published commit is available"
+        stage["reason"] = "fleet frontend validation skipped because no published commit is available"
         return stage
 
-    base_url = _normalize_render_base_url(
-        str(getattr(args, "render_validation_base_url", "") or "").strip()
+    base_url = _normalize_base_url(
+        str(getattr(args, "fleet_validation_base_url", "") or "").strip()
         or str(getattr(args, "live_lens_base_url", "") or "").strip()
-        or _infer_render_base_url()
+        or _infer_fleet_base_url()
     )
     cron_token = (
-        str(getattr(args, "render_validation_cron_token", "") or "").strip()
+        str(getattr(args, "fleet_validation_cron_token", "") or "").strip()
         or str(getattr(args, "live_lens_cron_token", "") or "").strip()
         or _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
     )
     if not base_url:
-        stage["reason"] = "render validation requested but the base URL is unavailable"
+        stage["reason"] = "fleet frontend validation requested but the base URL is unavailable"
         return stage
 
-    smoke_py = (_NATIVE_ROOT / "tools" / "smoke" / "smoke_render_frontend.py").resolve()
+    smoke_py = (_NATIVE_ROOT / "tools" / "smoke" / "smoke_fleet_frontend.py").resolve()
     cmd = [
         sys.executable,
         str(smoke_py),
@@ -1815,7 +1823,7 @@ def _run_render_frontend_validation_stage(
         "--season",
         str(int(season)),
         "--timeout-seconds",
-        str(int(getattr(args, "render_validation_timeout_seconds", 45) or 45)),
+        str(int(getattr(args, "fleet_validation_timeout_seconds", 45) or 45)),
     ]
     if cron_token:
         cmd.extend(["--cron-token", str(cron_token)])
@@ -1837,7 +1845,7 @@ def _run_render_frontend_validation_stage(
             except Exception:
                 stage["stdout"] = stdout
                 stage["status"] = "error"
-                stage["error"] = "render smoke output was not valid JSON"
+                stage["error"] = "fleet frontend smoke output was not valid JSON"
                 return stage
             if isinstance(report_doc, dict):
                 stage["report"] = report_doc
@@ -1864,7 +1872,7 @@ def _run_render_frontend_validation_stage(
                 stage["stdout"] = stdout
         if int(completed.returncode or 0) != 0:
             stage["status"] = "error"
-            stage["error"] = f"smoke_render_frontend exit {int(completed.returncode or 0)}"
+            stage["error"] = f"smoke_fleet_frontend exit {int(completed.returncode or 0)}"
             return stage
         stage["status"] = "ok"
     except Exception as exc:
@@ -2791,6 +2799,11 @@ def _build_next_day_ui_daily_command(args: argparse.Namespace, raw_argv: List[st
             "--git-commit-message",
             "--build-next-day",
             "--next-date",
+            # Both spellings: the --*render* names are the pre-2026-11-17 aliases.
+            "--validate-fleet-frontend",
+            "--fleet-validation-base-url",
+            "--fleet-validation-cron-token",
+            "--fleet-validation-timeout-seconds",
             "--validate-render-frontend",
             "--render-validation-base-url",
             "--render-validation-cron-token",
@@ -2828,7 +2841,7 @@ def _build_next_day_ui_daily_command(args: argparse.Namespace, raw_argv: List[st
         "off",
         "--build-next-day",
         "off",
-        "--validate-render-frontend",
+        "--validate-fleet-frontend",
         "off",
     ]
     cmd.extend(passthrough_args)
@@ -2862,7 +2875,7 @@ def _mark_ui_daily_prior_eval_failure_nonfatal(
     }
 
 
-def _validate_render_page_artifacts(
+def _validate_page_artifacts(
     *,
     game_out: Path,
     date_str: str,
@@ -2879,8 +2892,8 @@ def _validate_render_page_artifacts(
         bundle_doc = loaded_bundle if isinstance(loaded_bundle, dict) else {}
     except Exception as exc:
         current_stage["status"] = "error"
-        current_stage["render_artifact_validation_error"] = f"profile_bundle_unreadable: {type(exc).__name__}: {exc}"
-        report["errors"].append(f"render artifact validation failed: profile bundle unreadable: {type(exc).__name__}: {exc}")
+        current_stage["page_artifact_validation_error"] = f"profile_bundle_unreadable: {type(exc).__name__}: {exc}"
+        report["errors"].append(f"page artifact validation failed: profile bundle unreadable: {type(exc).__name__}: {exc}")
         return
 
     hr_targets_info = dict(bundle_doc.get("hr_targets") or {})
@@ -2892,11 +2905,11 @@ def _validate_render_page_artifacts(
     current_stage["hr_targets_rows"] = int(hr_targets_rows)
     if hr_targets_error or not hr_targets_path.exists():
         current_stage["status"] = "error"
-        current_stage["render_artifact_validation_error"] = (
+        current_stage["page_artifact_validation_error"] = (
             hr_targets_error or "hr_targets_artifact_missing"
         )
         report["errors"].append(
-            "render artifact validation failed: hr-targets artifact missing or errored"
+            "page artifact validation failed: hr-targets artifact missing or errored"
             + (f" ({hr_targets_error})" if hr_targets_error else "")
         )
 
@@ -2909,11 +2922,11 @@ def _validate_render_page_artifacts(
     current_stage["rfi_targets_rows"] = int(rfi_targets_rows)
     if rfi_targets_error or not rfi_targets_path.exists():
         current_stage["status"] = "error"
-        current_stage["render_artifact_validation_error"] = (
+        current_stage["page_artifact_validation_error"] = (
             rfi_targets_error or "rfi_targets_artifact_missing"
         )
         report["errors"].append(
-            "render artifact validation failed: rfi-targets artifact missing or errored"
+            "page artifact validation failed: rfi-targets artifact missing or errored"
             + (f" ({rfi_targets_error})" if rfi_targets_error else "")
         )
 
@@ -2938,7 +2951,7 @@ def _validate_render_page_artifacts(
         season_frontend_stage["status"] = "error"
         current_stage["status"] = "error"
         report["errors"].append(
-            "render artifact validation failed: missing current-day season frontend artifact(s): "
+            "page artifact validation failed: missing current-day season frontend artifact(s): "
             + ", ".join(missing_frontend)
         )
 
@@ -3954,7 +3967,7 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
             }
             report["errors"].append(f"current-day season frontend artifact build failed: {type(exc).__name__}: {exc}")
     report["stages"]["current_day_season_frontend_artifacts"] = season_frontend_stage
-    _validate_render_page_artifacts(
+    _validate_page_artifacts(
         game_out=game_out,
         date_str=str(args.date),
         current_stage=current_stage,
@@ -4050,20 +4063,20 @@ def _run_ui_daily_workflow(args: argparse.Namespace, *, raw_argv: List[str]) -> 
     _write_json(ops_report_path, report)
     print(f"[ui-daily] Wrote ops report: {ops_report_path}")
 
-    render_validation_stage = _run_render_frontend_validation_stage(
+    frontend_validation_stage = _run_fleet_frontend_validation_stage(
         args,
         date_str=str(args.date),
         season=int(args.season),
         expected_commit=str((report.get("git_push") or {}).get("commit_sha") or ""),
     )
-    report["stages"]["render_frontend_validation"] = render_validation_stage
-    if str(render_validation_stage.get("status") or "") == "error":
-        error_bits = list(render_validation_stage.get("failures") or [])
-        stage_error = str(render_validation_stage.get("error") or "").strip()
+    report["stages"]["fleet_frontend_validation"] = frontend_validation_stage
+    if str(frontend_validation_stage.get("status") or "") == "error":
+        error_bits = list(frontend_validation_stage.get("failures") or [])
+        stage_error = str(frontend_validation_stage.get("error") or "").strip()
         if stage_error:
             error_bits.append(stage_error)
         report["validation_errors"].append(
-            "render frontend validation failed"
+            "fleet frontend validation failed"
             + (f": {'; '.join(str(bit) for bit in error_bits if str(bit).strip())}" if error_bits else "")
         )
         report["status"] = "error"
@@ -5522,24 +5535,34 @@ def main() -> int:
         default="Daily update {date}",
         help="Commit message template used when --git-push on. Supports {date}, {next_date}, and {workflow} placeholders.",
     )
+    # The --*render* spellings below are the pre-2026-11-17 names (lane mlb-native-fleet-names),
+    # kept as aliases: recorded commands (reports/ops_jobs.json) and older callers pass them.
     ap.add_argument(
+        "--validate-fleet-frontend",
         "--validate-render-frontend",
+        dest="validate_fleet_frontend",
         choices=["on", "off"],
         default="on",
         help="If on during --workflow ui-daily, run the frontend smoke against production (the local fleet) after a successful build/push and fail the workflow if deployed cards/live endpoints do not validate.",
     )
     ap.add_argument(
+        "--fleet-validation-base-url",
         "--render-validation-base-url",
+        dest="fleet_validation_base_url",
         default="",
         help="Optional base URL override for the post-push frontend smoke (defaults to --live-lens-base-url, MLB_BETTING_BASE_URL, BASE_URL or SYNDICATE_BASE_URL, else the local fleet).",
     )
     ap.add_argument(
+        "--fleet-validation-cron-token",
         "--render-validation-cron-token",
+        dest="fleet_validation_cron_token",
         default="",
         help="Optional cron token override for the post-push frontend smoke (defaults to --live-lens-cron-token, MLB_BETTING_CRON_TOKEN, MLB_CRON_TOKEN, or CRON_TOKEN).",
     )
     ap.add_argument(
+        "--fleet-validation-timeout-seconds",
         "--render-validation-timeout-seconds",
+        dest="fleet_validation_timeout_seconds",
         type=int,
         default=45,
         help="HTTP timeout used by the post-push frontend smoke during --workflow ui-daily.",

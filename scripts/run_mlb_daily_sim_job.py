@@ -307,7 +307,7 @@ def main() -> int:
         "--sims", str(int(args.sims)),
         "--workers", str(int(args.workers)),
         "--git-push", "off",
-        "--validate-render-frontend", "off",
+        "--validate-fleet-frontend", "off",  # was --validate-render-frontend (still an alias) until 2026-11-17
         # Next-day build off in the worker-centric loop: the date-rollover
         # first_appearance gate sims the new day at midnight Central and the
         # look-ahead warms next-day odds, so chaining tomorrow's slate here
