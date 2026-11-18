@@ -283,3 +283,39 @@ on fleet head `2ae0c646a`.
 side and price band, do our picks win less than the close implies, measured on the live book and the paper ladder
 together? That decides whether the fix is in the model's probabilities (calibration shrink) or in which prices we
 accept. The cell table (`--cells`, descriptive only) was not read; no cell-level rule is pre-registered.
+
+## Reading 37 — Wed 11-18 8:21 AM CST (14:21Z), window 60 min
+
+**Results first.** No live bet was graded since 7:49 AM, so the windows equal the baseline: last 30 days -7.35%
+[-12.8, -1.9] on 673 games, last 7 days -2.71% [-13.3, +7.9], fee-net CLV (30 d) -0.36 pp. The same 8 signals.
+Today's (11-18) bets are not graded yet.
+
+**Optimization lead this reading — F12, the gate's clock and the change cadence.**
+- The gate's clock is now **BC-047 from 14:05:39Z**, 0 of 800 events. In the last 24 h four live-betting changes
+  loaded, each restarting the count:
+  - BC-042 08:31Z, the board-process split;
+  - BC-045 08:03Z, NFL seeds + I-17 (classified after the fact);
+  - BC-046 13:47Z, the odds-lane deadline #838;
+  - BC-047 14:05Z, NHL in-play props on.
+- The book grades about **24 games a day**: 168 in the last 7 days, 673 in the last 30. **800 games therefore needs
+  about 33-36 consecutive days with no betting change.**
+- At today's cadence the count never gets past about one day of games. **As adopted ("Any betting change"), the
+  scale-up gate cannot pass.** No live stake or cap can rise until it does.
+- **This is the user's call, not a fault:** keep the gate and batch betting changes into rare windows, or decide which
+  changes restart the clock. Recorded with the numbers.
+
+**The fleet since 7:20 AM:**
+- **Fast-forward to `2ae0c646a` at 13:47Z** (BC-046). Then a **drained full `down`/`up` at 14:05Z** for the NHL
+  in-play props env key (BC-047).
+- All roles rebooted about 14:05:18Z (refresh-worker 23140, live-odds 23141, web 23074).
+- **The board-process split came back with them:** `mode=process parent=23140`, child 23192 ready at 14:05:44Z,
+  1 serve process.
+- BC-043 (the compaction restart) is classified `no`. BC-044 (11-17 NFL rebuild) and BC-045 are classified `yes`.
+  **The register's unclassified count is now 0, so this reading has 0 anomalies.**
+
+**Health:**
+- Plan 8.3 min old. In 6 h: 74 commits, max gap 15.0 min across the 14:05 restart.
+- **Execution, 60 min:** 19 live ticks, 5 placed (polymarket), 0 failed.
+- Orders today 35: 33 filled, 2 maker posts resting about 7.6 h, exempt until kickoff. Unreconciled 0.
+- Cap use: kalshi 14.0%, polymarket 13.7%.
+- All 7 endpoints 200 (`/portfolio` 0.72 s). 0 kills.
