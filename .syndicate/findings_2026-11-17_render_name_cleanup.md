@@ -12,10 +12,34 @@ removed every functional dependency. What was left: names, stale comments, docs,
 | part | state |
 |---|---|
 | 1. stale comments/docstrings (the case-sensitive `RENDER*` grep) | **ON MAIN `4c777e4d0`.** 19 files. Comment-only: each file's AST, docstrings stripped, is identical to HEAD's. |
-| 2. Render-named identifiers, API fields, `RENDER_URL`, test fixtures | **ON MAIN** (commit below). Targeted tests: see "Tests". |
-| 3. README, `docs/`, `.github/` | **ON MAIN** (commit below). 55 files. |
+| 2. Render-named identifiers, API fields, `RENDER_URL`, test fixtures | **ON MAIN `e13ae3c8c`.** 58 files. Targeted tests: see "Tests". |
+| 3. README, `docs/`, `.github/` | **ON MAIN `abb0f192a`.** 53 files (docs only). |
 | 4. delete `render.yaml` + its guard rule | **OWED: waits on the user** confirming Render's GitHub App is uninstalled from the repo (or the services deleted). Exact list below. |
 | 5. protective strip lists | **LEFT ON PURPOSE** (below). |
+
+Nothing here loads anywhere until someone fast-forwards the fleet. When it does, what a reader
+sees changes in exactly three places: `/versionz`, `/healthz` and `/api/ops/version` gain
+`service_name` / `instance_id` / `external_url` beside the old `render_*` keys; the WNBA ops trace
+gains `web_role`; web's boot line says `hosted=` instead of `on_render=`. Betting change: no.
+
+## Tests
+
+`[2026-11-17, 5:2x-5:5x PM CST, worktree at the part-2 tree, Idle priority, 6 xdist workers]`
+32 files (the 26 edited test files plus `test_request_path_guard`, `test_simulation_adapter`,
+`test_venue_order_family_census`, `test_deploy_guard`, `test_live_refresh_loop`,
+`test_mlb_refresh_runner`): **1558 passed, 2 failed** in 27 min.
+- `test_fleet_logs.py::test_render_logs_script_runs_the_same_cli` — my own new test: argparse
+  wraps the usage block to the prog name's length, and the help text quotes both file names.
+  Fixed to compare words with both names masked; `test_fleet_logs.py` + `test_local_logstamp.py`
+  re-run: **18 passed**.
+- `test_mlb_refresh_runner.py::test_live_lens_payload_refreshes_card_before_game_lens` —
+  **PRE-EXISTING, unrelated**: its `fake_build_game_lens()` rejects the `live_mc_refusal`
+  keyword `live_lens_port/app_slice.py:14452` now passes. Re-run alone in a throwaway worktree
+  at the pre-part-2 HEAD: **fails identically**. Neither file is touched by this lane.
+- `test_correlation_arm_value.py` (the substrate label edit landed after the big run started):
+  **24 passed**.
+
+Part 1 needed no test: the AST of all 19 files, docstrings stripped, equals HEAD's.
 
 ## Part 2 — every rename and every consumer checked
 
@@ -97,7 +121,7 @@ Rewritten to the fleet (present-tense Render instructions only; dated history ke
 - Repo root: `RENDER_SELF_HOST_BACKLOG.md`, `RENDER_SELF_HOST_REFACTOR_PLAN.md` (a dated
   "Render-era record" note on top).
 - `.github/`: `copilot-instructions.md` ("RENDER 502 STATUS" bucket -> "WEB 502 STATUS"), the 5
-  `betting-board-*` agents and 21 skills ("Render parity" -> "fleet parity", the
+  `betting-board-*` agents and 19 skill files ("Render parity" -> "fleet parity", the
   "Render-emulated" step -> a fleet-equivalent run with paper money only).
 
 Left as records: `docs/ai_context/todo.md` / `todo_closed.md`, `docs/fix_notes_log.md`,
