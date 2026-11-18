@@ -61580,3 +61580,11 @@ Lane `render-config-retirement` (session 267d8859).
 - **OWED:**
   - **I-17 rail check, the 11-18 evening:** `/api/board/live-rail` college full-game totals rows carry `live_total_basis: "calibrated"`, and none shows a total on the wrong side of the line from its flag (`C:\tmp\ncal816\i17check.py`). No college game is live at 2 AM.
   - **NFL seeding:** acts first at TNF 11-19.
+
+## 2026-11-18 08:24:41Z (2:24 AM CST) -- READING for the 2026-11-18 08:02:54Z refresh-worker load (written by lane `ncaab-total-overprojection`; do not read this as a second LOAD entry): todo #809's per-build memo (lane `ncaaf-grid-build-speed`) -- **REACHABILITY MET; the speed reading is OWED on a live window**
+- betting change: no (a reading; the load's own entry carries BC-041).
+- **Read independently at 08:24:41Z, from this lane:** fleet head `3920a2d4d`. The supervised refresh-worker is pid **419651**; it booted 08:03:01Z, after the 01:46:27Z ff that put the memo on disk. `class _BuildMemo` is on disk 1x, and `memo = _BuildMemo(last_seen, now)` is wired into `build_book_grid` 1x.
+- **Harm, 08:03-08:24Z:** 0 `BOOK_GRID_BUILD_ERROR`, 0 `^Traceback`. 3 BOOK_GRID_TICKs (08:04:40, 08:14:17, 08:24:41Z), no sport live. Quiet-hour builds: nba 3.4 / 3.6 s, ncaab 2.7 / 2.2 s, ncaaf 0.2 / 0.8 s, soccer 3.0 / 2.5 s. These are not a speed reading: the shards are small and nothing is live.
+- **Owed:**
+  - the live speed effect, expected to be small: replay CPU NCAAF 7.3 -> 6.6 s, NBA 5.5 -> 5.1 s, NCAAB 1.7 -> 1.5 s. The prediction it was loaded under: `ncaab_build_seconds_median` no higher at a like shard size, and 0 build errors;
+  - the Saturday 11-21 NCAAF reading (task `ncaaf-grid-pivot-reading-1121`, 11:30 PM CST). Its prompt now names the memo and lane `layer2-board-process-split`'s board-process switch as confounds for P1.
