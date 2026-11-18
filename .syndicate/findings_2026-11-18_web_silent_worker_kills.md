@@ -19,7 +19,7 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
 ## Hypotheses (written into the lane before any test)
 
 - **H1** the worker's main loop blocks in the fast `/healthz` or accept path.
-- **H2** the heartbeat itself blocks: gunicorn 21's `WorkerTmp.notify` is an `os.utime` on a temp file in
+- **H2** the heartbeat itself blocks: gunicorn's `WorkerTmp.notify` writes metadata on a temp file in
   `worker_tmp_dir`, the system tmp on the WSL disk, and an I/O stall holds it past 60 s.
 - **H3** GIL starvation: another thread in the same process holds the GIL in one long C call.
 
@@ -90,3 +90,51 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
   `09eddabf2`, still carrying the black box. The new workers 622/623 armed.
 - Not a verdict. The 11-17 kills fell 15:23-21:36Z (9:23 AM - 3:36 PM CST), and this window was the evening and the
   night. The daytime window is the one that matters.
+
+## H4, from the portfolio monitor (written 2026-11-18 16:25Z / 10:25 AM CST, before its test)
+
+- The peer's reading (web.log, 11-18): worker 23086 served a `POST /api/intelligence/query` from `Python-urllib` (a script,
+  not a browser) 16:22:07-16:22:25Z: 25,945 ms, 3.7 MB, `QUERY_STAGE_MS` rows=4906, board_read 13,216 ms. A
+  `GET /api/portfolio/live` in the same worker at the same time took 25,163 ms (normally 0.2-1.7 s). Then a
+  `GROWTH_EPISODE` to 1,161 MB and a hard memory recycle (drained, in_flight 0). No stall dump: the loop never went 40 s
+  without a heartbeat.
+- **H4:** the 11-17 kills were a heavy request of this shape (a script's large intelligence query, or another request doing
+  seconds-long work) in the killed worker, long enough to starve its main loop past 60 s.
+- **Falsification:** H4 is falsified for a kill if the killed pid started no long or large request in the 120 s before its
+  kill: no intelligence query / `QUERY_STAGE_MS` line, no response over 10 s, only ordinary fast requests.
+- By construction a Python-level request cannot keep the main thread off the GIL for 60 s (the interpreter forces a switch
+  every 5 ms). Only one long C call, a full GC over a large heap, or the host starving the process of CPU can. The 25 s
+  request that left no dump fits that: the loop kept turning.
+
+## H4 tested (2026-11-18 16:27-16:31Z / 10:27-10:31 AM CST, read-only, web.log)
+
+- **Long requests ran without kills.** `POST /api/intelligence/query` took 20 s or more 30 times: 11 on 11-17 (max 54.4 s,
+  23:09:03Z) and 19 on 11-18 up to 16:22Z (max 48.6 s, 01:07:50Z). None was followed by a kill. None ran past 60 s either,
+  so this alone does not rule out "a request stalls the loop for as long as it runs".
+- **The kill windows show no long request.** In the 120 s before each 11-17 kill, the requests that finished (from either
+  worker) were `/wnba/api/live_player_boxscore` (3-8 s), `/api/ops/version` and `/syndicate`. But an access line is written
+  when a request FINISHES, so a request still in flight at the kill leaves no line. The log cannot rule one out.
+- **The overlay warmer does not tell killed workers from survivors.** On 11-17, 289 of 293 boots started
+  `COMBINED_BOARD_OVERLAY_WARMER`.
+  - Two kills came 67 s and 74 s after their worker's first combined-board read, and two came 6.5 min and 31 min after it.
+  - The warmer's rebuilds run in a web thread: `build_s` max 136.6 s and 53 of 874 at 30 s or more on 11-17; max 82.0 s
+    and 42 of 631 on 11-18.
+- **The 4,906-row client is `scripts/build_cheat_sheets.py`** (task `SyndicateCheatSheetPicks`, every 15 min: 10:22, then
+  10:37 AM CST). Its body is the only one with `slim_aliases` False + `drop_row_diagnostics` + `row_refs`, matching the
+  logged `"slim": false, "drop": true, "refs": true`. It is not the Layer 2 rail probe, which sends `slim_aliases` True.
+- **Verdict: H4 is not supported as the kill mechanism, but not falsified.** A Python-level request cannot hold the main
+  thread off the GIL for 60 s; only one long C call, a full GC, or CPU starvation can. The 25 s portfolio read beside the
+  16:22Z query is a web-capacity matter (a 13 s `board_read` in a request thread), outside this lane.
+- **Correction to H2.** The fleet's gunicorn `WorkerTmp.notify` is an `os.fchmod` that toggles the unlinked tmp file's
+  mode, and `last_update()` reads `st_ctime`, which the master compares with `time.time()`. It is not `os.utime`. It is
+  the same disk, so H2's precondition is unchanged.
+
+## A continuous instrument: heartbeat-age sampler (from 16:31Z 11-18, 9 h cap)
+
+- The dump fires only at a 40 s stall, which is rare. To see shorter stalls, a read-only sampler (session scratchpad
+  `wsk_hb_sampler.py`, nice 19) `stat`s each worker's heartbeat file once a second, through the master's
+  `/proc/<master>/fd`, so it reads exactly what the master reads. It prints every heartbeat gap of 3 s or more at its peak,
+  plus an hourly max.
+- A normal loop reads 0.2-0.8 s, measured at 16:30Z.
+- If heavy requests or warmer rebuilds stall the loop for seconds, the gaps will line up with them in web.log. The 60 s
+  kills would then be the tail of that distribution, and H4/H3 gets a dose-response test without waiting for a kill.
