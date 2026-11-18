@@ -125,10 +125,11 @@ def test_the_card_says_who_has_it_and_where_in_espns_words():
 
 
 def test_the_served_chip_is_that_line_up_to_its_40_character_cap():
-    """The board's wrapper labels the sides from the card and cuts at `_SITUATION_MAX_CHARS` (40), for every
-    sport. A 41-character goal-to-go line loses its last letter there -- pinned here, not fixed in this lane."""
+    """The board's wrapper labels the sides from the card and caps at `_SITUATION_MAX_CHARS` (40), for every
+    sport. The 41-character goal-to-go line used to lose its last letter there ("... red zon"); since lane
+    `chip-situation-cut` it drops the whole last part instead -- "Goal at LAC 2" already says red zone."""
     assert _chip_live_detail("nfl", _attached(AWAY_RED_ZONE)) == "LAC ball · 4th & 4 at BAL 20 · red zone"
-    assert _chip_live_detail("nfl", _attached(HOME_GOAL_TO_GO)) == "BAL ball · 1st & Goal at LAC 2 · red zone"[:40]
+    assert _chip_live_detail("nfl", _attached(HOME_GOAL_TO_GO)) == "BAL ball · 1st & Goal at LAC 2"
 
 
 def test_the_card_never_shows_the_team_id_or_the_home_frame_number():

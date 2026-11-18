@@ -582,6 +582,32 @@ def _matchup_text(game: dict[str, Any]) -> str:
 _SITUATION_NOISE = {"in progress", "live", "final", "scheduled", "pre-game", "pregame", "warmup", "delayed start"}
 _SITUATION_MAX_CHARS = 40
 _CLOCK_PERIOD_TEXT_RE = re.compile(r"\d{1,2}:\d{2}\s*-\s*(?:\d(?:st|nd|rd|th)|OT\d?)", re.IGNORECASE)
+_SITUATION_SEPARATOR = " · "
+
+
+def _fit_situation(text: str | None) -> str | None:
+    """The live line within `_SITUATION_MAX_CHARS`, cut only between whole parts.
+
+    A plain slice cut mid-word (lane chip-situation-cut, user 2026-11-18 "Fix the chip cut"): the 41-character
+    "BAL ball · 1st & Goal at LAC 2 · red zone" was served ending "red zon". A line over the cap keeps its
+    leading " · " parts that fit and drops the rest whole -- leading, because every line puts the main fact
+    first (who has the ball, the outs, the run). A first part too long on its own ends at its last full
+    word with an ellipsis. A line within the cap is returned as it is."""
+    if not text:
+        return None
+    text = str(text)
+    if len(text) <= _SITUATION_MAX_CHARS:
+        return text
+    kept: list[str] = []
+    for part in text.split(_SITUATION_SEPARATOR):
+        if len(_SITUATION_SEPARATOR.join([*kept, part])) > _SITUATION_MAX_CHARS:
+            break
+        kept.append(part)
+    if kept:
+        return _SITUATION_SEPARATOR.join(kept)
+    head = text[: _SITUATION_MAX_CHARS - 1]
+    space = head.rfind(" ")
+    return (head[:space] if space > 0 else head).rstrip(" ·") + "…"
 
 
 def _side_logo(sport: str, game: dict[str, Any], side: str) -> str | None:
@@ -622,7 +648,7 @@ def _live_situation(game: dict[str, Any], status_token: str | None) -> str | Non
                 continue
             kept.append(part)
         if kept:
-            return " · ".join(kept)[:_SITUATION_MAX_CHARS]
+            return _fit_situation(_SITUATION_SEPARATOR.join(kept))
     return None
 
 
@@ -755,7 +781,7 @@ def _chip_live_detail(sport: str, game: dict[str, Any], start_utc: datetime | No
         text = live_detail(sport, game, start_utc, {"home": _side_label(game, "home"), "away": _side_label(game, "away")})
     except Exception:  # noqa: BLE001 -- a detail line must never break a chip
         return None
-    return text[:_SITUATION_MAX_CHARS] if text else None
+    return _fit_situation(text)
 
 
 def _chip_footer(sport: str, game: dict[str, Any], start_utc: datetime | None) -> str | None:
