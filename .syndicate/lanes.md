@@ -1375,6 +1375,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_trader_follow_pregame.py (pregame filter, price band, follow price at t+delay with no look-ahead, staleness and kickoff cut-offs); one full run with per-step counts; registered verdict + diagnostics (own-price ROI selected and baseline, followable coverage per delay, selected wallets' entry-price and minutes-before-start distributions) in the findings file
 - Blocked by: none
 
+### inplay-recorder-weeknight-stalls — OPEN — opened 2026-11-18 — session 7d49bbd3-03d7-4cb4-828c-52f841ff3b41
+- Goal: The in-play recorder's weeknight whole-loop stalls (11-16: 70 s at 01:24:58Z and 136 s at 01:30:54Z, no Kalshi 429) get a named cause with evidence (log lines, timings) in a findings file; if a fix is needed it is drafted with a test and its measurement, and nothing lands on main or changes the nightly without the user's yes. Side session of local_cbc2cd31 (M3 entry window, todo #736).
+- Files: .syndicate/findings_2026-11-18_inplay_recorder_weeknight_stalls.md (NEW), scripts/inplay_sched_probe.py (NEW), tests/test_inplay_sched_probe.py (NEW)
+- Hypothesis: Stated 2026-11-18 ~8:05 AM CST after the 11-16 timeline, before any probe: H1 HOST CPU STARVATION -- the recorder runs at Windows IDLE_PRIORITY_CLASS; in the live evening the host's 12 cores are saturated by Normal-class work (vmmemwsl, Defender, System, remoting), so the recorder's thread runs only when the balance-set manager's ~4 s anti-starvation boost picks it, and every step that needs several schedulings (a TLS request, a 9P file read, a JSON parse) stretches to tens of seconds. Alternatives: H2 network / remote latency (Kalshi or the NIC), H3 host or VM pause (sleep, Modern Standby), H4 the wsl.localhost read alone.
+- Falsification test: H1 is FALSE if (a) in the stall minutes only one kind of step is slow (Kalshi HTTP only, with ESPN / OddsAPI / 9P reads at their usual latency), or (b) the fleet VM's own 1 s loop shows no slowdown in those minutes, or (c) prospectively, an Idle-class scheduling probe run beside a Normal-class twin in a live evening shows Idle wake lateness p99 < 1 s in minutes where the recorder's requests take > 10 s. H2 is FALSE if 9P file reads (no network) stall in the same minutes. H3 is FALSE if the fleet keeps logging through the stall and System shows no power event.
+- Verification: Findings file names the cause with the 11-16 timeline (every step's latency in the two stalls), the per-minute join against the 11-16 VM-side sampler, the other nights' stall counts, and (if a fix is proposed) its CPU cost and a live-evening A/B probe reading; the fix's test passes; the user is asked before any landing.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
