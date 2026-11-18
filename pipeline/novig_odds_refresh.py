@@ -330,7 +330,7 @@ def start_background_loop_if_enabled() -> bool:
     Kalshi's real-money live-trading cadence, and this lane holds only a
     NARROW claim on that file for small, additive, boot-time hooks (see
     `.syndicate/lanes.md`). A self-contained background thread, the same
-    pattern `syndicate/app.py::_bootstrap_render_data` already uses for its
+    pattern `syndicate/app.py::_bootstrap_hosted_data` already uses for its
     own periodic-shaped work, gets genuine hourly recurrence without
     widening this lane's footprint in a file another lane depends on for
     something with real money behind it.

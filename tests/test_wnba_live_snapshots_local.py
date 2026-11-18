@@ -739,7 +739,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         # masking good data with a self-inflicted write-back. Web must only
         # ever read this artifact.
         payload = {"ok": True, "date": central_today_iso(), "games": [{"event_id": "evt-1"}]}
-        with patch("syndicate.features.wnba.cards._render_web_dyno", return_value=True), patch(
+        with patch("syndicate.features.wnba.cards._is_web_role", return_value=True), patch(
             "syndicate.features.wnba.cards._write_jsonl_snapshot_payload"
         ) as mock_write:
             result = _maybe_persist_current_day_live_snapshot_artifact("live_lines", central_today_iso(), payload)
@@ -749,7 +749,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
 
     def test_maybe_persist_current_day_live_snapshot_artifact_still_writes_off_the_web_dyno(self) -> None:
         payload = {"ok": True, "date": central_today_iso(), "games": [{"event_id": "evt-1"}]}
-        with patch("syndicate.features.wnba.cards._render_web_dyno", return_value=False), patch(
+        with patch("syndicate.features.wnba.cards._is_web_role", return_value=False), patch(
             "syndicate.features.wnba.cards._live_snapshot_artifact_path",
             return_value=Path("does") / "not" / "exist.jsonl",
         ), patch("syndicate.features.wnba.cards._write_jsonl_snapshot_payload", return_value=True) as mock_write, patch(
@@ -776,7 +776,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
             self.assertGreater(existing_path.stat().st_size, 0)
 
             fresh_payload = {"ok": True, "date": central_today_iso(), "games": [{"event_id": "evt-1", "in_progress": True}]}
-            with patch("syndicate.features.wnba.cards._render_web_dyno", return_value=False), patch(
+            with patch("syndicate.features.wnba.cards._is_web_role", return_value=False), patch(
                 "syndicate.features.wnba.cards._live_snapshot_artifact_path",
                 return_value=existing_path,
             ), patch(
@@ -907,7 +907,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
         self.assertTrue(game.get("in_progress"))
 
     def test_live_state_payload_render_omits_projected_pts_for_pregame_game(self) -> None:
-        # #160: this _render_web_dyno() branch is what /api/board/game-chips
+        # #160: this _is_web_role() branch is what /api/board/game-chips
         # and every other web-served WNBA game list actually hits on Render.
         # home_pts/away_pts fell back to the SmartSim *projected* point
         # total unconditionally, so a pregame game reported a fabricated

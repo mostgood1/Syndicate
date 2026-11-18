@@ -8,7 +8,7 @@ WHY IT DOES NOT CALL WEB, which is what the WNBA capture does. Measured on the
 fleet 2026-10-24 00:30Z with six NBA games on the slate and one in the 1st
 quarter: `/nba/api/live_player_boxscore?date=2026-10-23` returned six games and
 ZERO players in every one -- `build_live_player_boxscore_payload` short-circuits
-to an empty list on a web dyno (`_render_web_dyno()`), so a copy of the WNBA
+to an empty list on a web dyno (`_is_web_role()`), so a copy of the WNBA
 capture would have stored nothing, forever, and looked wired.
 
 WHY IT CALLS THE LIVE TICK'S OWN FETCHERS INSTEAD. The NBA live tick already

@@ -62,7 +62,7 @@ def _last_publish(service: str, since: str, until: str) -> str | None:
     """Timestamp of this service's most recent PUBLISH_OK for the artifact."""
     try:
         out = subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "render_logs.py"),
+            [sys.executable, str(REPO / "scripts" / "fleet_logs.py"),
              "--service", service, "--text", "boxscores_history.csv",
              "--start", since, "--end", until, "--tail", "20"],
             capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=180,

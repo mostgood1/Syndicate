@@ -113,7 +113,7 @@ def test_scrub_removes_every_marker() -> None:
 def test_app_hosted_web_predicate(monkeypatch, marker, value) -> None:
     from syndicate import app as app_module
 
-    _assert_reachable_and_equivalent(_four(monkeypatch, {marker: value}, app_module._is_render_web_dyno))
+    _assert_reachable_and_equivalent(_four(monkeypatch, {marker: value}, app_module._is_web_role))
 
 
 @pytest.mark.parametrize("module", [
@@ -125,13 +125,13 @@ def test_web_dyno_predicates(monkeypatch, module, marker, value) -> None:
     import importlib
 
     mod = importlib.import_module(module)
-    _assert_reachable_and_equivalent(_four(monkeypatch, {marker: value}, mod._render_web_dyno))
+    _assert_reachable_and_equivalent(_four(monkeypatch, {marker: value}, mod._is_web_role))
 
 
 def test_nba_web_dyno_predicate(monkeypatch) -> None:
     from syndicate.features.nba import cards
 
-    _assert_reachable_and_equivalent(_four(monkeypatch, {"SYNDICATE_HOSTED": "true"}, cards._render_web_dyno))
+    _assert_reachable_and_equivalent(_four(monkeypatch, {"SYNDICATE_HOSTED": "true"}, cards._is_web_role))
 
 
 def test_web_dyno_override_still_comes_first(monkeypatch) -> None:
@@ -140,7 +140,7 @@ def test_web_dyno_override_still_comes_first(monkeypatch) -> None:
     _clear(monkeypatch)
     monkeypatch.setenv("SYNDICATE_HOSTED", "true")
     monkeypatch.setenv("SYNDICATE_WEB_DYNO", "false")
-    assert cards._render_web_dyno() is False
+    assert cards._is_web_role() is False
 
 
 @pytest.mark.parametrize("marker,value", [
@@ -148,7 +148,7 @@ def test_web_dyno_override_still_comes_first(monkeypatch) -> None:
 def test_portfolio_auth_hosted(monkeypatch, marker, value) -> None:
     from syndicate.features.shared import portfolio_auth
 
-    _assert_reachable_and_equivalent(_four(monkeypatch, {marker: value}, portfolio_auth._on_render))
+    _assert_reachable_and_equivalent(_four(monkeypatch, {marker: value}, portfolio_auth._is_hosted))
 
 
 # --- H2 "hosted storage" ----------------------------------------------------------------
@@ -156,7 +156,7 @@ def test_portfolio_auth_hosted(monkeypatch, marker, value) -> None:
 def test_intelligence_hosted_request(monkeypatch) -> None:
     from syndicate.blueprints import intelligence
 
-    _assert_reachable_and_equivalent(_four(monkeypatch, {"SYNDICATE_HOSTED": "true"}, intelligence._render_hosted_request))
+    _assert_reachable_and_equivalent(_four(monkeypatch, {"SYNDICATE_HOSTED": "true"}, intelligence._is_hosted_request))
 
 
 def test_refresh_state_store_hosted_branches(monkeypatch, tmp_path) -> None:
@@ -207,7 +207,7 @@ def test_request_path_guard_arms_on_the_neutral_name_only(monkeypatch) -> None:
         assert results["neither"] is None
         assert results["legacy"] is None  # a Render name alone no longer arms it
         assert results["neutral"] == results["both"] == marker
-        armed = _four(monkeypatch, {marker: value}, guard._is_render_hosted)
+        armed = _four(monkeypatch, {marker: value}, guard._is_hosted)
         _assert_reachable_and_equivalent(armed)
 
 
@@ -352,8 +352,8 @@ def test_readers_on_the_launcher_env_and_on_a_render_named_env(monkeypatch, tmp_
     spec = lp.load_role_spec()
     settings = lp.Settings(home=tmp_path)
     readers = {
-        "app": app_module._is_render_web_dyno, "portfolio": portfolio_auth._on_render,
-        "guard": guard._is_render_hosted, "strict": source_roots._strict_hosted_storage_enabled,
+        "app": app_module._is_web_role, "portfolio": portfolio_auth._is_hosted,
+        "guard": guard._is_hosted, "strict": source_roots._strict_hosted_storage_enabled,
         "compaction": lambda: disk_compaction.disk_compaction_wanted("refresh-worker"),
         "service": ops_refresh._this_service_identity, "instance": ops_refresh._this_instance_identity,
     }

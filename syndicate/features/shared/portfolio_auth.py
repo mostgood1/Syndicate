@@ -92,8 +92,8 @@ def _marker(name: str) -> str:
     return str(service_marker(name) or "").strip()
 
 
-def _on_render() -> bool:
-    # Same predicate as `syndicate.app._is_render_web_dyno`, restated rather
+def _is_hosted() -> bool:
+    # Same predicate as `syndicate.app._is_web_role`, restated rather
     # than imported because that module imports this one.
     return bool(
         _marker("SYNDICATE_HOSTED").lower() in {"1", "true", "yes", "on"}
@@ -153,7 +153,7 @@ def auth_mode() -> str:
         return "required"
     # ANY credential key present means somebody meant to lock this -- a
     # malformed one included, which must lock (503) rather than open.
-    return "required" if (_on_render() or credentials().any_set) else "off"
+    return "required" if (_is_hosted() or credentials().any_set) else "off"
 
 
 def is_gated_path(path: str) -> bool:
@@ -432,7 +432,7 @@ def install_portfolio_auth(app: Any) -> None:
         "[portfolio_auth] PORTFOLIO_AUTH_MODE "
         f"mode={auth_mode()} credentials_configured={creds.configured} "
         f"hash={'yes' if creds.password_hash else 'no'} problem={creds.problem or 'none'} "
-        f"on_render={_on_render()}",
+        f"hosted={_is_hosted()}",
         flush=True,
     )
 

@@ -200,7 +200,7 @@ def _parity(date_value: str) -> int:
       * the WORKER's games list -- what candidate collection is handed
       * the WHOLE page context, worker mode -- everything else the build returns
       * the WHOLE page context, WEB mode -- `blueprints/mlb.py:336` (`/mlb/cards`)
-        calls the same builder, and `_render_web_dyno()` selects a different half
+        calls the same builder, and `_is_web_role()` selects a different half
         of this module. Proving the worker arm alone would leave the served page
         unproven, which is the "isolate the thing you changed" gap.
     """
@@ -263,10 +263,10 @@ def main() -> int:
     if args.parity:
         return _parity(args.date)
 
-    # The worker path is the subject. `_render_web_dyno()` decides which half of
+    # The worker path is the subject. `_is_web_role()` decides which half of
     # this module runs, and every fleet role sets SYNDICATE_HOSTED, so the
     # explicit override is the only unambiguous way to select it -- see
-    # `_render_web_dyno`'s own comment.
+    # `_is_web_role`'s own comment.
     os.environ["SYNDICATE_WEB_DYNO"] = "0"
 
     rows: list[dict[str, object]] = []

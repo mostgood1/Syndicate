@@ -93,8 +93,9 @@ clusters would be needed. It never reads as "no difference".
 SUBSTRATE (`model_engine_standard` Sec 3b)
 --------------------------------------------------------------------------
 
-`render` by default: every input is pulled from `/api/ops/artifacts/export` on
-the live web service and the report stamps `substrate=render`. `--offline-dir`
+`fleet` by default: every input is pulled from `/api/ops/artifacts/export` on
+the live web service and the report stamps `substrate=fleet` (`render` before
+2026-11-17, when `model_engine_standard` Sec 3b renamed the label). `--offline-dir`
 replays a previously pulled cache and stamps `substrate=cache:<dir>`, which is
 NOT a claim about production and is labelled that way in the output.
 
@@ -859,7 +860,7 @@ def main() -> int:
         date_str = args.date
         cache_dir = Path(args.cache_dir) if args.cache_dir else REPO_ROOT / ".cache" / "corr_arms" / date_str
         fetch_inputs(date_str, cache_dir, args.base_url)
-        substrate = "render"
+        substrate = "fleet"
 
     return run(
         date_str,

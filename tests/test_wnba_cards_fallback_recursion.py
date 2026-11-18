@@ -11,7 +11,7 @@ MEASURED 2026-09-02 (lane `wnba-cards-fallback-recursion`), by calling
 `_artifact_bundle:1686` called `_games_from_live_state_fallback`, which called
 `_artifact_bundle` straight back at `:3078`, and nothing memoises either. The
 trigger is an EMPTY artifact, not a date: one row in `game_cards_<date>.csv` is
-enough to prevent it. It is also disabled on Render by `_render_web_dyno()`,
+enough to prevent it. It is also disabled on Render by `_is_web_role()`,
 which is why it survived as a cold/dev path.
 
 The cost was never the point -- 0.6-0.8s. The defect was the SILENCE: the
@@ -70,7 +70,7 @@ def _no_cards_artifact(monkeypatch, tmp_path):
     """Force the empty-artifact condition that triggers the fallback."""
     monkeypatch.setattr(cards, "_wnba_source_roots", lambda: (tmp_path,))
     monkeypatch.setattr(cards, "_load_game_cards_csv_rows_from_keyvalue", lambda *a, **kw: [])
-    monkeypatch.setattr(cards, "_render_web_dyno", lambda: False)
+    monkeypatch.setattr(cards, "_is_web_role", lambda: False)
 
 
 def test_fallback_cannot_reenter_artifact_bundle(monkeypatch, tmp_path, depth_spy, today):
@@ -137,7 +137,7 @@ def test_rows_present_means_the_fallback_is_never_reached(monkeypatch, tmp_path,
     )
     monkeypatch.setattr(cards, "_wnba_source_roots", lambda: (tmp_path,))
     monkeypatch.setattr(cards, "_load_game_cards_csv_rows_from_keyvalue", lambda *a, **kw: [])
-    monkeypatch.setattr(cards, "_render_web_dyno", lambda: False)
+    monkeypatch.setattr(cards, "_is_web_role", lambda: False)
     cards._artifact_bundle(today)
     assert depth_spy["fallback"] == 0, "the fallback ran despite the artifact having rows"
     assert depth_spy["max"] == 1

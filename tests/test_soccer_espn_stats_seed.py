@@ -9,7 +9,7 @@ reading code. The first soccer `sim_input_report` ever published from production
 
 Same `history/` directory, opposite verdicts. The cause is the seed glob:
 refresh-worker runs NO general bootstrap (it is a plain script with no Flask
-app, so `_bootstrap_render_data` never runs there), and its narrow seeder was
+app, so `_bootstrap_hosted_data` never runs there), and its narrow seeder was
 called with `glob_pattern="*.csv"` for `history/`, which silently excludes the
 JSON sitting beside those CSVs. The file has been git-tracked for 9 leagues
 since 2026-08-19 and had never reached that disk.

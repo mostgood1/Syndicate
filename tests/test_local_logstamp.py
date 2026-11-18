@@ -16,7 +16,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 
 from local_logstamp.sitecustomize import StampedStream  # noqa: E402
 
-import render_logs  # noqa: E402
+import fleet_logs  # noqa: E402
 
 FIXED = dt.datetime(2026, 10, 2, 14, 36, 49, 123456, tzinfo=dt.timezone.utc)
 
@@ -36,11 +36,11 @@ def test_stamps_each_line_once_even_across_partial_writes() -> None:
     assert sink.getvalue() == f"{stamp}a\n{stamp}bc\n{stamp}d\n{stamp}\n"
 
 
-def test_stamp_is_the_prefix_render_logs_reads_as_exact(tmp_path: Path) -> None:
+def test_stamp_is_the_prefix_fleet_logs_reads_as_exact(tmp_path: Path) -> None:
     sink, out = _stream()
     print("ORDER_PATH venue=kalshi status=ok", file=out)
     (tmp_path / "live-odds-worker.log").write_text(sink.getvalue(), encoding="utf-8")
-    lines, info = render_logs.fetch_local_window(
+    lines, info = fleet_logs.fetch_local_window(
         service="live-odds-worker", text="ORDER_PATH", start="2026-10-02T00:00:00Z", log_dir=tmp_path)
     assert lines == [("2026-10-02T14:36:49.123Z", "ORDER_PATH venue=kalshi status=ok")]
     assert info["exact"] == 1
@@ -67,13 +67,13 @@ def _run_child_to_file(env_extra: dict[str, str], tmp_path: Path) -> str:
 
 def test_child_python_writing_to_a_file_is_stamped_via_pythonpath(tmp_path: Path) -> None:
     output = _run_child_to_file({}, tmp_path)
-    assert output.splitlines() and all(render_logs._PREFIX.match(line) for line in output.splitlines())
+    assert output.splitlines() and all(fleet_logs._PREFIX.match(line) for line in output.splitlines())
 
 
 def test_off_switch_leaves_output_raw(tmp_path: Path) -> None:
     output = _run_child_to_file({"SYNDICATE_LOCAL_LOG_TIMESTAMPS": "0"}, tmp_path)
     assert "hello" in output.splitlines()
-    assert not any(render_logs._PREFIX.match(line) for line in output.splitlines())
+    assert not any(fleet_logs._PREFIX.match(line) for line in output.splitlines())
 
 
 def test_a_child_whose_stdout_a_parent_captures_is_not_stamped() -> None:

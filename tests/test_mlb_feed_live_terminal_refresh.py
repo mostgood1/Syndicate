@@ -171,7 +171,7 @@ class TestRefreshCounter:
             monkeypatch.setattr(cards, "_fetch_current_feed_live", lambda _pk: fetched)
             # The line is worker-only; force the worker branch so the test does
             # not depend on ambient RENDER* env.
-            monkeypatch.setattr(cards, "_render_web_dyno", lambda: False)
+            monkeypatch.setattr(cards, "_is_web_role", lambda: False)
             monkeypatch.setenv("SYNDICATE_MLB_FEED_LIVE_PRUNE", "0")
             cards._daily_actual_by_game(date, list(pks))
             line = [l for l in capsys.readouterr().out.splitlines() if "FEED_LIVE_REFRESH" in l]
@@ -230,7 +230,7 @@ class TestPerGameStatusLine:
             monkeypatch.setattr(cards, "load_json_or_gz_file", lambda *_a, **_k: cached)
             monkeypatch.setattr(cards, "central_today_iso", lambda: today)
             monkeypatch.setattr(cards, "_fetch_current_feed_live", lambda _pk: None)
-            monkeypatch.setattr(cards, "_render_web_dyno", lambda: False)
+            monkeypatch.setattr(cards, "_is_web_role", lambda: False)
             monkeypatch.setenv("SYNDICATE_MLB_FEED_LIVE_PRUNE", "0")
             cards._daily_actual_by_game(date, [776])
             rows = [l for l in capsys.readouterr().out.splitlines() if "FEED_LIVE_STATUS" in l]

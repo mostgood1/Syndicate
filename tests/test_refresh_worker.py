@@ -126,7 +126,7 @@ class RefreshWorkerTests(unittest.TestCase):
         # sims present) but produced zero player projections for every
         # league, because refresh-worker's own disk never received the
         # git-committed players_{season}.csv roster seed files -- unlike web
-        # (syndicate/app.py's _bootstrap_render_data), refresh-worker never
+        # (syndicate/app.py's _bootstrap_hosted_data), refresh-worker never
         # ran any bootstrap sync from git at all.
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)

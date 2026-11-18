@@ -163,7 +163,7 @@ def warn_if_compute_in_request_path(operation: str) -> None:
     logger.warning("WARNING: compute in request path (operation=%s)", name, extra={"operation": name})
 
 
-def _is_render_hosted() -> bool:
+def _is_hosted() -> bool:
     """Hosted if ANY flag is true or ANY injected marker is present.
 
     Two changes from the original `RENDER or SYNDICATE_REQUIRE_HOSTED_STORAGE`:
@@ -214,7 +214,7 @@ def refuse_if_compute_in_request_path(operation: str) -> None:
     """
     if not has_request_context():
         return
-    if not _is_render_hosted():
+    if not _is_hosted():
         warn_if_compute_in_request_path(operation)
         return
     name = str(operation or "").strip() or "unknown"

@@ -92,7 +92,7 @@ def _cache_put_context(cache_key: tuple[Any, ...], result: dict[str, Any]) -> No
         _WNBA_CARDS_CONTEXT_CACHE.popitem(last=False)
 
 
-def _render_web_dyno() -> bool:
+def _is_web_role() -> bool:
     # SYNDICATE_HOSTED / _EXTERNAL_URL / _SERVICE_ID are set on every fleet role
     # (web *and* the workers; Render injected them as RENDER*), so they can't
     # distinguish "am I the request-serving web dyno" from "am I a worker
@@ -239,7 +239,7 @@ def _maybe_persist_current_day_live_snapshot_artifact(kind: str, selected_date: 
         return payload
     if str(selected_date or "").strip() != central_today_iso():
         return payload
-    if _render_web_dyno():
+    if _is_web_role():
         # Root-caused live 2026-08-02 (MIN@IND): this had no web/worker gate,
         # so EVERY web request for today's live_lines/live_state/etc. wrote
         # its own read-time "merged_payload" back into the same cross-service
@@ -1723,7 +1723,7 @@ def _artifact_bundle(selected_date: str, *, allow_fallback: bool = True) -> dict
     The trigger is an EMPTY artifact, not a date: with one row in
     `game_cards_<date>.csv` the depth is 1 and the fallback is never reached;
     with none it is 247. It is also off entirely on Render
-    (`_render_web_dyno()`), which is why this survived as a cold/dev path.
+    (`_is_web_role()`), which is why this survived as a cold/dev path.
     """
     csv_name = f"game_cards_{selected_date}.csv"
     repo_data_root = _repo_root_from(__file__) / "data" / "wnba_source"
@@ -1770,7 +1770,7 @@ def _artifact_bundle(selected_date: str, *, allow_fallback: bool = True) -> dict
 
     # Runtime WNBA fallback is disabled on Render so the deployed app only
     # serves published artifacts.
-    if allow_fallback and not rows and selected_date == central_today_iso() and not _render_web_dyno():
+    if allow_fallback and not rows and selected_date == central_today_iso() and not _is_web_role():
         try:
             rows, _ = _games_from_live_state_fallback(selected_date)
         except Exception as error:
@@ -4083,7 +4083,7 @@ def _build_cards_page_context_uncached(
         # scoreboard-only view -- this is the same fresh source the
         # ESPN-only shortcut above already proved works for status, applied
         # without throwing away everything else. Runs regardless of
-        # _render_web_dyno() since this is a direct ESPN fetch, not the
+        # _is_web_role() since this is a direct ESPN fetch, not the
         # (separately gated) keyvalue-backed live_state.jsonl merge below.
         public_games, public_source_path = _games_from_public_scoreboard(resolved_date)
         if public_games:
@@ -4094,7 +4094,7 @@ def _build_cards_page_context_uncached(
                 used_public_scoreboard_merge = True
                 source_title = "WNBA processed game cards + live scoreboard supplement"
                 cards_path = f"{cards_path} | {live_source_path}"
-    if not _render_web_dyno() and not used_public_scoreboard_fallback and not used_public_scoreboard_merge:
+    if not _is_web_role() and not used_public_scoreboard_fallback and not used_public_scoreboard_merge:
         games, live_source_path, supplemented_count, updated_count = _supplement_games_with_live_state(games, resolved_date)
         if supplemented_count > 0 or updated_count > 0:
             if had_artifact_games:
@@ -6507,7 +6507,7 @@ def _build_live_state_payload_uncached(selected_date: str, ttl: int = 12, *, all
     is_today = str(selected_date).strip() == central_today_iso()
     log_runtime_memory("build_live_state_payload_start", selected_date=selected_date, ttl=int(ttl))
 
-    if _render_web_dyno():
+    if _is_web_role():
         local_payload = _local_live_state_payload(selected_date)
         if _payload_has_meaningful_live_state(local_payload):
             log_runtime_memory("build_live_state_payload_local_return", selected_date=selected_date, ttl=int(ttl), game_count=len(local_payload.get("games") or []))
@@ -6532,7 +6532,7 @@ def _build_live_state_payload_uncached(selected_date: str, ttl: int = 12, *, all
                 clock=game.get("clock"),
             )
             # #160: the actual root cause -- this is the branch that runs on
-            # Render's web dyno (_render_web_dyno() above), which is what
+            # Render's web dyno (_is_web_role() above), which is what
             # /api/board/game-chips and every other web-served WNBA game
             # list actually hits. home_pts/away_pts fell back to the
             # SmartSim *projected* point total unconditionally, with no
@@ -6669,7 +6669,7 @@ def _build_live_state_payload_uncached(selected_date: str, ttl: int = 12, *, all
             source_period = normalized_status.get("period")
             source_in_progress = bool(normalized_status["in_progress"])
             source_final = bool(normalized_status["final"])
-        # Same gate as the _render_web_dyno() branch above: source_away_pts/
+        # Same gate as the _is_web_role() branch above: source_away_pts/
         # source_home_pts fall back to the SmartSim projected total when no
         # real ESPN boxscore row (source_row) has matched -- must not be
         # reported as "pts" (read as "score" by every consumer) unless the
@@ -6754,7 +6754,7 @@ def _build_live_state_payload_uncached(selected_date: str, ttl: int = 12, *, all
 # Above this age, a cached live_state snapshot for a slate that isn't fully
 # final yet is no longer trustworthy on its own -- a game's status/score can
 # legitimately change within minutes, so a snapshot this old is more likely
-# evidence the writer has stalled (see _render_web_dyno) than evidence
+# evidence the writer has stalled (see _is_web_role) than evidence
 # nothing changed. Fully-final slates are exempt below since a final score
 # doesn't go stale.
 _LIVE_STATE_STALE_AFTER_SECONDS = 600

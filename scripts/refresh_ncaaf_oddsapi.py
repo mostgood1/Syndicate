@@ -137,7 +137,7 @@ def _refresh_player_props(*, data_root: Path, season: int, week: int) -> dict[st
             print(f"[ncaaf_props] PUBLISH_FAILED {type(exc).__name__}: {exc}", flush=True)
 
     # `logger.info` never reaches Render's log collector -- print/flush is the
-    # only line that shows up in `render_logs.py`.
+    # only line that shows up in `fleet_logs.py`.
     print(
         f"[ncaaf_props] {status} season={season} week={week} rows={rows} rc={rc} "
         f"published={published} path={out_path}",

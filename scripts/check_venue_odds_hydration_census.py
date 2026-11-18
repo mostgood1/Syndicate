@@ -105,7 +105,7 @@ def _redis_venue_odds_keys(token: str, top: int) -> tuple[dict[tuple[str, str, s
 
 def _logs(service: str, text: str, since: str) -> str:
     cmd = [
-        sys.executable, os.path.join(REPO, "scripts", "render_logs.py"),
+        sys.executable, os.path.join(REPO, "scripts", "fleet_logs.py"),
         "--service", service, "--text", text, "--start", since, "--width", "260",
     ]
     try:

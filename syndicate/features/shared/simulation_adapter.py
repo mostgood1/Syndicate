@@ -15,9 +15,9 @@ AdapterLoader = Callable[[Any], dict[str, Any]]
 def _log_sim_contract_memory(stage: str, **extra: Any) -> None:
     # #75. Worker-only, same guard and reasoning as the cards_context_* and
     # board_contract_* samples. See docs/ai_context/handoff_refresh_worker_oom.md.
-    from syndicate.features.shared.game_board_contract import _render_web_dyno
+    from syndicate.features.shared.game_board_contract import _is_web_role
 
-    if _render_web_dyno():
+    if _is_web_role():
         return
     try:
         from syndicate.features.shared.memory_observability import log_container_memory

@@ -269,7 +269,7 @@ def test_no_admin_token_configured_means_no_token_passes(creds, client):
 # ---------------------------------------------------------------- absent is not off
 
 
-def test_on_render_with_no_credentials_the_portfolio_is_locked_not_open(env, client, handlers_must_not_run):
+def test_hosted_with_no_credentials_the_portfolio_is_locked_not_open(env, client, handlers_must_not_run):
     env.setenv("SYNDICATE_HOSTED", "true")
     assert portfolio_auth.auth_mode() == "required"
     page = client.get("/portfolio")
@@ -281,14 +281,14 @@ def test_on_render_with_no_credentials_the_portfolio_is_locked_not_open(env, cli
     assert client.post("/portfolio/login", data={"username": "", "password": ""}).status_code == 503
 
 
-def test_on_render_an_unrecognised_mode_still_locks(env, client):
+def test_hosted_an_unrecognised_mode_still_locks(env, client):
     env.setenv("SYNDICATE_HOSTED", "true")
     env.setenv("SYNDICATE_PORTFOLIO_AUTH", "requierd")
     assert portfolio_auth.auth_mode() == "required"
     assert client.get("/api/portfolio/books").status_code == 503
 
 
-def test_an_explicit_off_is_honoured_even_on_render(env, client):
+def test_an_explicit_off_is_honoured_even_when_hosted(env, client):
     env.setenv("SYNDICATE_HOSTED", "true")
     env.setenv("SYNDICATE_PORTFOLIO_AUTH", "off")
     assert client.get("/api/portfolio/books").status_code == 200

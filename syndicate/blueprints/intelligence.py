@@ -210,7 +210,7 @@ def _no_cache_response(response):
     return response
 
 
-def _render_hosted_request() -> bool:
+def _is_hosted_request() -> bool:
     raw_value = str(service_marker("SYNDICATE_HOSTED") or os.environ.get("SYNDICATE_REQUIRE_HOSTED_STORAGE") or "").strip().lower()
     return raw_value in {"1", "true", "yes", "on"}
 
@@ -3029,7 +3029,7 @@ def intelligence_query_api():
     force_refresh = _query_bool(payload.get("force_refresh"))
     _LOGGER.info("BETTING_BOARD_REFRESH_START", extra={"selected_date": str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or None, "force_refresh": force_refresh, "source": "query_api"})
     if force_refresh:
-        if _render_hosted_request():
+        if _is_hosted_request():
             queued = True
             try:
                 _safe_queue_intelligence_state_refresh(dict(payload))

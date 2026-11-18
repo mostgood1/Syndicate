@@ -489,7 +489,7 @@ class WnbaCardsMergeAliasTests(WallClockCacheIsolationMixin, unittest.TestCase):
             "syndicate.features.wnba.cards._artifact_bundle",
             return_value={"rows": [], "recommendations": {}, "sim": {}, "props": {}},
         ), patch(
-            "syndicate.features.wnba.cards._render_web_dyno",
+            "syndicate.features.wnba.cards._is_web_role",
             return_value=True,
         ), patch(
             "syndicate.features.wnba.cards._games_from_public_scoreboard",
@@ -695,7 +695,7 @@ class WnbaCardsMergeAliasTests(WallClockCacheIsolationMixin, unittest.TestCase):
             "syndicate.features.wnba.cards.has_games_for_date",
             return_value=True,
         ), patch(
-            "syndicate.features.wnba.cards._render_web_dyno",
+            "syndicate.features.wnba.cards._is_web_role",
             return_value=True,
         ), patch(
             "syndicate.features.wnba.cards._path_cache_signature",

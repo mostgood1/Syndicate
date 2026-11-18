@@ -1179,7 +1179,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
                     "syndicate.features.wnba.cards._wnba_source_roots",
                     return_value=[Path(temp_dir)],
                 ), patch(
-                    "syndicate.features.wnba.cards._render_web_dyno",
+                    "syndicate.features.wnba.cards._is_web_role",
                     return_value=True,
                 ):
                     from syndicate.features.wnba.cards import get_wnba_overview
@@ -3032,7 +3032,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         }
 
         # _cached_intelligence_response_with_source is only consulted on the
-        # render-hosted branch of force_refresh (_render_hosted_request());
+        # render-hosted branch of force_refresh (_is_hosted_request());
         # without RENDER set the endpoint takes the non-hosted branch instead
         # and this mock was dead, so the response came from whatever real
         # repo artifacts _compute_intelligence_response found on disk
@@ -7145,7 +7145,7 @@ class IntelligenceBlueprintTests(unittest.TestCase):
             method="POST",
             json={"question": "top edges today", "date": "2026-06-10", "force_refresh": True},
         ):
-            with patch("syndicate.blueprints.intelligence._render_hosted_request", return_value=True):
+            with patch("syndicate.blueprints.intelligence._is_hosted_request", return_value=True):
                 with patch("syndicate.blueprints.intelligence._safe_queue_intelligence_state_refresh"):
                     with patch("syndicate.blueprints.intelligence._cached_intelligence_response_with_source", side_effect=cached_response_probe):
                         response = intelligence_query_api()

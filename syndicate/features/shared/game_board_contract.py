@@ -65,7 +65,7 @@ def _metric_lookup(metrics: list[dict[str, Any]], label: str) -> str | None:
     return None
 
 
-def _render_web_dyno() -> bool:
+def _is_web_role() -> bool:
     # SYNDICATE_HOSTED / _EXTERNAL_URL / _SERVICE_ID are set on every fleet role
     # (web *and* the workers; Render injected them as RENDER*), so they can't
     # distinguish "am I the request-serving web dyno" from "am I a worker
@@ -987,7 +987,7 @@ def _log_board_contract_memory(stage: str, **extra: Any) -> None:
     # dies building the same board.
     #
     # Worker-only, for the same reason as the cards_context_* samples.
-    if _render_web_dyno():
+    if _is_web_role():
         return
     try:
         from syndicate.features.shared.memory_observability import log_container_memory

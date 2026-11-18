@@ -175,7 +175,7 @@ class SharedGameLinesShardRemovalTests(unittest.TestCase):
         with patch.object(cards, "load_oddsapi_game_lines_doc", return_value=None), patch(
             "syndicate.features.mlb.cards.load_odds_history_payload_for_sport"
         ) as loader, patch.object(cards, "central_today_iso", return_value="2026-07-23"), patch.object(
-            cards, "_render_web_dyno", return_value=False
+            cards, "_is_web_role", return_value=False
         ):
             cards._enrich_games_with_tracked_market_lines(
                 [{"gamePk": 1, "away": {"abbr": "DET"}, "home": {"abbr": "ATH"}, "markets": {}}],
@@ -215,7 +215,7 @@ class SharedGameLinesShardRemovalTests(unittest.TestCase):
 
         with patch.object(cards, "load_oddsapi_game_lines_doc", return_value=game_lines_doc), patch.object(
             cards, "central_today_iso", return_value="2026-07-23"
-        ), patch.object(cards, "_render_web_dyno", return_value=False), patch(
+        ), patch.object(cards, "_is_web_role", return_value=False), patch(
             "syndicate.features.mlb.cards.load_odds_history_payload_for_sport",
             return_value=realistic_shard,
         ):
@@ -223,7 +223,7 @@ class SharedGameLinesShardRemovalTests(unittest.TestCase):
 
         with patch.object(cards, "load_oddsapi_game_lines_doc", return_value=game_lines_doc), patch.object(
             cards, "central_today_iso", return_value="2026-07-23"
-        ), patch.object(cards, "_render_web_dyno", return_value=False), patch(
+        ), patch.object(cards, "_is_web_role", return_value=False), patch(
             "syndicate.features.mlb.cards.load_odds_history_payload_for_sport",
             return_value=None,
         ):

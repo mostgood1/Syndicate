@@ -357,7 +357,7 @@ class PublishHotArtifactClientTests(unittest.TestCase):
                 {
                     "SYNDICATE_DATA_ROOT": str(data_root),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -382,7 +382,7 @@ class PublishHotArtifactClientTests(unittest.TestCase):
                 {
                     "SYNDICATE_DATA_ROOT": str(data_root),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -392,7 +392,7 @@ class PublishHotArtifactClientTests(unittest.TestCase):
         self.assertTrue(result)
         mocked_urlopen.assert_called_once()
         sent_request = mocked_urlopen.call_args.args[0]
-        self.assertEqual(sent_request.full_url, "https://syndicate.onrender.com/api/ops/artifacts/publish")
+        self.assertEqual(sent_request.full_url, "http://127.0.0.1:10000/api/ops/artifacts/publish")
         self.assertEqual(sent_request.get_header("Authorization"), "Bearer secret-token")
         body = json.loads(sent_request.data.decode("utf-8"))
         self.assertEqual(body["relative_path"], HOT_RELATIVE_PATH)
@@ -409,7 +409,7 @@ class PublishHotArtifactClientTests(unittest.TestCase):
                 {
                     "SYNDICATE_DATA_ROOT": str(data_root),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -448,7 +448,7 @@ class PublishHotArtifactClientTests(unittest.TestCase):
                 {
                     "SYNDICATE_DATA_ROOT": str(data_root),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -493,7 +493,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                     "SYNDICATE_DATA_ROOT": tmp_dir,
                     "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -520,18 +520,18 @@ class PullHotArtifactClientTests(unittest.TestCase):
             self.assertEqual(
                 {url.split("&since=")[0] for url in pattern_urls},
                 {
-                    "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026-07-20%2A",
-                    "https://syndicate.onrender.com/api/ops/artifacts/export?pattern=%2A2026_07_20%2A",
+                    "http://127.0.0.1:10000/api/ops/artifacts/export?pattern=%2A2026-07-20%2A",
+                    "http://127.0.0.1:10000/api/ops/artifacts/export?pattern=%2A2026_07_20%2A",
                 },
             )
             self.assertTrue(all("since=" in url for url in pattern_urls))
             self.assertEqual(
                 live_lens_urls,
                 {
-                    "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fmlb_live_lens.json",
-                    "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnba_live_lens.json",
-                    "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fwnba_live_lens.json",
-                    "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnhl_live_lens.json",
+                    "http://127.0.0.1:10000/api/ops/artifacts/export?path=live%2Fmlb_live_lens.json",
+                    "http://127.0.0.1:10000/api/ops/artifacts/export?path=live%2Fnba_live_lens.json",
+                    "http://127.0.0.1:10000/api/ops/artifacts/export?path=live%2Fwnba_live_lens.json",
+                    "http://127.0.0.1:10000/api/ops/artifacts/export?path=live%2Fnhl_live_lens.json",
                 },
             )
             self.assertTrue(all("since=" not in url for url in live_lens_urls))
@@ -563,7 +563,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                     "SYNDICATE_DATA_ROOT": tmp_dir,
                     "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -573,7 +573,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
             sent_request = mocked_urlopen.call_args.args[0]
             self.assertEqual(
                 sent_request.full_url.split("?")[0],
-                "https://syndicate.onrender.com/api/ops/artifacts/export",
+                "http://127.0.0.1:10000/api/ops/artifacts/export",
             )
             self.assertIn("since=", sent_request.full_url)
 
@@ -598,7 +598,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                     "SYNDICATE_DATA_ROOT": str(data_root),
                     "SYNDICATE_REPORTS_ROOT": str(data_root / "reports_root"),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -610,7 +610,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
             sent_request = mocked_urlopen.call_args.args[0]
             self.assertEqual(
                 sent_request.full_url.split("?")[0],
-                "https://syndicate.onrender.com/api/ops/artifacts/export",
+                "http://127.0.0.1:10000/api/ops/artifacts/export",
             )
             self.assertIn("since=", sent_request.full_url)
             self.assertEqual(sent_request.get_header("Authorization"), "Bearer secret-token")
@@ -639,7 +639,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                     "SYNDICATE_DATA_ROOT": tmp_dir,
                     "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -676,7 +676,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 "SYNDICATE_DATA_ROOT": tmp_dir,
                 "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
                 "ADMIN_TOKEN": "secret-token",
-                "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
             }
             with patch.dict(os.environ, env, clear=False):
                 with patch("urllib.request.urlopen", side_effect=URLError("boom")):
@@ -762,7 +762,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 {
                     "SYNDICATE_DATA_ROOT": str(data_root),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -798,7 +798,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 {
                     "SYNDICATE_DATA_ROOT": str(data_root),
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -815,7 +815,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
                 {
                     "SYNDICATE_DATA_ROOT": tmp_dir,
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -1246,7 +1246,7 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
                 "SYNDICATE_DATA_ROOT": tmp_dir,
                 "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
                 "ADMIN_TOKEN": "secret-token",
-                "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 # WNBA's required-artifact paths (added alongside the MLB ones
                 # above) resolve via syndicate.features.wnba.sources, which
                 # falls back to the REAL repo's data/wnba_source when this
@@ -1293,13 +1293,13 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
     # account for these FOUR extra `path=` requests alongside whatever the
     # missing-required-artifact repair pass contributes.
     _LIVE_LENS_SNAPSHOT_URLS = {
-        "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fmlb_live_lens.json",
-        "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnba_live_lens.json",
-        "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fwnba_live_lens.json",
+        "http://127.0.0.1:10000/api/ops/artifacts/export?path=live%2Fmlb_live_lens.json",
+        "http://127.0.0.1:10000/api/ops/artifacts/export?path=live%2Fnba_live_lens.json",
+        "http://127.0.0.1:10000/api/ops/artifacts/export?path=live%2Fwnba_live_lens.json",
         # `nhl` joined 2026-09-24 (lane `nhl-live-resim`): its live re-sim runs
         # on live-odds-worker and the board that reads it is built on
         # refresh-worker, so the snapshot has to cross. FOUR now, not three.
-        "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fnhl_live_lens.json",
+        "http://127.0.0.1:10000/api/ops/artifacts/export?path=live%2Fnhl_live_lens.json",
     }
 
     @staticmethod
@@ -1434,7 +1434,7 @@ class OddsHistoryStreamedPullTests(unittest.TestCase):
             "SYNDICATE_DATA_ROOT": tmp_dir,
             "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
             "ADMIN_TOKEN": "secret-token",
-            "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+            "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
         }
 
     def test_shard_paths_are_allowlisted_and_skip_week_scoped_sports(self) -> None:
@@ -1589,7 +1589,7 @@ class AppendOnlySyncedPullTests(unittest.TestCase):
             "SYNDICATE_DATA_ROOT": tmp_dir,
             "SYNDICATE_REPORTS_ROOT": str(Path(tmp_dir) / "reports_root"),
             "ADMIN_TOKEN": "secret-token",
-            "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+            "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
         }
 
     @staticmethod
@@ -2311,7 +2311,7 @@ class StreamedPublishSenderTests(unittest.TestCase):
                 {
                     "SYNDICATE_DATA_ROOT": tmp_dir,
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):
@@ -2341,7 +2341,7 @@ class StreamedPublishSenderTests(unittest.TestCase):
                 {
                     "SYNDICATE_DATA_ROOT": tmp_dir,
                     "ADMIN_TOKEN": "secret-token",
-                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                    "SYNDICATE_WEB_PUBLISH_URL": "http://127.0.0.1:10000",
                 },
                 clear=False,
             ):

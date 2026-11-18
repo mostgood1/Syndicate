@@ -129,7 +129,7 @@ def _bootstrap_soccer_player_seed_files() -> None:
     # --source-root to the PERSISTENT DATA DISK
     # (_local_source_bundle_root -> SYNDICATE_DATA_ROOT/soccer_source), not
     # the git checkout -- and unlike web (syndicate/app.py's
-    # _bootstrap_render_data, gated the same way), refresh-worker (a plain
+    # _bootstrap_hosted_data, gated the same way), refresh-worker (a plain
     # script, no Flask app) never ran ANY bootstrap sync from git onto its
     # own disk. The committed players CSVs were real and correct the whole
     # time; refresh-worker's disk just never received them.
@@ -228,7 +228,7 @@ def _bootstrap_soccer_history_seed_files() -> None:
     # in the checkout since 2026-08-19 while the worker's disk never received
     # it. refresh-worker runs NO general bootstrap -- see the comment on
     # `_bootstrap_soccer_player_seed_files`: it is a plain script with no Flask
-    # app, so `_bootstrap_render_data` never runs here and these narrow seeders
+    # app, so `_bootstrap_hosted_data` never runs here and these narrow seeders
     # are the only path from the checkout onto this disk.
     #
     # Its own glob, not a widened `*` on the call above: the seeder skips a

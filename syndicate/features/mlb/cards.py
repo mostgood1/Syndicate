@@ -153,7 +153,7 @@ def _purge_idle(
 def _cards_cache_limit() -> int:
     return (
         _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES
-        if _render_web_dyno()
+        if _is_web_role()
         else _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES_WORKER
     )
 
@@ -176,7 +176,7 @@ def _today_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None
     # #253: never populate this on a worker -- see the note above. The entry
     # could not be read back before it was evicted, so every put was pure
     # retention of a full page context.
-    if not _render_web_dyno():
+    if not _is_web_role():
         return
     _MLB_TODAY_CACHE[cache_key] = (time.time(), result)
     _MLB_TODAY_CACHE.move_to_end(cache_key)
@@ -218,12 +218,12 @@ def _cards_context_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any])
         print(
             f"[mlb_cards] CONTEXT_CACHE_EVICTED count={evicted} "
             f"size={len(_MLB_CARDS_CONTEXT_CACHE)} limit={limit} "
-            f"web={_render_web_dyno()}",
+            f"web={_is_web_role()}",
             flush=True,
         )
 
 
-def _render_web_dyno() -> bool:
+def _is_web_role() -> bool:
     # SYNDICATE_HOSTED / _EXTERNAL_URL / _SERVICE_ID are set on every fleet role
     # (web *and* the workers; Render injected them as RENDER*), so they can't
     # distinguish "am I the request-serving web dyno" from "am I a worker
@@ -259,7 +259,7 @@ def _log_cards_context_memory(stage: str, **extra: Any) -> None:
     # Worker-only: this function also backs /mlb/api/cards, and a sample per
     # stage per request would be pure noise on the web service (and #56 says
     # that service has no headroom to spare).
-    if _render_web_dyno():
+    if _is_web_role():
         return
     try:
         from syndicate.features.shared.memory_observability import log_container_memory
@@ -2436,7 +2436,7 @@ def _daily_actual_by_game(selected_date: str, game_pks: list[int]) -> dict[int, 
                         plays_dropped += len(all_plays)
                 payload = reduced
             out[int(game_pk)] = payload
-    if not _render_web_dyno() and game_pks:
+    if not _is_web_role() and game_pks:
         # print, not logger.info -- #37, logger.info never reaches Render's
         # collector, which is most of why this path stayed invisible for weeks.
         print(
@@ -2598,7 +2598,7 @@ def _enrich_games_with_tracked_market_lines(games: list[dict[str, Any]], selecte
     #
     #     shared_game_lines_doc = load_odds_history_payload_for_sport(
     #         "mlb", resolve_current_shard_key("mlb", selected_date)
-    #     ) if selected_date == today_iso and not render_web_dyno else None
+    #     ) if selected_date == today_iso and not web_role else None
     #     if isinstance(shared_game_lines_doc, dict):
     #         shared_game_lines_games = shared_game_lines_doc.get("games") ... or []
     #         ...
@@ -2621,7 +2621,7 @@ def _enrich_games_with_tracked_market_lines(games: list[dict[str, Any]], selecte
     # So `shared_game_lines_games` was `[]` on every call ever made, the branch
     # could not fire, and `game_lines_doc` was never replaced.
     #
-    # WHAT IT COST. Worker-only (`not render_web_dyno`), today-only -- which on
+    # WHAT IT COST. Worker-only (`not web_role`), today-only -- which on
     # the refresh-worker is EVERY board build -- and uncached: the `cache=`
     # parameter exists on that function and this call site did not use it. The
     # MLB shard was measured at 19,798,176 bytes / 3,436 markets, and `#435`
@@ -2688,7 +2688,7 @@ def source_cards_api_payload(
     k_rows = k_targets.get("rows") if k_targets and isinstance(k_targets.get("rows"), list) else []
     selected_date = str(context.get("date") or "").strip()
     today_iso = central_today_iso()
-    render_web_dyno = _render_web_dyno()
+    web_role = _is_web_role()
     cache_key = None
     if selected_date == today_iso:
         cache_key = (
@@ -2718,7 +2718,7 @@ def source_cards_api_payload(
         load_odds_history_payload_for_sport(
             "mlb", resolve_current_shard_key("mlb", selected_date), cache=history_cache
         )
-        if selected_date == today_iso and not render_web_dyno
+        if selected_date == today_iso and not web_role
         else None
     )
     shared_game_lines_refreshed_at = None
@@ -2767,7 +2767,7 @@ def source_cards_api_payload(
         enriched_games.append(merged_game)
     games = enriched_games
     live_lens_report = None
-    if selected_date == today_iso and not render_web_dyno:
+    if selected_date == today_iso and not web_role:
         try:
             from syndicate.features.mlb.live_lens import _persist_live_lens_report
 
@@ -6143,7 +6143,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "auto_expand_cards": True,
     }
     _log_cards_context_memory("result_assembled", game_count=len(games))
-    if not _render_web_dyno():
+    if not _is_web_role():
         result = apply_game_board_contract(result, sport="mlb", module="cards")
     else:
         result = _attach_cards_board_contract(result)
@@ -6176,7 +6176,7 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     # nothing else references `result` and it can go straight into the one cache
     # that remains. That takes the miss path from three live copies to two, and
     # from two retained to one.
-    if _render_web_dyno():
+    if _is_web_role():
         _cards_context_cache_put(page_cache_key, deepcopy(result))
         if cache_key is not None and games:
             _today_cache_put(cache_key, result)

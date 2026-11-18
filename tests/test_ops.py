@@ -269,7 +269,8 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertEqual(payload["version"]["commit"], "273983a")
         self.assertEqual(payload["version"]["commit_source"], "env")
         self.assertEqual(payload["version"]["branch"], "main")
-        self.assertEqual(payload["version"]["render_service_name"], "syndicate-web")
+        self.assertEqual(payload["version"]["service_name"], "syndicate-web")
+        self.assertEqual(payload["version"]["render_service_name"], "syndicate-web")  # deprecated twin
 
     def test_board_snapshot_inspect_requires_admin_token(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):

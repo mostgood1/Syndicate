@@ -73,12 +73,12 @@ class GameBoardSimulationContractTests(unittest.TestCase):
         )
         self.assertNotIn("simulation_contract", context)
 
-    def test_apply_game_board_contract_skips_simulation_contract_on_render_web(self) -> None:
+    def test_apply_game_board_contract_skips_simulation_contract_on_hosted_web(self) -> None:
         with patch.dict(
             "os.environ",
             {
                 "SYNDICATE_HOSTED": "1",
-                "SYNDICATE_EXTERNAL_URL": "https://syndicate-an21.onrender.com",
+                "SYNDICATE_EXTERNAL_URL": "http://127.0.0.1:10000",
                 "SYNDICATE_SERVICE_ID": "srv-test",
             },
             clear=False,

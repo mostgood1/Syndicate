@@ -79,7 +79,7 @@ class HomePageCommandCenterTests(unittest.TestCase):
         self.assertIn("/nfl/preseason/market-board", html)
         self.assertIn("NFL Preseason", html)
 
-    def test_home_payload_uses_light_shell_on_render_web_dyno(self) -> None:
+    def test_home_payload_uses_light_shell_on_the_web_role(self) -> None:
         from syndicate.blueprints import home as home_module
 
         light_sports = [
@@ -103,7 +103,7 @@ class HomePageCommandCenterTests(unittest.TestCase):
             }
         ]
 
-        with patch("syndicate.blueprints.home._render_web_dyno", return_value=True), patch(
+        with patch("syndicate.blueprints.home._is_web_role", return_value=True), patch(
             "syndicate.blueprints.home._build_light_home_sports",
             return_value=light_sports,
         ) as mocked_light, patch(

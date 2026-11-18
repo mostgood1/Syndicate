@@ -51,14 +51,14 @@ BASELINE = {
 
 def logs(text: str, since: str) -> dict:
     out = subprocess.run(
-        [sys.executable, "scripts/render_logs.py", "--service", "refresh-worker",
+        [sys.executable, "scripts/fleet_logs.py", "--service", "refresh-worker",
          "--text", text, "--start", since, "--json"],
         capture_output=True)
     body = out.stdout.decode("utf-8", "replace")
     try:
         return json.loads(body)
     except Exception:
-        print("could not parse render_logs output for %r:" % text)
+        print("could not parse fleet_logs output for %r:" % text)
         print(body[:600])
         return {"lines": [], "matches": 0, "covered": {"start": None, "end": None}}
 

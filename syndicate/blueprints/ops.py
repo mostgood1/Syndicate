@@ -213,6 +213,9 @@ def _build_version_payload() -> dict[str, Any]:
     branch = env_branch or git_branch
     commit_source = "env" if env_commit else "git" if git_commit else "unknown"
     branch_source = "env" if env_branch else "git" if git_branch else "unknown"
+    service_name = str(service_marker("SYNDICATE_SERVICE_NAME") or "").strip() or None
+    instance_id = str(service_marker("SYNDICATE_INSTANCE_ID") or "").strip() or None
+    external_url = str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip() or None
 
     return {
         "service": "syndicate",
@@ -220,9 +223,15 @@ def _build_version_payload() -> dict[str, Any]:
         "commit_source": commit_source,
         "branch": branch,
         "branch_source": branch_source,
-        "render_service_name": str(service_marker("SYNDICATE_SERVICE_NAME") or "").strip() or None,
-        "render_instance_id": str(service_marker("SYNDICATE_INSTANCE_ID") or "").strip() or None,
-        "render_external_url": str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip() or None,
+        "service_name": service_name,
+        "instance_id": instance_id,
+        "external_url": external_url,
+        # DEPRECATED twins of the three fields above, same values (2026-11-17, lane
+        # render-name-cleanup). Ledger readings and session tooling outside the repo
+        # read `version.render_*`; drop these once nothing does.
+        "render_service_name": service_name,
+        "render_instance_id": instance_id,
+        "render_external_url": external_url,
         "syndicate_data_root": str(current_app.config.get("SYNDICATE_DATA_ROOT") or os.environ.get("SYNDICATE_DATA_ROOT") or "").strip() or None,
         "syndicate_reports_root": str(current_app.config.get("SYNDICATE_REPORTS_ROOT") or os.environ.get("SYNDICATE_REPORTS_ROOT") or "").strip() or None,
     }
@@ -4189,9 +4198,11 @@ def api_ops_wnba_status_trace() -> Any:
 
     trace: dict[str, Any] = {"ok": True, "date": date}
     try:
-        trace["render_web_dyno"] = wnba_cards._render_web_dyno()
+        trace["web_role"] = wnba_cards._is_web_role()
+        # DEPRECATED twin of `web_role` (2026-11-17, lane render-name-cleanup).
+        trace["render_web_dyno"] = trace["web_role"]
     except Exception as exc:
-        trace["render_web_dyno_error"] = f"{type(exc).__name__}: {exc}"
+        trace["web_role_error"] = f"{type(exc).__name__}: {exc}"
     try:
         trace["local_live_state_payload"] = wnba_cards._local_live_state_payload(date)
     except Exception as exc:

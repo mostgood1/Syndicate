@@ -161,7 +161,7 @@ def _bootstrap_lock_path() -> str:
     return os.path.join(tempfile.gettempdir(), "syndicate_bootstrap_sync.lock")
 
 
-def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> None:
+def _bootstrap_hosted_data(bootstrap_main: Callable[[], int] | None = None) -> None:
     if not _env_bool("SYNDICATE_BOOTSTRAP_ON_START", default=False):
         return
     if bootstrap_main is None:
@@ -169,7 +169,7 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
             from scripts.bootstrap_data_root import main as bootstrap_main  # type: ignore
         except Exception:
             return
-    if _is_render_web_dyno():
+    if _is_web_role():
         # 2026-07-05: running bootstrap synchronously during app creation
         # blocked startup long enough for Render's proxy to 502, so it was
         # skipped here outright. But with the GHA daily-update retired this
@@ -297,7 +297,7 @@ def _bootstrap_render_data(bootstrap_main: Callable[[], int] | None = None) -> N
         return
 
 
-def _is_render_web_dyno() -> bool:
+def _is_web_role() -> bool:
     return bool(
         str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}
         or str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip()
@@ -306,7 +306,7 @@ def _is_render_web_dyno() -> bool:
 
 
 def create_app() -> Flask:
-    _bootstrap_render_data()
+    _bootstrap_hosted_data()
 
     app = Flask(
         __name__,
@@ -647,8 +647,8 @@ def create_app() -> Flask:
         )
 
     def _start_background_loops() -> None:
-        render_web_dyno = _is_render_web_dyno()
-        if render_web_dyno and not _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):
+        web_role = _is_web_role()
+        if web_role and not _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):
             return
         if app.extensions.get("syndicate_background_loops_started"):
             return
@@ -661,7 +661,7 @@ def create_app() -> Flask:
                 if app.extensions.get("syndicate_background_loops_started"):
                     return
                 start_intelligence_state_background_loop(app)
-                if not render_web_dyno:
+                if not web_role:
                     start_live_refresh_background_loop()
                 app.extensions["syndicate_background_loops_started"] = True
             finally:
@@ -755,7 +755,7 @@ def create_app() -> Flask:
         except Exception:
             pass
 
-    if _is_render_web_dyno():
+    if _is_web_role():
         if _env_bool("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP", default=False):
             _start_background_loops()
     else:

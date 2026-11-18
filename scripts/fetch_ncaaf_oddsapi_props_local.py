@@ -973,7 +973,7 @@ def main(argv: list[str] | None = None) -> int:
             published = False
             print(f"[ncaaf_props] PUBLISH_FAILED {type(exc).__name__}: {exc}", flush=True)
         # `logger.info` never reaches Render's log collector -- print/flush is
-        # the only line that shows up in `render_logs.py`.
+        # the only line that shows up in `fleet_logs.py`.
         print(f"[ncaaf_props] rows={len(out_df)} published={published} path={out_path}", flush=True)
     return 0
 

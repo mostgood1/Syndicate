@@ -58,7 +58,7 @@ STAMP = re.compile(r"^(?P<ts>\d{4}-\d{2}-\d{2}T[\d:.]+Z)")
 
 def _fetch(start: str, end: str | None, service: str) -> list[str]:
     cmd = [
-        sys.executable, "scripts/render_logs.py",
+        sys.executable, "scripts/fleet_logs.py",
         "--service", service, "--text", "VENUE_QUOTE_AGE",
         "--start", start, "--tail", "400",
     ]

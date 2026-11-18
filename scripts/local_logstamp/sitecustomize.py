@@ -4,8 +4,8 @@
 `PYTHONPATH`, so Python imports it at startup, before the role's own code.
 Render stamped every log line; the fleet writes raw stdout to a file, and on
 2026-10-02 only 1.5-2.6% of worker lines carried any time of their own, which
-left `scripts/render_logs.py --local` guessing. Each line now starts with
-`2026-10-02T14:36:49.123Z ` -- the exact prefix `render_logs` treats as EXACT.
+left `scripts/fleet_logs.py --local` guessing. Each line now starts with
+`2026-10-02T14:36:49.123Z ` -- the exact prefix `fleet_logs` treats as EXACT.
 
 Done INSIDE the role and not with a pipe through the supervisor on purpose:
 roles can outlive a supervisor crash (`down` reaps them as orphans), and a
@@ -14,7 +14,7 @@ pipe would turn that crash into a broken-pipe error on the role's next print
 
 Only writes through `sys.stdout` / `sys.stderr` are stamped (print, logging,
 tracebacks). Bytes written to `.buffer` or straight to fd 1 by a non-Python
-child are not, and `render_logs` reads those as APPROXIMATE, never as exact.
+child are not, and `fleet_logs` reads those as APPROXIMATE, never as exact.
 
 This shadows the distro's own `sitecustomize` (Ubuntu's apport hook) for the
 roles only. Off switch: `SYNDICATE_LOCAL_LOG_TIMESTAMPS=0`, read here AND by

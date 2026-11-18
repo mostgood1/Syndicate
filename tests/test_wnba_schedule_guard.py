@@ -113,7 +113,7 @@ def _stub_page_builder(monkeypatch, verdict):
     monkeypatch.setattr(cards, "_games_from_public_scoreboard", lambda _d: ([], ""))
     monkeypatch.setattr(cards, "_supplement_games_with_live_state", lambda games, _d, **_k: (games, None, 0, 0))
     monkeypatch.setattr(cards, "_games_from_live_state_fallback", lambda _d, ttl=12: ([], ""))
-    monkeypatch.setattr(cards, "_render_web_dyno", lambda: False)
+    monkeypatch.setattr(cards, "_is_web_role", lambda: False)
     monkeypatch.setattr(cards, "_cache_get_context", lambda _k: None)
     monkeypatch.setattr(cards, "_cache_set_context", lambda *_a, **_k: None, raising=False)
     monkeypatch.setattr(cards, "_build_wnba_game_lens", lambda _g: {})

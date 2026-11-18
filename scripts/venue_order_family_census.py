@@ -498,7 +498,7 @@ def main() -> int:
     if not start:
         start = (datetime.now(timezone.utc) - timedelta(hours=args.hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    from render_logs import fetch_window  # local import: reads the fleet's role logs
+    from fleet_logs import fetch_window  # local import: reads the fleet's role logs
 
     lines, pages = fetch_window(service=args.service, text=LOG_TEXT, start=start, end=args.end.strip())
     exec_lines, exec_pages = fetch_window(

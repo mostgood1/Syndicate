@@ -21,11 +21,11 @@ def _run_bootstrap_once(bootstrap_main, *, data_root):
     """One web-dyno boot, with the background thread run inline."""
     with patch.dict(os.environ, {"SYNDICATE_DATA_ROOT": data_root}), patch(
         "syndicate.app._env_bool", return_value=True
-    ), patch("syndicate.app._is_render_web_dyno", return_value=True), patch(
+    ), patch("syndicate.app._is_web_role", return_value=True), patch(
         "syndicate.app.threading.Thread",
         side_effect=lambda **kwargs: _ImmediateThread(**kwargs),
     ), patch("time.sleep"):
-        syndicate_app._bootstrap_render_data(bootstrap_main)
+        syndicate_app._bootstrap_hosted_data(bootstrap_main)
 
 
 def _remove_lock() -> None:
@@ -43,27 +43,27 @@ class AppBootstrapTests(unittest.TestCase):
         _remove_lock()
         self.addCleanup(_remove_lock)
 
-    def test_bootstrap_render_data_runs_when_enabled(self) -> None:
+    def test_bootstrap_hosted_data_runs_when_enabled(self) -> None:
         calls: list[int] = []
 
         with patch("syndicate.app._env_bool", return_value=True), patch(
-            "syndicate.app._is_render_web_dyno",
+            "syndicate.app._is_web_role",
             return_value=False,
         ):
-            syndicate_app._bootstrap_render_data(lambda: calls.append(1) or 0)
+            syndicate_app._bootstrap_hosted_data(lambda: calls.append(1) or 0)
 
         self.assertEqual(calls, [1])
 
     def test_create_app_triggers_bootstrap(self) -> None:
-        with patch("syndicate.app._bootstrap_render_data") as bootstrap_mock, patch(
-            "syndicate.app._is_render_web_dyno",
+        with patch("syndicate.app._bootstrap_hosted_data") as bootstrap_mock, patch(
+            "syndicate.app._is_web_role",
             return_value=False,
         ):
             syndicate_app.create_app()
 
         bootstrap_mock.assert_called_once()
 
-    def test_bootstrap_render_data_runs_in_background_on_render_web_dyno(self) -> None:
+    def test_bootstrap_hosted_data_runs_in_background_on_the_web_role(self) -> None:
         calls: list[int] = []
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -284,15 +284,15 @@ class AppBootstrapTests(unittest.TestCase):
         self.assertFalse(syndicate_app._pid_is_running(0))
         self.assertFalse(syndicate_app._pid_is_running(-1))
 
-    def test_bootstrap_render_data_skips_when_disabled(self) -> None:
+    def test_bootstrap_hosted_data_skips_when_disabled(self) -> None:
         calls: list[int] = []
 
         with patch("syndicate.app._env_bool", return_value=False):
-            syndicate_app._bootstrap_render_data(lambda: calls.append(1) or 0)
+            syndicate_app._bootstrap_hosted_data(lambda: calls.append(1) or 0)
 
         self.assertEqual(calls, [])
 
-    def test_create_app_starts_intelligence_loop_on_render_web_when_enabled(self) -> None:
+    def test_create_app_starts_intelligence_loop_on_hosted_web_when_enabled(self) -> None:
         class _ImmediateThread:
             def __init__(self, *, target=None, name=None, daemon=None):
                 self._target = target
@@ -301,8 +301,8 @@ class AppBootstrapTests(unittest.TestCase):
                 if self._target is not None:
                     self._target()
 
-        with patch("syndicate.app._bootstrap_render_data") as bootstrap_mock, patch(
-            "syndicate.app._is_render_web_dyno",
+        with patch("syndicate.app._bootstrap_hosted_data") as bootstrap_mock, patch(
+            "syndicate.app._is_web_role",
             return_value=True,
         ), patch(
             "syndicate.app._env_bool",

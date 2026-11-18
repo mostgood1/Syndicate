@@ -500,7 +500,9 @@ def cmd_sync(args: argparse.Namespace) -> int:
             "base_url": WEB_BASE,
             "service_commit": version.get("commit"),
             "syndicate_data_root": version.get("syndicate_data_root"),
-            "render_instance_id": version.get("render_instance_id"),
+            # `instance_id` since 2026-11-17 (lane render-name-cleanup); older webs
+            # serve only `render_instance_id`, with the same value.
+            "instance_id": version.get("instance_id") or version.get("render_instance_id"),
         },
         "inventory": {"count": inventory["count"], "bytes": inventory["bytes"]},
         "families": manifest_families,

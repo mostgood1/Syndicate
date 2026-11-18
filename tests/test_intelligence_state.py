@@ -657,7 +657,7 @@ class IntelligenceStateTests(unittest.TestCase):
             # real synchronous recompute instead. Mock hosted=True so this
             # test actually exercises what its name says, instead of
             # accidentally running the full (very slow) live pipeline.
-            with patch("syndicate.blueprints.intelligence._render_hosted_request", return_value=True), patch(
+            with patch("syndicate.blueprints.intelligence._is_hosted_request", return_value=True), patch(
                 "syndicate.blueprints.intelligence._safe_queue_intelligence_state_refresh"
             ), patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(cached_response)), patch(
                 "syndicate.blueprints.intelligence._cached_intelligence_response_with_source",

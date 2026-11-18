@@ -54,7 +54,7 @@ _SAMPLE_RE = re.compile(r"ALL_PROCESS_MEMORY\s+(\{.*\})\s*$")
 
 
 def _read_logs(service: str, start_iso: str, tail: int) -> list[str]:
-    """Delegate to scripts/render_logs.py -- it already pages BACKWARD correctly.
+    """Delegate to scripts/fleet_logs.py -- it already pages BACKWARD correctly.
 
     Reimplementing the pager here is exactly the mistake that tool's docstring
     documents three sessions making: a forward pager re-reads the same tail and
@@ -66,13 +66,13 @@ def _read_logs(service: str, start_iso: str, tail: int) -> list[str]:
     # arrived as 232 chars, so the JSON never closed and NOTHING parsed. The
     # failure looked exactly like "the emitter is off".
     command = [
-        sys.executable, str(REPO_ROOT / "scripts" / "render_logs.py"),
+        sys.executable, str(REPO_ROOT / "scripts" / "fleet_logs.py"),
         "--service", service, "--text", "ALL_PROCESS_MEMORY",
         "--start", start_iso, "--tail", str(tail), "--width", "200000",
     ]
     result = subprocess.run(command, capture_output=True, text=True, timeout=900)
     if result.returncode != 0:
-        raise SystemExit(f"render_logs failed ({result.returncode}): {result.stderr[-800:]}")
+        raise SystemExit(f"fleet_logs failed ({result.returncode}): {result.stderr[-800:]}")
     return result.stdout.splitlines()
 
 

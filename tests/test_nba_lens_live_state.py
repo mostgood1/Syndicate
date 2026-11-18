@@ -43,7 +43,7 @@ def slate(monkeypatch):
         return feed["scoreboard"]
 
     monkeypatch.setattr(basketball_pbp, "espn_get", fake_espn_get)
-    monkeypatch.setattr(c, "_render_web_dyno", lambda: False)
+    monkeypatch.setattr(c, "_is_web_role", lambda: False)
     monkeypatch.setattr(c, "_local_live_state_payload", lambda _d: None)   # the pregame file is absent or stale
     monkeypatch.setattr(c, "_live_snapshot_or_state_signature", lambda _p: 0)
     monkeypatch.setattr(c, "available_dates", lambda: [day])
@@ -105,7 +105,7 @@ def test_a_live_state_change_replaces_the_dates_entry_instead_of_adding_one(slat
 
 
 def test_the_web_dyno_never_reads_espn_for_the_cache_key(slate, monkeypatch):
-    monkeypatch.setattr(c, "_render_web_dyno", lambda: True)
+    monkeypatch.setattr(c, "_is_web_role", lambda: True)
     assert c._live_state_merge_signature(slate.day) is None
     assert slate.feed["calls"] == []
 

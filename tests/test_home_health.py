@@ -52,7 +52,8 @@ class HomeHealthRouteTests(unittest.TestCase):
         self.assertEqual(version["git_commit"], "ebb2136d")
         self.assertFalse(version["commit_matches_checkout"])
         self.assertEqual(version["branch"], "main")
-        self.assertEqual(version["render_service_name"], "syndicate-web")
+        self.assertEqual(version["service_name"], "syndicate-web")
+        self.assertEqual(version["render_service_name"], "syndicate-web")  # deprecated twin
         self.assertEqual(version["hostname"], "host-123")
         self.assertEqual(version["pid"], 4321)
         self.assertEqual(version["served_at"], 1234.5)

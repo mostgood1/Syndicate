@@ -294,7 +294,7 @@ def _home_selected_date(selected_date: str | None = None) -> str:
     return value or central_today_iso()
 
 
-def _render_web_dyno() -> bool:
+def _is_web_role() -> bool:
     return bool(
         str(service_marker("SYNDICATE_HOSTED") or "").strip().lower() in {"1", "true", "yes", "on"}
         or str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip()
@@ -369,6 +369,9 @@ def _public_detailed_version_payload() -> dict[str, Any]:
     branch_matches_checkout = None
     if env_branch and git_branch and git_branch not in {"HEAD", "DETACHED"}:
         branch_matches_checkout = env_branch == git_branch
+    service_name = str(service_marker("SYNDICATE_SERVICE_NAME") or "").strip() or None
+    instance_id = str(service_marker("SYNDICATE_INSTANCE_ID") or "").strip() or None
+    external_url = str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip() or None
     return {
         "service": "syndicate",
         "commit": commit,
@@ -381,9 +384,15 @@ def _public_detailed_version_payload() -> dict[str, Any]:
         "branch_source": "env" if env_branch else "git" if git_branch else "unknown",
         "commit_matches_checkout": bool(env_commit and git_commit and env_commit == git_commit) if env_commit or git_commit else None,
         "branch_matches_checkout": branch_matches_checkout,
-        "render_service_name": str(service_marker("SYNDICATE_SERVICE_NAME") or "").strip() or None,
-        "render_instance_id": str(service_marker("SYNDICATE_INSTANCE_ID") or "").strip() or None,
-        "render_external_url": str(service_marker("SYNDICATE_EXTERNAL_URL") or "").strip() or None,
+        "service_name": service_name,
+        "instance_id": instance_id,
+        "external_url": external_url,
+        # DEPRECATED twins of the three fields above, same values (2026-11-17, lane
+        # render-name-cleanup). Ledger readings and session tooling outside the repo
+        # read `version.render_*`; drop these once nothing does.
+        "render_service_name": service_name,
+        "render_instance_id": instance_id,
+        "render_external_url": external_url,
         "hostname": hostname,
         "pid": pid,
         "served_at": served_at,
@@ -8515,7 +8524,7 @@ def _home_payload(*, selected_date: str | None = None, cached_only: bool = False
             "html": render_template("shared/_home_sport_stack.html", sports=sports),
             "polled_at": time.time(),
         }
-    if _render_web_dyno():
+    if _is_web_role():
         overview = _build_light_home_sports(effective_date)
     else:
         sports = current_app.config["SYNDICATE_SPORTS"]

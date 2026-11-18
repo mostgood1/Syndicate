@@ -714,11 +714,13 @@ def poll(league: str, date_str: str, *, out_root: Path, dry_run: bool = False) -
     # **A SHAPE LINE PER CAPTURED GAME, because `with_series=1` says a series
     # was BUILT and nothing about whether its numbers are right.**
     #
-    # The artifact itself cannot be read from a Claude Code session: the ops
-    # export endpoint is on `syndicate-an21.onrender.com`, which the agent
-    # proxy answers 403 to at CONNECT (an org policy denial, not an auth
-    # failure -- an ADMIN_TOKEN does not change it). Logs are the one channel
-    # that does reach out, so the check goes here rather than into a fetch.
+    # When this was written the artifact could not be read from a Claude Code
+    # session: the ops export endpoint was on `syndicate-an21.onrender.com`,
+    # which the agent proxy answered 403 to at CONNECT (an org policy denial,
+    # not an auth failure). Logs were the one channel that reached out, so the
+    # check went here rather than into a fetch. `[2026-11-17]` Production is
+    # the fleet now and its export endpoint (`http://127.0.0.1:10000`) IS
+    # readable from a session; the log check stays because it works.
     #
     # Deliberately a SHAPE, not a dump: series lengths, endpoint values, the
     # narrator's presence under its own name, and the clock. Enough to catch

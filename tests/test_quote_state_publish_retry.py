@@ -21,7 +21,7 @@ from syndicate.features.shared import artifact_publisher as ap
 
 QUOTE_STATE = "nfl_source/tracking/book_quotes/2026-09-13.state.json"
 NOT_QUOTE_STATE = "nfl_source/oddsapi_player_props_2026_wk1.csv"
-PUBLISH_URL = "https://syndicate.onrender.com"
+PUBLISH_URL = "http://127.0.0.1:10000"
 
 
 def _ok_response() -> MagicMock:

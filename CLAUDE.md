@@ -252,7 +252,7 @@ Do not spend time on readers/hydration/endpoints/UI until candidate and artifact
 ### Directory map
 
 - `app.py` — thin entrypoint (`from syndicate.app import app`)
-- `syndicate/app.py` — Flask app factory: registers all sport blueprints, starts the live-refresh and intelligence-state background loops, has Render-specific bootstrap-on-start logic (`_bootstrap_render_data`) guarded by `SYNDICATE_BOOTSTRAP_ON_START`
+- `syndicate/app.py` — Flask app factory: registers all sport blueprints, starts the live-refresh and intelligence-state background loops, has hosted bootstrap-on-start logic (`_bootstrap_hosted_data`, a seed-only copy of the checkout mirror onto the data root) guarded by `SYNDICATE_BOOTSTRAP_ON_START`
 - `syndicate/blueprints/` — one Flask blueprint per sport (`mlb.py`, `nba.py`, ...) plus `home.py`, `intelligence.py`, `ops.py`, `sports.py`, and the `ask_the_syndicate*` LLM-briefing blueprint family
 - `syndicate/features/<sport>/` — per-sport feature logic (cards, game detail, picks, props, live-lens, archive) — MLB is the reference implementation other sports converge toward
 - `syndicate/features/shared/` — cross-sport contracts and services: board contract (`game_board_contract.py`), live-lens contract/loop, odds framework/lifecycle/refresh-tracking, rank board, props pipeline (`basketball_props_*.py`), refresh state store

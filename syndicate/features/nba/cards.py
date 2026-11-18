@@ -49,7 +49,7 @@ from syndicate.features.shared.status_text import looks_terminal_status_text as 
 from syndicate.features.shared.service_identity import service_marker
 
 
-def _render_web_dyno() -> bool:
+def _is_web_role() -> bool:
     # SYNDICATE_HOSTED is set on every fleet role (web *and* the workers; Render
     # injected it as RENDER), so it can't distinguish "am I the request-serving web dyno"
     # from "am I a worker script calling into this module directly" -- that
@@ -106,7 +106,7 @@ def _live_state_merge_signature(selected_date: str) -> int | None:
     (`live_state`). ESPN rows carry no per-row timestamp, so a pregame slate hashes the same on every read and the
     cache still hits until something actually changes. None on the web dyno, which never merges live state (and must
     not fetch ESPN for a cache key)."""
-    if _render_web_dyno():
+    if _is_web_role():
         return None
     try:
         payload = _best_live_state_payload(selected_date)
@@ -2580,7 +2580,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     parsed_date = parse_iso_date(resolved_date)
     games, cards_path, recs_path = _games_from_artifacts(resolved_date)
     had_artifact_games = bool(games)
-    if not _render_web_dyno():
+    if not _is_web_role():
         games, live_source_path, supplemented_count, updated_count = _merge_games_with_live_state(games, resolved_date)
         if supplemented_count > 0 or updated_count > 0:
             if had_artifact_games:
@@ -2592,7 +2592,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
                 recs_path = str(live_source_path)
     has_actionable_data = _games_have_actionable_data(games)
 
-    if not _render_web_dyno() and not games and resolved_date == central_today_iso():
+    if not _is_web_role() and not games and resolved_date == central_today_iso():
         live_games, live_source_path = _games_from_live_state_fallback(resolved_date)
         if live_games:
             games = live_games
@@ -2602,7 +2602,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
             has_actionable_data = _games_have_actionable_data(games)
 
     # Prefer nearby local artifact-backed slates before any live/remote fallback.
-    if not _render_web_dyno() and allow_stored_date_fallback and (not games or not has_actionable_data):
+    if not _is_web_role() and allow_stored_date_fallback and (not games or not has_actionable_data):
         fallback_date = None
         if games and not has_actionable_data:
             fallback_date = _next_available_actionable_cards_date(resolved_date)
@@ -2821,7 +2821,7 @@ def build_cards_sim_detail_payload(selected_date: str, away_tri: str, home_tri: 
 
 def build_live_state_payload(selected_date: str, ttl: int = 12, *, allow_stored_date_fallback: bool = True) -> dict[str, Any]:
     is_today = str(selected_date).strip() == central_today_iso()
-    if _render_web_dyno():
+    if _is_web_role():
         local_payload = _best_live_state_payload(selected_date)
         if isinstance(local_payload, dict) and isinstance(local_payload.get("games"), list) and bool(local_payload.get("games")):
             return _attach_odds_refresh_timestamp(local_payload)
@@ -2901,7 +2901,7 @@ def build_live_player_boxscore_payload(
             selected_date,
             allow_stored_date_fallback=allow_stored_date_fallback,
         )
-    if _render_web_dyno():
+    if _is_web_role():
         return _attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),
@@ -2987,7 +2987,7 @@ def build_live_player_lens_payload(
             selected_date,
             allow_stored_date_fallback=allow_stored_date_fallback,
         )
-    if _render_web_dyno():
+    if _is_web_role():
         return _attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),
@@ -3099,7 +3099,7 @@ def build_live_lines_payload(
             selected_date,
             allow_stored_date_fallback=allow_stored_date_fallback,
         )
-    if _render_web_dyno():
+    if _is_web_role():
         return _attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),
@@ -3183,7 +3183,7 @@ def build_live_pbp_stats_payload(
     allow_stored_date_fallback: bool = True,
 ) -> dict[str, Any]:
     normalized_event_ids = [str(event_id).strip() for event_id in event_ids if str(event_id).strip()]
-    if _render_web_dyno():
+    if _is_web_role():
         return _attach_odds_refresh_timestamp({
             "ok": True,
             "ttl": int(ttl),

@@ -36,11 +36,11 @@ def _clear_caches():
 
 
 def _as_worker():
-    return patch.object(cards_module, "_render_web_dyno", return_value=False)
+    return patch.object(cards_module, "_is_web_role", return_value=False)
 
 
 def _as_web():
-    return patch.object(cards_module, "_render_web_dyno", return_value=True)
+    return patch.object(cards_module, "_is_web_role", return_value=True)
 
 
 def test_today_cache_is_a_noop_on_a_worker():

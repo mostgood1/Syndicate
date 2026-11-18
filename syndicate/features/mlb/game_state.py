@@ -98,13 +98,13 @@ def mlb_feed_live_is_refreshable(
     correctness fix with an outage, so the caller passes
     `has_request_context()` and the extra day exists only for workers.
 
-    NOT `_render_web_dyno()` -- but not for the reason first written here.
+    NOT `_is_web_role()` -- but not for the reason first written here.
     That helper is CORRECT: `SYNDICATE_WEB_DYNO` is `true` on web and `false`
     on BOTH workers, live and in `render.yaml` alike (re-read 2026-09-04 WITH
     PAGINATION; the first read was one 100-key page of refresh-worker's 153
     and reported a drift that does not exist). Independently confirmed from
     refresh-worker's own logs: `[mlb_cards] FEED_LIVE_PRUNE`, which sits
-    behind `not _render_web_dyno()`, emits there every build.
+    behind `not _is_web_role()`, emits there every build.
 
     `has_request_context()` is preferred on the merits instead. The
     constraint is *"do not add network to a REQUEST path"*, and that is what

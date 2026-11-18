@@ -201,7 +201,7 @@ def _temporary_env(overrides: dict[str, str | None]):
                 os.environ[key] = value
 
 
-def _normalize_render_base_url(value: str) -> str:
+def _normalize_base_url(value: str) -> str:
     base_url = str(value or "").strip()
     if not base_url:
         return ""
@@ -1147,7 +1147,9 @@ def _refresh_live_lens_artifacts(*, source_root: Path, date_str: str, trigger: s
         reused = _reuse_existing_live_lens_tick(source_root=source_root, date_str=date_str, trigger=trigger)
         if reused is not None:
             return reused
-    base_url = _normalize_render_base_url(_env_first("MLB_BETTING_BASE_URL", "BASE_URL", "RENDER_URL", "SYNDICATE_EXTERNAL_URL"))
+    # `RENDER_URL` was dropped from this list 2026-11-17 (lane render-name-cleanup): a
+    # Render-era operator variable, set in no fleet env layer and no running role.
+    base_url = _normalize_base_url(_env_first("MLB_BETTING_BASE_URL", "BASE_URL", "SYNDICATE_EXTERNAL_URL"))
     token = _env_first("MLB_BETTING_CRON_TOKEN", "MLB_CRON_TOKEN", "CRON_TOKEN")
     if base_url and token:
         try:
