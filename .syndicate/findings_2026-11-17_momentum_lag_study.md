@@ -69,8 +69,11 @@ A forward test would have to confirm the price at the book itself at entry.
 ## Corrections to what I told the user earlier the same evening
 
 - **`book_updated_at` is not a book-side clock.** It equals OddsAPI's snapshot time on 441,068 of 441,068 rows
-  (E5 pre-registration, 2026-10-26). A "behind for N minutes" timer would come from our own fetch history, not
-  from that field.
+  (E5 pre-registration, 2026-10-26). That equality holds by construction (both fields come from OddsAPI's
+  `last_update`), so it was re-measured: NBA 11-15 pregame, `captured_at - book_updated_at` has p50 0.8 min and
+  p99 3.1 min even on the 51,475 FIRST sightings of a key, with 0 over 30 min. A book-side change clock would
+  show hours on stable markets. A "behind for N minutes" timer would come from our own fetch history, not
+  from that field (`C:\tmp\momentum_lag_study\bu_semantics.py`).
 - **Prop capture is not hourly.** NBA props had a price-changing fetch about every 3.5 min (median, 11-15). The
   "hourly" figure came from the 10-16 MLB postseason reading.
 
