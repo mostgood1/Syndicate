@@ -740,6 +740,7 @@ once this index exists: re-splitting would orphan the parts.
 | [soccer-shots-prop-skill] | SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1- | `state_soccer.md` |
 | [soccer-moneyline-precision] | SOCCER'S MONEYLINE EDGE IS NOW GATED ON ITS OWN SIM NOISE, AND 61% OF IT WAS INSIDE THAT NOISE `[measured 2026 | `state_soccer.md` |
 | [soccer-shot-woodwork-undercount] | EVERY SHOT OFF THE WOODWORK WAS MISSING FROM SHOT TOTALS — FIXED, LIVE ON live-odds-worker `20d589ed` 2026-09- | `state_soccer.md` |
+| [soccer-understat-outage] | UNDERSTAT IS DOWN SITE-WIDE SINCE 2026-11-03, SO BIG-5 SOCCER TEAM/PLAYER HISTORY IS FROZEN AT 10-31; THE FETCH STEPS FAIL WITH A NAMED REASON (NAMING GUARD LIVE, COOLDOWN OFF) | `state_soccer.md` |
 | [live-lens-snapshot] | THE LIVE-LENS SNAPSHOT CANNOT BE DATED — it is a 4 MB KEYVALUE key, not a file, and archiving it would cost ~5 | `state_ui.md` |
 | [live-surface-tier5] | THE LIVE SURFACE — Tier 5 `[measured 08-15 02:3x–03:0xZ]` | `state_ui.md` |
 | [ask-the-syndicate] | ASK THE SYNDICATE | `state_ui.md` |

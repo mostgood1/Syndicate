@@ -1372,3 +1372,21 @@ Lane `soccer-shot-woodwork-undercount` (readings in `deploys.md` 2026-09-17 21:1
 - **It is a PRICED path, not a display one:** `soccer_live_gameline_source.py:337` banks `shots_so_far` under the live `player_shots` market and `live_lens.py` derives the over-probabilities. A shooter whose woodwork strike vanished was banked one shot low.
 - **STILL OPEN:** (1) refresh-worker — the rare second writer — runs the OLD code until the 2026-09-18 09:30 CT scheduled deploy; (2) **SETTLED 2026-09-17 by lane `soccer-shot-on-target-definition`: ESPN's `shotsOnTarget` is NOT derivable from the commentary type keys.** Per team over 48 team-matches, `goal + saved` is exact 39/48 and short 9 (never over), total shortfall 0.25 shots per team per match; every short team has an EXACT total (48/48 per team), so ESPN's boxscore classifies events its own commentary types differently. Adding `shot-hit-woodwork` scores WORSE (10 exact teams had 1-3 woodwork shots), which independently confirms woodwork-as-off-target. `shots_on_target_so_far` is therefore a commentary-derived LOWER BOUND, and it is banked under the live `player_shots_on_target` market; (3) `league_profiles`' conversion bases were fitted with the undercounted shots as denominator, so the same data now implies bases ~4.8% lower — refit is a user decision, not done.
 - Instrument: `py -3 scripts/check_soccer_shot_reconciliation.py` (non-zero exit on any gap; `--baseline` reproduces 9/24). `check_soccer_shot_capture.py` is a league-level SCREEN and cannot see this — 1.42 shots/match is inside its 0.75-of-benchmark floor.
+
+## [soccer-understat-outage] UNDERSTAT IS DOWN SITE-WIDE SINCE 2026-11-03, SO BIG-5 SOCCER TEAM/PLAYER HISTORY IS FROZEN AT 10-31; THE FETCH STEPS FAIL WITH A NAMED REASON (NAMING GUARD LIVE, COOLDOWN OFF) `[verified 2026-11-18 2:22 PM CST, lane understat-fetch-failures; 5a7cc60d2 on the fleet via db6a395ed 19:14:22Z]`
+- **The site:** understat.com serves a 26,719-byte maintenance page ("We will come back soon", HTTP 200 text/html) on `/`, `/league/<L>/<season>` and `getLeagueData/<L>/<season>`.
+  - Measured by 13 GETs on 11-18 (11 from the fleet host, 2 from another network) and by the fleet's own probes, the latest at 2:19 PM CST.
+  - DNS/connect failures began 11-01 6:34 PM CST; the maintenance page 11-03 2:54 PM CST.
+- **The effect:** every big-5 `soccer_<league>_history_current` / `_players` step fails on every full run (5,152 of 5,152 in 800 runs, 11-10..11-20 dirs).
+  - Last good writes: `teams_2026.csv` 10-31 7:12-8:47 PM CDT; `players_2026.csv` 11-01 2:09-4:12 AM CST.
+  - `build_soccer_artifacts` reads both with no freshness check, so EPL, La Liga, Bundesliga, Serie A and Ligue 1 are simulated on history frozen at 10-31 (69 matches missing by 11-18).
+  - Soccer `ok` stays False while it lasts. That red masked a different soccer failure in 8 of 800 runs.
+- **LIVE since 1:14:22 PM CST:** the naming guard `SYNDICATE_UNDERSTAT_OUTAGE_GUARD` (absent = ON).
+  - Tails read `UNDERSTAT_UNAVAILABLE ... reason=non_json` (52 of 52 steps by 2:19 PM CST); the steps still exit rc 1.
+  - The marker `~/syndicate-prod/data/soccer_source/_understat_status.json` holds `state`, `down_since`, `probes` and `last_ok_at`.
+  - It sends the same requests as OFF: 1 per teams step, 2 per players step.
+- **NOT on:**
+  - the cooldown `SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN` (absent = OFF; a betting change: it can lag a recovery refresh by up to 1 h);
+  - any alternative big-5 source (a model change; the user's decision).
+- **Recovery reads as:** the marker flips to `state: up` with `last_outage`, the 10 steps go rc 0, and the `teams_2026.csv` / `players_2026.csv` mtimes move.
+- Findings: `.syndicate/findings_2026-11-18_understat_fetch_failures.md`; todo `#841`.
