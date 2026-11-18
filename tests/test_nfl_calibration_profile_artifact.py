@@ -1,4 +1,5 @@
-"""The NFL calibration profile artifact is exactly todo #808's held-out candidate (lane `nfl-profile-load`).
+"""The NFL calibration profile artifact is exactly todo #808's held-out candidate (lane `nfl-profile-load`), with its
+level lever re-fitted on honest seeds (lane `nfl-engine-level-refit`, todo #813 part 3).
 
 `load_versioned_profile` silently DROPS any key that is not a `CalibrationProfile` field, and degrades to the
 in-source default on any read error. So a typo in `data/calibration/nfl_profile.json` would ship the default
@@ -6,7 +7,8 @@ for that field with no error anywhere. These tests make the file's content a pin
 
   * every key in `fields` is a real field, with the default's type (a JSON `1` is not `True`);
   * the file loads to the held-out candidate EXACTLY: the seven #808 switches ON, `home_field_bonus` 0.03,
-    `touchdown_weight_multiplier` 0.825, every other field at the in-source default;
+    `touchdown_weight_multiplier` 0.925 (re-fitted from 0.825, which #808 chose on seeds 1..100 shared by every
+    game; those read about +1.9 points a game high), every other field at the in-source default;
   * the module constant every NFL sim reads resolves to the file (reachability), unless an env override
     points elsewhere.
 
@@ -33,9 +35,10 @@ from syndicate.features.shared.calibration_profile_store import load_versioned_p
 
 CALIBRATION_DIR = REPO_ROOT / "data" / "calibration"
 ARTIFACT = CALIBRATION_DIR / "nfl_profile.json"
-VERSION = "nfl-808-v3h0.03-t0.825"
+VERSION = "nfl-813-refit-v3h0.03-t0.925"
 
-# The held-out candidate `v3h0.03_t0.825` (findings_2026-11-15_football_end_of_half_fix.md, V3 HELD-OUT RESULTS).
+# #808's held-out candidate `v3h0.03_t0.825` (findings_2026-11-15_football_end_of_half_fix.md, V3 HELD-OUT RESULTS)
+# with touchdown_weight_multiplier re-fitted on per-game seeds (findings_2026-11-18_nfl_engine_level_refit.md).
 CANDIDATE = {
     "halftime_kickoff": True,
     "q2_urgency_ignores_score": True,
@@ -45,7 +48,7 @@ CANDIDATE = {
     "q4_kick_waits": True,
     "kneel_out_q4_only": True,
     "home_field_bonus": 0.03,
-    "touchdown_weight_multiplier": 0.825,
+    "touchdown_weight_multiplier": 0.925,
 }
 
 pytestmark = pytest.mark.skipif(
