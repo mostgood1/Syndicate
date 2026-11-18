@@ -1501,6 +1501,14 @@ death, never life — do not invert it.
 - Verification: Findings file: first failing date in fleet manifests (n runs / n failing), roles+lanes that run the steps, newest file ages per league, what build_soccer_artifacts reads while they fail; <= ~6 plain GETs to Understat. Fix: unit test that with the switch off the fetch path is today's (fails on the recorded new-shape response) and on it parses the recorded response (off != on), plus a test that an unfetchable response still exits non-zero with a named reason. Prediction pre-registered here before the load. Load put to the user (deploy_claim + preflight CLEAR + deploys.md with betting change yes|no).
 - Blocked by: none
 
+### betting-change-windows — OPEN — opened 2026-11-18 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: Live-betting changes load only in scheduled rare windows (user 2026-11-18: 'batch the betting changes into rare windows'): a machine-read window schedule, deploy_preflight refuses a declared betting change outside a window (OUTSIDE_WINDOW) unless a recorded exception reason, betting_change.py refuses to register an out-of-window load without one, protocol text in CLAUDE.md, tests green
+- Files: .syndicate/betting_change_windows.md (NEW), scripts/betting_change.py (window schedule reader + the add/resolve window check ONLY), scripts/deploy_preflight.py (the --betting-change / --outside-window flags + the OUTSIDE_WINDOW verdict ONLY), tests/test_betting_change_windows.py (NEW), CLAUDE.md (one paragraph in Before any deploy ONLY)
+- Hypothesis: n/a (policy enforcement)
+- Falsification test: n/a
+- Verification: tests: window parsing, in/out of window, preflight OUTSIDE_WINDOW verdict and its exception, register add refusal; a dry preflight on the fleet with --betting-change yes outside a window returns exit 8; CLAUDE.md and state carry the rule
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

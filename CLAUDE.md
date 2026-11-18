@@ -390,6 +390,17 @@ use `--pending <roles>`, then `resolve` it at the load. While a `yes` is pending
 gate counts 0. `betting_change.py candidates` lists unclassified loads
 (`.syndicate/betting_changes.md`).
 
+**Betting changes load ONLY in a betting-change window** `[2026-11-18, user: "batch the
+betting changes into rare windows"]`. The windows are every second Tuesday, 2-7 AM CST,
+listed in `.syndicate/betting_change_windows.md`; `python scripts/betting_change.py window`
+says whether one is open now. Every preflight declares `--betting-change yes|no`. A `yes`
+outside a window returns `OUTSIDE_WINDOW` (exit 8) unless `--outside-window "<revert | risk
+reduction | broken money path: why>"`, and `betting_change.py add`/`resolve` refuses the same.
+Between windows a betting change queues. It lands on main **default-off** or stays on its
+branch, because an ff ships ALL of main and would load it early. Why: seven changes loaded in
+32 hours on 11-17/18, each restarting the gate's count. At about 24 graded games a day the
+gate needs about 5 change-free weeks, so a window may load nothing and the count goes on.
+
 **Why the coordinator role was retired.** One session owned every deploy. A
 session can be archived, and that one was — with two requests queued into it and
 `deploy/grants/` empty, while the guard gated on `session_id in coordinator.id`.

@@ -38,6 +38,12 @@ from typing import Iterable, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTER_PATH = ROOT / ".syndicate" / "betting_changes.md"
+# User 2026-11-18: "batch the betting changes into rare windows" (lane betting-change-windows). A live-betting change
+# loads only inside a window listed here; outside one it needs a recorded exception (revert, risk reduction, broken
+# money path). Read by `add`/`resolve` below and by deploy_preflight.py's OUTSIDE_WINDOW verdict.
+WINDOWS_PATH = ROOT / ".syndicate" / "betting_change_windows.md"
+_EFFECTIVE_RE = re.compile(r"^Effective from:\s*`?(\d{4}-\d{2}-\d{2}T[0-9:]+Z)`?\s*$", re.MULTILINE)
+_WINDOW_RE = re.compile(r"^- (\d{4}-\d{2}-\d{2}T[0-9:]+Z)\s*\.\.\s*(\d{4}-\d{2}-\d{2}T[0-9:]+Z)\s*$", re.MULTILINE)
 DEPLOYS_PATH = ROOT / ".syndicate" / "deploys.md"
 
 KIND_YES = "yes"
@@ -197,6 +203,57 @@ def candidates(changes: Sequence[Change], deploys_text: str, since: str) -> list
     return out
 
 
+def parse_windows(text: str) -> list[tuple[datetime, datetime]]:
+    """The machine-read windows (`- START .. END`, UTC), sorted. Unparseable lines are not windows."""
+    out = []
+    for start, end in _WINDOW_RE.findall(text or ""):
+        a, b = parse_utc(start), parse_utc(end)
+        if a and b and b > a:
+            out.append((a, b))
+    return sorted(out)
+
+
+def parse_effective(text: str) -> datetime | None:
+    """When the window rule took effect: loads before it predate the policy and are not checked."""
+    match = _EFFECTIVE_RE.search(text or "")
+    return parse_utc(match.group(1)) if match else None
+
+
+def load_windows(path: Path | None = None) -> list[tuple[datetime, datetime]]:
+    path = path or WINDOWS_PATH
+    return parse_windows(path.read_text(encoding="utf-8")) if path.exists() else []
+
+
+def load_effective(path: Path | None = None) -> datetime | None:
+    path = path or WINDOWS_PATH
+    return parse_effective(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+def window_at(at: datetime, windows: Sequence[tuple[datetime, datetime]]) -> tuple[datetime, datetime] | None:
+    """The window containing `at` (start inclusive, end exclusive), else None."""
+    for start, end in windows:
+        if start <= at < end:
+            return start, end
+    return None
+
+
+def next_window(at: datetime, windows: Sequence[tuple[datetime, datetime]]) -> tuple[datetime, datetime] | None:
+    return next(((s, e) for s, e in windows if s > at), None)
+
+
+def window_refusal(at: datetime, windows: Sequence[tuple[datetime, datetime]], outside_reason: str = "",
+                   effective: datetime | None = None) -> str | None:
+    """Why a betting change loading at `at` is refused, or None. Loads before `effective` predate the rule; an empty
+    schedule refuses (fails closed)."""
+    if (effective is not None and at < effective) or window_at(at, windows) or (outside_reason or "").strip():
+        return None
+    nxt = next_window(at, windows)
+    return (f"{normalize_ts(at.strftime('%Y-%m-%dT%H:%M:%SZ'))} is outside every betting-change window "
+            + (f"(next: {nxt[0].strftime('%Y-%m-%d %H:%M')}Z..{nxt[1].strftime('%H:%M')}Z)" if nxt
+               else "(no future window is listed)")
+            + "; queue it for the window, or pass --outside-window \"<revert | risk reduction | broken money path: why>\"")
+
+
 def next_id(changes: Sequence[Change]) -> str:
     numbers = [int(_ID_RE.match(c.id).group(1)) for c in changes]
     return f"BC-{(max(numbers) + 1) if numbers else 1:03d}"
@@ -304,9 +361,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     add.add_argument("--what", required=True)
     add.add_argument("--deploy", default="", help="the deploys.md heading's instant, e.g. '2026-11-17 00:04:20Z'")
     add.add_argument("--lane", default="")
+    add.add_argument("--outside-window", default="", metavar="REASON",
+                     help="a yes loaded outside every betting-change window: the exception and why")
     res = sub.add_parser("resolve", help="record the load time of a pending row")
     res.add_argument("id")
     res.add_argument("--loaded-at", required=True)
+    res.add_argument("--outside-window", default="", metavar="REASON")
+    win = sub.add_parser("window", help="is a betting change allowed now (or at --at)? and the next window")
+    win.add_argument("--at", default="", help="UTC instant to check; default now")
+    parser.add_argument("--windows", default=str(WINDOWS_PATH))
     args = parser.parse_args(argv)
 
     register = Path(args.register)
@@ -325,6 +388,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         if line:
             print(line)
         return 0
+    windows = load_windows(Path(args.windows))
+    effective = load_effective(Path(args.windows))
+    if args.cmd == "window":
+        at = parse_utc(args.at) if args.at else datetime.now(timezone.utc)
+        if at is None:
+            parser.error(f"--at {args.at!r} is not a UTC instant")
+        inside = window_at(at, windows)
+        nxt = next_window(at, windows)
+        if inside:
+            print(f"IN WINDOW {inside[0]:%Y-%m-%d %H:%M}Z..{inside[1]:%H:%M}Z: betting changes may load")
+            return 0
+        print("OUTSIDE every betting-change window: betting changes queue (exceptions: revert, risk reduction, broken"
+              " money path, recorded with --outside-window)"
+              + (f"; next window {nxt[0]:%Y-%m-%d %H:%M}Z..{nxt[1]:%H:%M}Z" if nxt else "; NO future window listed"))
+        return 1
     text = register.read_text(encoding="utf-8")
     changes, coverage = parse_register(text)
 
@@ -356,7 +434,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         deploy = normalize_ts(args.deploy) if args.deploy else ""
         if deploy and deploy in {c.deploy for c in changes}:
             parser.error(f"deploys.md entry {deploy} is already classified")
-        change = Change(next_id(changes), args.kind, loaded_at, _cell(args.what), deploy, _cell(args.lane))
+        what = _cell(args.what)
+        if args.kind == KIND_YES and args.loaded_at:
+            refusal = window_refusal(parse_utc(normalize_ts(args.loaded_at)), windows, args.outside_window, effective)
+            if refusal:
+                parser.error(refusal)
+            if args.outside_window.strip() and not window_at(parse_utc(normalize_ts(args.loaded_at)), windows):
+                what = f"{what} [OUTSIDE WINDOW: {_cell(args.outside_window)}]"
+        change = Change(next_id(changes), args.kind, loaded_at, what, deploy, _cell(args.lane))
         register.write_text(append_row(text, change), encoding="utf-8")
         print(format_row(change))
         print(describe_clock(clock_start([*changes, change])))
@@ -366,7 +451,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not match or not match[0].pending:
             parser.error(f"{args.id} is not a pending row")
         old = match[0]
-        new = Change(old.id, old.kind, normalize_ts(args.loaded_at), old.what, old.deploy, old.lane)
+        what = old.what
+        if old.kind == KIND_YES:
+            loaded = parse_utc(normalize_ts(args.loaded_at))
+            refusal = window_refusal(loaded, windows, args.outside_window, effective)
+            if refusal:
+                parser.error(refusal)
+            if args.outside_window.strip() and not window_at(loaded, windows):
+                what = f"{what} [OUTSIDE WINDOW: {_cell(args.outside_window)}]"
+        new = Change(old.id, old.kind, normalize_ts(args.loaded_at), what, old.deploy, old.lane)
         register.write_text(replace_row(text, new), encoding="utf-8")
         print(format_row(new))
         print(describe_clock(clock_start([new if c.id == new.id else c for c in changes])))

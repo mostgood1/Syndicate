@@ -70,6 +70,8 @@ Exit codes:  0 = CLEAR (only infrastructure running)
              6 = NO_EXPECTATION (no stated prediction with a fresh baseline for its fields)
              7 = OUTCOME_GATE (--reinject-env changes a *_LIVE_MECHANISMS value with no
                  fresh outcome-scored receipt for that exact transition; todo #784)
+             8 = OUTSIDE_WINDOW (--betting-change yes outside every betting-change window,
+                 with no --outside-window exception; user 2026-11-18, lane betting-change-windows)
 
 THE THREE PROPERTIES, because they are independent and each was learned
 separately -- a deploy needs all three and no two of them imply the third:
@@ -238,6 +240,33 @@ EXIT_NO_EXPECTATION = 6
 # inert); an edit made after the CLEAR is not seen, and the guard does not
 # re-read it.
 EXIT_OUTCOME_GATE = 7
+
+# User 2026-11-18: "batch the betting changes into rare windows" (lane betting-change-windows,
+# .syndicate/betting_change_windows.md). A deploy that DECLARES a live-betting change (--betting-change yes) is
+# refused outside a window unless --outside-window names the exception (revert, risk reduction, broken money path).
+# The declaration is the deployer's: an undeclared deploy is not checked, and the protocol (CLAUDE.md) requires it.
+EXIT_OUTSIDE_WINDOW = 8
+
+
+def betting_window_problem(betting_change: str, outside_reason: str, now: datetime,
+                           windows_path: Path | None = None) -> tuple[str | None, dict]:
+    """(problem or None, detail) for OUTSIDE_WINDOW. Pure apart from reading the schedule file."""
+    if (betting_change or "").strip().lower() != "yes":
+        return None, {"betting_change": betting_change or "undeclared"}
+    import importlib.util
+
+    name = "betting_change_for_preflight"
+    module = sys.modules.get(name)
+    if module is None:
+        spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "scripts" / "betting_change.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    windows = module.load_windows(windows_path)
+    inside = module.window_at(now, windows)
+    detail = {"betting_change": "yes", "in_window": bool(inside),
+              "outside_window_reason": (outside_reason or "").strip() or None}
+    return module.window_refusal(now, windows, outside_reason, module.load_effective(windows_path)), detail
 
 # Equal to deploy-guard.py's PREFLIGHT_TTL_SECONDS: a baseline older than the
 # CLEAR it rides on describes a world the deploy will not land in.
@@ -900,6 +929,8 @@ def _write_receipt(args, report, verdict, reason, live_commit) -> None:
             # todo #784: which *_LIVE_MECHANISMS transition this deploy carries and the receipt that scored it
             # (or the waiver), so a later reader can see what the guard let through.
             "outcome_gate": report.get("outcome_gate"),
+            # lane betting-change-windows: what the deployer declared, and any recorded exception.
+            "betting_window": report.get("betting_window"),
         }
         (RECEIPT_DIR / f"{args.service}.json").write_text(
             json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -945,6 +976,11 @@ def main() -> int:
     parser.add_argument("--accept-outcome-regression", default="", metavar="REASON",
                         help="load a candidate whose outcome-gate receipt has WORSE cells anyway. "
                              "Recorded on the receipt with the cells it accepts.")
+    parser.add_argument("--betting-change", choices=("yes", "no"), default="",
+                        help="does this deploy load a live-betting change? yes is refused outside a betting-change "
+                             "window (.syndicate/betting_change_windows.md) unless --outside-window")
+    parser.add_argument("--outside-window", default="", metavar="REASON",
+                        help="a betting change outside a window: revert | risk reduction | broken money path, and why")
     parser.add_argument("--max-sample-age-seconds", type=int, default=DEFAULT_MAX_SAMPLE_AGE_SECONDS)
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
@@ -1182,6 +1218,14 @@ def main() -> int:
             changes, read_error, True, gate_dir, now.timestamp(),
             args.no_outcome_gate, args.accept_outcome_regression)
     report["outcome_gate"] = {**outcome_detail, "problem": outcome_issue} if outcome_detail else None
+    try:
+        window_issue, window_detail = betting_window_problem(args.betting_change, args.outside_window,
+                                                             datetime.now(timezone.utc))
+    except Exception as exc:  # noqa: BLE001 -- an unreadable schedule refuses a declared betting change
+        window_issue = (f"betting-change window schedule unreadable ({type(exc).__name__}: {exc})"
+                        if args.betting_change == "yes" else None)
+        window_detail = {"betting_change": args.betting_change or "undeclared", "error": str(exc)}
+    report["betting_window"] = {**window_detail, "problem": window_issue}
 
     stale = True if is_cron else (age is None or age > args.max_sample_age_seconds)
     if off_main:
@@ -1259,6 +1303,11 @@ def main() -> int:
                   + ". The gate replays this season's completed games on both values and scores them against the "
                     "finals (scripts/live_mechanism_outcome_gate.py, run on the fleet). For an urgent revert or a "
                     'league it cannot replay, --no-outcome-gate "<reason>".')
+    elif window_issue:
+        verdict, code = "OUTSIDE_WINDOW", EXIT_OUTSIDE_WINDOW
+        reason = (window_issue + ". Betting changes load only in scheduled windows "
+                  "(.syndicate/betting_change_windows.md; user 2026-11-18). Queue it: land it default-off or keep it "
+                  "on its branch until the window.")
     elif expectation_issue:
         # LAST BEFORE CLEAR, deliberately. Every verdict above means "do not deploy
         # now" for a reason the operator cannot write away; this one is fixed by
@@ -1278,7 +1327,11 @@ def main() -> int:
         ) + (
             "; EXPECTATION WAIVED: " + str(expectation_detail.get("no_expectation_reason"))
             if expectation_detail.get("no_expectation_reason") else ""
-        ) + _outcome_gate_clear_note(outcome_detail)
+        ) + _outcome_gate_clear_note(outcome_detail) + (
+            "; BETTING CHANGE OUTSIDE A WINDOW, EXCEPTION: " + str(window_detail.get("outside_window_reason"))
+            if window_detail.get("betting_change") == "yes" and not window_detail.get("in_window")
+            and window_detail.get("outside_window_reason") else ""
+        )
     report["verdict"] = verdict
     report["reason"] = reason
     _write_receipt(args, report, verdict, reason, live_commit)
