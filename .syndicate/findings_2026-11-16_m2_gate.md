@@ -939,3 +939,23 @@ def main():
 if __name__ == "__main__":
     sys.exit(main())
 ```
+
+
+## Context for the 11-24 read: the live re-sims changed inside the windows (filed 2026-11-18 10:39 AM CST, before the read; the rule is unchanged)
+
+The live expert reads what the live re-sims publish, and they changed on the fleet inside both of M2's windows (train
+11-09..11-14, test 11-15..11-22). So M2's fit applies weights learned on one set of re-sims to opinions from a later
+set: a harder test, not an invalid one. Nothing in the rule changes; this is filed before the read so the result is
+read with it. The full timeline, and how each load was found: `.syndicate/findings_2026-11-17_m3_paper_book.md`, Addendum 5.
+
+- **NBA:** the closing-line margin anchor (`68fbb8eeb`) loaded about 11-14 9:37 AM CST. Of the train window only
+  11-14's games ran anchored; every test night does. The test window also has the starter-exit refusals (loaded
+  11-15 12:25 PM and 11-16 12:15 PM). Earlier train-window changes: the canonical player key (11-09), re-simming past
+  midnight (11-10), recording P(overtime) (11-11).
+- **NCAAF:** in the train window the only change was display-only (segment blocks, 11-11). The test window adds the
+  QB-exit refusals (11-15 12:24 PM and 7:28 PM), the `#808` end-of-half switches (11-16 10:29 AM, all default OFF) and
+  an MLB edit to the shared exit-gate file (11-17 9:47 AM).
+- **NFL:** the test window adds the QB-exit refusals (11-15), the `#808` switches and the real timeouts left
+  (11-16 10:29 AM), the drive in progress and ESPN's timeouts carried in (11-17 9:47 AM), and per-game seeding
+  (11-18 2:03 AM).
+- These are role loads, not commit times. NBA before 11-14 10:29 AM is approximate (see the addendum).

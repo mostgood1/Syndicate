@@ -540,3 +540,95 @@ if __name__ == "__main__":
     it. If disabling is refused, the entry says "needs the user".
   - Nothing else in the prompt, and nothing in the runner, kit or code, changed.
 - Checked: the task's stored body equals `m3_kit/task_prompt_nightly.md` byte for byte.
+
+
+## Addendum 5: which live re-sim each bet came from, registered 2026-11-18 10:39 AM CST (before any M3 slate's data is read)
+
+- **User:** "Yes, do it", answering "Build the re-sim change timeline and register it in M3 before its first slate?".
+- **Why.** The live expert reads what the live re-sims publish. Other lanes change those re-sims almost daily, and an
+  evidence row does not record the code that wrote it. M3 freezes M2's weights for up to ten weeks, so without a record
+  no result could say which re-sim it measured.
+- **What it adds. Report-only:** the gate, its looks and boundaries, the HARM and NOT_A_VERDICT rules, the counts that
+  trigger a look, and every pinned M3 file are unchanged.
+  1. Every morning, before the runner, the nightly task captures the fleet's role starts and checkout moves and
+     rebuilds the per-sport version timeline. It is read-only and reads no M3 result. The role logs rotate in about
+     four days, which is why it runs every morning.
+  2. On a look morning only, after the verdict is written, one line per (sport, version): arm A1's bets, games,
+     unmarked, mean mark-out and game-clustered z (the gate's own `clustered_z`), with A2 beside it. These lines change
+     no verdict; the user reads them with it.
+  3. From 11-24 on, each newly loaded re-sim version gets one log line (`M3_EPOCH_NEW`), so a change to what M3
+     measures is never silent.
+- **How a version is found** (`m3_kit/epochs/m3_epochs.py`):
+  - The role that runs each re-sim: NBA in the live-odds-worker (its own loop, in-thread); NCAAF and NFL in the
+    refresh-worker (`_run_ncaaf_live_resim_tick`, `_run_nfl_live_resim_tick`). NHL live is never eligible
+    (Amendment 1).
+  - A role runs the checkout HEAD as it stood when the role last started. Starts come from each role log's
+    `==== start` line, the refresh-worker's exit records (+5 s) and each `up`'s bootstrap stamp. HEAD comes from the
+    fleet checkout's reflog.
+  - A new version begins at a start whose HEAD changed the code of the sport's re-sim files: its module, the engine it
+    simulates with and the shared helpers it imports. Comment- and docstring-only edits do not count (the files' ASTs
+    are compared). For `scripts/run_refresh_worker.py` and two shared NBA helpers, only the named functions count.
+- **Limits:**
+  - Env-only changes are not detected; `deploys.md` records them. The env backups dated inside 11-08..11-18 are
+    labelled for NCAAB (11-09, 11-10), the board split and NHL props (11-18).
+  - NBA before 11-14 10:29 AM CST is approximate. Those live-odds-worker logs have rotated away, so a checkout move is
+    taken as loaded at once. The worker also recycles itself about every 6 h, so the true load can be up to ~6 h later.
+  - The file lists are deliberately wide. A version can begin at a change that alters nothing in practice (a
+    default-OFF switch, or another sport's refusal in a shared file); each version lists its commits.
+- **Pins** (sha256):
+  - `m3_kit/epochs/m3_epochs.py` `b5209d5a6dcb0fe722a9d97a0210b4b2b09858c95d98999de91ea6beb6332ccf`
+  - `m3_kit/epochs/run_epochs.sh` `508361e8858789f36880bf5257a7e1b78efe8026723415ad90d99e843d201c4e`
+  - `m3_kit/epochs/run_report.sh` `c453547bc49503b002ab3de13d572674deb380c6b6a5585c28c2292dfbb2fe4c`
+  - The nightly task's prompt is now `d4c8e87a7fb9449da008504451b9d77a70829654fcf40cecc4cd08e50cfd9d15`, replacing `670796f2b32eebe9...` (the old text is kept as
+    `m3_kit/task_prompt_nightly_670796f2.md`). It adds the morning capture (step 2), the look report (step 4) and the
+    `M3_EPOCH_NEW` log line, and checks the three pins above; a mismatch there skips only the epoch steps. Nothing else
+    in the prompt changed, and nothing in the runner, the kit's M3 files or the M3 code.
+  - Checked: the task's stored body equals `m3_kit/task_prompt_nightly.md` byte for byte.
+- **Checked on dev data, NOT the gate:**
+  - On the 11-14 rehearsal bets the report reproduces the rehearsal exactly: A1 416 bets / 54 games, mean -0.0330,
+    z -5.33; A2 -0.0241, z -5.10.
+  - Synthetic bets at 11-13, 11-16 and 11-17 were tagged `nba-E4`, `nba-E8` and `nfl-E5`, the versions loaded then.
+  - Capture and timeline together take 47 s.
+
+### The timeline, 11-08..11-18
+
+Built 11-18 10:34 AM CST (`m3_kit/epochs/timeline.json`). A version is the re-sim code a role ran from one load to the next code-changing load.
+
+**NBA** (runs in the live-odds-worker; its starts are logged from 11-14 10:29 AM CST; before that, a checkout move is taken as loaded at once and marked approx (the worker also recycles itself about every 6 h)):
+
+| version | from (CST) | fleet SHA | how it loaded | the code changes that started it |
+|---|---|---|---|---|
+| `nba-E0` | 11-07 6:00 PM | `af4244afd` | window start (approx) | (the window's starting code) |
+| `nba-E1` | 11-08 11:22 AM | `a3d72c82b` | ff-assumed (approx) | a3d72c82b nba live props (#762 (6)): a market the books pull mid-game keeps a DISPLAY-ONLY Live proj. / Live actual |
+| `nba-E2` | 11-09 8:00 AM | `e2558013c` | ff-assumed (approx) | e2558013c #762 (7): one player, one key -- the NBA live re-sim and the board join use the engine's canonical player name |
+| `nba-E3` | 11-10 12:04 PM | `eeb2461c7` | ff-assumed (approx) | eeb2461c7 nba live re-sim: keep re-simming a game still live at midnight Central (#776) |
+| `nba-E4` | 11-11 5:39 PM | `837320ab5` | ff-assumed (approx) | 837320ab5 nba live re-sim: record its own P(overtime) per lane and in live_resim_history (#789); #788's overtime miss wa |
+| `nba-E5` | 11-14 9:37 AM | `fee389971` | ff-assumed (approx) | 68fbb8eeb nba live_resim: anchor the live full-game margin to the closing line, as college does; the join prices an anch |
+| `nba-E6` | 11-15 12:25 PM | `f6f1ad93a` | rolelog | 7a5f4d09e live-player-exit-gate: live_player_status -- who has left a live game, from the ESPN summary feed<br>11ecd2bbf live-player-exit-gate: NFL live re-sim refuses a game whose QB has left it (key_player_out) + WNBA ejection pl |
+| `nba-E7` | 11-15 7:44 PM | `db2af02ab` | rolelog | 60188bad1 live-player-exit-gate: NCAAF -- a live QB exit refuses the game key_player_out, and in-play entries hold on it<br>db2af02ab live-player-exit-gate: football detector catches a QB who leaves with NO injury line -- once another passer ta |
+| `nba-E8` | 11-16 12:15 PM | `a39058946` | rolelog | 2c39a3043 live-player-exit-gate: NBA -- a starter gone mid-game (ejection / foul-out / in-game injury) refuses the live <br>09925a4b1 live-player-exit-gate: NBA -- a foul-out the engine already models is PRICED, not refused (user 11-16 "No, kee |
+| `nba-E9` | 11-17 12:13 PM | `92ae7490a` | rolelog | f668eb6b9 live-player-exit-gate: MLB -- a starter out for injury or ejection refuses the game's live lines (todo 814) |
+| `nba-E10` | 11-17 3:53 PM | `91d865fd5` | rolelog | cc90fb653 render-config-retirement step 2: every service-marker reader prefers a neutral SYNDICATE_* name; the launcher  |
+
+**NCAAF** (runs in the refresh-worker; its starts are logged from 11-10 11:13 PM CST; before that, from its exit records and each `up`):
+
+| version | from (CST) | fleet SHA | how it loaded | the code changes that started it |
+|---|---|---|---|---|
+| `ncaaf-E0` | 11-07 6:00 PM | `af4244afd` | window start (approx) | (the window's starting code) |
+| `ncaaf-E1` | 11-11 12:45 PM | `b43236e17` | rolelog | b43236e17 ncaaf live: segment blocks (h1 h2 q1-q4) for the board's Live column, display only (todo #785) |
+| `ncaaf-E2` | 11-15 12:24 PM | `32ccf391b` | rolelog | 7a5f4d09e live-player-exit-gate: live_player_status -- who has left a live game, from the ESPN summary feed<br>11ecd2bbf live-player-exit-gate: NFL live re-sim refuses a game whose QB has left it (key_player_out) + WNBA ejection pl |
+| `ncaaf-E3` | 11-15 7:28 PM | `db2af02ab` | rolelog | 60188bad1 live-player-exit-gate: NCAAF -- a live QB exit refuses the game key_player_out, and in-play entries hold on it<br>db2af02ab live-player-exit-gate: football detector catches a QB who leaves with NO injury line -- once another passer ta |
+| `ncaaf-E4` | 11-16 10:29 AM | `a39058946` | rolelog | 2c39a3043 live-player-exit-gate: NBA -- a starter gone mid-game (ejection / foul-out / in-game injury) refuses the live <br>38e237e6d smartsim2: the end-of-half fix mechanism (todo #808), every new switch default OFF and byte-identical<br>6c5f8633b smartsim2: #808 v2 end-of-half mechanism -- kneel-out, timeouts and spikes by need, Q4 kick timing, quarter-ke<br>5ddfdd86e smartsim2: #808 v3 -- kneel_out_q4_only, the kneel-out in Q4 only (default OFF, inert without the kneel-out) |
+| `ncaaf-E5` | 11-17 9:47 AM | `17ff69398` | rolelog | f668eb6b9 live-player-exit-gate: MLB -- a starter out for injury or ejection refuses the game's live lines (todo 814) |
+
+**NFL** (runs in the refresh-worker; its starts are logged from 11-10 11:13 PM CST; before that, from its exit records and each `up`):
+
+| version | from (CST) | fleet SHA | how it loaded | the code changes that started it |
+|---|---|---|---|---|
+| `nfl-E0` | 11-07 6:00 PM | `af4244afd` | window start (approx) | (the window's starting code) |
+| `nfl-E1` | 11-09 8:48 AM | `aa5f50ac5` | exit+5s | b2a5013e2 live NHL/NFL props: display-only box-score Live actual on the Layer 2 board |
+| `nfl-E2` | 11-15 12:24 PM | `32ccf391b` | rolelog | 7a5f4d09e live-player-exit-gate: live_player_status -- who has left a live game, from the ESPN summary feed<br>11ecd2bbf live-player-exit-gate: NFL live re-sim refuses a game whose QB has left it (key_player_out) + WNBA ejection pl |
+| `nfl-E3` | 11-15 7:28 PM | `db2af02ab` | rolelog | 60188bad1 live-player-exit-gate: NCAAF -- a live QB exit refuses the game key_player_out, and in-play entries hold on it<br>db2af02ab live-player-exit-gate: football detector catches a QB who leaves with NO injury line -- once another passer ta |
+| `nfl-E4` | 11-16 10:29 AM | `a39058946` | rolelog | 38e237e6d smartsim2: the end-of-half fix mechanism (todo #808), every new switch default OFF and byte-identical<br>6c5f8633b smartsim2: #808 v2 end-of-half mechanism -- kneel-out, timeouts and spikes by need, Q4 kick timing, quarter-ke<br>5ddfdd86e smartsim2: #808 v3 -- kneel_out_q4_only, the kneel-out in Q4 only (default OFF, inert without the kneel-out)<br>6f7cb9eb3 nfl live resim: take the real timeouts left from the live row (todo #808, lane nfl-live-timeouts) |
+| `nfl-E5` | 11-17 9:47 AM | `17ff69398` | rolelog | f668eb6b9 live-player-exit-gate: MLB -- a starter out for injury or ejection refuses the game's live lines (todo 814)<br>9049537d1 nfl live re-sim: carry the drive in progress from ESPN's situation (todo 813, lane nfl-live-possession-map; us<br>17ff69398 nfl live tick: carry ESPN's timeouts left (home_timeouts / away_timeouts, int 0-3 else None) for lane nfl-live |
+| `nfl-E6` | 11-18 2:03 AM | `3920a2d4d` | rolelog | ee47c930a nfl live re-sim: seed each game by its ESPN event id (todo 813 part 2) |
