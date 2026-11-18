@@ -837,3 +837,39 @@ No `as_of_in_future`. No user-seen timeout, no transport error.
 - 2e deploys.md headers since 6:57 PM CST: 01:08Z render_env/ deletion (no deploy), 01:08Z `923869cf3` deploy attempt ABORTED nothing loaded, 01:16Z operator ledger write (no deploy). No fleet load.
 
 - **ANOMALY:** an overlay warm took 82.0 s (1 of 32 over 60 s; 4 over 45 s). Check next: the web log's overlay-warm lines 01:05-01:37Z for which sport/date, and whether it coincided with a hard recycle (6 hard of 8) or the soccer build + two odds refreshes at load ~10.7 on 12 cores.
+
+## Reading 20 (8:05 PM CST)
+
+Probe 8:05-8:06 PM CST (02:05:29Z). Web window from 7:35 PM CST (01:35Z), 261 requests.
+
+**Ask:** 6 / 6 answered, 0 past the 45 s cut-off, median 11.61 s, max 16.45 s. A game was live (a `live_row` ask exists: Southern Miss Golden Eagles, NCAAB).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text (spread) | 11.28 | yes | bet_analysis | 2026-11-17T23:13:09Z | 0 |
+| free_text (Lakers vs Celtics) | 0.93 | yes | matchup_analysis | 2026-11-17T23:13:09Z | 0 |
+| free_text (top edges) | 11.61 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NCAAF WKU) | 16.45 | yes | bet_analysis | 2026-11-14 (date) | 3 |
+| pregame_prop (NBA Wagler) | 14.62 | yes | bet_analysis | 2026-11-18T00:33:24Z | 7 |
+| live_row (NCAAB) | 8.34 | yes | bet_analysis | 2026-11-18T01:30:49Z | 0 |
+
+No `as_of_in_future`. No user-seen timeout, no transport error. Page 200 in 0.18 s; shortlist 200 rows in 5.58 s.
+
+**Web (30 min):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 21 (17 hard), max anon 1082 MB vs 646.1 MB limit (Reading 19: 8, 6 hard). One gunicorn worker was 15 s old at the host read.
+- Overlay warms: 27, median 25.0 s, 18 over 20 s, 2 over 45 s, 2 over 60 s, max 82.0 s.
+- Over 20 s: 8 (`POST /api/intelligence/query` 4, `GET /api/board/game-chips` 2, `POST /api/syndicate/query` 2). Over 45 s: 0.
+- Asks from any client: 12, 0 over 45 s, 0 non-200; 0 not this probe's (all `Python-urllib/3.12`; 6 are Reading 19's probe at 01:35Z).
+
+**Host:** load 8.65 / 7.47 / 7.62 on 12 cores; MemAvailable 6767 MB. Top CPU: gunicorn web 108% ni 0 (15 s old) and 62% ni 0; refresh-worker 92% ni 0 (3.9 GB RSS); live-odds-worker 69% ni 0; m2gate_kit `launch.py learner run` 51% ni 19 (not this probe's); live_resim_workers x2 47% ni 5; out790_chips_prof 18% ni 19.
+
+**Engine:**
+- 2a F2: 1 run total (16:30-17:17Z, "did NOT PASS"), the one already on main `c765eec64`; no newer run.
+- 2b `engine-learner-m2-gate-read-1124`: enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c `m2_gate.py` sha256 `c1a2c029c2a1816f...`: matches Amendment 2.
+- 2d engine-file commits on origin/main in the last 40 min: none.
+- 2e deploys.md headers since 7:27 PM CST: 01:46:27Z (7:46 PM CST) web load of `3920a2d4d`, the loop-stall black box (lane `web-silent-worker-kills`). A fleet load; web instrumentation, not live pricing.
+
+- **ANOMALY:** 2 overlay warms over 60 s (max 82.0 s, 2 of 27). Check next: the web log's overlay-warm lines 01:35-02:06Z for sport/date, and whether they sit beside the hard recycles.
+- **ANOMALY:** new fleet load at 7:46 PM CST: web `3920a2d4d` (loop-stall black box). Check next: its deploys.md `verify:` reading, and whether the recycle jump (8 -> 21, 17 hard) follows the reload or predates it.
