@@ -1445,6 +1445,14 @@ death, never life — do not invert it.
 - Verification: Read-only fleet reading of live_resim_history (~/syndicate-prod/data), games and draws counted; nothing on the fleet changed
 - Blocked by: none
 
+### nba-live-resim-total-anchor — OPEN — opened 2026-11-18 — session 7a9aef07-117a-4dfa-96b8-b401885c91ed
+- Goal: todo #834: the NBA live re-sim's full-game total, traced file:line from the pregame engine inputs to the lane's projection.total, gets a default-off fix whose off != on is shown by a test; on the dev slates 11-09..11-14 (C:/tmp/elp/engine_read totals_ladder.py + ladder_analysis.py, same rows) the fixed re-sim's 0-25% gap to Kalshi's ladder total is within +/-0.5 pts (today +1.78, se 0.40). No deploy, no restart, no fleet write.
+- Files: syndicate/features/nba/live_resim.py (a new total-anchor section after the margin anchor, _anchor_lane_fields, and the tick's one call next to apply_margin_anchor ONLY), tests/test_nba_live_total_anchor.py (NEW), scripts/replay_nba_live_total_anchor.py (NEW), .syndicate/findings_2026-11-18_nba_live_total_anchor.md (NEW), docs/ai_context/todo.md (#834 section only)
+- Hypothesis: Stated 2026-11-18 before any artifact is read: the live re-sim's total starts high because its pregame target total is only pulled 70% of the way to the market (basketball_props_smart_sim.py _apply_market_anchor_local, total_w 0.7), so a raw model total above the market leaves ~30% of that gap in target_home_points + target_away_points, which the live resume reuses; secondary terms are engine output vs target and overtime points (#763). Prediction: on the dev slates' pregame smart_sim artifacts, mean(score.total_mean - Kalshi pregame total) is about +2 and most of it is (anchored_total - market_total).
+- Falsification test: If mean(anchored_total - market_total) over the dev games is within +/-0.5 pts while the live-vs-Kalshi gap stays ~+1.8, the pre-sim anchor weight is EXONERATED and the cause is downstream (q-bias, engine drift, OT, or the market_total itself vs Kalshi).
+- Verification: Decomposition table per game (Kalshi pregame mu0_K, market_total, model_total_raw, anchored_total, quarter target sum, engine score.total_mean, live tip proj.total); a reachability test (switch off = byte-identical lane, on = shifted); the two engine-read scripts re-run with the fix applied to the same evidence rows: 0-25% gap within +/-0.5 pts, every bucket reported with se.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
