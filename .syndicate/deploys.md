@@ -61973,6 +61973,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
     - Read as the exited worker's file, held until the master reaped and respawned (4.7 s), not a stall of the serving worker 268065. Believed, not proven: the sampler does not record a pid per inode.
     - Hour 20Z: max heartbeat age 4.0 s, 4 gaps >= 3 s.
   - **Owed:** the 11-19 full-day count (UTC day) against 11-18's 24 before the load.
+- **reading 2, 2026-11-18 22:11:41Z (4:11 PM CST): the `hard_deferred_s` < ~35 prediction was WRONG for 1 of 2 holds** (scratchpad `wsk_day.py`, `wsk_q4.sh`):
+  - 22:01:06.089Z pid 268195 hard-recycled; 0.6 s later pid 268065 (955.8 MB, limit 646.5) was held. Both had reached their 10th request in the same burst (`GROWTH_EPISODE` +615 MB in 530 s).
+  - 268065 went at 22:06:46.325Z on request 13: `hard_deferred_s` **339.6**. Requests 11-12 came inside the 30 s window, and its next request was 5 min 10 s later.
+  - Why: a held worker leaves on its next request, and at this traffic each worker sees an app request only every few minutes (253224: 11 requests in 2,889 s).
+  - Harm: none seen. Its anon grew 2.7 MB over the hold (955.8 -> 958.5 MB; the emergency line was 1,396.5). It drained in 5.1 s with 0 abandoned, its replacement booted 22:06:57.7Z, and there was no `WORKER TIMEOUT`. The heartbeat sampler's max age in the window was 4.0 s.
+  - Not changed: memory grows on requests, and every request while held re-checks. A timer release is the lever if a held worker is ever seen growing toward the emergency line between requests.
+  - Since the load (19:14:22-22:11:41Z): 12 recycles, 0 doubles < 30 s, 2 holds (held 31.0 s and 339.6 s), 0 `WORKER TIMEOUT`, respawn max 8.3 s.
 ## 2026-11-18 20:22Z (2:22 PM CST) -- READING (no deploy by this lane): the soccer Understat outage guard's NAMING half `5a7cc60d2` (todo #841, lane `understat-fetch-failures`; user "Load it now" to "Load the naming half on the fleet now (ff to 5a7cc60d2, betting change no)?") reached the fleet as a ride-along of lane `web-silent-worker-kills`'s ff `640c6d4fd` -> `db6a395ed` at 19:14:22Z (BC-051) -- **P1 MET 52 of 52, P2 MET, P3 MET, P5 MET; P4 (recovery) owed**
 - betting change: **no**. This entry loads nothing; the load is BC-051 (`no`), which lists this guard as a ride-along.
   - Naming sends the same requests and writes the same bytes as OFF under 7 responses x 2 kinds (`tests/test_understat_fetch.py`, 46 of 46).

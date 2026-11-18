@@ -205,5 +205,13 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
   - Since the load: 0 doubles under 30 s in 10 recycles (~2.9 expected at 11-18's pre-load rate, P(0) ~ 0.06). Also
     0 WORKER TIMEOUT, 0 dumps, 0 guard errors.
   - Still owed: the 11-19 full-day count.
+- Reading 2, 22:11Z (4:11 PM CST): the second hold lasted 339.6 s, not < ~35 s as predicted.
+  - 22:01:06Z both workers crossed the hard line in one burst, 0.6 s apart. 268195 went; 268065 was held.
+  - A held worker leaves on its next request, and 268065's next came 5 min 10 s later. Each worker here sees an app
+    request only every few minutes.
+  - Harmless as seen: +2.7 MB over the hold, a drain with 0 abandoned, no WORKER TIMEOUT.
+  - Since the load: 0 doubles under 30 s in 12 recycles.
+- The day counter for the owed reading is scratchpad `wsk_day.py` / `wsk_day.sh`. Its `silent_kills` counts 5 on 11-17:
+  the lane's 4 plus 16:13:23Z, the self-inflicted `/api/portfolio/paper` GET named above.
 - Correction: the lane status said the widening happened at "19:30Z". The fleet clock read 19:13:44Z at the baseline, so it
   was ~19:05Z.
