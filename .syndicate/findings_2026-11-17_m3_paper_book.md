@@ -222,3 +222,59 @@ Each recommendation below was adopted; the alternative beside it was not.
 - The recorder log's DONE lines, which say only that a night finished.
 - **Nothing from M2's test window (11-15..11-22):** no learner output, close, outcome or Kalshi quote of those
   slates.
+
+## Build and dev rehearsal, 2026-11-17 6:11 PM CST (dev slates 11-13 / 11-14: NOT the gate)
+
+**Built** on local branch `engine-paper-m3`, commit `46439b912` (`refs/keep/engine-paper-m3-46439b912`). It is NOT on main; pushing
+it needs the user's yes. Files:
+- `syndicate/features/shared/engine_paper_m3.py`: the rule's mechanics, pure;
+- `scripts/engine_paper_m3.py`: `save-fit`, `check-fit`, `replay`, `gate`;
+- `tests/test_engine_paper_m3.py`: 21 tests, plus the experts' shadow guard (22 passed);
+- `docs/ai_context/engine_paper_m3.md`: the pipeline trace.
+
+Kit `C:\tmp\elp\m3_kit`:
+- `code/` is the M2 kit's export of `981ef14f6`. With CR stripped, its learner, experts, resolver and fee files equal
+  `981ef14f6`'s blobs.
+- It adds the two M3 files (blobs `5efd781ef584`, `39e1b5ff8358`, equal to `46439b912`'s) and `m3_launch.py`.
+- The hash addendum goes on main before the first M3 slate.
+
+**Constants the rule implied but did not number** (each one can only refuse a bet):
+- the frame check needs at least 20 line-instants, compares a standing quote no more than 60 s old, and treats a tie
+  as unverified;
+- settlement is the first non-active quote after the market's LAST active one.
+
+**The dev rehearsal** (`m3_kit/rehearse.sh`, on the fleet at nice 19; every line REHEARSAL):
+- **Fit precondition:** `save-fit` re-ran the dev learner (11-09..11-14, test from 11-13, outcome) through the
+  wrapper. `check-fit`: the re-run's weight table equals the dev run's (622 rows), and the saved fit (1,058
+  parameters) reproduces it.
+- **Dev M2 verdict:** PASS on `ncaaf|spreads|live|a<=60` and `ncaaf|totals|live|a<=60`.
+- **11-13:** 1,158 NCAAF line-instants and 0 eligible: 887 had a prior older than 60 s, 241 were not in a PASS
+  stratum, 30 were not full-game.
+- **11-14:** 34,281 line-instants and 9,991 eligible.
+  - Kalshi markets placed: 2,893. Another 1,652 belong to games our ledger does not carry.
+  - Frame check ok: spreads over 2,825 lines, median |book - Kalshi| 0.027 chosen vs 0.040 flipped; totals over 1,208
+    lines, 0.027 vs 0.040. On the 33 bets priced away from 50/50: 0.057 vs 0.476.
+  - A1: 416 bets in 54 games. Refused: 4,347 lines with no Kalshi market at that exact line, 2,956 below the floor,
+    1,636 with no quote in the entry window.
+  - A2: 709 bets.
+  - Entry lag p10 / p50 / p90: 12 / 23 / 48 s.
+- **A forced L1 on dev** (dev never reaches 400 bets / 100 games; this is 416 / 54):
+  - **A1's mean mark-out is -3.30c per contract, z -5.33: FAIL, with HARM in both NCAAF strata.** That is the fee
+    -1.67c, the half-spread -0.76c, and the mid's move by +300 s -0.86c.
+  - A2 (reported): -2.41c, z -5.10. Fee -1.62c, half-spread -1.04c, move +0.25c.
+- **Settlement ROI on dev** (not read by the gate unless a mark-out passes): A1 +2.4% per contract (95% CI -17% to
+  +22%); A2 -2.4% (-17% to +12%). On one Saturday that is noise.
+- **Reading.** On this one dev Saturday, NCAAF's live learner adjustment does not move Kalshi's price its way within 5
+  minutes. In M2's dev run it beat the books' fresh price as a forecast; Kalshi has already priced it. This is one slate
+  of 54 games next to the train window, not the gate. Nothing of M2's test window was read.
+
+**Risk found: gaps in the recorder.**
+- The recorder writes a row on every poll. But it takes its tickers from the fleet's Kalshi capture file
+  (`inplay_recorder.kalshi_tickers`, re-read every 600 s), and that file was at its 8,000-market budget on 11-14.
+  So markets drop out of polling for minutes at a time.
+- On 11-14, 36 of A1's 416 bets (8.7%) had no mark:
+  - of both arms' 101 unmarked bets, 72 had their next quote 13 to 80 minutes later;
+  - 29 had a quote in the window that was not two-sided.
+- More than 10% unmarked at a look is `NOT_A_VERDICT`.
+- A fix belongs in lane `in-game-trading`'s recorder (its tickers taken from Kalshi's events directly). That needs a
+  loan and the user's decision.
