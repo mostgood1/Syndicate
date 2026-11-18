@@ -619,3 +619,14 @@ One pass over every portfolio route, before any probe existed:
 - **Register:** the 23:46Z "DEPLOY ATTEMPT ABORTED, NOTHING LOADED" entry (lane `ncaaf-grid-build-speed`) was a
   heuristic false positive; classified `no` (BC row added). 1 unclassified load remains (16:17Z NFL rebuild,
   with its lane).
+
+## The late NHL bet GRADED (user "fix the late NHL bet", ~7:05 PM CST)
+
+- `a2c3f0c0` (Utah +1.5 as NO on `KXNHLSPREAD-26NOV16VANUTA-VAN2`) was graded at 01:16:32Z 11-18 by the existing
+  `scripts/kalshi_operator_grade.py`, the documented exit for `both_sides_held`. Outcome **won**, pnl **+1.2971**
+  (own fill: 4 x 0.34 - 0.0629 fee), `settled_by` venue; evidence, note and the prior fields are kept on the row.
+- **Verified:** `/api/portfolio/live` row won +1.2971; late settlements 0 (was 1 at every reading today).
+  deploys.md 01:16:32Z.
+- **The cause stays:** another client trades on the same Kalshi account (357 foreign-client orders in
+  `RECONCILE_ORPHANS`). Any market where both hold positions makes `grade_kalshi_settlement` refuse
+  `both_sides_held`. The score grader takes over after 24 h; this tool is the faster exit.

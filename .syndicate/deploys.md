@@ -61423,3 +61423,9 @@ Lane `render-config-retirement` (session 267d8859).
   - Seen, not mine: refresh-worker runs `25fc2e4f`, while HEAD is `64daca46` (STALE, 15 runtime files).
 - **verify:** `ls -d ~/syndicate-prod/render_env` -> "No such file or directory"; `status` (venv) shows all three roles `up`.
 - **betting change: no** (no code or env loaded; the launcher reads `fleet_env/`).
+
+## 2026-11-18 01:16:32Z (7:16 PM CST 11-17) -- OPERATOR LEDGER WRITE (no deploy): late NHL bet `a2c3f0c0` graded from Kalshi's settled result (lane `portfolio-monitor`, user "fix the late NHL bet")
+- betting change: no (one ungraded historical row graded, 11-16 slate; nothing that places, sizes, holds or exits a bet).
+- **why:** `KXNHLSPREAD-26NOV16VANUTA-VAN2`, our 4 NO filled at 0.66. Kalshi finalized `market_result=no` (settlement 2026-11-17T05:21:19Z), so our leg won. The venue grader refused `both_sides_held`: the settlement row also carries `yes_count_fp 66.46` from a foreign client on the same account, not in our ledger. The row sat ungraded 22 h.
+- **what:** `scripts/kalshi_operator_grade.py --key a2c3f0c01a95057b886169bd`, run on main (worktree) against the fleet store with the live-odds-worker env, nice 19. The dry run passed every check (live, kalshi, filled, ungraded; settlement holds our leg 4.00; venue grader refuses `both_sides_held`). `--apply` went through `operator_grade_from_venue`: outcome `won`, pnl **+1.2971** = 4 x (1 - 0.66) - fee 0.0629 (own-fill basis; the venue's net revenue 0 nets the foreign YES), `settled_by` venue. Evidence, note and `pre_operator_grade` are kept on the row. One CAS write: `OPERATOR_GRADE ... outcome=won pnl=1.2971`.
+- **verify -- MET (01:17Z):** `/api/portfolio/live?on=all`: the row reads filled / won / +1.2971 / settled_by venue / graded_at 01:16:32Z; filled live bets unsettled > 8 h after start: **0** (was 1 all day); unreconciled 0.
