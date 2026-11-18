@@ -222,3 +222,18 @@ our side (over, or home covers at the live join's line).
 - Live full-game lines only: no pregame, no segments, no props.
 - An outcome is one draw per game, so a single game's row is an example, not evidence.
 - Re-run on 11-09..11-22 once M2's 11-24 read frees those slates.
+
+## NHL outcome label: checked 2026-11-17 8:42 PM CST -- correct; the shared intercept is the games
+
+The user asked for it ("Yes, check it"). Script: `C:\tmp\elp\engine_read\nhl_label_check.py` (dev slates only;
+rows in `nhl_label_check.json`).
+
+- **Our label equals Kalshi's own settlement on every dev NHL line: 86 of 86** (30 moneylines, 56 puck lines; 0
+  disagreements, 0 unsettled). Our label is the learner's truth: the board's final-score chips. Kalshi's is the
+  recorder's `res` for the same market, placed by M3's index in the live join's frame.
+- **"Home" is the home team.** On all 30 moneylines, the market we trade as "home" ends with the SECOND code of
+  Kalshi's event ticker, and Kalshi writes away then home (for example `KXNHLGAME-26NOV09NYISJ-SJ`, Islanders at
+  Sharks).
+- **So the -1.45 intercept that Kalshi and the re-sim share is the outcomes themselves.** Home teams won 7 of these 30
+  dev games (23%), far below the ~54% both prices expect. It is a 30-game sample effect, not a defect. NHL's rows in
+  this read are noise-dominated at this size, and nothing in the labels needs fixing.
