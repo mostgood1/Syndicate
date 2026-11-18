@@ -681,3 +681,29 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - What remains is (1) **the trigger itself**: require the price gap to persist or the consensus to be fresh,
     tested on paper; and (2) **exposure while no edge is shown**: stakes at the measurement minimum. Both are betting
     changes and the user's call.
+
+## Reading 42 — Wed 11-18 12:47 PM CST (18:47Z), window 60 min
+
+- **Results first.** No new grades: 30 d -7.35% [-12.8, -1.9], fee-net CLV -0.36 pp. Today's 45 orders settle from the
+  evening.
+- **Optimization state:**
+  - the betting-change windows are in force (first window Tue 11-24);
+  - the program is on main (`plan_2026-11-18_profit_learning_program.md`);
+  - S1 (freshness / adverse selection) is next;
+  - live stakes at the measurement minimum is waiting on the user.
+- **NEW anomalies: `books` 11.70 s (budget 2) and `live_today` 4.39 s (budget 3).**
+  - *Hypothesis, written first:* F14-type contention or a recycle drain in the same web worker.
+  - **Confirmed, recycle form:** **both web workers were hard-recycled within 2 s**:
+    - pid 209505, 971 MB vs a 641 MB limit, after only 5 requests, at 18:48:01.6Z;
+    - pid 206403, 994 MB, 10 requests, at 18:48:03.3Z.
+  - Each drained with one accepted-but-unread request, and no worker served until 214265 booted at 18:48:09Z.
+  - The portfolio endpoint is the victim again. Added to F14 and sent to lane `web-silent-worker-kills`.
+- **1 unclassified load:** the soccer odds-lane ff `59fbefc71 -> 640c6d4fd` at 17:58:30Z (#840, lane
+  `soccer-pregame-odds-lane`). That is 90 s before the window rule took effect, so it is not a violation. Its lane owes
+  the classification.
+- **Health otherwise:**
+  - plan 8.6 min old;
+  - 16 live ticks, 1 placed, 0 failed;
+  - orders today 45 (43 filled, 2 resting: a maker post at 721 min and a fresh one at 4.9 min);
+  - unreconciled 1, inside the grace;
+  - cap use 16.7% / 16.1%.
