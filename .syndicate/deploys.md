@@ -61403,3 +61403,23 @@ Lane `render-config-retirement` (session 267d8859).
   1. **At the next refresh-worker restart:** `WNBA_BOXSCORES_COUNT_SKIPPED date=<today|yesterday> reason=schedule_has_no_games` in refresh-worker.log, and 0 `final_player_boxscore` for those dates in web.log after it (`C:\tmp\wnba_boxpoll\baseline829.sh <since>`).
   2. **08:14-08:58Z 11-18, the nightly suite (`ci-checkout` follows main):** 0 `final_player_boxscore` for June/September dates. It was ~76 a night.
   3. **Recycles**, once both halves are loaded: `measure.py 2026-11-18T19:51:31 2026-11-18T21:52:41` against 11-17's 224/386, 10.46/h, 18.4 requests/recycle. It is confounded by #828 (web memory per query), so name that in the reading.
+
+## 2026-11-18 01:08:30Z (7:08 PM CST 11-17) -- FLEET DATA DELETION (no deploy): `~/syndicate-prod/render_env/` deleted (todo #766 leftover; session 24d2e336; user "Yes, delete it" in that session, after the fleet-watcher relayed "yes, delete the render_env folder")
+- **what:** `rm -rf ~/syndicate-prod/render_env/`, Render's 2026-10-01 env import, kept as the rollback copy after the move to `fleet_env/` (`ac2cbc2fc`). It held 4 files: `web.json`, `refresh-worker.json`, `live-odds-worker.json` and `live-odds-worker.json.bak_nba_20261004T174221Z`.
+- **why safe:**
+  - The launcher on the fleet checkout (`64daca46f`) never opens `render_env/`.
+  - No process had a `render_env` path open. The one match was the check script itself, whose folder name contains "render_env".
+  - The fleet has run on `fleet_env/` through 2 clean starts (1:50 PM and 3:53 PM CST 11-17), plus the 5:25 PM CST `up`.
+- **backup precondition (my call, as the fleet-watcher asked):** met by the 11-16 11:31 AM CST secrets backup; I did not wait for tonight's.
+  - That backup's script (`c053671a2`) collected EVERY file in `render_env/`, the `.bak` included, plus `local_production.env`: 5 files.
+  - The vhdx-reclaim session verified it today: it decrypts, all 5 match, and `fleet_env/` equals what it converts to (88 / 182 / 148 keys).
+  - Nothing deleted exists only on the fleet.
+  - The 11-17 03:34 backup FAILED (C: full; a 0-byte `.partial` in OneDrive). Tonight's ~3:34 AM run will be the first to hold `fleet_env/`.
+- **reading:**
+  - `render_env: gone`;
+  - `fleet_env/` unchanged (3 files, 9650 / 11394 / 4734 B, mtime 11:24 11-17);
+  - venv `local_production.py status` at 01:09Z: web, refresh-worker and live-odds-worker `up`, `/healthz` 200.
+  - NOTE: run with Ubuntu's `python3`, `status` printed all three roles `DOWN` / "role env unreadable" while `ps` showed them alive (since 23:25Z). Use the venv python for `status`.
+  - Seen, not mine: refresh-worker runs `25fc2e4f`, while HEAD is `64daca46` (STALE, 15 runtime files).
+- **verify:** `ls -d ~/syndicate-prod/render_env` -> "No such file or directory"; `status` (venv) shows all three roles `up`.
+- **betting change: no** (no code or env loaded; the launcher reads `fleet_env/`).
