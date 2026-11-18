@@ -95,8 +95,10 @@ def _write_csv(rows: list[dict], out_path: Path) -> None:
 
 
 #: The Understat outage marker's name. ONE file for the whole host, in the soccer
-#: data root (lane `understat-fetch-failures`): an outage is site-wide, so one
-#: league's failed probe answers for all five.
+#: data root (lane `understat-fetch-failures`): an outage is site-wide. By default
+#: it is a RECORD (state, down_since, probes); with
+#: `SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN` on (default off) it is also the gate that
+#: lets one league's failed probe answer for all five for an hour.
 UNDERSTAT_STATUS_FILENAME = "_understat_status.json"
 
 

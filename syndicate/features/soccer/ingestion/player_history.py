@@ -59,20 +59,34 @@ _UNDERSTAT_XHR_HEADERS = {**_USER_AGENT, "X-Requested-With": "XMLHttpRequest"}
 #
 # WHAT THE GUARD DOES, AND WHAT IT DOES NOT. It cannot make the site return
 # data, and it does not pretend to: a fetch that gets no data still FAILS.
-# It (a) names what came back -- `UnderstatUnavailable` with the reason,
-# status, content type, size and visible page text -- instead of a JSON decode
-# traceback; (b) stops the players path from asking the same host again for
-# the legacy page after `getLeagueData` was unavailable; (c) when given a
-# status file, records the outage there and, for `UNDERSTAT_OUTAGE_COOLDOWN_
-# SECONDS` after a failed probe, raises `UnderstatUnavailable("cooldown")`
-# WITHOUT a request. The first probe after the cooldown that gets JSON clears
-# it, so recovery needs no human.
+# TWO SWITCHES, because the two halves differ on one question -- can they
+# change what the sim reads (a betting change, `.syndicate/betting_change_
+# windows.md`)?
 #
-# Switch: ON unless `SYNDICATE_UNDERSTAT_OUTAGE_GUARD` is 0/false/off/no, and
-# OFF is today's code path exactly (the reachability test pins both).
+# 1. NAMING -- `SYNDICATE_UNDERSTAT_OUTAGE_GUARD`, ON unless 0/false/off/no.
+#    `UnderstatUnavailable` names what came back (reason, status, content
+#    type, size, visible page text) instead of a JSON decode traceback, and,
+#    when given a status file, the outage is recorded there (`probes` counts
+#    the failed requests). It sends EXACTLY the requests OFF sends, in the same
+#    order -- the players path still asks the legacy page -- and writes exactly
+#    the files OFF writes, so it cannot change a bet;
+#    `test_NAMING_writes_exactly_what_OFF_writes` pins that over every response.
+# 2. COOLDOWN -- `SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN`, OFF unless 1/true/on/yes
+#    (and only with naming on). For `UNDERSTAT_OUTAGE_COOLDOWN_SECONDS` after a
+#    failed probe every Understat fetch raises `UnderstatUnavailable("cooldown")`
+#    WITHOUT a request, and the players path stops asking the legacy page after
+#    an unavailable `getLeagueData`. ~990 requests a day become ~24, and a DNS /
+#    connect-timeout phase costs one probe instead of p50 324 s per run. But a
+#    refresh after recovery can lag OFF by up to the cooldown, and a legacy page
+#    that still carried `playersData` would go unread -- both can change the
+#    sim's inputs, so this half is DEFAULT-OFF and is switched on in a
+#    betting-change window (or on the user's classification).
+#
+# Both OFF is today's code path exactly (the reachability tests pin all three).
 # --------------------------------------------------------------------------
 
 UNDERSTAT_OUTAGE_GUARD_ENV = "SYNDICATE_UNDERSTAT_OUTAGE_GUARD"
+UNDERSTAT_OUTAGE_COOLDOWN_ENV = "SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN"
 #: After a failed probe, Understat steps exit without a request for this long.
 #: One probe an hour host-wide (~24 a day) against ~990 requests a day without it;
 #: on recovery the first refetch lags at most this, on a 1-day refresh cadence.
@@ -99,8 +113,16 @@ class UnderstatUnavailable(RuntimeError):
 
 
 def understat_outage_guard_enabled() -> bool:
+    """Naming half: ON unless switched off (absent = ON)."""
     raw = str(os.environ.get(UNDERSTAT_OUTAGE_GUARD_ENV) or "").strip().lower()
     return raw not in {"0", "false", "off", "no"}
+
+
+def understat_outage_cooldown_enabled() -> bool:
+    """Cooldown half: OFF unless switched on (absent = OFF), and never without
+    the naming half, whose marker it reads."""
+    raw = str(os.environ.get(UNDERSTAT_OUTAGE_COOLDOWN_ENV) or "").strip().lower()
+    return raw in {"1", "true", "on", "yes"} and understat_outage_guard_enabled()
 
 
 def _visible_text(html: str, limit: int = 80) -> str:
@@ -235,7 +257,8 @@ def _clock() -> float:
 
 def _guarded_league_data(url: str, *, timeout: int, status_path: Path | None) -> Any:
     now = _clock()
-    _raise_if_cooling_down(status_path, url, now)
+    if understat_outage_cooldown_enabled():
+        _raise_if_cooling_down(status_path, url, now)
     try:
         payload = _understat_get_json(url, timeout=timeout, headers=_UNDERSTAT_XHR_HEADERS)
     except UnderstatUnavailable as exc:
@@ -256,9 +279,10 @@ def fetch_understat_league_data(
     per-match history: xG, xGA, PPDA, deep entries), and ``dates``.
 
     With the outage guard on (the default), an outage raises
-    `UnderstatUnavailable`; ``status_path`` (the host-wide marker) adds the
-    cooldown. Guard off: the original request, ``raise_for_status`` and
-    ``response.json()``, and ``status_path`` is ignored."""
+    `UnderstatUnavailable` and is recorded in ``status_path`` (the host-wide
+    marker); the cooldown switch adds the no-request cooldown. Guard off: the
+    original request, ``raise_for_status`` and ``response.json()``, and
+    ``status_path`` is ignored."""
     league_key = UNDERSTAT_LEAGUES[str(league).strip().lower()]
     url = f"https://understat.com/getLeagueData/{league_key}/{int(season_start_year)}"
     if understat_outage_guard_enabled():
@@ -276,6 +300,7 @@ def fetch_understat_players(
     status_path: Path | None = None,
 ) -> list[dict[str, Any]]:
     guard = understat_outage_guard_enabled()
+    unavailable: UnderstatUnavailable | None = None
     try:
         league_data = fetch_understat_league_data(
             league, season_start_year, timeout=timeout, status_path=status_path if guard else None
@@ -283,22 +308,35 @@ def fetch_understat_players(
         players = league_data.get("players")
         if isinstance(players, list) and players:
             return players
-    except UnderstatUnavailable:
-        # Guard on only (it is never raised with the guard off). The legacy
-        # page is on the SAME host: asking it again during an outage is a
-        # second request that can only fail, and its "playersData not
-        # available" error hid the real reason for 15 days.
-        raise
+    except UnderstatUnavailable as exc:
+        # Raised only with the guard on.
+        if understat_outage_cooldown_enabled():
+            # COOLDOWN half: the legacy page is on the SAME host, so during an
+            # outage it is a second request that can only fail -- and its
+            # "playersData not available" hid the real reason for 15 days.
+            raise
+        # NAMING half: ask the legacy page exactly as OFF does, so the files
+        # written cannot differ from OFF's; only a failure's NAME changes.
+        unavailable = exc
     except Exception:
         pass
     # Fallback: legacy embedded-JSON page scrape.
     league_key = UNDERSTAT_LEAGUES[str(league).strip().lower()]
     url = f"https://understat.com/league/{league_key}/{int(season_start_year)}"
-    response = requests.get(url, timeout=timeout, headers=_USER_AGENT)
-    response.raise_for_status()
-    match = re.search(r"var playersData\s*=\s*JSON\.parse\('([^']+)'\)", response.text)
-    if not match:
-        raise ValueError(f"playersData not available for {url}")
+    try:
+        response = requests.get(url, timeout=timeout, headers=_USER_AGENT)
+        response.raise_for_status()
+        match = re.search(r"var playersData\s*=\s*JSON\.parse\('([^']+)'\)", response.text)
+        if not match:
+            raise ValueError(f"playersData not available for {url}")
+    except Exception as legacy_exc:
+        if unavailable is None:
+            raise
+        raise UnderstatUnavailable(
+            unavailable.reason,
+            url=unavailable.url,
+            detail=f"{unavailable.detail} legacy_page={url} legacy_error={type(legacy_exc).__name__}",
+        ) from legacy_exc
     decoded = match.group(1).encode("utf-8").decode("unicode_escape").encode("latin-1").decode("utf-8")
     return json.loads(decoded)
 
@@ -641,6 +679,7 @@ def normalize_asa_players(
 
 __all__ = [
     "UNDERSTAT_LEAGUES",
+    "UNDERSTAT_OUTAGE_COOLDOWN_ENV",
     "UNDERSTAT_OUTAGE_COOLDOWN_SECONDS",
     "UNDERSTAT_OUTAGE_GUARD_ENV",
     "UnderstatUnavailable",
@@ -653,5 +692,6 @@ __all__ = [
     "normalize_understat_players",
     "normalize_understat_team_history",
     "read_understat_status",
+    "understat_outage_cooldown_enabled",
     "understat_outage_guard_enabled",
 ]

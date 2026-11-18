@@ -30,7 +30,7 @@ with the same page: 26,719 bytes, md5 `7942487b2c63810ef72fb43aead4a0b0`, `nginx
 | 6 | web fetcher (other network) | `/league/EPL` and `/` | the same "We will come back soon" text |
 | 7 | fleet venv | the NEW fetcher, ON then OFF (section 4) | maintenance page |
 
-Seven GETs went from the fleet host and two from the fetcher; the brief allowed about six. A web
+Seven GETs went from the fleet host for the diagnosis, and four more for the live checks in section 4 (11 in all). Two went from the fetcher. The brief allowed about six. A web
 search found no public notice and no return date.
 
 Each hypothesis against those results:
@@ -108,10 +108,15 @@ During the DNS/timeout phase the cost per run was much higher:
 **Why it repeats every run.** Both steps are MTIME-gated at 1.0 day. A failed fetch leaves the file
 stale, so every full soccer run re-fails them.
 
-## 4. The fix: an outage guard (ON by default, behind a switch)
+## 4. The fix: an outage guard with two switches
 
-The commit is listed in section 7. Switch: `SYNDICATE_UNDERSTAT_OUTAGE_GUARD`. Absent means ON,
-and `0`/`false`/`off`/`no` runs today's code exactly.
+**Amended 2026-11-18 1:06 PM CST, before any load.** The first build (`09f8540a6`, 12:56 PM CST) was a
+single default-ON switch that included the cooldown. The session that started this lane pointed at the
+betting-change windows rule (`002a7e720`, effective 18:00Z), and it applies. The cooldown can delay a
+refresh after recovery by up to 1 h. Skipping the legacy page would leave unread a page that still
+carried `playersData`. Either can change the sim's inputs, so that half is a betting change. A
+default-on betting change must not sit on main between windows, because the next unrelated ff would
+load it. So the guard was split. The commit is listed in section 7.
 
 The fix touches only `player_history.py` and `fetch_soccer_history_local.py`:
 
@@ -119,37 +124,59 @@ The fix touches only `player_history.py` and `fetch_soccer_history_local.py`:
 - no step is added, removed or reordered;
 - it makes 0 OddsAPI calls.
 
-With the guard ON:
+**Switch 1, NAMING: `SYNDICATE_UNDERSTAT_OUTAGE_GUARD`.** Absent means ON; `0`/`false`/`off`/`no`
+runs today's code.
 
-1. **The outage is named.** A non-JSON 200, a 5xx/403/429, or a connection error raises
-   `UnderstatUnavailable`, which names the reason, status, content type, bytes and visible text.
-   The step still **exits rc 1**, and its last stderr line (what the manifest keeps) is
-   `UNDERSTAT_UNAVAILABLE league=.. kind=.. season=.. reason=..`. Nothing is written, and the old
-   file is kept. A 404 is a wrong URL, not an outage, and raises `HTTPError` as before.
-2. **Players stops asking the legacy page on the same host** after `getLeagueData` is unavailable.
-   That second request is where the misleading "playersData not available" came from.
-3. **The cooldown.** A host-wide marker, `<soccer_root>/_understat_status.json`, is shared by all
-   roles, leagues and kinds. For 3,600 s after a failed probe, every Understat step exits rc 1 with
-   `reason=cooldown no_request_sent` and states `down_since`, `last_probe_at` and `next_probe_in_s`.
-   The first probe that gets JSON writes the files and flips the marker to `up`, keeping
-   `last_outage`. An unreadable marker never blocks a probe, and OFF neither reads nor writes it.
+- **The outage is named.** A non-JSON 200, a 5xx/403/429, or a connection error raises
+  `UnderstatUnavailable`, which names the reason, status, content type, bytes and visible text.
+- **The step still exits rc 1.** Its last stderr line (what the manifest keeps) is
+  `UNDERSTAT_UNAVAILABLE league=.. kind=.. season=.. reason=..`. For players it adds
+  `legacy_page=.. legacy_error=..`.
+- **Nothing is written,** and the old file is kept. A 404 stays an `HTTPError`.
+- **The outage is recorded** in the host-wide marker `<soccer_root>/_understat_status.json`: state,
+  `down_since`, `last_probe_at`, and `probes` (one per failed `getLeagueData` request).
+- **It sends exactly OFF's requests.** Players still asks the legacy page.
+- **It writes exactly OFF's bytes**, and fails exactly when OFF fails. That holds under all 7 fixture
+  responses: maintenance, connect timeout, 503, 404, healthy, a legacy page that still carries
+  `playersData`, and JSON without players.
 
-**Tests:** `tests/test_understat_fetch.py`, 22 of 22.
+**Switch 2, COOLDOWN: `SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN`.** Absent means OFF; `1`/`true`/`on`/`yes`
+turns it on, and it only works while naming is on. The rule asks for it to be switched on in a
+betting-change window, or on the user's classification.
+
+- **No request during the cooldown.** For 3,600 s after a failed probe, every Understat step exits
+  rc 1 with `reason=cooldown no_request_sent`, `down_since`, `last_probe_at` and `next_probe_in_s`.
+- **Players skips the legacy page.**
+- **The first JSON clears it** and flips the marker to `up`, keeping `last_outage`.
+- **An unreadable marker never blocks a probe.** Naming OFF neither reads nor writes the marker.
+- **The effect:** about 990 requests a day become about 24. A DNS/connect-timeout phase costs one
+  probe an hour instead of p50 324 s per run.
+
+**Tests:** `tests/test_understat_fetch.py`, 46 of 46.
 
 - They fail at collection on the old code, where the names do not exist.
-- The **off != on** test drives the fetcher with the REAL step's argv, from
-  `_soccer_current_history_step` and `_soccer_players_step`. OFF raises the fleet's exact
-  exceptions, with 2 requests for players. ON raises a named `SystemExit`, with 1 request, and
-  writes the marker.
-- Other tests cover the cooldown across all 5 leagues and both kinds (0 requests), recovery, a kept
-  `down_since`, an unreadable marker, 404 versus 5xx versus a timeout, and the marker path.
-- The neighbouring tests pass too: 225 of 225 in the files that touch `player_history` or the
-  fetcher.
+- **Naming, off != on,** through the REAL step's argv (`_soccer_current_history_step`,
+  `_soccer_players_step`). OFF raises the fleet's exact exceptions; naming raises a named
+  `SystemExit` with the SAME request list and writes the marker.
+- **`test_NAMING_writes_exactly_what_OFF_writes`:** 7 responses x 2 kinds. It checks the same
+  failure outcome, the same requests and the same file bytes.
+- **Cooldown, off != on:** with a fresh failed probe on the marker, OFF probes and ON sends nothing.
+- **Other tests:** the cooldown across all 5 leagues and both kinds (0 requests), recovery, a kept
+  `down_since`, an unreadable marker, 404 versus 5xx versus a timeout, both switches' parsing, and
+  the marker path.
+- **Neighbours:** 249 of 249 in the files that touch `player_history` or the fetcher.
 
-**Live check, 12:53 PM CST** (scratch out-dir, not the data root). Run 1 exited rc 1 with
-`reason=non_json … bytes=26719 text='Understat.com We will come back soon'`. Run 2 (serie_a players)
-exited rc 1 with `reason=cooldown no_request_sent … next_probe_in_s=3583`. OFF reproduced
-`requests.exceptions.JSONDecodeError`.
+**Live checks** (scratch out-dir, not the data root):
+
+| when (CST) | build | run | result |
+|---|---|---|---|
+| 12:53 PM | first build | 1 | rc 1, `reason=non_json … bytes=26719 text='Understat.com We will come back soon'` |
+| 12:53 PM | first build | 2 | rc 1, `reason=cooldown no_request_sent` |
+| ~1:05 PM | split build, default switches | epl teams | rc 1, `reason=non_json` |
+| ~1:05 PM | split build, default switches | serie_a players | rc 1, `reason=non_json … legacy_page=… legacy_error=ValueError`; marker `probes` 2 |
+| both | either build | OFF | `requests.exceptions.JSONDecodeError` |
+
+Those runs sent 4 more requests, so 11 GETs in all went from the fleet host.
 
 **What the guard does NOT do.** It does not make big-5 history fresh: no code can make a site in
 maintenance serve data. The soccer result stays red while Understat is down, deliberately, so the
@@ -181,12 +208,24 @@ Either one is a model change, put to the user, not papered over here.
 - **No freshness signal reaches the artifact.** `build_soccer_artifacts` could record the newest
   history row's date per league, so a frozen input is visible on the board.
 
-## 7. Prediction (pre-registered in `5637a627f`) and load
+## 7. Prediction and load
 
-P1-P5 and the falsification rule are in the lane block. The load is a fleet ff with no restart:
-the fetcher is a child script, picked up at its next run. `betting change: no`, for two reasons:
+P1-P5 were pre-registered in `5637a627f`, and the AMENDMENT for the split is in the lane block.
+Commits:
 
-- while the site is down, the files are identical with the guard ON or OFF;
-- on recovery, the first refetch lags OFF by at most 3,600 s, on a 1-day refresh cadence.
+- the first build: `09f8540a6`;
+- the split: listed in the lane STATUS and todo `#841`.
 
-The load was put to the user; it has not happened.
+The load is a fleet ff with no restart: the fetcher is a child script, picked up at its next run.
+
+**Naming (default) — `betting change: no`, tested.** It sends the same requests and writes the same
+bytes as OFF under every response.
+
+**Cooldown (default OFF) — `betting change: yes`, strictly.** Its inputs differ from OFF only on
+recovery (a lag of at most 1 h on a 1-day cadence) or when a legacy page still carries `playersData`.
+Switching it on would follow the windows rule:
+- in the 11-24 2-7 AM CST window, as an env key (a drained down/up), or as a one-line
+  default flip that is ff'd in the window;
+- or now, if the user classifies it `no`.
+
+Both decisions were put to the user; nothing is loaded.

@@ -1,21 +1,26 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#841` — **UNDERSTAT IS DOWN SITE-WIDE ("We will come back soon", HTTP 200, since 2026-11-03 2:54 PM CST; DNS/connect failures from 11-01 6:34 PM CST), so every big-5 `soccer_<league>_history_current` / `_players` step fails (5,152 of 5,152 in 800 runs, 11-10..11-20 dirs) and the sim prices EPL/La Liga/Bundesliga/Serie A/Ligue 1 on history frozen at 10-31 (69 matches missing by 11-18). Outage guard ON MAIN behind `SYNDICATE_UNDERSTAT_OUTAGE_GUARD` (absent = ON): named `UNDERSTAT_UNAVAILABLE` exit, one probe per hour host-wide, auto-recovery. NOT LOADED; the alternative-source decision is the user's** `[2026-11-18, lane understat-fetch-failures; `.syndicate/findings_2026-11-18_understat_fetch_failures.md`; split from #840's lead]`
+### `#841` — **UNDERSTAT IS DOWN SITE-WIDE ("We will come back soon", HTTP 200, since 2026-11-03 2:54 PM CST; DNS/connect failures from 11-01 6:34 PM CST), so every big-5 `soccer_<league>_history_current` / `_players` step fails (5,152 of 5,152 in 800 runs, 11-10..11-20 dirs) and the sim prices EPL/La Liga/Bundesliga/Serie A/Ligue 1 on history frozen at 10-31 (69 matches missing by 11-18). Outage guard ON MAIN in two halves: NAMING `SYNDICATE_UNDERSTAT_OUTAGE_GUARD` (absent = ON, betting change no, tested equal to OFF) and COOLDOWN `SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN` (absent = OFF, betting change yes). NOT LOADED; the cooldown and the alternative-source decisions are the user's** `[2026-11-18, lane understat-fetch-failures; `.syndicate/findings_2026-11-18_understat_fetch_failures.md`; split from #840's lead]`
 - **Measured:**
-  - 7 GETs from the fleet host and 2 from another network all got the same 26,719-byte maintenance page (`/`, `/league/EPL/2026`, `getLeagueData` 2026 and 2025).
+  - 11 GETs from the fleet host and 2 from another network all got the same 26,719-byte maintenance page (`/`, `/league/EPL/2026`, `getLeagueData` 2026 and 2025).
   - The site has not changed and is not blocking the fleet; the season key is right.
   - Last good writes: `teams_2026.csv` 10-31 7:12-8:47 PM CDT and `players_2026.csv` 11-01 2:09-4:12 AM CST.
   - The red masked a real other soccer failure in 8 runs: 792 of 800 runs were red only from Understat.
   - The DNS/timeout phase cost p50 324 s of Understat per run.
 - **Fix (no step added or reordered, 0 OddsAPI calls):**
-  - A step that cannot fetch still exits rc 1, with a last line naming the reason, status and page text.
-  - Players no longer asks the legacy page on the same host.
-  - A marker at `<soccer_root>/_understat_status.json` makes every Understat step exit `reason=cooldown` without a request for 3,600 s after a failed probe.
-  - The first JSON flips the marker to `up`.
-  - Tests: `tests/test_understat_fetch.py` 22 of 22 (off != on through the real step argv); neighbours 225 of 225.
-- **Load** = fleet ff to the fix SHA or later; no restart (child script). It needs claims, a preflight and a ride-along check. `betting change: no`: the files are identical while the site is down, and on recovery the first refetch lags OFF by at most 1 h on a 1-day cadence.
-- **Reading owed at load (P1-P5 in the lane block):** 100% of failing big-5 Understat step tails end `UNDERSTAT_UNAVAILABLE`; <= 2 requests per clock hour host-wide (about 990 a day before); Understat seconds per run p50 <= 11 s. On recovery the 10 steps go rc 0 within 1 h + 1 run.
-- **Owed to the user (a model change, not built):** a big-5 source while Understat is down.
+  - **NAMING (default on):**
+    - a step that cannot fetch still exits rc 1, with a last line `UNDERSTAT_UNAVAILABLE` naming the reason, status and page text (plus the legacy page's error for players);
+    - the outage is recorded in `<soccer_root>/_understat_status.json`;
+    - it sends the same requests as OFF and writes the same bytes, under 7 responses x 2 kinds.
+  - **COOLDOWN (default off):**
+    - for 3,600 s after a failed probe, every step exits `reason=cooldown` with no request, and players skips the legacy page;
+    - the first JSON clears it.
+  - First build `09f8540a6` was a single default-ON switch that included the cooldown. It was split before any load, under the betting-change windows rule.
+  - Tests: `tests/test_understat_fetch.py` 46 of 46; neighbours 249 of 249.
+- **Load (naming)** = fleet ff to the split SHA or later; no restart (child script). It needs claims, a preflight with `--betting-change no`, and a ride-along check.
+- **Cooldown** = a betting change (a refresh lags by up to 1 h on recovery). Turn it on in the 11-24 2-7 AM CST window, or now on the user's classification.
+- **Reading owed at the naming load (lane AMENDMENT):** 100% of failing big-5 Understat tails end `UNDERSTAT_UNAVAILABLE`; requests equal OFF's (probes counter); Understat seconds per run p50 <= 11 s. With the cooldown on: <= 2 requests per hour.
+- **Owed to the user (a model change, not built; proposed as its own session):** a big-5 source while Understat is down.
   - Players from ESPN aggregation: a different estimator and id space, so every season of a league must be re-sourced.
   - Ratings from football-data goals: a mechanism change that needs a re-fit and backtest.
 - **Leads:**
