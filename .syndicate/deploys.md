@@ -61753,3 +61753,10 @@ Lane `render-config-retirement` (session 267d8859).
   - First board build after boot: `portfolio_commit` exit 14:47:01Z. **0** real tracebacks and **0** BOOK_GRID_BUILD_ERROR since boot. The board query's slim rows do not carry the projection meta; the grid artifact is the reading.
 - **OWED:** today's WNCAAB pregame totals rows, once listed, carry `fallback: market`.
 - **claims:** refresh-worker and web released after this entry.
+
+## 2026-11-18 15:29:31Z (9:29 AM CST) -- READING (no deploy): the #816 gate fallback on WNCAAB pregame totals (owed by the 14:42:44Z load; lane `ncaab-total-overprojection`, user "check the women's pregame rows when they list") -- **MET**
+- betting change: no (reading only)
+- **Read** by a read-only watcher (`C:	mp
+cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row for the 11-18 Central slate appeared in `book_grid_2026-11-18.json` (generated 15:24:23Z): **1 row, stamped `fallback: market`** (as_of 11-17).
+- UMBC @ Pittsburgh 131.5: served P(over) 0.500 = p_book 0.500; the engine's raw number was 0.725, which the old rule would have served as a +22.5 pp over.
+- 0 fallback rows with served != book.
