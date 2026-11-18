@@ -477,3 +477,26 @@ alternative-source session working.
 - Added **rail flag results by day** (11-15..11-17, grade outputs) and **board / shortlist-published / staked results**
   (44 scorecard days, 10-06..11-18, 28-day rolling, by sport; `C:\tmp\railmon\dash\perf_series.py` + `perf_build.py`).
 - **Gap:** the shortlist's `suggested` flag is not graded as its own set. A session was offered to the user.
+
+## Reading 11 — Wed 11-18 5:50 PM CST (23:50Z)
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 3.2-3.6.
+
+**Slate: 24 live.**
+- Flags: 7 shown, 0 false, 0 missed, 1 dark row.
+- P1: 3 college totals flags, 0 contradictions. P6: 0. #824: 0.
+- Live rows: 139, 47 priced <= 120 s (college row ages are lower bounds per #844).
+
+**Board (P2): 4 builds, 161 / 171 / 183 / 189 s, median 177 s, 0 over 300 s.** CPU per build 132-165 s.
+- No nice-0 batch job in the top processes (L-d: none). The live re-sim workers run at nice 5.
+
+**Overlay:** 0 gaps over 360 s (max NCAAB 66 s); ticks 71, gap max 57 s; web merges 19, 0 stale.
+
+**Live odds lane:** 11 launched, 3 refused (21.4%). Live runs 3, max 117 s; pregame 284 s.
+
+**Load:** query 6.3 s; shortlist 1.0 s. Today's board was 403 s old (a build in flight).
+
+**Team cards:** 0 defects.
+
+**Session started on the user's "Yes, start it":** local_fbe07d8c "Grade the board's suggested picks as their own set".
+When it reports the file, the dashboard adds a "Suggested by the board" set.
