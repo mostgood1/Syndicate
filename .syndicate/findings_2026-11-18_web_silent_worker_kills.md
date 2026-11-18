@@ -187,3 +187,15 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
 - **Serving workers stall too.** Heartbeat gaps up to 11.7 s (16:52:08Z, the 10:52 AM CST picks slot) and 5.9 s (17:13:21Z)
   came with no recycle nearby.
 - The recycle path is outside this lane's declared files, and no OPEN lane holds it (checked origin/main lanes.md 19:05Z).
+
+## Fix 1, the double-recycle hole: LOADED 2026-11-18 19:14:22Z (`db6a395ed`)
+
+- A hard recycle now waits `SYNDICATE_WEB_WORKER_HARD_RECYCLE_SPACING_SECONDS` (30 s) after another worker's recycle,
+  re-checking on every request. Only `SYNDICATE_WEB_WORKER_EMERGENCY_MARGIN_MB` (600) above the hard limit skips the wait.
+- Loaded by ff + reload-web, with 0 failures. Both new workers logged `hard_spacing_s` 30.
+- Baseline: 24 doubles on 11-18 before the load, every one hard. The second worker was 173-462 MB over its limit, so with
+  the 600 MB emergency margin none of them would have gone at once.
+- Owed: doubles since 19:14:22Z, which should be 0 apart from `"emergency": true` recycles, and the first hard hold's
+  `hard_deferred_s`. Entry: deploys.md 19:14:22Z.
+- Correction: the lane status said the widening happened at "19:30Z". The fleet clock read 19:13:44Z at the baseline, so it
+  was ~19:05Z.
