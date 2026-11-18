@@ -984,3 +984,94 @@ stage slows together and the process CPU equals the wall time.
 - **Lever (not built):** run the board build and the live tick in separate processes, so they stop sharing one
   interpreter. Architectural, so it is a session of its own.
 - **Owner:** none open. The convoy lane is closed, and no todo item proposes the split.
+
+## Reading 11 — Tue 11-17 6:17 PM CST (00:17Z 11-18) — the college peak
+
+**Fleet:** unchanged. Web `64daca46f`; live-odds-worker 52087; refresh-worker 28948 (`91d865fd5`). Host load
+3.3-4.1. No drain.
+
+**On main, NOT loaded:**
+- `923869cf3` (17:46): college totals show the CALIBRATED total as "ours". This is the I-17 fix, lane
+  ncaab-total-overprojection; the user chose "A: calibrated total". A load is a web reload.
+- `882a64d5a`: #829's live half MET, measured by its owner (the WNBA share of web requests 40.1% → 0.8%).
+
+**Slate: 50 live chips.** NCAAB 25, NCAAF 3, NHL 5 (P1), WNCAAB 17. NBA not tipped.
+
+**Flags: 36 shown, 0 false, 0 missed, 0 dark.** 24 of 50 live cards carry a flag.
+- **I-17 at peak:** 20 NCAAB full-game totals flags, **all unders**. **12 of 20 show "ours" on the other side
+  of the line:**
+  - Norfolk St @ Georgia Tech u148.5 at 153.0;
+  - CSUN @ Troy u155.5 at 159.5;
+  - Tennessee St @ USF u169.5 at 171.7;
+  - ETSU @ Marshall u137.5 at 142.8;
+  - Cleveland St @ Xavier u152.5 at 158.3;
+  - Monmouth @ Wake u144.5 at 148.8;
+  - Fordham @ Manhattan u141.5 at 146.9;
+  - Rider @ Miami u142.5 at 143.2;
+  - Lehigh @ Mt. St. Mary's u143.5 at 148.3;
+  - Wagner @ St. Joseph's u144.5 at 148.5;
+  - Akron @ Bucknell u143.5 at 145.0;
+  - Central Michigan @ Dayton u149.5 at 154.2.
+
+  WNCAAB 0 of 3. The fix that ends this is on main, not loaded.
+- **Graded at the final:** WNCAAB Tennessee St @ Louisville. Now u154.5, 23.5 pp (model 0.730); at r10
+  u162.5, 32.4 pp.
+
+**Live rows: 667.** 234 priced <= 120 s; 181 over 300 s; priced age p50 193 s.
+- By sport: NCAAB 520 (201 <= 120 s, 72 flagged); WNCAAB 78 (29, 3); NCAAF 60 (**0** <= 120 s); NHL 9 (4).
+- **NCAAF:** 0 of 60 rows priced within 120 s. Book age p50 235 s, min 141 s; seen age p50 130 s. To watch.
+- 21 of 151 live markets carry no price of ours.
+- **I-19: 22 of 151 live markets carry only pregame-shortlist rows** (r9 6 of 28, r10 6 of 32).
+
+**Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less, 0 live chips without a live card.
+
+**Overlay (27 min).** 0 gaps over 360 s; 0 `deferred_slow`.
+
+| sport | builds | gap p50 / max | build s p50 / max | zero-card with rows |
+|---|---|---|---|---|
+| NCAAB | 33 | 49 s / 77 s | 7.2 / 20.0 | 0 |
+| WNCAAB | 28 | 57 s / 91 s | 1.6 / 7.5 | 0 |
+| NCAAF | 23 | 59 s / 155 s | 1.4 / 5.9 | 0 |
+| NHL | 8 | 96 s / 126 s | 3.8 / 23.1 | 1 |
+
+- **Ticks:** 60, gap p50 22 s, max 81 s.
+- **Web merges:** fresh NCAAF / NCAAB / WNCAAB 57 / 57 / 57, NHL 14; 0 stale. No NCAAB build over 20 s.
+
+**Board builds since the drain:**
+- 153 s (23:56Z), 124 s, 242 s, 253 s, 250 s (00:17:48Z). All under the 300 s today limit, but 1.5-3× the calm
+  82 s.
+- **I-20 corrected:** the two 520-540 s builds (23:13Z and 23:49Z) bracket the drain. The second was the first
+  build after the 38-min hold. Monday's 345-942 s evening builds (00:16-02:05Z) had no drain. Tonight's peak
+  past 7 PM is still to read.
+
+**Load:**
+- **Query 8.1 s / 4.53 MB wire / 24.3 MB raw.**
+- Chips 1.5 s; shortlist 0.67 s; live-rail 0.09-0.34 s (740 rows, 700 KB raw).
+- Board built 117 s ago; query snapshot 3,994 s (as of 23:11:20Z; the state loop refreshes it about hourly,
+  as all day).
+
+**#824:** 0 of 12 college `LIVE_GAMELINE_JOIN` lines since 23:50Z carry the reason. 0 of 23 college totals
+flags below the points scored.
+
+### Improvement hunt, reading 11
+
+**I-21 (lead): the NHL in-play overlay drops its props for one build. At the same moment the latest-quote
+cache is thrashing.**
+
+- **The drop, measured:**
+  - The NHL `INPLAY_OVERLAY` `rows_inplay` since puck drop: 20, 20 (pre-props), 770, 770, 770, **20** (00:14:30Z,
+    6 cards), 755, 755, 760.
+  - The web merged NHL 283 → **6** (00:15:00Z) → 277 (00:15:37Z). So the live NHL props left the board for one
+    merge, ~37 s.
+- **The cache, measured:** `[odds_book_quotes] LATEST_CACHE_EVICT` (budget 250 MB) evicts 7-15 shard files at
+  a time, every ~5 min: 00:08:57, 00:13:58-00:14:42, 00:19:39Z.
+  - The files include **the live sports' own today shards**: NCAAB 2026-11-17 at 00:13:58 (19,920 rows) and
+    00:19:39 (21,315 rows); NBA 2026-11-17 (29,458); **NHL 2026-11-17 at 00:14:08 (12,542 rows), 22 s before
+    the 20-row NHL build**.
+- **Not shown:**
+  - that the eviction causes the drop. n = 1, and the NHL quote read at 00:14:25 was `mode=incremental` and
+    healthy;
+  - that the thrash costs the convoy (I-20) measurable CPU.
+- **Next:** at each reading, count the NHL 20-row builds and the evictions that precede them. The idea: size
+  the budget or the eviction order (oldest dates first) so the live sports' today shards are not evicted. Owner
+  to name at the summary.
