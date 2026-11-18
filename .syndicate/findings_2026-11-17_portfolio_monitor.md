@@ -630,3 +630,15 @@ One pass over every portfolio route, before any probe existed:
 - **The cause stays:** another client trades on the same Kalshi account (357 foreign-client orders in
   `RECONCILE_ORPHANS`). Any market where both hold positions makes `grade_kalshi_settlement` refuse
   `both_sides_held`. The score grader takes over after 24 h; this tool is the faster exit.
+
+## Reading 15 — Tue 11-17 7:31 PM CST (01:31Z 11-18), window 33 min
+
+- **Anomalies down to 1** (the 16:17Z NFL rebuild, unclassified, with its lane). **Late settlements 0** after
+  the 01:16:32Z operator grade of the NHL bet. Unreconciled 0, unknown submits 0.
+- **Endpoints:** all 7 read 200 and inside budget, but the slowest since the morning on a busy live-slate web:
+  `/portfolio` 2.30 s (budget 3), `live?on=all` 1.77 s, `live` 1.44 s, `settings` 0.84 s. 0 kills, 0 5xx.
+- **Plan (12.9 min):** board 5,027 -> suggested 130 -> sized 25 -> positions 9; `in_play_market_fair` 40.
+  **`key_player_out` 2 is the first time today the #814 live player-exit gate refuses in the plan.** Ceiling used
+  27.2%.
+- **Execution, 33 min:** 10 live ticks, 0 placed, 0 failed (20 `outside_price_band`, 7 `game_started`). Orders
+  today 54.
