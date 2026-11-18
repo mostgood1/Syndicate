@@ -91,6 +91,47 @@ def now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")[:-4] + "Z"
 
 
+IDLE_PRIORITY_CLASS = 0x40
+NORMAL_PRIORITY_CLASS = 0x20
+PROCESS_MEMORY_PRIORITY = 0  # PROCESS_INFORMATION_CLASS.ProcessMemoryPriority
+MEMORY_PRIORITY_NORMAL = 5
+# mode -> (priority class, memory priority to set; None = keep what the parent handed down)
+PRIORITY_MODES = {"normal": (NORMAL_PRIORITY_CLASS, MEMORY_PRIORITY_NORMAL), "idle": (IDLE_PRIORITY_CLASS, None)}
+
+
+def set_priority(mode: str, k32=None) -> None:
+    """Set this process's Windows scheduling for `mode` (lane inplay-recorder-weeknight-stalls, 2026-11-18).
+
+    normal (default): Normal class + memory priority 5. The recorder is a latency-bound poller, not a research
+    job: ~4% of one core (7.2 CPU-s in 180 s on 824 tickers, measured 2026-11-18). At Idle, on a live weeknight
+    with all 12 host cores busy, it ran only when Windows' ~4 s anti-starvation boost picked it, and single
+    Kalshi requests took 30-110 s: on 11-16 a 70 s and a 136 s stall of every market at once. The Task
+    Scheduler task (default priority 7) also hands it memory priority 2, so its pages are the first trimmed
+    when RAM is short; normal resets that to 5.
+    idle: the old behaviour, Idle class (memory priority as inherited); `nice 19` off Windows.
+    Raises SystemExit if a call fails: the Idle call once failed SILENTLY (64-bit HANDLE, 2026-10-21).
+    """
+    cls, mem = PRIORITY_MODES[mode]
+    if k32 is None:
+        if os.name != "nt":
+            if mode == "idle" and hasattr(os, "nice"):
+                os.nice(19)
+            return
+        k32 = ctypes.windll.kernel32
+        # HANDLE is 64-bit: without these the pseudo-handle is truncated to a 32-bit int and the call
+        # fails SILENTLY (measured 2026-10-21: every recorder ran at Normal).
+        k32.GetCurrentProcess.restype = ctypes.c_void_p
+        k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        k32.SetProcessInformation.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+    h = k32.GetCurrentProcess()
+    if not k32.SetPriorityClass(h, cls):
+        raise SystemExit(f"could not set priority class {cls:#x} ({mode})")
+    if mem is not None:
+        info = ctypes.c_ulong(mem)
+        if not k32.SetProcessInformation(h, PROCESS_MEMORY_PRIORITY, ctypes.byref(info), ctypes.sizeof(info)):
+            raise SystemExit(f"could not set memory priority {mem} ({mode})")
+
+
 def get_json(url: str, timeout: float = 15.0):
     req = urllib.request.Request(url, headers={"User-Agent": "syndicate-inplay-recorder/1"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -260,18 +301,10 @@ def main() -> int:
                     help="poll OddsAPI for a sport only while ESPN shows a game of it in play (default), also pregame, or always")
     ap.add_argument("--stop-after-final-minutes", type=float, default=0.0,
                     help="stop this many minutes after every ESPN game of the slate is final (0 = only --until)")
+    ap.add_argument("--priority", choices=sorted(PRIORITY_MODES), default="normal",
+                    help="Windows scheduling: normal (default) or idle (the pre-2026-11 behaviour); see set_priority")
     a = ap.parse_args()
-    if os.name == "nt":  # Idle priority: the fleet shares this host.
-        k32 = ctypes.windll.kernel32
-        # HANDLE is 64-bit: without these the pseudo-handle is truncated to a
-        # 32-bit int and the call fails SILENTLY (measured 2026-10-21: every
-        # recorder ran at Normal).
-        k32.GetCurrentProcess.restype = ctypes.c_void_p
-        k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-        if not k32.SetPriorityClass(k32.GetCurrentProcess(), 0x40):
-            raise SystemExit("could not set Idle priority")
-    elif hasattr(os, "nice"):
-        os.nice(19)
+    set_priority(a.priority)
     sports = [s.strip() for s in a.sports.split(",") if s.strip() and s.strip() != "none"]
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
