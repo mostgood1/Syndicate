@@ -13,7 +13,8 @@
   - 26 tests incl. off != on through the real run loop.
 - **Loaded 2026-11-18 13:47:14Z (7:47 AM CST)** on the user's "Load it now": a fleet ff `09eddabf2` -> `2ae0c646a`, no TERM (deploys.md `2582a45ce`, BC-046). Harm checks MET on the first sweep (13:47:44Z, pregame, 372 s).
 - **Owed:** the pre-registered reading in the first live NHL window with the stats API slow (findings file). The rail monitor reads it from noon CST 11-18.
-- **Not covered, measured 11-18:** pregame sweeps on the same lane still run NHL's full generation inline (181 runs 11-13..11-18: p50 218 s, max 532 s, 0 over 900 s). A stats-API slowdown before puck drop could still hold the lane for 1,800 s per sweep, though the run now continues to the other sports. Extending the split to pregame is the user's call.
+- **Pregame half on main `cdab875d5`, NOT LOADED** (user "Yes, build it" 11-18): `SYNDICATE_NHL_PREGAME_GENERATION_SPLIT` (absent = on) splits pregame NHL the same way, as fast odds plus a deferred `nhl_pregame_generation` with a 900 s deadline and the shared cooldown marker; 17 new test cases. Baseline 258 pregame full NHL steps 11-13..11-18, max 807 s, 0 over 900 s. Loading it (a fleet ff) is put to the user.
+- **Not covered, measured 11-18:** pregame lane holds over 900 s are SOCCER (51 of 54 runs; up to 2,763 s summed over its league steps, no single step over 900 s), which a per-step deadline cannot bound.
   - The ff ships all of main up to that SHA: child scripts at once, in-process code at each role's next restart.
   - Claim + preflight for the exact SHA; `betting change: yes` (live odds freshness across the lane's sports, NHL generation timing).
 - **Verify (pre-registered in the findings):** in a slow-NHL-API window,

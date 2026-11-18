@@ -158,3 +158,46 @@ make full generation fast on healthy nights and possible on slow ones.
 Prediction 4's in-play baseline: NHL in-play overlay rows were 0-16 for 02:06-02:37Z, except **600 at
 02:26-02:29Z**, right after the 02:24Z timeout freed the lane. Sweeps 02:06-02:37Z: 7 launched, 6 refused
 `lane_busy`. So NHL in-play rows track the lane being free, which is the mechanism this fix bounds.
+
+## Pregame extension (2026-11-18 ~9:50 AM CST, user "Yes, build it")
+**On main `cdab875d5`, NOT LOADED.** Hypothesis H3 and predictions P1-P6 were written into the lane block
+(`b74546351`) before the build.
+
+- **Why.** A pregame sweep still ran NHL's full step inline: odds and generation, under only the 1,800 s
+  run-wide timeout, with no cooldown. Pregame sweeps with NHL launch about every 31 min (wrapper launch gaps
+  p50 1,850 s), so a stats-API stall before puck drop could hold the lane on every one.
+- **Change.** The switch is `SYNDICATE_NHL_PREGAME_GENERATION_SPLIT`, absent = ON. It also needs
+  `SYNDICATE_ODDS_LANE_STEP_DEADLINE` on.
+  - A pregame sweep runs `nhl_oddsapi_refresh --mode fast` in NHL's turn.
+  - `nhl_pregame_generation` (`--mode generate`, 0 OddsAPI calls) runs after every sport, deferred, with its
+    own 900 s deadline (`SYNDICATE_NHL_PREGAME_GENERATION_DEADLINE_SECONDS`).
+  - A timeout writes the SAME per-date marker as live. Pregame and live sweeps inside one cadence
+    (`SYNDICATE_NHL_LIVE_FULL_GENERATION_SECONDS`, 1,800 s) then run NHL odds only and log
+    `NHL_PREGAME_GENERATION_COOLDOWN` / `NHL_LIVE_GENERATION_COOLDOWN`.
+  - Pregame always generates outside a cooldown, as before. `--phase all` is unchanged; `off` restores the
+    inline full step.
+- **Baseline, fleet manifests 11-13..11-18 (read 15:30Z):**
+
+  | measure | value |
+  |---|---|
+  | pregame full NHL steps | 258: 184 wrapper (p50 218 s, p90 372 s, max 532 s) + 74 direct (p50 331 s, max 807 s) |
+  | over 900 s / timed out | 0 / 0 |
+  | ok | 255 of 258 |
+  | live `--mode fast` NHL steps | 482, p50 44-46 s, max 89 s |
+
+  So the 900 s deadline cuts no measured healthy pregame generation.
+- **Tests.** 17 new cases in `tests/test_refresh_odds_sport_deadline.py`; 16 fail on main's code, and the
+  `--phase all` pin passes on both.
+  - The `off != on` reachability test runs the REAL `_build_nhl_steps` through the real run loop (commands
+    swapped for loggers): ON = fast odds, the next sport, then generation; OFF = one full step in NHL's turn.
+  - A hung pregame generation dies at its deadline, the next sport keeps its result, the marker is written,
+    and the next pregame and live builds are odds-only.
+  - 51 targeted + 78 neighbouring tests pass.
+- **Prediction** (lane block H3): see P1-P6 there.
+- **Measured, not fixed here: soccer holds the pregame lane longest.**
+  - 54 of 184 pregame wrapper runs with NHL ran over 900 s, and 7 over 1,800 s. In 51 of the 54, soccer was
+    the longest sport: up to 2,763 s in run `odds_refresh_20261117_182727` (2,983 s in all).
+  - No single soccer step went over 900 s. Of 271 runs per league step, the worst step's p90 was 206 s and its
+    max 855 s (`soccer_championship_artifacts`). The hold is the SUM over leagues.
+  - So a per-step deadline cannot bound it, and this lane's goal ("no single sport ... for 30 min") is not met
+    for soccer.
