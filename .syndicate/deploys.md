@@ -61544,3 +61544,39 @@ Lane `render-config-retirement` (session 267d8859).
 - **Attempts 2-4 (07:25, 07:35, 07:45Z) were refused by MY OWN claim.** After attempt 1, `claim809_release.py` printed `NO_TOKEN_FOUND`, so the claim stayed held until its TTL ran out (EXPIRED 07:55:09Z, does not block). Every later acquire then read `HELD by ncaaf-grid-build-speed`. The cause is not established: `deploy_claim.py` prints `token <hex16>`, which the release regex matches, and Git Bash hands Python the path correctly (checked). The evidence is gone, because each attempt overwrote the same output file. The script's defect stands either way: it kept retrying after a failed release, and it reused one output file. A reuse must keep one output file per attempt and stop at the first failed release.
 - **End state, read 07:56Z:** fleet head `3920a2d4d`; refresh-worker pid 28948 unchanged; refresh-worker claim EXPIRED; no drain held. The I-17 task `i17-calibrated-total-load-1118` (1:50 AM) and lane `layer2-board-process-split` (next: an ff to `09eddabf2` plus a drained full down/up) were both told at ~07:57Z. Either restart loads the memo, I-17 and the NFL seeds. This lane makes no more attempts tonight and only verifies the memo after their load.
 - **Learned:** at 1:10 AM CST refresh-worker's odds jobs also run 14+ min, so a 300 s drain cap is too short at this hour as well. The evening abort (deploys.md 2026-11-17 23:46Z) found the same.
+
+## 2026-11-18 08:02:54Z (2:02 AM CST) -- DEPLOY (TERM only, no ff): refresh-worker restart at fleet `3920a2d4d`, loading I-17's calibrated college total `923869cf3` (refresh-worker half) + NFL re-sim event-id seeds `ee47c930a` (BC-041) (lane `ncaab-total-overprojection`, scheduled task `i17-calibrated-total-load-1118`) -- **LOADED; harm checks MET; the I-17 rail check and the NFL seeding reading are OWED**
+- betting change: **yes** -- BC-041 (`ee47c930a` NFL live re-sim seeds, run by `run_refresh_worker._run_nfl_live_resim_tick`), resolved at the new refresh-worker boot `2026-11-18T08:03:01Z`. I-17 itself is display only.
+- **User decisions (verbatim, 2026-11-17 CST):** "A: calibrated total"; "load it when tests pass"; "Try now anyway" (the 01:08Z attempt, ABORTED); "Schedule 1:50 AM"; "Yes, carry it" (the NFL seeds). Grid memo: "Load it now" / "Load all now".
+- **Why this lane loaded it:** the plan was that lane `ncaaf-grid-build-speed`'s 1:10 AM CST script (`C:\tmp\railload\grid809_night2.sh`) would do the restart.
+  - Attempt 1 (07:10Z) acquired the claim, but its drain did not CLEAR in 300 s (a board build and odds/soccer child jobs were in flight), so it backed off at 07:15Z.
+  - Its claim was still held afterwards. Attempts 2-4 (to 07:45Z) were each refused `HELD by ncaaf-grid-build-speed`, and each refusal overwrote the claim file that carried the token.
+  - The claim expired at 07:55Z (TTL 45 min). This lane replaced the EXPIRED claim; no `--force` was used.
+- **Step-1 read (07:50Z):** fleet HEAD `3920a2d4d` (it contains `923869cf3` and `ee47c930a`; reflog: ff at 01:46:27Z). Refresh-worker pid 28948 had booted ~21:56Z 11-17, BEFORE that ff: it was running `91d865fd5`. Web had reloaded at 01:46:27Z on `3920a2d4d`. **Branch B** (on disk, not running): restart-only, no ff. `3920a2d4d` is on origin/main.
+- **Ride-alongs loaded** (`91d865fd5..3920a2d4d`, runtime; each checked in lanes.md / deploys.md, none waiting on a user decision):
+  - `923869cf3` I-17;
+  - `ee47c930a` NFL seeds;
+  - `b25afc1e5` / `3f337b2d9` book-grid memo (#809);
+  - `920c19e70` #829 WNBA settlement half;
+  - `f1a278ed8` render-config 3b, approved with #828's "Load it";
+  - `bb133096c` NFL card display;
+  - `25fc2e4f0` / `64daca46f` board-query (web-side);
+  - `3920a2d4d` web stall dump (web only);
+  - `85af16b35` engine experts and `95ae83f74` engine paper M3: no role imports them;
+  - `b96ea17a7` operator-fill (inert unless its CLI runs);
+  - `e13ae3c8c` / `4c777e4d0` / `abb0f192a` / `7f43e5777` / `3b6f41c1f`: names, comments, docs and tools;
+  - scripts only: portfolio probe, `f311b9ddb` / `6c93a13fe` / `72788f48e`.
+- **Gates:**
+  - claim refresh-worker 08:00:40Z (rc 0, replacing the expired claim). Web was not claimed: it was already on the target.
+  - drain (`C:\tmp\ncal816\drain.sh drain 300`, under the worker's environ) 08:00:51Z, **CLEAR 08:02:36Z**.
+  - baseline 08:02:39Z: head `3920a2d4d`, pid 28948, real_tracebacks_10min 0, book_grid_ticks_10min 1, `college_calibrated_total` defs on disk 1.
+  - preflight `--service refresh-worker --target-commit 3920a2d4d634...` from the lane worktree at origin/main, 4 expect/baseline pairs: **CLEAR 08:02:45Z** (0 processes).
+- **Load:** `term824.sh 3920a2d4d`, which checked the head. TERM pid 28948 at **08:02:54.497Z**; new pid **419651** first seen 08:03:02.551Z; `[refresh_worker] BOOTED` at 08:03:01.617Z. Undrained 08:03:06Z (`DRAIN_CLEARED`). The claim was released 08:22:28Z.
+- **expect / measured** (read 08:22:23Z):
+  - `refresh_worker_pid` 28948 -> new: **MET** (419651).
+  - `refresh_worker_loaded` 91d865fd5 -> 3920a2d4d: **MET by boot order.** The worker booted at 08:03:01Z from a checkout that has been at `3920a2d4d` since 01:46:27Z. NOTE: its env marker `SYNDICATE_GIT_COMMIT` still reads `91d865fd5`. Env is built only at `up`, and a role restart reuses it, so preflight's "deployed commit" for refresh-worker keeps showing `91d865fd` until the next drained `up`. That is a stale label, not the loaded code.
+  - `real_tracebacks_10min` 0 -> <=1: **MET.** 0 `^Traceback (most recent call last)` since the TERM, and 0 `BOOK_GRID_BUILD_ERROR`.
+  - `book_grid_ticks_10min` 1 -> >=3: **NOT MET as stated; the expectation was wrong for the hour.** With no game live (`any_live: false`) the grid ticks every ~10 min: 07:34 / 07:44 / 07:55Z before the load, 08:04:40 / 08:14:17Z after. The cadence is unchanged and the first tick came 99 s after boot. The >=3 figure fits only a live window.
+- **OWED:**
+  - **I-17 rail check, the 11-18 evening:** `/api/board/live-rail` college full-game totals rows carry `live_total_basis: "calibrated"`, and none shows a total on the wrong side of the line from its flag (`C:\tmp\ncal816\i17check.py`). No college game is live at 2 AM.
+  - **NFL seeding:** acts first at TNF 11-19.
