@@ -329,3 +329,17 @@ https://claude.ai/artifact/HoJ2n52ewHZnVDbN2LpxaJ. Each reading re-uploads `read
 **Team cards:** 0 defects.
 
 **Dashboard:** row 5 uploaded. The page has still not been opened in a browser, so there is no render check (`data/users/me` is empty).
+
+### CORRECTION to reading 5 (~2:55 PM CST): the "stale college quotes" are a grid bug, not the books
+
+The #816 lane (local_1f10ce63, on the user's ask to count books) found it: `.syndicate/findings_2026-11-18_college_quote_age_text_max.md`, `5edae7ef6`, todo #844.
+- **The bug:** `syndicate/features/shared/book_grid.py` (origin/main, ~line 1159) sets `newest = max(stamps)` over `observed_at` STRINGS. College sportsbooks stamp `2026-11-18 20:58:05+00:00`; Kalshi / Polymarket stamp `2026-11-18T20:55:57Z`. `T` sorts above a space, so an older venue stamp becomes the row's age, and the live gate (120 s) reads that age.
+  - I re-read the line on main and confirm it.
+- **The books are fine:** a median of 9 books per live NCAAB game.
+  - Rutgers @ Notre Dame had 5-6 fresh books; its grid row read 143.6 s (Kalshi) while FanDuel was 14.6 s.
+  - NCAAB moneyline: fresh 81.2% of live minutes by time, but 25.5% by the row age.
+  - NBA and NHL are unaffected: their sportsbook stamps use `T` too.
+- **The monitor is blind here.** My "priced <= 120 s" counts and "missed" flags read the same row age, so for college rows that carry a venue quote they share the bug. "0 missed" on college cannot see lines the gate wrongly withheld.
+  - Recorded as **I-27** on the dashboard.
+  - P1's college counts are a lower bound until the bug is fixed.
+- **The fix is not built.** `book_grid.py` is held by OPEN lane `ncaaf-grid-build-speed`. It is a betting change, so it loads in the 11-24 window unless the user grants an exception.
