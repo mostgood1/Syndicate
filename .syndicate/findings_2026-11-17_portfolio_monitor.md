@@ -714,3 +714,8 @@ The multipliers stay after the split, but each costs minutes once builds run at 
 **No live mitigation tonight.** A refresh-worker restart now drops the in-flight build, takes about 20 min to first
 publish, and drains have not reached idle this evening. Bets are still checked against current prices before
 placement, so a stale plan costs missed bets, not bad ones.
+- **USER DECISION, Tue 11-17 ~8:35 PM CST.** The user answered "Load the board-process split after tonight's slate?"
+  with "Yes, after the slate". Relayed verbatim to lane `layer2-board-process-split` ("Take the board build out of
+  the live tick's process"), which runs the load under its own claims, preflight and betting-change row. Sent with
+  it: the clash with lane `ncaaf-grid-build-speed`'s 1:10 AM CST TERM-only refresh-worker load at `3920a2d4d`, which
+  refuses if the fleet head moves. This lane keeps the `plan_commits` series running for that lane's metric 4.
