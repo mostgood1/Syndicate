@@ -525,3 +525,18 @@ def main():
 if __name__ == "__main__":
     raise SystemExit(main())
 ```
+
+## Addendum: the nightly task created, 2026-11-17 7:49 PM CST
+
+- The user said "Yes, create it", answering "Create the M3 nightly task, 8:30 AM CT daily from 11-25?".
+- Task `engine-paper-m3-nightly` ("M3 paper book nightly"): cron `30 8 * * *` local time. The app adds a dispatch delay
+  and lists it at 8:41 AM CT; the first run is 2026-11-18. It is saved in Bypass permissions mode, and this session is
+  notified when each run finishes. Until M2's 11-24 verdict, the runner prints only `WAITING m2_verdict_missing`.
+- **The prompt was revised once before any run, and before any M3 data:**
+  - New sha256 `670796f2b32eebe9aedc60953033fccc3074fbe2f46822aae357f074d7f2e0bb`, replacing the `8f1421fb34ee695c...` pinned above.
+  - Why: an unattended run is refused changes to scheduled tasks, so "disable this task" would fail, and the same
+    ledger entry would then be written every morning.
+  - Now each status (NO_M3 / NO_LIVE_ARM / STOPPED) and each look is written ONCE, after grepping `origin/main` for
+    it. If disabling is refused, the entry says "needs the user".
+  - Nothing else in the prompt, and nothing in the runner, kit or code, changed.
+- Checked: the task's stored body equals `m3_kit/task_prompt_nightly.md` byte for byte.
