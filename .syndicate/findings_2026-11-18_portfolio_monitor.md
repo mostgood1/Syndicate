@@ -521,3 +521,41 @@ descriptive only.
 - H-spread survives: a **per-line entry-spread limit** (judge each line on its own spread, never a market switch) is
   the candidate lever, and its threshold comes from this table. It is the user's call, and a betting change.
 - H-fair survives as well: the live book's loss is the spread and fees it pays, not its picks.
+
+## Live sizing trace — is live-odds-worker staking raw sim probabilities? (fleet-watcher lead, user's OK relayed 11-18 ~11:20 AM CST)
+
+**Lead as received:** live-odds-worker places the live orders, and its env has no
+`SYNDICATE_STAKED_PROBABILITY_UNFITTED`, which means `raw`. Under `raw`, a model-edge row in an unfitted cell would
+be staked on the raw sim. Not confirmed: whether live orders go through that path.
+
+**Read, 2026-11-18 17:16Z, read-only:** the sizing fields stamped on each live order record
+(`/api/portfolio/live?on=all&show=all`; copy at `C:\tmp\pfmon\sizing_trace_live_all.json`, not committed).
+- **All 48 live orders submitted 11-18** (44 with selected_date 11-18):
+  - `sizing_basis = model_edge`;
+  - `staked_probability_version = market_fair@staked_probability_pooled_v1@2026-10-22T21:45:48Z`;
+  - `sim_share_of_stake = 0.0`;
+  - `side_picked_by = price_shopping`.
+  - Both orders the watcher named carry exactly this: KXNCAAFSPREAD-26NOV20OREMSU-ORE17 (16:54:40Z, model_edge_pct
+    -8.31, ev_pct 4.99) and KXNCAAFTOTAL-26NOV21VTMIA-62 (17:06:51Z, model_edge_pct 20.98, ev_pct 4.86). The model
+    edge did not reach the stake.
+- **Last 30 days (1,634 live orders):**
+  - `market_fair@...pooled_v1` 1,053;
+  - `inplay:inplay_book_median_novig/1` 214;
+  - `market_fair@unfitted` 20;
+  - `unfitted` 11 (sizing basis `market_fair`);
+  - no stamp 336 (orders before the field existed);
+  - **raw or sim-based: 0.**
+  - `side_picked_by`: price_shopping 1,188, simulation 1, none 445. Mean `sim_share_of_stake` -0.039 (n=1,185).
+
+**Answer: NOT raw-sim sizing.** Every live order in 30 days was staked on the market-fair probability. The pooled v1
+profile gives the sim zero weight, and the 31 unfitted-cell orders also resolved to market fair. The missing
+`SYNDICATE_STAKED_PROBABILITY_UNFITTED` on live-odds-worker is not reached in practice. Setting it to `market` would
+change nothing observed here; it is a guard against a future unfitted path only. That is the user's call, and it would
+be a betting change.
+
+**What this adds to F9.** The live book's "edge" is a **price-shopping edge**: the venue's ask against the de-vigged
+sportsbook consensus (`market_fair`), with the model's sim weighted at 0. So the 2-5% predicted EV that realises
+-10.75% [-18.5, -3.1] is the gap between the venue price and the consensus fair price, and that gap does not pay
+after fees. Read with F13 (thin, one-sided markets), the venue being "cheaper than the consensus" on thin markets
+looks like a stale or one-sided venue quote, not value. The candidate levers are unchanged: per-line spread and
+liquidity at entry, now under measurement.
