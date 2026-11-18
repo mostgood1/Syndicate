@@ -297,3 +297,35 @@ https://claude.ai/artifact/HoJ2n52ewHZnVDbN2LpxaJ. Each reading re-uploads `read
 - **I-25:** NBA history is duplicated by a game-id format mismatch: 1,563 rows for 196 games, Elo shifted 119 points on average.
   The fix `4178ba866` is off by default.
 - **I-26:** the day-2 look-ahead was refused 115 of 127 times.
+
+## Reading 5 — Wed 11-18 2:27 PM CST (20:27Z)
+
+**Fleet:** `db6a395ed`, no new ff. Host load 1.2.
+
+**Slate: 4 live.** NCAAB Rutgers @ Notre Dame H2; WNCAAB UC Riverside @ Oregon St, Cal Baptist @ San José St, South Dakota @ Chicago St.
+
+**Flags:** 0 shown, 0 false, 0 missed, 0 dark. P1, P6 and #824: 0.
+
+**Live rows: 10, but only 1 priced <= 120 s.**
+- NCAAB: 9 rows, 0 priced <= 120 s. Priced age p50 230 s, max 419 s. Seen age at pricing p50 149 s, so the quotes were already old when priced.
+- WNCAAB: 1 row, 85 s.
+
+**This is not a pipeline stall:**
+- `NCAAB_LIVE_AUTORUN_LAUNCHED` 106 times and `WNCAAB_` 106 times since 12:39 PM (every ~60 s, `live_games=1` / `3`).
+- My first count said "last launch 12:39 PM". That came from a misaligned awk pairing; it is withdrawn.
+- The one NCAAB game's book quotes are simply not moving. **Watch:** if more NCAAB games show the same tonight, count books per game (as I-10 did for WNCAAB).
+
+**Main live odds loop:** 1 sweep launched since 1:49 PM.
+- 16 `PREGAME_RELAUNCH_COOLDOWN_SKIPPED` (cooldown 1,800 s): the pregame sweep's 30-min relaunch cooldown, as designed.
+- Live-phase manifests today are all soccer (16 since 10:53 AM). College live odds run on their own autorun lane.
+- Pregame runs 452 / 454 s; look-ahead 292 s (soccer 140 s).
+
+**Board: 9 builds, 140-216 s, median 163 s, 0 over 300 s**, at host load ~1.2. Shortlist span max 111 s.
+
+**Overlay:** 0 gaps over 360 s (max NCAAB 79 s). Web merges 29, 0 stale.
+
+**Load:** query 2.4 s; shortlist 1.3 s. Today's board was 152 s old.
+
+**Team cards:** 0 defects.
+
+**Dashboard:** row 5 uploaded. The page has still not been opened in a browser, so there is no render check (`data/users/me` is empty).
