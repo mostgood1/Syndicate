@@ -61495,3 +61495,13 @@ Lane `render-config-retirement` (session 267d8859).
   - **Its NHL child re-hung:** pid 158782 at 148 s, 7.6% CPU, `poll_schedule_timeout`, an open connection to 104.16.144.251:443 (api-web.nhle.com). The 02:49:20Z sweep was refused `lane_busy` again.
 - **Verdict:** killing one child frees the lane for one run, not more. The fix is I-22's (session local_73a5d2dd, lane odds-lane-sport-deadline): a per-sport deadline / independent sport jobs.
 - **Revert:** none needed. The next run re-creates the child.
+
+## 2026-11-18 06:37:28Z (12:37 AM CST) -- READING, no deploy: the first same-week NCAAF run on `0a60d9e0a` (todo #807 follow-up, lane `ncaaf-sim-history-order-dedupe`, session 386d4115) -- **MET: `sim_history_kept=unchanged`, `sim_history/ncaaf/` stays at 6 files, 0 `sim_history_error=`; the rows came back in another order (37 of 66 moved), so the old compare would have kept a third wk12 pair**
+- **Owed by:** deploys.md 2026-11-17 17:01:55Z (the fleet ff that loaded the order-insensitive compare, no restart).
+- **betting change: no** (a reading; nothing loaded. The load itself is BC-036, `no`.)
+- **Read by** a read-only watcher (`C:\tmp\propsatomic\watch807b.sh`, 10-min polls of the fleet's refresh-worker logs and `sim_history/ncaaf/`), reading at 06:43:07Z in `C:\tmp\propsatomic\r807b_after.out`:
+  - The run: `segment_distributions_path=.../smartsim2_segment_distributions_2026_wk12.json` at 06:37:28.230Z, then **`sim_history_kept=unchanged`** at 06:37:28.241Z. `ncaaf_runs_since=1`, `sim_history_error_since=0`.
+  - Live wk12 files rewritten at 06:37:28Z (sidecar `generated_at` 2026-11-18T06:37:28.207977+00:00, 66 games). Kept files: still **6** (wk11 x1 pair, wk12 x2 pairs: 11-16 06:26:36Z and 11-17 06:31:45Z). No 11-18 pair.
+- **Was the fix exercised, or would the old compare have passed too?** `C:\tmp\propsatomic\d807d.py` (read-only, fleet venv at nice 19): live vs the newest kept copy (11-17 06:31:45Z), less `generated_at`: 66 / 66 rows; **old ordered compare equal = False**; new compare equal = True; **37 of 66 rows in another position**; sidecar `games` equal = True (66). So without `0a60d9e0a` this run would have kept a third, redundant wk12 pair. The fix's branch ran, not just its outcome.
+- **What it adds to #807:** two same-week rewrites now read (11-17, 11-18), and neither changed content: the generator re-simulates a week to the same numbers and only reorders rows. On these two days, #805's refusals of games priced off an earlier same-week write were conservative. Two days of one week, not a rule.
+- **Claims:** none held (refresh-worker released 11-17 after the load).
