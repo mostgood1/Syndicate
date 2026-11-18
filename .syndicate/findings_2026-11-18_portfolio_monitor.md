@@ -615,3 +615,33 @@ picks win about 4-5 pp less than the venue's own fair price says.
   - Orders today 44: 43 filled, 1 maker post resting 656 min, exempt until kickoff.
   - Cap use: kalshi 16.7%, polymarket 15.0%.
 - **Endpoints:** all 7 read 200, all under 0.35 s. 0 kills. **Gate:** BC-050, 0 of 800. **Anomalies: 0.**
+
+## Is the sportsbook consensus or the venue's own price better calibrated on our picks? — PRE-REGISTRATION (written 2026-11-18 18:31:42Z, before any number below is computed; user "Yes, measure it")
+
+**Question (F15).** Every live order is picked by price shopping: the venue's ask is below the sportsbook-consensus
+fair price, which is what the stake is sized on. When the venue and the consensus disagree, which one is right?
+
+**Prices.**
+- **Consensus fair** q_c = implied(`requested_price`) x (1 + `ev_pct`/100). Under market-fair staking (48 of 48
+  orders today, 1,053 of 1,634 in 30 d), `ev_pct` is the consensus fair's EV at the requested price.
+- **Venue fair at entry** q_v = ours / (ours + theirs), from the quote log at the fill (the entry-spread method above).
+
+**Population.**
+- Live bets selected 10-18..11-17, decided (pushes out), pregame.
+- **Primary:** the bets with a usable venue pair at entry (about 388).
+- **Secondary:** q_c's calibration alone on every bet that has `ev_pct` and `requested_price`.
+
+**Metrics** (event-clustered): gap_c = won - q_c; gap_v = won - q_v; **Brier difference d = (won - q_c)^2 - (won - q_v)^2**
+(d > 0 means the venue is better calibrated).
+
+**Hypothesis H-venue:** on the primary set, the venue's own price is the better forecast. d > 0 with its 95% interval
+above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstates our side).
+- *Falsified if* d's interval includes 0 or d < 0.
+- If gap_c is negative but d's interval includes 0, the verdict is "consensus overstates our side, venue not shown
+  better".
+
+**Decision use.**
+- H-venue survives: "venue below consensus" is adverse selection on these venues, and price shopping as built has no
+  edge. The candidate levers are to judge EV against a blend that includes the venue's own fair, or to require the
+  sportsbook consensus to agree with the venue's own move. Each is per line, a betting change, and the user's call.
+- H-venue falsified: the consensus is fine, and the loss sits elsewhere (fees, stake sizing).
