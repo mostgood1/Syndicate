@@ -242,3 +242,44 @@ at the price paid after fees, and that band is most of the book.
 3. **Sizing:** the top stake quartile loses more than the rest. Compounding/Kelly stakes are largest where the claimed
    EV is highest, and the claimed EV is overstated.
 4. **Timing:** the gate's clock restarted at BC-042 (08:31:33Z) with 0 events. A betting change now costs no gate time.
+
+## Paper ladder by net-EV band — does a higher live floor stop the losses? (user "Yes, measure it", 11-18)
+
+**Hypothesis, written before the run:** if the live book's losses come from taking edges that are too thin, the paper
+ladder's higher net-EV bands earn more than its lower ones, and some band above today's floor (Kalshi 1.0, Polymarket
+0.5) earns beyond noise. **Falsified if** returns do not rise with net EV, or no band above the floor is positive
+beyond noise.
+
+**Read:** `scripts/paper_ladder_readout.py` (lane `paper-alongside-live`'s own instrument, pre-registered 2026-10-20 in
+`findings_2026-10-20_paper_ladder.md`). Run read-only on the fleet's paper ledger with refresh-worker's env, nice 19,
+on fleet head `2ae0c646a`.
+- **Coverage:** paper bets submitted since 2026-10-20T16:18:24Z and settled by 11-18 14:2xZ. **27,347 bets over 29 slate
+  dates, 10-20..11-17.** This is the fleet, not the git mirror.
+- **Units:** flat ROI per bet (mean return per dollar, x100), event-clustered SE. Same-book CLV in pp (gross; the
+  readout's `clv_pct`).
+
+| net-EV band | Kalshi ROI ± SE (games) | CLV | Polymarket ROI ± SE (games) | CLV | readout verdict |
+|---|---|---|---|---|---|
+| paper venue book (the live selection's paper twin) | -5.7 ± 3.8 (318) | +1.65 | -2.1 ± 5.2 (185) | +1.12 | no change |
+| ge2 (>= 2 pp, above both floors) | **-9.4 ± 5.1** (109) | -0.91 (n=23) | -7.5 ± 6.4 (79, too few) | -7.96 (n=10) | no change / insufficient |
+| 1to2 | **+1.2 ± 3.1** (499) | +1.07 | -6.8 ± 4.4 (340) | +0.58 | straddles 0 |
+| 0to1 | -5.9 ± 1.7 (1,196) | +0.95 | -3.7 ± 2.1 (981) | +0.92 | Kalshi AGAINST: keep the floor |
+| m1to0 | -4.0 ± 1.2 (1,341) | +0.85 | -5.1 ± 1.5 (1,190) | +0.45 | AGAINST both: keep the floor |
+
+**Result: the hypothesis is FALSIFIED.**
+- **Returns do not rise with net EV.** Kalshi's best band is 1to2 at +1.2 ± 3.1; its ge2 band is the worst
+  (-9.4 ± 5.1, 1.8 SE below 0). No band above either floor earns beyond noise.
+- **Raising the live floor is not supported.** It would keep the bands that lose most and drop the one band near
+  breakeven.
+- **The floor itself is confirmed:** below it, 0to1 and m1to0 lose beyond 2 SE (pre-registered AGAINST). Lowering it
+  is also not supported.
+- **Positive same-book CLV with negative ROI in almost every band**, paper and live alike. On the live book the close
+  overprices the sides we pick by 6.28 pp (z -2.93, 30 d). The picks beat the close and still lose, because the close
+  on those sides is itself too high. That points upstream of any threshold: at which sides and prices the model's
+  edge is real, versus where the venue's close is biased (for example a favourite-longshot pattern; live price band
+  0.30-0.45 is -12.6% beyond noise).
+
+**So the EV bar is not the lever.** F9 is updated. The next optimization lead is the close-calibration gap: where, by
+side and price band, do our picks win less than the close implies, measured on the live book and the paper ladder
+together? That decides whether the fix is in the model's probabilities (calibration shrink) or in which prices we
+accept. The cell table (`--cells`, descriptive only) was not read; no cell-level rule is pre-registered.
