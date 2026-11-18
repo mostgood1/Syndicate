@@ -407,9 +407,34 @@ peak O(segments + dates) instead of O(ledger) — is the next build
 - **WSL UNREACHABLE now emails too `[2026-10-20, lane watchdog-unreachable-email, 5ff3002f, deploys.md 13:03Z]`.** The one failure this mailer cannot report (WSL down) is emailed by the Windows-side `watchdog.ps1` itself, through the same Gmail account. It fires after >= 10 min down, every 6 h after that, and once on recovery; blips stay toast-only. The secret is a DPAPI copy in `C:\SyndicateProd\watchdog\smtp_alerts.json`, owner-only ACL; re-run `-SetupEmail` after changing the app password, because the two copies do NOT sync. Proven: the drill email plus a task-context 'reachable again' email (13:19:33Z). A healthchecks.io dead-man's switch is built but DORMANT by user decision ("skip this", 2026-10-20): `heartbeat_url.txt` is absent, so a machine that is asleep or off still shows up only as a missing 8 AM CT digest. Both emails were received (user).
 - **wsl_state.json has ONE writer and the NEWEST OBSERVATION WINS `[2026-10-20, lane watchdog-stale-writer, 6ab163ba + d3b68ea9, deploys.md 15:01Z]`.** PT4M kills conhost.exe but not the child powershell.exe, so a run that overran lived on and wrote late. Today that was routine: wsl.exe started 65 s after launch, and a line landed 5 min 14 s after launch. Now the read-modify-write holds `wsl_state.lock`, and the state carries `observed_at` + `run_pid`. An older observation logs `STATE_STALE` and writes nothing; a lock still held after the wait logs `STATE_BUSY`. The run works to `-DeadlineSeconds 200` from the process start, and every log line carries `run=<pid>` (the check lines also carry `took_s` / `startup_s`). Off-cadence lines in that log are late writers from overrunning runs, NOT extra schedules. Do not run watchdog.ps1 by hand against the default StateDir: test with `-StateDir <scratch>` (and `-FleetTaskName DRILL-no-such-task` if the WSL check is real).
 
-## [local-fleet-runner] THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, lane m625-fleet-runner, commit 92020995, NO DEPLOY]`
+## [local-fleet-runner] THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, lane m625-fleet-runner, commit 92020995; RE-VERIFIED 2026-11-17 on the fleet's own env, lane fleet-local-env-source, NO DEPLOY]`
 
-`py -3 scripts/fleet_local.py doctor` -> READY.
+**REBUILT ON THE FLEET'S ENV 2026-11-17** (findings_2026-11-17_fleet_local_env_source.md). Its only env input, a
+`snapshot_render_env.py` file, lost its producer at the 2026-11-15 render-retirement (`f9ed2ec0f`): every `doctor`/`up`
+exited rc=1 at "no env snapshot" (reproduced from a clean worktree).
+- **Env = the fleet's own `local_production.derive_role_env`** (`fleet_role_spec.json` -> snapshot -> forced; NEVER
+  `local_production.env`) plus the rehearsal overrides. Snapshot: `python3 scripts/fleet_local.py --mirror <M> snapshot
+  --fleet-home ~/syndicate-prod` inside WSL (`fleet_env/` is 0700): a CREDENTIAL-FREE copy, **83/88, 172/182, 139/148
+  keys kept**, withheld by NAME only (no hash): venue keys, ADMIN_TOKEN, ODDS/CFBD keys, the portfolio login, the
+  state/publish URLs, and `SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET` ("HO-URL-Y": a safe false positive). Leak check on the
+  live files: 0 withheld values in any rehearsal file, every kept value byte-identical. `doctor`/`up` refuse a
+  `fleet_env/` without the rehearsal mark (i.e. the live one) and re-apply the rule on load.
+- **PRODUCTION IS ON THIS MACHINE.** Measured before: a guarded replay child CONNECTED to 127.0.0.1:10000 (fleet web)
+  and :6379 (fleet Redis) from Windows, and its web base URL resolved to the fleet. Now the guard denies those ports
+  in EVERY fetch mode, the workers' web URLs point at the rehearsal web, `--port`/`--redis-url` refuse the fleet's
+  ports, and a fleet-home data root is refused by the parent and by the child (rc=71).
+- **After:** `doctor` READY with 5 negative controls per role (money-armed rc=70, :10000 and :6379 refused, fleet data
+  root rc=71). `up --bounded --duration-seconds 120` ok=True: web 168.7 MB (waitress), refresh-worker 570.2 MB,
+  live-odds-worker 1004.2 MB; outbound denied 163/167; fleet-port attempts 0.
+- **CORRECTION to the 2026-09-02 reading below:** the Render-era snapshot kept plaintext for booleans and numbers only.
+  Read off the 10-01 file: `SYNDICATE_REFRESH_LANE`, `SYNDICATE_ACTIVE_SPORTS`, `SYNDICATE_LIVE_ODDS_REFRESH_MODE` and
+  `SYNDICATE_DATA_ROOT` had NO plaintext for any service, so "103 / 77 / 37 production keys passed through" never
+  included the string run-modes or a data path. Now they come from the spec and the snapshot.
+- **Not reproduced, by design:** the credentials, the hosted-only branches (`--state file`), gunicorn on Windows. The
+  fleet's `NHL_DATA_DIR`/`NHL_LIVE_LENS_DIR` are checkout-relative `./...`, so the rehearsal drops them (a lead: the
+  fleet reads NHL from under its checkout, not its data root).
+
+2026-09-02: `py -3 scripts/fleet_local.py doctor` -> READY.
 `... up --bounded --duration-seconds 120` ran all three: web **156.7 MB** of its
 2048 MB cap and still serving, refresh-worker **exit 0, 408.9 MB** of 4096,
 live-odds-worker **exit 0, 620.2 MB** of 2048. Production run-modes preserved —
@@ -425,8 +450,10 @@ live-odds-worker **exit 0, 620.2 MB** of 2048. Production run-modes preserved �
   `statsapi.mlb.com`, `site.api.espn.com` and `api.weather.gov`.
 - **FOUR INDEPENDENT DEFENCES**, the first three asserted BY THE CHILD (a
   parent-side scrub can be mis-edited): mode != `live`, the arm switch, no venue
-  credentials — and structurally, `snapshot_render_env.py` withholds secret
-  VALUES, so 49/50/35 keys per service were never in the snapshot to leak.
+  credentials — and structurally, the snapshot withholds secret VALUES (2026-09:
+  `snapshot_render_env.py`, 49/50/35 keys per service; since 2026-11-17 `fleet_local.py
+  snapshot`), so they were never in the file to leak. Since 2026-11-17 the child also
+  refuses a fleet data root / state store and denies the fleet's ports.
 - **A `sitecustomize` THAT RAISES DOES NOT STOP THE INTERPRETER.** CPython's
   `site.execsitecustomize` catches it, prints `Error in sitecustomize; set
   PYTHONVERBOSE for traceback:` and CARRIES ON — verified with a one-line probe,
@@ -434,14 +461,15 @@ live-odds-worker **exit 0, 620.2 MB** of 2048. Production run-modes preserved �
   refusal and permits the thing it refused.
 - **BOTH WORKERS REFUSE A FILE STATE BACKEND** while
   `SYNDICATE_REQUIRE_HOSTED_STORAGE` is truthy (`refresh_state_store.py:316`),
-  and production sets it `true` on all three services. Clearing `RENDER` alone
-  is not enough — the predicate is an OR of the two.
+  and production sets it `true` on all three services. Clearing the hosted marker
+  alone is not enough — the predicate is an OR of the two.
 - **GUNICORN CANNOT RUN ON WINDOWS** (`import fcntl`), though
-  `shutil.which("gunicorn")` finds the pip shim. Local web runs the Flask dev
-  server and says so; do not read performance or concurrency from it.
+  `shutil.which("gunicorn")` finds the pip shim. Local web on Windows runs waitress
+  (the fleet's own fallback, `local_production.role_command`, since 2026-11-17; the Flask
+  dev server before) and says so; do not read performance or concurrency from it.
 - **Memory caps are a WATCHDOG, not a container limit.** RSS sampling: a process
   can exceed the cap between samples and a sudden allocation outruns the
-  sampler. Useful for the slow ratchet, NOT evidence about Render's ceiling.
+  sampler. Useful for the slow ratchet, NOT evidence about the fleet's ceiling.
 
 ## [local-production-host] PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared disk `[verified 2026-09-30, lane local-production-host, PR #118 f565a435, NO DEPLOY]`
 

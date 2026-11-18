@@ -9,7 +9,7 @@ Use this skill when the problem is about live cards, live props, scoreboard stat
 
 ## Workflow
 1. Identify the sport, event date, route, and artifact path involved.
-2. Reproduce the issue in a local fleet-equivalent run (same role env and worker/web split, paper money only) first when the symptom could depend on runtime behavior, startup timing, the shared data root, env vars, or worker/web split behavior.
+2. Reproduce the issue in a local fleet-equivalent run (same role env and worker/web split, paper money only: `scripts/fleet_local.py`) first when the symptom could depend on runtime behavior, startup timing, the shared data root, env vars, or worker/web split behavior.
 3. Check the owning local payload, mirror artifact, and home/card rendering surface before comparing with the live fleet at `http://127.0.0.1:10000`.
 4. Verify whether the issue is source freshness, payload shape, fallback merge logic, runtime-equivalence mismatch, or UI rendering.
 5. Prefer focused archive or route tests for the affected sport before broader smoke runs.

@@ -1,4 +1,4 @@
-"""The guard every local fleet child loads BEFORE any Syndicate code. `#625`(4).
+"""The guard every local rehearsal child loads BEFORE any Syndicate code. `#625`(4).
 
 Imported from a generated `sitecustomize.py` that `fleet_local.py` places first
 on the child's `PYTHONPATH`. CPython imports `sitecustomize` during interpreter
@@ -35,6 +35,18 @@ Three independent things stop an order, so any ONE of them holding is enough:
      (`execution_ledger.py:244`).
   3. No venue credentials in the environment -> nothing can sign a submit.
 This module asserts all three and refuses on any one of them failing.
+
+PRODUCTION IS ON THIS MACHINE NOW, SO LOOPBACK IS NOT "OURS" `[2026-11-17, lane fleet-local-env-source]`
+-----------------------------------------------------------------------------------------------------
+This guard was written when production was Render: loopback could only be the
+rehearsal's own roles. Since 2026-09-30 production is the WSL fleet on this
+same machine, and MEASURED 2026-11-17 a guarded replay-mode child connected to
+127.0.0.1:10000 (the fleet's web) and 127.0.0.1:6379 (the fleet's Redis, its
+whole shared state store) from Windows, and resolved its web base URL to the
+fleet. So, in EVERY fetch mode, a connection to one of `FLEET_PORTS` is denied
+(any host: the fleet's VM address reaches the same server), and a data root,
+reports root or state-store URL that is the fleet's refuses the process before
+it starts (`assert_not_production`).
 """
 
 from __future__ import annotations
@@ -77,8 +89,64 @@ SHARED_BUDGET_ENV: tuple[str, ...] = (
 )
 
 
+# The fleet's own ports on this machine: web (`local_production.Settings.port`)
+# and its Redis (`Settings.redis_url`). `tests/test_fleet_local.py` pins both to
+# local_production's defaults, so a fleet that moves its ports fails a test here
+# instead of quietly reopening the path. Spelled out rather than imported:
+# this module runs in every child's interpreter startup.
+FLEET_PORTS: tuple[int, ...] = (10000, 6379)
+
+# Directory names of a fleet home (`local_production.default_home()`:
+# `~/syndicate-prod` on Linux, `%LOCALAPPDATA%\SyndicateProd` on Windows). A
+# rehearsal's data or reports root inside one would write onto production's disk.
+PRODUCTION_DIR_NAMES: frozenset[str] = frozenset({"syndicate-prod", "syndicateprod"})
+
+# Where a child's state can land: the data and reports roots, and the state store.
+PRODUCTION_PATH_ENV: tuple[str, ...] = ("SYNDICATE_DATA_ROOT", "SYNDICATE_REPORTS_ROOT")
+STATE_URL_ENV: tuple[str, ...] = ("SYNDICATE_REFRESH_STATE_URL", "REDIS_URL", "SYNDICATE_KEYVALUE_URL")
+
+
 class FleetGuardRefused(RuntimeError):
     """Raised during interpreter startup. Nothing Syndicate has imported yet."""
+
+
+def is_production_path(value: str) -> bool:
+    """True when any component of the path names a fleet home directory."""
+    text = str(value or "").replace("\\", "/")
+    return any(part.lower() in PRODUCTION_DIR_NAMES for part in text.split("/") if part)
+
+
+def url_port(url: str) -> int | None:
+    from urllib.parse import urlparse
+
+    try:
+        return urlparse(str(url or "").strip()).port
+    except ValueError:
+        return None
+
+
+def assert_not_production() -> list[str]:
+    """Return why this process cannot write to the fleet's disk or state, or raise."""
+    failures: list[str] = []
+    for name in PRODUCTION_PATH_ENV:
+        value = str(os.environ.get(name) or "").strip()
+        if value and is_production_path(value):
+            failures.append(f"{name} is inside a fleet home ({sorted(PRODUCTION_DIR_NAMES)})")
+    for name in STATE_URL_ENV:
+        value = str(os.environ.get(name) or "").strip()
+        if value and url_port(value) in FLEET_PORTS:
+            failures.append(f"{name} names port {url_port(value)}, the fleet's")
+    if failures:
+        raise FleetGuardRefused(
+            "REFUSING TO START A LOCAL REHEARSAL PROCESS THAT COULD WRITE TO PRODUCTION.\n  "
+            + "\n  ".join(failures)
+            + "\n\nThis is the local fleet guard (`scripts/_fleet_guard.py`). Production runs on this\n"
+            "machine; a rehearsal reads its own mirror and its own state store."
+        )
+    return [
+        "data and reports roots are not a fleet home",
+        "state store is not the fleet's (no state URL on ports " + ", ".join(map(str, FLEET_PORTS)) + ")",
+    ]
 
 
 def _truthy(name: str) -> bool:
@@ -118,16 +186,20 @@ def assert_money_is_off() -> list[str]:
     return reasons
 
 
-def install_network_guard(record: list[dict[str, object]]) -> None:
-    """Deny every outbound connection and RECORD what was attempted.
+def install_network_guard(record: list[dict[str, object]], *, deny_outbound: bool = True) -> None:
+    """Deny connections a rehearsal must not make, and RECORD what was attempted.
 
     Recording matters as much as denying: "would this role have called out, and
     where to?" is otherwise answered by reading code, and reading is how a
     conditional fetch behind a cache check gets missed.
 
-    Loopback is ALLOWED. The roles legitimately talk to each other and to a
-    local redis, and a guard that broke that would make the fleet untestable --
-    which is how a guard gets switched off.
+    Two rules. `deny_outbound` (replay mode) denies every non-loopback address.
+    The fleet's ports (`FLEET_PORTS`) are denied in EVERY mode and on any host:
+    `--fetch live` opts into upstream APIs, never into production.
+
+    Other loopback ports stay ALLOWED. The roles legitimately talk to each other
+    and to a rehearsal redis, and a guard that broke that would make the fleet
+    untestable -- which is how a guard gets switched off.
     """
 
     original_connect = socket.socket.connect
@@ -140,37 +212,50 @@ def install_network_guard(record: list[dict[str, object]]) -> None:
         host = str(address[0])
         return host in {"127.0.0.1", "::1", "localhost", "0.0.0.0", ""} or host.startswith("127.")
 
-    def _deny(where: str, address: object) -> None:
+    def _fleet_port(address: object) -> bool:
+        return isinstance(address, tuple) and len(address) >= 2 and address[1] in FLEET_PORTS
+
+    def _deny(where: str, address: object, *, fleet: bool) -> None:
         host, port = (address[0], address[1]) if isinstance(address, tuple) and len(address) >= 2 else (address, None)
-        record.append({"via": where, "host": str(host), "port": port, "at": time.time()})
+        record.append({"via": where, "host": str(host), "port": port, "at": time.time(), "fleet_port": fleet})
         path = os.environ.get(RECEIPT_ENV)
         if path:
             try:
                 Path(path).with_suffix(".network.jsonl").open("a", encoding="utf-8").write(
-                    json.dumps({"role": os.environ.get(ROLE_ENV), "via": where, "host": str(host), "port": port}) + "\n"
+                    json.dumps({"role": os.environ.get(ROLE_ENV), "via": where, "host": str(host), "port": port,
+                                "fleet_port": fleet}) + "\n"
                 )
             except Exception:
                 pass
+        if fleet:
+            raise OSError(
+                f"local rehearsal: {where} to {host}:{port} denied -- FLEET PORT. Port {port} is the live "
+                "fleet's own (web 10000 / redis 6379) on this machine, and a rehearsal must not read from "
+                "or write to production in any fetch mode."
+            )
         raise OSError(
             f"local fleet is in REPLAY mode: {where} to {host}:{port} denied. "
             "One-way flows (`#625` law 1): a local run must not read from or write to production. "
             "Re-run with --fetch live if an outbound call is genuinely intended."
         )
 
+    def _check(where: str, address: object) -> None:
+        if _fleet_port(address):
+            _deny(where, address, fleet=True)
+        if deny_outbound and not _local(address):
+            _deny(where, address, fleet=False)
+
     def guarded_connect(self, address):  # type: ignore[no-untyped-def]
-        if _local(address):
-            return original_connect(self, address)
-        _deny("socket.connect", address)
+        _check("socket.connect", address)
+        return original_connect(self, address)
 
     def guarded_connect_ex(self, address):  # type: ignore[no-untyped-def]
-        if _local(address):
-            return original_connect_ex(self, address)
-        _deny("socket.connect_ex", address)
+        _check("socket.connect_ex", address)
+        return original_connect_ex(self, address)
 
     def guarded_create_connection(address, *args, **kwargs):  # type: ignore[no-untyped-def]
-        if _local(address):
-            return original_create_connection(address, *args, **kwargs)
-        _deny("socket.create_connection", address)
+        _check("socket.create_connection", address)
+        return original_create_connection(address, *args, **kwargs)
 
     socket.socket.connect = guarded_connect  # type: ignore[method-assign]
     socket.socket.connect_ex = guarded_connect_ex  # type: ignore[method-assign]
@@ -216,15 +301,24 @@ def engage() -> dict[str, object]:
         sys.stderr.write(f"\n{refusal}\n")
         sys.stderr.flush()
         os._exit(70)
+    try:
+        receipt["production_off_because"] = assert_not_production()
+    except FleetGuardRefused as refusal:
+        sys.stderr.write(f"\n{refusal}\n")
+        sys.stderr.flush()
+        os._exit(71)
     shared = [name for name in SHARED_BUDGET_ENV if str(os.environ.get(name) or "").strip()]
     receipt["shared_budget_credentials_present"] = shared
+    fleet_ports = ", ".join(str(port) for port in FLEET_PORTS)
     if receipt["fetch_mode"] == "replay":
-        install_network_guard([])
-        receipt["network"] = "DENIED (loopback allowed)"
+        install_network_guard([], deny_outbound=True)
+        receipt["network"] = f"DENIED (loopback allowed except the fleet's ports {fleet_ports})"
     else:
         # Explicit, and recorded in the receipt so a run that spent real quota
-        # is identifiable afterwards rather than reconstructed.
-        receipt["network"] = "LIVE -- outbound allowed by explicit --fetch live"
+        # is identifiable afterwards rather than reconstructed. The fleet's
+        # ports stay denied: live fetch is upstream data, never production.
+        install_network_guard([], deny_outbound=False)
+        receipt["network"] = f"LIVE -- outbound allowed by explicit --fetch live; the fleet's ports {fleet_ports} denied"
     path = os.environ.get(RECEIPT_ENV)
     if path:
         Path(path).parent.mkdir(parents=True, exist_ok=True)

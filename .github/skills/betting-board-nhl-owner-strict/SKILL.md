@@ -17,7 +17,7 @@ Production is the local WSL fleet at `http://127.0.0.1:10000` `[since 2026-09-30
 - The visible response should expose NHL opportunities through the fields the UI consumes.
 - The board should remain readable even when worker state is stale or the snapshot is partial.
 - Fleet parity (the board as `http://127.0.0.1:10000` serves it) should be verified before calling the board fixed.
-- When runtime behavior is suspect, reproduce the issue in a local fleet-equivalent run (same worker/web split, same role env, a data root laid out like `~/syndicate-prod/data`, paper money only) before leaning on live fleet checks.
+- When runtime behavior is suspect, reproduce the issue in a local fleet-equivalent run (same worker/web split, same role env, a data root laid out like `~/syndicate-prod/data`, paper money only: `scripts/fleet_local.py`) before leaning on live fleet checks.
 
 ## Validation Bar
 A change is not complete until at least one of these passes:

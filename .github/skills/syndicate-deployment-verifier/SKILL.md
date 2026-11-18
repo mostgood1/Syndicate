@@ -11,7 +11,7 @@ Production is the local WSL fleet `[since 2026-09-30; Render is retired]`. Pushi
 
 ## Workflow
 1. Identify the route, artifact, or payload that looks stale.
-2. Check the local file or response contract first, and reproduce the behavior in a local fleet-equivalent run (same role env and worker/web split, paper money only) when runtime shape or startup behavior could matter.
+2. Check the local file or response contract first, and reproduce the behavior in a local fleet-equivalent run (same role env and worker/web split, paper money only: `scripts/fleet_local.py`) when runtime shape or startup behavior could matter.
 3. Compare the deployed revision (web's `/versionz` at `http://127.0.0.1:10000`; `scripts/deploy_preflight.py` reads each role's loaded commit), published artifacts (`/api/ops/artifacts/export` on the fleet), and data-root expectations (`~/syndicate-prod/data`) after the local runtime-equivalent check.
 4. Distinguish code drift from stale mirrors, stale deployment, or a runtime-equivalence mismatch.
 5. End with a concrete parity statement: local only, deploy only, runtime-equivalent local only, or full parity.

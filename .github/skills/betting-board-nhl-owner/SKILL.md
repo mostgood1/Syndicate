@@ -43,7 +43,7 @@ This skill applies to work on:
 3. Confirm whether the response is empty, stale, queued, or computed.
 4. Determine whether the worker, cache, or request path owns the failure.
 5. Verify the visible NHL board shape matches what the template expects.
-6. Reproduce the issue in a local fleet-equivalent run (same worker/web split, same role env, a data root laid out like `~/syndicate-prod/data`, paper money only) when the symptom could depend on runtime behavior, startup timing, the shared data root, env vars, or worker/web split behavior.
+6. Reproduce the issue in a local fleet-equivalent run (same worker/web split, same role env, a data root laid out like `~/syndicate-prod/data`, paper money only: `scripts/fleet_local.py`) when the symptom could depend on runtime behavior, startup timing, the shared data root, env vars, or worker/web split behavior.
 7. Validate locally with the same request path the UI uses after the runtime-equivalent environment check.
 
 ## Validation Expectations
