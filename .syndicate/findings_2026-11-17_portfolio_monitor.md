@@ -679,3 +679,38 @@ One pass over every portfolio route, before any probe existed:
 - **Execution, 30 min:** 10 live ticks, 0 placed, 0 failed. Orders today 54 (53 filled, 1 rejected maker expiry).
   Resting 0. Late settlements 0, 32 started bets unsettled while games are live. Cap use kalshi 18.6%, polymarket 17.6%.
 - **Gate:** clock pending BC-041 (count 0), as designed until the refresh-worker restart loads `ee47c930a`.
+
+## F7 diagnosed — why tonight's plan goes stale (Tue 11-17 8:31 PM CST, read-only)
+
+The user asked to "fix the stale plan". Hypothesis before reading: the plan only waits on slow board builds.
+**Partly false.** From `refresh-worker.log`, every step on the board-loop thread between today's `portfolio_commit`s:
+
+- **Gap 1: 4:58 -> 5:46 PM CST (22:58 -> 23:46Z), ~48 min.**
+  - A next-day (11-18) cycle: 23:03-23:13Z.
+  - 16 `DEFERRED_BOARD_BUILD reason=deploy_drain_requested`, 23:14:42-23:32:44Z: a refresh-worker drain that never
+    reached an idle worker.
+  - `_refresh_today_layer2_on_cadence`: 23:33-23:39Z.
+  - Today's build: 542 s.
+- **Gap 2: 7:21 PM -> still open at 8:30 PM CST (01:21Z -> after 02:30Z), 69+ min.**
+  - The rest of the 1,510 s build: paper execution and persist, to 01:33Z.
+  - `LAYER2_TODAY_CADENCE ran=yes elapsed_s=779.6`: the in-loop Layer 2 refresh, 13 min.
+  - The pending 11-18 key popped ahead of today. The queue is FIFO and today is re-queued to the end every pass.
+  - Then the 11-18 cycle: refresh before (01:46-01:51Z), build (829 s), refresh after (02:05-02:11Z).
+  - Another 10-min in-loop refresh (02:13-02:23Z).
+  - Today's build started 02:24:34Z and was still running at 02:30:52Z.
+- **For contrast, 00:00-01:04Z:** the loop wrote today's plan every 4-7 min, with builds of 150-350 s.
+
+**One root, three multipliers.** Everything on the loop thread runs 5-10x slower in the live evening.
+`layer2-board-process-split` measured why: the board thread gets 0.19-0.46 of a core against the book-grid and odds
+threads in one interpreter. Its fix, `09eddabf2` (`SYNDICATE_BOARD_BUILD_PROCESS`), is on main and not loaded. It
+needs an env line plus a drained `down`/`up` after a slate, because two live-evening drains on 11-17 never reached an
+idle worker. Its pre-registered metric 4 is this lane's `plan_commits` series.
+
+The multipliers stay after the split, but each costs minutes once builds run at calm speed:
+- the next-day cycle with its two extra Layer 2 refreshes, about hourly;
+- deploy drains;
+- the in-loop Layer 2 refresh.
+
+**No live mitigation tonight.** A refresh-worker restart now drops the in-flight build, takes about 20 min to first
+publish, and drains have not reached idle this evening. Bets are still checked against current prices before
+placement, so a stale plan costs missed bets, not bad ones.
