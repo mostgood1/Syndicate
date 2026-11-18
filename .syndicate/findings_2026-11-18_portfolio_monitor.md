@@ -645,3 +645,39 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   edge. The candidate levers are to judge EV against a blend that includes the venue's own fair, or to require the
   sportsbook consensus to agree with the venue's own move. Each is per line, a betting change, and the user's call.
 - H-venue falsified: the consensus is fine, and the loss sits elsewhere (fees, stake sizing).
+
+### Consensus vs venue calibration — RESULT (run 2026-11-18 ~18:00-18:10Z, read-only; `C:\tmp\pfmon\calib_cons_venue.py`)
+
+**Population:** decided pregame live bets, 10-18..11-17: 1,156. The consensus fair is recoverable for 1,155.
+**Primary** (consensus plus a venue pair at entry): **388 bets / 272 games.**
+
+| primary, 388 / 272 | pp [95%] |
+|---|---|
+| won - consensus fair (gap_c) | **-7.76 [-13.12, -2.41]** |
+| won - venue fair at entry (gap_v) | **-5.87 [-11.23, -0.51]** |
+| Brier d = consensus - venue (x100; > 0 means the venue is better) | +0.21 [-0.14, +0.56] |
+| consensus fair minus venue fair (the claimed edge) | +1.89 [+1.59, +2.20] |
+
+- **By consensus-minus-venue gap:**
+  - < 2 pp (143 / 121): won-consensus -7.09, won-venue -7.20;
+  - **2-4 pp (225 / 177): won-consensus -8.60 (se 3.35), won-venue -5.79 (se 3.35)**;
+  - 4-7 pp (17): noise.
+- **Secondary** (all 1,155): won - consensus **-2.94 [-6.40, +0.51]**.
+
+**Verdict as registered: "the consensus overstates our side, and the venue is not shown better."**
+- H-venue is FALSIFIED on its Brier test: d's interval includes 0.
+- **Both prices overstate the sides we pick, beyond noise:** the consensus by 7.8 pp, the venue's own fair by 5.9 pp.
+
+**What it means:**
+- The losses are not a bad fair-price source, a spread, or a threshold. **The price-shopping trigger selects sides
+  that win less often than either market says.** It buys when the venue's ask sits below the consensus, and those
+  are the sides that go on to lose.
+- That is **adverse selection in the trigger.** The likely mechanism, not yet tested, is that one source has moved
+  on information the other has not absorbed, and we buy the side the information moved against.
+- In the strongest group (claimed edge 2-4 pp, 225 bets) the picks win 8.6 pp less than the consensus says, against
+  a claimed +3.
+- **Implication for the lever list:**
+  - Thresholds, spread limits and fair-source swaps are all ruled out by the evidence above.
+  - What remains is (1) **the trigger itself**: require the price gap to persist or the consensus to be fresh,
+    tested on paper; and (2) **exposure while no edge is shown**: stakes at the measurement minimum. Both are betting
+    changes and the user's call.
