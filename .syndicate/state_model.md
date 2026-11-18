@@ -706,6 +706,7 @@ map with the tool, not the prose.
   rebound/tip-in coefficient sign is an open question; `#470`'s
   market-backtest sample (n=14-15) is nowhere near powered — re-run as the
   season resumes and dates accumulate.
+- **Ingestion caches on the fleet** `[verified 2026-11-18 ~9:40 AM CST, lane nhl-stats-rest-cache, read-only]`: live-odds-worker sets `SYNDICATE_DATA_ROOT` but no `SYNDICATE_ARTIFACT_ROOT_NHL`, so the generation's boxscore cache (`nhl_web._default_cache_dir`) is the CHECKOUT's `~/Syndicate/data/nhl_source/data/ingestion_cache` (578 boxscores), not the data root's (1,092 files from other producers). The stats-REST report cache on main `59fbefc71` (todo #839, NOT LOADED) resolves to the data root.
 
 ## [model-skill] MODEL SKILL (`#428`) — measured vs not
 
