@@ -1429,6 +1429,14 @@ death, never life — do not invert it.
 - Verification: Reproduction gate first: the rebuilt inputs reproduce served total_mean exactly on seeds 1..300 for a sample of games across weeks, else no attribution; then the block table, the shared-luck SD, served and long-run level vs real with game-bootstrap CIs; findings with data coverage
 - Blocked by: none
 
+### nba-ot-789-check1 — CLOSED 2026-11-18 (GOAL MET: hypothesis CONFIRMED -- first-tick mean p_ot 2.14% [1.72, 2.56] on 50 games vs real 4.54% [3.54, 5.80]; routed to basketball-scenario-calibration via leads.md; read-only, nothing on the fleet changed) — opened 2026-11-18 — session 5b9aa6b3-783e-4f57-8cff-e2fa0f49acf3
+- Goal: Todo #789 check 1 read-only: mean p_ot at each NBA game's first live re-sim tick since 11-11 6:11 PM CT, with a 95% CI, against the real 4.5% overtime rate; recorded in todo #789 and the #789 findings addendum; a confirmed shortfall routed to basketball-scenario-calibration
+- Files: docs/ai_context/todo.md (#789 section only), .syndicate/findings_2026-11-11_nba_blowout_bench.md (Addendum (#789) only)
+- Hypothesis: Engine P(OT) at the tip is ~half the real 4.5% (#789 owed item 2)
+- Falsification test: The 95% CI of the first-tick mean p_ot contains 4.5%
+- Verification: Read-only fleet reading of live_resim_history (~/syndicate-prod/data), games and draws counted; nothing on the fleet changed
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

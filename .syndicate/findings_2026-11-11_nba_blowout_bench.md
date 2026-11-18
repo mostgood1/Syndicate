@@ -170,3 +170,23 @@ The user said "Yes, record it" to recording the re-sim's own overtime chance. Be
 Re-run: `python scripts/nba_blowout_bench_study.py --start 2026-10-20 --end <date> --evidence --data-root ~/syndicate-prod/data` (`q4_overtime`).
 
 **First fleet reading (2026-11-12 00:11:31Z, after the user-approved load at 23:39:26Z):** WAS @ IND, 0-0 at the tip, `p_ot` 0.01 on 100 draws. The archive's real rate: 60 of 1,321 graded 2025-26 games went to overtime (4.5%), 8 of 160 this season (5.0%). With `#763`'s 2.9% of draws tied across 6,215 live lanes, and 0.47 expected overtime points per game on Q1-Q3 ticks since 11-06 (about 2%), the engine may give overtime about HALF its real chance EARLY in games. NOT yet evidence: one row. The test is the mean first-tick `p_ot` over a week of slates against 4.5% (todo #789).
+
+### Check 1 (#789 owed item 2), 2026-11-18 ~10:40 AM CST, lane `nba-ot-789-check1`: CONFIRMED, the engine gives overtime about half its real chance at the tip
+
+Read-only, on the fleet's `~/syndicate-prod/data/nba_source/data/processed/live_resim_history/2026-11-1*.jsonl`. Nothing changed. Script: `C:\tmp\ot789_check1b.py` (scratch, not committed).
+
+| | games / ticks | mean P(OT) | 95% CI |
+|---|---|---|---|
+| engine, each game's first `p_ot` tick (11-11..11-17 slates) | 50 games, 100 draws each | **2.14%** | [1.72, 2.56] (game-clustered) |
+| same, pooled draws | 107 of 5,000 | 2.14% | [1.77, 2.58] (Wilson) |
+| engine, Q1 with >= 10:00 left | 45 games | 2.20% | |
+| engine, all Q1-Q3 ticks | 1,818 ticks | 2.06% | |
+| real, 2025-26 graded games | 60 of 1,321 | **4.54%** | [3.54, 5.80] (Wilson) |
+
+- Every first tick is in Q1 (median 11:15 left, 21 of 50 at 0-0). Slates: 11-11 10, 11-12 4, 11-13 9, 11-14 5, 11-15 9, 11-16 8, 11-17 5.
+- The intervals do not overlap. The engine is at about 47% of the real rate.
+- The games themselves agree. At least 4 of the 50 reached a 5th period in the history (a lower bound: it counts only overtimes with a tick in them). At the engine's 2.14% that is 1.07 expected, and P(>= 4) is about 0.02.
+- `#820` measured the same thing on the pregame sim: 2.0% of draws level after regulation, against 5.7% real.
+- Cost: (4.54 - 2.14) pp x ~21.6 points per overtime = **about 0.5 points low on a full-game total at the tip**, shrinking as the game goes on.
+- Routed to lane `basketball-scenario-calibration` (leads.md 2026-11-18): the engine produces too few regulation ties. The cause is not pinned. Candidates are the margin spread (Phase 1 flagged margin SD 19.4 vs 14.0 real) and end-of-game play for the tie (the last ~6 s scores nothing). A real tie rate needs the margin-at-48:00 distribution, not only the tails.
+- Check 2 (late close ticks, `q4_overtime.p_ot`) is still owed after a few weeks of slates.
