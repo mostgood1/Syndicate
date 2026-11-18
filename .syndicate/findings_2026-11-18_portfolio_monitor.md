@@ -438,3 +438,32 @@ method above to `/api/portfolio/live?on=all&show=all` saved at 13:49Z.
      ask at fill time, by market family.
    - If ROI falls with entry spread, a **per-line maximum-spread rule** judges each line on its own spread: a
      threshold, not a market switch (learnings line 1056).
+
+## Reading 39 — Wed 11-18 10:22 AM CST (16:22Z), window 60 min
+
+**Results first.** No new grades, so the windows are unchanged: 30 d -7.35% [-12.8, -1.9], 7 d -2.71%, fee-net CLV
+-0.36 pp. Today's bets settle from the afternoon. Optimization leads: F13 (thin-market spread, next = ROI vs the spread
+paid at entry) and F12 (gate cadence), both waiting on the user.
+
+**NEW anomaly: `ENDPOINT live_today slow: 25.58 s > budget 3.0 s`.**
+- *Hypothesis, written before reading:* a web-worker main-loop stall like yesterday's kills, so the stall dump fired.
+- **Falsified as written.** The dump is armed at **40 s**, not 20 s as the hypothesis said, and no dump fired.
+- **Cause, from `web.log`:** worker 23086 served a `POST /api/intelligence/query` (Python-urllib script client)
+  16:22:07-16:22:25Z: 25,945 ms, 3.7 MB, rows 4,906, `board_read` 13,216 ms, `hydrate_and_mirror` 3,197 ms. **Our
+  `GET /api/portfolio/live` ran in the same worker at the same time (25,163 ms)**: CPU/GIL contention between two
+  requests, not a loop stall.
+- The worker then grew 954 -> 1,161 MB (`GROWTH_EPISODE`, pymalloc) and was **hard-recycled**
+  (`WEB_WORKER_MEMORY_RECYCLE hard=true`, limit 625 MB) at 16:22:38.8Z, drained cleanly. New worker 164574 at 16:22:54Z.
+- **Rate:**
+  - `/api/portfolio/live` over 3 s: 1 of 27 reads today.
+  - Intelligence queries with `board_read` > 8 s: 32 of 416 today.
+  - Hard web-worker memory recycles: 156 since 00:00Z.
+- **The portfolio endpoint is the victim, not the cause.** Handed to lane `web-silent-worker-kills` (it owns web-worker
+  health, F2/F3) at 16:24Z with the evidence. Which client posts the 4,906-row queries is unverified. Finding F14.
+
+**Health otherwise:**
+- Plan 3.6 min old; in 6 h 66 commits, max gap 33.1 min (the 14:42Z restart).
+- **Execution, 60 min:** 18 live ticks, 1 placed, 0 failed. Orders today 40 (38 filled, 2 maker posts resting).
+- Cap use: kalshi 15.5%, polymarket 15.0%.
+- `/portfolio` 2.17 s of 3.0 (slow-ish, same minute).
+- Gate: BC-048, 0 of 800.
