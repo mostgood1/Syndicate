@@ -167,3 +167,97 @@ N (learnings 2026-09-17).
 | TEST, Pinnacle | 471 | 545 | 1,166 | 1,532 | 1,851 | 735 | 2,271 |
 | FIT, consensus | 790 | 709 | 1,098 | 2,203 | 2,394 | 1,460 | 30 |
 | TEST, consensus | 823 | 793 | 1,757 | 2,243 | 2,042 | 912 | 1 |
+
+## RESULT -- H-fresh is FALSIFIED (run 2026-11-18 19:13Z = 1:13 PM CST, read-only; pre-registration on main `5ee9e18c1` at 19:11:45Z)
+
+**Run.** `s1_freshness_study.py report` on the pre-registered join (the coverage section above; same ledger dump, same
+heartbeats). Fee-net flat ROI per order, event-clustered 95%. Nothing in the method changed after the
+pre-registration.
+
+### FIT: choose N (orders submitted 10-25 18:36Z .. 11-07; 7,239 orders / 552 events with a readable Pinnacle age)
+
+| N | fresh orders / events | fresh ROI | stale orders / events | stale ROI | fresh - stale [95%] |
+|---|---|---|---|---|---|
+| 1 min | 646 / 230 | -8.34% | 6,593 / 546 | -5.47% | -2.87 [-11.38, +5.65] |
+| 2 min | 1,266 / 302 | -7.88% | 5,973 / 524 | -5.27% | -2.61 [-9.53, +4.30] |
+| 5 min | 2,142 / 414 | -5.72% | 5,097 / 472 | -5.73% | +0.01 [-6.37, +6.39] |
+| **10 min** | 3,342 / 480 | -3.18% | 3,897 / 424 | -7.90% | **+4.72 [-1.61, +11.06]** |
+| 15 min | 4,080 / 507 | -3.91% | 3,159 / 383 | -8.07% | +4.16 [-2.45, +10.77] |
+
+**Chosen N = 10 min** (largest fresh - stale; every N qualified). On FIT the short cuts that Test B used point the
+OTHER way: orders <= 2 min old did 2.6 pp WORSE than the rest.
+
+### TEST: the registered test (orders submitted 11-08..11-17; 6,300 orders / 274 events with a readable Pinnacle age)
+
+| set | orders / events | flat ROI | 95% |
+|---|---|---|---|
+| all (readable age) | 6,300 / 274 | -2.49% | [-6.19, +1.22] |
+| **fresh-only (<= 10 min)** | 3,153 / 263 | **-2.28%** | **[-6.74, +2.18]** |
+| stale (> 10 min) | 3,147 / 193 | -2.69% | [-7.79, +2.40] |
+
+- **D = fresh-only - all = +0.21 pp, 95% [-2.82, +3.24]** (se 1.55). The bootstrap check agrees: [-2.73, +3.15].
+  An independent recomputation from the rows file (plain means, leave-one-event-out jackknife) gives the same D and
+  se 1.56.
+- **Verdict as registered: H-fresh is FALSIFIED.** The interval includes 0. Fresh - stale is +0.42 pp
+  [-5.65, +6.49].
+- **Diagnostics:** mean `ev_pct` is +2.68 for all and +2.79 for fresh-only, so freshness does not select a different
+  EV mix. Dollar ROI: all -2.36%, fresh-only -1.24% (descriptive).
+
+**By book and venue (TEST, N = 10, descriptive).** No slice's interval excludes 0, and the live book points the wrong
+way.
+
+| slice | all: orders / events, ROI | fresh-only: orders / events, ROI | D [95%] |
+|---|---|---|---|
+| live | 441 / 177, -4.16% | 210 / 123, -6.82% | -2.66 [-11.13, +5.81] |
+| paper, twin + ladder | 5,859 / 274, -2.36% | 2,943 / 263, -1.95% | +0.41 [-2.59, +3.40] |
+| paper twin | 169 / 102, +3.42% | 110 / 73, +7.42% | +4.00 [-5.53, +13.53] |
+| ladder | 5,690 / 274, -2.53% | 2,833 / 263, -2.32% | +0.21 [-2.90, +3.33] |
+| Kalshi | 3,805 / 265, -3.80% | 1,981 / 249, -2.17% | +1.63 [-1.26, +4.52] |
+| Polymarket | 2,495 / 205, -0.49% | 1,172 / 185, -2.46% | -1.97 [-6.90, +2.95] |
+
+**The age gradient (Pinnacle capture age; orders / events, flat ROI [95%]).** It is not monotone in either window,
+and the two windows disagree bucket by bucket.
+
+| age at submit | TEST | FIT | FIT + TEST |
+|---|---|---|---|
+| 0-1 min | 471 / 153, +6.13% [-3.57, +15.83] | 646 / 230, -8.34% [-16.42, -0.25] | 1,117 / 370, -2.24% [-8.51, +4.03] |
+| 1-2 min | 545 / 161, -6.75% [-16.19, +2.70] | 620 / 227, -7.40% [-16.12, +1.32] | 1,165 / 376, -7.10% [-13.51, -0.68] |
+| 2-5 min | 1,166 / 211, -0.21% [-6.82, +6.40] | 876 / 311, -2.59% [-9.41, +4.23] | 2,042 / 513, -1.23% [-6.03, +3.57] |
+| 5-15 min | 1,532 / 178, -6.53% [-12.90, -0.17] | 1,938 / 352, -1.91% [-8.20, +4.38] | 3,470 / 526, -3.95% [-8.47, +0.57] |
+| 15-60 min | 1,851 / 171, -2.28% [-8.91, +4.35] | 2,155 / 382, -5.95% [-11.67, -0.23] | 4,006 / 545, -4.25% [-8.62, +0.11] |
+| > 60 min | 735 / 68, -0.55% [-11.41, +10.31] | 1,004 / 101, -12.61% [-23.21, -2.01] | 1,739 / 169, -7.51% [-15.31, +0.29] |
+| unknown (no Pinnacle fetch) | 2,271 / 551, -8.57% [-14.49, -2.65] | 1,445 / 313, -7.49% [-17.23, +2.25] | 3,716 / 861, -8.15% [-13.38, -2.91] |
+
+- The unknown row is mostly a sport mix, not an age: in TEST it is NCAAB 1,702, NHL 218, NBA 191, WNCAAB 99,
+  NCAAF 53 and NFL 8. NCAAB has no Pinnacle at all. It is coverage, not a finding, and never a sport switch.
+
+**Secondary arm: the sportsbook-consensus capture age (registered as secondary).** It is falsified the same way.
+- On FIT, N = 10 again (fresh - stale +4.96 [-1.08, +10.99]).
+- On TEST (8,570 orders / 721 events): all -4.10% [-7.21, -0.99]; fresh-only -5.18% [-8.64, -1.71].
+  **D = -1.08 pp [-3.53, +1.37]:** fresh is not better.
+- Live slice: D -2.77 [-9.57, +4.04]. The consensus gradient on TEST is not monotone either (1-2 min -11.1%,
+  2-5 min -2.6%, 5-15 min -6.4%).
+
+### EXPLORATORY: the venue's own quote between the reference fetch and submit
+
+Pending: the `book_quotes` join (`join --quotes`) was still running on the fleet when the registered verdict above was
+pushed. It does not touch the verdict.
+
+### What it means
+
+- **The age of our reference copy at submit does not separate winning picks from losing ones, out of sample.** This
+  holds for Pinnacle and for the consensus, live and paper, Kalshi and Polymarket. The N that looked best on FIT
+  (10 min, +4.7 pp) shrinks to +0.2 pp on TEST.
+- **Test B's P1 split does not generalise.** P1 was a 5% subset (1,231 of 23,480 orders since REG), with intervals
+  of +-11 to +-14 pp. In this population (13,539 orders with a readable age, about 11 times larger), the same
+  2-minute cut points the other way on FIT (-2.6 pp).
+- **So "the trigger fires on a stale reference" is not the mechanism behind the 11-18 adverse selection** (our picks
+  win 7.8 pp less than the consensus), at least as our fetch clock can measure staleness.
+- **What this test cannot see.** Capture age is when WE last looked, not when the reference last moved relative to
+  the venue. A fresh fetch of a price that the venue has already moved past still reads "fresh". The venue-move
+  section above is the first look at that; the S6 features (book count, dispersion, time to start, price band) are
+  next.
+
+**No challenger rule is proposed.** The plan's S1 rule ("fire only when the reference is fresh AND the venue has not
+moved toward the consensus") loses its freshness half. Nothing changes live, and nothing is queued for the 11-24
+window from this study.
