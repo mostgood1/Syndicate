@@ -8,6 +8,8 @@ columns they expect. Network-based (NHL api-web), cache-first.
 from __future__ import annotations
 
 import csv
+import time
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -94,6 +96,9 @@ def collect_slate_inputs(
     teams = _slate_teams(date, root)
     client = client or NhlWebIngestClient()
     out_dir = out_dir or _processed_dir(root)
+    stats_before = Counter(getattr(client, "stats_report_counts", None) or {})
+    stats_seconds_before = float(getattr(client, "stats_fetch_seconds", 0.0) or 0.0)
+    t_start = time.monotonic()
 
     lineup_rows: List[Dict] = []
     try:
@@ -139,8 +144,9 @@ def collect_slate_inputs(
         project_lineup(usage, date=date)
         season = season_code_for_date(date)
         prev = f"{int(season[:4]) - 1}{season[:4]}" if len(season) == 8 else ""
-        attach_assist_share(usage, [(client.onice_goals(team_code, season), 1.0),
-                                    (client.onice_goals(team_code, prev) if prev else {}, ASSIST_SHARE_PRIOR_SEASON_WEIGHT)],
+        attach_assist_share(usage, [(client.onice_goals(team_code, season, before_date=date), 1.0),
+                                    (client.onice_goals(team_code, prev, before_date=date) if prev else {},
+                                     ASSIST_SHARE_PRIOR_SEASON_WEIGHT)],
                             date)
         for r in usage:
             lineup_rows.append({
@@ -163,11 +169,22 @@ def collect_slate_inputs(
                 "confidence": 0.5, "source": "hockeysim_toi",
             })
 
+    # One line per date: how the stats-REST reports were served (`nhl_web.STATS_CACHE_ENV`). Printed, not
+    # logged -- `logger.info` never reached a role log (CLAUDE.md). fetch:<reason> counts real calls.
+    stats = Counter(getattr(client, "stats_report_counts", None) or {})
+    stats.subtract(stats_before)
+    stats = {k: v for k, v in sorted(stats.items()) if v}
+    stats_fetch_s = float(getattr(client, "stats_fetch_seconds", 0.0) or 0.0) - stats_seconds_before
+    print(f"NHL_STATS_REPORT_CACHE date={date} enabled={'on' if getattr(client, 'stats_cache', False) else 'off'} "
+          f"teams={len(teams)} fetched={sum(v for k, v in stats.items() if k.startswith('fetch:'))} "
+          f"served={sum(v for k, v in stats.items() if not k.startswith('fetch:'))} "
+          f"fetch_s={stats_fetch_s:.1f} collect_s={time.monotonic() - t_start:.1f} detail={stats}", flush=True)
     summary: Dict[str, object] = {
         "date": date, "teams": len(teams),
         "lineup_rows": len(lineup_rows), "roster_rows": len(roster_rows), "goalies": len(goalie_rows),
         "lineup_status": (availability.summary() if availability is not None
                           else {"enabled": lineup_availability.enabled(), "applied": False}),
+        "stats_reports": stats,
     }
     if availability is not None:
         availability.report()

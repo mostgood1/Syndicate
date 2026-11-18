@@ -115,7 +115,9 @@ def build_team_usage(
     st_by_game: Dict[str, Dict[int, Tuple[float, float]]] = {}
     for season_code in sorted({_season_of_game(gid) for gid in game_ids} - {""}):
         try:
-            st_by_game.update(client.special_teams_toi(team_abbr.upper(), season_code))
+            # before_date lets the stats-report cache check it holds every finished game the window
+            # could read (`nhl_web.STATS_CACHE_ENV`); the rows are the same either way.
+            st_by_game.update(client.special_teams_toi(team_abbr.upper(), season_code, before_date=date))
         except Exception:  # noqa: BLE001 - enrichment; infer_lines falls back to the positional shape
             continue
     for gid in game_ids:
