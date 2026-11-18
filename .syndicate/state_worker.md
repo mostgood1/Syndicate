@@ -2932,10 +2932,10 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   fresh children per sweep). The first sweep on it launched 13:47:44Z. Entry: deploys.md `2582a45ce`, BC-046.
 - **Owed:** the pre-registered slow-API reading in a live NHL window
   (`findings_2026-11-17_odds_lane_sport_deadline.md`).
-- **Pregame half: on main `cdab875d5`, NOT LOADED (verified on main 2026-11-18 15:47Z):** behind
+- **Pregame half: on main `cdab875d5`, LOADED 2026-11-18 15:56:43Z (fleet ff, BC-049; first sweep 162338 verified 16:31Z: NHL fast 78 s + deferred `nhl_pregame_generation` 293 s ok):** behind
   `SYNDICATE_NHL_PREGAME_GENERATION_SPLIT` (absent = on; needs the lane switch too) a pregame sweep runs
   NHL odds fast in turn and a deferred `nhl_pregame_generation` (900 s deadline, the shared per-date
   marker, `NHL_PREGAME_GENERATION_COOLDOWN`). Baseline: 258 pregame full NHL steps 11-13..11-18, max 807 s,
-  0 over 900 s. Loads at a fleet ff (child script; no restart).
+  0 over 900 s. P3 (NHL p50 <= 280 s) read 371 s on n=1; the nhl-stats-rest-cache ff changes generation time after it.
 - **Not covered (measured 11-18):** pregame lane holds over 900 s are soccer, not NHL: 51 of 54 such runs,
   soccer up to 2,763 s summed over its league steps, no single step over 900 s.

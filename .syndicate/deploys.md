@@ -61772,3 +61772,43 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **expect / measured** (read 15:50:51Z, window 15:40:01Z..): `fleet_checkout_head` 36a9f5501 -> d1e14be46 **MET**; `lean_on_disk` 0/0/0 -> 1/1/1 **MET**; `refresh_worker_pid` 139688 -> 152916 **MET**; `live_odds_refresh_worker_pid` 23141 unchanged **MET**; `lean_env_key` absent **MET**; `book_grid_build_error` 0, tracebacks 0, attach errors 0 **MET** (grid ticks 15:41:04Z and 15:50:51Z, the same ~10-min pregame cadence as 14:53-15:34Z); the NBA grid published 15:40:21Z by the new pid: 4,815 rows, 4,815 with all seven game fields and a `game_key`, all `pregame` (the probe's 4,815 matched) **MET**; `nba_only_attached_in_join`: NBA-only ATTACHED lines 0 in the 11-min window while 10 other ATTACHED lines were written (emitter alive; before ~46/h) -- consistent with the lean path, but the per-build split needs in-play builds (pregame builds rarely log the pivot / flag markers, 1 of 56 split) **OWED tonight**; `nba_build` **OWED**: NBA builds on the new pid 7.2 s (first after boot, cold) and 5.9 s, vs 4.75 s median (n 6) on the old pid's last hour and 2.30 s (n 56) since 06:00Z -- n 2 decides nothing.
 - **verify (OWED, tonight):** `C:\tmp\railload\lean_join.py` + `lean_stages.py` on the 11-18 slate: with >= 2 NBA games live, the pivot -> OUT_PLAYER_PROPS_FLAGGED median at least 0.3 s below the 11-17 night's 3.37 s (n 127, 11-17 18:00Z..11-18 06:00Z), and 0 split NBA builds holding an NBA-only ATTACHED line (11-17: 119 of 127); 0 build errors; game blocks on every matched row. Pregame: the afternoon's NBA build median on pid 152916 vs 2.30 s. The lean-vs-full live probes at 01:30Z and 02:50Z (`lean_probe_live_a/b.txt`) still run.
 - **claims:** refresh-worker + live-odds-worker released after this entry.
+
+## 2026-11-18 15:56:43Z (9:56 AM CST) -- DEPLOY (ff only, no restart): fleet `d1e14be46` -> `cdab875d5`, the PREGAME half of the NHL generation split (todo #838, lane `odds-lane-sport-deadline`; user "Yes, load it" to "Load the pregame NHL split on the fleet (ff d1e14be46 -> cdab875d5)?") -- **LOADED (child script at the next sweep); first pregame NHL sweep on the new code: P1, P2, P4, P5 MET, P3 above its bound on n=1**
+- betting change: **yes** (BC-049). Every later sport's pregame odds now refresh before NHL's rebuild, and a stalled pregame rebuild stops at 900 s and cools down both phases, so which quotes and predictions are fresh enough to bet changes. Loaded at **16:07:01Z**: the first pregame run with NHL launched after the ff (refresh_status `2026-11-19/20261118_160701`, date 11-19, 7 sports). It ran `~/Syndicate/scripts/refresh_odds_sources.py`, which was `cdab875d5` at its launch; its manifest was not yet written at 16:31Z.
+- **The change** (`SYNDICATE_NHL_PREGAME_GENERATION_SPLIT`, absent = ON, needs `SYNDICATE_ODDS_LANE_STEP_DEADLINE` on; findings addendum "Pregame extension"):
+  - a pregame sweep runs `nhl_oddsapi_refresh --mode fast` in NHL's turn;
+  - `nhl_pregame_generation` (`--mode generate`) runs after every sport, deferred, with a 900 s deadline;
+  - a timeout writes the shared per-date marker, so the next pregame and live sweeps inside 1,800 s run NHL odds only;
+  - `--phase all` is unchanged.
+- **Ride-alongs** (`d1e14be46..cdab875d5`, 13 commits, 2 runtime files):
+  - `c0d9cf9b8` `scripts/inplay_recorder.py` (lane `inplay-recorder-weeknight-stalls`, priority default normal) is INERT here. The "Syndicate inplay nightly" task syncs it from the primary Windows tree's `origin/main` via `git show` (`scripts/inplay_nightly.py:103`), not from `~/Syndicate`.
+  - The rest is ledger and tests. No env change.
+- **Gates:**
+  - claim live-odds-worker 15:55:13Z (holder `odds-lane-sport-deadline`, rc 0).
+  - Baseline 15:54:59Z: fleet head `d1e14be46`, 14 dirty paths. Manifests naming `nhl_pregame_generation`: 0 of 645 (11-18) and 0 of 2,357 (11-17). Worker env: `SYNDICATE_NHL_PREGAME_GENERATION_SPLIT`, `SYNDICATE_ODDS_LANE_STEP_DEADLINE` and the deadline keys all absent, from `/proc/<pid>/environ`, allowlisted keys only.
+  - A pregame NHL sweep in flight (launched 15:52:00Z) finished at 15:56:13Z.
+  - Preflight `--service live-odds-worker --target-commit cdab875d5`, from a worktree at origin/main `1a3cb1c28`, 2 expect/baseline pairs: **CLEAR 15:56:23Z** (0 processes).
+- **ff:** `git fetch github` + `git merge --ff-only cdab875d5` at **15:56:43.511Z** (12 files, rc 0). Fleet HEAD `cdab875d5661`, 14 dirty paths before and after. No role restarted.
+- **expect / measured:**
+  - `fleet_head` d1e14be46 -> cdab875d5: **MET** 15:56:43.982Z.
+  - `nhl_pregame_generation_manifests_on_next_pregame_nhl_sweep` 0 -> >=1: **MET.** Run `odds_refresh_20261118_162338` (launched 16:23:38.698Z, date 11-18, nba/nhl/ncaab/wncaab), 16:23:40-16:30:22Z, **402 s, ok True:**
+
+    | sport | step | seconds | ok | timed out |
+    |---|---|---|---|---|
+    | NBA | | 4 | yes | |
+    | NHL | `nhl_oddsapi_refresh --mode fast` | **78** | yes | |
+    | NCAAB | | 2 | yes | |
+    | WNCAAB | | 3 | yes | |
+    | NHL | `nhl_pregame_generation --mode generate` (deferred, 16:25:29-16:30:22Z) | **293** | yes | no |
+
+    `predictions_2026-11-18.csv` was rewritten at 16:26:44Z and `predictions_2026-11-19.csv` at 16:30:21Z. No timeout marker.
+- **H3 predictions, read on this one run** (each was registered as a p50 or rate over several runs):
+  - P1 split, 0 inline full: MET.
+  - P2 fast step <= 90 s: MET (78 s).
+  - P3 fast + generation p50 <= 280 s: **ABOVE on n=1** (371 s). The same-day old full step over the 6 four-sport pregame runs 13:15-15:52Z was 194, 348, 243, 227, 198 and 224 s (median ~226 s), so this run is +145 s on the median and inside the same-day range (max 348 s). The run total of 402 s is against 199-367 s.
+  - P4 0 timeouts, generation ok: MET (1 of 1).
+  - P5 predictions rewritten in the sweep: MET.
+  - P6 0 added OddsAPI calls: by construction (`--mode generate` collects nothing, pinned by `test_nhl_runner_modes`).
+- **P3 IS LIKELY UNREADABLE from here on.** Lane `nhl-stats-rest-cache` (todo #839) asked for this claim to ff `59fbefc71`. That ff caches the stats-REST reports, which that lane measured at collection 129 s -> 14 s. It changes the generation time this P3 is about. The claim was released at **16:30:37Z**, after this run's generation child exited (16:30:29Z), so the reading above is all on the pre-cache code. The 11-19 7-sport run (16:07:01Z) defers its NHL generation until after soccer, so that child will likely run on the cache code.
+- **Not covered here:** pregame holds over 900 s are soccer, not NHL (51 of 54 runs 11-13..11-18). That is lane `soccer-pregame-lane-hold`, its own session.
+- The user's go-ahead, quoted: "Yes, load it" here. Two sessions also relayed it: "load the pregame split when it's ready" (rail monitor, ~9:35 AM CST) and "load the pregame NHL split" (Layer 2 Game Rail monitoring, ~9:4x AM CST).
