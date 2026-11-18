@@ -1,5 +1,14 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#845` — **DECISION OWED (the user's): switch the Understat-outage SPLICE on in the 12-08 betting-change window if understat.com is still down. `SYNDICATE_SOCCER_UNDERSTAT_SPLICE` is on main default OFF; nothing to do now or at 11-24** `[2026-11-18, lane understat-fallback-backtest; `.syndicate/findings_2026-11-18_understat_fallback_backtest.md`; follows #841]`
+- **Measured (leak-free, 1,818 big-5 matches 2025-09-15..2026-10-31 with a true close; link cross-fitted, real-engine check on a sample):**
+  - The frozen history costs +0.0007 1X2 log loss per match at 2 missing rounds (CI spans 0), +0.0027 at 4, +0.0067 [+0.0023, +0.0114] at 8; O/U 2.5 none.
+  - The splice holds it at about +0.0014 at every k: vs frozen +0.0007 at 2 rounds, −0.0013 at 4, −0.0054 [−0.0103, −0.0004] at 8.
+  - Missing rounds per club: 1-2 now, 2-3 at the 11-24 window, 4-5 at 12-08, 6-7 at 12-22.
+  - Goals-based ratings and an ESPN players re-source are both NOT recommended (findings sections 4, 6).
+- **To switch it on (in a window, betting change yes):** add `SYNDICATE_SOCCER_UNDERSTAT_SPLICE=1` globally to `~/syndicate-prod/local_production.env` (refresh-worker AND live-odds-worker read `_load_team_ratings`), drained down/up per the fleet env recipe, `betting_change.py add --kind yes`. Verify in the role log: `SOCCER_UNDERSTAT_SPLICE league=<big5> ... spliced_matches=N unresolved=[]` with N > 0.
+- **If Understat returns first:** close this item; the splice adds nothing once Understat covers the matches (tested), so it is never needed off for correctness.
+
 ### `#844` — **COLLEGE LIVE QUOTES READ STALE BECAUSE THE BOOK GRID TAKES THE NEWEST TIMESTAMP BY TEXT: `book_grid.py:1159` `newest = max(stamps)` over `observed_at` strings; college sportsbooks stamp `2026-11-18 20:58:05+00:00`, Kalshi/Polymarket `2026-11-18T20:55:57Z`, and `T` sorts above a space, so a venue's (often older) stamp becomes the row's `age_seconds` and the live gate (`quote_age_verdict`, 120 s for NCAAB/WNCAAB) refuses rows a fresh sportsbook is pricing** `[2026-11-18, lane ncaab-total-overprojection; user "count books per game on the stale NCAAB quotes"; findings `.syndicate/findings_2026-11-18_college_quote_age_text_max.md`]`
 - **Measured (fleet, read-only):** NCAAB full-game moneyline, 57 live games / 6,112 live minutes on 11-17 + 11-18: fresh by time 81.2%, fresh by the grid's text max 25.5%, so 68.6% of the fresh minutes read stale. WNCAAB 11-17: 62.7%. NBA and NHL 11-17: 0% (their sportsbook stamps share the `T` format). Snapshot 20:58:22Z, Rutgers @ Notre Dame moneyline: row age 143.6 s (Kalshi) while FanDuel was 14.6 s.
 - **Not book coverage:** median 9 books quote each live NCAAB game, and spreads/totals had a fresh book about 90% of live minutes.
