@@ -93,3 +93,9 @@ training nights used the old loop. In a dry test the old loop never quoted 40-42
 totals among them, and quoted no NFL or NHL market (`739fa951b`). So the test nights hold line-instants, NCAAF totals
 above all, whose cells were thin or empty in training, and those fall back to their parent cells exactly as the
 learner is built to. The Normal-priority fix (`c0d9cf9b8`) records from 11-19 on.
+
+
+## Correction to the re-run's context note (2026-11-18 11:51 AM CST, before its data; the rule is unchanged)
+
+The note missed one change. **F1 of todo `#821`** (`feed_game_model` with the outs penalties off, in the NBA processed root's `nba_sim_total_inputs.json`) was switched on 2026-11-17 at 11:35 AM CST (`deploys.md` 17:34:59Z). It is a data-file switch, not code, so the version timeline cannot see it. It moves the NBA pregame sim's totals, which the NBA live re-sim starts from. Lane `nba-live-total-anchor` measured 11-18's 12 NBA pregame totals at +6.78 (se 1.04) above the closing line (`.syndicate/findings_2026-11-18_nba_live_total_anchor.md`). So of the NBA training nights only 11-17 starts from that level, and every test
+night does.
