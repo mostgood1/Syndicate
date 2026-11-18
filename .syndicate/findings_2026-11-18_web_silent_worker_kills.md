@@ -77,3 +77,16 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
   - If `WORKER TIMEOUT` follows ~20 s later, the stall was the kill.
   - If the dump came from a worker that had logged `WEB_WORKER_MEMORY_RECYCLE` and is draining, it is the older
     drain-path stall (`futures.wait(..., graceful_timeout)` does not heartbeat), not the 11-17 mode.
+
+## Reading 1: overnight, 2026-11-18 01:46:27Z - 12:37:58Z (7:46 PM - 6:37 AM CST)
+
+- web.log: **0 `WORKER TIMEOUT`, 0 stall dumps, 0 `WEB_LOOP_STALL_DUMP_ERROR`**.
+- 161 worker boots and 161 `WEB_LOOP_STALL_DUMP_ARMED` lines, every pid armed. Per hour (UTC): 01h 8, 02h 35,
+  03h 33, 04h 34, 05h 35, 06h 9, 07h 2, 08h 2, 09-11h 0. The evening's ~35 boots an hour are memory recycles.
+  - Counting trap, met here: a `substr($0,1,19) >= "2026-11-18T01:46"` filter also passes web.log.1's lines that
+    start with `[` (no supervisor timestamp), because `[` sorts after `2`. That gave a false "251 boots / 161 armed"
+    and a 10-01 WORKER TIMEOUT. Filter on `^2026-11-18T` instead.
+- The window ended at the planned vhdx compaction: WSL was terminated 12:37:58Z and the fleet was back at 12:44:40Z on
+  `09eddabf2`, still carrying the black box. The new workers 622/623 armed.
+- Not a verdict. The 11-17 kills fell 15:23-21:36Z (9:23 AM - 3:36 PM CST), and this window was the evening and the
+  night. The daytime window is the one that matters.
