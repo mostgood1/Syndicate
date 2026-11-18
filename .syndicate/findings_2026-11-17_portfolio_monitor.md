@@ -836,3 +836,47 @@ placement, so a stale plan costs missed bets, not bad ones.
   - *Field note:* a bet is graded when `outcome` is set. `settled_at` is the venue's order-resolve time (an IOC has
     one 2 s after submit). Counting by `settled_at` miscounts.
 - **Endpoints:** all 7 read 200, all under 0.25 s. 0 kills.
+
+## DAILY SUMMARY — Tue 11-17 (Central), written Wed 11-18 1:15 AM CST after the day's last grade
+
+Counts and percentages only (the repo is public). Sources: `/api/portfolio/live?on=all&show=all` at 07:13Z 11-18,
+and the 24 probe readings (10:21 AM -> 11:39 PM CST).
+
+**Live book, selected_date 11-17.**
+- **Orders:** 59 = 56 filled + 3 rejected, every rejection a designed ending.
+  - 1 of 2 maker-pilot posts expired unfilled at kickoff.
+  - **2 of 2 in-play IOC entries were cancelled unfilled.** In-play fill rate 0 of 2, too few to judge.
+  - 0 failed, 0 unknown submits.
+- **Graded 46 of 56 fills: 29 won, 17 lost, 0 push (63.0% won), ROI -8.02% on graded stake.** One day of 46 bets is
+  noise, not a verdict. The adopted gate is the verdict, and its clock is pending BC-041.
+  - The other 10 are NCAAF (8) and NFL (2) bets on games later this week, not late.
+  - By venue: polymarket 16-6, kalshi 13-11.
+  - By sport: NBA 20-5, NCAAB 5-3, NHL 4-9.
+- **Grading lag after the start:** p50 2.5 h, p90 2.9 h, max 3.0 h (n=46). Late (> 8 h) at day end: 0. During the day,
+  F6, a 22-h-late NHL bet from 11-16, was graded by hand.
+
+**Endpoint.**
+- 24 readings, 168 endpoint reads, 0 non-200.
+- Slowest against budget: `/api/portfolio/live` 2.20 s of 3.0, `live?on=all` 3.20 s of 5.0, `/portfolio` 2.30 s of 3.0.
+- Web worker kills: 4 silent ones on 11-17 (15:23, 16:38, 16:49, 21:36Z; lane `web-silent-worker-kills`'s count).
+ 
+- The plan was stale (> 45 min) in 2 of 24 readings (F7). Its longest gap was 79 min, 7:21 -> 8:40 PM CST.
+
+**Findings.**
+- **F1 (paper endpoint):** fixed, then retired.
+- **F2 / F3 (web drain path / silent kills):** owned by `web-silent-worker-kills`. Its instrument is loaded and waiting
+  on the first dump.
+- **F4 (stuck Kalshi order):** fixed by an operator fill.
+- **F5 (boot-stamp zero caps):** healed itself; display only.
+- **F6 (late NHL bet):** fixed by an operator grade.
+- **F7 (stale evening plan):** diagnosed. Its fix, the board-process split, was approved by the user ("Yes, after the
+  slate") and loads ~2 AM CST via `layer2-board-process-split`.
+
+**Probe improvements this day:**
+- the plan-cadence series;
+- the 10-min unreconciled grace;
+- unfilled in-play IOCs counted apart from failures;
+- maker expiries counted apart from failures (earlier).
+
+**Side work:** the trader-following study closed with a NO-GO recommendation
+(`findings_2026-11-18_trader_following_study.md`).
