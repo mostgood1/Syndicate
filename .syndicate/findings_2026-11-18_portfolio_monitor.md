@@ -748,3 +748,28 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - unreconciled 0;
   - cap use 16.7% / 16.2%;
   - plan 18.3 min old, 16 positions.
+
+## Reading 44 — Wed 11-18 2:01 PM CST (20:01Z), window 55 min
+
+- **Results first.** No new grades: 30 d -7.35% [-12.8, -1.9] on 673 events; 7 d -2.71% [-13.3, +7.9]. Today's 48
+  orders settle from the evening.
+- **Program news since reading 43 (all on main):**
+  - Stake cut dropped by the user ("Yes, drop the cut"). Lane `live-stake-minimum` is closed; nothing loaded, and
+    sizing stays compounding off venue capital.
+  - **S1 freshness: FALSIFIED as registered**: +0.21 pp [-2.82, +3.24] on 6,300 TEST orders / 274 games (F16). No
+    challenger for the 11-24 window.
+  - In-play recorder backfill complete (27 nights, 319 files, 1.4 GB). The daily copy task `SyndicateInplayPreserve`
+    is set up (7:15 AM); its first run returned result 0.
+- **No new anomalies.** Every endpoint was inside budget: page 0.20 s, books 0.01 s, live 0.22 s.
+- **F14 after the double-recycle fix** (web, live since 19:14Z, lane `web-silent-worker-kills`):
+  - 3 recycles in 47 min: 19:16 soft, 19:25 hard, 19:49 hard;
+  - none simultaneous, against 18 (16 hard) in the 18Z hour;
+  - each came after 10-25 requests at 781-859 MB against a ~630 MB limit.
+  - The pressure is the same; the overlap is gone. The evening will test it.
+- **Flow:**
+  - plan 1.5 min old: 198 suggested, 25 sized, 16 positions; 169 refused `beyond_max_positions`;
+  - 16 live ticks, 3 placed, 0 failed (3 `axis_held_live`, a known guard);
+  - orders today 48 (47 filled, 1 resting at 4.7 min; the 12-h maker post is no longer resting);
+  - unreconciled 1, inside the grace;
+  - cap use 17.5% / 17.1%.
+- **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it); gate clock BC-050, 0 of 800.

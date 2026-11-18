@@ -82,8 +82,14 @@ No result guarantees future returns.
      toward the reference before submit [-28.2, +2.9]. That is 747 vs 301 orders, and only 34% of orders have the
      venue quote, which is the I2 gap.
 2. **S2: in-play 95-99c favourites**, the one structural cell that survived fees: +1.1..+1.6c per contract in 5 of 6
-   sports (`findings_2026-10-24_kalshi_market_price_map.md`). Forward-confirm on the 29 recorder nights with the ESPN
+   sports (`findings_2026-10-24_kalshi_market_price_map.md`). Forward-confirm on the recorder nights with the ESPN
    clock. Its tails (late flips, score corrections) are sized before it goes live.
+   - **Result 11-18: KILL**, under the cell's own pre-registration (R3, `in-game-trading`, locked 10-25)
+     (`findings_2026-11-18_s2_inplay_favourites.md`).
+     - Over 27 nights, the first qualifying ask was **+0.26c per game [-1.59, +1.95]**.
+     - **19 of 476 games lost (3.99%)**, above the registered 3% line.
+     - After the lock alone: about +0.8c and a 3.4% loss rate.
+     - No challenger. What is left of the cell is the maker side, which is S3's question.
 3. **S3: maker entry.** Earn the spread instead of paying it, in zero- and low-fee cells (maker shadow, counted looks
    at 200 / 400 / 600). Today's tests say our picks are not worse than the venue's fair, so capturing the spread is a
    direct lever.
