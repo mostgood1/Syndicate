@@ -1226,7 +1226,7 @@ death, never life — do not invert it.
 
 ### c-drive-cleanup-record — OPEN — opened 2026-11-17 — session a0a717de-0296-4da1-97cd-7a4636ad499d
 - Goal: The 2026-11-17 C: disk cleanup is recorded where sessions read: each todo item whose C:\tmp evidence was deleted carries a dated note saying what is gone and what that costs, and the fleet runbook says the OneDrive data archives are online-only (a restore downloads first) and names the SyndicateBackupOnlineOnly task
-- Files: docs/ai_context/todo.md (one dated note each in the #766, #743, #700, #699, #677 and #387 sections ONLY), docs/ai_context/local_production_runbook.md (ONE new bullet after the Backups off-disk bullets ONLY; NOT the fleet off-disk-dir sentence, which syndicate-decision-engine claims)
+- Files: docs/ai_context/todo.md (one dated note each in the #766 + #743 + #700 + #699 + #677 + #387 sections ONLY), docs/ai_context/local_production_runbook.md (ONE new bullet inserted after the fleet off-disk-dir bullet ONLY)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: git show origin/main: both files carry the notes; every deleted path the todo cites has a note in its section; check_lane_invariants passes
