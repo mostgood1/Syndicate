@@ -731,3 +731,33 @@ A game was live (a `live_row` ask exists). `as_of_in_future` false on 6 / 6. All
 No anomaly.
 
 Notes, not anomalies: 17 recycles (14 hard) in 30 min is high for 235 requests, and the web worker was 40 s old at the probe. No request was killed and no Ask passed 20 s. Check next: whether the recycle rate tracks the 5:15 PM serialize-once load (#828) or the refresh-worker's 3.6 GB RSS. The ask snapshot is 54 min old; Reading 15 attributed this to the refresh-worker deploy drain holding board builds.
+
+## Reading 17 (6:34 PM CST)
+
+Probe 6:34:59-6:35:31 PM CST (`ask_reading_20261118T003459Z.json`). Page 200 in 0.12 s; shortlist 200 in 2.31 s (200 rows).
+
+**Ask:** 6 / 6 answered, 0 past the 45 s cut-off, 0 user-saw-timeout. Median 6.25 s, max 7.86 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "What do you think of this spread?" | 6.28 | True | bet_analysis | 2026-11-17T23:11:20Z | 0 |
+| free_text "Lakers vs Celtics" | 1.27 | True | matchup_analysis | 2026-11-17T23:11:20Z | 0 |
+| free_text "top edges today" | 7.86 | True | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (ncaab, Houston @ Florida) | 6.25 | True | bet_analysis | 2026-11-17T23:11:20Z | 0 |
+| pregame_prop (soccer, Boura SOT o0.5, Le Havre @ Troyes) | 6.25 | True | bet_analysis | 2026-11-20 (date, **in future**) | 10 |
+| live_row (ncaab, Villanova @ Pittsburgh) | 1.13 | True | bet_analysis | 2026-11-17T23:11:20Z | 0 |
+
+A game was live (a `live_row` ask exists). `as_of_in_future` true on 1 / 6 (the soccer prop's date-kind as_of). All answers `answer_source=snapshot`; the snapshot `as_of` is still 23:11:20Z, now 84 min old (54 min at reading 16): it has not advanced in this window.
+
+**Web (6:04-6:35 PM CST, 97 requests):** WORKER TIMEOUT kills 0. Memory recycles 8, all hard; max anon 1133.7 MB vs limit 649.1 MB. Overlay warms 50: median 7.37 s, 2 over 20 s, 0 over 45 s, 0 over 60 s, max 23.28 s. Requests over 20 s: 0; over 45 s: 0. Asks from any client: 12, 0 over 45 s, 0 non-200. All 12 are `Python-urllib` (6 from the 6:05 PM probe, 6 from this one), so 0 from other clients.
+
+**Host:** load 5.91 / 4.18 / 3.98 on 12 cores; MemAvailable 7499 MB. Top CPU: build_soccer_artifacts (belgian_pro_league) 99% ni 0; refresh-worker 89% ni 0 (4.0 GB RSS); gunicorn web worker 88% ni 0 (10 s old, just recycled); live-odds-worker 52% ni 0; 2 x live_resim_workers 31% ni 5; refresh_ncaab_odds_history 16% ni 0.
+
+**Engine:**
+- 2a F2: 1 run total (10:30-11:17 AM CST, "did NOT PASS"), already on main `c765eec64`; no newer run.
+- 2b M2 task `engine-learner-m2-gate-read-1124`: enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c `m2_gate.py` sha256 `c1a2c029c2a1816f...`: matches Amendment 2.
+- 2d engine-file commits on origin/main in the last 40 min: none.
+- 2e deploys.md: newest header 23:54Z (5:54 PM CST, a READING, no deploy), 41 min before this reading; no fleet ff / deploy / restart in the last 40 min.
+
+- **ANOMALY:** `as_of_in_future` true on the pregame_prop ask (soccer, Ismael Boura SOT over 0.5, Le Havre @ Troyes): `as_of` = 2026-11-20 (date kind), 3 days ahead. Check next: whether the soccer prop answer stamps `as_of` from the event/kickoff date instead of the snapshot time (reading 16 had 0 of 6 in the future).
