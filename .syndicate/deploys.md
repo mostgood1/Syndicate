@@ -61721,3 +61721,35 @@ Lane `render-config-retirement` (session 267d8859).
   - Join: `nice -n 19 python3 /mnt/c/tmp/nhlprops_load/reading/nhlprops_captures.py 2026-11-18 2026-11-19T00:00 <drop_rows>`. It counts PULL lines as capture instants, because the quote shard holds a row only when a price moved (see the findings' 11-18 addendum). Choose `<drop_rows>` from the night's full level with 1-3 games live, not 11-17's 99.
   - The rail monitor (session local_62433e58) said it will count NHL props drop builds against this prediction in its day-4 readings.
 - **Rollback** = remove the env line (or set it to 0) and run a drained full `down`/`up`. A live-odds-worker TERM alone reuses the env.
+
+## 2026-11-18 14:42:44Z (8:42 AM CST) -- DEPLOY (ff + refresh-worker TERM): fleet `2ae0c646a` -> `36a9f5501`, the #816 gate fallback, a FAILED college totals calibration serves the MARKET, not the engine's raw number (lane `ncaab-total-overprojection`; user "fix the gate to fall back to market, not raw", then "Load it now") -- **LOADED; MET: every NCAAB pregame full-game total row on today's slate serves the market (246 rows stamped `fallback: market`, served P = the book's no-vig price)**
+- betting change: yes (BC-048, loaded-at 14:42:52Z). Pregame NCAAB and WNCAAB totals move from the engine's raw number to the market's probability, so they carry no edge and place no pregame total bets. NCAAB live is unchanged (calibrated, a -0.159 / c 0.250).
+- **Why:** the 11-18 refit (11:02:02Z) failed NCAAB pregame: walk-forward calibrated 0.25146 vs market 0.25, raw 0.27752. The old rule served raw, the worst of the three, for the day's pregame college totals.
+- **The change:** `total_prob_calibration.failed_gate_fallback`. When an uncalibrated phase was SCORED on its walk-forward (>= 40 games) and the market beat raw there, it serves a = 0 / c = 0 (stamped `fallback: market`). Otherwise it serves the engine's number, as before (a thin phase, or raw beating the market). It reads the walk-forward each file already carries, so no file was rewritten.
+- **Ride-alongs** (`2ae0c646a..36a9f5501`, runtime):
+  - `e9eb52568` / `a2af81258` `scripts/inplay_recorder.py` (Kalshi in-play recorder pacing; lane `inplay-recorder-discovery`, a standalone recording script, no bets);
+  - `8a5459b57` `scripts/inplay_poll_gaps.py` (offline measurement);
+  - `9dc6c64c0` `nhl/inplay_props_lane.py` (comment only);
+  - the rest is ledger and tests.
+- **Gates:**
+  - claims refresh-worker + web 14:19:5xZ (holder `ncaab-total-overprojection`, rc 0).
+  - Drain (`C:\tmp\ncal816\drain.sh`) from 14:20Z. Three capped waits were NOT CLEAR: a refresh-worker odds job (pid 23478, ~19 min), then a NEW one (pid 138985) that started DURING the drain. The drain does not hold odds jobs; same lesson as `ncaaf-grid-build-speed`'s lead.
+  - One continuous 1,200-s wait reached **CLEAR 14:42:2xZ** (between two odds jobs).
+  - Baseline 14:42:26Z: head 2ae0c646a, refresh-worker pid 23140, tracebacks 0, grid ticks 1.
+  - Preflight refresh-worker + web, `--target-commit 36a9f5501...`, 5 expect/baseline pairs: **CLEAR 14:42:35Z** (both).
+- **Load** (`C:\tmp\ncal816\load_gate.sh`): `git merge --ff-only` **14:42:44.190Z**; `def failed_gate_fallback` on disk; TERM pid 23140 at 14:42:44.193Z; new pid **139688** first seen 14:42:52.249Z. No web reload: web does not call the lookup. Undrained right after (`DRAIN_CLEARED`).
+- **expect / measured:**
+  - `fleet_checkout_head` -> 36a9f5501: **MET**.
+  - `refresh_worker_pid` new: **MET** (139688).
+  - The fleet's own code (`calibration_for`, read 14:4xZ under the worker's environ):
+    - NCAAB pregame -> a 0 / c 0, `fallback: market`;
+    - WNCAAB pregame -> market;
+    - NCAAB live -> fitted (a -0.159, c 0.250);
+    - WNCAAB live -> None (thin, raw).
+  - `ncaab_pregame_total_served` raw -> market: **MET**. `book_grid_2026-11-18.json` (generated 14:43:09Z), full-game totals:
+    - every row of today's slate (commence 11-18 day and 11-19 UTC) is stamped `fallback: market`, 38 + 208 = 246;
+    - e.g. N Colorado @ BYU 162.5: served P(over) 0.5033 = p_book 0.5033 (raw 0.505);
+    - the 140 + 16 rows on the as_of 11-16 fit are yesterday's slate (late tips), and the WNCAAB grid holds only yesterday's games (tips to 03:30Z), on the older thin file, so raw.
+  - First board build after boot: `portfolio_commit` exit 14:47:01Z. **0** real tracebacks and **0** BOOK_GRID_BUILD_ERROR since boot. The board query's slim rows do not carry the projection meta; the grid artifact is the reading.
+- **OWED:** today's WNCAAB pregame totals rows, once listed, carry `fallback: market`.
+- **claims:** refresh-worker and web released after this entry.
