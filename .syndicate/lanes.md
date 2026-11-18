@@ -1453,6 +1453,14 @@ death, never life — do not invert it.
 - Verification: Decomposition table per game (Kalshi pregame mu0_K, market_total, model_total_raw, anchored_total, quarter target sum, engine score.total_mean, live tip proj.total); a reachability test (switch off = byte-identical lane, on = shifted); the two engine-read scripts re-run with the fix applied to the same evidence rows: 0-25% gap within +/-0.5 pts, every bucket reported with se.
 - Blocked by: none
 
+### live-resim-endgame-staleness — OPEN — opened 2026-11-18 — session e2f5878d-b673-4035-81c4-f227cff8263b
+- Goal: todo #836: the end-of-game state age of the NBA / NCAAF / NHL live re-sims is traced to what sets it (file:line, fleet-measured tick gaps on dev dates), every consumer that prices or bets from a re-sim probability late in a game is listed, and the smaller of the two fixes (faster late refresh, or refusing a live opinion/bet whose state is > 30 s old in the last 5% of game time) is on main behind a switch with an off != on reachability test and a staleness.py re-measure on dev dates 11-09..11-14 only; nothing loaded on the fleet without the user's yes (a betting change)
+- Files: .syndicate/findings_2026-11-18_live_resim_endgame_staleness.md (NEW), syndicate/features/shared/live_endgame_freshness.py (NEW), tests/test_live_endgame_freshness.py (NEW), docs/ai_context/todo.md (#836 section only) -- shared files a wiring needs are added here by name and declared section when the wiring starts
+- Hypothesis: Stated 2026-11-18 ~12:40 PM CST before any fleet read: the late-game state age is set by each PRODUCER's loop, not by the evidence log (30 s poll, rows keyed on the producer's own t / as_of): NBA = a 240 s-budget tick then a 120 s wait (nba/live_resim.py:1861, :2056) on live-odds-worker; NHL = one step of the shared live-lens loop's serial all-sport sweep plus a 60 s wait (live_lens_loop.py:495, :1287); NCAAF = refresh-worker's main-loop tick gated at max(75, 6 x elapsed) (run_refresh_worker.py:1850) on a live-state record allowed up to 120 s old (:2172)
+- Falsification test: Fleet producer tick gaps per game in the dev window (from the evidence log's t / as_of series and role-log tick lines) do not account for the measured state-age medians (NBA 69-76 s, NCAAF 104-113 s, NHL 39-63 s) within ~30 s, or the evidence log's own 30 s sampling explains more than half of the median age
+- Verification: Findings file with the per-sport trace (file:line), fleet-measured tick gaps, the consumer table, the chosen fix and why; the fix's tests pass including off != on through the real consumer; staleness.py (or its copy) re-run with the fix's rule applied on dev 11-09..11-14, reporting the 95-100% bucket gap and the share of late line-instants refused; ledger updated
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
