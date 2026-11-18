@@ -873,3 +873,38 @@ No `as_of_in_future`. No user-seen timeout, no transport error. Page 200 in 0.18
 
 - **ANOMALY:** 2 overlay warms over 60 s (max 82.0 s, 2 of 27). Check next: the web log's overlay-warm lines 01:35-02:06Z for sport/date, and whether they sit beside the hard recycles.
 - **ANOMALY:** new fleet load at 7:46 PM CST: web `3920a2d4d` (loop-stall black box). Check next: its deploys.md `verify:` reading, and whether the recycle jump (8 -> 21, 17 hard) follows the reload or predates it.
+
+## Reading 21 (8:35 PM CST)
+
+Probe 8:35:24-8:36:14 PM CST (02:35Z-02:36Z 11-18); web window 8:05-8:36 PM CST.
+
+**Ask:** 6 / 6 answered, 0 past the 45 s cut-off, 0 user-saw-timeout; median 10.12 s, max 14.98 s (pregame_prop). Page 200 in 0.19 s; shortlist 200 in 1.16 s (200 rows).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "this spread?" | 10.12 | ok | bet_analysis | 2026-11-18T01:30:49Z (7:30 PM CST, 65 min) | 0 |
+| free_text "Lakers vs Celtics" | 0.52 | ok | matchup_analysis | 2026-11-18T01:30:49Z | 0 |
+| free_text "top edges today" | 7.62 | ok | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line NCAAF WKU +16.5 | 11.76 | ok | bet_analysis | 2026-11-14 (date) | 3 |
+| pregame_prop NBA Wagler o12.5 pts | 14.98 | ok | bet_analysis | 2026-11-18T00:33:24Z (6:33 PM CST, 123 min) | 7 |
+| live_row NBA Knicks h2 h2h | 1.76 | ok | bet_analysis | 2026-11-18T01:30:49Z | 0 |
+
+All `answer_source=snapshot`; `as_of_in_future` false on 6 / 6. A game was live: a `live_row` ask exists (Knicks @ Raptors, h2).
+
+**Web (8:05-8:36 PM CST, 265 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 19 (17 hard); max anon 1069.7 MB vs 644.6 MB limit.
+- Overlay warms: 35; median 19.42 s; 17 over 20 s; 2 over 45 s; 0 over 60 s; max 57.52 s.
+- Requests over 20 s: 8 (POST /api/intelligence/query 6, GET /api/board/game-chips 2); over 45 s: 0.
+- Asks from any client: 12, 0 over 45 s, 0 non-200; 0 of 12 not this probe's (all `Python-urllib`; 6 are the 8:05 PM reading's, 6 this one's).
+
+**Host:** load 7.27 / 6.80 / 7.08 on 12 cores; MemAvailable 6,618 MB. Top CPU: refresh-worker 92.9% (ni 0, 4.5 GB RSS), gunicorn web worker 87.9% (ni 0, 35 s old), live-odds-worker 72.7% (ni 0), two live_resim_workers 47.2% each (ni 5), second gunicorn worker 25.9% (ni 0, 109 s old). The probe's own `ps` (ni 19) is excluded.
+
+**Engine:**
+- 2a F2: 1 run total (10:30-11:17 AM CST, "did NOT PASS"), already recorded at `c765eec64`; no newer run.
+- 2b M2: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c gate hash `c1a2c029c2a1816f...`: matches Amendment 2.
+- 2d engine-file commits on origin/main in the last 40 min: none.
+- 2e deploys.md: no header in the last 40 min (since 7:56 PM CST). Newest is the 7:46 PM CST web loop-stall black box `3920a2d4d` (`web-silent-worker-kills`), 50 min ago, so outside this window. The two recent gunicorn worker ages (35 s, 109 s) are recycles, not a load.
+
+No anomaly.
