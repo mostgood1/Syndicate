@@ -1331,6 +1331,14 @@ death, never life — do not invert it.
 - Verification: Findings file with a per-build table over 11-17 (build time, rows_inplay, age of the latest prop capture, n of N builds explained), the replay result, a per-line change on main behind a switch with an off != on test, and a numeric prediction for the next NHL night.
 - Blocked by: none
 
+### nfl-engine-level-2026 — OPEN — opened 2026-11-17 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: Explain why smartsim2 NFL projects about 1.8 points a game lower on 2026 games than on the 2024-25 FIT games under the same harness and profile (44.12 on 2026 wk1-8 vs 45.95, off profile) while 2026 scores at the 2024-25 level (todo #813 part 3): name the input or mechanism that carries the gap and size it with CIs, by re-running production's build_projection path with one input swapped at a time on fixed seeds, after first reproducing the existing runs' per-game totals from rebuilt ratings; diagnosis only, no engine, ratings or profile edit; any fix is the user's call
+- Files: .syndicate/findings_2026-11-17_nfl_engine_level_2026.md (NEW)
+- Hypothesis: H-DISP: the engine's total is convex in its ratings (NFL LEVEL +16.1/-11.4, DIFFERENCE +7.35/-4.89 per unit, state_football smartsim2-total-carrier), so the mean projected total rises with the dispersion of the per-game rating level and difference, and 2026's ratings are less dispersed (mean abs projected margin 4.19 vs 5.89); a first regression on the run outputs gives |margin| 0.46 of the 1.84 and leaves -1.38 +-0.50. Rivals: H-RATE-FEATURE (another property of 2026's ratings such as offence vs defence structure lowers the total), H-NONRATING (the 2026 run differed by a non-ratings input such as a data-root file the engine reads), H-PBP (2026 nflverse EPA differs in kind, compressing or shifting the ratings)
+- Falsification test: H-DISP false if 2026 games re-run with their ratings rescaled to the FIT sets per-component dispersion (fixed seeds) stay within 0.5 of their own-ratings total; H-NONRATING false if identical ratings give identical totals under both data roots; H-PBP false if 2026 per-game team EPA SD and offence/defence structure sit inside the 2023-25 seasons range
+- Verification: Reproduction gate first: rebuilt ratings reproduce fit_off2.jsonl per-game total_mean exactly on its seeds (and a hold_off.jsonl subset at 1000 seeds), else no attribution is reported; then the swap arms with game-bootstrap CIs; findings file with per-family data coverage, the attribution table, and verdicts per hypothesis
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
