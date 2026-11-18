@@ -1224,12 +1224,13 @@ death, never life — do not invert it.
 - Verification: targeted pytest at Idle: tests/test_mlb_native_tools.py plus the new alias/shim tests plus any test importing the touched modules
 - Blocked by: none
 
-### c-drive-cleanup-record — OPEN — opened 2026-11-17 — session a0a717de-0296-4da1-97cd-7a4636ad499d
+### c-drive-cleanup-record — CLOSED 2026-11-17 (GOAL MET: on main 93bcce6ce -- 8 dated notes in todo.md #766/#743/#700/#699/#677/#387, every deleted-path citation covered; 1 runbook bullet on the online-only archives) — opened 2026-11-17 — session a0a717de-0296-4da1-97cd-7a4636ad499d
 - Goal: The 2026-11-17 C: disk cleanup is recorded where sessions read: each todo item whose C:\tmp evidence was deleted carries a dated note saying what is gone and what that costs, and the fleet runbook says the OneDrive data archives are online-only (a restore downloads first) and names the SyndicateBackupOnlineOnly task
 - Files: docs/ai_context/todo.md (one dated note each in the #766 + #743 + #700 + #699 + #677 + #387 sections ONLY), docs/ai_context/local_production_runbook.md (ONE new bullet inserted after the fleet off-disk-dir bullet ONLY)
 - Hypothesis: n/a
 - Falsification test: n/a
 - Verification: git show origin/main: both files carry the notes; every deleted path the todo cites has a note in its section; check_lane_invariants passes
+- Result 2026-11-17: verified on origin/main 93bcce6ce -- todo.md carries 8 notes and a scan finds 0 citations of a deleted C:\tmp path without a note within 14 lines; the runbook carries the bullet. check_lane_invariants: the runbook claim reads as a disjoint section; its todo.md contest is pre-existing (lanes claiming the whole file). WSL /tmp/ci697 (#697) is a different path, so no note.
 - Blocked by: none
 
 ### inplay-recorder-discovery — OPEN — opened 2026-11-17 — session e6287e48-2784-4660-9dab-277e0ad478cd
