@@ -61450,3 +61450,29 @@ Lane `render-config-retirement` (session 267d8859).
 - **What was running:** a today board build entered before the drain. Its `layer2_shortlist_build` stage took 633.44 s (exit 01:18:10Z) and `portfolio_commit` 225.68 s (exit 01:21:56Z). The check still read `board_build=in_flight` after that. BOOK_GRID ticks showed `background_pending` 16-18 (other dates' grid builds) throughout. DRAIN_HOLD was logged only at `mlb_sim_tick`. Undrained 01:28Z (`DRAIN_CLEARED`).
 - **Cost:** ~20 min of drain. The today board published at ~01:22Z, when the in-flight build finished.
 - **Same lesson as the grid lane's 23:46Z abort:** in the live evening this worker has no idle window. Load at a quiet hour.
+
+## 2026-11-18 01:46:27Z (7:46 PM CST 11-17) -- web: the loop-stall black box `3920a2d4d` (lane `web-silent-worker-kills`; handed over from the portfolio monitor on the user's "fix the silent web worker kills") -- **LOADED on web; an INSTRUMENT, not the fix**
+- betting change: **yes, pending refresh-worker**, for ONE ride-along: `ee47c930a` (NFL live re-sim event-id seeds, lane `nfl-live-resim-event-seeds`). It is now on the fleet checkout and loads at the next refresh-worker restart. That lane wanted the load to be the user's decision after TNF 11-19 (its BC-022 precedent was `yes`). The web load itself is `no`: a stack dump to web.log, nothing that places, sizes, holds or exits a bet.
+- **The change:** `gunicorn.conf.py` `post_worker_init` wraps each web worker's heartbeat. Every beat re-arms `faulthandler.dump_traceback_later` (at most every 5 s). If the worker loop stops turning for 40 s, a C watchdog writes EVERY thread's Python stack to web.log, without the GIL, ~20 s before gunicorn's 60 s `WORKER TIMEOUT` kill. Boot line `WEB_LOOP_STALL_DUMP_ARMED`; dump header `Timeout (0:00:40)!`; off switch `SYNDICATE_WEB_LOOP_STALL_DUMP_SECONDS=0`. Tests: 27 passed on the fleet's Linux Python.
+- **Why an instrument first:** the 11-17 kills (15:23, 16:38, 16:49, 21:36Z; 0 a day 11-12..11-16) have no recycle/drain line and took one worker each. The read-only tests weakened H2 (heartbeat file I/O stall: a shared-disk stall would take both workers) and ruled H1 (main-loop block) unlikely by construction. H3 (GIL starvation) needs a stack of a stalled worker. Findings: `.syndicate/findings_2026-11-18_web_silent_worker_kills.md`.
+- **Ride-alongs** (`64daca46f..3920a2d4d`, 79 commits, runtime):
+  - `ee47c930a` NFL re-sim seeds: refresh-worker only (above);
+  - `923869cf3` I-17 calibrated college total: **its web half (the rail template + `live_rail_rows` fields) is now live on web**. It is display only and falls back to the old number when no row carries `live_total_basis: calibrated`, which stays true until refresh-worker loads it. The I-17 lane's next load needs only the refresh-worker restart;
+  - `b25afc1e5` / `3f337b2d9` book-grid memo (#809), `920c19e70` WNBA #829 settlement half, `bb133096c` NFL card display, `95ae83f74` engine paper M3 (scripts and paper only; nothing in syndicate/ imports it);
+  - `e13ae3c8c` render names part 2 (names only, incl. `_is_web_role` in `syndicate/app.py`), `4c777e4d0` comments, `7f43e5777` MLB native tool names, `3b6f41c1f` fleet_local rehearsal (scripts).
+  - None of the 14 dirty paths on the fleet checkout is in the ff (184 incoming files).
+- **Gates:**
+  - claim web 01:46:02Z (holder `web-silent-worker-kills`, ACQUIRED, rc 0);
+  - baseline 01:45:42Z: fleet head `64daca46f`, `WEB_LOOP_STALL_DUMP_ARMED` lines 0, healthz 200, kills 4 on 11-17 (last 21:36:36Z);
+  - preflight `--service web --target-commit 3920a2d4d`, from a worktree at origin/main `c9df5ab2c`, 4 expect/baseline pairs: **CLEAR 01:46:07Z** (0 processes). refresh-worker runs `91d865fd`, live-odds-worker `64daca46`.
+- **ff + reload** (scratchpad `wsk_ff_reload.sh 3920a2d4d`):
+  - `git merge --ff-only 3920a2d4d` at **01:46:27Z**;
+  - `RELOAD_WEB {"elapsed_s": 10.0, "failures": 0, "healthz_ok_last": true, "state": "done"}`, healthz 200 on all 6 probes;
+  - web workers 100537/102136 -> **102762/102763**, master 28883 unchanged.
+- **expect / measured:**
+  - `fleet_head` 64daca46f -> 3920a2d4d: **MET.** Fleet HEAD `3920a2d4d634` at 01:46:27Z, and the new workers booted after the ff.
+  - `stall_dump_armed_per_new_worker` 0 -> 1: **MET, 5 of 5 boots** 01:46:27-01:54:13Z (2 from the reload, 3 from memory recycles), 0 `WEB_LOOP_STALL_DUMP_ERROR`.
+  - `healthz` 200 -> 200: **MET** (6 reload probes, 2 later reads, ~1-2 ms).
+  - Harm check 01:46:27-01:54:13Z: 0 `WORKER TIMEOUT`, 0 `Timeout (0:00:` dumps, 0 Traceback, 0 SIGKILL. 3 `WEB_WORKER_MEMORY_RECYCLE` drains ended without a dump, so each drain took under 40 s.
+  - web.log's event mix matched the 7.8 min before the ff (`NCAAF_LIVE_STATE_FROM_WORKER` 98 before / 96 after, `NCAAF_LIVE_STATE` 49 / 48, drains 5 / 5). No loop started in web from the render-names ride-along.
+- **verify (owed):** `web_worker_timeout_kills_per_day` 4 -> below 4 is not measurable until 11-18 ends. The lane's real reading is the next `Timeout (0:00:40)!` dump: which thread held the loop. A dump from a draining worker (after `WEB_WORKER_MEMORY_RECYCLE` / during `WEB_WORKER_DRAINED`) is the older drain-path stall, not the new mode.

@@ -65,3 +65,15 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
   (reachability, off != on). Results: 25 passed / 2 skipped on Windows (those 2 need `grp`); **27 passed** on the
   fleet's Linux Python.
 - Read the next dump to see which thread held the loop, then fix that, under this lane.
+
+## Deployed 2026-11-18 01:46:27Z (7:46 PM CST 11-17)
+
+- On main `3920a2d4d`; the fleet checkout fast-forwarded from `64daca46f` at 01:46:27Z, then `reload-web` (rolling HUP,
+  0 failures, healthz 200 throughout). New workers 102762/102763 each logged `WEB_LOOP_STALL_DUMP_ARMED`
+  (`dump_after_s` 40, `kill_timeout_s` 60). Entry and readings: `deploys.md`, the 01:46:27Z entry.
+- **How to read a dump.** Search web.log for `Timeout (0:00:40)!`. The block that follows lists every thread, the
+  current one first. Look for the thread that is NOT in `selectors`/`threading.wait`/`queue.get`: that is the one
+  holding the GIL (H3) or blocked in a syscall (H1/H2: then the main thread itself is in that call).
+  - If `WORKER TIMEOUT` follows ~20 s later, the stall was the kill.
+  - If the dump came from a worker that had logged `WEB_WORKER_MEMORY_RECYCLE` and is draining, it is the older
+    drain-path stall (`futures.wait(..., graceful_timeout)` does not heartbeat), not the 11-17 mode.
