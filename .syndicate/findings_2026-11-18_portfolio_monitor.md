@@ -602,3 +602,16 @@ picks win about 4-5 pp less than the venue's own fair price says.
   one.
 - **Also owed, separately:** the quote log's venue coverage. 48% of live fills have no logged own-side quote before
   the fill. That blinds the CLV and spread instruments on about half the book.
+
+## Reading 41 — Wed 11-18 11:43 AM CST (17:43Z), window 50 min
+
+- **Results first.** No new grades: 30 d -7.35% [-12.8, -1.9] on 673 games, 7 d -2.71%, fee-net CLV -0.36 pp. Today's
+  bets grade from the evening slate.
+- **Optimization state.** The pre-registered spread test falsified the spread lever (F13 downgraded). The open lead is
+  F15, the price-shopping premise; a calibration test of the sportsbook consensus against the venue's own fair is
+  offered to the user.
+- **Plan 1.3 min old.** 160 suggested -> 25 sized -> 13 positions (`beyond_max_positions` 135). Ceiling used 19.1%.
+- **Execution, 50 min:** 16 live ticks, 3 placed (kalshi), 0 failed.
+  - Orders today 44: 43 filled, 1 maker post resting 656 min, exempt until kickoff.
+  - Cap use: kalshi 16.7%, polymarket 15.0%.
+- **Endpoints:** all 7 read 200, all under 0.35 s. 0 kills. **Gate:** BC-050, 0 of 800. **Anomalies: 0.**
