@@ -347,3 +347,37 @@ reading.
 - Orders today 39: 37 filled, 2 maker posts resting about 8.6 h, exempt until kickoff. Unreconciled 0.
 - Cap use: kalshi 15.2%, polymarket 15.0%.
 - All 7 endpoints 200 (`/portfolio` 0.55 s). 0 kills. **Anomalies: 0.**
+
+## Close calibration by side and price band — PRE-REGISTRATION (written 2026-11-18 15:33:59Z, before any number below is computed; user "Yes, measure it")
+
+**Question.** The live book's picks beat the same-book close (gross CLV +1.28 pp, 30 d) and still win 6.28 pp less than
+the close implies (z -2.93). Why?
+
+**Known confound, stated first.** The same-book close is our side's last pregame **ask** (`book_quotes_last_pregame`;
+`kalshi_board_join`: each side is priced from its own ask, and `yes_ask + no_ask > 1` by the spread). So
+"wins - close-implied" is biased negative by roughly half the venue's spread before anything real.
+
+**Measurement.**
+- For each live bet with a resolved same-book close (30 d, decided), resolve the OPPOSITE selection's last pregame
+  quote at the same venue with the same resolver (`order_clv._quote_closes_for_orders`, `read_quote_rows_for_events`).
+  The flip: over<->under, home<->away, yes<->no; spreads negate the line.
+- From the pair: **fair = ours / (ours + theirs)** (a proportional de-vig) and **overround = ours + theirs - 1**.
+- Only pairs whose two quotes were captured within 15 min of each other count. The pair rate is reported.
+- **Gaps (event-clustered):** raw = won - ours; **fair gap = won - fair**.
+- **Slices:** fair-probability band (<.30, .30-.45, .45-.55, .55-.70, .70-.85, >=.85), market family (totals, spreads,
+  h2h, props), side (over/under, home/away, yes/no), venue.
+
+**Hypotheses and what falsifies each.**
+- **H0, the spread:** the raw gap is mostly the half-spread. The fair gap is within 1.5 pp of 0, with a 95% range that
+  includes 0. *Falsified if* the fair gap's 95% upper bound < -1.5 pp.
+- **H1, favourite-longshot:** the fair gap concentrates in longshots (fair < .45), and favourites (fair >= .55) are
+  calibrated. *Falsified if* the favourites' fair gap is at least as negative as the longshots', or the longshots'
+  95% range includes 0.
+- **H2, adverse selection (our picks):** the fair gap is negative across price bands alike. *Falsified if* any band
+  with >= 50 bets has a fair gap > 0 beyond noise, or the gap differs across bands beyond noise in H1's direction.
+
+**Decision use.**
+- H0 survives: the close-calibration condition of the gate is mis-specified (an ask, not a fair price). That is a
+  measurement fix, not a betting change.
+- H1 survives: a per-line price-band lever, evidence only.
+- H2 survives: the model's side selection or probabilities are the problem (calibration shrink).
