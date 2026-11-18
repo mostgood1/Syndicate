@@ -941,6 +941,12 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
 - **NOT a statement about** our model-edge entries or pregame exits: that is kalshi-exit-path's 10-26 counterfactual.
 - **Scripts:** `scripts/inplay_edge_report.py`, `scripts/inplay_exit_replay.py`, `scripts/inplay_fair_score.py` over `scripts/inplay_recorder.py` output.
 - **Detail:** `findings_2026-10-20_in_game_trading.md`, todo #715.
+- **THE RECORDER'S KALSHI LIST AND POLL LOOP CHANGED AT THE 2026-11-18 NIGHTLY** `[verified 2026-11-18: dry A/B 13 x 15 min on 4,663 markets; nightly SYNC 14:00:03Z took a2af81258; lane inplay-recorder-discovery, CLOSED]`
+  - The list is Kalshi's public listing by series for the slate date, unioned with the fleet capture file and kept until settled. The capture file's 8,000-market cap no longer bounds it. `KXNHLTOTAL` is still not polled.
+  - Polls are 200 tickers x 1.25 req/s, evenly spaced. A 429 resumes at the batch that failed.
+  - On a Saturday-sized list every market is quoted, with no gap > 120 s. The old loop never quoted 40-42% of the same list.
+  - **Nights recorded before 11-18 carry the old bias on big slates.** On 11-14, 82.4% of markets had a gap > 120 s, mostly NCAAF totals and NHL at the end of the sorted list. The one weeknight measured, 11-16 (596 markets), had no starvation. Its gaps came from two whole-loop stalls of 70 s and 136 s, which were not 429s; session local_c00c0322 is diagnosing them.
+  - Measure any night with `py -3 scripts/inplay_poll_gaps.py C:/tmp/inplay_<date>`. Detail: `findings_2026-11-17_inplay_recorder_discovery.md`.
 - **IN-GAME FAST EXIT LOOP IS LIVE** `[verified on fleet logs 2026-10-22 15:15Z]`
   - `execution_exits_fast` runs every 15 s on its own thread in live-odds-worker (ac248f07, live since 21:51Z 10-21).
   - It hands triggered LIVE in-play positions to kalshi-exit-path's `run_exit_tick`: same rules (take_profit), same shared caps (5 sales / $25 per UTC day), same place_exit. Both passes are serialised by `execution_exits.EXIT_STATE_LOCK`.
