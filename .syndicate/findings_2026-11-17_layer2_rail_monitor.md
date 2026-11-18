@@ -1460,3 +1460,51 @@ points scored.
     lane had recorded that load as the user's call after TNF 11-19.
   - **Relayed** to the TERM's lane (local_208683f1, delivered) and to the seeds lane's owner (local_997aa897,
     queued). Nothing loaded by me.
+
+## Reading 16 — Tue 11-17 8:37 PM CST (02:37Z 11-18) — the NHL odds hang repeats every run
+
+**Fleet:** unchanged. Web `3920a2d4d`; live-odds-worker 52087; refresh-worker 28948. Host load 7.3 on 12 cores.
+
+**Sessions started on the user's words:**
+- I-20 local_9c4bd078: switch on main `09eddabf2`. The user said **"Yes, switch it on"** in that session: env key
+  + a drained full down/up after the overnight loads (`d32449953`).
+- I-22 local_73a5d2dd: lane odds-lane-sport-deadline, `1f4b262da`.
+- I-16 local_1a1d1ce7.
+- I-21 local_ce6ce550.
+
+**Slate: 42 live chips.** NCAAB 23, NHL 7, WNCAAB 7, NBA 3, NCAAF 2.
+
+**Flags: 38 shown, 0 false, 0 missed, but 73 dark rows (18 markets).**
+- **Dark:** almost all NBA alternates: totals_alt full / Q3 / Q4, spreads_alt full / Q3 / Q4. They were priced
+  fresh (<= 120 s) and are now 310-325 s old. The NBA alt quotes are not re-priced within 5 min. Also 8 NCAAB rows
+  at ~355 s.
+- **I-17 (P > 0.5 rule):** NCAAB full-game totals 7 of 20 contradict "ours". NBA 1 value flag, not counted.
+- **Largest:** Kennesaw St @ Alabama ALA −23.5, 25.2 pp.
+
+**Live rows: 881.** 377 priced <= 120 s; 620 over 300 s; priced age p50 160 s. 12 of 141 markets carry no
+price of ours.
+
+**I-22, the NHL odds hang, now three runs in a row** (`odds_refresh.json` manifests):
+- **01:21:11Z: TimeoutExpired** on `scripts/refresh_nhl_oddsapi.py`, 1,929 s;
+- **01:54:27Z: TimeoutExpired** on the same script, 1,817 s;
+- **02:25:36Z:** its NHL child (pid 138879) at 688 s and 1.8% CPU at 02:37Z, the same pattern.
+
+**Live odds sweeps 02:06-02:37Z:** 7 launched, **6 refused** `lane_busy`.
+
+**NHL in-play rows:** 5, 0, 4, 4, 4, 16, 6, **600, 598**, 0, 9. They are present only at 02:26-02:29Z, right
+after the 02:24Z timeout freed the lane. 5 of 11 NHL builds carried zero cards.
+
+**Overlay (31 min).**
+- Gap max: NHL **382 s (1 over 360)**; NCAAF 286 s; WNCAAB 279 s; NCAAB 212 s; NBA 158 s.
+- Web merges stale 1 of 63 (NHL `stale_371s` 02:36:02Z).
+- Ticks 33, gap max 152 s. `deferred_slow`: NBA 1, NCAAB 1.
+- Build s p50 / max: NBA 26.8 / 111.4; NCAAB 19.0 / 79.9.
+
+**Board:** build spans overview 98 s, shortlist 561 s (exit 02:35:52Z). Board built 202 s ago at the read.
+
+**Load:** **query 19.2 s** / 4.64 MB / 24.9 MB; **shortlist 5.9 s; chips 5.2 s**; live-rail 0.36-0.50 s.
+
+**Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less, 0 live chips without a live card.
+
+**#824:** **2 of 6** college `LIVE_GAMELINE_JOIN` lines since 02:06Z carry the reason (refusals). 0 of 21 college
+totals flags below the points scored.
