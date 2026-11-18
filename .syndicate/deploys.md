@@ -60828,7 +60828,7 @@ User decision 2026-11-03 "Edge-floor only". The coordinator chat (332cb014) rela
   - The manual run is not in the sim-run ledger (`_record_season_projection_in_sim_ledger` runs only on the autorun's launch).
   - The worker's next NFL `artifact_stale` launch moves to ~16:17Z 11-18, still before TNF (11-20 01:15Z).
 - **The #752 re-grade's condition (d):** week 11's sidecar was written after 15:25:08Z. MET for now; later rewrites before kickoff also come after the ff.
-- **Betting change:** no new row. The rebuild is pregame projection data under BC-022's load; it changes no code, env or live-bet rule.
+- betting change: yes (BC-044, classified 2026-11-18; this line first read "no new row ... under BC-022's load", which was wrong: BC-022 carried only the live re-sim, and this rebuild moved the served week-11 pregame projection). Loaded at the first board build to finish after the files, 16:31:32Z. It does not move the gate clock, which starts later (BC-042).
 - **revert:** none needed. The next daily run rewrites the same files on the same profile.
 
 ## 2026-11-17 16:24:06Z (10:24 AM CST) -- DEPLOY (ff only, no restart): fleet `17ff69398` -> `c4d35b515`, the portfolio `key_player_out` refusal (lane `live-player-exit-gate`, todo #814, user "Yes, ff now") -- **ff MET; the refusal loads at refresh-worker's next restart. The props join (`884a2928a`) is already LOADED.**
