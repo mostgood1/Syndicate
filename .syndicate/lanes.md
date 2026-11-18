@@ -1274,6 +1274,14 @@ death, never life — do not invert it.
 - Verification: Findings file states the population per sport/date (coverage intersection printed), the primary cell's mean EV vs close with event-bootstrap CI, the control arm, and the registered verdict.
 - Blocked by: none
 
+### trader-following-study — OPEN — opened 2026-11-17 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: A paper-only answer to whether following selected Polymarket sports traders earns money after entry delay: wallets chosen on their 2026-08-01..10-16 bets (in-sample), their 10-17..11-16 bets (out-of-sample) followed at the market's own price 0 s / 60 s / 300 s after their fill, on the sports we trade (NFL, NBA, NHL, NCAAF, NCAAB, soccer); ROI with an event-clustered 95% bound per delay, against an unselected-wallet baseline; and a go / no-go for a live shadow on Kalshi and Polymarket US
+- Files: scripts/trader_follow_study.py (NEW, read-only research: Polymarket public data + gamma APIs), tests/test_trader_follow_study.py (NEW), .syndicate/findings_2026-11-18_trader_following_study.md (NEW), .syndicate/scope_2026-11-17_trader_following.md
+- Hypothesis: Stated 2026-11-17 ~7:45 PM CST before any trade is pulled: wallets with >= 100 in-sample bets on our sports and in-sample ROI lower 95% bound > 0 (one-sided traders only: no market where they bought both outcomes) earn positive out-of-sample ROI when followed at the market price 60 s after their buy, with the event-clustered 95% lower bound > 0, and above the unselected leaderboard baseline
+- Falsification test: At the 60 s delay, the selected wallets' out-of-sample ROI lower 95% bound is <= 0, or it is not above the unselected baseline's ROI; then following is not worth a live shadow
+- Verification: pytest tests/test_trader_follow_study.py (bet dedupe, two-sided exclusion, follow price at t+delay from the tape, settlement from resolved outcome prices, clustered ROI); one full run with per-step counts (wallets, bets, resolved, followed, by delay) and the result written to the findings file
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
