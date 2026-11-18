@@ -1256,6 +1256,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: git show origin/main: both files carry the notes; every deleted path the todo cites has a note in its section; check_lane_invariants passes
 - Result 2026-11-17: verified on origin/main 93bcce6ce -- todo.md carries 8 notes and a scan finds 0 citations of a deleted C:\tmp path without a note within 14 lines; the runbook carries the bullet. check_lane_invariants: the runbook claim reads as a disjoint section; its todo.md contest is pre-existing (lanes claiming the whole file). WSL /tmp/ci697 (#697) is a different path, so no note.
+- Follow-through 2026-11-18: the runbook bullet's task did its first real marking (20261118 archive, 04:07 CST, dehydrated by 06:21), and the secrets backup recovered (`fleet-secrets-20261118T093045Z`). Nothing is owed.
 - Blocked by: none
 
 ### inplay-recorder-discovery — CLOSED 2026-11-18 7:46 AM CST (GOAL MET: on main `e9eb52568` + `8a5459b57` + `a2af81258` with the user's yes; dry A/B on 4,663 markets: 0 gaps > 120 s vs 40-42% of markets never quoted; loan returned; the live 11-21 Saturday reading is owed) — opened 2026-11-17 — session e6287e48-2784-4660-9dab-277e0ad478cd
