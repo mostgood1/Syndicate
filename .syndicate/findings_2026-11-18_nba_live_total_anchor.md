@@ -174,7 +174,19 @@ probit ladder fit), plus ONE step. Each evidence row's histogram goes through th
 
 ## 8. To load (the user's decision; betting change: yes)
 
-**Load hold:** proposed 2026-11-18 ~12:00 PM CST by the decision-engine session (local_898e5510).
+**Hold LIFTED, 2026-11-18 ~11:55 AM CST.**
+- **The decision:** the user's "Yes, lift it", typed in the decision-engine session (local_898e5510) and relayed from
+  there. The question was "Lift the 11-22 load hold for the NBA total anchor (#834)?".
+- **Why:** F1 (#821, on since 11-17 11:35 AM CST) already moved the NBA re-sim's starting totals inside M2's window.
+  So the hold no longer keeps that window on one re-sim, and it would cost ~4 more nights of the over-lean.
+- **Scope:** #834 only; #836's hold stands. M3 picks up an anchor load as a new NBA version; the M2/M3/re-run notes
+  carry the F1 correction (`89ff009f2`).
+- **Still owed:** the push and the load each need the user's own yes in this lane's session. The load is a betting
+  change.
+
+The original hold, kept for the record:
+
+**Load hold (superseded):** proposed 2026-11-18 ~12:00 PM CST by the decision-engine session (local_898e5510).
 - **The hold:** load nothing before 2026-11-22 ends.
   - M2's test window (11-15..11-22) and the learner re-run window end then.
   - Holding keeps both windows on the re-sims they started with.
