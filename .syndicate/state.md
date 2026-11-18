@@ -797,3 +797,4 @@ once this index exists: re-splitting would orphan the parts.
 | [web-oom-leak] | WEB SERVICE MEMORY GROWTH — LIVE: UPDATE 37..44 + the 2026-09-09 block; UPDATE 1..36 archived to state_archive | `state_worker.md` |
 | [fleet-redis-test-pollution] | THE FLEET REDIS HELD 426 TEST-FIXTURE KEYS; A PYTEST GUARD AND A JANITOR ARE LIVE AND THE COUNT IS 0 `[verifie | `state_worker.md` |
 | [board-build-process-split] | THE LAYER 2 BOARD BUILD SHARES ONE INTERPRETER LOCK WITH THE BOOK-GRID TICK AND THE VENUE ODDS LOOP; A SWITCH  | `state_worker.md` |
+| [odds-lane-sport-deadline] | ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE; A PER-SPORT DEADLINE + DEFERRED NHL GENERATION IS | `state_worker.md` |

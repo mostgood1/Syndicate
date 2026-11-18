@@ -3530,3 +3530,22 @@ as a verdict.
   - Measure a caller's bytes or latency by calling the caller's OWN function, or by importing what it imports. A re-typed copy of its request is not the caller.
   - A repo-wide import side effect (`install_opener`, a patched socket, a sitecustomize) changes the transport without appearing at the call site.
   - Before writing a client-side reading down, check it against the server's log for the caller's real runs.
+
+## 2026-11-17 — OVERTURNED (in part): "the NHL odds child hangs on api-web.nhle.com" — the stall is the NHL STATS REST API, which shares api-web's Cloudflare IPs; and a cadence keyed on an output's freshness re-enters a stalled job forever `[lane odds-lane-sport-deadline, session bb342d07]`
+- **What was believed (rail monitor I-22):** the hung `refresh_nhl_oddsapi.py` sat on api-web.nhle.com, read from its socket's remote IP (104.16.144.251), via `NhlWebClient`'s 30 s per-request timeout.
+- **Measured:**
+  - `api.nhle.com` and `api-web.nhle.com` resolve to the SAME pair (104.16.144.251 / .145.251).
+  - The child's file writes put the stall after the odds and season inputs, in `collect_slate_inputs`: 6 uncached
+    stats-REST calls per slate team (`NhlWebIngestClient`, not `NhlWebClient`). 5 of 7 sampled took >20 s or
+    returned 520.
+  - The api-web calls were 0.2 s.
+- **The second half:** NHL live generation is "due" while `predictions_<date>.csv` is >= 1,800 s old. A generation
+  killed at its timeout writes none, so EVERY later sweep was due again: four 1,800 s hangs in a row, one of them
+  ended by a manual kill, then immediately repeated.
+- **Rule:**
+  - Attribute a socket to a host by the process's stage or its DNS, never by a CDN IP; Cloudflare fronts many
+    hosts on one address.
+  - Any "due when the output is stale" trigger needs a record of the last ATTEMPT (or a cooldown). Without one,
+    a job that fails to produce its output is retried at the full rate forever.
+  - `odds_refresh.json` has TWO shapes: the wrapper (`startedAt` / `command` / `result`) and the direct summary
+    (`started_at` / `results`). Read both, or the scan silently drops runs.

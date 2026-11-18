@@ -2899,3 +2899,28 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
 - **Measured** (fleet, per-thread `/proc` + `schedstat`, nice 19): refresh-worker's board loop (thread `syndicate-intelligence-state-loop`; tid 29001 on pid 28948) got **0.19 of a core** over the 165.6 s 11-18 overview stage (01:51:46-01:54:32Z = 7:51-7:54 PM CST 11-17); the main thread (book-grid / overlay tick) 0.41, the venue odds loop 0.36, process 1.02, runqueue wait ~0.03 per thread. 11-16 evening, 24 builds: board share median 0.58. Findings `.syndicate/findings_2026-11-17_layer2_board_process_split.md`.
 - **The switch:** `SYNDICATE_BOARD_BUILD_PROCESS` on refresh-worker, `pipeline/board_build_process.py`, on main since `09eddabf2` (2026-11-18 02:16Z). Absent = the identical in-thread starter. **NOT in `local_production.env`; no role runs it.** Turning it on needs an ff >= `09eddabf2` + `REFRESH_WORKER__SYNDICATE_BOARD_BUILD_PROCESS=1` + a drained full `down`/`up` (betting change: yes). Its pre-registered first-evening reading is in the findings.
 - **The host is a second, separate cost:** Windows read 100% busy at 56-64% of nominal clock (1,920-2,188 of 3,417 MHz, Snapdragon X1E80100, on AC) at 7:36 and 8:05 PM CST 11-17, with vmmemwsl 3.9-6.4 cores and MsMpEng 1.0-2.4. Inside WSL that shows as clock, not runqueue wait. A WSL-side process appending to `/mnt/c` every second raised MsMpEng ~2.4 -> ~1.1 cores when stopped: write samplers to WSL-native paths.
+
+## [odds-lane-sport-deadline] ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE; A PER-SPORT DEADLINE + DEFERRED NHL GENERATION IS ON MAIN `2ae0c646a`, NOT LOADED `[verified 2026-11-18 03:02Z, lane odds-lane-sport-deadline, todo #838]`
+
+- **The run (verified):**
+  - live-odds-worker runs a live sweep's sports SERIALLY (`SYNDICATE_SERIAL_SPORT_REFRESH=true`), with one
+    1,800 s step timeout.
+  - On the fleet's loaded code (`3920a2d4d` and before), a step `TimeoutExpired` escapes to `main`: rc 1, the
+    sports after the hung one never run, and the finished ones' results are dropped (01:21Z manifest: 831 B, no
+    `results`).
+- **The child (verified 11-18):**
+  - NHL live generation runs `--mode full` when `predictions_<date>.csv` is >= 1,800 s old.
+  - Its `collect_slate_inputs` makes 6 uncached NHL stats-REST calls per slate team. That host answered 5 of 7
+    sampled calls in >20 s or 520.
+  - A timed-out generation writes no predictions, so every later live sweep is full again (4 in a row,
+    01:21-~03:20Z).
+  - `api.nhle.com` and `api-web.nhle.com` share one Cloudflare IP pair: the IP cannot attribute a call.
+- **Baseline cost:** 23 of 26 sweep attempts refused `lane_busy` 01:21-03:02Z (9 of 42 at 22-00Z). NHL live full
+  steps 11-13..11-17: n=60, p50 351 s, max 987 s; fast n=413, p50 46 s.
+- **Fix `2ae0c646a`** (`SYNDICATE_ODDS_LANE_STEP_DEADLINE`, absent = ON, `off` = old behaviour exactly):
+  - timeout = a failed step, and the run continues;
+  - per-step / per-sport deadlines;
+  - NHL due generation deferred past every sport as `--mode generate` (0 added OddsAPI calls), deadline 900 s;
+  - a 1,800 s cooldown after a timeout.
+- **Load = a fleet ff only.** Both scripts run as fresh children per sweep; no role restart is needed. It is NOT
+  loaded; the decision is the user's. Prediction: `findings_2026-11-17_odds_lane_sport_deadline.md`.

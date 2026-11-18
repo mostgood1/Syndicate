@@ -1,5 +1,27 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#838` — **ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE: NHL full generation hung on the NHL stats REST API (21-44 s per call or 520, 168 uncached calls) for its 1,800 s timeout four sweeps in a row, the `TimeoutExpired` killed each run, and 23 of 26 sweep attempts 01:21-03:02Z were refused `lane_busy`. Fix on main `2ae0c646a` behind `SYNDICATE_ODDS_LANE_STEP_DEADLINE` (absent = ON), NOT loaded; the load is the user's** `[2026-11-17, lane odds-lane-sport-deadline; `.syndicate/findings_2026-11-17_odds_lane_sport_deadline.md`]`
+- **Cause (measured 11-18, read-only):**
+  - live-odds-worker runs sports SERIALLY with one 1,800 s step timeout, and a timeout escaped `_run_command` to `main`: rc 1, the sports after NHL never ran, NBA's result was dropped (an 831-byte manifest).
+  - A timed-out generation writes no predictions, so every later live sweep was full again (01:21Z, 01:54Z, 02:25Z, ~02:48Z).
+  - The stall is `collect_slate_inputs`: 6 stats-REST calls per slate team (`api.nhle.com`, same Cloudflare IPs as api-web), 28 teams on 11-17 + 11-18.
+- **Fix (`2ae0c646a`, switch ON when absent; `off` = today exactly):**
+  - a step timeout is a failed step and the run continues;
+  - per-step / per-sport deadlines (`SYNDICATE_REFRESH_STEP_TIMEOUT_SECONDS__<SPORT>`, absent everywhere);
+  - NHL live generation, when due, runs as a deferred `nhl_live_generation` (`--mode generate`, no odds collection, so 0 added OddsAPI calls) after every sport, deadline 900 s (`SYNDICATE_NHL_LIVE_GENERATION_DEADLINE_SECONDS`);
+  - a generation timeout holds NHL to fast sweeps for 1,800 s.
+  - 26 tests incl. off != on through the real run loop.
+- **To load (user's call):** a fleet ff of `~/Syndicate` to `2ae0c646a` or later. Both changed scripts run only as fresh children per sweep, so **no TERM is needed**; the next live sweep runs it.
+  - The ff ships all of main up to that SHA: child scripts at once, in-process code at each role's next restart.
+  - Claim + preflight for the exact SHA; `betting change: yes` (live odds freshness across the lane's sports, NHL generation timing).
+- **Verify (pre-registered in the findings):** in a slow-NHL-API window,
+  - max live run <= 1,200 s;
+  - `lane_busy` <= 50% of attempts (11-18: 88%);
+  - `NHL_LIVE_GENERATION_COOLDOWN` lines after a timeout;
+  - NHL team odds age <= ~1,200 s.
+- **Follow-up (separate task, not this item):** cache the stats-REST reports (last season's are immutable; this season's playoffs are empty before April; this season's change only with a finished game). That takes 168 calls to ~0-12 per generation with identical data, so NHL predictions can regenerate on a slow-API night.
+- **Related:** `#837` (NHL in-play props on their own clock) is complementary. This item bounds the hold; `#837` removes NHL props' dependence on the sweep.
+
 ### `#837` — **NHL LIVE PROPS LEAVE THE BOARD WHENEVER THEIR ONE CAPTURE CLOCK LAPSES PAST 300 s: they rode only the shared live sweep (median gap 335 s), so 33 of 76 NHL overlay builds on 11-17 carried no props. An NHL in-play props pull is built OFF on main `9f911cb98`; loading it and the lapsed-line display are the user's** `[2026-11-17, lane nhl-inplay-props-drop; `.syndicate/findings_2026-11-17_nhl_inplay_props_drop.md`]`
 - **Cause (measured 11-17, read-only):** NHL's live props are written only by `refresh_nhl_oddsapi.py` inside the live sweep. The overlay keeps a live row while `seen_age_seconds <= 300` (`book_grid_artifact.is_inplay_fresh_row`).
   - 18 captures, median gap 335 s, max 1,869 s.
