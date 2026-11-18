@@ -9,17 +9,18 @@
     "name": "nfl",
     "q2_urgency_ignores_score": true,
     "q4_kick_waits": true,
-    "touchdown_weight_multiplier": 0.825
+    "touchdown_weight_multiplier": 0.925
   },
   "fit_from": {
-    "candidate": "v3h0.03_t0.825 = full3 (the seven #808 switches) + home_field_bonus 0.03 + touchdown_weight_multiplier 0.825, on the in-source NFL default",
-    "findings": ".syndicate/findings_2026-11-15_football_end_of_half_fix.md (V3 USER OVERRIDE, V3 HELD-OUT RESULTS)",
-    "fit": "NFL 2024-25, 136 games x 100 seeds: every quarter, Q2's last-120 s points and snaps inside the league's CIs, H1 > H2; as registered v3 is FIT FAIL on G5 at hfb 0.06 (3.01), this R2 point reads 2.94 and passes G1-G5",
-    "held_out": "NFL 2026 wk1-8, 121 games x 1000 seeds, read under the user override of 2026-11-15 19:21 CST: HB-ML -0.0023 [-0.0067, +0.0023], HB-TOT +0.0021 [-0.0027, +0.0066], HB-SPR -0.0027 [-0.0070, +0.0018], none shown worse; |sim total - close total| -0.266 [-0.374, -0.151]",
-    "live_inputs": "end_of_half_clock reads SmartSim2SimulationInput.initial_timeouts_home/away; the NFL live re-sim feeds them only when the tick adapter emits home_timeouts / away_timeouts (lane nfl-live-possession-map); unfed means 3 each",
-    "todo": "#808",
-    "user": "load the NFL profile after the MNF check (2026-11-16, lane nfl-profile-load)"
+    "candidate": "v3h0.03_t0.925 = the loaded nfl-808-v3h0.03-t0.825 with touchdown_weight_multiplier re-fitted on HONEST seeds (every game on its own disjoint seed block keyed by its game id); the seven #808 switches and home_field_bonus 0.03 unchanged",
+    "findings": ".syndicate/findings_2026-11-18_nfl_engine_level_refit.md (lane nfl-engine-level-refit, pre-registered b4272102b); .syndicate/findings_2026-11-17_nfl_engine_level_2026.md",
+    "fit": "NFL 2024-25, the same 136 games x 100 per-game seeds, #808's R2 objective and gates: grid t 0.825 / 0.875 / 0.900 / 0.925 / 0.950 / 0.975 / 1.025, minimum Q 2.93 at t0.925 (0.825 reads 10.18), regulation 45.35; G1 q1-q4, G2, G4, G5 pass; G3 (Q2 last-120 snaps 10.875 [10.835, 10.912] vs the league's upper bound 10.862) FAILS as registered at every t >= 0.875, flat in t, so a FIT FAIL on G3 alone",
+    "held_out": "NFL 2026 wk9-10, 29 games x 1000 per-game seeds, cand vs the loaded t0.825: HB-ML +0.0021 [-0.0020, +0.0061], HB-TOT -0.0113 [-0.0257, +0.0038], HB-SPR -0.0012 [-0.0065, +0.0039], none shown worse (the pre-registered rule); total signed error -2.59 -> -1.25 a game; n 29 rules out only large harm",
+    "live_inputs": "unchanged from nfl-808-v3h0.03-t0.825: end_of_half_clock reads initial_timeouts_home/away, fed by the NFL live tick adapter when it emits home_timeouts / away_timeouts; unfed means 3 each",
+    "todo": "#813 part 3 (re-fit of #808's level)",
+    "user": "'Yes, re-fit it' (2026-11-18); the LOAD is the user's separate decision",
+    "why": "the 0.825 was chosen on #808's FIT, whose 136 games shared seeds 1..100; those seeds read about +1.9 points a game over the long run (lane nfl-engine-level-2026), so on honest seeds the loaded profile projects 44.08 regulation points against the league's 45.62 and fails its own G1 on q3 and q4"
   },
-  "generated_at": "2026-11-16T20:18:18Z",
-  "version": "nfl-808-v3h0.03-t0.825"
+  "generated_at": "2026-11-18T14:38:24Z",
+  "version": "nfl-813-refit-v3h0.03-t0.925"
 }
