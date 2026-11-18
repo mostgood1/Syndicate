@@ -3586,3 +3586,11 @@ as a verdict.
     reads it. Name the launcher a value is meant for, and check what else reads it.
 - **Also, repeated, a known rule:** I wrote three lane stamps 40-70 min in the FUTURE by estimating the time instead
   of reading it. Read the clock (`Get-Date`, or the commit's `%ci`) before every stamp.
+
+## 2026-11-18 — OVERTURNED: "a fresh live re-sim state beats Kalshi at the end of a game" — the <= 30 s cell is 14 games, and the experts' `evidence_age_s` is not the state's age `[lane live-resim-endgame-staleness, session e2f5878d, todo #836]`
+
+- **What was believed:** the engine read's last-5% table (state <= 30 s old: -0.048, se 0.019) showed a fresh state beats Kalshi, so a faster late refresh would turn a loss into a win; and `evidence_age_s` measured how old the re-sim's state was.
+- **What was true:** the -0.048 cell is 62 line-instants from 14 games, two NBA games carrying 38 of them, and the threshold sweep is not monotone (<= 45 s already +0.178). What is established is the other side: 767 of 829 last-5% line-instants (85 games) were older than 30 s and lost +0.174 (se 0.053). And `evidence_age_s` = line instant minus max(snapshot tick, state `as_of`): NBA stamps its tick AFTER reading every game's state (lag p50 13 s, p90 43 s) and NCAAF's state comes from a record 40-93 s older than its tick, so it understates the state's age.
+- **Rule:** before acting on a favourable cell, count its games and how many come from the top two; a cell that lives on one or two games is a lead, not a fact. And measure a live number's information age from when its STATE was read (`liveStateAsOf`), never from when its snapshot was stamped.
+- **Process rule from the same session:** after `git push origin HEAD:main`, confirm `git merge-base --is-ancestor HEAD origin/main` BEFORE deleting the branch that holds the commit; twice a rejected push plus an immediate `git branch -D` orphaned a ledger commit (both recovered from the reflog).
+- *(evidence in `.syndicate/findings_2026-11-18_live_resim_endgame_staleness.md`)*

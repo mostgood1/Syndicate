@@ -1029,3 +1029,14 @@ Lane `board-today-freshness` (CLOSED; readings in `deploys.md` 2026-09-17 18:00:
 - **LOADED (verified):** live-odds-worker pid 2925378 booted 23:55:09Z 11-16 -- `PLAYER_EXIT_TICK` read=11/11/5/1 live games for NCAAB/WNCAAB/NBA/NHL at 00:48-00:49Z 11-17, 0 refusals, 0 tracebacks. refresh-worker pid 4027303 booted ~15:47Z 11-17 on a head carrying the props join and the soccer board skip.
 - **Portfolio refusal LOADED (verified):** refresh-worker pid 4049350 at 17:26:26Z 11-17 (the #790 TERM, BC-027 / BC-031), reloaded at 18:04:04Z (pid 4060729). Reading 18:44Z: today's plan has 0 `key_player_out` over 105 rows_in, with >= 1 in-play row reaching the loop. That is a null: no unmodelled exit occurred.
 - **One real refusal (producer side):** WNCAAB 401927467, Talia Kemp's foul-out, refused `key_player_out` for one tick at 03:12:34Z 11-17. The box showed the 5th foul before the engine state did. The game was priced again at 03:16:40Z once the foul-out was modelled (deploys.md). **NOT VERIFIED:** a refusal on an UNMODELLED key exit (injury, ejection, goalie or keeper change) carried to the board, the plan and an entry hold; no sport yet. MLB 183 fleet feeds: 7 games (3.8%) had a starter injury exit (offline replay, not live).
+
+## [live-endgame-freshness] LIVE RE-SIM NUMBERS IN THE LAST 5% OF A GAME: THE STATE IS 1.5-2.5 MIN OLD BY CADENCE, AND AN END-GAME FRESHNESS GATE IS ON MAIN IN SHADOW `[verified 2026-11-18, lane live-resim-endgame-staleness, todo #836]`
+
+- **The age is the producers' loops** (fleet live evidence log 11-09..11-14; new-state gap p50 / p90):
+  - NBA 151 / 186 s: a tick, then `nba/live_resim.py` `_interval_seconds` 120 s.
+  - NCAAF 154 / 342 s: refresh-worker's main-loop cycle (the 75 s floor does not bind; realised p50 142 s), on a live-state record up to 120 s old (lag p50 40 s).
+  - NHL 91 / 128 s: the serial live-lens loop, then a 60 s wait.
+  - The live evidence log (30 s poll) caught every tick and adds no age.
+- **Who reads a re-sim number late:** no live-money order (Kalshi / Polymarket entries refused after kickoff, `SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY` unset = ON; the in-play program prices from the book median). The board's live edges, the rail flag, the paper books and the engine experts do.
+- **On main, shadow when unset** (`SYNDICATE_LIVE_ENDGAME_FRESHNESS`; `3a04f43b0`, `18d036bef`, `52e68382a`): a full-game NBA / NCAAF / NHL lane in the last 5% or overtime whose state was read > 30 s earlier is withheld (`live_state_stale_in_endgame`) under `on`. Shadow prints `LIVE_ENDGAME_FRESHNESS` per build. NOT loaded on any role as of 2026-11-18 12:55 PM CST; `on` is a betting change (window only, earliest 2026-12-08).
+- Findings `.syndicate/findings_2026-11-18_live_resim_endgame_staleness.md`.

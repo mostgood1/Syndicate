@@ -523,6 +523,7 @@ once this index exists: re-splitting would orphan the parts.
 | [combined-board-state-rows-lost] | THE COMBINED BOARD DROPS EVERY PERSISTED STATE ROW; ITS AGE IS TOMORROW'S SHORTLIST — FIXED, LIVE ON WEB `b6a0 | `state_board.md` |
 | [board-per-date-freshness] | THE COMBINED BOARD DATES EACH WINDOW DATE ON ITS OWN; THE CHIP SHOWS TODAY APART FROM TOMORROW — LIVE ON WEB ` | `state_board.md` |
 | [inplay-overlay-board-cadence] | THE BOARD'S IN-PLAY ROWS COME FROM THE BOOK GRID EVERY TICK, NOT THE SHORTLIST — LIVE ON ALL THREE SERVICES `[ | `state_board.md` |
+| [live-endgame-freshness] | LIVE RE-SIM NUMBERS IN THE LAST 5% OF A GAME: THE STATE IS 1.5-2.5 MIN OLD BY CADENCE, AND AN END-GAME FRESHNE `[ | `state_board.md` |
 | [intelligence-season-evidence] | INTELLIGENCE EXPLANATIONS NAMED METRICS THEY NEVER READ, AND THE READINESS GATE COULD NOT SEE THE DATA ROOT -- | `state_board.md` |
 | [live-winpct-blank] | LIVE NFL/NCAAF ROWS SHOW NO PREGAME SIM PROBABILITY -- the Win%, the "Our sim has..." sentence and the directi | `state_board.md` |
 | [ncaaf-polymarket-spread-no-fair] | 73 NCAAF SPREAD ROWS REACH THE BOARD WITH NO FAIR AND NO REASON, BECAUSE POLYMARKET ALONE QUOTES THEM AND PRIC | `state_board.md` |
