@@ -1399,6 +1399,14 @@ death, never life — do not invert it.
 - Verification: (1) tests/test_nhl_stats_report_cache.py: off != on reachability (call counter), parity on a REAL captured report + schedule, empty-gt3 skip, coverage miss -> refetch, live game -> refetch, settle window. (2) replay of a real slate off vs on-cold vs on-warm: count stats-REST + api-web calls and wall time each, byte-compare the three CSVs' rows. (3) findings file with denominators and Central times. (4) load put to the user; not loaded here.
 - Blocked by: none
 
+### worktree-close-scoped-prune — OPEN — opened 2026-11-18 — session e9b4d640-7bf1-4f95-a490-8c426665baaf
+- Goal: session_worktree.py close removes only its OWN .git/worktrees record and never runs a real git worktree prune: another worktree's stale record and a gitdir-less husk both survive a close (tested) and the close tests pass
+- Files: scripts/session_worktree.py, tests/test_session_worktree_close.py
+- Hypothesis: n/a (a fix: close's real prune at lines 560 and 618 reached 20 other sessions' records on 2026-11-17 and 2026-11-18; Windows READONLY refused every delete)
+- Falsification test: a test that closes one worktree beside a peer's stale record still sees the peer's admin dir deleted, or close still issues a prune without --dry-run
+- Verification: new tests pass with the peer's record and a husk still on disk after close and no non-dry-run prune call recorded; the existing close and prune tests still pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
