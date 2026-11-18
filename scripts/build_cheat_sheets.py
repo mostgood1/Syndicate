@@ -702,14 +702,34 @@ IMAGE_FIELDS = (
 
 def fetch_board_cards(base_url: str) -> list[dict[str, Any]]:
     """The Layer 2 board's own cards -- the request the board page makes (templates/intelligence.html,
-    `intelligenceQueryPayload`) -- so a promoted pick is exactly what the board shows, with its written case."""
+    `intelligenceQueryPayload`) -- so a promoted pick is exactly what the board shows, with its written case.
+
+    `row_refs` (lane `cheat-sheet-picks-row-refs`, 2026-11-17, layer2-rail-monitor backlog I-16): the cards travel as
+    references into `ranked_all` plus a per-row patch, and `decode_row_refs` -- the page's own `rehydrateAliases`, in
+    Python -- rebuilds them before anything reads them. MEASURED on the fleet 2026-11-18 02:40Z, one board state
+    (both flag-off reads hashed the same): 69,000,099 -> 24,516,064 B per call, 17.6 / 12.6 s -> 4.8 s. That is the
+    wire: Python-urllib sends no Accept-Encoding, so this client was never gzipped. The 6,045 rebuilt cards, and the
+    whole rebuilt response, were identical to the flag-off read with key order included. A server that ignores the
+    flag (`SYNDICATE_QUERY_ROW_REFS=off`, or one that predates it) sends the full lists, and the rebuild is a no-op.
+
+    Encoded cards that did not rebuild RAISE, so they take the path a failed read already takes: `main_picks_only`
+    leaves every sheet as it was, and `main_build` builds without the board, as it does today when the read fails.
+    Returning an empty list instead would look like a board with no cards, and `merge_picks` would mark every pick
+    off the board on every picks run."""
+    from syndicate.features.shared.response_row_refs import RESPONSE_KEY, decode_row_refs
+
     body = {"question": "top edges today", "mode": "recommendation", "timing": "all", "background": False,
-            "force_refresh": False, "slim_aliases": False, "drop_row_diagnostics": True}
+            "force_refresh": False, "slim_aliases": False, "drop_row_diagnostics": True, "row_refs": True}
     req = urllib.request.Request(f"{base_url}/api/intelligence/query", data=json.dumps(body).encode("utf-8"),
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=300) as resp:
         doc = json.load(resp)
-    cards = (((doc.get("response") or {}).get("board_contract") or {}).get("cards")) or []
+    response = doc.get("response") or {}
+    if isinstance(response, dict) and RESPONSE_KEY in response:
+        decode_row_refs(response)
+        if not isinstance((response.get("board_contract") or {}).get("cards"), list):
+            raise ValueError("row_refs: board_contract.cards came encoded and did not rebuild")
+    cards = ((response.get("board_contract") or {}).get("cards")) or []
     return [c for c in cards if isinstance(c, dict)]
 
 
