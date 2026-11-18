@@ -156,8 +156,8 @@ If refresh-worker's evening look-ahead fetched first, the midnight run does not 
 - `wncaab_odds_snapshot` reports ok false on every live-odds-worker run 11-09..11-18, so every run's rc is 1.
 - The WNBA twin (`scripts/refresh_wnba_oddsapi_props.py` and its source CLI) has the same bootstrap shape. Its id
   handling was not checked; WNBA is off-season.
-- Which live NBA bets read `predictions_<D>.csv` and `elo_diff` was not traced, so the money impact of the
-  duplicated history is unsized.
+- The money impact of the duplicated history: **sized** by session 9383ef18 in
+  `.syndicate/findings_2026-11-18_nba_elo_money_impact.md` (main `20c9f9f45`).
 
 ## 9. Load
 
