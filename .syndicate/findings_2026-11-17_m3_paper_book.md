@@ -638,3 +638,50 @@ Built 11-18 10:34 AM CST (`m3_kit/epochs/timeline.json`). A version is the re-si
 
 Data-file switches are not detected either, only code. The first one inside the window: **F1 of todo `#821`** (`feed_game_model` with the outs penalties off, in the NBA processed root's `nba_sim_total_inputs.json`) was switched on 2026-11-17 at 11:35 AM CST (`deploys.md` 17:34:59Z). It is a data-file switch, not code, so the version timeline cannot see it. It moves the NBA pregame sim's totals, which the NBA live re-sim starts from. Lane `nba-live-total-anchor` measured 11-18's 12 NBA pregame totals at +6.78 (se 1.04) above the closing line (`.syndicate/findings_2026-11-18_nba_live_total_anchor.md`). The per-version lines
 cannot separate such a switch, and `M3_EPOCH_NEW` covers code only; `deploys.md` records the switches.
+
+
+## Addendum 5b: a settings or data-file switch starts its own version, registered 2026-11-18 12:41 PM CST (before any M3 slate's data is read)
+
+- **User:** "Yes, extend it", answering "Extend M3's version capture to env and data-file switches before 11-24?".
+- **Why.** Addendum 5 saw code only. `#821`'s F1, a data-file switch on 11-17, moved NBA's starting totals by about 7
+  points without a code change. The `#834` anchor is turned on by a setting, and so are many of this repo's live
+  changes. Report-only as before: the gate and every pinned M3 file are unchanged.
+- **What the morning capture now also records** (`m3_epochs.py`, read-only):
+  - **Settings.** Only names that look like re-sim switches are read: a sport token (`NBA` but not `WNBA`,
+    `BASKETBALL`, `NCAAF`, `NFL`, `FOOTBALL`, `SMARTSIM`) together with a re-sim token (`LIVE`, `RESIM`, `SIM`,
+    `ANCHOR`, `MECHANISM`, `ENDGAME`, `STANDIN`, `EXIT`, `TOTAL_LEVEL`, `MARGIN`, `SEGMENT`), or a shared
+    `SYNDICATE_LIVE_PLAYER_EXIT*` / `SYNDICATE_LIVE_ENDGAME*` key. Names with `KEY`, `TOKEN`, `SECRET`, `PASS`,
+    `AUTH`, `CRED`, `URL`, `ROOT`, `DIR`, `PATH` and similar are never read. A value is kept only if it is a short
+    plain token (on, off, 0.85); anything else is kept as a 12-character hash.
+  - From two places: each worker's running process (its live settings), and `local_production.env` with its
+    backups. A backup named with a UTC stamp holds the state just before that edit; an edit takes effect at the
+    next `up`. A live-settings change that no file edit explains is put at the first `up` after the previous
+    morning's reading, marked approx.
+  - **Data files:** the content hash and write time of the undated settings files the re-sims, or the pregame sims
+    they start from, read under `nba_source`, `ncaaf_source` and `nfl_source`. Today that is 7 files, among them F1's
+    `nba_sim_total_inputs.json`. A file seen for the first time counts as written at its write time, marked approx
+    because its earlier content is unknown.
+- **Effect on the timeline:** NBA gains `nba-E9`, F1's switch at 11-17 11:35 AM, so NBA's later versions move up by
+  one (Addendum 5's `nba-E9` and `nba-E10` are now `nba-E10` and `nba-E11`). NCAAF and NFL are unchanged. No settings
+  switch for NBA, NCAAF or NFL took effect inside 11-08..11-18. Over the whole history the capture finds NBA's earlier
+  ones (live re-sim on 10-13, `SYNDICATE_NBA_LIVE_PRICED` 10-21, the standins and minutes switches 10-22), which shows
+  the settings half reads real edits.
+
+| version | from (CST) | fleet SHA | how it loaded | what started it |
+|---|---|---|---|---|
+| `nba-E8` | 11-16 12:15 PM | `a39058946` | rolelog | 2c39a3043 live-player-exit-gate: NBA -- a starter gone mid-game (ejection / foul-out / in-game injury) refuses the live <br>09925a4b1 live-player-exit-gate: NBA -- a foul-out the engine already models is PRICED, not refused (user 11-16 "No, kee |
+| `nba-E9` | 11-17 11:35 AM | `a39058946` | switch (approx) | data nba_source/data/processed/nba_sim_total_inputs.json written (first reading; earlier content unknown) |
+| `nba-E10` | 11-17 12:13 PM | `92ae7490a` | rolelog | f668eb6b9 live-player-exit-gate: MLB -- a starter out for injury or ejection refuses the game's live lines (todo 814) |
+| `nba-E11` | 11-17 3:53 PM | `91d865fd5` | rolelog | cc90fb653 render-config-retirement step 2: every service-marker reader prefers a neutral SYNDICATE_* name; the launcher  |
+
+- **Checked:**
+  - `m3_kit/epochs/test5b.py` (sha256 `a664f5bb25a90dec81baeb07a53e57325ab6bfbca44dc199a68a0a3f02ef3b30`) passes. A data rewrite starts a version at its write time. A setting
+    seen changed in a worker's live settings, with no file edit, starts one at the next `up`. Neither touches another
+    sport. Secret-shaped and WNBA names are refused, and a non-plain value is hashed.
+  - On the 11-14 rehearsal bets the report still gives A1 416 / 54 games, mean -0.0330, z -5.33.
+- **Pins:** `m3_kit/epochs/m3_epochs.py` is now `50d42599553b16c6377601b6d42ea21af7881fb342bcfa76ab4c4ed7d3b1dbf3` (was `b5209d5a6dcb0fe7...`). The nightly task's prompt is now
+  `f5e6ed004abcefe93aef55db08855691569c97de805f301ee03a66887981c1eb`: the new pin and one sentence naming this addendum, nothing else. Its stored body equals
+  `m3_kit/task_prompt_nightly.md` byte for byte.
+- **Still not seen:** a switch outside these files and names (another data root, a code default flipped in a
+  commit the file lists miss), and the env layers below `local_production.env` (`fleet_role_spec.json`,
+  `fleet_env/`), which change rarely and are recorded in `deploys.md`.
