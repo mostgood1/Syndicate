@@ -812,3 +812,40 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - cap use 18.0% / 17.5%;
   - paper book 14,863 settled, -1.30%.
 - **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it); gate clock BC-050, 0 of 800.
+
+## Reading 47 — Wed 11-18 4:58 PM CST (22:58Z), window 60 min
+
+- **Results first.** No new grades since reading 46: all-time 2,026 bets / 1,094 events, -11.01%; 30 d -7.35%
+  [-12.8, -1.9]. Today's 52 orders (all filled) settle from the evening.
+- **New since reading 46: the gate's clock moved to BC-052, loaded 21:02:51Z (3:02 PM CST), 0 of 800.**
+  - *Hypothesis, written first:* another lane loaded a betting change outside a window, either under a recorded
+    exception or in breach of the rule.
+  - **Read (betting_changes.md row BC-052):** lane `nba-midnight-bootstrap-hold`. The NBA games-history fetch is
+    bounded and de-duplicated, default ON (`a3104a5b6`), so the NBA Elo/rest/form inputs change.
+  - It is registered `[OUTSIDE WINDOW: user override 2026-11-18 ~2:50 PM CST ("Load it now"); not a revert / risk
+    reduction / money-path fix]`. **Not a breach:** the user decided, and the row says so plainly.
+  - Effect: the gate's 800-event count restarted at 3:02 PM, three hours after the window rule took effect.
+  - BC-051 (web double-recycle hold, 19:14:22Z) is classified `no`.
+- **No anomalies.** Every endpoint was inside budget: `live_all` 0.28 s, page 0.23 s.
+- **Flow:**
+  - plan 0.5 min old: 196 suggested, 25 sized, 17 positions; 169 refused `beyond_max_positions`;
+  - 20 live ticks, 0 placed (16 `outside_price_band`);
+  - orders today 52, all filled; nothing resting; unreconciled 0;
+  - cap use 18.0% / 17.5%.
+- **S3 measurement:** the daily maker-pilot line copy `SyndicateMakerPilotLines` is set up (first run 22:57Z, result
+  0, 14 fills, 0 TAKER).
+- **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it).
+
+## Reading 48 — Wed 11-18 5:29 PM CST (23:29Z), window 32 min
+
+- **Results first.** No new grades; 30 d -7.35% [-12.8, -1.9] on 673 events. Today's 54 orders (all filled) settle
+  from the evening slate.
+- **No anomalies.** Every endpoint was inside budget: `live_all` 0.34 s, page 0.12 s.
+- **Flow:**
+  - plan 0.2 min old: 229 suggested, 25 sized, 18 positions; 202 refused `beyond_max_positions`. The pre-slate board
+    is the widest of the day.
+  - 10 live ticks, 2 placed, 0 failed;
+  - orders today 54, all filled; nothing resting; unreconciled 0;
+  - cap use 18.6% / 18.6%.
+- **Unchanged:** gate clock BC-052 from 21:02:51Z, 0 of 800; 1 unclassified load (soccer ff 17:58:30Z, its lane owes
+  it).
