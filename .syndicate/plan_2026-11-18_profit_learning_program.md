@@ -72,6 +72,15 @@ No result guarantees future returns.
    - Challenger rule: fire only when the sharp or consensus quote is fresh (<= N min, N fit before the split) **and**
      the venue has not moved toward the consensus since it.
    - Win condition: out-of-sample fee-net ROI lower bound > the champion's on the same dates.
+   - **Result 11-18: FALSIFIED as registered** (`findings_2026-11-18_s1_freshness_study.md`; pre-registration
+     `5ee9e18c1` pushed before the run, result `5affebf41`).
+     - N = 10 min, chosen on FIT.
+     - On TEST (6,300 orders / 274 games), fresh-only minus all is **+0.21 pp [-2.82, +3.24]**.
+     - The consensus-age arm fails the same way.
+     - No challenger goes to the 11-24 window.
+   - **Lead for S6 (exploratory, not a result):** picks did 12.6 pp worse when the venue's own price had moved
+     toward the reference before submit [-28.2, +2.9]. That is 747 vs 301 orders, and only 34% of orders have the
+     venue quote, which is the I2 gap.
 2. **S2: in-play 95-99c favourites**, the one structural cell that survived fees: +1.1..+1.6c per contract in 5 of 6
    sports (`findings_2026-10-24_kalshi_market_price_map.md`). Forward-confirm on the 29 recorder nights with the ESPN
    clock. Its tails (late flips, score corrections) are sized before it goes live.
