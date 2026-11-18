@@ -1399,7 +1399,8 @@ death, never life — do not invert it.
 - Verification: (1) tests/test_nhl_stats_report_cache.py: off != on reachability (call counter), parity on a REAL captured report + schedule, empty-gt3 skip, coverage miss -> refetch, live game -> refetch, settle window. (2) replay of a real slate off vs on-cold vs on-warm: count stats-REST + api-web calls and wall time each, byte-compare the three CSVs' rows. (3) findings file with denominators and Central times. (4) load put to the user; not loaded here.
 - Blocked by: none
 
-### worktree-close-scoped-prune — OPEN — opened 2026-11-18 — session e9b4d640-7bf1-4f95-a490-8c426665baaf
+### worktree-close-scoped-prune — CLOSED 2026-11-18 (a2f21fd9e: close deletes only its own record, counts the rest with --dry-run) — opened 2026-11-18 — session e9b4d640-7bf1-4f95-a490-8c426665baaf
+- session_worktree.py close removes only its OWN .git/worktrees record and never runs a real git worktree prune: another worktree's stale record and a gitdir-less husk both survive a close (tested) and the close tests pass. GOAL: MET -- the 2 new tests in tests/test_session_worktree_close.py pass on a2f21fd9e and FAIL on the old close (peer record deleted); 14/14 worktree tests pass; landed numstat equals the commit (1/0, 65/16, 70/1). Live check: this worktree is closed with the fixed close from the primary tree (ff'd to a2f21fd9e), and the held nba-lines-props-backtest record must survive it.
 - Goal: session_worktree.py close removes only its OWN .git/worktrees record and never runs a real git worktree prune: another worktree's stale record and a gitdir-less husk both survive a close (tested) and the close tests pass
 - Files: scripts/session_worktree.py, tests/test_session_worktree_close.py
 - Hypothesis: n/a (a fix: close's real prune at lines 560 and 618 reached 20 other sessions' records on 2026-11-17 and 2026-11-18; Windows READONLY refused every delete)
