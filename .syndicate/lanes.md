@@ -1478,6 +1478,14 @@ death, never life — do not invert it.
 - Verification: Findings file with the per-sport trace (file:line), fleet-measured tick gaps, the consumer table, the chosen fix and why; the fix's tests pass including off != on through the real consumer; staleness.py (or its copy) re-run with the fix's rule applied on dev 11-09..11-14, reporting the 95-100% bucket gap and the share of late line-instants refused; ledger updated
 - Blocked by: none
 
+### soccer-live-shared-seeds — OPEN — opened 2026-11-18 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: Size the soccer live re-sim's shared-seed offset: scripts/poll_soccer_live_state.py calls simulate_live_paths without a seed, so every live match re-sims on seeds 1..300 (live_lens.py default seed=1); measure on the soccer engine, from kickoff (the most play left, so the upper bound), the share of a seed's luck common across matches and the seeds-1..300 level against a long-run mean in goals, with CIs; record MLB and soccer pregame as per-game seeded (code); diagnosis only, no code or fleet change; any fix is the user's call
+- Files: .syndicate/findings_2026-11-18_ncaaf_engine_level_seeds.md (the seed-survey section ONLY)
+- Hypothesis: H-SOCCER-LIVE-SEED: soccersim's Random(seed) streams carry common luck across matches as smartsim2's do (NFL 34%, NCAAF 23%), so every live match's projected remaining goals shares one offset from seeds 1..300. Size unknown: NFL seeds 1..300 read +0.1 to +0.4 points of ~44 (about 1%); NCAAF -0.06 of ~51
+- Falsification test: False (negligible) if the seeds-1..300 mean total goals sits within 0.03 goals (about 1% of ~2.7) of the long-run mean, or the across-seed SD of the all-matches mean is within 1.5x of the independent value
+- Verification: 60 synthetic matches (ratings uniform +-0.25, cap 0.35) x seeds 1..2000 through simulate_match_distribution's own per-seed loop; block levels, the shared share, the 1..300 offset with its SE; findings section with the per-path seed table for MLB and soccer
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
