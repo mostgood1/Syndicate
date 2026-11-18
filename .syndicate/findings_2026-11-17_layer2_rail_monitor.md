@@ -1515,3 +1515,53 @@ totals flags below the points scored.
   - The next sweep was accepted at 02:48:06Z, but **its NHL child (pid 158782) re-hung on api-web.nhle.com within
     ~2.5 min**, and the 02:49:20Z sweep was refused `lane_busy` again.
   - So a kill frees the lane for one run only. Recorded in deploys.md (betting change: no). The fix is I-22's.
+
+## Reading 17 — Tue 11-17 9:06 PM CST (03:06Z 11-18)
+
+**Fleet:** unchanged. Web `3920a2d4d`; live-odds-worker 52087; refresh-worker 28948. Host load 5.4-6.4.
+
+**Sessions:**
+- **I-16 CLOSED, GOAL MET** (`3cae8b32c`): on main `aaff7fb04` + `598981f93`, not loaded. 12,848,512 → 4,521,512 B per
+  board pull on the wire.
+- **I-21** (`9f911cb98`, todo #837): the NHL in-play player-prop pull on its own clock, OFF by default. Its load and
+  the lapsed-line display are owed to the user. Finding: "76 of 76 builds at 300 s".
+- I-22 and I-20 are running.
+
+**I-22 after the 8:46 PM kill:**
+- The killed run (02:25:36Z) finished at 1,301 s.
+- The next run (02:48:06Z) hung on NHL again: child pid 158782 at 1,100 s and 1.2% CPU at 03:06Z, connected to
+  api-web.nhle.com (now 104.16.145.251).
+- Sweeps refused through 03:06:45Z. Since the 02:37Z reading: 9 launched, 8 refused.
+- NHL in-play: 3 live rows on the cards. **Web merges stale 6 of 62**: NHL `stale_360s`..`417s` at 03:06Z, NBA
+  `stale_360s` once. NHL overlay gap max 426 s (1 over 360).
+
+**Slate: 27 live chips.** NCAAB 16, NHL 4, WNCAAB 4, NBA 2, NCAAF 1.
+
+**Flags: 28 shown, 0 false, 0 missed, 0 dark.** I-17 (P > 0.5): NCAAB 3 of 11 contradict "ours".
+
+**#824 check: 2 of 13 college totals flags show a projected final BELOW the points already scored.**
+- **Lamar @ Omaha u173.5, 16.4 pp:** ours / live_total 168.65; chip points **170** at H2 1:02. Grid 03:06:16Z; the
+  quote priced 50 s.
+- **Bryant @ UMass u164.5, 14.4 pp:** ours 161.0; points **162** at OT 0:00. The card carries two live_total sets
+  (141.4 on the 138.5/139.5 rows, 162.6 on the 160.5-164.5 rows).
+- Both are late-game. 1 of 4 college join lines since 02:37Z carried the #824 reason.
+- **Not shown:** whether the join's own points (at pricing) were already ≥ the projection, which would be a #824
+  miss, or the projection used an older game state than the chip. The latter matches todo #836 (end-of-game
+  state staleness, from the engine read).
+- To the #824 owner at the summary.
+
+**Live rows: 586.** 113 priced <= 120 s; 192 over 300 s; priced age p50 266 s.
+- NBA 282 rows, **14** <= 120 s (the lane blocked); NCAAB 270 (83); WNCAAB 20 (14); NCAAF 11 (0); NHL 3 (2).
+- 14 of 88 markets carry no price of ours.
+
+**Overlay (29 min).**
+- Gap max: NHL 426 s; NCAAB 262 s; NCAAF 188 s; WNCAAB 180 s; NBA 102 s.
+- Ticks 38, gap max 135 s. `deferred_slow`: NBA 1, NCAAB 1.
+- Build s p50 / max: NCAAB 27.5 / 53.0; NBA 26.5 / 43.0.
+
+**Board:** **1,254 s** (finished 02:45:15Z; portfolio_commit 287 s). Next: overview 49 s, shortlist 434 s (exit
+03:04:39Z). Board built 163 s ago at the read.
+
+**Load:** query 3.75 s / 4.18 MB / 22.7 MB; **shortlist 6.2 s**; chips 2.3 s; live-rail 0.08-1.0 s.
+
+**Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less.
