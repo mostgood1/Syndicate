@@ -1283,6 +1283,14 @@ death, never life — do not invert it.
 - Verification: pytest tests/test_trader_follow_study.py (bet dedupe, two-sided exclusion, follow price at t+delay from the tape, settlement from resolved outcome prices, clustered ROI); one full run with per-step counts (wallets, bets, resolved, followed, by delay) and the result written to the findings file
 - Blocked by: none
 
+### fanduel-lead-forward — OPEN — opened 2026-11-17 — session c5ab914e-f248-426b-88e3-57112faeabe0
+- Goal: Forward, pre-registered read of FanDuel-led stale-book bets on detections after the registration commit: (A) replication at the move's fetch and (B) the stale price still there at a fetch >= 3 min later, each scored against the consensus close; verdict at look 1 (2026-12-16) and look 2 (2027-01-13) per the registration. Read-only: no code path, capture, env or deploy changes.
+- Files: scripts/momentum_lag_study.py, .syndicate/findings_2026-11-17_fanduel_lead_forward_preregistration.md, .syndicate/findings_2027-01-13_fanduel_lead_forward.md
+- Hypothesis: When FanDuel's de-vigged fair on a side rises >= 2pp at a pregame fetch and another sportsbook in the same fetch is still at or better than FanDuel's pre-move price, that price has positive EV against the consensus close on data the in-sample cell (+0.85% [+0.38, +1.32], 10-25..11-17) never saw.
+- Falsification test: Arm A's z (event-clustered) misses the look's O'Brien-Fleming boundary at look 2, or its 95% CI upper bound is below 0 at either look -> the FanDuel lead is closed as chance.
+- Verification: A results file reporting, per look, both arms' n / events / mean EV vs close / event-bootstrap CI and z against the registered boundary, the coverage dates, and the registered verdict.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
