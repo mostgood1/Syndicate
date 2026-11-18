@@ -1163,3 +1163,102 @@ cause is FALSIFIED as the general explanation.**
 - **Next lead:** the NHL live-props quote capture cadence, if props rows age out of the in-play window between
   captures. Read the live-odds-worker's NHL props pulls against the drop times at the next reading.
   - **Effect:** the live NHL props leave the board for ~30-80 s at a time. The game lines stay.
+
+## Reading 13 — Tue 11-17 7:11 PM CST (01:11Z 11-18)
+
+**Fleet:** unchanged. Web `64daca46f`; live-odds-worker 52087; refresh-worker 28948. **Host load 7.0-7.6.**
+- Top CPU: refresh-worker 89%; an NBA ESPN live-status fetch 80%; live-odds-worker 56%; `kalshi_combo_capture`
+  40% (nice 19); two live re-sim servers 38% each (nice 5); an M3 rehearsal `m3_launch.py` 16% (nice 19).
+- **Scheduled:** the user moved lane ncaaf-grid-build-speed's refresh-worker load (`3f337b2d9`, #809 memo) to
+  **after 1:10 AM CST**. A background script tries from 07:10Z: up to 4 capped attempts, each holding the board
+  at most 5 min. No drain before then.
+
+**Slate: 69 live chips.** NCAAB 37, WNCAAB 19, NHL 9, NCAAF 3, NBA 1.
+
+**Flags: 47 shown, 0 false, 0 missed, 1 dark.** The dark one: Charlotte @ Davidson ML away, gap 3.4 pp; priced
+28 s, now 531 s old.
+- **I-17:** NCAAB full-game totals 15 (all unders), **3 contradict "ours"**. WNCAAB 1 over contradicts "ours"
+  (raw model; outside #816's fix).
+- **Notable flags:**
+  - NBA Knicks @ Raptors o209.5, 13.9 pp; ours 221.1.
+  - NCAAB Illinois @ Duke 2H u88.5, 21.0 pp.
+  - WNCAAB SMU @ Kansas St o111.5, 17.8 pp.
+  - WNCAAB Tennessee @ Belmont u150.5, 16.6 pp.
+- **Villanova @ Pittsburgh** (H2 15:52): the 24.4 pp ML PITT flag of r12 is gone. Now PITT −3.5 (8.1 pp) and
+  u151.5 (9.4 pp). Grade at the final.
+
+**Live rows: 1,165.** 260 priced <= 120 s; **737 over 300 s now**; priced age p50 246 s.
+- By sport:
+
+| sport | rows | priced <= 120 s |
+|---|---|---|
+| NCAAB | 772 | 203 |
+| NBA | 267 | **4** |
+| NCAAF | 51 | 16 |
+| NHL | 33 | 20 |
+| WNCAAB | 42 | 17 |
+
+- 42 of 209 live markets carry no price of ours. Priced age max 39,585 s (a pregame shortlist row, I-19).
+
+**Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less, 0 live chips without a live card.
+
+**Overlay (26 min).** 0 gaps over 360 s; 0 `deferred_slow`.
+
+| sport | builds | gap p50 / max | build s p50 / max |
+|---|---|---|---|
+| NBA | 26 | 58 s / 126 s | 10.0 / 24.8 |
+| NCAAB | 24 | 63 s / 97 s | 10.4 / **43.7** |
+| WNCAAB | 21 | 70 s / 127 s | 1.4 / 13.4 |
+| NHL | 14 | 97 s / **203 s** | 5.9 / 17.8 |
+| NCAAF | 17 | 90 s / 158 s | 2.4 / 6.7 |
+
+- **Ticks:** 60, gap p50 23 s, max 75 s. Web merges fresh 53 / 53 for every sport.
+- NCAAB builds over 20 s: 3 (23.0 / 43.7 / 37.8 s), none with background work.
+
+**Board builds:**
+- 207, 242, 226 s, then **346 s (01:04:00Z, over the 300 s today limit)**.
+- The build in progress at 01:07Z had spent **90.7 s in the intelligence overview** (1.4 s calm).
+- Board built 503 s ago at the read. **I-20 holds at the 7 PM wave.**
+
+**Load:**
+- **Query 15.9 s** / 4.77 MB wire / 25.5 MB raw.
+- **Chips 4.0 s; shortlist 2.9 s.** Live-rail 0.16-0.34 s (1,303 rows, 1.2 MB raw).
+- Both gunicorn workers 215-292 s old.
+
+**#824:** **1 of 8** college `LIVE_GAMELINE_JOIN` lines since 00:45Z carries
+`model_projected_final_below_points_scored`: the day's first NCAAB refusal I have seen. 0 of 23 college totals
+flags below the points scored.
+
+### Improvement hunt, reading 13
+
+**I-21 → I-22: the NHL props drops follow the live odds lane's long runs. That lane runs one refresh at a time,
+and in the evening half its sweeps are refused.**
+
+- **Measured:** `[live_refresh_loop] ODDS_SWEEP_LAUNCHED` / `ODDS_SWEEP_REFUSED`, live-odds-worker.log, 00:00-01:10Z.
+  - **34 sweeps launched, 17 refused** `reason=lane_busy` ("A refresh run is already active").
+  - Runs inferred from the busy `run_stamp`s:
+
+| run | lasted (to the next accepted sweep) |
+|---|---|
+| 00:14:10 | **~8.3 min** (refused through 00:21:15) |
+| 00:24:39 | ~2.4 min |
+| 00:32:56 | ~3.8 min |
+| 00:41:44 | ~2.5 min |
+| 00:48:39 | **~10.7 min** (refused through 00:58:00) |
+| 00:59:19 | ~6.7 min (no launch between 01:00:31 and 01:06:01) |
+
+- **The NHL props drops sit inside or at the end of those runs:**
+  - 00:21:46-00:22:41: end of the 8.3-min run;
+  - 00:55:10-00:58:40: inside the 10.7-min run;
+  - 01:05:17-01:06:38: inside the 6.7-min gap;
+  - 00:14:30: right after a 5.5-min gap;
+  - 00:34:32: right after a 4.6-min gap.
+
+  That is **5 of 5 drop episodes**. Two gaps of 4.5-5.0 min had no drop. So a drop needs ~6+ min without a
+  completed odds run: the props rows age out of the overlay's in-play window.
+- **Wider than NHL:** in those windows every live sport's quotes age together. That fits 737 of 1,165 live rows
+  being over 300 s at 01:11Z, and the NBA rows' 200 s+ quote ages.
+- **Lead (not built; the OddsAPI call budget applies):** split the live odds lane, or bound a run's length, so
+  one slow sport cannot hold every live sport's refresh for 8-11 min.
+  - First, find what made the 00:14:10 and 00:48:39 runs long: the run's per-sport job times.
+  - Owner: the live-odds-worker `live_refresh_loop` (to name at the summary).
