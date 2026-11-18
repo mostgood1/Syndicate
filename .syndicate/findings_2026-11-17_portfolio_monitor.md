@@ -765,3 +765,33 @@ placement, so a stale plan costs missed bets, not bad ones.
     not in `failed_or_rejected`, as was done for the maker-pilot expiry. 2 tests, 18 pass.
 - **Endpoints:** all 7 read 200 inside budget (`/portfolio` 1.86 s of 3.0). 0 kills, 0 5xx. **Banner:** ok, armed.
 - **Settlement:** 22 started and unsettled while live, 0 late. **Gate:** pending BC-041 (count 0).
+
+## Reading 20 — Tue 11-17 9:34 PM CST (03:34Z 11-18), window 30 min
+
+- **Clean apart from the gate's clock.** Only anomalies: gate pending BC-041 (count 0) and 1 unclassified load with
+  its lane.
+- **Plan 6.8 min old.** Tonight's newest commit is 03:28:29Z, 5.5 min before the reading.
+  - In 6 h: 30 commits, max completed gap still 79.0 min (01:21 -> 02:40Z).
+  - 85 suggested -> 25 sized -> 9 positions. Ceiling used 37.6%.
+- **Execution, 30 min:** 10 live ticks, 0 placed, 0 failed (10 `outside_price_band`, 3 `game_started`).
+  - Orders today 57: 55 filled, 2 rejected. Both rejections are designed endings, now counted as such: the maker
+    expiry and reading 19's unfilled in-play IOC. `failed_or_rejected` is 0.
+  - Resting 0. Unreconciled 0.
+  - Cap use: kalshi 20.8% -> 18.7% (the cancelled IOC's budget came back), polymarket 17.8%.
+- **Settlement:** 10 started and unsettled (from 22), 0 late. **Endpoints:** all 7 read 200, all fast
+  (`/portfolio` 0.27 s). 0 kills.
+- **Paper book (all dates):** 14,688 settled, ROI -1.31%, win 50.92%.
+
+## Reading 21 — Tue 11-17 10:05 PM CST (04:05Z 11-18), window 31 min
+
+- **Clean apart from the gate's clock.**
+- **The new unreconciled grace did its job.** 1 order is submitted and unreconciled at 3.1 min old (Polymarket, placed
+  in this window). It is reported, not alarmed: `UNRECONCILED_GRACE_MIN` = 10.
+- **Plan 5.9 min old.** Tonight's newest commit is 04:00:43Z. The 11-18 board was also written at 03:44:59Z, and
+  tonight's next commit came 16 min later, not after a stall.
+  - In 6 h: 30 commits, max completed gap 79.0 min (unchanged).
+  - 71 suggested -> 25 sized -> 12 positions. Ceiling used 23.4%.
+- **Execution, 31 min:** 10 live ticks, 1 placed (polymarket), 0 failed, 9 `outside_price_band`. Orders today 58:
+  55 filled, 2 rejected (both designed endings), 1 submitted.
+- **Settlement:** 3 started and unsettled (from 10), 0 late. Cap use: kalshi 18.8%, polymarket 18.4%.
+- **Endpoints:** all 7 read 200, fast. 0 kills. **Paper book:** 14,772 settled, ROI -1.31%.
