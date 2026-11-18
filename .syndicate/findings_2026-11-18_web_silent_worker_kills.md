@@ -138,3 +138,52 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
 - A normal loop reads 0.2-0.8 s, measured at 16:30Z.
 - If heavy requests or warmer rebuilds stall the loop for seconds, the gaps will line up with them in web.log. The 60 s
   kills would then be the tail of that distribution, and H4/H3 gets a dose-response test without waiting for a kill.
+
+## H5, written 2026-11-18 ~19:00Z (1:00 PM CST), before its test
+
+- Two of the four 11-17 stalls began about 60 s before the kill, at ~15:22:37Z and ~16:37:10Z. Those are the
+  `:22`/`:37` slots of the 15-minute `SyndicateCheatSheetPicks` run, whose board query is the 4,906-row,
+  `slim_aliases`-False POST.
+- **H5:** the killed worker was serving the cheat-sheet picks board query when its loop stopped.
+- **Falsification:** H5 is false for a kill if the picks run for that slot finished its board read normally, or did not
+  run then. The kills fell at 09:23, 10:38, 10:49 and 15:36 CST.
+
+## H5 tested (2026-11-18 ~19:00-19:15Z, read-only): CONFIRMED for 2 of the 4 kills
+
+- `~/syndicate-prod/logs/cheat_sheet_picks.log` has no timestamps. On 11-17, 2 of its 96 runs failed the board read with
+  `RemoteDisconnected: Remote end closed connection without response`, the error a client gets when the server process dies
+  mid-request (log lines 14280 and 14294).
+- **Timed by process id.** The task's processes share one pid space with the web workers, so the web workers' boots
+  bracket each run:
+  - the run two before failure #1 (pid 4031795) started 16:06:01-16:10:35Z, which is the 16:07Z slot;
+  - the run after failure #2 (pid 4042014) started 16:49:53-16:53:06Z, which is the 16:52Z slot.
+  - So failure #2 was the **16:37Z** run (10:37 AM CST) and failure #1 the **15:22Z** run (9:22 AM CST). Each matches a kill
+    whose stall began ~60 s before it: 15:23:37Z (pid 4012882) and 16:38:10Z (pid 4032063).
+- **What that request was.** The picks board query: `POST /api/intelligence/query`, `slim_aliases` False, ~5,000 cards.
+  Then it was a **~62 MB JSON response** (decoded; ~11 MB gzip on the wire).
+  - Since `row_refs` reached the picks run on 11-18 it is ~20.5 MB decoded (3.7 MB wire), last 6 runs.
+- **The other two kills are not the picks run.** At 16:49:49Z the next run (16:52Z) came after it; at 21:36:36Z the stall began
+  before the 21:37Z run. What those workers served is not in the log: a request killed in flight leaves no access line. The
+  board page also sent ~62 MB responses until `5db26434e` (18:58Z 11-17). That makes it a candidate, but it is not shown.
+- **Not yet named: how serving a big response stopped the main loop for 60 s.** Normal GIL switching rules out Python-level
+  work. One GIL-holding C call over ~60 MB (json encoding), or page-fault stalls while it holds the GIL, would fit, as would
+  "one worker of two" (only the worker serving it stalls). The stall dump would name it.
+- **Since the picks read shrank: 0 kills** (21:36Z 11-17 to ~19:15Z 11-18, ~21.5 h, including 15:00-19:15Z of today's daytime
+  window). This is believed, not a verdict.
+
+## Recycle storm and the double-recycle hole (2026-11-18 16:48-18:48Z, portfolio monitor's report, checked here)
+
+- Since 16:48Z (10:48 AM CST) web workers hard-recycle every 3-10 min, after 5-35 requests, at anon 830-1,020 MB against limits
+  of ~630 MB.
+  - Example: 18:36:06-18:36:35Z, three 20 MB-on-the-wire board-query responses (8-10 s each), then a hard recycle at
+    1,011.8 MB.
+- **Both workers went at once at 18:48Z.** 209505 hard-recycled at 18:48:01.6Z and 206403 at 18:48:03.3Z.
+  - `gunicorn.conf.py` defers a recycle when the sibling recycled within `spacing_s` (90 s), but only `if not hard`, so two
+    hard recycles can coincide.
+  - The replacements booted at 18:48:09.4Z and **18:48:31.0Z**: 28 s for the second.
+  - So web had no booted worker for ~6 s, and one worker for ~28 s. The heartbeat sampler shows the hole as a 27.2 s gap.
+- **The master's respawn is slow.** Exit to replacement boot is 10.5 s at 17:15:39 -> 17:15:49.7Z, 4.4 s at 16:48:10.9 ->
+  16:48:15.3Z, and 28 s at 18:48:03 -> 18:48:31Z. Elsewhere it is 1-3 s.
+- **Serving workers stall too.** Heartbeat gaps up to 11.7 s (16:52:08Z, the 10:52 AM CST picks slot) and 5.9 s (17:13:21Z)
+  came with no recycle nearby.
+- The recycle path is outside this lane's declared files, and no OPEN lane holds it (checked origin/main lanes.md 19:05Z).
