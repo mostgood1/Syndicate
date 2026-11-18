@@ -74,3 +74,25 @@ projections and the truth files at 10:22 AM CST. Harness: `C:\tmp\ncaaf813\` (`n
 - The general rule from the NFL lane still applies to NCAAF research: a level read on 100 shared seeds carries about
   +-1.3 points of common noise (2 x 0.63) here. Paired arm-vs-arm differences are much less exposed.
 - Other sports' engines (NBA, NHL, the basketball and hockey sims) were not checked; the lead stays open for them.
+
+## NBA, WNBA, NHL and college basketball: a code survey (2026-11-18 11:16 AM CST, user "Check NBA and NHL")
+
+The NFL / NCAAF offset needs one thing: every game in a run drawing from the same seed list. No production NBA / NHL
+path does that, so nothing here needed a measurement. Read on main `434fc7f48`:
+
+| path | how a game is seeded | shared across games? |
+|---|---|---|
+| NBA / WNBA pregame (`shared/basketball_props_smart_sim.py:6348` -> `basketball_engine/orchestrator/smart_sim.py:1183`) | `seed=None` -> `np.random.default_rng(None)`: fresh OS entropy per game | no |
+| NBA live re-sim (`nba/live_resim.py:1622`, `:528`) | `stable_seed(event_id, last_seq)` (crc32) | no |
+| college basketball pregame + live (`college_basketball/pregame_sim.py:238`, `ncaab/live_resim.py:624`) | `stable_seed(event_id, ...)` | no |
+| NHL pregame (`nhl/sim_engine/hockeysim/projection.project_game`; market sim `adapters.py:148`) | the LEVEL is analytic (Poisson expected goals), no Monte Carlo; the market sim seeds `game_seed(date, game_pk)` | no |
+| NHL live re-sim (`nhl/live_resim.py:661`) | `hash(game_pk)` per game (cross-process reproducibility depends on PYTHONHASHSEED for a str pk, a known caveat) | no |
+
+**Level-fitting harnesses:** `scripts/nba_pregame_total_bias.py:64` seeds per game (`stable_seed(event_id, -1)`); the
+NHL calibrations (`calibrate_nhl_block_rate.py:126,164`, `calibrate_nhl_special_teams_goal_mult.py:102,132`) give
+every simulation its own seed from a `Random(seed)` stream; the WNBA rate fits are data fits, not sims. The one
+shared-seed harness is `scripts/ab_basketball_sim_anchor.py` (`--seed 7` -> every game `default_rng(7)`), a PAIRED
+anchor on/off A/B, where the common luck cancels; it sets no production level.
+
+**Verdict:** the shared-seed offset is a smartsim2 property (NFL and NCAAF seed `range(1, N + 1)`). NBA / WNBA /
+NHL / college basketball production levels cannot carry it. MLB and soccer were not part of this check.
