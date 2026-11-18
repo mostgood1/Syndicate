@@ -82,3 +82,28 @@ and their fixes. Same probe (`scripts/portfolio_monitor_probe.py`), same page (P
   - Orders today 16: 14 filled, 2 maker posts resting (94.2 and 88.9 min, exempt until kickoff).
   - Unreconciled 0. Cap use: kalshi 10.7%, polymarket 4.7%.
 - **Endpoints:** all 7 read 200, all under 0.3 s. 0 kills.
+
+## Reading 30 — Wed 11-18 2:48 AM CST (08:48Z), window 32 min — THE BOARD-PROCESS SPLIT IS LOADED
+
+- **F7's fix is running.** At 08:48:21Z:
+  - the fleet head is `09eddabf2`;
+  - every role restarted together around 08:31:05Z (refresh-worker 429499, live-odds-worker 429500, web 429429,
+    supervisor 429414, all up about 1,035 s), which is the drained `down`/`up`;
+  - `BOARD_PROCESS_MODE mode=process parent=429499` and `BOARD_PROCESS_STARTED pid=429539` at 08:31:33Z, then
+    `BOARD_PROCESS_CHILD_READY` at 08:31:34Z;
+  - exactly 1 `board_build_process --serve` process alive.
+  - The load is lane `layer2-board-process-split`'s. Its deploys.md entry and betting-change row were not on main at
+    this reading; they are owed by that lane.
+- **First builds in the child (calm hours):** `BOARD_BUILD_TIMING` wall 166.2 / 133.8 / 108.7 / 111.3 s (08:37-08:47Z).
+  - This is not the reading. The lane's pre-registered reading is the first live evening, 6-10 PM CST 11-18. This
+    lane's `plan_commits` is its metric-4 cross-check, and the 11-17 evening is the "before".
+- **Plan through the night's two restarts.** Plan writes resumed after each. The largest gap in the 6-h series is
+  29.5 min, which covers both restarts and the drain. Plan 0.8 min old at the reading. 30 suggested -> 25 sized ->
+  20 positions, ceiling used 56.4%.
+- **BC-041 is resolved on main:** loaded at 08:03:01Z by lane `ncaab-total-overprojection`, with its deploys.md entry
+  at 08:02:54Z. This reading's gate line still said PENDING because the worktree's register predated the resolve
+  (fast-forwarded right after). The gate clock now runs from 08:03:01Z unless the split adds a newer row.
+- **Execution, 32 min:** 10 live ticks, 1 placed, 0 failed.
+  - Orders today 17: 15 filled, 2 maker posts resting (126 and 121 min, exempt until kickoff).
+  - Cap use: kalshi 11.1%, polymarket 4.7%.
+- **Endpoints** after the web restart: all 7 read 200, all under 0.25 s. 0 kills.
