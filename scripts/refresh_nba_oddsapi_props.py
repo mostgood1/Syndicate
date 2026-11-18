@@ -2484,6 +2484,42 @@ def _run_source_subprocess_cli_command(
                                    data_root=Path(source_root) / "data")
 
 
+#: The bootstrap's games-history fetch timeout with the switch OFF (unchanged since the port).
+GAMES_HISTORY_FETCH_TIMEOUT_LEGACY_S = 45 * 60
+#: With `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` on: the cap, well under the live odds lane's 1,800 s step timeout, so a
+#: stalled stats.nba.com fails this one call and the bootstrap carries on (lane nba-midnight-bootstrap-hold).
+GAMES_HISTORY_FETCH_TIMEOUT_ENV = "SYNDICATE_NBA_HISTORY_FETCH_TIMEOUT_SECONDS"
+GAMES_HISTORY_FETCH_TIMEOUT_BOUNDED_DEFAULT_S = 900
+
+
+def _games_history_fetch_timeout_seconds(*, log_file: Path | None = None) -> int:
+    """Subprocess timeout for the bootstrap's `cli fetch`.
+
+    Measured 2026-11-18 (fleet, 11-09..11-18): the legacy 2,700 s timeout is LONGER than the live odds lane's 1,800 s
+    step timeout, so on 4 of 10 midnights the step was killed inside this fetch and the whole NBA run (and, before
+    `2ae0c646a`, every sport after it) was lost while the lane sat held for 30 min. The switch lives with the fetch
+    (`scrape_nba_api.history_fetch_bounded`, absent = OFF); an import failure keeps the legacy value.
+    """
+    try:
+        from syndicate.features.nba.source_cli.scrape_nba_api import history_fetch_bounded
+        bounded = bool(history_fetch_bounded())
+    except Exception:  # noqa: BLE001 - never block the bootstrap on the switch read
+        bounded = False
+    if not bounded:
+        return GAMES_HISTORY_FETCH_TIMEOUT_LEGACY_S
+    raw = str(os.environ.get(GAMES_HISTORY_FETCH_TIMEOUT_ENV, "") or "").strip()
+    try:
+        value = int(float(raw)) if raw else GAMES_HISTORY_FETCH_TIMEOUT_BOUNDED_DEFAULT_S
+    except ValueError:
+        value = GAMES_HISTORY_FETCH_TIMEOUT_BOUNDED_DEFAULT_S
+    value = value if 0 < value <= GAMES_HISTORY_FETCH_TIMEOUT_LEGACY_S else GAMES_HISTORY_FETCH_TIMEOUT_BOUNDED_DEFAULT_S
+    line = f"[nba] GAMES_HISTORY_FETCH_BOUNDED timeout_s={value}"
+    print(line, flush=True)
+    if log_file is not None:
+        _append_log(log_file, line)
+    return value
+
+
 def _ensure_source_game_inputs(
     *,
     source_root: Path,
@@ -2548,13 +2584,14 @@ def _ensure_source_game_inputs(
             _append_log(log_file, line)
     if history_stale or behind_schedule:
         fetch_years = _games_history_fetch_years_needed(raw_candidates[0])
+        fetch_timeout_s = _games_history_fetch_timeout_seconds(log_file=log_file)
         rc_fetch = _run_source_subprocess_cli_command(
             source_root=source_root,
             package_name=package_name,
             command_parts=["fetch", "--years", str(fetch_years)],
             log_file=log_file,
             heartbeat_cb=heartbeat_cb,
-            timeout_s=45 * 60,
+            timeout_s=fetch_timeout_s,
         )
         _seed_games_history_from_checkout_if_fresher(
             raw_path=raw_candidates[0],

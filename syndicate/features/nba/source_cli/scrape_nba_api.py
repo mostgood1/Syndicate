@@ -17,6 +17,64 @@ import requests
 from tenacity import retry, stop_after_attempt, wait_exponential_jitter, retry_if_exception_type
 from .config import paths
 
+import os
+
+# --- Bounded history fetch (lane nba-midnight-bootstrap-hold, 2026-11-18) -------------------------------------------
+#
+# THE DEFECT, measured on the fleet 2026-11-18. `games_nba_api.csv` is read back with pandas' default dtypes, so the
+# game id `0022600001` comes back as the integer 22600001 and, re-stringified, as `22600001`. LeagueGameLog hands the
+# fetch `0022600001`. The two never compare equal, so:
+#   * the quarter merge below matched NO game, every current-season game looked quarter-less, and every fetch walked
+#     BoxScoreSummaryV2 for the whole season (196 games by 11-15) at 30 s x 4 attempts when stats.nba.com stalls.
+#     4 of 10 midnight fetches 11-09..11-18 ran into the live odds lane's 1,800 s step timeout and wrote nothing;
+#   * the save's `base[~base.game_id.isin(out.game_id)]` dropped nothing, so every completed fetch appended one more
+#     copy of the season: 1,563 rows for 196 games (up to 16 copies), and `build_features` / `predict-date` replay each
+#     copy as a game (NBA Elo off by a mean 119 points, max 293, over the 30 teams on 11-18).
+# With the switch ON the history is keyed by the 10-digit id, the quarter walk asks only for games that have no
+# quarters (newest first) and stops at a wall-clock deadline, and the save keeps one row per game.
+#
+# ABSENT = OFF: a betting change (NBA Elo / form move once the history is de-duplicated), so it lands default-off and is
+# turned on in a betting-change window (CLAUDE.md "Before any deploy").
+HISTORY_FETCH_BOUNDED_ENV = "SYNDICATE_NBA_HISTORY_FETCH_BOUNDED"
+LINESCORE_DEADLINE_ENV = "SYNDICATE_NBA_LINESCORE_DEADLINE_SECONDS"
+DEFAULT_LINESCORE_DEADLINE_SECONDS = 600.0
+_ON_VALUES = {"1", "true", "on", "yes"}
+
+
+def history_fetch_bounded() -> bool:
+    """`SYNDICATE_NBA_HISTORY_FETCH_BOUNDED`: on only when set to 1/true/on/yes. Absent = OFF."""
+    return str(os.environ.get(HISTORY_FETCH_BOUNDED_ENV, "") or "").strip().lower() in _ON_VALUES
+
+
+def linescore_deadline_seconds() -> float:
+    """Wall-clock budget for the quarter walk when bounded. Unparseable or <= 0 falls back to the default."""
+    raw = str(os.environ.get(LINESCORE_DEADLINE_ENV, "") or "").strip()
+    try:
+        value = float(raw) if raw else DEFAULT_LINESCORE_DEADLINE_SECONDS
+    except ValueError:
+        value = DEFAULT_LINESCORE_DEADLINE_SECONDS
+    return value if value > 0 else DEFAULT_LINESCORE_DEADLINE_SECONDS
+
+
+def normalize_game_ids(values: pd.Series) -> pd.Series:
+    """NBA stats game ids as 10-digit strings: `22600001`, `22600001.0` and `0022600001` all become `0022600001`.
+
+    Anything that is not all digits after dropping a float's `.0` is left as it is.
+    """
+    text = values.astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    digits = text.str.fullmatch(r"\d+").fillna(False).astype(bool)
+    return text.where(~digits, text.str.zfill(10))
+
+
+def _one_row_per_game(frame: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    """Keep one row per `keys`, preferring a row that carries quarters (`home_q1`), then the LATER row."""
+    if frame.empty:
+        return frame
+    has_quarters = frame["home_q1"].notna() if "home_q1" in frame.columns else pd.Series(False, index=frame.index)
+    ranked = frame.assign(_has_quarters=has_quarters.astype(int), _row_order=range(len(frame)))
+    ranked = ranked.sort_values(["_has_quarters", "_row_order"], kind="stable")
+    return ranked.drop_duplicates(keys, keep="last").sort_values("_row_order").drop(columns=["_has_quarters", "_row_order"])
+
 
 def season_to_str(season_end_year: int) -> str:
     # NBA API season format: "2023-24"
@@ -228,6 +286,9 @@ def fetch_games_nba_api(last_n: int = 10, rate_delay: float = 0.6, with_periods:
     if out.empty:
         return out
     out["game_id"] = out["game_id"].astype(str)
+    bounded = history_fetch_bounded()
+    if bounded:
+        out["game_id"] = normalize_game_ids(out["game_id"])
 
     # 2) Optional: fetch period line scores with concurrency + resume
     if with_periods:
@@ -253,7 +314,12 @@ def fetch_games_nba_api(last_n: int = 10, rate_delay: float = 0.6, with_periods:
         to_fetch_ids = out["game_id"].unique().tolist()
         if prev is not None and "game_id" in prev.columns:
             prev["game_id"] = prev["game_id"].astype(str)
+            if bounded:
+                prev["game_id"] = normalize_game_ids(prev["game_id"])
             prev_small = prev[[c for c in ["game_id","home_team","visitor_team"] + list(period_cols) if c in prev.columns]].copy()
+            if bounded:
+                # One row per game, so a duplicated history cannot multiply `out` or mark a game with quarters missing.
+                prev_small = _one_row_per_game(prev_small, ["game_id", "home_team", "visitor_team"])
             out = out.merge(prev_small, on=["game_id","home_team","visitor_team"], how="left", suffixes=("", "_prev"))
             if "home_q1" in out.columns:
                 missing_mask = out["home_q1"].isna()
@@ -333,11 +399,32 @@ def fetch_games_nba_api(last_n: int = 10, rate_delay: float = 0.6, with_periods:
         progress_file = paths.data_raw / "_period_fetch_progress.txt"
         success = 0
         failures = 0
+        walk_started = time.monotonic()
+        deadline_s = linescore_deadline_seconds() if bounded else None
+        deadline_hit = False
+        attempted = 0
+        if bounded and to_fetch_ids:
+            # Newest first: when the deadline cuts the walk, the games it leaves are the oldest, and they are asked
+            # again by the next fetch (they still have no quarters).
+            wanted = set(to_fetch_ids)
+            order = out.loc[out["game_id"].isin(wanted), ["game_id", "date"]].drop_duplicates("game_id")
+            order = order.sort_values(["date", "game_id"], ascending=[False, False], kind="stable")
+            to_fetch_ids = order["game_id"].tolist()
+
+        def _past_deadline() -> bool:
+            return deadline_s is not None and (time.monotonic() - walk_started) >= deadline_s
+
         if max_workers and max_workers > 1:
             with ThreadPoolExecutor(max_workers=max_workers) as ex:
                 futures = {ex.submit(fetch_one, gid): gid for gid in to_fetch_ids}
                 done = 0
                 for fut in as_completed(futures):
+                    if _past_deadline():
+                        deadline_hit = True
+                        for pending in futures:
+                            pending.cancel()
+                        break
+                    attempted += 1
                     gid, ls = fut.result()
                     if ls is not None:
                         id_to_lines[gid] = ls
@@ -354,6 +441,10 @@ def fetch_games_nba_api(last_n: int = 10, rate_delay: float = 0.6, with_periods:
                     time.sleep(rate_delay)
         else:
             for idx, gid in enumerate(to_fetch_ids, start=1):
+                if _past_deadline():
+                    deadline_hit = True
+                    break
+                attempted += 1
                 gid, ls = fetch_one(gid)
                 if ls is not None:
                     id_to_lines[gid] = ls
@@ -370,6 +461,16 @@ def fetch_games_nba_api(last_n: int = 10, rate_delay: float = 0.6, with_periods:
 
         if verbose:
             print(f"[fetch] LineScore fetch complete: success={success} failures={failures}")
+        if bounded:
+            # Always printed when bounded (not only --verbose): the bootstrap's log file is the only place a midnight
+            # run's walk can be read back from.
+            print(
+                "[fetch] LINESCORE_WALK bounded=1 "
+                f"to_fetch={len(to_fetch_ids)} attempted={attempted} success={success} failures={failures} "
+                f"skipped_deadline={max(len(to_fetch_ids) - attempted, 0) if deadline_hit else 0} "
+                f"deadline_hit={int(deadline_hit)} elapsed_s={time.monotonic() - walk_started:.1f} deadline_s={deadline_s:.0f}",
+                flush=True,
+            )
 
         def attach_periods(row):
             gid = row["game_id"]
@@ -426,12 +527,28 @@ def fetch_games_nba_api(last_n: int = 10, rate_delay: float = 0.6, with_periods:
         except Exception:
             base = None
 
+    history_rows_read = len(base) if base is not None else 0
     if base is not None and "game_id" in base.columns:
         base["game_id"] = base["game_id"].astype(str)
+        if bounded:
+            base["game_id"] = normalize_game_ids(base["game_id"])
         base = base[~base["game_id"].isin(out["game_id"])].copy()
         out_save = pd.concat([base, out], ignore_index=True)
     else:
         out_save = out
+
+    if bounded and "game_id" in out_save.columns:
+        # One row per game id. Rows without a numeric id are never merged with each other.
+        rows_before = len(out_save)
+        out_save = out_save.reset_index(drop=True)
+        keyed = out_save["game_id"].astype(str).str.fullmatch(r"\d{10}").fillna(False).astype(bool)
+        kept = _one_row_per_game(out_save[keyed], ["game_id"]).index
+        out_save = out_save[(~keyed) | out_save.index.isin(kept)].reset_index(drop=True)
+        print(
+            f"[fetch] HISTORY_SAVE bounded=1 history_rows_read={history_rows_read} rows_written={len(out_save)} "
+            f"fetched_games={len(out)} same_id_rows_merged={rows_before - len(out_save)}",
+            flush=True,
+        )
 
     out_save.to_csv(out_csv, index=False)
     try:

@@ -1,5 +1,33 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#843` — **THE ~12:01 AM CST 1,800 s HOLDS OF THE LIVE ODDS LANE ARE THE NBA PROPS JOB'S GAMES-HISTORY FETCH, AND THE SAME BUG HAS DUPLICATED THE NBA HISTORY: a game-id mismatch (`0022600001` vs the CSV round-trip's `22600001`) makes every `cli fetch --years 1` walk BoxScoreSummaryV2 for the WHOLE season under a 2,700 s timeout (longer than the 1,800 s step), and makes every completed fetch append another copy of the season (1,563 rows for 196 games; NBA Elo off by a mean 119, max 293, at each team's latest game). Fix on main behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` (absent = OFF). Switching it on is a betting change (window); the load is the user's call** `[2026-11-18, lane nba-midnight-bootstrap-hold; `.syndicate/findings_2026-11-18_nba_midnight_bootstrap_hold.md`; from #840's lead]`
+- **Measured (fleet, read-only):**
+  - 4 of 10 midnights (11-09..11-18) ran 1,765-1,801 s: 11-12, 11-14, 11-15 and 11-18, plus 11-05 before that.
+    Every one fetched at midnight; none of the 6 others did.
+  - The launcher is `live_refresh_loop`'s first pregame sweep of the new date (`nba,ncaab,wncaab`).
+  - Lane cost: 2 refused sweeps in about 2 h of hold. Live NBA/NCAAB games ran on their own lanes.
+  - The larger harm is the history: it is never caught up on those nights (still ending 11-15 on 11-18) and is
+    duplicated.
+- **`2ae0c646a` alone does not bound it:** the fetch outlives the step, so the lane is still held about 30 min and NBA's
+  run is still lost.
+- **The fix:**
+  - ids are compared as 10-digit strings;
+  - the quarter walk asks only for quarter-less games, newest first, under a 600 s deadline;
+  - the history is saved with one row per game;
+  - the bootstrap's fetch timeout is 900 s.
+  - `tests/test_nba_history_fetch_deadline.py` has 10 cases, including off != on through both real callers.
+  - Replay on the fleet history: 196 -> 31 calls, and 1,759 -> 196 season rows.
+- **Predictions P1-P6** are in the findings file §7. Tonight's run (11-19 00:01 CST, switch off) is predicted there too:
+  a failed NBA step at about 1,800 s, then NCAAB/WNCAAB run.
+- **Load:**
+  - EITHER flip the default to on, on main, inside the 11-24 window, and ff (child scripts, no restart);
+  - OR set the env key and run a drained `down`/`up`;
+  - OR load it now as an exception (the Elo defect). The user's call.
+- **Leads:**
+  - `wncaab_odds_snapshot` reports ok false on every run;
+  - the WNBA twin's id handling is unchecked;
+  - the live NBA bets that read `predictions_<D>.csv` are untraced.
+
 ### `#842` — **REFRESH-WORKER'S DAY-2 LOOK-AHEAD IS PHASE-LOCKED OUT BY ITS OWN DAY-1 RUN: both look-ahead decisions stamp their marker BEFORE launching, so a `lane_busy` refusal waits a full 3,600 s and meets the next day-1 run again. Day 2 refused 115 of 127 attempts over 7.6 days, 114 of them held by the same hour's day-1 run. Fix on main behind `SYNDICATE_LOOK_AHEAD_LANE_WAIT` (absent = OFF). Switching it on is a betting change (window); restore day 2, fix day 1 only, or leave it -- the user's call** `[2026-11-18, lane lookahead-day2-phase-lock]`
 - **Measured** (fleet refresh-worker logs 11-10 11:14 PM .. 11-18 12:55 PM CST; `.syndicate/findings_2026-11-18_lookahead_day2_phase_lock.md`):
   - day 2: 12 launched, 115 refused; refusal p50 165 s after the day-1 launch; 108 of 114 next tried >= 3,600 s later;
