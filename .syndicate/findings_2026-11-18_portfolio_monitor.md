@@ -381,3 +381,60 @@ the close implies (z -2.93). Why?
   measurement fix, not a betting change.
 - H1 survives: a per-line price-band lever, evidence only.
 - H2 survives: the model's side selection or probabilities are the problem (calibration shrink).
+
+### Close calibration — RESULT (runs 2026-11-18 15:34-15:39Z, read-only, refresh-worker env, fleet head `36a9f5501`)
+
+**Instrument:** `C:\tmp\pfmon\close_calib.py` (run through `run_with_worker_env.py`). It applies the pre-registered
+method above to `/api/portfolio/live?on=all&show=all` saved at 13:49Z.
+- **Population:** live bets on 10-18..11-17, decided, with a resolved same-book close: **580 bets / 370 games.**
+- **The opposite side's close paired within 15 min: 231 (39.8%).** Unpaired 349:
+  - 265 had the two quotes more than 15 min apart;
+  - 81 had the opposite side unchanged since our fill;
+  - 3 opened in play.
+
+| | gap, pp [95%] | bets / games |
+|---|---|---|
+| raw gap, won - ask, all 580 | **-6.36 [-10.56, -2.16]** (reproduces the readout's -6.28) | 580 / 370 |
+| raw gap, paired | -1.00 [-7.79, +5.80] | 231 / 187 |
+| overround at the close, paired | +1.84 [+1.19, +2.49] | 231 / 187 |
+| **fair gap, won - de-vigged close, paired** | **+0.03 [-6.76, +6.81]** | 231 / 187 |
+
+- **Paired, by fair band:**
+  - .30-.45: +19.3 [-0.7, +39.3] (23);
+  - .45-.55: -0.6 [-9.7, +8.5] (120);
+  - .55-.70: -3.6 [-17.3, +10.2] (57);
+  - .70-.85: -4.9 [-21.6, +11.8] (29).
+- **Paired, by family:** h2h -10.6 [-26.3, +5.1] (36); every other family within +-3 pp. **By venue:** kalshi -2.6
+  [-10.0, +4.9] (184), polymarket +10.1 [-2.4, +22.7] (47).
+
+**Verdicts as registered:**
+- **H0 (the spread) is NOT falsified** where it could be tested. On the 40% of bets with a contemporaneous two-sided
+  close, our picks are calibrated against the fair close: +0.03 pp, while the raw ask-based gap is -1.0 pp with a
+  +1.84 pp overround.
+- **H1 (favourite-longshot) is FALSIFIED:** favourites are not better calibrated than longshots, and the paired
+  longshot band leans positive.
+- **H2 (adverse selection across bands) is not supported** on the paired set: the fair gap is about 0.
+- **Power:** the paired fair gap's 95% range is +-6.8 pp. It rules out a -6.4 pp effect on liquid two-sided markets
+  only at the edge.
+
+**EXPLORATORY, not pre-registered: where the -6.36 pp lives.** The **349 unpaired bets carry -9.91 pp [-15.17, -4.65]**
+(247 games), against -1.00 on the paired.
+- **Unpaired by family:** props **-9.13 [-15.87, -2.40]** (205 bets / 121 games); totals -12.5 [-25.2, +0.3] (64);
+  spreads -7.9 (36); h2h -4.9 (27); btts -21.9 (17).
+- **Unpaired by venue:** kalshi **-9.30 [-15.23, -3.36]** (273), polymarket **-12.10 [-22.97, -1.23]** (76).
+- **Unpaired by ask band:** .30-.45 **-31.4 [-45.5, -17.4]** (19); .55-.70 **-9.2 [-17.8, -0.6]** (128).
+- **Reading:** these are markets where the other side was not quoted near our side's close: thin, one-sided books,
+  mostly player props. There the last ask is far from a fair price (the paired props alone ran a +4.25 pp overround),
+  so both our ENTRY and the "close" sit on a wide spread.
+
+**What it means for the levers:**
+1. **The gate's condition 3 compares wins to an ask, so on thin markets it reads a spread as a calibration failure.**
+   Measured against a de-vigged two-sided close, liquid picks are calibrated. That is a **measurement fix** to the
+   adopted gate's instrument (de-vig where a pair exists, report the paired share), not a betting change. The
+   wording of an adopted gate is the user's.
+2. **New lead, F13: the live book's shortfall concentrates in thin, one-sided markets (mostly Kalshi player props),
+   where fills pay a wide ask.** Liquid two-sided markets look calibrated before fees.
+   - **Next measurement (no money):** ROI against the spread AT ENTRY. That is our fill against the opposite side's
+     ask at fill time, by market family.
+   - If ROI falls with entry spread, a **per-line maximum-spread rule** judges each line on its own spread: a
+     threshold, not a market switch (learnings line 1056).
