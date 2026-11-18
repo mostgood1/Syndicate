@@ -17,7 +17,7 @@
     - the first JSON clears it.
   - First build `09f8540a6` was a single default-ON switch that included the cooldown. It was split before any load, under the betting-change windows rule.
   - Tests: `tests/test_understat_fetch.py` 46 of 46; neighbours 249 of 249.
-- **Load (naming)** = fleet ff to the split SHA or later; no restart (child script). It needs claims, a preflight with `--betting-change no`, and a ride-along check.
+- **Load (naming)** = fleet ff to `5a7cc60d2` or later; no restart (child script). It needs claims, a preflight with `--betting-change no`, and a ride-along check.
 - **Cooldown** = a betting change (a refresh lags by up to 1 h on recovery). Turn it on in the 11-24 2-7 AM CST window, or now on the user's classification.
 - **Reading owed at the naming load (lane AMENDMENT):** 100% of failing big-5 Understat tails end `UNDERSTAT_UNAVAILABLE`; requests equal OFF's (probes counter); Understat seconds per run p50 <= 11 s. With the cooldown on: <= 2 requests per hour.
 - **Owed to the user (a model change, not built; proposed as its own session):** a big-5 source while Understat is down.

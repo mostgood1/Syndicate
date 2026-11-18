@@ -214,7 +214,7 @@ P1-P5 were pre-registered in `5637a627f`, and the AMENDMENT for the split is in 
 Commits:
 
 - the first build: `09f8540a6`;
-- the split: listed in the lane STATUS and todo `#841`.
+- the split: `5a7cc60d2`.
 
 The load is a fleet ff with no restart: the fetcher is a child script, picked up at its next run.
 
