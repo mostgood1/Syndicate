@@ -61812,3 +61812,36 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **P3 IS LIKELY UNREADABLE from here on.** Lane `nhl-stats-rest-cache` (todo #839) asked for this claim to ff `59fbefc71`. That ff caches the stats-REST reports, which that lane measured at collection 129 s -> 14 s. It changes the generation time this P3 is about. The claim was released at **16:30:37Z**, after this run's generation child exited (16:30:29Z), so the reading above is all on the pre-cache code. The 11-19 7-sport run (16:07:01Z) defers its NHL generation until after soccer, so that child will likely run on the cache code.
 - **Not covered here:** pregame holds over 900 s are soccer, not NHL (51 of 54 runs 11-13..11-18). That is lane `soccer-pregame-lane-hold`, its own session.
 - The user's go-ahead, quoted: "Yes, load it" here. Two sessions also relayed it: "load the pregame split when it's ready" (rail monitor, ~9:35 AM CST) and "load the pregame NHL split" (Layer 2 Game Rail monitoring, ~9:4x AM CST).
+
+## 2026-11-18 16:33:54Z (10:33 AM CST) -- DEPLOY (ff only, no restart): fleet `cdab875d5` -> `59fbefc71`, the NHL generation's stats-REST report cache (todo #839, lane `nhl-stats-rest-cache`; user "Load it now" to "Load the NHL stats cache on the fleet now, before tonight's games?") -- **LOADED 16:45:40Z; MET: cold and warm generations measured, the warm one made 14 stats calls, all for uncached teams (180 on the old code); uncached rebuild byte-identical**
+- betting change: **yes** (BC-050, loaded-at 16:45:40Z). NHL generation inputs are identical, but the generation is faster and can now finish on a slow stats API, so NHL predictions, recommendations and props refresh when they used to time out.
+- **The change:** `SYNDICATE_NHL_STATS_REPORT_CACHE`, absent = ON (findings `.syndicate/findings_2026-11-18_nhl_stats_rest_cache.md`).
+  - An unscheduled playoff report is skipped.
+  - A stats-REST report is reused from `<data root>/nhl_source/data/ingestion_cache/statsrest_*` when it holds every finished game before the slate date, none in progress, settled 18 h or younger than 6 h.
+  - Otherwise it is fetched exactly as before.
+- **Ride-alongs** (`cdab875d5..59fbefc71`): `scripts/session_worktree.py`, a session tool no role runs, plus tests and ledger. None of the 14 dirty fleet paths is in the ff.
+- **Gates:**
+  - Claim live-odds-worker 16:30:46Z (holder `nhl-stats-rest-cache`, ACQUIRED rc 0), after lane `odds-lane-sport-deadline` released it at the end of its first pregame reading. That session flagged that the refresh-worker 11-19 run's deferred NHL generation would load this change.
+  - First preflight 16:31:22Z: HOLD (a sweep in flight, pids 168909/168917). Waited for it to exit.
+  - Baseline 16:33:17Z: fleet head `cdab875d5`; `statsrest_*` 0, `club_schedule_*` 0. Pregame NHL generations on `cdab875d5`: run `162338` 16:25:29Z, 11-18 + 11-19, **293 s**. Inline full steps 12:05-15:52Z: 175-348 s, n = 12.
+  - Preflight `--service live-odds-worker --target-commit 59fbefc71`, from a worktree at origin/main: **CLEAR 16:33:24Z** (0 processes).
+- **ff:** `git fetch github` + `git merge --ff-only 59fbefc71` at **16:33:54Z** (reflog). Fleet HEAD `59fbefc71`; dirty paths 14 before and after; no role restarted.
+- **expect / measured:**
+  - `fleet_head` cdab875d5 -> 59fbefc71: **MET** 16:33:55Z.
+  - `statsrest_files_data_root` 0 -> >0 after the first post-ff NHL generation: **MET**. Readings at 16:46-16:59Z: 86 files plus 24 `club_schedule_*_20252026` from the first generation, then 100 + 28.
+- **Load:** the first NHL generation child after the ff was refresh-worker's look-ahead run `odds_refresh_20261118_160701`, `nhl_pregame_generation` 11-19 (pid 175753). It started 16:45:40Z, ran **123 s** with a cold cache, rc 0, and wrote `lineups_2026-11-19.csv` 531 rows (531 before) and `predictions_2026-11-19.csv` 12 rows. Its `lineups_2026-11-20.csv` is header-only because 11-20 has no NHL games: scoreboard 0 rows, NHL API 0 games.
+- **Warm reading, same shape as the 293 s baseline:** live-odds-worker run `odds_refresh_20261118_165637`, `nhl_pregame_generation` 11-18 + 11-19 (pid 179071), started 16:58:24Z, **85 s**, rc 0. That is 293 -> 85 s for the same two dates on a healthy API.
+  - **14 `statsrest_*` files written in its window, all for the 4 teams not yet cached** (BOS 4, DET 3, NJD 3, UTA 4: this season's timeonice + goalsForAgainst, last season's goalsForAgainst, and last season's playoffs for BOS and UTA; plus 4 `club_schedule_*`).
+  - **0 rewrites for the 26 cached team-slates.** The old code makes 6 x 30 = 180 calls for these dates.
+- **Production parity (cache OFF rebuild, read-only):** `collect_slate_inputs` was rebuilt from the fleet's own inputs into scratch at 17:01-17:05Z, cache off (180 stats calls), and diffed against the fleet files the cached generation wrote at 16:58-16:59Z.
+  - **`lineups` and `roster_snapshot` byte-identical** for 11-18 (126 rows) and 11-19 (531).
+  - 11-19 `starting_goalies` identical (24 rows).
+  - 11-18 `starting_goalies`: same 6 goalies. DET and NJD read `confirmed, 0.95, dailyfaceoff` on the fleet, from the confirmed-goalie overlay that writes after collection (mtime 16:58:49Z, 1 s after the lineups). That overlay is not part of the rebuild and does not depend on this switch.
+  - Exclusions: the same players and statuses (13 and 17).
+  - 11-18's lineup count moved 127 -> 126 between the 16:26Z and 16:58Z generations because one more player is OUT in the news (12 -> 13 exclusions), not because of the cache: the uncached rebuild also gives 126.
+- **Owed / for tonight (not a gate):**
+  - Live generations should show `statsrest_*` rewrites only for teams with a newly finished or in-progress game (2 per team), plus one settling refetch per team ~18 h after its last game.
+  - If the stats API is slow tonight, NHL live generations should finish inside the 900 s deadline instead of timing out. The rail monitor's NHL odds-age reading covers it.
+  - **No log line carries the count:** `NHL_STATS_REPORT_CACHE` prints from the child, whose stdout `refresh_odds_sources` drops (only `_STEP_STDOUT_MARKERS` survive). Read the counts from the cache files' mtimes. Adding the marker token is a one-line follow-up in `refresh_odds_sources.py` (lane `odds-lane-sport-deadline`'s file).
+- **Off switch:** `SYNDICATE_NHL_STATS_REPORT_CACHE=off` in `local_production.env` + drained `down`/`up`, or an ff back to `cdab875d5`.
+- The user's go-ahead, quoted: "Load it now" (this session, to the question above).
