@@ -3549,3 +3549,10 @@ as a verdict.
     a job that fails to produce its output is retried at the full rate forever.
   - `odds_refresh.json` has TWO shapes: the wrapper (`startedAt` / `command` / `result`) and the direct summary
     (`started_at` / `results`). Read both, or the scan silently drops runs.
+
+## 2026-11-17 — OVERTURNED: "the NFL engine was on target on 2024-25" — a level read on a SHARED seed list has the noise of its seed count, not of games x seeds `[lane nfl-engine-level-2026, session 8062940b]`
+
+- **What was believed:** smartsim2 NFL read regulation 45.84 against the league's 45.62 on the #808 FIT (136 games x seeds 1..100), so #813's -2.2 pregame miss was "the engine's response to 2026's ratings".
+- **What was true:** `game_simulator.py:91` seeds `Random(seed)` alone, so seed k's luck is common to every game. The all-games mean moves with SD 6.86 across seeds (1.01 if independent), and seeds 1..100 read about +1.9 over the long run in every set tested. On seeds 101..400 the engine is 2.3 points a game below real totals in BOTH 2024-25 and 2026, and the 2026 "gap" is -0.09 [-1.01, +0.84]. #808's touchdown multiplier was fitted against the inflated reading.
+- **Rule:** never read an absolute LEVEL (a total, a quarter's points against the league's CI) off a run whose games share one seed list, unless the run also reports the across-seed SD of the all-games mean. Seed each game on its own block (keyed on the game id), or read several disjoint blocks. A PAIRED arm-vs-arm difference on the same seeds is far less exposed, because the common luck cancels.
+- *(evidence in `.syndicate/findings_2026-11-17_nfl_engine_level_2026.md`)*
