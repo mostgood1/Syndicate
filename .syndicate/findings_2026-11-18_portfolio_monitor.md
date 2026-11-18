@@ -107,3 +107,32 @@ and their fixes. Same probe (`scripts/portfolio_monitor_probe.py`), same page (P
   - Orders today 17: 15 filled, 2 maker posts resting (126 and 121 min, exempt until kickoff).
   - Cap use: kalshi 11.1%, polymarket 4.7%.
 - **Endpoints** after the web restart: all 7 read 200, all under 0.25 s. 0 kills.
+
+## Reading 31 — Wed 11-18 3:48 AM CST (09:48Z), window 60 min
+
+- **Clean.** The only anomaly is the register's unclassified-load count.
+- **Gate clock now runs from BC-042 at 08:31:33Z** (the board-process split's `yes`, registered by its lane): 0 of 800
+  events so far. BC-041 (08:03:01Z) is superseded as the clock's start.
+- **Unclassified loads 1 -> 2.** `betting_change.py candidates` lists:
+  - the 11-17 16:17Z NFL rebuild, as before, with its lane;
+  - **the 08:02:54Z refresh-worker TERM, whose deploys.md entry has no `- betting change:` line.** That load carried
+    I-17 `923869cf3` (the calibrated college total) as well as BC-041's NFL seeds.
+  - It does not move the clock: BC-042 at 08:31:33Z is later. Whether I-17 is its own `yes` is for lane
+    `ncaab-total-overprojection` to say. Left with that lane; the session-start digest shows the count to every
+    session.
+- **Plan 0.6 min old.** In 6 h: 45 commits, **max gap 21.4 min** (the overnight restarts included). The board also
+  wrote 11-19 at 09:39:48Z.
+- **Execution, 60 min:** 21 live ticks, 2 placed, 0 failed.
+  - Orders today 19: 17 filled, 2 maker posts resting (186 and 181 min, exempt until kickoff).
+  - Cap use: kalshi 11.5%, polymarket 5.5%.
+- **Endpoints:** all 7 read 200 (`/portfolio` 1.02 s, the slowest). 0 kills.
+
+## Reading 32 — Wed 11-18 4:48 AM CST (10:48Z), window 60 min
+
+- **Quiet and clean.** The only flag is the same 2 unclassified loads.
+- **Plan 0.4 min old.** In 6 h: 58 commits, **max gap 11.9 min**. Calm-hours cadence on the split, with both overnight
+  restarts now outside the 6-h series. 32 suggested -> 25 sized -> 19 positions.
+- **Execution, 60 min:** 20 live ticks, 0 placed, 0 failed. Orders today 19, unchanged: 17 filled, 2 maker posts
+  resting 246 and 241 min, exempt until kickoff.
+- **Gate:** clock BC-042 from 08:31:33Z, 0 of 800.
+- **Endpoints:** all 7 read 200, all under 0.55 s. 0 kills.
