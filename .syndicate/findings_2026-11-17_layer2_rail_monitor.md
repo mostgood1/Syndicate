@@ -1075,3 +1075,91 @@ cache is thrashing.**
 - **Next:** at each reading, count the NHL 20-row builds and the evictions that precede them. The idea: size
   the budget or the eviction order (oldest dates first) so the live sports' today shards are not evicted. Owner
   to name at the summary.
+
+## Reading 12 — Tue 11-17 6:45 PM CST (00:45Z 11-18), full page — NBA tips
+
+**Fleet:** unchanged. Web `64daca46f`; live-odds-worker 52087; refresh-worker 28948. Host load 5.0. No drain.
+I-17 fix `923869cf3` still not loaded.
+
+**Slate: 61 live chips.** NCAAB 30, WNCAAB 20, NHL 7, NCAAF 3, NBA 1 (Knicks @ Raptors).
+
+**Flags: 50 shown, 0 false, 0 missed, 0 dark.** 31 of 61 live cards carry a flag.
+- **NCAAB:** spreads 18, h2h 2, full-game totals 20, all unders. **I-17: 10 of 20 contradict "ours"**, for
+  example:
+  - Jacksonville St @ Louisiana u122.5 at 130.9;
+  - Green Bay @ West Florida u149.5 at 153.7;
+  - Wagner @ St. Joseph's u144.5 at 148.7.
+- **WNCAAB:** totals 5, 0 contradict.
+- **NCAAF:** 4 (Ball St @ Ohio spread / total / ML; EMU @ WMU o57.5).
+- **NBA:** 1 (Knicks @ Raptors o214.5, 4.9 pp, priced 64 s).
+- **To grade at the final:**
+  - **Villanova @ Pittsburgh ML PITT, 24.4 pp** (0.694 vs fair).
+  - WNCAAB Tennessee St @ Louisville. It is at Q4 4:25; the book line fell 162.5 (r10) → 154.5 (r11) →
+    130.5 (now; u130.5, 15.0 pp, ours 129.0).
+
+**Live rows: 1,137.**
+- 270 priced <= 120 s; 395 over 300 s; priced age p50 201 s.
+- By sport:
+
+| sport | rows | priced <= 120 s | flagged |
+|---|---|---|---|
+| NCAAB | 687 | 215 | 81 |
+| NBA | 317 | **1** | 1 |
+| WNCAAB | 77 | 31 | 9 |
+| NCAAF | 35 | 9 (r11: 0 of 60) | 4 |
+| NHL | 21 | 14 | 0 |
+
+- **NBA in-play rows on the cards are alternates** (totals_alt full / 1H / quarters, spreads_alt). Book age p10
+  **200 s**, p50 214 s; seen p50 179 s. So almost no NBA row can carry a fresh-priced flag. Consistent with
+  I-4 (NBA alt flags lose regardless of age).
+- 28 of 180 live markets carry no price of ours.
+- **I-19: 17 of 180 live markets carry only pregame-shortlist rows.**
+
+**Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less, 0 live chips without a live card.
+
+**Overlay (28 min).** 0 gaps over 360 s; 0 `deferred_slow`.
+
+| sport | builds | gap p50 / max | build s p50 / max |
+|---|---|---|---|
+| NCAAB | 33 | 47 s / 90 s | 7.4 / 36.1 |
+| WNCAAB | 33 | 49 s / 114 s | 0.9 / 9.2 |
+| NHL | 26 | 55 s / 173 s | 3.9 / 16.7 |
+| NCAAF | 18 | 83 s / 165 s | 1.5 / 4.8 |
+| NBA | 4 | 38 s / 53 s | 7.1 / 16.3 |
+
+- **Ticks:** 80, gap p50 17 s, max 85 s. Web merges fresh: 72 lines for every sport, NBA 7; 0 stale.
+- **NBA overlay:** 929-937 rows in play, 805-814 cards, elapsed 0.9-11.4 s.
+- **NCAAB builds over 20 s:** 3 (25.8 / 26.6 / 36.1 s), none with background work.
+
+**Board builds since 00:17Z: 250, 155, 185, 191, 173, 256, 208 s.** All under 300 s; `off_cpu_pct` −2.4 to
++1.9.
+
+**Load (full page):**
+- `/intelligence` 5.5 s / 5.77 MB wire / 31.0 MB raw.
+- **Query 9.2 s / 4.70 MB wire / 25.3 MB raw.**
+- **Chips 3.1 s** (0.05-1.5 s earlier). Shortlist 0.94 s.
+- Live-rail 0.13-0.25 s (1,251 rows, 1.18 MB raw).
+- Board built 77 s ago.
+- Both gunicorn workers 42-46 s old.
+
+**#824:** 0 of 12 college `LIVE_GAMELINE_JOIN` lines since 00:17Z carry the reason. 0 of 25 college totals flags
+below the points scored.
+
+### Improvement hunt, reading 12
+
+**I-21 re-read: the NHL in-play overlay drops its props for 1-2 builds about every 10 min. The cache-eviction
+cause is FALSIFIED as the general explanation.**
+
+- **The drops (`rows_inplay` → cards):**
+  - 00:14:30 (20 → 6);
+  - **00:21:46 (36 → 1) and 00:22:41 (44 → 7)**: the web merged NHL 272 → **1** → 7 → 180, ~80 s;
+  - **00:34:32 (23 → 7).**
+
+  The builds between them carry 464-791 rows.
+- **The evictions:** an NHL `LATEST_CACHE_EVICT` came 22 s before the first drop only. None between 00:17 and
+  00:37Z, so the eviction preceded **1 of 4** drop builds.
+- **Separately:** between 00:24 and 00:35Z the NHL cards fell 180 → 6-21 while rows stayed 464-624.
+  Opportunities fell 288 → 36-63, which is the selection (value floor), not a drop.
+- **Next lead:** the NHL live-props quote capture cadence, if props rows age out of the in-play window between
+  captures. Read the live-odds-worker's NHL props pulls against the drop times at the next reading.
+  - **Effect:** the live NHL props leave the board for ~30-80 s at a time. The game lines stay.
