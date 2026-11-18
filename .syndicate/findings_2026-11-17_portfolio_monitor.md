@@ -578,3 +578,32 @@ One pass over every portfolio route, before any probe existed:
     documented exit for exactly this case.
 - **Worth knowing:** another client trades on the same Kalshi account (66.46 YES on this market). Every such
   overlap delays our venue grade by up to 24 h.
+
+## Reading 12 — Tue 11-17 5:56 PM CST (23:56Z), window 41 min
+
+- **Endpoints:** all 7 read 200, inside budget (`live?on=all` 0.22 s, `/portfolio` 0.25 s). 0 kills, 0 5xx, 0 browser
+  requests. **Banner:** ok, armed, state 211 s.
+- **Plan (1.2 min):** board 4,859 -> suggested 97 -> sized 25 -> positions 7; beyond_max_positions 62,
+  `in_play_market_fair` 5.
+  - Live plans 23:55Z: kalshi 887 -> 31 placeable -> 8 (814 below the net floor); polymarket 586 -> 17 -> 6.
+- **Execution, 41 min:** 14 live ticks, **0 placed**, 0 failed. Refused: 47 `outside_price_band`, 14 `axis_held_live`.
+- **Ledger:** unreconciled 0, unknown submits 0. Orders today 52 (unchanged). Cap use: polymarket 16.8%.
+- **Owed next reading:** the maker-pilot post `a1f809ca` ends at its 00:00Z kickoff (Kalshi expiry), and the late
+  NHL bet gets its score-grader grade after 02:40Z.
+
+## Reading 13 — Tue 11-17 6:27 PM CST (00:27Z 11-18), window 32 min
+
+- **The maker-pilot post ended as designed:** `a1f809ca` was reconciled at 00:00:07Z as `venue_status=canceled`,
+  `venue_open` False, 0 contracts, recorded `rejected` / `error=venue_canceled` (the status that frees its budget).
+  This is Kalshi's expiry at its kickoff. **Verify for the earlier "fix the resting maker-pilot order": MET.**
+- **Probe refined, one more false positive removed:** that ending was then counted as "failed or rejected today: 1/54".
+  A maker post the venue cancelled or expired unfilled is now counted separately (`maker_posts_expired_unfilled`)
+  and not as a failure. 15 tests pass.
+- **Endpoints:** all 7 read 200, the fastest of the day (`live` 0.19 s, `/portfolio` 0.19 s). 0 kills, 0 5xx.
+  **Banner:** ok, armed, state 283 s.
+- **Plan (1.9 min):** board 4,982 -> suggested 96 -> sized 25 -> positions 7; `in_play_market_fair` 13 (games live);
+  **ceiling used 42.9%** (16-23% earlier).
+- **Execution, 32 min:** 10 live ticks; 2 placed (1 per venue); 0 failed. Refused: 28 `outside_price_band`,
+  9 `axis_held_live`, 6 `game_started`.
+- **Orders today:** 54. Ledger: unreconciled 0, unknown submits 0. Cap use: polymarket 17.6%.
+- **Settlement:** 7 started bets unsettled, 1 late. The late one is the NHL both-sides case; score grader due 02:40Z.

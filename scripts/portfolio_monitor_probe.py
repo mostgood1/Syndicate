@@ -141,16 +141,27 @@ def order_flow(orders: Iterable[Mapping[str, Any]], today: str, now: dt.datetime
             overdue.append({"key": str(o.get("idempotency_key") or "")[:8], "style": o.get("execution_style") or "taker",
                             "age_min": age, "why": why})
     n = len(todays)
-    bad = status.get("failed", 0) + status.get("rejected", 0)
+    # A maker-pilot post the venue cancelled unfilled at its kickoff expiry is recorded `rejected` (the status
+    # that frees its budget), which is the post's normal ending, not a failure. First seen 2026-11-17 00:00:07Z.
+    expired_posts = sum(1 for o in todays if is_expired_maker_post(o))
+    bad = status.get("failed", 0) + status.get("rejected", 0) - expired_posts
     return {
         "orders": n,
         "by_status": dict(status),
+        "maker_posts_expired_unfilled": expired_posts,
         "failed_or_rejected": bad,
         "failed_or_rejected_rate": round(bad / n, 4) if n else None,
         "resting": len(resting),
         "resting_age_min": sorted((a for a in resting if a is not None), reverse=True),
         "resting_overdue": overdue,
     }
+
+
+def is_expired_maker_post(order: Mapping[str, Any]) -> bool:
+    """A maker-pilot post that ended unfilled at the venue (cancelled or expired): its designed ending."""
+    return (order.get("execution_style") == "maker_pilot" and order.get("status") == "rejected"
+            and str(order.get("error") or "") in ("venue_canceled", "venue_cancelled", "venue_expired")
+            and not order.get("contracts"))
 
 
 MAKER_KICKOFF_GRACE_MIN = 10.0   # Kalshi expires a pilot post at commence; allow the next reconcile pass

@@ -181,3 +181,16 @@ def test_a_taker_order_keeps_the_120_minute_rule():
     old = _order(status="submitted", submitted_at="2026-11-17T13:00:00Z", reconciled_at="2026-11-17T15:58:00Z")
     assert pm.order_flow([young], "2026-11-17", NOW)["resting_overdue"] == []
     assert pm.order_flow([old], "2026-11-17", NOW)["resting_overdue"][0]["why"] == "resting 180 min (> 120)"
+
+
+def test_a_maker_post_that_expired_unfilled_at_kickoff_is_not_a_failure():
+    """2026-11-18 00:00:07Z: the pilot post was cancelled unfilled at its kickoff expiry and recorded `rejected`
+    (`error=venue_canceled`), which the probe counted as 'failed or rejected'. It is the post's designed ending."""
+    expired = _order(status="rejected", execution_style="maker_pilot", error="venue_canceled", contracts=0)
+    real = _order(status="rejected", error="venue_400")
+    f = pm.order_flow([expired, _order()], "2026-11-17", NOW)
+    assert f["maker_posts_expired_unfilled"] == 1 and f["failed_or_rejected"] == 0
+    assert not any(a.startswith("ORDERS failed") for a in pm.anomalies({"orders_today": f}))
+    g = pm.order_flow([expired, real], "2026-11-17", NOW)
+    assert g["failed_or_rejected"] == 1
+    assert "ORDERS failed or rejected today: 1/2 (50.0%)" in pm.anomalies({"orders_today": g})
