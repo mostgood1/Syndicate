@@ -1,5 +1,24 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#842` — **REFRESH-WORKER'S DAY-2 LOOK-AHEAD IS PHASE-LOCKED OUT BY ITS OWN DAY-1 RUN: both look-ahead decisions stamp their marker BEFORE launching, so a `lane_busy` refusal waits a full 3,600 s and meets the next day-1 run again. Day 2 refused 115 of 127 attempts over 7.6 days, 114 of them held by the same hour's day-1 run. Fix on main behind `SYNDICATE_LOOK_AHEAD_LANE_WAIT` (absent = OFF). Switching it on is a betting change (window); restore day 2, fix day 1 only, or leave it -- the user's call** `[2026-11-18, lane lookahead-day2-phase-lock]`
+- **Measured** (fleet refresh-worker logs 11-10 11:14 PM .. 11-18 12:55 PM CST; `.syndicate/findings_2026-11-18_lookahead_day2_phase_lock.md`):
+  - day 2: 12 launched, 115 refused; refusal p50 165 s after the day-1 launch; 108 of 114 next tried >= 3,600 s later;
+  - day 1: 121 launched, 6 refused (5 held by the weekly soccer autorun), each costing it an hour; one more live at 1:08:30 PM 11-18.
+- **The soccer date anchor (`640c6d4fd`) does not break the lock:** day-1 runs are back to ~386 s, but the offset is ~165-220 s (12:10:59 PM 11-18, refused).
+- **Value of day 2 is small:** its only-writer outputs at D-2 are earlier odds snapshots (NCAAB odds + book_quotes, opening/movement baselines, `odds_events` line-history points, soccer props markets) plus near-empty NBA/NHL files. The board seats D+2 only for soccer/NFL/NCAAF, which other producers feed. One past harm: `#721`'s D-2 NBA anchor (fixed).
+- **Fix (`SYNDICATE_LOOK_AHEAD_LANE_WAIT`, on main, default off):**
+  - ON: a due look-ahead whose lane is busy waits (no stamp, no fetch, no launch) and launches on the first free tick, at most once per interval;
+  - a racing `lane_busy` refusal re-arms in 300 s, and any other refusal keeps the full interval;
+  - day 1 is decided first and gets the same wait.
+  - Tests: `tests/test_lookahead_day2_phase_lock.py` (off reproduces the lock; on launches day 2 hourly; off != on).
+- **Load:**
+  - The code load is `betting change: no` and rides the next refresh-worker restart.
+  - Switching ON is `betting change: YES` (conservative), first window Tue 11-24 2-7 AM CST:
+    - set `REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_LANE_WAIT=on` in `local_production.env`;
+    - then a drained full `down`/`up`.
+  - Option (b) also sets `REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_48H_ENABLED=false`, which retires day 2 and keeps the day-1 fix.
+- **Owed:** the user's choice (a / b / c), then P0-P7 in the lane block after the load.
+
 ### `#841` — **UNDERSTAT IS DOWN SITE-WIDE ("We will come back soon", HTTP 200, since 2026-11-03 2:54 PM CST; DNS/connect failures from 11-01 6:34 PM CST), so every big-5 `soccer_<league>_history_current` / `_players` step fails (5,152 of 5,152 in 800 runs, 11-10..11-20 dirs) and the sim prices EPL/La Liga/Bundesliga/Serie A/Ligue 1 on history frozen at 10-31 (69 matches missing by 11-18). Outage guard ON MAIN in two halves: NAMING `SYNDICATE_UNDERSTAT_OUTAGE_GUARD` (absent = ON, betting change no, tested equal to OFF) and COOLDOWN `SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN` (absent = OFF, betting change yes). NOT LOADED; the cooldown and the alternative-source decisions are the user's** `[2026-11-18, lane understat-fetch-failures; `.syndicate/findings_2026-11-18_understat_fetch_failures.md`; split from #840's lead]`
 - **Measured:**
   - 11 GETs from the fleet host and 2 from another network all got the same 26,719-byte maintenance page (`/`, `/league/EPL/2026`, `getLeagueData` 2026 and 2025).

@@ -2961,7 +2961,11 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   never led a live-lane `lane_busy` holder (0 of 430).
 - **Owner of days 2-7 is healthy:** the weekly autorun (610 runs, 11.72 sim-hours; unit age at launch p90 17,146 s vs 14,400 s).
 - **Day-2 look-ahead is phase-locked out:** 84 of 89 attempts refused `lane_busy`, p50 165 s after the day-1 launch (it stamps its
-  marker before launching). Not caused by soccer. Lead, no owner.
+  marker before launching). Not caused by soccer. **CONFIRMED + FIX ON MAIN, DEFAULT OFF** `[2026-11-18, lane
+  lookahead-day2-phase-lock, todo #842]`: 115 of 127 refused over 11-10..11-18, 114 held by the same hour's day-1 run; the
+  anchor's 386 s day-1 run still outlasts the ~165-220 s offset. `SYNDICATE_LOOK_AHEAD_LANE_WAIT` (absent = off) makes a due
+  look-ahead wait for its lane instead of stamping; switching it on is a betting change (window) and the user's choice.
+  Findings: `findings_2026-11-18_lookahead_day2_phase_lock.md`.
 - **Fix `640c6d4fd`** (`SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR`, absent = ON, `off` = old command): a future-dated PREGAME run
   with no `--soccer-date` uses the week of its own date and `--horizon-days 0 --date <date>`. Child script: a fleet ff loads it.
   LOADED by a fleet ff 17:58:30Z (11:58 AM CST), no restart. First look-ahead on it (`180720`, 12:07 PM CST): every soccer step

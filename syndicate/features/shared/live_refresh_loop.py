@@ -3316,6 +3316,80 @@ def _look_ahead_has_scheduled_games(date_str: str, *, sports: str | None) -> boo
 	return False
 
 
+# LANE-AWARE LOOK-AHEAD (`#842`, lane `lookahead-day2-phase-lock`).
+#
+# Both look-ahead decisions stamp their marker BEFORE `_launch_look_ahead_refresh`
+# runs, and the stamp stays when `launch_refresh_run` refuses the launch because
+# this role's own refresh lane is busy. So a refused look-ahead waits a whole
+# interval (3,600 s) for its next try. Measured on the fleet, refresh-worker logs
+# 11-10 23:14 .. 11-18 12:55 CST: day 2 was refused `lane_busy` on 115 of 127
+# attempts, and 114 of those 115 refusals were held by the SAME HOUR'S DAY-1
+# look-ahead run (p50 165 s after its launch). Day 1 and day 2 both re-arm 3,600 s
+# after their own stamps, so day 2's next try lands inside the next day-1 run
+# again: a phase lock. Day 2 launched only while day-1 runs were shorter than
+# that offset (7 of 18 on 11-11, runs ~390 s, offset ~500 s).
+#
+# With SYNDICATE_LOOK_AHEAD_LANE_WAIT on (absent = off = the old behaviour
+# exactly):
+# - a due look-ahead whose lane is busy WAITS: no stamp, no schedule fetch, no
+#   launch attempt, no refusal line -- one read-only lane check per tick -- and
+#   launches on the first tick the lane is free. Still at most ONE launch per
+#   interval per day, because the stamp is written only when it launches.
+# - a launch the mutex refuses `lane_busy` anyway (the check is read-only and can
+#   race, or miss a queued external run) is rewound to retry in
+#   _LOOK_AHEAD_LANE_RETRY_SECONDS, not a full interval. Any OTHER refusal
+#   (state_unconfirmed, a launch error) keeps the full-interval stamp, so a lane
+#   that cannot be read is never retried every tick.
+# Day 1 is decided first in the tick, so when both are due and the lane frees,
+# day 1 wins and day 2 takes the next free tick.
+_LOOK_AHEAD_LANE_RETRY_SECONDS = 300
+
+
+def _look_ahead_lane_wait_enabled() -> bool:
+	return _env_bool("SYNDICATE_LOOK_AHEAD_LANE_WAIT", default=False)
+
+
+def _look_ahead_lane_busy() -> bool:
+	# Read-only (`is_refresh_run_active` mutates nothing), same default lane
+	# `launch_refresh_run` would use for the look-ahead launch. A failed read
+	# reads as free: the launch then meets the real mutex, and the rewind below
+	# bounds what a wrong "free" can cost.
+	try:
+		return bool(is_refresh_run_active())
+	except Exception:
+		return False
+
+
+def _look_ahead_rewind_after_lane_busy(
+	result: dict[str, Any],
+	decision: Mapping[str, Any],
+	*,
+	now_epoch: float,
+	record: Any,
+) -> None:
+	"""Re-arm a look-ahead the lane mutex refused, so it retries in minutes, not an hour.
+
+	No-op unless SYNDICATE_LOOK_AHEAD_LANE_WAIT is on and the launch was refused
+	`lane_busy`. `record` is `_record_look_ahead_check` or its day-2 twin.
+	"""
+	if not _look_ahead_lane_wait_enabled():
+		return
+	if not isinstance(result, dict) or result.get("launched") or result.get("reasonCode") != "lane_busy":
+		return
+	target_date = str(decision.get("date") or "")
+	if not target_date:
+		return
+	interval = _look_ahead_interval_seconds()
+	retry = min(float(_LOOK_AHEAD_LANE_RETRY_SECONDS), float(interval))
+	try:
+		record(now_epoch - float(interval) + retry, target_date, launched=False)
+	except Exception as exc:  # noqa: BLE001 - a failed rewind leaves the full-interval stamp, today's behaviour
+		result["markerRewindError"] = f"{type(exc).__name__}: {exc}"
+		return
+	result["markerRewound"] = True
+	result["retryInSeconds"] = int(retry)
+
+
 def _look_ahead_decision(*, now_epoch: float, selected_date: str, any_live: bool | None) -> dict[str, Any]:
 	if not _look_ahead_enabled():
 		return {"launch": False, "reason": "disabled"}
@@ -3333,6 +3407,9 @@ def _look_ahead_decision(*, now_epoch: float, selected_date: str, any_live: bool
 	interval = _look_ahead_interval_seconds()
 	if last_epoch > 0.0 and last_date == target_date and (now_epoch - last_epoch) < interval:
 		return {"launch": False, "reason": "within_check_interval", "date": target_date}
+	if _look_ahead_lane_wait_enabled() and _look_ahead_lane_busy():
+		# Due, but our lane is busy: wait without stamping (see the block above).
+		return {"launch": False, "reason": "lane_busy_wait", "date": target_date}
 	if not _look_ahead_has_scheduled_games(target_date, sports=_live_refresh_loop_sports()):
 		_record_look_ahead_check(now_epoch, target_date, launched=False)
 		return {"launch": False, "reason": "no_games_scheduled", "date": target_date}
@@ -3386,6 +3463,10 @@ def _look_ahead_decision_day2(*, now_epoch: float, selected_date: str, any_live:
 	interval = _look_ahead_interval_seconds()
 	if last_epoch > 0.0 and last_date == target_date and (now_epoch - last_epoch) < interval:
 		return {"launch": False, "reason": "within_check_interval", "date": target_date}
+	if _look_ahead_lane_wait_enabled() and _look_ahead_lane_busy():
+		# Due, but our lane is busy (on the fleet: the same hour's day-1 run,
+		# 114 of 115 measured refusals): wait without stamping.
+		return {"launch": False, "reason": "lane_busy_wait", "date": target_date}
 	if not _look_ahead_has_scheduled_games(target_date, sports=_live_refresh_loop_sports()):
 		_record_look_ahead_check_day2(now_epoch, target_date, launched=False)
 		return {"launch": False, "reason": "no_games_scheduled", "date": target_date}
@@ -3414,7 +3495,16 @@ def _launch_look_ahead_refresh(decision: dict[str, Any]) -> dict[str, Any]:
 	except ValueError as exc:
 		# Same single-active-refresh guard the main tick already respects --
 		# skip gracefully and retry next interval rather than erroring.
-		return {"ok": False, "launched": False, "skipped": True, "date": target_date, "error": str(exc)}
+		# `reasonCode` (`#842`) tells a busy lane from an unreadable one; only
+		# `lane_busy` is rewound by _look_ahead_rewind_after_lane_busy.
+		return {
+			"ok": False,
+			"launched": False,
+			"skipped": True,
+			"date": target_date,
+			"error": str(exc),
+			"reasonCode": getattr(exc, "reason_code", None),
+		}
 	except Exception as exc:
 		return {"ok": False, "launched": False, "date": target_date, "error": f"{type(exc).__name__}: {exc}"}
 
@@ -5843,6 +5933,9 @@ def _run_mlb_sim_tick() -> dict[str, Any]:
 		look_ahead_decision = _look_ahead_decision(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
 		if look_ahead_decision.get("launch"):
 			meta["lookAhead"] = _launch_look_ahead_refresh(look_ahead_decision)
+			_look_ahead_rewind_after_lane_busy(
+				meta["lookAhead"], look_ahead_decision, now_epoch=tick_started_epoch, record=_record_look_ahead_check
+			)
 		else:
 			meta["lookAhead"] = {"ok": False, "launched": False, "reason": look_ahead_decision.get("reason")}
 	except Exception as exc:
@@ -5859,6 +5952,12 @@ def _run_mlb_sim_tick() -> dict[str, Any]:
 			look_ahead_day2_decision = _look_ahead_decision_day2(now_epoch=tick_started_epoch, selected_date=selected_date, any_live=any_live)
 			if look_ahead_day2_decision.get("launch"):
 				meta["lookAheadDay2"] = _launch_look_ahead_refresh(look_ahead_day2_decision)
+				_look_ahead_rewind_after_lane_busy(
+					meta["lookAheadDay2"],
+					look_ahead_day2_decision,
+					now_epoch=tick_started_epoch,
+					record=_record_look_ahead_check_day2,
+				)
 			else:
 				meta["lookAheadDay2"] = {"ok": False, "launched": False, "reason": look_ahead_day2_decision.get("reason")}
 		except Exception as exc:
