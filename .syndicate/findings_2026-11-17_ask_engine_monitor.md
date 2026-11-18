@@ -1089,3 +1089,39 @@ Probe file `ask_reading_20261118T050500Z.json` (11:05 PM CST). Page 200 in 0.04 
 - 2e: newest deploys.md header is still 8:46 PM CST (02:46Z, ops kill of a hung NHL odds child, no deploy); no fleet ff / deploy / restart in the last 40 min.
 
 - **ANOMALY:** `as_of_in_future` true again on the pregame_prop ask (soccer, Ismael Boura shots on target Over 0.5, Le Havre @ Troyes, event `5dcc9d2b...`): `as_of` = 2026-11-20 (`as_of_kind=date`). This is the 2nd reading in a row, same event, so it is persistent, not a one-off. Check next: the same as Reading 25. Find out whether the soccer bet_analysis path stamps `as_of` from the fixture's game date rather than the snapshot build time (a labelling bug; the answer itself is 200/ok with 10 tables).
+
+## Reading 27 (11:35 PM CST)
+
+Probe 05:34:58Z (11:34 PM CST); web window from 05:04:58Z (11:04 PM CST).
+
+**Ask:** 6/6 answered, 0 past 45 s, median 3.42 s, max 4.26 s. Page 200 in 1.12 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text (spread) | 1.34 | True | bet_analysis | 2026-11-18T05:26:15Z | 0 |
+| free_text (Lakers vs Celtics) | 3.64 | True | matchup_analysis | 2026-11-18T05:26:15Z | 0 |
+| free_text (top edges) | 2.78 | True | market_summary | 2026-11-17 | 1 |
+| pregame_game_line (Villarreal @ Barcelona U4.5) | 3.27 | True | bet_analysis | 2026-11-18 | 5 |
+| pregame_prop (Ismael Boura O0.5) | 4.26 | True | bet_analysis | **2026-11-20 (future)** | 10 |
+| live_row (Jazz @ Lakers O241.5) | 3.42 | True | bet_analysis | 2026-11-15 | 2 |
+
+A game was live (a `live_row` ask exists).
+
+**Web (30 min, 253 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 23, 16 hard; max anon 904 MB vs a 650 MB limit.
+- Overlay warms: 61; median 6.09 s; 0 over 45 s, 0 over 60 s; max 13.21 s.
+- Requests over 20 s: 0; over 45 s: 0.
+- Asks from any client: 12 (0 over 45 s, 0 non-200); 0 not this probe's (all 12 are `Python-urllib`, i.e. the 11:05 and 11:35 PM probes).
+
+**Host:** load 2.75 / 2.28 / 2.31 on 12 cores; MemAvailable 7,359 MB. Top CPU: refresh-worker 93% (ni 0, 4.2 GB RSS, up 7.6 h); live-odds-worker 37% (ni 0, up ~30 min); 2 gunicorn workers 13.5% / 10.8% (ni 0); refresh_odds_sources 3.7% (ni 0); probe 2.8% (ni 19); 2 live_resim_workers ~2-3% (ni 5).
+
+**Engine:**
+- 2a F2: still 1 run (16:30-17:17Z, did NOT PASS, recorded `c765eec64`); no newer run.
+- 2b M2: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c gate hash: `c1a2c029c2a1816f...`, Amendment 2 as expected.
+- 2d engine-file commits on origin/main in the last 40 min: none.
+- 2e deploys.md: newest 11-17/18 header is 02:46:25Z (8:46 PM CST, ops, no deploy); none in the last 40 min.
+
+- **ANOMALY:** soccer pregame_prop `as_of` 2026-11-20 is in the future (3rd reading running: 25, 26, 27). Check which artifact date feeds that prop row's `as_of` (fixture date vs. data date) in the Ask row-context builder.
+- **ANOMALY:** live-odds-worker process is ~30 min old (started ~11:05 PM CST) with no deploys.md header for it. Check the fleet supervisor log for an exit/restart of that role around 05:05Z.
