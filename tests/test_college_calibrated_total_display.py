@@ -115,6 +115,15 @@ def test_the_rail_card_prefers_the_calibrated_total():
     assert 'row.live_total_basis === "calibrated"' in html
 
 
+def test_the_rail_card_tooltip_names_the_calibrated_total_and_the_sims():
+    """User 2026-11-18 "show the calibrated total in the rail card tooltip too": the OURS cell and the callout carry a
+    tooltip naming the number as the calibrated total and giving the sim's own projected final beside it."""
+    html = (Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "intelligence.html").read_text(encoding="utf-8")
+    assert "calibratedRow.live_total_sim" in html and "Calibrated total ${total.toFixed(1)}" in html
+    assert 'class="game-mini-card__live-ours" title="${escapeHtml(m.oursTip)}"' in html
+    assert "m.edge.oursTip" in html and "ours: oursScore, oursTip," in html and "ours, oursTip, book," in html
+
+
 # ------------------------------------------------------------------------------------------------ the number
 
 def _calibrated_over(total, p_mkt=MARKET, line=LINE, sims=200):

@@ -3552,6 +3552,7 @@
         const team = liveRailTeamLabel(main, chip);
         const line = liveRailNum(main.line);
         let ours = null;
+        let oursTip = null;
         let book = "–";
         if (spec.key === "totals") {
           // I-17 (#816 lane, user chose the calibrated total, 2026-11-17): a college total under the totals
@@ -3561,6 +3562,13 @@
           const total = calibratedRow ? liveRailNum(calibratedRow.live_total)
             : (liveRailNum(final.total) ?? marketRows.map((row) => liveRailNum(row.live_total)).find((v) => v !== null) ?? null);
           ours = total === null ? null : total.toFixed(1);
+          if (calibratedRow && total !== null) {
+            // The tooltip says which number this is and keeps the sim's own beside it (user 2026-11-18 "show the
+            // calibrated total in the rail card tooltip too").
+            const sim = liveRailNum(calibratedRow.live_total_sim);
+            oursTip = `Calibrated total ${total.toFixed(1)}: the total where our calibrated probability is 50/50`
+              + (sim === null ? "" : `. The live sim's own projected final is ${sim.toFixed(1)}`);
+          }
           book = line === null ? "–" : (Number.isInteger(line) ? String(line) : line.toFixed(1));
         } else if (spec.key === "spreads") {
           // A spread row with no live number is blank BY DECISION upstream (NFL
@@ -3597,7 +3605,7 @@
           // OURS in the callout only where it is a score (a total, a margin):
           // a moneyline's OURS is the same probability the callout already says.
           const oursScore = spec.key === "h2h" || ours === null || /%/.test(ours) ? null : ours;
-          edge = { side, edge: best.edge, model: best.model, fair: best.fair, ours: oursScore, priced: best.priced, ageNow: best.ageNow };
+          edge = { side, edge: best.edge, model: best.model, fair: best.fair, ours: oursScore, oursTip, priced: best.priced, ageNow: best.ageNow };
           out.freshEdges[spec.key] = true;
           out.hasFreshEdge = true;
         }
@@ -3605,7 +3613,7 @@
           key: spec.key, segment,
           label: prefix ? `${prefix} ${spec.label}` : spec.label,
           short: prefix ? `${prefix} ${spec.short}` : spec.short,
-          ours, book,
+          ours, oursTip, book,
           ageNow: liveQuoteAgeNowSeconds(main, response, nowMs),
           pricedAge: liveQuotePricingAgeSeconds(main),
           builtAt: liveQuoteBuiltAtMs(main, response),
@@ -3753,7 +3761,10 @@
       const shown = m.ageNow !== null ? m.ageNow : m.pricedAge;
       const age = shown === null ? null : formatAge(shown);
       const tip = `Quote ${m.pricedAge === null ? "age unknown" : `${formatAge(m.pricedAge)} old`} when the board priced it; ${m.ageNow === null ? "no board build time" : `≈${formatAge(m.ageNow)} now`}`;
-      return span("mkt", m.short) + span("ours", m.ours === null ? "–" : m.ours) + span("book", m.book)
+      const oursCell = m.oursTip
+        ? `<span class="game-mini-card__live-ours" title="${escapeHtml(m.oursTip)}">${escapeHtml(m.ours === null ? "–" : m.ours)}</span>`
+        : span("ours", m.ours === null ? "–" : m.ours);
+      return span("mkt", m.short) + oursCell + span("book", m.book)
         + `<span class="game-mini-card__live-age${liveRailAgeClass(m.ageNow)}"${liveRailAgeAttrs(m)} title="${escapeHtml(tip)}">${escapeHtml(age || "?")}</span>`;
     }).join("");
     const title = "Live, full game and each interval: OURS is the live re-sim, BOOK the market's live line (priced closest to even among the fresh quotes, or the line called out below). "
@@ -3776,7 +3787,7 @@
       const ours = m.edge.ours ? `ours ${m.edge.ours} · ` : "";
       const ageNow = m.ageNow !== null ? m.ageNow : m.edge.ageNow;
       const aged = ageNow !== null && ageNow !== undefined && ageNow > LIVE_EDGE_FRESH_QUOTE_SECONDS;
-      const tip = `Our live sim gives ${m.edge.side} ${model === null ? "?" : pct(model)}; the book's no-vig price says ${fair === null || fair === undefined ? "?" : pct(fair)}. The book's quote was ${formatAge(m.edge.priced) || "?"} old when the board priced it. Information -- the sim against the book -- not a graded bet signal.`;
+      const tip = `Our live sim gives ${m.edge.side} ${model === null ? "?" : pct(model)}; the book's no-vig price says ${fair === null || fair === undefined ? "?" : pct(fair)}. The book's quote was ${formatAge(m.edge.priced) || "?"} old when the board priced it.${m.edge.oursTip ? ` ${m.edge.oursTip}.` : ""} Information -- the sim against the book -- not a graded bet signal.`;
       return `<div class="game-mini-card__live-edge"${liveRailAgeAttrs(m)}${aged ? ` style="opacity:${LIVE_RAIL_AGED_OPACITY}"` : ""} title="${escapeHtml(tip)}">≠ ${escapeHtml(m.label)} ${escapeHtml(m.edge.side)}: ${escapeHtml(ours)}${escapeHtml(probs)} · <span class="game-mini-card__live-edge-age">${escapeHtml(formatAge(ageNow) || "?")} old</span></div>`;
     }).join("");
     return `<div class="game-mini-card__live" title="${escapeHtml(title)}">${head}${body}</div>${edges}`;
