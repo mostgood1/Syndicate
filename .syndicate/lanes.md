@@ -1524,6 +1524,14 @@ death, never life — do not invert it.
 - Verification: Findings file with re-derived counts (attempts / launches / refusals by reason with denominators + holder attribution by run_stamp) and the value read; fix behind a switch with off != on test through _run_mlb_sim_tick; targeted tests green; prediction pre-registered here before the load; fix on origin/main; load (refresh-worker role TERM after a board save under claim + preflight CLEAR) put to the user and run only on their explicit yes
 - Blocked by: none
 
+### live-stake-minimum — OPEN — opened 2026-11-18 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: Live stakes at the measurement minimum until a challenger passes (user 2026-11-18: 'Yes, cut stakes'): every live order one contract -- pregame via REFRESH_WORKER__SYNDICATE_COMPOUNDING_BANKROLL_FRACTION=0.01 (compounded stakes floor to one contract) and in-play by removing LIVE_ODDS_WORKER__SYNDICATE_INPLAY_ENTRY_ORDER_DOLLARS (absent = one contract); drained full down/up under the locks as a risk-reduction exception outside the betting-change windows; registered as a betting change; measured on the next orders
+- Files: .syndicate/findings_2026-11-18_live_stake_minimum.md (NEW)
+- Hypothesis: n/a (risk reduction)
+- Falsification test: n/a
+- Verification: after the up: both keys read from /proc/<pid>/environ as intended; the first >= 10 new live orders have contracts == 1 (pregame and in-play); positions per plan unchanged in kind (same refusal mix); betting_changes.md row with the OUTSIDE WINDOW exception; deploys.md entry with the measurement
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
