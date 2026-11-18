@@ -319,3 +319,31 @@ Today's (11-18) bets are not graded yet.
 - Orders today 35: 33 filled, 2 maker posts resting about 7.6 h, exempt until kickoff. Unreconciled 0.
 - Cap use: kalshi 14.0%, polymarket 13.7%.
 - All 7 endpoints 200 (`/portfolio` 0.72 s). 0 kills.
+
+## Reading 38 — Wed 11-18 9:22 AM CST (15:22Z), window 60 min
+
+**Results first.** No new grades yet today, so the windows are unchanged: 30 d -7.35% [-12.8, -1.9] on 673 games,
+7 d -2.71%, fee-net CLV -0.36 pp. The same 8 signals. 11-18's bets grade from the afternoon slate on.
+
+**A fifth live-betting change in 24 h: BC-048, 14:42:52Z** (lane `ncaab-total-overprojection`, ff `2ae0c646a` ->
+`36a9f5501` and a refresh-worker TERM).
+- `#816`: a college totals phase whose calibration FAILED its walk-forward now serves the MARKET line, not the
+  engine's raw number. **NCAAB and WNCAAB pregame totals stop producing bets**; NCAAB live is unchanged.
+- This is a model fallback on lines whose fit failed, not a market switch.
+- It meets this lane's evidence:
+  - 30-day `totals` -12.2% [-23.9, -0.5];
+  - NCAAB in the EV 2-5 band -33.9% [-59.6, -8.1].
+- The next readings can watch the `totals` and NCAAB slices for the effect. Today's bets settle under the new rule.
+- **F12 updated:** BC-042, BC-045, BC-046, BC-047 and BC-048 in about 24 h. The gate's clock is 0 of 800 again from
+  14:42:52Z.
+
+**Plan across the 14:42Z restart: a 33.1-min gap**, the largest in 6 h (70 commits). The refresh-worker TERM drops the
+build in flight and needs a full cycle to publish. **The board split survived again:** refresh-worker 139688, child
+139716, 1 serve process. Web and live-odds-worker were not restarted (up since 14:05Z). Plan 2.7 min old at the
+reading.
+
+**Health:**
+- **Execution, 60 min:** 20 live ticks, 4 placed (kalshi 3, polymarket 1), 0 failed.
+- Orders today 39: 37 filled, 2 maker posts resting about 8.6 h, exempt until kickoff. Unreconciled 0.
+- Cap use: kalshi 15.2%, polymarket 15.0%.
+- All 7 endpoints 200 (`/portfolio` 0.55 s). 0 kills. **Anomalies: 0.**
