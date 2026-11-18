@@ -245,3 +245,22 @@ the nightly starts the recorder.
    - The A/B that isolates priority is tonight's probe (section 5).
 3. **If tonight's probe FALSIFIES H1** (section 5's falsifier), the revert goes to the user before 8:00 AM CST on
    11-19.
+
+**Close-out handed off (12:19 PM CST 11-18), and one rule added before the evening.** The user chose to archive this
+lane's session now and schedule the rest ("Archive now, schedule").
+- **The task.** The one-time task `inplay-stalls-closeout-1118` runs at 9:45 PM CST. It runs
+  `C:\tmp\inplay_sched_probe\closeout\closeout_1118.py`, written and tested here: six verdict branches on synthetic
+  rows against 11-17's real stalls, plus the apply step on copies of main's ledger.
+- **What it writes.** Section 7 below, with the probe verdict under section 5's rules exactly as registered. Unless the
+  verdict is FALSIFIED, it then closes the lane and returns the recorder loan. If FALSIFIED, the lane stays OPEN and
+  the revert decision for `c0d9cf9b8` goes to the user before the 8:00 AM CST sync.
+- **The 11-19 outcome reading** (task `inplay-priority-check-1120-reading`, 11-20 9:00 AM CST, set up by
+  local_cbc2cd31) was amended at 12:17 PM CST, as follows.
+  - **Baseline.** 11-18 is its first comparison row: the same paced loop `a2af81258`, at Idle. 11-16 and 11-17 ran the
+    old loop. Corrected count: 11-17 had 18 slow gaps in 5-9 PM CST (19 is its whole-night count).
+  - **TESTABLE fallback, written now, before the 11-18 evening.** Count n95 and n80 (10 s samples at >= 95% and
+    >= 80% busy) over 5:30-9:00 PM CST: on 11-18 from the probe's Normal copy, on 11-19 from typeperf.
+    - If 11-18 had zero slow gaps in 5-9 PM, or n95 >= 100, keep ">= 100 samples at >= 95%".
+    - Otherwise 11-18 stalled at a load below that bar. Then 11-19 is TESTABLE if it was at least as busy:
+      n95 >= min(100, 11-18's n95) when 11-18's n95 >= 10, else n80 >= min(100, 11-18's n80).
+  - **Findings.** With the lane closed, it appends its verdict here as section 8.
