@@ -1386,7 +1386,7 @@ Lane `soccer-shot-woodwork-undercount` (readings in `deploys.md` 2026-09-17 21:1
   - The marker `~/syndicate-prod/data/soccer_source/_understat_status.json` holds `state`, `down_since`, `probes` and `last_ok_at`.
   - It sends the same requests as OFF: 1 per teams step, 2 per players step.
 - **NOT on:**
-  - the cooldown `SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN` (absent = OFF; a betting change: it can lag a recovery refresh by up to 1 h);
+  - the cooldown `SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN` (absent = OFF; a betting change: it can lag a recovery refresh by up to 1 h). KEPT OFF by user "Keep it off", 2026-11-18 2:53 PM CST; reconsider only if a DNS/connect-timeout phase returns;
   - any alternative big-5 source (a model change; the user's decision).
 - **Recovery reads as:** the marker flips to `state: up` with `last_outage`, the 10 steps go rc 0, and the `teams_2026.csv` / `players_2026.csv` mtimes move.
 - Findings: `.syndicate/findings_2026-11-18_understat_fetch_failures.md`; todo `#841`.

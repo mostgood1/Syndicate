@@ -244,4 +244,6 @@ Reading at 2:22 PM CST (10 soccer runs, 52 big-5 Understat steps, 1:22-2:19 PM C
 | P4: recovery | **OWED**: Understat still in maintenance at 2:19 PM CST |
 | P5: nothing else moves | **MET**: 0 new step sequences (31 runs before, 10 after); non-Understat soccer steps rc 0 258 of 258 |
 
-The cooldown half stays default OFF; its decision is still the user's.
+The cooldown half stays default OFF: user "Keep it off", 2026-11-18 2:53 PM CST. Its benefit while the maintenance page answers fast is small
+(about 78 requests an hour to a down site, p50 5 s per run). It would pay only in a DNS/connect-timeout phase,
+and switching it on is a betting change (a window).
