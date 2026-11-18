@@ -1367,3 +1367,89 @@ peak, the refresh-worker's one interpreter carries both the board build and the 
 Running the board build in its own process (card **task_265c4921**, waiting for the user) is the lever this
 reading supports. A second, smaller lever: the evening's pregame soccer artifact build runs at nice 0 next to
 the live roles.
+
+## Reading 15 — Tue 11-17 8:06 PM CST (02:06Z 11-18), full page — the live odds lane is blocked by a hung NHL odds fetch
+
+**Fleet:**
+- **Web reloaded at 01:46:27Z (7:46 PM CST)** onto `3920a2d4d`: lane web-silent-worker-kills' loop-stall black box
+  (deploys.md, `c2dd0bd6f`).
+- **I-17's web half is now live:** the rail template and the `live_rail_rows` fields from `923869cf3` rode along.
+  It falls back to the old number until refresh-worker loads the join. The I-17 lane has scheduled that load for
+  1:50 AM CST 11-18 (task i17-calibrated-total-load-1118).
+- **BC-041 `yes` is pending at the next refresh-worker restart:** `ee47c930a`, NFL re-sim seeds.
+- refresh-worker 28948 (`91d865fd5`); live-odds-worker 52087. Host load 7.2-7.6 on 12 cores; 7 GB available.
+
+**Slate: 58 live chips.** NCAAB 34, NHL 9, WNCAAB 9, NBA 3, NCAAF 3. Villanova @ Pittsburgh and Tennessee St @
+Louisville are final (graded at the summary).
+
+**Flags: 47 shown, 0 false, 0 missed, 0 dark.** 25 of 58 live cards carry a flag.
+
+**I-17 metric corrected.** A "contradiction" now requires the flagged side's model P > 0.5 with "ours" on the other
+side of the line. An alternate-line value flag at P < 0.5 is consistent with its median. Example: Knicks @ Raptors
+u199.5 at P 0.28 vs fair 0.13, ours 217.7.
+
+Recount over every shown totals flag since the #816 load (`flags.jsonl`):
+
+| sport | contradictions (P > 0.5) | of observations |
+|---|---|---|
+| **NCAAB** (full game) | **64** | **176** |
+| WNCAAB | 4 | 41 |
+| NBA | 2 (1 full, 1 Q2) | 82 |
+
+Every NCAAB and WNCAAB "other side" observation had P > 0.5, so the earlier readings' college counts stand. This
+reading: NCAAB 4 of 16.
+
+**Live rows: 1,256.** 456 priced <= 120 s; 587 over 300 s; priced age p50 154 s. 23 of 189 markets carry no
+price of ours.
+
+| sport | rows | priced <= 120 s |
+|---|---|---|
+| NBA | 671 | 330 |
+| NCAAB | 472 | 86 |
+| NCAAF | 49 | 14 |
+| WNCAAB | 46 | 19 |
+| NHL | 18 | 7 |
+
+**Overlay (27 min): 0 gaps over 360 s** (max NHL 292 s, NBA 278 s, NCAAB 259 s).
+- Ticks 25; gap p50 54 s, max 144 s. `deferred_slow`: NBA 2, NCAAB 1.
+- Build s p50 / max: NBA 31.8 / 74.8; NCAAB 27.9 / 52.5; NHL 9.1 / 20.6.
+- **Web merges stale 2 of 48** (NHL 1, NBA `stale_399s` at 01:45:21Z), down from r14's 19 of 36.
+- **NHL in-play rows: 99 → 5 → 723 → 0 → 5.** 7 of 11 NHL builds carried zero cards (see below).
+
+**Board build 829 s** (01:51:40-02:05:29Z): overview 166 s, shortlist 430 s, portfolio 49 s. Over 300 s again.
+
+**Load (full page):**
+- **`/intelligence` 17.0 s** / 6.07 MB wire / 32.2 MB raw.
+- Query 14.5 s / 4.62 MB / 24.7 MB.
+- Chips 2.7 s; shortlist 1.5 s; live-rail 0.14-1.42 s.
+
+**#824:** 0 of 5 college join lines since 01:39Z carry the reason. 0 of 21 college totals flags below the
+points scored.
+
+### I-22 ROOT CAUSE: `scripts/refresh_nhl_oddsapi.py` hangs for its full 1,800 s timeout inside the live odds lane
+
+- **The run that held the lane 01:21-01:53Z** (manifest
+  `data/reports/migration_runs/2026-11-17/odds_refresh_20261118_012111/odds_refresh.json`):
+  - `refresh_odds_sources.py --sports nba,nhl,ncaaf,ncaab,wncaab --phase live`, started 01:21:11Z, finished
+    01:53:20Z, ok False, rc 1;
+  - error `TimeoutExpired: ... scripts/refresh_nhl_oddsapi.py --date 2026-11-17 --days-ahead 1 ... timed out
+    after 1800 seconds`.
+- **The next run (01:54:26Z) is in the same state now:**
+  - `refresh_nhl_oddsapi.py` pid 110202 had run 1,032 s at 02:12Z, at 1.7% CPU;
+  - main thread in `poll_schedule_timeout`, 11 threads in `futex_do_wait`;
+  - it opens successive HTTPS connections (the local port changed 52538 → 54862) to **104.16.144.251:443 =
+    api-web.nhle.com**, the NHL web API (`syndicate/local_nhl_odds.py` `NhlWebClient`: 30 s per request, 3/s).
+  - Expected to time out ~02:24:30Z.
+- **Cost:**
+  - live odds sweeps 01:39-02:06Z: **11 launched, 10 refused `lane_busy`**; 00:00-01:10Z: 17 of 34;
+  - every sport this lane refreshes waits behind NHL: NBA, NHL, NFL, NCAAF, NCAAB, WNCAAB. NCAAB / WNCAAB also
+    have a fast tick; NBA has its own autorun;
+  - NHL in-play rows fell to 0-5 for most of 01:41-02:07Z. NHL is the sport with live in-game entries.
+- **First time in three days of manifests:** 11-15..11-17 had three earlier `TimeoutExpired`s, all on
+  `refresh_nba_oddsapi_props.py` at ~05:00Z, off-peak. This is the first NHL odds timeout, and the first at peak.
+- **The fix (not built; a live-odds-worker restart to load is the user's call):**
+  - give each sport's odds job its own lane or deadline, so one stuck sport cannot block the rest;
+  - and/or give `NhlWebClient` a total deadline (or move the NHL web schedule call out of the live odds path).
+- **Owner:** no lane claims `refresh_nhl_oddsapi.py` or `local_nhl_odds.py`. Proposed as a session card.
+- **Immediate mitigation:** none taken. Ending the stuck child early would free the lane ~10 min sooner; that is
+  a production action for the user.
