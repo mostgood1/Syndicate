@@ -736,3 +736,32 @@ placement, so a stale plan costs missed bets, not bad ones.
   - Cap use: kalshi 18.6%, polymarket 17.6%.
 - **Gate:** pending BC-041 (count 0). One unclassified load (16:17Z NFL rebuild) remains with its lane.
 - **No new anomaly.**
+
+## Reading 19 — Tue 11-17 9:06 PM CST (03:06Z 11-18), window 33 min
+
+- **Tonight's plan was rewritten at 02:40:12Z (8:40 PM CST), ending a 79.0-min gap** (01:21:13 -> 02:40:12Z). This is the
+  longest tonight and is finding F7. Plan age 30.1 min at the reading.
+  - In 6 h: 36 commits.
+  - The fresh plan is larger: kalshi rows_in 625 -> 27 placeable -> 3 positions; polymarket 579 -> 20 -> 3.
+  - The plan as a whole: 109 suggested -> 25 sized -> 11 positions.
+  - Ceiling used 27.2% -> 32.3%.
+- **Execution, 33 min: 2 placed** (1 kalshi, 1 polymarket), the first live placements since reading 14, both after the
+  rewrite. 10 live ticks, 0 failed, refused 12 `outside_price_band` and 2 `game_started`.
+  - Orders today 57: 55 filled, 1 submitted, 1 rejected maker expiry.
+  - Resting 1, 1.2 min old.
+  - Cap use: kalshi 20.8%, polymarket 18.5%.
+- **NEW anomaly: `LEDGER unreconciled: 1 (6d56320b)`.**
+  - *Hypothesis, written before the check:* it is the order the worker just submitted, and the next reconcile pass
+    picks it up. So it is no failure.
+  - *Falsified if* it is still unreconciled 15+ min after submit.
+  - *Check 03:07:12Z:* it is the NHL Kalshi order submitted 03:05:02Z, status `submitted`, `reconciled_at` null,
+    2 min old. **Result (watcher, 60 s polls):** reconciled at 03:08:30Z, 3.5 min after submit. The ledger shows
+  `rejected` / `venue_canceled`, `venue_resolved_at` 03:05:04.9Z (2 s after submit), and no contracts. It was an
+  in-play entry (`position_key ingame:KXNHLSPREAD-...`), and in-play entries go out immediate-or-cancel
+  (`inplay_entries_live._IOC`). So it is a **no-fill, not a failure**: nothing was available at our price that
+  instant. Hypothesis confirmed. No money moved.
+  - **Probe fix, same lane:** `unreconciled` now alarms only past `UNRECONCILED_GRACE_MIN` = 10 min, or when there
+    is no submit time. An unfilled in-play IOC (`is_unfilled_inplay_ioc`) is counted as `inplay_ioc_unfilled`,
+    not in `failed_or_rejected`, as was done for the maker-pilot expiry. 2 tests, 18 pass.
+- **Endpoints:** all 7 read 200 inside budget (`/portfolio` 1.86 s of 3.0). 0 kills, 0 5xx. **Banner:** ok, armed.
+- **Settlement:** 22 started and unsettled while live, 0 late. **Gate:** pending BC-041 (count 0).

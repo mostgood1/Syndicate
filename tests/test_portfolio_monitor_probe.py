@@ -212,3 +212,27 @@ def test_plan_commits_groups_venue_lines_per_date_and_ages_tonight():
     assert pc["by_date"]["2026-11-18"]["commits"] == 1
     assert pc["today_newest_age_min"] == 49.4   # the 02:02 write was tomorrow's: tonight's plan is still 01:21's
     assert pm.plan_commits([], now)["today_newest_age_min"] is None
+
+
+def test_unreconciled_waits_out_the_reconcile_pass():
+    now = dt.datetime(2026, 11, 18, 3, 7, 12, tzinfo=dt.timezone.utc)
+    live = {"unreconciled": [{"idempotency_key": "6d56320bcab7", "submitted_at": "2026-11-18T03:05:02.986108Z"},
+                             {"idempotency_key": "aaaaaaaa1111", "submitted_at": "2026-11-18T02:40:00Z"},
+                             {"idempotency_key": "bbbbbbbb2222"}]}
+    led = pm.ledger_flags(live, now)
+    assert led["unreconciled"] == 3 and led["unreconciled_overdue_keys"] == ["aaaaaaaa", "bbbbbbbb"]
+    alarms = [a for a in pm.anomalies({"ledger": led}) if a.startswith("LEDGER unreconciled")]
+    assert alarms == ["LEDGER unreconciled > 10 min: 2 (aaaaaaaa, bbbbbbbb)"]
+    fresh = pm.ledger_flags({"unreconciled": live["unreconciled"][:1]}, now)
+    assert not [a for a in pm.anomalies({"ledger": fresh}) if a.startswith("LEDGER")]
+
+
+def test_an_unfilled_inplay_ioc_is_not_a_failed_order():
+    now = dt.datetime(2026, 11, 18, 3, 10, tzinfo=dt.timezone.utc)
+    ioc = {"selected_date": "2026-11-17", "mode": "live", "status": "rejected", "error": "venue_canceled",
+           "position_key": "ingame:KXNHLSPREAD-26NOV17TORCHI-CHI4:no", "contracts": None}
+    real = {"selected_date": "2026-11-17", "mode": "live", "status": "rejected", "error": "insufficient_balance"}
+    pregame_cancel = {"selected_date": "2026-11-17", "mode": "live", "status": "rejected", "error": "venue_canceled",
+                      "position_key": "pregame:X", "contracts": None}
+    flow = pm.order_flow([ioc, real, pregame_cancel], "2026-11-17", now)
+    assert flow["inplay_ioc_unfilled"] == 1 and flow["failed_or_rejected"] == 2

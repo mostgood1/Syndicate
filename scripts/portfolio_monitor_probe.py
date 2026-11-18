@@ -146,11 +146,13 @@ def order_flow(orders: Iterable[Mapping[str, Any]], today: str, now: dt.datetime
     # A maker-pilot post the venue cancelled unfilled at its kickoff expiry is recorded `rejected` (the status
     # that frees its budget), which is the post's normal ending, not a failure. First seen 2026-11-17 00:00:07Z.
     expired_posts = sum(1 for o in todays if is_expired_maker_post(o))
-    bad = status.get("failed", 0) + status.get("rejected", 0) - expired_posts
+    unfilled_ioc = sum(1 for o in todays if is_unfilled_inplay_ioc(o))
+    bad = status.get("failed", 0) + status.get("rejected", 0) - expired_posts - unfilled_ioc
     return {
         "orders": n,
         "by_status": dict(status),
         "maker_posts_expired_unfilled": expired_posts,
+        "inplay_ioc_unfilled": unfilled_ioc,
         "failed_or_rejected": bad,
         "failed_or_rejected_rate": round(bad / n, 4) if n else None,
         "resting": len(resting),
@@ -166,6 +168,17 @@ def is_expired_maker_post(order: Mapping[str, Any]) -> bool:
             and not order.get("contracts"))
 
 
+def is_unfilled_inplay_ioc(order: Mapping[str, Any]) -> bool:
+    """An in-play entry the venue cancelled with nothing filled. In-play entries go out immediate-or-cancel
+    (`inplay_entries_live._IOC`), so "nothing at our price this instant" ends as `rejected` / `venue_canceled`
+    within seconds: a no-fill, not a failure. First seen 2026-11-18 03:05Z (NHL spread, resolved 2 s after submit)."""
+    in_play = (str(order.get("position_key") or "").startswith("ingame:")
+               or order.get("sizing_basis") == "inplay_order_dollars")
+    return (in_play and order.get("status") == "rejected" and not order.get("contracts")
+            and str(order.get("error") or "") in ("venue_canceled", "venue_cancelled", "venue_expired"))
+
+
+UNRECONCILED_GRACE_MIN = 10.0    # a just-submitted order waits for the worker's next reconcile pass (~3-5 min)
 MAKER_KICKOFF_GRACE_MIN = 10.0   # Kalshi expires a pilot post at commence; allow the next reconcile pass
 UNREAD_RESTING_MIN = 30.0        # a resting order the reconciler has not read this long is not being watched
 
@@ -245,12 +258,22 @@ def cap_use(orders: Iterable[Mapping[str, Any]], limits: Mapping[str, Any], toda
     return out
 
 
-def ledger_flags(live: Mapping[str, Any]) -> dict[str, Any]:
+def ledger_flags(live: Mapping[str, Any], now: dt.datetime | None = None) -> dict[str, Any]:
+    """`unreconciled` is every submitted row the reconciler has not read yet, including one sent seconds ago;
+    only rows older than UNRECONCILED_GRACE_MIN (or with no readable submit time) are overdue. Reading 19,
+    2026-11-18: an order 2 min old was flagged and reconciled 3.5 min after submit."""
     unrec = list(live.get("unreconciled") or [])
+    now = now or dt.datetime.now(dt.timezone.utc)
+    overdue = []
+    for u in unrec:
+        sub = parse_ts(u.get("submitted_at"))
+        if sub is None or (now - sub).total_seconds() / 60.0 > UNRECONCILED_GRACE_MIN:
+            overdue.append(str(u.get("idempotency_key") or "")[:8])
     return {
         "unknown_submits": len(live.get("unknown_submits") or []),
         "unreconciled": len(unrec),
         "unreconciled_keys": sorted(str(u.get("idempotency_key") or "")[:8] for u in unrec),
+        "unreconciled_overdue_keys": sorted(overdue),
         "grade_conflicts": len(live.get("grade_conflicts") or []),
         "ledger_error": live.get("ledger_error"),
         "settlement_error": live.get("settlement_error"),
@@ -463,8 +486,10 @@ def anomalies(reading: Mapping[str, Any]) -> list[str]:
     for key in ("unknown_submits", "grade_conflicts"):
         if led.get(key):
             out.append(f"LEDGER {key}: {led[key]}")
-    if led.get("unreconciled"):
-        out.append(f"LEDGER unreconciled: {led['unreconciled']} ({', '.join(led.get('unreconciled_keys') or [])})")
+    # Older readings carry no overdue list: fall back to every unreconciled key, as before.
+    overdue_keys = led.get("unreconciled_overdue_keys", led.get("unreconciled_keys") if led.get("unreconciled") else [])
+    if overdue_keys:
+        out.append(f"LEDGER unreconciled > {UNRECONCILED_GRACE_MIN:.0f} min: {len(overdue_keys)} ({', '.join(overdue_keys)})")
     for key in ("ledger_error", "settlement_error"):
         if led.get(key):
             out.append(f"LEDGER {key}: {str(led[key])[:120]}")
@@ -701,7 +726,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "orders_today": order_flow(all_orders, today, now),
         "settlement": settlement_lag(all_orders, now),
         "cap_use": cap_use(all_orders, live_all.get("limits") or {}, today),
-        "ledger": ledger_flags(live_today) if live_today else {},
+        "ledger": ledger_flags(live_today, now) if live_today else {},
     }
     if all_orders:
         try:
