@@ -2498,13 +2498,14 @@ def _games_history_fetch_timeout_seconds(*, log_file: Path | None = None) -> int
     Measured 2026-11-18 (fleet, 11-09..11-18): the legacy 2,700 s timeout is LONGER than the live odds lane's 1,800 s
     step timeout, so on 4 of 10 midnights the step was killed inside this fetch and the whole NBA run (and, before
     `2ae0c646a`, every sport after it) was lost while the lane sat held for 30 min. The switch lives with the fetch
-    (`scrape_nba_api.history_fetch_bounded`, absent = OFF); an import failure keeps the legacy value.
+    (`scrape_nba_api.history_fetch_bounded`, absent = ON since 2026-11-18); an import failure takes the bounded cap,
+    the default.
     """
     try:
         from syndicate.features.nba.source_cli.scrape_nba_api import history_fetch_bounded
         bounded = bool(history_fetch_bounded())
     except Exception:  # noqa: BLE001 - never block the bootstrap on the switch read
-        bounded = False
+        bounded = True
     if not bounded:
         return GAMES_HISTORY_FETCH_TIMEOUT_LEGACY_S
     raw = str(os.environ.get(GAMES_HISTORY_FETCH_TIMEOUT_ENV, "") or "").strip()

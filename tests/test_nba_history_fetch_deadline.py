@@ -5,7 +5,7 @@ season (the history's ids round-trip through CSV as `22600001`, LeagueGameLog's 
 matched its stored quarters) under a 2,700 s timeout -- longer than the live odds lane's 1,800 s step. The same
 mismatch kept every completed fetch from replacing the season, so the history carried up to 16 copies of a game.
 
-`SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` (absent = OFF) keys by the 10-digit id, walks only quarter-less games, newest
+`SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` (absent = ON since 2026-11-18; landed default-off in 4178ba866) keys by the 10-digit id, walks only quarter-less games, newest
 first, under a deadline, writes one row per game, and caps the bootstrap's fetch at 900 s. The reachability tests drive
 the REAL callers (`fetch_games_nba_api`, `_ensure_source_game_inputs`) and assert off != on.
 """
@@ -106,19 +106,20 @@ def test_normalize_game_ids_pads_ints_floats_and_leaves_non_digits():
     assert got.tolist() == ["0022600001", "0022600001", "0022600001", "nan", "g1"]
 
 
-def test_switch_is_off_when_absent_and_on_only_for_on_values(monkeypatch):
+def test_switch_is_on_when_absent_and_off_only_for_off_values(monkeypatch):
     monkeypatch.delenv(SWITCH, raising=False)
-    assert scrape.history_fetch_bounded() is False
-    for value in ("0", "off", "false", "", "maybe"):
+    assert scrape.history_fetch_bounded() is True
+    for value in ("0", "off", "false", "NO", " Off "):
         monkeypatch.setenv(SWITCH, value)
         assert scrape.history_fetch_bounded() is False, value
-    for value in ("1", "on", "true", "YES"):
+    for value in ("1", "on", "true", "YES", "", "maybe"):
         monkeypatch.setenv(SWITCH, value)
         assert scrape.history_fetch_bounded() is True, value
 
 
 def test_off_walks_every_game_and_keeps_appending_copies(fetch_env, monkeypatch):
-    """Today's behaviour, pinned: the id mismatch asks for all 3 games and the save drops none of the old copies."""
+    """The legacy behaviour, pinned: the id mismatch asks for all 3 games and the save drops none of the old copies."""
+    monkeypatch.setenv(SWITCH, "0")
     calls: list[str] = []
     _run(monkeypatch, calls)
     assert sorted(calls) == ["0022600001", "0022600002", "0022600003"]
@@ -141,8 +142,18 @@ def test_on_walks_only_quarterless_games_newest_first_and_saves_one_row_per_game
     assert len(saved[saved["season"] == 2026]) == 1  # the older season survives
 
 
+def test_absent_switch_takes_the_bounded_fetch(fetch_env, monkeypatch):
+    """Default ON since 2026-11-18: with the key absent the real fetch walks only quarter-less games, one row per game."""
+    calls: list[str] = []
+    _run(monkeypatch, calls)  # fetch_env deleted the switch
+    assert calls == ["0022600003", "0022600002"]
+    saved = pd.read_csv(fetch_env / "games_nba_api.csv", dtype={"game_id": str})
+    assert len(saved[saved["season"] == 2027]) == 3
+
+
 def test_off_and_on_differ_through_the_real_fetch(fetch_env, monkeypatch, tmp_path):
     """Reachability: the switch must change what the real fetch does (calls and rows), not just a helper."""
+    monkeypatch.setenv(SWITCH, "0")
     off_calls: list[str] = []
     _run(monkeypatch, off_calls)
     off_rows = len(pd.read_csv(fetch_env / "games_nba_api.csv"))
@@ -188,9 +199,11 @@ def _props_module():
 
 def test_fetch_timeout_is_legacy_off_and_capped_on(monkeypatch):
     mod = _props_module()
-    monkeypatch.delenv(SWITCH, raising=False)
+    monkeypatch.setenv(SWITCH, "0")
     monkeypatch.delenv(mod.GAMES_HISTORY_FETCH_TIMEOUT_ENV, raising=False)
     assert mod._games_history_fetch_timeout_seconds() == 2700
+    monkeypatch.delenv(SWITCH, raising=False)
+    assert mod._games_history_fetch_timeout_seconds() == 900
     monkeypatch.setenv(SWITCH, "on")
     assert mod._games_history_fetch_timeout_seconds() == 900
     monkeypatch.setenv(mod.GAMES_HISTORY_FETCH_TIMEOUT_ENV, "600")
@@ -200,7 +213,7 @@ def test_fetch_timeout_is_legacy_off_and_capped_on(monkeypatch):
         assert mod._games_history_fetch_timeout_seconds() == 900, bad
 
 
-@pytest.mark.parametrize("switch, expected", [(None, 2700), ("on", 900)])
+@pytest.mark.parametrize("switch, expected", [("0", 2700), (None, 900), ("on", 900)])
 def test_the_bootstrap_hands_the_fetch_its_timeout(tmp_path, monkeypatch, switch, expected):
     """Reachability through `_ensure_source_game_inputs`: the fetch call itself carries the bounded timeout."""
     mod = _props_module()
@@ -226,4 +239,4 @@ def test_the_bootstrap_hands_the_fetch_its_timeout(tmp_path, monkeypatch, switch
     fetches = [timeout for parts, timeout in calls if parts and parts[0] == "fetch"]
     assert fetches == [expected], calls
     logged = (tmp_path / "run.log").read_text(encoding="utf-8") if (tmp_path / "run.log").exists() else ""
-    assert ("GAMES_HISTORY_FETCH_BOUNDED timeout_s=900" in logged) is (switch == "on")
+    assert ("GAMES_HISTORY_FETCH_BOUNDED timeout_s=900" in logged) is (switch != "0")

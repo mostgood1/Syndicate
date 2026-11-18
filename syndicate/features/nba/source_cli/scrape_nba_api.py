@@ -33,17 +33,17 @@ import os
 # With the switch ON the history is keyed by the 10-digit id, the quarter walk asks only for games that have no
 # quarters (newest first) and stops at a wall-clock deadline, and the save keeps one row per game.
 #
-# ABSENT = OFF: a betting change (NBA Elo / form move once the history is de-duplicated), so it lands default-off and is
-# turned on in a betting-change window (CLAUDE.md "Before any deploy").
+# ABSENT = ON since 2026-11-18 (user, 2:5x PM CST: "Load it now", a betting change loaded outside a window; it landed
+# default-off in 4178ba866). `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED=0` (or false/off/no) restores the legacy fetch.
 HISTORY_FETCH_BOUNDED_ENV = "SYNDICATE_NBA_HISTORY_FETCH_BOUNDED"
 LINESCORE_DEADLINE_ENV = "SYNDICATE_NBA_LINESCORE_DEADLINE_SECONDS"
 DEFAULT_LINESCORE_DEADLINE_SECONDS = 600.0
-_ON_VALUES = {"1", "true", "on", "yes"}
+_OFF_VALUES = {"0", "false", "off", "no"}
 
 
 def history_fetch_bounded() -> bool:
-    """`SYNDICATE_NBA_HISTORY_FETCH_BOUNDED`: on only when set to 1/true/on/yes. Absent = OFF."""
-    return str(os.environ.get(HISTORY_FETCH_BOUNDED_ENV, "") or "").strip().lower() in _ON_VALUES
+    """`SYNDICATE_NBA_HISTORY_FETCH_BOUNDED`: off only when set to 0/false/off/no. Absent (or empty) = ON."""
+    return str(os.environ.get(HISTORY_FETCH_BOUNDED_ENV, "") or "").strip().lower() not in _OFF_VALUES
 
 
 def linescore_deadline_seconds() -> float:
