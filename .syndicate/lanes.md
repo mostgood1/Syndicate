@@ -1586,6 +1586,15 @@ death, never life — do not invert it.
   - Left:
     - P1, P2 and P4 at the first bootstrap fetch for 11-19 (refresh-worker's evening look-ahead or the 00:01 CST run);
     - P3 over the 7 nights 11-19..11-25.
+    - As of 4:18 PM CST 11-18, 0 fetches had run since the load: `predictions_2026-11-19.csv` was absent, and the
+      history was unchanged at 1,563 rows / 196 ids, newest 11-15.
+    - **SCHEDULED** (user, 4:1x PM CST: "Yes, schedule it"):
+      - one-time task `nba-history-fix-first-night-1119`, 12:45 AM CST 11-19, saved in bypassPermissions;
+      - it runs `C:\tmp\mn1800\mn1800_reading_1119.py` (fleet, nice 19, read-only), writes
+        `C:\tmp\mn1800\reading_1119.txt`, and appends the P1-P4 verdict to the shared note `nba-midnight-bootstrap-hold.md`;
+      - a dry run on the 11-18 night reproduced that night's known numbers: run 1,765 s, NBA step timeout, 1,563 / 196,
+        and 1 refusal behind the run;
+      - this session holds a backup timer for 12:55 AM CST; if the task shows 0 runs, run the script by hand.
   - **The clause "the first night on the 2ae0c646a deadline read" can no longer be met.** The user's load-now
     decision put the fix ahead of that night. 11-19 is read as the first night ON the fix instead.
 - Goal: The ~12:01 AM CST nba+ncaab+wncaab pregame run on live-odds-worker's live odds lane stops holding the lane for 1,800 s: the hung call and its launcher named with a nightly rate 11-10..11-19; the first night on the 2ae0c646a deadline read; the cause fixed on main behind a switch with an off != on reachability test and a pre-registered numeric prediction; findings file; the load decision put to the user
