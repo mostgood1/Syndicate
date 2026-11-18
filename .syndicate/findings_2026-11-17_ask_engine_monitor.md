@@ -802,3 +802,38 @@ A game was live: a `live_row` ask exists (NBA Knicks @ Raptors). Its `as_of` is 
 - 2e: the newest deploys.md header is 23:54Z (5:54 PM CST, a reading with no deploy). No fleet ff, deploy or restart since 6:25 PM CST.
 
 No anomaly.
+
+## Reading 19 (7:35 PM CST)
+
+Probe 7:35-7:37 PM CST (01:35:28Z). Web window from 7:05 PM CST (01:05Z), 108 requests.
+
+**Ask:** 6 / 6 answered, 0 past the 45 s cut-off, median 8.99 s, max 33.86 s. A game was live (a `live_row` ask exists: Knicks @ Raptors total).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text (spread) | 5.11 | yes | bet_analysis | 2026-11-17T23:11:20Z | 0 |
+| free_text (Lakers vs Celtics) | 0.82 | yes | matchup_analysis | 2026-11-17T23:11:20Z | 0 |
+| free_text (top edges) | 31.84 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line | 33.86 | yes | bet_analysis | 2026-11-16 (date) | 2 |
+| pregame_prop | 8.99 | yes | bet_analysis | 2026-11-18T00:33:24Z | 7 |
+| live_row | 3.14 | yes | bet_analysis | 2026-11-15 (date) | 2 |
+
+No `as_of_in_future`. No user-seen timeout, no transport error.
+
+**Web (30 min):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 8 (6 hard), max anon 1253 MB vs 642.9 MB limit.
+- Overlay warms: 32, median 26.43 s, 24 over 20 s, 4 over 45 s, 1 over 60 s, max 82.0 s.
+- Over 20 s: 11 (`POST /api/intelligence/query` 5, `GET /api/board/game-chips` 3, `POST /api/syndicate/query` 2, `GET /` 1). Over 45 s: 1 (`POST /api/intelligence/query`).
+- Asks from any client: 6, 0 over 45 s, 0 non-200; 0 not this probe's (all `Python-urllib/3.12`).
+
+**Host:** load 10.78 / 10.63 / 9.67 on 12 cores; MemAvailable 6241 MB. Top CPU: build_soccer_artifacts (bundesliga) 94% ni 0; refresh-worker 91% ni 0 (4.2 GB RSS); refresh_odds_sources x2 89% / 62% ni 0; live-odds-worker 64% ni 0; momentum_lag_study 55% ni 19; gunicorn web 50% ni 0 (up 192 s).
+
+**Engine:**
+- 2a F2: 1 run total (16:30-17:17Z, "did NOT PASS"), the one already on main `c765eec64`; no newer run.
+- 2b `engine-learner-m2-gate-read-1124`: enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c `m2_gate.py` sha256 `c1a2c029c2a1816f...`: matches Amendment 2.
+- 2d engine-file commits on origin/main in the last 40 min: none.
+- 2e deploys.md headers since 6:57 PM CST: 01:08Z render_env/ deletion (no deploy), 01:08Z `923869cf3` deploy attempt ABORTED nothing loaded, 01:16Z operator ledger write (no deploy). No fleet load.
+
+- **ANOMALY:** an overlay warm took 82.0 s (1 of 32 over 60 s; 4 over 45 s). Check next: the web log's overlay-warm lines 01:05-01:37Z for which sport/date, and whether it coincided with a hard recycle (6 hard of 8) or the soccer build + two odds refreshes at load ~10.7 on 12 cores.
