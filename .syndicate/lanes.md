@@ -1216,6 +1216,14 @@ death, never life — do not invert it.
 - Verification: before/after console of doctor and up --bounded --duration-seconds 120 from this worktree against a scratch mirror (never the fleet's data root), counts and key names only; pytest tests/test_fleet_local.py tests/test_service_marker_readers.py tests/test_fleet_role_spec.py at Idle; doctor negative controls: money-armed env refused, loopback :10000/:6379 refused, fleet data root refused
 - Blocked by: none
 
+### mlb-native-fleet-names — OPEN — opened 2026-11-17 — session fea5cdfa-d195-479f-b8fc-204c595aecb5
+- Goal: Rename the Render-platform names left in the frozen MLB native tools (daily_update.py flags/helpers/stage keys plus the sync/smoke/tune tools) to fleet names; every old CLI flag and choice kept as an argparse alias and every renamed script kept as a shim; the on-disk live_lens/render_sync directory kept as is (named constant, no migration); names only, nothing loaded; on main with targeted tests green, findings note listing each rename and consumer, todo #766 updated
+- Files: syndicate/features/mlb/native/tools/daily_update.py, syndicate/features/mlb/native/tools/eval/sync_render_live_lens_history.py, syndicate/features/mlb/native/tools/eval/sync_fleet_live_lens_history.py (NEW), syndicate/features/mlb/native/tools/smoke/smoke_render_frontend.py, syndicate/features/mlb/native/tools/smoke/smoke_fleet_frontend.py (NEW), syndicate/features/mlb/native/tools/tune/export_live_pitcher_projection_dataset.py, syndicate/features/mlb/native/tools/tune/fit_live_pitcher_outs_correction.py, syndicate/features/mlb/native/tools/tune/fit_live_pitcher_strikeouts_correction.py, syndicate/features/mlb/cards.py (the _workflow_summary validation-error prefix ONLY), syndicate/features/mlb/live_lens_port/app_slice.py (the _workflow_summary validation-error prefix ONLY), scripts/run_mlb_daily_sim_job.py (the validate frontend flag ONLY), scripts/unified_daily_update.ps1 (the validate frontend flag ONLY), tests/test_mlb_native_fleet_names.py (NEW), .syndicate/findings_2026-11-17_mlb_native_fleet_names.md (NEW), docs/ai_context/todo.md (the #766 section ONLY)
+- Hypothesis: Names only: no in-repo or scheduled-task reader depends on the old report keys or values except the two _workflow_summary error-prefix filters, which will accept both prefixes
+- Falsification test: A test or reader outside daily_update.py reads render_frontend_validation, render_base_url, render_api, renderSync or render_sync_archive
+- Verification: targeted pytest at Idle: tests/test_mlb_native_tools.py plus the new alias/shim tests plus any test importing the touched modules
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
