@@ -5,7 +5,7 @@
 - **Not book coverage:** median 9 books quote each live NCAAB game, and spreads/totals had a fresh book about 90% of live minutes.
 - **Fix (not built):** newest stamp by parsed time in `book_grid.py` (claimed by OPEN lane `ncaaf-grid-build-speed`; coordinate), with a test where a space-format sportsbook stamp is newer than a `T`-format venue stamp. BETTING CHANGE: loads in a betting-change window (next Tue 11-24 2:00-7:00 AM CST) unless the user calls it a broken money path. Owed after load: college moneyline fresh-by-row-age share near the 81% fresh-by-time, and the count of college live rows priced per build before and after.
 
-### `#843` — **THE ~12:01 AM CST 1,800 s HOLDS OF THE LIVE ODDS LANE ARE THE NBA PROPS JOB'S GAMES-HISTORY FETCH, AND THE SAME BUG HAS DUPLICATED THE NBA HISTORY: a game-id mismatch (`0022600001` vs the CSV round-trip's `22600001`) makes every `cli fetch --years 1` walk BoxScoreSummaryV2 for the WHOLE season under a 2,700 s timeout (longer than the 1,800 s step), and makes every completed fetch append another copy of the season (1,563 rows for 196 games; NBA Elo off by a mean 119, max 293, at each team's latest game). Fix on main behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` (absent = OFF). Switching it on is a betting change (window); the load is the user's call** `[2026-11-18, lane nba-midnight-bootstrap-hold; `.syndicate/findings_2026-11-18_nba_midnight_bootstrap_hold.md`; from #840's lead]`
+### `#843` — **THE ~12:01 AM CST 1,800 s HOLDS OF THE LIVE ODDS LANE ARE THE NBA PROPS JOB'S GAMES-HISTORY FETCH, AND THE SAME BUG HAS DUPLICATED THE NBA HISTORY: a game-id mismatch (`0022600001` vs the CSV round-trip's `22600001`) makes every `cli fetch --years 1` walk BoxScoreSummaryV2 for the WHOLE season under a 2,700 s timeout (longer than the 1,800 s step), and makes every completed fetch append another copy of the season (1,563 rows for 196 games; NBA Elo off by a mean 119, max 293, at each team's latest game). Fix on main behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED`; LOADED 11-18 3:02 PM CST, default ON (`a3104a5b6`, user "Load it now", BC-052 outside a window). The effect readings are owed tonight** `[2026-11-18, lane nba-midnight-bootstrap-hold; `.syndicate/findings_2026-11-18_nba_midnight_bootstrap_hold.md`; from #840's lead]`
 - **Measured (fleet, read-only):**
   - 4 of 10 midnights (11-09..11-18) ran 1,765-1,801 s: 11-12, 11-14, 11-15 and 11-18, plus 11-05 before that.
     Every one fetched at midnight; none of the 6 others did.
@@ -22,12 +22,21 @@
   - the bootstrap's fetch timeout is 900 s.
   - `tests/test_nba_history_fetch_deadline.py` has 10 cases, including off != on through both real callers.
   - Replay on the fleet history: 196 -> 31 calls, and 1,759 -> 196 season rows.
-- **Predictions P1-P6** are in the findings file §7. Tonight's run (11-19 00:01 CST, switch off) is predicted there too:
-  a failed NBA step at about 1,800 s, then NCAAB/WNCAAB run.
-- **Load:**
-  - EITHER flip the default to on, on main, inside the 11-24 window, and ff (child scripts, no restart);
-  - OR set the env key and run a drained `down`/`up`;
-  - OR load it now as an exception (the Elo defect). The user's call.
+- **Predictions P1-P6** are in the findings file §7.
+- **LOADED 2026-11-18 3:02 PM CST** (user: "Load it now"):
+  - The default was flipped to absent = ON in `a3104a5b6`; `=0` turns it off.
+  - Fleet ff `db6a395ed` -> `a3104a5b6` at 21:02:51Z, with no restart.
+  - BC-052 is a betting change OUTSIDE a window, by user override; deploys.md has the entry.
+  - A fleet child reads the switch as on.
+- **Owed:**
+  - **The first bootstrap fetch for 11-19** (refresh-worker's evening look-ahead or the 00:01 CST run):
+    - P1: its log carries `GAMES_HISTORY_FETCH_BOUNDED timeout_s=900` and `LINESCORE_WALK bounded=1` with
+      `to_fetch <= 60`;
+    - P2: it ends within 900 s;
+    - P4: after it, the season's rows equal its unique ids, and the newest game is 11-18.
+  - **The 11-19 00:01 CST `nba,ncaab,wncaab` run:** <= 1,100 s.
+  - **P3 over 11-19..11-25.**
+  - Tonight's switch-off prediction (H4) can no longer be read: the fix loaded first.
 - **Leads:**
   - `wncaab_odds_snapshot` reports ok false on every run;
   - the WNBA twin's id handling is unchecked;

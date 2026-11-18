@@ -1288,7 +1288,12 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     - its quarter walk asks BoxScoreSummaryV2 for every game of the season.
   - Pre-game Elo at each team's latest game, duplicated minus de-duplicated: mean |d| 119, max 293 (30 teams). `predict-date` builds `elo_diff` from this history.
   - The bootstrap fetch timeout is 2,700 s against a 1,800 s step. 4 of 10 live-lane midnights (11-09..11-18) were killed inside it.
-  - Fix on main `4178ba866` behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED`, absent = OFF. **NOT LOADED; it is a betting change, so it waits for a window.**
+  - **Fix LOADED on the fleet 2026-11-18 21:02:51Z (3:02 PM CST)** `[verified 21:03:06Z]`:
+    - `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED`, absent = ON, from `a3104a5b6`; `=0` turns it off.
+    - Fleet ff `db6a395ed` -> `a3104a5b6` with no restart: the child scripts load it at their next launch.
+    - BC-052 yes, outside a window, user "Load it now".
+    - A fleet child reads the switch as on.
+  - The history above is the pre-fix reading. It is de-duplicated at the first bootstrap fetch for 11-19, which is owed.
 - **Readings owed at WNBA Finals G1 (10-17) lines:**
   - `player_logs.csv` rewritten through 10-09+.
   - A new `calibration_totals_*.json`.

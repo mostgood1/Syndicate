@@ -1557,18 +1557,22 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### nba-midnight-bootstrap-hold — OPEN — opened 2026-11-18 — session 11c3b7a0-f76e-4289-b46e-6120e246e907
-- **GOAL VERDICT 2026-11-18 1:35 PM CST.**
+- **GOAL VERDICT 2026-11-18 3:06 PM CST.**
   - Goal, verbatim: "The ~12:01 AM CST nba+ncaab+wncaab pregame run on live-odds-worker's live odds lane stops holding the lane for 1,800 s: the hung call and its launcher named with a nightly rate 11-10..11-19; the first night on the 2ae0c646a deadline read; the cause fixed on main behind a switch with an off != on reachability test and a pre-registered numeric prediction; findings file; the load decision put to the user"
-  - **GOAL: NOT MET.**
+  - **GOAL: NOT MET.** The fix is LOADED; the reading that shows the lane is no longer held comes at the 11-19 ~00:01 CST run.
   - Done:
     - the hung call, the launcher and the rate (4 of 10 nights 11-09..11-18);
-    - the fix on main `4178ba866` behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` (absent = OFF), with the off != on tests;
-    - the prediction (P1-P6), the findings file, and the load put to the user.
+    - the fix on main behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` with the off != on tests (`4178ba866`);
+    - the prediction (P1-P6) and the findings file;
+    - the load decision put to the user. The user answered "Load it now". The default was flipped to absent = ON in
+      `a3104a5b6` (12 tests), and the fleet was ff'd `db6a395ed` -> `a3104a5b6` at 21:02:51Z (3:02 PM CST) with no
+      restart. This is BC-052, a betting change OUTSIDE a window by user override; deploys.md has the entry.
+    - A fleet child reads `history_fetch_bounded()` = True.
   - Left:
-    - the 11-19 00:01 CST reading on `2ae0c646a` (not yet happened at the checkpoint; prediction in findings §7);
-    - the lane does not stop being held until the switch is on, and that load is a betting change for the user to
-      decide (11-24 window, or an exception);
-    - P1-P6 are read after that load.
+    - P1, P2 and P4 at the first bootstrap fetch for 11-19 (refresh-worker's evening look-ahead or the 00:01 CST run);
+    - P3 over the 7 nights 11-19..11-25.
+  - **The clause "the first night on the 2ae0c646a deadline read" can no longer be met.** The user's load-now
+    decision put the fix ahead of that night. 11-19 is read as the first night ON the fix instead.
 - Goal: The ~12:01 AM CST nba+ncaab+wncaab pregame run on live-odds-worker's live odds lane stops holding the lane for 1,800 s: the hung call and its launcher named with a nightly rate 11-10..11-19; the first night on the 2ae0c646a deadline read; the cause fixed on main behind a switch with an off != on reachability test and a pre-registered numeric prediction; findings file; the load decision put to the user
 - Files: scripts/refresh_nba_oddsapi_props.py (the source-bootstrap games-history fetch call + the new _games_history_fetch_timeout_seconds helper ONLY), syndicate/features/nba/source_cli/scrape_nba_api.py (the new bounded-fetch helpers + fetch_games_nba_api line-score and save sections ONLY), tests/test_nba_history_fetch_deadline.py (NEW), .syndicate/findings_2026-11-18_nba_midnight_bootstrap_hold.md (NEW), docs/ai_context/todo.md (the #843 item section ONLY)
 - Hypothesis: Stated 2026-11-18 1:10 PM CST. Already read when stated: the 11-18 run (odds_refresh_20261118_060115) and its NBA props log, which put the child in 'cli fetch --years 1' from 06:01:31Z to its kill at 06:30:40Z. H1 (the hung call): after the 00:00 CST roll the first NBA props run of the new date has no predictions_<D>.csv, so it runs the source bootstrap; the games history is behind the schedule (yesterday's finals), so it runs 'cli fetch --years 1' with a 2,700 s subprocess timeout, LONGER than the 1,800 s step timeout. The fetch re-requests BoxScoreSummaryV2 line scores for every current-season game whose home_q1 is missing; BoxScoreSummaryV2 has no data for games after 2025-04-10, so that is every 2026-27 game, every night, at >= 0.7 s a game plus 30 s timeouts x up to 4 attempts. Its length grows with games played and stats.nba.com latency and crosses 1,800 s; the kill writes no history, so the next night is behind again. H2 (the launcher): live-odds-worker's first pregame sweep after the 00:00 CST date roll (nba+ncaab+wncaab with --force-refresh-sports nba,wnba). H3 (the rate): every night 11-10..11-19 whose first NBA run fetched has a long NBA step; a night with no fetch (cooldown or not behind) has a short one. H4 (the 2ae0c646a deadline): the step still runs to 1,800 s and NBA's result for that run is lost, so the lane is still held ~30 min
@@ -1582,7 +1586,7 @@ death, never life — do not invert it.
   - **H3: CONFIRMED.** The rate is 4 of 10 nights; the condition is fetch-at-midnight, 4 of 4 vs 0 of 6.
   - **H4: NOT READ.** The 11-19 run was still in the future; its prediction is in findings §7.
   - Cost: 2 refused sweeps in about 2 h of hold. Live NBA/NCAAB ran on their own lanes.
-- FIX on main behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` (absent = OFF; a betting change outside a window). 10 tests, including off != on through `fetch_games_nba_api` and `_ensure_source_game_inputs`. Replay on the fleet history: 196 -> 31 BoxScoreSummaryV2 calls, 1,759 -> 196 season rows.
+- FIX on main behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` (landed absent = OFF in `4178ba866`; absent = ON from `a3104a5b6`, loaded 11-18 3:02 PM CST). 10 tests (12 after the flip), including off != on through `fetch_games_nba_api` and `_ensure_source_game_inputs`. Replay on the fleet history: 196 -> 31 BoxScoreSummaryV2 calls, 1,759 -> 196 season rows.
 - PREDICTION (pre-registered before any load; first 7 nights after the switch is on):
   - P1: `to_fetch <= 60`;
   - P2: every fetch ends within 900 s;
@@ -1590,7 +1594,13 @@ death, never life — do not invert it.
   - P4: season rows == unique ids and >= 90% of fetches complete (baseline 61%);
   - P5: latest Elo moves mean |d| about 119;
   - P6: 0 added OddsAPI calls.
-- LOAD: put to the user (11-24 window default flip + ff, or an exception now).
+- LOAD 2026-11-18 3:02 PM CST:
+  - The user answered "Load it now" to "When should the NBA history fix load?".
+  - Default flip `a3104a5b6` (absent = ON; `=0` turns it off). Fleet ff `db6a395ed` -> `a3104a5b6` at 21:02:51Z, no restart.
+  - BC-052 yes, OUTSIDE a window (user override, not a revert / risk reduction / money-path fix).
+  - Claim live-odds-worker; preflight CLEAR 21:02:43Z; claim released 21:04:36Z.
+  - Ride-alongs inert: `2aff90c36`, default off and in no env layer.
+  - Measured: fleet_head MET, history_fetch_bounded_in_child=True MET. Season-rows and midnight readings OWED.
 
 ### chip-situation-cut — CLOSED 2026-11-18 GOAL MET — opened 2026-11-18 — session 8062940b-57fd-454a-8de5-25fdd4804d85
 - STATUS 2026-11-18 3:03 PM CST (21:03Z): Goal: The live chip's situation line is never cut mid-word: build_game_chip's two 40-character cuts (_live_situation and _chip_live_detail in game_chip_scoreboard.py) keep whole middle-dot-separated parts and drop trailing parts that do not fit (a lone over-long part ends at a word with an ellipsis); every line of 40 characters or fewer is unchanged; tests incl. old != new on the 41-character NFL goal-to-go line; on main; display only (betting change no); the fleet load is the user's call -- **GOAL: MET** (on main `c264692d5`: `_fit_situation` in `game_chip_scoreboard.py` replaces both 40-character slices (`_live_situation`, `_chip_live_detail`); the 41-character 'BAL ball · 1st & Goal at LAC 2 · red zone' now serves 'BAL ball · 1st & Goal at LAC 2' where it served '... red zon' (old != new pinned); lines of 40 or fewer unchanged; a lone over-long part ends at a word + ellipsis; 2,000 random lines all within the cap and ending on a part or a word; 809 pass across the 51 test files that read the chip situation). NOT LOADED: web builds chips inline (`intelligence.py:3748`) and the worker for its artifact, so any fleet ff past `c264692d5` carries it (web at its next recycle); betting change no. The loan from `nba-grid-lean-chips` ends with this close.

@@ -169,3 +169,13 @@ If refresh-worker's evening look-ahead fetched first, the midnight run does not 
   - the env key in `local_production.env` with a drained `down`/`up`.
 - The next window opens 2026-11-24 08:00Z (2:00 AM CST). Whether to load there, or outside it as an exception, is
   the user's call.
+
+**LOADED 2026-11-18 21:02:51Z (3:02 PM CST), on the user's "Load it now".** I had recommended the 11-24 window.
+- The default was flipped to absent = ON in `a3104a5b6`, and the fleet was ff'd `db6a395ed` -> `a3104a5b6`, with no
+  restart.
+- BC-052 is a betting change OUTSIDE a window, by user override. It is not a revert, a risk reduction or a money-path
+  fix.
+- A fleet child reads `history_fetch_bounded()` = True, and no env layer names the key.
+- The §7 switch-off prediction for tonight can no longer be read. 11-19 is the first night ON the fix, read against
+  P1-P4.
+- Entry: `.syndicate/deploys.md` "2026-11-18 21:02:51Z".
