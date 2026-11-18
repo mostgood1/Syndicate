@@ -136,3 +136,32 @@ and their fixes. Same probe (`scripts/portfolio_monitor_probe.py`), same page (P
   resting 246 and 241 min, exempt until kickoff.
 - **Gate:** clock BC-042 from 08:31:33Z, 0 of 800.
 - **Endpoints:** all 7 read 200, all under 0.55 s. 0 kills.
+
+## Reading 33 — Wed 11-18 5:48 AM CST (11:48Z), window 60 min
+
+- **Quiet and clean.** The only flag is the same 2 unclassified loads.
+- **Plan 5.8 min old.** In 6 h: 64 commits, max gap 11.9 min. The 11-19 board was also written at 11:45:51Z.
+  32 suggested -> 25 sized -> 18 positions.
+- **Execution, 60 min:** 19 live ticks, 1 placed (kalshi), 0 failed. Orders today 20: 18 filled, 2 maker posts
+  resting about 5 h, exempt until their kickoff.
+- **Endpoints:** all 7 read 200, all under 0.7 s. 0 kills. **Gate:** BC-042 from 08:31:33Z, 0 of 800.
+
+## Reading 34 — Wed 11-18 6:48 AM CST (12:48Z), window 60 min — after the planned vhdx compaction
+
+- **The fleet was down for the planned WSL disk compaction.** It started 12:37:58Z (6:37 AM CST), according to lane
+  `web-silent-worker-kills`, whose watcher it stopped. It ran under the vhdx-shrink plan's own lane.
+  - Before reading anything, this lane checked over HTTP only: `/healthz` returned 200 at 12:48:14Z, and no
+    compaction process was running. **No `wsl` command was run while the compaction might still have been
+    going**, since starting WSL mid-compaction could break it.
+- **Every role came back together:** supervisor up from about 12:44:28Z, web 610, refresh-worker 678,
+  live-odds-worker 679. **The board-process split came back with them:** `BOARD_PROCESS_MODE mode=process parent=678`
+  and `STARTED pid=742` at 12:44:44Z, exactly 1 serve child. The env switch survived the restart, as designed.
+  - Downtime was about 6.5 min, 12:37:58 -> about 12:44:28Z.
+- **Plan 14.5 min old.** The last write, at 12:34:00Z, came before the compaction. The first one after boot is
+  expected about 10-20 min after boot. In 6 h: 68 commits, max gap 11.6 min (the outage gap is still open).
+- **Execution, 60 min:** 18 live ticks, 1 placed, 0 failed.
+  - Orders today 21: 19 filled, 2 maker posts resting about 6 h, exempt until kickoff.
+  - Unreconciled 0.
+  - Banner ok and armed, state 161 s: **the live-odds-worker is executing again after the restart.**
+- **Endpoints:** all 7 read 200, all under 0.3 s. **Gate:** BC-042 from 08:31:33Z, 0 of 800. The compaction loaded
+  no code, so it is no betting change.
