@@ -409,7 +409,14 @@ def _worker_children(
 # preflight HOLD on its two `--serve` children alone, so no live-odds-worker deploy could pass the guard. Matched on
 # the exact serve cmdline; anything else under a worker -- odds jobs, a pool child's own descendants -- stays a job.
 # `deploy_preflight.fleet_role_processes` uses this same helper. Lane ncaab-blowout-off-load.
-SERVICE_CHILD_CMDLINE_MARKERS = ("syndicate.features.shared.live_resim_workers --serve",)
+# The board-build child (`pipeline/board_build_process.py`, refresh-worker with SYNDICATE_BOARD_BUILD_PROCESS on) is
+# one too: it lives as long as refresh-worker. A board build IN FLIGHT inside it still blocks, through the line-order
+# board-build check above -- the child writes the same `[intelligence_state]` lines to the same role log. Lane
+# layer2-board-process-split; `board_build_process.CHILD_CMDLINE_MARKER` is this exact string (a test pins the two).
+SERVICE_CHILD_CMDLINE_MARKERS = (
+    "syndicate.features.shared.live_resim_workers --serve",
+    "pipeline.board_build_process --serve",
+)
 
 
 def is_service_child(args: str) -> bool:
