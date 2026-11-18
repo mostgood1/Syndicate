@@ -83,8 +83,17 @@ every NHL prop row's `seen_age_seconds` crosses the overlay's 300 s in-play wind
   1.2% CPU** at 02:45:00Z. This time WITHOUT `--mode fast`, so the full generation was due.
 - It captured the props at **02:26:09Z, at the START of the run**, then stuck. Live sweeps at 02:28,
   02:36 and 02:43Z were refused `lane_busy` (run pid 138663).
-- The fix for the lane belongs to lane `odds-lane-sport-deadline` (I-22, session bb342d07). Ending the
-  child early is a production action for the user.
+- **Ended by an ops kill:** user "kill the hung nhl odds process" (lane layer2-rail-monitor, deploys.md 02:46:25Z).
+  The next sweep was accepted at 02:48:06Z, and its NHL child hung again within ~2.5 min.
+- **Why every run since 01:21Z is `full`** (run manifests):
+  - the NHL step ran FULL at 00:14:10Z and 00:48:39Z. Both succeeded, but held the lane 8.3 / 10.7 min:
+    the rail monitor's two long runs behind the early drops;
+  - `predictions_2026-11-17.csv` was last written 00:53:10Z. From 01:23Z, `_nhl_live_generation_due`
+    (`refresh_odds_sources.py:1004`, 1,800 s) is True on every sweep;
+  - every run since went FULL and hung: 01:21:11, 01:54:26, 02:25:36 and 02:48Z. A failed generation
+    leaves the predictions old, so the next sweep is FULL again. A self-reinforcing loop.
+- Sent to the I-22 session (local_73a5d2dd, lane `odds-lane-sport-deadline`) ~02:50Z. The lane fix is
+  theirs.
 
 ## Q3 — what should the board show per line when a props quote lapses?
 
@@ -92,7 +101,7 @@ Today: the props drop. The overlay drops every lapsed line, and web falls back t
 shortlist. With one capture clock, every line lapses at once. The display choice is put to the user. See
 "Decisions owed".
 
-## The props-side fix (built, OFF by default — see the lane for the commit)
+## The props-side fix (built, OFF by default, on main `9f911cb98`, NOT loaded)
 
 An NHL in-play props pull on its own clock, outside the shared sweep: the lane every other live sport
 already has.
@@ -105,6 +114,22 @@ already has.
   tonight.
 
 Each line's last-seen stamp then refreshes every ~2 min, whether or not the sweep is blocked.
+
+- **Switch:** `SYNDICATE_ENABLE_NHL_INPLAY_PROPS_AUTORUN`, absent = OFF. Also
+  `SYNDICATE_NHL_INPLAY_PROPS_INTERVAL_SECONDS` (120, floor 60) and `..._TIMEOUT_SECONDS` (90).
+- **Files:** `syndicate/features/nhl/inplay_props_lane.py`, `scripts/refresh_nhl_inplay_props.py`, and one
+  try block in `run_live_odds_refresh_worker._launch_inplay_capture_autoruns`.
+- **Tests:** `tests/test_nhl_inplay_props_lane.py` 15 of 15. They cover:
+  - off != on: absent launches nothing with a live game, on launches;
+  - one child at a time, the interval, the kill;
+  - the scoreboard liveness rules and the midnight roll;
+  - one call per LIVE game with no fallback, the sweep's markets and books;
+  - a drift guard against `collect_oddsapi_props`' market list;
+  - the hook reaching the launcher, and an NHL failure costing no other lane;
+  - the real writer moving every line's last-seen stamp on a repeat look.
+- **Regression:** the existing capture-thread, NBA autorun, NCAAB lane and NHL shard tests, 56 of 56.
+- **NOT verified:** a real OddsAPI pull. Not run, because it would spend credits and write the fleet's
+  shard. The first `[nhl_inplay_props] PULL` line after a load is that check.
 
 **Cost (upper estimate):**
 - 5 credits per live game per pull;
