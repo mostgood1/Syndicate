@@ -61861,3 +61861,10 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - So only the 11-20 look-ahead depends on these runs alone.
   - Total lane hold is unchanged by the split, because NHL's work is in the run either way. NHL was 185 s here, against 175-195 s in today's three earlier 7-sport runs (cache-confounded).
   - Same-day 7-sport runs with soccer (155812, 163704, 164353) carry no NHL, so no same-day NHL rebuild waits behind soccer.
+
+## 2026-11-18 18:03Z (12:03 PM CST) -- READING (no deploy): the I-17 rail-card tooltip `baef443cc` is served by web (lane `ncaab-total-overprojection`; user "show the calibrated total in the rail card tooltip too"; it rode along in lane `soccer-pregame-odds-lane`'s fleet ff `59fbefc71` -> `640c6d4fd` at 17:58:30Z, which that lane loads and records) -- **MET (served)**
+- betting change: no (reading only). The tooltip is display only: a `title` on the rail card's OURS cell and callout for calibrated college totals. No rows, probabilities, recs or stakes change.
+- **Reading:**
+  - fleet head `640c6d4fd` contains `baef443cc` (`git merge-base --is-ancestor`); the template on disk has the tooltip string (1 match).
+  - `GET http://127.0.0.1:10000/intelligence` six times at 18:02-18:03Z: 6 of 6 responses carry both `oursTip` and the tooltip text, so every web worker that answered serves the new template.
+- **OWED:** the tooltip shows only on a live NCAAB/WNCAAB full-game totals card with `live_total_basis: "calibrated"`. College games are live this afternoon; the I-17 rail watcher's readings cover those rows tonight.
