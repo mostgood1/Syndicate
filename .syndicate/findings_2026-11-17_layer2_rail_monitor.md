@@ -1262,3 +1262,108 @@ and in the evening half its sweeps are refused.**
   one slow sport cannot hold every live sport's refresh for 8-11 min.
   - First, find what made the 00:14:10 and 00:48:39 runs long: the run's per-sport job times.
   - Owner: the live-odds-worker `live_refresh_loop` (to name at the summary).
+
+## Reading 14 — Tue 11-17 7:39 PM CST (01:39Z 11-18) — the evening peak overloads the refresh-worker
+
+**Fleet:** unchanged. Web `64daca46f`; live-odds-worker 52087; refresh-worker 28948.
+
+**A second drain, recorded by its owner (deploys.md 01:08Z, `35c366025`):** lane ncaab-total-overprojection
+tried to load I-17's `923869cf3` ("Try now anyway").
+- It held four capped drains, 01:08-01:28Z (~20 min). Every one was NOT CLEAR (`board_build=in_flight`).
+- It ABORTED and loaded nothing. Claims released 01:29:47Z.
+- Same lesson as the 23:46Z abort: in the live evening this worker has no idle window.
+
+**Slate: 74 live chips.** NCAAB 40, WNCAAB 19, NHL 9, NBA 3, NCAAF 3.
+
+**Flags: 65 shown, 0 false, 0 missed, 3 dark.** 39 of 74 live cards carry a flag.
+- **Dark:**
+  - Illinois @ Duke 2H spread ILL +7, 10.9 pp;
+  - Seton Hall @ Auburn ML away, 3.7 pp;
+  - Edmonton @ Florida spread FLA +2.5, 4.6 pp.
+
+  All priced fresh (23-119 s), now 607-702 s old.
+- **I-17:** NCAAB full-game totals 26 (all unders), **10 contradict "ours"**. **WNCAAB 2 of 5 contradict**: FGCU
+  @ South Carolina u174.5 at 24.9 pp, ours 175.8, so the raw model contradicts too.
+- **Large gaps:**
+  - CSUN @ Troy TROY −9.5 **30.7 pp** (0.807; ours TROY −18.6);
+  - Lehigh −25.5 24.9 pp;
+  - WNCAAB FGCU u174.5 24.9 pp and Mt. St. Mary's @ Nebraska u153.5 23.1 pp.
+- **NBA:** 5 flags across Pistons @ Spurs, Blazers @ Wolves, Knicks @ Raptors, priced 75-113 s.
+- **Villanova @ Pittsburgh** (H2 6:15): now VILL +10.5 (11.8 pp) and u147 (11.7 pp).
+
+**Live rows: 1,752.** 326 priced <= 120 s; **1,199 over 300 s now (68%)**; priced age p50 304 s. 36 of 230 live
+markets carry no price of ours.
+
+| sport | rows | priced <= 120 s |
+|---|---|---|
+| NBA | 880 | 23 |
+| NCAAB | 789 | 267 |
+| WNCAAB | 39 | 15 |
+| NCAAF | 24 | 5 |
+| NHL | 20 | 16 |
+
+**Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less, 0 live chips without a live card.
+
+### The degradation (28 min, 01:11-01:40Z)
+
+**Book-grid ticks:** **21** (60-80 in earlier readings' windows). Gap p50 65 s; max 206 s and 212 s.
+`deferred_slow`: NBA 3, NHL 1, NCAAB 1.
+
+| sport | build s p50 / max | overlay builds | gap p50 / max | gaps over 360 s |
+|---|---|---|---|---|
+| NBA | **51.5 / 107.1** | 6 | **342 s / 498 s** | **2** |
+| NCAAB | **35.4 / 64.1** | 10 | 147 s / **453 s** | **1** |
+| NHL | **34.3 / 87.7** | 4 | 177 s / 316 s | 0 |
+| WNCAAB | 7.3 / 20.7 | 12 | 133 s / 215 s | 0 |
+| NCAAF | 4.7 / 12.8 | 11 | 144 s / 242 s | 0 |
+
+**Web merges: stale 19 of 36 lines** (NHL 11, NBA 5, NCAAB 3).
+- NBA `stale_374s`..`469s` (01:22-01:32Z);
+- NCAAB `stale_374s`..`438s` (01:31-01:33Z);
+- **NHL `stale_405s`..`666s`** (01:18-01:40Z; the NHL overlay was last written ~01:29Z).
+
+A stale overlay is dropped at merge, so in those minutes the board serves those games' live rows from the
+shortlist.
+
+**The board build: 1,510 s (25.2 min), 01:05:38-01:30:47Z.**
+
+| span | this build | calm (22:41Z) |
+|---|---|---|
+| intelligence overview | 91 s | 1.4 s |
+| `layer2_shortlist_build` | **633 s** | 51 s |
+| `portfolio_commit` | **226 s** | 12.6 s |
+| tail | ~531 s | ~15 s |
+
+- `off_cpu_pct` 0.2: computing, not waiting.
+- The previous build: 346 s (01:04:00Z). **The today board went 01:04:00 → 01:30:47Z (26.8 min) without a
+  publication.**
+- At the read: board 583 s old; **query 16.3 s** / 5.00 MB wire / 26.7 MB raw; chips 3.5 s; shortlist 2.2 s;
+  live-rail 0.5-1.3 s (1.72 MB raw).
+
+**The host is NOT saturated. The refresh-worker is.**
+- **12 cores, load 8.6-10.1.**
+- refresh-worker **90.7% CPU** (its one-interpreter ceiling); live-odds-worker 65%.
+- Also on the host, each about one core:
+  - a Bundesliga soccer artifact build (99%, nice 0);
+  - `momentum_lag_study.py` (94%, nice 19, the new research lane);
+  - gunicorn workers 60% + 33%;
+  - two live re-sim servers 44% each (nice 5).
+- Memory: 254 MB free, 5.4 GB available.
+
+**The live odds lane at the same time (I-22):** 5 sweeps launched in 29 min, 3 refused `lane_busy`. The 01:21:11Z
+run lasted ≥12 min (refused through 01:33:25Z).
+
+**#824:** 0 of 2 college `LIVE_GAMELINE_JOIN` lines since 01:11Z carry the reason. 0 of 35 college totals flags
+below the points scored.
+
+### Improvement hunt, reading 14
+
+**I-20 is now the evening's main defect, and the measurement says why the split works.** At the NBA + college
+peak, the refresh-worker's one interpreter carries both the board build and the live book-grid tick:
+- the board build took 25 min, against a 300 s today limit;
+- the live overlays crossed web's 360 s staleness cutoff (NBA 2, NCAAB 1; 19 stale merges);
+- the host had 2-3 idle cores the whole time.
+
+Running the board build in its own process (card **task_265c4921**, waiting for the user) is the lever this
+reading supports. A second, smaller lever: the evening's pregame soccer artifact build runs at nice 0 next to
+the live roles.
