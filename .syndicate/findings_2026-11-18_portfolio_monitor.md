@@ -773,3 +773,42 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - unreconciled 1, inside the grace;
   - cap use 17.5% / 17.1%.
 - **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it); gate clock BC-050, 0 of 800.
+
+## Reading 45 — Wed 11-18 3:01 PM CST (21:01Z), window 60 min
+
+- **Results first.** No new grades: 30 d -7.35% [-12.8, -1.9] on 673 events; 7 d -2.71% [-13.3, +7.9]. Today's 49
+  orders (all filled) settle from the evening.
+- **Program:** S2 (in-play 95-99c favourites) is closed, **KILL under its own 10-25 pre-registration (R3)**:
+  - 476 games over 27 nights;
+  - +0.26c per game [-1.59, +1.95];
+  - loss rate 3.99% against a 3% line (F17, `findings_2026-11-18_s2_inplay_favourites.md`).
+  - S1 and S2 are both closed with no challenger.
+- **Near miss: `live_all` 4.45 s (budget 5.0).**
+  - *Hypothesis:* F14 again.
+  - **Confirmed:** pid 252983 was hard-recycled at 21:01:07.1Z, at 1,082 MB against a 632 MB limit. The probe's read
+    started at 21:01:06Z.
+  - Since the double-recycle fix (19:14Z) there have been 4 web recycles in 20Z-21Z, all hard and none simultaneous.
+    The closest pair was 80 s apart (20:41:11, 20:42:31), each after its own replacement booted.
+  - **The peaks are climbing: 970 -> 1,001 -> 1,079 -> 1,082 MB** into the evening. Added to F14 for
+    `web-silent-worker-kills`.
+- **Flow:**
+  - plan 0.6 min old: 166 suggested, 25 sized, 12 positions; 135 refused `beyond_max_positions`;
+  - 20 live ticks, 1 placed, 0 failed (6 `axis_held_live`, a known guard);
+  - orders today 49, all filled; nothing resting; unreconciled 0;
+  - cap use 17.5% / 16.3%.
+- **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it); gate clock BC-050, 0 of 800.
+
+## Reading 46 — Wed 11-18 4:01 PM CST (22:01Z), window 60 min
+
+- **Results first.** The first of today's bets has graded: all-time 2,026 bets / 1,094 events, -11.01%
+  [-18.3, -3.7]. The 30-day window (1,605 bets, -7.35% [-12.8, -1.9]) and the 7-day window (-2.71%) are unchanged
+  until today's slate settles.
+- **No anomalies.** Every endpoint was inside budget: `live_all` 0.42 s (4.45 s last reading), page 0.38 s.
+- **Flow:**
+  - plan 11.7 min old (newest write 21:50Z; max gap 20.7 min over 6 h): 186 suggested, 25 sized, 15 positions; 158
+    refused `beyond_max_positions`;
+  - 18 live ticks, 3 placed, 0 failed (1 `game_started`, a known guard);
+  - orders today 52, all filled; nothing resting; unreconciled 0;
+  - cap use 18.0% / 17.5%;
+  - paper book 14,863 settled, -1.30%.
+- **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it); gate clock BC-050, 0 of 800.
