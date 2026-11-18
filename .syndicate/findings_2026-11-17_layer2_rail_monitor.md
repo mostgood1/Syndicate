@@ -1757,3 +1757,15 @@ session is archived.
 
 The pending question "keep killing hung NHL odds fetches?" was not answered. No kill since 02:46Z; the lane
 recovered on its own after ~03:14Z.
+
+- **OVERNIGHT, received 2:30 AM CST 11-18 (from the I-17 load session, local_9de193d8; deploys.md 08:02:54Z,
+  main `af9bcad02`):**
+  - **I-17 is LOADED on both roles:** web since 01:46:27Z; refresh-worker via a restart-only load at fleet
+    `3920a2d4d`, pid 28948 → 419651, booted 08:03:01Z.
+  - **Rode along:** #809 memo and BC-041 NFL seeds, resolved 08:03:01Z. The grid lane's 1:10 AM attempts never
+    cleared.
+  - **The board split** (local_9c4bd078) holds all three claims from 2:23 AM CST and is draining for its env key +
+    drained down/up.
+  - **Owed to the next college reading (11-18 evening):** college full-game totals rows on `/api/board/live-rail`
+    carry `live_total_basis: "calibrated"`, and 0 show a total on the wrong side of the line from their flag
+    (`C:\tmp\ncal816\i17check.py`).
