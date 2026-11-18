@@ -27,6 +27,7 @@ board a user reads and the board that gets persisted cannot drift apart.
 from __future__ import annotations
 
 import time
+import inspect
 import json
 import os
 import logging
@@ -208,6 +209,19 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
         from syndicate.features.shared.team_aliases import teams_match
 
         try:
+            from syndicate.features.shared.game_chip_scoreboard import book_grid_lean_chips_enabled
+
+            # LEAN CHIPS (todo #790 lever (ii)): this join reads a chip's teams, game_key, matchup, state, start,
+            # status_token, scores and line score -- the lean build keeps all of them and skips the bonus summary
+            # fetches, situation, trend, plays and intervals. Off: SYNDICATE_BOOK_GRID_LEAN_CHIPS=off.
+            # PROBED, like `game_chip_scoreboard._games_accepts_include_upcoming`: a builder without the keyword
+            # (an older blob, or a test's two-argument stub) gets the plain call, never a TypeError that would
+            # cost every date its chips.
+            lean_chips = bool(book_grid_lean_chips_enabled()) and "lean" in inspect.signature(build_game_chips).parameters
+        except Exception:  # pragma: no cover - deploy-skew guard; full chips as before
+            lean_chips = False
+
+        try:
             from syndicate.features.shared.ncaaf_team_registry import resolve_ncaaf_team_id
         except Exception:  # pragma: no cover - deploy-skew guard; the name match still runs
             resolve_ncaaf_team_id = None
@@ -267,7 +281,8 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
         chips = []
         for query_date in query_dates:
             try:
-                chips.extend(build_game_chips(query_date, [sport]) or [])
+                chips.extend((build_game_chips(query_date, [sport], lean=True) if lean_chips
+                              else build_game_chips(query_date, [sport])) or [])
             except Exception:
                 # One bad date must not cost the others their state.
                 _LOGGER.exception("BOOK_GRID_GAME_STATE_DATE_FAILURE sport=%s date=%s", sport, query_date)

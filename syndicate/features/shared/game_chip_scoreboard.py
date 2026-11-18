@@ -13,11 +13,13 @@ single, artifact-backed source instead of each re-deriving game state.
 from __future__ import annotations
 
 import inspect
+import os
 import re
 import threading
 import time
 
 from syndicate.features.shared.single_flight import SingleFlight
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
@@ -59,7 +61,36 @@ _CHIP_WAITER_POLL_SECONDS = 30.0
 # behaviour it stands in for, and the alternative is holding a gunicorn slot.
 _CHIP_STALE_TTL_MULTIPLE = 10.0
 _cache_lock = threading.Lock()
-_cache: dict[tuple[str, tuple[str, ...]], tuple[float, list[dict[str, Any]]]] = {}
+# Key: (date, sports) for full chips, (date, sports, "lean") for lean ones -- never one for the other.
+_cache: dict[tuple, tuple[float, list[dict[str, Any]]]] = {}
+
+# LEAN CHIPS (todo #790 lever (ii), lane `nba-grid-lean-chips`, user 2026-11-18 "Yes, build it"). The book grid's
+# game-state join (`board_enrichment.attach_game_state`) reads a chip's identity (teams, game_key, matchup), state,
+# start, status_token, scores and line score -- nothing else. A FULL chip also fetches, per live NBA/WNBA game, an
+# ESPN summary for the bonus text; builds the football situation, the NHL/soccer trend, the board's plays line and
+# the interval projections; and NBA's cards context is deep-copied twice (2.41 MB each, 0.08-0.28 s a copy measured
+# on the fleet 11-17). All of that lands in `situation` / `plays` / `intervals`, which the grid never reads.
+# MEASURED 11-17 (5 NBA games): the grid's NBA chip stage was 2.6 s median in the worker, 3.2 s with 3 live, ~1.4 s
+# of it ESPN requests. Lean chips skip exactly those, keep every field the grid reads, and sit under their own cache
+# key so no full-chip caller (board, rail, layer 2) is ever served a lean list. Off switch for the GRID's use:
+# SYNDICATE_BOOK_GRID_LEAN_CHIPS=off (absent = ON).
+BOOK_GRID_LEAN_CHIPS_ENV = "SYNDICATE_BOOK_GRID_LEAN_CHIPS"
+
+
+def book_grid_lean_chips_enabled() -> bool:
+    return str(os.environ.get(BOOK_GRID_LEAN_CHIPS_ENV) or "").strip().lower() not in ("0", "off", "false", "no")
+
+
+def _read_only_cards_scope(slug: str):
+    """NBA's cards context without its deepcopies, for a caller that only READS the games (lean chips). Any other
+    sport, or an NBA module without the scope (deploy skew), gets the ordinary copying call."""
+    if slug != "nba":
+        return nullcontext()
+    try:
+        from syndicate.features.nba.cards import cards_context_read_only
+    except Exception:  # noqa: BLE001 -- deploy skew: copy as before
+        return nullcontext()
+    return cards_context_read_only()
 
 
 def _text(value: Any) -> str:
@@ -744,10 +775,14 @@ def _chip_footer(sport: str, game: dict[str, Any], start_utc: datetime | None) -
         return None
 
 
-def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], date_value: str) -> None:
+def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], date_value: str, *, lean: bool = False) -> None:
     """Per-interval scores (R/H/E for MLB) on a live or final chip
     (`game_chip_linescore`, user 2026-10-13). The game's OWN Central date,
-    not the requested one: the rail carries other days' games too."""
+    not the requested one: the rail carries other days' games too.
+
+    `lean` (the book grid's chips): the line score, the clock / inning token and the score sums as always, but not
+    the football situation or the NBA/WNBA bonus text -- both only write `situation`, and the bonus costs an ESPN
+    summary request per live game."""
     try:
         from syndicate.features.shared.game_chip_linescore import linescore
 
@@ -775,7 +810,7 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
                 chip["status_token"] = token
         # Football: possession + down & distance from ESPN, replacing the
         # worker's copy (as old as its build) each pass (user 2026-10-14).
-        if sport in ("nfl", "ncaaf") and chip.get("state") == "live":
+        if sport in ("nfl", "ncaaf") and chip.get("state") == "live" and not lean:
             from syndicate.features.shared.game_chip_linescore import football_situation
 
             fresh = football_situation(sport, game, day, away_abbr=away_abbr, home_abbr=home_abbr)
@@ -783,7 +818,7 @@ def _attach_linescore(sport: str, game: dict[str, Any], chip: dict[str, Any], da
                 chip["situation"] = fresh
         # Basketball bonus on the live line, after the run (user 2026-10-14).
         # Rebuilt each pass: the serve-time re-read must replace, not stack.
-        if sport in ("nba", "wnba") and chip.get("state") == "live":
+        if sport in ("nba", "wnba") and chip.get("state") == "live" and not lean:
             from syndicate.features.shared.game_chip_linescore import live_bonus_text
 
             parts = [p for p in str(chip.get("situation") or "").split(" · ") if p and "bonus" not in p]
@@ -1077,13 +1112,15 @@ def _games_accepts_include_upcoming(provider: Any) -> bool:
     return _games_accepts_include_upcoming_by_type(type(provider))
 
 
-def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, Any]]:
+def build_game_chips(selected_date: str, sports: list[str], *, lean: bool = False) -> list[dict[str, Any]]:
+    """`lean=True`: the book grid's chips -- see `BOOK_GRID_LEAN_CHIPS_ENV`. Same games, identity, state, start,
+    status token, scores and line score; no bonus/situation/trend/plays/intervals; own cache key."""
     from syndicate.features.shared.sport_data_provider import get_sport_data_provider
 
     _ensure_sport_data_providers()
     date_value = _text(selected_date) or central_today_iso()
     normalized_sports = tuple(sorted({_text(slug).lower() for slug in sports if _text(slug)}))
-    cache_key = (date_value, normalized_sports)
+    cache_key = (date_value, normalized_sports, "lean") if lean else (date_value, normalized_sports)
     now = time.monotonic()
     with _cache_lock:
         cached = _cache.get(cache_key)
@@ -1123,7 +1160,7 @@ def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, An
                 return list(cached[1])
 
     try:
-        return _build_game_chips_uncached(date_value, normalized_sports, cache_key, now)
+        return _build_game_chips_uncached(date_value, normalized_sports, cache_key, now, lean=lean)
     finally:
         # Released here rather than left to the lease: this body is short and
         # has one exit, so try/finally is honest. The lease is the backstop for
@@ -1131,7 +1168,23 @@ def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, An
         _CHIP_BUILD_FLIGHT.finish(cache_key)
 
 
-def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now):
+def _provider_games(provider: Any, date_value: str, today_value: str) -> list[dict[str, Any]]:
+    context = provider.resolve_context(requested_date=date_value)
+    is_active_today = provider.is_active(today_value=today_value, context_label=context.context_label)
+    # `#575`. ASK FOR THE BOARD'S HORIZON, not just today.
+    #
+    # PROBED, NOT ASSUMED. `home.py` and this file are separate blobs
+    # and either can be a deploy behind the other -- the exact hazard
+    # `layer2_board._blended_score_accepts` exists for. An unguarded
+    # kwarg would raise TypeError against an older provider and take out
+    # the WHOLE scoreboard strip for every sport, which is strictly
+    # worse than the narrow chips it replaces.
+    if _games_accepts_include_upcoming(provider):
+        return provider.games(context, is_active_today=is_active_today, include_upcoming=True)
+    return provider.games(context, is_active_today=is_active_today)
+
+
+def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now, *, lean: bool = False):
     from syndicate.features.shared.sport_data_provider import get_sport_data_provider
 
     today_value = central_today_iso()
@@ -1141,22 +1194,10 @@ def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now):
         if provider is None:
             continue
         try:
-            context = provider.resolve_context(requested_date=date_value)
-            is_active_today = provider.is_active(today_value=today_value, context_label=context.context_label)
-            # `#575`. ASK FOR THE BOARD'S HORIZON, not just today.
-            #
-            # PROBED, NOT ASSUMED. `home.py` and this file are separate blobs
-            # and either can be a deploy behind the other -- the exact hazard
-            # `layer2_board._blended_score_accepts` exists for. An unguarded
-            # kwarg would raise TypeError against an older provider and take out
-            # the WHOLE scoreboard strip for every sport, which is strictly
-            # worse than the narrow chips it replaces.
-            if _games_accepts_include_upcoming(provider):
-                games = provider.games(
-                    context, is_active_today=is_active_today, include_upcoming=True
-                )
-            else:
-                games = provider.games(context, is_active_today=is_active_today)
+            # Lean: NBA's cards context is READ, not deep-copied -- nothing below writes into a game (`build_game_chip`
+            # makes new dicts; `_attach_linescore` copies the game first), pinned by tests/test_game_chip_lean.py.
+            with (_read_only_cards_scope(slug) if lean else nullcontext()):
+                games = _provider_games(provider, date_value, today_value)
         except Exception:
             continue
         if slug == "wnba":
@@ -1169,12 +1210,15 @@ def _build_game_chips_uncached(date_value, normalized_sports, cache_key, now):
             if isinstance(game, dict):
                 chip = build_game_chip(slug, game)
                 if chip.get("state") in ("live", "final"):
-                    _attach_linescore(slug, game, chip, date_value)
-                    _attach_trend(slug, game, chip, date_value)
+                    _attach_linescore(slug, game, chip, date_value, lean=lean)
+                    if not lean:
+                        _attach_trend(slug, game, chip, date_value)
                 chips.append(chip)
 
-    _attach_board_plays(chips, date_value, normalized_sports)
-    _attach_intervals(chips, date_value, live_only=False)
+    if not lean:
+        # The board's plays line and the interval projections: `plays` / `intervals`, which the grid never reads.
+        _attach_board_plays(chips, date_value, normalized_sports)
+        _attach_intervals(chips, date_value, live_only=False)
 
     with _cache_lock:
         _cache[cache_key] = (now, chips)

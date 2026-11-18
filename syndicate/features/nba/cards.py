@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import deepcopy
 import csv
 import json
@@ -80,6 +82,25 @@ def _cache_get_context(cache_key: tuple[Any, ...], live_signature: Any = None) -
         return None
     _NBA_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
     return cached[1]
+
+
+# READ-ONLY CALLERS SKIP THE COPIES (todo #790 lever (ii), lane `nba-grid-lean-chips`). `build_cards_page_context`
+# deep-copies its 2.41 MB context to RETURN it (a hit: 1 copy; a miss: one for the cache and one to return), so a
+# caller may mutate what it gets. The book grid's lean chips only read the games, and with NBA live the live
+# signature changes on every ESPN read, so they paid both copies on every grid build (0.08-0.28 s each, fleet 11-17).
+# Inside this scope a hit returns the cached object itself and a miss returns `result` uncopied; the cache keeps its
+# own copy either way, so its isolation from the objects `result` was built from is unchanged. A caller inside the
+# scope MUST NOT write into what it gets back.
+_CARDS_CONTEXT_READ_ONLY: ContextVar[bool] = ContextVar("nba_cards_context_read_only", default=False)
+
+
+@contextmanager
+def cards_context_read_only():
+    token = _CARDS_CONTEXT_READ_ONLY.set(True)
+    try:
+        yield
+    finally:
+        _CARDS_CONTEXT_READ_ONLY.reset(token)
 
 
 def _cache_put_context(cache_key: tuple[Any, ...], result: dict[str, Any], live_signature: Any = None) -> None:
@@ -2573,7 +2594,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     live_signature = _live_state_merge_signature(requested_date)
     cached_context = _cache_get_context(cache_key, live_signature)
     if cached_context is not None:
-        return deepcopy(cached_context)
+        return cached_context if _CARDS_CONTEXT_READ_ONLY.get() else deepcopy(cached_context)
 
     resolved_date = requested_date
     source_title = "NBA processed game cards"
@@ -2711,7 +2732,7 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         "poller": "shared.polling",
     }
     _cache_put_context(cache_key, deepcopy(result), live_signature)
-    return deepcopy(result)
+    return result if _CARDS_CONTEXT_READ_ONLY.get() else deepcopy(result)
 
 
 def build_cards_api_payload(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
