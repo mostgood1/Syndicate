@@ -278,3 +278,38 @@ Kit `C:\tmp\elp\m3_kit`:
 - More than 10% unmarked at a look is `NOT_A_VERDICT`.
 - A fix belongs in lane `in-game-trading`'s recorder (its tickers taken from Kalshi's events directly). That needs a
   loan and the user's decision.
+
+## Addendum: the code, pinned 2026-11-17 7:03 PM CST (before any M3 slate's data is read)
+
+The M3 code is on main as `95ae83f74` (user "Yes, push it", answering "Push the M3 code to main?"). It was rebased
+unchanged from the rehearsed local `46439b912`: the same blobs, and 59 tests passed on `95ae83f74` (M3, the experts'
+shadow guard, the learner).
+
+| File on main | blob |
+|---|---|
+| `scripts/engine_paper_m3.py` | `5efd781ef584aa0e275b77fece82b5a543a78b63` |
+| `syndicate/features/shared/engine_paper_m3.py` | `39e1b5ff83582d60773e47b2611a88cbf86c12b9` |
+| `tests/test_engine_paper_m3.py` | `785d61b90372c75fd461dc7ab478699bc921c01d` |
+| `docs/ai_context/engine_paper_m3.md` | `6f902c7653513c8eb3be51eff681bfc96fded617` |
+
+The kit `C:\tmp\elp\m3_kit`. Each file's sha256 as stored; the `code/` files are CRLF:
+
+| Kit file | sha256 |
+|---|---|
+| `m3_launch.py` | `d1bec7637517c5e5413ba4040b980e4fc8beffd6f422b89ce2e7d02cb3c0f423` |
+| `rehearse.sh` | `6ec799538a17f07dcc04b2a40bc1db9a3bcbb9961dea8245e0591a78de82d5c5` |
+| `code/PINNED_SHA` | `8170a5112905ec406d4060f6232a7df867181d0a2a9425b610a20597542f4058` |
+| `code/scripts/engine_paper_m3.py` | `d445c67b2fde08663fb322365edf68205c7cf33cdb16e22fc34fc45469063d70` |
+| `code/syndicate/features/shared/engine_paper_m3.py` | `ffba9bb4f424f556750f3558a2e9d28f4b45e4023c1bae1ba27810886e7ef325` |
+| `code/scripts/engine_learner.py` | `e59d7d6f94c537ed1e0b8c79b6d129649f835ca6bdcb11f5a82f626e280bf9b7` |
+| `code/syndicate/features/shared/engine_learner.py` | `b9d5db099b9131df95544ddf78e7082b9bdfb9497cba443c2cc3806eea088fd9` |
+| `code/scripts/engine_experts.py` | `ede517b2bf0059b5c020a38d882cc577ee1502adb8430a6f35b23ded6d1e274b` |
+| `code/syndicate/features/shared/engine_experts.py` | `812e4e8a8c504efbb7c73296491d16f9e6cbce5c8b52ef25744a2fabce08e461` |
+| `code/syndicate/features/shared/kalshi_board_join.py` | `e08f88ca129695902675d12d9e05f06e33d4ca9a2b800d1144d0734a60654ae4` |
+| `code/syndicate/features/shared/venue_fees.py` | `c0782f5b1c3319eae5077b93e29e602268b49a02fba9119e3b5a9502d3220aea` |
+
+- `code/` is the M2 kit's export of `981ef14f6`. With CR stripped, its learner, experts, resolver and fee files equal
+  `981ef14f6`'s blobs, and its two M3 files equal `95ae83f74`'s (checked by this addendum's own script).
+- **Not pinned yet:** the nightly runner and its scheduled task. They are created after M2's 11-24 verdict and pinned
+  in a further addendum before the first M3 slate's data is read.
+- A change to any file above before the first slate needs a new addendum; after it, an amendment.
