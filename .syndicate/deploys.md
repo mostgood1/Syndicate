@@ -61429,3 +61429,24 @@ Lane `render-config-retirement` (session 267d8859).
 - **why:** `KXNHLSPREAD-26NOV16VANUTA-VAN2`, our 4 NO filled at 0.66. Kalshi finalized `market_result=no` (settlement 2026-11-17T05:21:19Z), so our leg won. The venue grader refused `both_sides_held`: the settlement row also carries `yes_count_fp 66.46` from a foreign client on the same account, not in our ledger. The row sat ungraded 22 h.
 - **what:** `scripts/kalshi_operator_grade.py --key a2c3f0c01a95057b886169bd`, run on main (worktree) against the fleet store with the live-odds-worker env, nice 19. The dry run passed every check (live, kalshi, filled, ungraded; settlement holds our leg 4.00; venue grader refuses `both_sides_held`). `--apply` went through `operator_grade_from_venue`: outcome `won`, pnl **+1.2971** = 4 x (1 - 0.66) - fee 0.0629 (own-fill basis; the venue's net revenue 0 nets the foreign YES), `settled_by` venue. Evidence, note and `pre_operator_grade` are kept on the row. One CAS write: `OPERATOR_GRADE ... outcome=won pnl=1.2971`.
 - **verify -- MET (01:17Z):** `/api/portfolio/live?on=all`: the row reads filled / won / +1.2971 / settled_by venue / graded_at 01:16:32Z; filled live bets unsettled > 8 h after start: **0** (was 1 all day); unreconciled 0.
+
+## 2026-11-18 01:08Z (7:08 PM CST 11-17) -- DEPLOY ATTEMPT ABORTED, NOTHING LOADED: `923869cf3`, I-17's calibrated college total (lane `ncaab-total-overprojection`; user chose "A: calibrated total", then "load it when tests pass", then "Try now anyway" to "Load it right after the grid lane's 1:10 AM CST load?") -- **NOT LOADED: refresh-worker never went idle in the live evening**
+- betting change: no (nothing loaded; the change itself is display only)
+- **The change:** on main `923869cf3`, tests 549 + 78 pass. It needs a refresh-worker restart (the join and the board build) and a web reload (the rail card template).
+- **Locks:** claims refresh-worker + web ~01:07Z (holder `ncaab-total-overprojection`, rc 0); both released 01:29:47Z. The fleet checkout stayed at `64daca46f`: nothing fast-forwarded, TERMed or reloaded.
+- **Ride-alongs that a load to `923869cf3` would carry** (`64daca46f..923869cf3`, runtime):
+  - `b25afc1e5` / `3f337b2d9`: book-grid memo (#809, lane `ncaaf-grid-build-speed`; user "Load it now", "Load all now");
+  - `920c19e70`: #829 WNBA settlement half;
+  - `ee47c930a`: NFL re-sim event-id seeds (lane `nfl-live-resim-event-seeds`). Its load is the user's call after TNF 11-19, and the refresh-worker's board build imports `nfl/live_resim`. No NFL game before TNF;
+  - `bb133096c`: NFL card down/distance, display only;
+  - `4c777e4d0`: comments only;
+  - scripts: `portfolio_monitor_probe.py`, `score_live_bet_timing_forward.py`.
+- **Drain** (`C:\tmp\ncal816\drain.sh`), four capped waits:
+  - 01:08-01:13Z, 300 s;
+  - 01:13-01:18Z, 300 s;
+  - 01:19-01:24Z, 300 s;
+  - 01:24-01:28Z, 240 s.
+  Every one ended NOT CLEAR: `board_build=in_flight`, "worker has not acked".
+- **What was running:** a today board build entered before the drain. Its `layer2_shortlist_build` stage took 633.44 s (exit 01:18:10Z) and `portfolio_commit` 225.68 s (exit 01:21:56Z). The check still read `board_build=in_flight` after that. BOOK_GRID ticks showed `background_pending` 16-18 (other dates' grid builds) throughout. DRAIN_HOLD was logged only at `mlb_sim_tick`. Undrained 01:28Z (`DRAIN_CLEARED`).
+- **Cost:** ~20 min of drain. The today board published at ~01:22Z, when the in-flight build finished.
+- **Same lesson as the grid lane's 23:46Z abort:** in the live evening this worker has no idle window. Load at a quiet hour.
