@@ -252,11 +252,15 @@ def wallet_trades(api: Api, wallet: str) -> tuple[list[dict], bool]:
 
 
 def markets(api: Api, condition_ids: Sequence[str]) -> dict[str, dict]:
+    """Resolved markets only. Gamma's `/markets` serves OPEN markets unless `closed=true` is passed, even when
+    `condition_ids` names closed ones (measured 2026-11-18: 0 of 40 by default, 40 of 40 with closed=true), and an
+    open market cannot settle a bet anyway."""
     out: dict[str, dict] = {}
     ids = sorted(set(condition_ids))
     for i in range(0, len(ids), 40):
         chunk = ids[i:i + 40]
-        rows = api.get(f"{GAMMA_API}/markets", [("condition_ids", c) for c in chunk] + [("limit", 100)])
+        rows = api.get(f"{GAMMA_API}/markets",
+                       [("condition_ids", c) for c in chunk] + [("closed", "true"), ("limit", 100)])
         for m in rows or []:
             out[str(m.get("conditionId") or "").lower()] = m
     return out

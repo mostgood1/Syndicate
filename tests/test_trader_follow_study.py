@@ -71,3 +71,17 @@ def test_selection_applies_the_pre_registered_rule():
     train = {"good": good, "few": few, "coin": coin, "twosided": good, "hf": good}
     chosen = tf.select_wallets(train, {"twosided": {"0xabc"}}, capped={"hf"})
     assert set(chosen) == {"good"}
+
+
+def test_market_lookup_asks_for_closed_markets():
+    """Gamma serves open markets only unless closed=true is passed; without it every bet goes unresolved."""
+    seen = []
+
+    class FakeApi:
+        def get(self, url, params, cache=True):
+            seen.append(list(params))
+            return [{"conditionId": c, "closed": True} for k, c in params if k == "condition_ids"]
+
+    out = tf.markets(FakeApi(), [f"0x{i:02x}" for i in range(45)])
+    assert len(out) == 45 and len(seen) == 2
+    assert all(("closed", "true") in p for p in seen)

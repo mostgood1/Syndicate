@@ -642,3 +642,22 @@ One pass over every portfolio route, before any probe existed:
   27.2%.
 - **Execution, 33 min:** 10 live ticks, 0 placed, 0 failed (20 `outside_price_band`, 7 `game_started`). Orders
   today 54.
+
+## Reading 16 — Tue 11-17 8:02 PM CST (02:02Z 11-18), window 32 min
+
+- **Endpoints:** all 7 read 200 and are fast again (`/portfolio` 0.33 s). 0 kills, 0 5xx. **Banner:** ok, armed,
+  state 262 s.
+- **Plan read at 43.9 min old (stale line 45).** That plan is tonight's (11-17), generated when `portfolio_commit`
+  started at 01:18:10Z. *Corrected 02:11Z:* this note first said a fresh plan followed 29 s later, but that write
+  (02:02:23Z) was **tomorrow's** (11-18) plan. The board loop alternates dates, and its 01:51:40Z cycle built 11-18
+  (shortlist 430.4 s, board 829.4 s). No 11-17 plan has been written since 01:21:13Z; it was 53 min old at 02:11Z.
+  Cause: the board cycle that started 01:05:38Z ran for 25 min (`BOARD_BUILD_TIMING wall_s=1509.8`). Its
+  shortlist span took 633.4 s, against 63-138 s for each of the 18 builds from 23:55 to 00:55Z. The next cycle started
+  46 min after that one began. Finding F7; handed to lane `layer2-board-process-split` (02:09Z), which owns the build.
+- **Gate clock PENDING (count 0), as designed:** BC-041. The web-silent-worker-kills ff to `3920a2d4d` carries
+  ride-along `ee47c930a` (NFL live re-sim event-id seeds), a `yes` pending the refresh-worker's next restart.
+  It is registered by that session, so the register is doing its job.
+- **Execution, 32 min:** 10 live ticks, 0 placed, 0 failed (20 `outside_price_band`, 10 `game_started`).
+- **Orders today:** 54 (53 filled, 1 rejected: the maker post's kickoff expiry, which is no longer counted as a
+  failure). Resting 0. Late settlements 0; 34 started bets unsettled while games are live. Cap use: kalshi 18.3%,
+  polymarket 17.6%.
