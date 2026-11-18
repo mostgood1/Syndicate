@@ -1019,3 +1019,38 @@ No `as_of_in_future`. All 200, no transport error.
 - 2e: newest deploys.md header is 8:46 PM CST (02:46Z, ops kill of a hung NHL odds child, no deploy); no fleet ff / deploy / restart in the last 40 min.
 
 No anomaly.
+
+## Reading 25 (10:35 PM CST)
+
+Probe file `ask_reading_20261118T043502Z.json` (10:35 PM CST). Page 200 in 0.11 s; shortlist 200 rows in 0.89 s.
+
+**Ask:** 6/6 answered, 0 past the 45 s cut-off, median 4.38 s, max 7.52 s. A game was live (a `live_row` ask exists: UC Irvine @ Stanford, NCAAB).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text (spread) | 0.67 | yes | bet_analysis | 03:44:18Z (9:44 PM) | 0 |
+| free_text (Lakers vs Celtics) | 0.97 | yes | matchup_analysis | 03:44:18Z | 0 |
+| free_text (top edges) | 7.23 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NCAAF Kennesaw St h2h) | 7.52 | yes | bet_analysis | 2026-11-14 (date) | 4 |
+| pregame_prop (soccer, Boura SOT o0.5, Le Havre @ Troyes) | 4.38 | yes | bet_analysis | **2026-11-20 (date, in future)** | 10 |
+| live_row (NCAAB UC Irvine h2h) | 4.04 | yes | bet_analysis | 03:44:18Z | 0 |
+
+`as_of_in_future` true on 1 / 6 (the soccer prop). All 200, all `answer_source=snapshot`, no transport error, no user-seen timeout.
+
+**Web (10:05-10:35 PM CST, 254 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 18 (17 hard); max anon 1,125 MB vs limit 648 MB.
+- Overlay warms: 65; median 6.88 s; 1 over 20 s; 0 over 45 s; 0 over 60 s; max 27.6 s.
+- Requests over 20 s: 1 (`GET /api/board/live-rail`); over 45 s: 1 (the same live-rail request). Not an Ask; noted, not an anomaly under this monitor's rules.
+- Asks from any client: 12; 0 over 45 s; 0 non-200. 0 were NOT this probe's (all `Python-urllib`; 6 from the previous probe at 10:05 PM).
+
+**Host:** load 2.62 / 2.68 / 3.05 on 12 cores; MemAvailable 6,999 MB. Top CPU: refresh-worker 94% (ni 0, 4.6 GB RSS), live-odds-worker 69% (ni 0), gunicorn workers 42% and 27% (ni 0, 23 s and 116 s old), two live_resim_workers ~37% each (ni 5).
+
+**Engine:**
+- 2a: F2 task has 1 run total (10:30-11:17 AM CST, settled on main `c765eec64`); no newer run.
+- 2b: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 `c1a2c029c2a1816f...` (Amendment 2), unchanged.
+- 2d: 0 engine-file commits on origin/main in the last 40 min.
+- 2e: newest deploys.md header is 8:46 PM CST (02:46Z, ops kill of a hung NHL odds child, no deploy); no fleet ff / deploy / restart in the last 40 min.
+
+- **ANOMALY:** `as_of_in_future` true on the pregame_prop ask (soccer, Ismael Boura shots on target Over 0.5, Le Havre @ Troyes, event `5dcc9d2b...`): `as_of` = 2026-11-20 (`as_of_kind=date`), 3 days ahead. First time in 25 readings. Check next: whether the soccer bet_analysis path stamps `as_of` from the fixture's game date rather than the snapshot's build time (a labelling bug, the answer itself 200/ok with 10 tables), by comparing that answer's `as_of` source with the event's commence date.
