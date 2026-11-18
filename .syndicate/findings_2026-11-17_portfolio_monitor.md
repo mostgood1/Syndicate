@@ -661,3 +661,21 @@ One pass over every portfolio route, before any probe existed:
 - **Orders today:** 54 (53 filled, 1 rejected: the maker post's kickoff expiry, which is no longer counted as a
   failure). Resting 0. Late settlements 0; 34 started bets unsettled while games are live. Cap use: kalshi 18.3%,
   polymarket 17.6%.
+
+## Reading 17 — Tue 11-17 8:22 PM CST (02:22Z 11-18), window 30 min
+
+- **New instrument: tonight's plan cadence** (`plan_commits`, asked for by lane `layer2-board-process-split` as the
+  portfolio-side before/after for its board-process switch). The probe reads 6 h of `LIVE_PLAN_WRITTEN` lines per
+  date. Venue lines of one date less than 3 min apart are one commit, and a write for tomorrow does not count for
+  tonight. Tonight (11-17): **41 commits in 6 h, max completed gap 45.0 min; newest 01:21:13Z, 60.7 min ago.**
+  11-18's newest is 02:02:23Z.
+- **PLAN stale 64.3 min (> 45): finding F7, real.** The board loop published 11-18 at 02:05:37Z
+  (`board_publication` 847 s), then ran `LAYER2_AROUND_NEXT_DAY phase=after ... ran=yes` (02:11:59), then
+  `LOOP_ITERATION` (02:13:05), then Layer 2 shard writes until 02:22:43. **No 11-17 cycle had started by 02:22:51Z.**
+  Bets are still checked against current prices before placement (`outside_price_band` 20, `game_started` 10 in the
+  window), so the likely cost is missed bets, not bad ones. Sent to the owning lane 02:24Z.
+- **Endpoints:** all 7 read 200 inside budget (`live?on=all` 1.25 s, `/portfolio` 0.70 s). 0 kills, 0 5xx.
+  **Banner:** ok, armed, state 184 s.
+- **Execution, 30 min:** 10 live ticks, 0 placed, 0 failed. Orders today 54 (53 filled, 1 rejected maker expiry).
+  Resting 0. Late settlements 0, 32 started bets unsettled while games are live. Cap use kalshi 18.6%, polymarket 17.6%.
+- **Gate:** clock pending BC-041 (count 0), as designed until the refresh-worker restart loads `ee47c930a`.

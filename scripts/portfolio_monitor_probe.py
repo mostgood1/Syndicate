@@ -65,6 +65,8 @@ NEVER_READ = ("/api/portfolio/summary", "/api/portfolio/paper")
 SETTLE_LAG_H = 8.0      # a filled bet still unsettled this long after its start is late
 RESTING_OLD_MIN = 120.0  # a resting order older than this is worth naming
 PLAN_STALE_MIN = 45.0    # the refresh-worker rewrites the plan every ~15 min; three missed is stale
+PLAN_SERIES_H = 6  # how far back the per-date plan-write series reads
+PLAN_COMMIT_GAP_S = 180  # LIVE_PLAN_WRITTEN lines of one date closer than this are one commit
 
 
 def utcnow() -> dt.datetime:
@@ -393,6 +395,39 @@ def execution(lines: Iterable[str], cutoff: str) -> dict[str, Any]:
             "paper_record": paper_record}
 
 
+def plan_commits(lines: Iterable[str], now: dt.datetime, today: str | None = None) -> dict[str, Any]:
+    """TONIGHT's plan cadence: when `portfolio_commit` last wrote the live plan for today's Central date.
+
+    One commit writes one LIVE_PLAN_WRITTEN line per venue within ~1 min, so lines of a date less than
+    PLAN_COMMIT_GAP_S apart are one commit. The board loop alternates dates (on 11-17 its 7:51 PM CST cycle built
+    11-18), so a write for TOMORROW is not a fresh plan for tonight; that is why the series is per date. Asked
+    for by lane layer2-board-process-split as the portfolio-side before/after for its switch (2026-11-18)."""
+    today = today or now.astimezone(CT).date().isoformat()
+    stamps: dict[str, list[dt.datetime]] = collections.defaultdict(list)
+    for line in lines:
+        ts = parse_ts(line[:24])
+        date = _kv(line).get("date")
+        if ts and date:
+            stamps[date].append(ts)
+    out: dict[str, Any] = {"today": today, "series_h": PLAN_SERIES_H, "by_date": {}}
+    for date, ts_list in sorted(stamps.items()):
+        commits: list[dt.datetime] = []
+        for ts in sorted(set(ts_list)):
+            if not commits or (ts - last).total_seconds() > PLAN_COMMIT_GAP_S:
+                commits.append(ts)
+            last = ts
+        gaps = [(b - a).total_seconds() / 60.0 for a, b in zip(commits, commits[1:])]
+        out["by_date"][date] = {
+            "commits": len(commits), "first": commits[0].strftime("%H:%M:%SZ"),
+            "newest": commits[-1].strftime("%H:%M:%SZ"),
+            "max_gap_min": round(max(gaps), 1) if gaps else None,
+            "gaps_min": [round(g, 1) for g in gaps],
+        }
+    t = stamps.get(today)
+    out["today_newest_age_min"] = round((now - max(t)).total_seconds() / 60.0, 1) if t else None
+    return out
+
+
 # ---------------------------------------------------------------- anomalies
 
 
@@ -495,6 +530,11 @@ echo '@@WORKERS@@'
 for f in live-odds-worker.log refresh-worker.log; do
   { tail -c 40000000 "$f.1" 2>/dev/null; tail -c 40000000 "$f"; } | grep -a -E '\[execute_portfolio\] EXECUTED |\[portfolio_commit\] LIVE_PLAN_WRITTEN |\[execution_ledger\] UNRECONCILABLE_ORDER |\[paper_settlement\] PAPER_ALL_TIME_WRITTEN ' | awk -v c="$1" '$1 >= c'
 done
+# $2 = the plan-write series' cutoff (PLAN_SERIES_H back): a gap between plan writes can outlast the window.
+echo '@@PLANS@@'
+for f in live-odds-worker.log refresh-worker.log; do
+  { tail -c 40000000 "$f.1" 2>/dev/null; tail -c 40000000 "$f"; } | grep -a '\[portfolio_commit\] LIVE_PLAN_WRITTEN ' | awk -v c="$2" '$1 >= c'
+done
 """
 
 
@@ -503,17 +543,20 @@ def to_wsl_path(p: Path) -> str:
     return f"/mnt/{s[0].lower()}{s[2:]}" if len(s) > 2 and s[1] == ":" else s
 
 
-def fleet_logs(cutoff: str, work_dir: Path) -> tuple[list[str], list[str], str | None]:
+def fleet_logs(cutoff: str, work_dir: Path, plan_cutoff: str | None = None
+               ) -> tuple[list[str], list[str], list[str], str | None]:
+    """(web lines, worker lines, plan-write lines since `plan_cutoff`, error)."""
     sh = work_dir / "portfolio_monitor_logs.sh"
     sh.write_bytes(LOG_SH.encode())  # LF only: bash rejects CRLF
     try:
-        r = subprocess.run(["wsl", "--", "nice", "-n", "19", "bash", to_wsl_path(sh), cutoff],
+        r = subprocess.run(["wsl", "--", "nice", "-n", "19", "bash", to_wsl_path(sh), cutoff, plan_cutoff or cutoff],
                            capture_output=True, timeout=240)
         text = r.stdout.decode("utf-8", "replace")
     except Exception as exc:  # noqa: BLE001 -- the log half is optional; the HTTP half stands alone
-        return [], [], f"{type(exc).__name__}: {exc}"
-    web, _, workers = text.partition("@@WORKERS@@")
-    return web.splitlines(), workers.splitlines(), None
+        return [], [], [], f"{type(exc).__name__}: {exc}"
+    web, _, rest = text.partition("@@WORKERS@@")
+    workers, _, plans = rest.partition("@@PLANS@@")
+    return web.splitlines(), workers.splitlines(), plans.splitlines(), None
 
 
 def set_idle_priority() -> None:
@@ -576,6 +619,14 @@ def render(r: Mapping[str, Any]) -> str:
         f"{pr.get('won')}W-{pr.get('lost')}L-{pr.get('push')}P of {pr.get('settled')} settled, ROI {pr.get('roi_pct')}%,"
         f" win {pr.get('win_pct')}% ({pr.get('rows')} rows, {pr.get('pending')} pending) at {pr.get('at')}"
         if pr else "no PAPER_ALL_TIME_WRITTEN line in the window (refresh-worker not on the writer yet, or no settle pass)"))
+    pc = r.get("plan_commits") or {}
+    td = (pc.get("by_date") or {}).get(pc.get("today")) or {}
+    lines.append(f"  plan writes for tonight ({pc.get('today')}, last {pc.get('series_h')} h): "
+                 + (f"{td.get('commits')} commits, newest {td.get('newest')} ({pc.get('today_newest_age_min')} min ago),"
+                    f" max gap {td.get('max_gap_min')} min; other dates "
+                    + (", ".join(f"{d} newest {v['newest']}" for d, v in pc["by_date"].items() if d != pc.get("today"))
+                       or "none")
+                    if td else "none in the series"))
     for venue, pl in (ex.get("plans") or {}).items():
         lines.append(f"  live plan {venue} @{pl['at'][11:19]}Z: rows_in {pl['rows_in']} placeable {pl['placeable_in']}"
                      f" positions {pl['positions']} refusals {pl['refusals']}")
@@ -659,9 +710,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             reading["gate"] = {"error": f"{type(exc).__name__}: {exc}"}
     if not args.no_logs:
         cutoff = (now - dt.timedelta(minutes=args.log_minutes)).strftime("%Y-%m-%dT%H:%M:%S")
-        web_lines, worker_lines, err = fleet_logs(cutoff, rdir)
+        plan_cutoff = (now - dt.timedelta(hours=PLAN_SERIES_H)).strftime("%Y-%m-%dT%H:%M:%S")
+        web_lines, worker_lines, plan_lines, err = fleet_logs(cutoff, rdir, plan_cutoff)
         reading["web"] = web_access(web_lines, cutoff)
         reading["execution"] = execution(worker_lines, cutoff)
+        reading["plan_commits"] = plan_commits(plan_lines, now)
         if err:
             reading["log_error"] = err
     reading["anomalies"] = anomalies(reading)

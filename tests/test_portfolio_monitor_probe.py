@@ -194,3 +194,21 @@ def test_a_maker_post_that_expired_unfilled_at_kickoff_is_not_a_failure():
     g = pm.order_flow([expired, real], "2026-11-17", NOW)
     assert g["failed_or_rejected"] == 1
     assert "ORDERS failed or rejected today: 1/2 (50.0%)" in pm.anomalies({"orders_today": g})
+
+
+def test_plan_commits_groups_venue_lines_per_date_and_ages_tonight():
+    """Tonight's plan cadence: venue lines within 3 min are one commit, and tomorrow's writes do not refresh tonight."""
+    def line(ts, date, venue="kalshi"):
+        return f"{ts} [portfolio_commit] LIVE_PLAN_WRITTEN date={date} venue={venue} rows_in=10 placeable_in=2"
+
+    lines = [line("2026-11-18T01:02:53.306Z", "2026-11-17"), line("2026-11-18T01:03:11.432Z", "2026-11-17", "polymarket"),
+             line("2026-11-18T01:21:13.360Z", "2026-11-17"), line("2026-11-18T01:21:49.506Z", "2026-11-17", "polymarket"),
+             line("2026-11-18T02:02:23.696Z", "2026-11-18"), line("2026-11-18T02:02:34.435Z", "2026-11-18", "polymarket")]
+    now = dt.datetime(2026, 11, 18, 2, 11, 13, tzinfo=dt.timezone.utc)   # 8:11 PM CST on 11-17
+    pc = pm.plan_commits(lines, now)
+    assert pc["today"] == "2026-11-17"
+    tonight = pc["by_date"]["2026-11-17"]
+    assert tonight["commits"] == 2 and tonight["newest"] == "01:21:13Z" and tonight["max_gap_min"] == 18.3
+    assert pc["by_date"]["2026-11-18"]["commits"] == 1
+    assert pc["today_newest_age_min"] == 49.4   # the 02:02 write was tomorrow's: tonight's plan is still 01:21's
+    assert pm.plan_commits([], now)["today_newest_age_min"] is None
