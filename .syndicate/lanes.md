@@ -1357,6 +1357,14 @@ death, never life — do not invert it.
 - Verification: FIT table per arm (Q, q1-q4, regulation total, G1-G5) on the per-game seed blocks; the pick; held-out deltas with game-bootstrap CIs and the total's signed error for both arms; a candidate nfl_profile.json + pinned test on a branch, tests passing; findings with data coverage; the load is the user's call
 - Blocked by: none
 
+### nba-grid-lean-chips — OPEN — opened 2026-11-18 — session f48ddc8c-a5b1-4f45-8c93-2f027730c0eb
+- Goal: todo #790 lever (ii), user 11-18 'Yes, build it': the book grid's game-state join (board_enrichment.attach_game_state) builds LEAN chips -- same provider games, chip, line score, clock token and score, but no NBA/WNBA bonus summary fetch, no football situation, no trend, no board plays, no interval projections (fields the grid never reads), and NBA's cards context read without its two deepcopies -- so every grid row's game block is byte-identical and the NBA chip stage is cheaper; own cache key; off switch env (absent = ON); tests incl. off != on; on main; the load is the user's call
+- Files: syndicate/features/shared/game_chip_scoreboard.py, syndicate/features/shared/board_enrichment.py, syndicate/features/nba/cards.py, tests/test_game_chip_lean.py
+- Hypothesis: The chip stage (2.6 s median in the worker on 11-17, 3.2 s with 3 NBA games live) is ~1.4 s of ESPN requests -- of which one summary per live game feeds only the bonus text the grid never reads -- plus two deepcopies of the 2.41 MB NBA cards context (0.08-0.28 s each); lean chips cut the grid's NBA chip build by >= 0.5 s with 2+ games live and change no row's game block
+- Falsification test: On the fleet with 2+ NBA games live, standalone lean build_game_chips(nba) saves < 0.3 s wall vs full; or any grid row's game block (state, start, status_token, matchup, scores, game_key, segment_score) differs between lean and full on the same inputs
+- Verification: pytest (lean == full on the grid's fields; bonus/plays/intervals/trend not called when lean and called when not; separate cache keys; env off = full; read-only cards context returns the cached object and a lean chip build leaves it deep-equal); a read-only fleet probe with games live: lean vs full wall/CPU/ESPN calls and attach_game_state row game blocks identical on the served NBA grid; after a user-approved load: the grid's NBA chip stage median from the log vs 11-17's 2.6 s
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
