@@ -1592,6 +1592,14 @@ death, never life — do not invert it.
   - P6: 0 added OddsAPI calls.
 - LOAD: put to the user (11-24 window default flip + ff, or an exception now).
 
+### chip-situation-cut — OPEN — opened 2026-11-18 — session 8062940b-57fd-454a-8de5-25fdd4804d85
+- Goal: The live chip's situation line is never cut mid-word: build_game_chip's two 40-character cuts (_live_situation and _chip_live_detail in game_chip_scoreboard.py) keep whole middle-dot-separated parts and drop trailing parts that do not fit (a lone over-long part ends at a word with an ellipsis); every line of 40 characters or fewer is unchanged; tests incl. old != new on the 41-character NFL goal-to-go line; on main; display only (betting change no); the fleet load is the user's call
+- Files: syndicate/features/shared/game_chip_scoreboard.py (LOAN from nba-grid-lean-chips approved by the user 2026-11-18 in chat choosing Approve the loan; the returns of _live_situation and _chip_live_detail + a NEW _fit_situation helper ONLY), tests/test_nfl_live_card_situation.py (LOAN from nfl-live-card-situation of this same session; test_the_served_chip_is_that_line_up_to_its_40_character_cap ONLY), tests/test_game_chip_situation_cut.py (NEW)
+- Hypothesis: n/a (a display fix; the defect is pinned in tests: the 41-character NFL goal-to-go line 'BAL ball, 1st & Goal at LAC 2, red zone' with middle dots is served by the worker chip ending 'red zon')
+- Falsification test: n/a
+- Verification: pytest: the 41-character line keeps whole parts; lines <= 40 identical to the old slice; a lone over-long part ends in a word + ellipsis; the chip test files pass; on origin/main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
