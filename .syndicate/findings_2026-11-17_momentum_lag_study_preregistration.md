@@ -72,7 +72,11 @@ the share of laggards whose next change moved toward the leader.
 About 40 cells. At alpha 0.05 two-sided, the chance that at least one of 40 null cells has a CI excluding 0 is
 1 - 0.95^40 = 87%. No secondary cell can flip the verdict; a striking one is a lead for its own pre-registration.
 
-## Population pass (run 2026-11-17 ~20:25 CST, `--now 2026-11-18T01:00:00Z`, 617 s, max RSS 335 MB)
+## Population pass (finished 7:48 PM CST 11-17 = 01:48:04Z 11-18, `--now 2026-11-18T01:00:00Z`, 617 s, max RSS 335 MB)
+
+*(Time corrected after the fact: this heading first said "~20:25 CST", a clock misread. Order, from git and file
+times: population summary written 01:48:04Z; this file committed 01:49:24Z (`827b5d533` on main); the outcome
+pass started about 01:49:50Z and wrote its summary at 01:57:58Z.)*
 
 The qualifying population exists and is not thin. Coverage (shards with completed pregame rows / with a
 heartbeat / intersection, which is what the primary can use):

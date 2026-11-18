@@ -1266,7 +1266,7 @@ death, never life — do not invert it.
 - Verification: The named cause's fix landed with tests; deployed with deploy_claim + deploy_preflight; then gunicorn WORKER TIMEOUT kills with no WEB_WORKER_MEMORY_RECYCLE line per day for the following days versus 11-17's 4, and the worker heartbeat file confirmed on the new location from /proc/<pid>/fd
 - Blocked by: none
 
-### momentum-lag-study — OPEN — opened 2026-11-17 — session c5ab914e-f248-426b-88e3-57112faeabe0
+### momentum-lag-study — CLOSED 2026-11-17 8:05 PM CST (VERDICT KILL as registered: sportsbook left on the pre-move price -2.60% vs close [-2.71, -2.47], 31,345 bets / 1,051 events; lead: FanDuel-led +0.85% [+0.38, +1.32], exploratory; findings_2026-11-17_momentum_lag_study.md; READ-ONLY, NO DEPLOY) — opened 2026-11-17 — session c5ab914e-f248-426b-88e3-57112faeabe0
 - Goal: Answer, from fleet book_quotes already captured, whether betting a sportsbook that is still on the pre-move price after another book moved (OddsJam-Momentum style) beats the close, net of the vig; verdict PROCEED/KILL per the pre-registration. Read-only: no code path, capture, env or deploy changes.
 - Files: scripts/momentum_lag_study.py, .syndicate/findings_2026-11-17_momentum_lag_study_preregistration.md, .syndicate/findings_2026-11-17_momentum_lag_study.md
 - Hypothesis: When a book moves a pregame two-way price by >= the registered threshold and another book's quote on the same selection and line is still at or better than the mover's pre-move price, the laggard price has positive EV against the de-vigged consensus close (taker entry, CLV is a fair proxy per learnings 2026-10-19).
