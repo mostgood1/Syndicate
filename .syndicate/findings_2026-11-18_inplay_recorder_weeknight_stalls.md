@@ -187,3 +187,21 @@ at 8:11 AM CST read back the right class and memory priority in both copies, and
   the nightly recorder logs a request over 30 s in the same minute.
 
 Launching the two copies needs the user's OK: they outlive this turn.
+
+**LAUNCHED 2026-11-18 9:35 AM CST (15:35:46Z), user "Yes, run it tonight".** Idle copy pid 22068, Normal copy pid
+33280, each under a `cmd.exe` that carries its stderr, created through WMI (`Win32_Process.Create`) so they do not
+belong to this session's process tree. Runner `C:\tmp\inplay_sched_probe\runner` = branch
+`claude/silly-lovelace-27b832` at `b4d89a805` (the recorder copy beside it is origin/main's, byte for byte bar line
+endings); launcher `C:\tmp\inplay_sched_probe\launch.ps1`; rows go to `C:\tmp\inplay_sched_probe\2026-11-18\
+{idle,normal}.jsonl`. Window 23:30Z-03:30Z (5:30-9:30 PM CST).
+
+Two probe changes landed on the branch after the registration above. Neither touches P1, P2 or the falsifier:
+1. `d1e224fd5` waits for `--start` in 60 s chunks against the wall clock. A Windows sleep does not count time the
+   host spends suspended, so one 8-hour sleep across a nap would have started the probe late. A test simulates a
+   300 s suspend; it fails on the old code.
+2. `b4d89a805` makes `--analyse` print the registered statistics, `req_p99` and `share_req_over_5s` (it printed
+   p50, p90 and the share over 10 s, which the registration does not use).
+
+Smoke run at 9:34 AM CST through the same WMI launch, 3 slots per copy. The Idle copy read back class 64 and memory
+priority 2; the Normal copy read back class 32 and memory priority 5. All 6 requests answered in 0.20-0.29 s, with
+the host 58-78% busy.
