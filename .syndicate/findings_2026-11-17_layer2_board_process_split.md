@@ -79,6 +79,26 @@ Per stage (median over the window; calm reference 22:41Z 11-17: overview 1.4 s, 
   level down: the VM's busy vCPUs (~7.8) get ~4 physical cores, and an Idle-priority job that does not preempt the
   fleet still costs it clock (all-core frequency at 56-64%).
 
+## Reading 3 — tonight per stage, WSL-native sampler with `schedstat` (from 7:37 PM CST)
+
+`build_intelligence_overview` for board date 11-18, 7:51:46-7:54:32 PM CST (01:51:46-01:54:32Z), **165.6 s wall**
+(calm reference 1.4 s), 164 s of samples (`C:\tmp\l2split\l2s_span.py`):
+
+| tid | thread | share of a core | runqueue wait (share of wall) |
+|---|---|---|---|
+| 28948 | main: book-grid / overlay tick | 0.41 | 0.03 |
+| 29004 | venue odds loop (Kalshi / Polymarket; 85 `[kalshi_odds]` lines in the window) | **0.36** | 0.02 |
+| 29001 | **the board loop** | **0.19** (30.8 CPU-s) | 0.03 |
+| 29002 | chip publisher | 0.04 | 0.02 |
+| process | | 1.02 | |
+
+- **H1 CONFIRMED for this stage:** board share 0.19 <= the predicted 0.35, process at the one-core ceiling, and every
+  thread's runqueue wait ~0.03 — the VM's CPUs were not the limit, the interpreter lock was. The two competitors, the
+  tick and the venue odds loop (the latter started BY `start_intelligence_state_background_loop` beside the board),
+  both stay in the parent under the split.
+- The board's own CPU in that stage (30.8 s, vs 1.4 s wall calm) says work also varies by date / cache warmth
+  (11-18's overview built 8 sports' contexts cold: ncaab 59 games, soccer 121). H2 stays open as a second factor.
+
 ## Baselines for the prediction (refresh-worker.log, `C:\tmp\l2split\l2s_baseline.py`)
 
 | window | board builds | wall p50 / p90 / max | today shortlist publish gap p50 / p90 (gaps > 300 s) | NCAAB grid build p50 / p90 |
