@@ -61989,3 +61989,39 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - P4 recovery: **OWED.** Understat still served the maintenance page at 20:19:05Z.
 - **Off switch:** `SYNDICATE_UNDERSTAT_OUTAGE_GUARD=off` in `~/syndicate-prod/local_production.env`, then a drained full `down`/`up` (env is built only at `up`).
 - **verify:** while Understat is down, every big-5 Understat step tail starts with `UNDERSTAT_UNAVAILABLE` (`reading2.py`). At recovery (P4): the marker flips to `state` up with `last_outage`, the next run's 10 steps go rc 0, and `teams_2026.csv` / `players_2026.csv` mtimes move, with rows past 2026-10-31.
+
+## 2026-11-18 21:02:51Z (3:02 PM CST) -- DEPLOY (ff only, no restart): fleet `db6a395ed` -> `a3104a5b6`, the NBA games-history fetch bounded and de-duplicated, default ON (todo #843, lane `nba-midnight-bootstrap-hold`; user "Load it now" to "When should the NBA history fix load?") -- **LOADED (child scripts load it at their next launch); the effect readings (the first bootstrap fetch, tonight's midnight run) are owed**
+- betting change: **yes**, BC-052, **OUTSIDE a window, a user override.**
+  - It changes the NBA game model's Elo, rest and form inputs once the history is de-duplicated (each team's latest pre-game Elo moves by a mean |d| of 119; findings §4). It also frees the live odds lane at midnight.
+  - It is not a revert, a risk reduction or a money-path fix. I told the user so and recommended the 11-24 window; the user chose to load now.
+  - It restarts the scale-up gate's count.
+- **The change:** `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` is absent = ON from `a3104a5b6`. It landed default-off in `4178ba866`. Findings: `.syndicate/findings_2026-11-18_nba_midnight_bootstrap_hold.md` §6.
+  - The bootstrap's `cli fetch` keys the history by the 10-digit game id.
+  - It walks BoxScoreSummaryV2 only for quarter-less games, newest first, under a 600 s deadline.
+  - It writes one row per game, and its subprocess timeout is 900 s instead of 2,700 s.
+  - The code runs only in the NBA props child script and its `cli fetch` subprocess. No long-running role imports it (grep of syndicate/, pipeline/ and scripts/: one caller, `refresh_nba_oddsapi_props.py`).
+- **Ride-alongs** (`db6a395ed..a3104a5b6`: 24 commits; 5 files in runtime paths including mine):
+  - `2aff90c36` `syndicate/features/shared/live_refresh_loop.py` (look-ahead lane wait, todo #842): inert. Its gate is `_env_bool("SYNDICATE_LOOK_AHEAD_LANE_WAIT", default=False)`, no env layer sets the key, and it would load only at a refresh-worker restart anyway.
+  - `438686bdb` `scripts/preserve_inplay_recordings.sh` (Windows task, copy only) and `5affebf41` `scripts/s1_freshness_study.py` (research): inert, with no importer.
+  - The rest is tests and ledger. None of the 14 dirty fleet paths is among the 28 incoming files.
+  - Env layers checked for both keys, 0 hits in each: `local_production.env`, `fleet_env/{web,refresh-worker,live-odds-worker}.json`, `fleet_role_spec.json`.
+- **Gates:**
+  - Claim live-odds-worker 21:01:34Z (ACQUIRED). Baseline read 21:01:22Z.
+  - Preflight `--service live-odds-worker --target-commit a3104a5b6 --betting-change yes --outside-window "<user override>"`:
+    - HOLD at 21:01:44Z (1 job), 21:02:00Z (3) and 21:02:22Z (5), for short live jobs. An ff kills none of them.
+    - **CLEAR 21:02:43Z** (0 processes).
+- **ff:** `git merge --ff-only a3104a5b6` at **21:02:51Z**. The fleet head was first confirmed as `db6a395ed`, an ancestor of the target. No role restarted (live-odds-worker pid 250752).
+- Claim released 21:04:36Z.
+- **expect / measured:**
+  - `fleet_head` db6a395ed -> a3104a5b6: **MET** 21:02:52Z.
+  - `history_fetch_bounded_in_child` missing -> True: **MET** 21:03:06Z. The fleet venv python, with the key unset, imported the fleet module and got `history_fetch_bounded()` = True.
+  - `nba_season_rows_minus_unique_ids_after_first_fetch` 1367 -> 0: **OWED.** Baseline 1,563 season rows for 196 ids, newest game 2026-11-15, file mtime 11-16 05:24Z. `predictions_2026-11-19.csv` was absent at 21:01Z. The cooldown marker is from 11-18 06:01:31Z and has expired, so the first 11-19 NBA props run fetches.
+  - `midnight_nba_run_max_s_7_nights` 1801 -> at most 1100: **OWED** (nights 11-19..11-25).
+- **verify:** the first NBA props bootstrap fetch after 21:02:51Z (refresh-worker's evening look-ahead, or the 00:01 CST live-lane run). Its props log carries:
+  - `GAMES_HISTORY_FETCH_BOUNDED timeout_s=900`;
+  - `LINESCORE_WALK bounded=1` with `to_fetch` <= 60;
+  - `HISTORY_SAVE bounded=1`.
+  After it, `games_nba_api.csv` season rows = unique ids, and the newest date is 2026-11-18. The ~00:01 CST 11-19 `nba,ncaab,wncaab` run lasts <= 1,100 s. P1-P6 are in findings §7.
+- **What loading now costs:** the H4 reading (the `2ae0c646a` deadline alone, tonight) can no longer be taken. Tonight's run reads the fix instead.
+- **Off switch:** `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED=0` in `local_production.env` plus a drained `down`/`up`. Or revert `a3104a5b6` and ff, which loads at the child's next launch with no restart.
+- The user's go-ahead, quoted: "Load it now" (this session, answering "When should the NBA history fix load?").
