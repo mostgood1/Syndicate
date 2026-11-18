@@ -1232,6 +1232,16 @@ death, never life — do not invert it.
 - Verification: git show origin/main: both files carry the notes; every deleted path the todo cites has a note in its section; check_lane_invariants passes
 - Blocked by: none
 
+### inplay-recorder-discovery — OPEN — opened 2026-11-17 — session e6287e48-2784-4660-9dab-277e0ad478cd
+- Goal: The in-play recorder's Kalshi full-game poll list no longer depends on the fleet capture file's 8,000-market cap (discovered from Kalshi's public /markets by series for the slate date, unioned with the capture file, kept until settled), and its poll loop no longer starves the end of the sorted list (requests paced at <=2.5 req/s, 100 tickers per request, a 429 resumes at the failed batch). Measured 11-14 before vs a dry recording after (per-market gap p50/p90/max, share of markets with any gap > 120 s), written to the ledger; on main before the 11-26..11-28 NCAAF slates with the user's yes. Side session of local_898e5510 (M3, todo #736).
+- Files: tests/test_inplay_recorder_discovery.py (NEW), .syndicate/findings_2026-11-17_inplay_recorder_discovery.md (NEW)
+- Hypothesis: 11-14's poll gaps come from two causes: the capture file's cap dropping markets from the list (cause 'list') and 429s ending a burst cycle before it reaches the tail of the sorted list (cause 'starve'). Measured before any change: 387 list gaps vs 90,485 starve gaps over 120 s (>=1200 s: 320 vs 3,750)
+- Falsification test: A dry recording with discovery + pacing still shows >20% of markets with a gap > 120 s, or a 429 count no lower than the old code's on the same universe
+- Verification: scratchpad gaps.py over C:/tmp/inplay_2026-11-14 (before) and a dry recording of the new recorder on a Saturday-sized universe (after); numbers in the findings file; tests pass
+- Blocked by: none
+- LOAN PENDING `[2026-11-17 7:20 PM CST]`: scripts/inplay_recorder.py (lane in-game-trading, owner quiet since 11-09), its Kalshi ticker source + the Kalshi poll cycle ONLY. Asked of the user via session local_898e5510; no edit to that file until the user's yes, and it joins this lane's Files line only then. The stage-2 scoreboard, inplay_nightly.py and M3 (`engine_paper_m3`) are not touched.
+- 2026-11-17 7:05 PM CST, outside this lane's scope and recorded for M3: the host rebooted at 1:50 PM CST and killed "Syndicate inplay nightly" while it waited for the 11-17 slate (LastTaskResult 0x40010004; no C:/tmp/inplay_2026-11-17). Restarted with Start-ScheduledTask under the existing nightly approval; it synced ffeccdc21 and is recording. 23:00Z-01:05Z of 11-17 is lost.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
