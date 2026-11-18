@@ -795,3 +795,31 @@ placement, so a stale plan costs missed bets, not bad ones.
   55 filled, 2 rejected (both designed endings), 1 submitted.
 - **Settlement:** 3 started and unsettled (from 10), 0 late. Cap use: kalshi 18.8%, polymarket 18.4%.
 - **Endpoints:** all 7 read 200, fast. 0 kills. **Paper book:** 14,772 settled, ROI -1.31%.
+
+## Reading 22 — Tue 11-17 10:37 PM CST (04:37Z 11-18), window 32 min
+
+- **Clean apart from the gate's clock.**
+- **Plan 4.4 min old.** Tonight's newest commit is 04:33:15Z. In 6 h: 31 commits, max completed gap 79.0 min.
+  106 suggested -> 25 sized -> 10 positions. Ceiling used 17.5%.
+- **Orders today 59:** 56 filled, 3 rejected, every rejection a designed ending.
+  - 1 maker expiry and **2 unfilled in-play IOCs**. The polymarket order from reading 21 ended as the second IOC
+    no-fill.
+  - `failed_or_rejected` 0, resting 0, unreconciled 0.
+  - The in-play IOC fill rate is not measured: the probe counts IOC no-fills but not IOC orders placed. The
+    denominator is owed in the daily summary.
+- **Execution, 32 min:** 10 live ticks, 0 placed (5 `outside_price_band`, 5 `game_started`).
+- **Settlement:** 10 started and unsettled while the late games play (from 3), 0 late. Cap use: kalshi 18.8%,
+  polymarket 18.5%.
+- **Endpoints:** all 7 read 200 (`limits` 1.23 s of 2.0, the slowest). 0 kills.
+
+## Reading 23 — Tue 11-17 11:08 PM CST (05:08Z 11-18), window 31 min
+
+- **Clean apart from the gate's clock.**
+- **Plan 5.2 min old.** Tonight's newest commit is 05:03:21Z, and 11-18 was written at 04:57:03Z. Tonight's next
+  commit came 6 min later, with no stall. In 6 h: 31 commits, max completed gap 79.0 min.
+  70 suggested -> 25 sized -> 13 positions.
+- **Execution, 31 min:** 12 live ticks, 0 placed, 0 failed (11 `outside_price_band`, 10 `game_started`).
+  - Orders today 59, unchanged: 56 filled, 3 rejected as designed endings.
+  - Resting 0, unreconciled 0.
+- **Settlement:** 10 started and unsettled (the late games), 0 late. Cap use: kalshi 18.8%, polymarket 18.5%.
+- **Endpoints:** all 7 read 200, all under 0.25 s. 0 kills.
