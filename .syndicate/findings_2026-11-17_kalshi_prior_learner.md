@@ -65,3 +65,31 @@ Against the books' prior, `live_resim` was +0.46 / +0.25.
 The same study on more data. After M2's 11-24 read, slates 11-15..11-22 may be read, adding two NCAAF Saturdays and
 about 8 NBA nights. Whether slice 5 (Kalshi as the prior) is worth rebuilding turns on that: a weight surviving against
 P2 there. Nothing here changes M2's or M3's registered rules.
+
+
+## Context for the 11-24 re-run: what changed inside its windows (filed 2026-11-18 11:21 AM CST, before its data; the rule is unchanged)
+
+The re-run trains on 11-09..11-17 and tests on 11-18..11-22. Two things the opinions and quotes rest on changed inside
+those windows. Nothing in the registered rule changes; this is filed before the run so its result is read with it.
+
+**1. The live re-sims** (the live expert reads what they publish; full timeline and method: `.syndicate/findings_2026-11-17_m3_paper_book.md`, Addendum 5;
+times are role loads, not commits):
+- **NBA:** training nights 11-09..11-13 ran without the closing-line margin anchor, 11-14..11-17 with it (loaded about
+  11-14 9:37 AM). The starter-exit refusals loaded 11-15 12:25 PM and 11-16 12:15 PM. As of 11-18 10:34 AM, every
+  test night runs the version loaded 11-17 3:53 PM.
+- **NCAAF:** the one training Saturday (11-14) ran before the QB-exit refusals (loaded 11-15). The `#808` end-of-half
+  switches (11-16, all default OFF) and an MLB edit to the shared exit-gate file (11-17) also came in training. The
+  test Saturday (11-21) runs after all of them.
+- **NFL:** the QB-exit refusals (11-15), real timeouts left (11-16), and the drive in progress (11-17) loaded during
+  training; per-game seeding loaded 11-18 2:03 AM, before any test game.
+- **NHL** is not in M3's timeline (never eligible for M3). Its re-sim also changed during training, per `deploys.md`:
+  the end-game (11-11 4:34 PM), the published total (11-13 11:57 AM), overtime as sudden death (11-13 3:28 PM) and the
+  rest of the period as regulation (11-14 1:42 PM); the goalie-pull refusal was committed 11-16.
+- Later changes: the M3 nightly records them every morning in `C:\tmp\elp\m3_kit\epochs\timeline.json`; read the
+  11-24 copy with the result. The `#834` and `#836` fixes are not to load before 11-22 ends.
+
+**2. The recorder's Kalshi quotes.** The new poll loop (`e9eb52568`, `a2af81258`) records from the 11-18 night on;
+training nights used the old loop. In a dry test the old loop never quoted 40-42% of a Saturday's markets, most NCAAF
+totals among them, and quoted no NFL or NHL market (`739fa951b`). So the test nights hold line-instants, NCAAF totals
+above all, whose cells were thin or empty in training, and those fall back to their parent cells exactly as the
+learner is built to. The Normal-priority fix (`c0d9cf9b8`) records from 11-19 on.
