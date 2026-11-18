@@ -136,6 +136,7 @@ def analyse(night_dir: str) -> dict:
     sport_markets: dict[str, set] = defaultdict(set)
     sport_over: dict[str, set] = defaultdict(set)
     tail = 0
+    span_total = excess_60 = 0.0
     for t, xs in obs.items():
         xs.sort()
         sp = sport_of(t)
@@ -144,6 +145,8 @@ def analyse(night_dir: str) -> dict:
         for a, b in zip(xs, xs[1:]):
             g = b - a
             gaps.append(g)
+            span_total += g
+            excess_60 += max(0.0, g - 60.0)
             sport_gaps[sp].append(g)
             mx = max(mx, g)
             if g > 120:
@@ -173,6 +176,9 @@ def analyse(night_dir: str) -> dict:
         "market_maxgap_p50": _r1(_pct(mm, 0.5)), "market_maxgap_p90": _r1(_pct(mm, 0.9)),
         "markets_any_gap_over_120": len(over),
         "share_any_gap_over_120": round(len(over) / len(obs), 4) if obs else None,
+        # M3's entry window is [t_d + 10 s, t_d + 70 s]: for a decision instant uniform over a market's
+        # quoted span, the chance that window holds no quote is sum(max(0, gap - 60)) / sum(gap).
+        "share_time_no_quote_60s": round(excess_60 / span_total, 5) if span_total else None,
         "gaps_over_120_by_cause": {k: {"n": v[0], "seconds": round(v[1])} for k, v in sorted(cause.items())},
         "tail_unresolved": tail,
         "by_sport": {sp: {"markets": len(sport_markets[sp]), "gap_p50": _r1(_pct(g, 0.5)),

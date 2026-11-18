@@ -44,3 +44,11 @@ def test_no_gap_over_120_when_every_cycle_is_whole(tmp_path):
     rep = _night(tmp_path, [(30 * i, full) for i in range(20)])
     assert rep["share_any_gap_over_120"] == 0.0 and rep["gap_p50"] == 30.0
     assert rep["gaps_over_120_by_cause"] == {}
+    assert rep["share_time_no_quote_60s"] == 0.0
+
+
+def test_share_time_no_quote_60s_counts_only_the_part_of_a_gap_past_60_s(tmp_path):
+    # One market quoted at 0, 30, 60 and 300 s: gaps 30, 30, 240; only 240 - 60 = 180 s of 300 s is uncovered.
+    rep = _night(tmp_path, [(0, [["KXNBAGAME-A"]]), (30, [["KXNBAGAME-A"]]), (60, [["KXNBAGAME-A"]]),
+                            (300, [["KXNBAGAME-A"]])])
+    assert rep["share_time_no_quote_60s"] == 0.6
