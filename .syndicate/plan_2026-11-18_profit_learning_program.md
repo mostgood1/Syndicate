@@ -101,7 +101,7 @@ No result guarantees future returns.
        - soccer spreads will be INSUFFICIENT at the 01-31 stop.
      - **Live maker pilot:**
        - about 21 of 30 timed fills, so the re-judge falls about 11-24;
-       - that holds only if fill times are saved: the ledger row has no fill time, and the log rotates in ~3.5 days;
+       - the ledger row has no fill time and the log rotates in ~3.5 days, so the task `SyndicateMakerPilotLines` (set up 11-18) copies the pilot lines daily;
        - 844 pilot log lines were saved 11-18 to `research/maker_pilot/`.
      - No maker challenger before the 12-08 window.
 4. **S4: Kalshi as the in-play prior, the sim as the challenger.** Kalshi's in-play log loss beats the books by

@@ -72,8 +72,16 @@ Earlier context (not re-tested here):
   - About 9 more are needed, so the re-judge is about 11-24, but only if each fill's line is saved within ~3 days.
   - Durable fix: write `venue_filled_at` on the ledger row. That is a ledger-only change, not a betting change; it
     needs its own lane and a live-odds-worker restart.
-  - Bridge: a daily copy of the lines, the same pattern as `SyndicateInplayPreserve`. This needs the user's yes, as
-    any new scheduled task does.
+  - **Bridge, set up 11-18 (user: "Yes, set it up"):** the Windows task `SyndicateMakerPilotLines` runs daily at
+    7:30 AM local.
+    - It runs `C:\SyndicateProd\maker_pilot_preserve\preserve_maker_pilot_lines.sh` (source:
+      `scripts/preserve_maker_pilot_lines.sh`).
+    - Copy only: it merges every `MAKER_PILOT` line into the research file, deduplicated, and excludes the
+      self-matching `ALL_PROCESS_MEMORY` lines.
+    - **Exit 3 = a FILL with `filled_as=TAKER`** (the pilot's stop rule); **exit 4 = a possible gap**.
+    - Log: `~/syndicate-prod/logs/maker_pilot_preserve.log`.
+    - Tested on temporary logs: copy, re-run, gap, taker and no-logs cases.
+    - First run 22:57Z: result 0, 1,592 lines, 14 distinct fills, 0 TAKER.
 
 ## What this means for the program
 
