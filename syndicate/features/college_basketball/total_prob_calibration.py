@@ -33,7 +33,9 @@ untouched; only the served probability moves, and the engine's own number is kep
 
 SWITCH: `SYNDICATE_COLLEGE_TOTAL_CALIBRATION=off` (0 / false / no) serves every line raw, as before; absent = on.
 A league or phase with fewer than MIN_GAMES graded games in the window writes an UNCALIBRATED entry and is served
-raw by name. `scripts/fit_college_total_calibration.py` runs the fit by hand and prints the walk-forward.
+raw by name. A phase whose fit was scored on its walk-forward and FAILED (2026-11-18, user "fix the gate to fall back to
+market, not raw") serves the MARKET's probability instead (`failed_gate_fallback`: a = 0, c = 0), unless the engine's
+raw number beat the market in that same walk-forward. `scripts/fit_college_total_calibration.py` runs the fit by hand and prints the walk-forward.
 
 SPREAD ONLY (2026-11-17, built, not served): `FIT_LEVEL = False` makes the daily refit fix a = 0 and fit c alone, so no
 line leans by a league-wide level. Re-graded 11-17 through 11-16's slate (findings § "2026-11-17"): live walk-forward
@@ -100,6 +102,9 @@ class TotalCalibration:
     games: float = 0.0
     source: str = ""
     level: str = LEVEL_FITTED
+    # "market" when this phase's fit FAILED its walk-forward and the market beat the engine there: the served
+    # probability is then the market's own (a = 0, c = 0). Empty for a fit that passed.
+    fallback: str = ""
 
     def apply(self, p_raw: float, p_mkt: float) -> float:
         lm = _logit(p_mkt)
@@ -118,7 +123,8 @@ class TotalCalibration:
 
     def stamp(self) -> dict[str, Any]:
         return {"phase": self.phase, "as_of": self.as_of.isoformat(), "a": round(self.a, 4), "c": round(self.c, 4),
-                "games": round(self.games, 1), "source": self.source, "level": self.level}
+                "games": round(self.games, 1), "source": self.source, "level": self.level,
+                "fallback": self.fallback or None}
 
 
 # ------------------------------------------------------------------------------------------------ the fit
@@ -200,6 +206,26 @@ def _walk_forward_verdict(wf: Mapping[str, Any]) -> Optional[str]:
     if cal > market:
         return f"walk-forward Brier {cal} is worse than the market's {market}"
     return None
+
+
+FALLBACK_MARKET = "market"
+
+
+def failed_gate_fallback(entry: Mapping[str, Any]) -> Optional[str]:
+    """What an UNCALIBRATED phase serves instead of its fit: "market" when the fit was scored on its walk-forward
+    (>= MIN_WALK_FORWARD_GAMES games) and the MARKET beat the engine's raw number there; None (the engine's own number,
+    as before) when the phase is too thin to have been scored, or when raw beat the market. Read from the walk-forward
+    the file already carries, so a file written before this rule existed is judged the same way."""
+    if entry.get("calibrated"):
+        return None
+    wf = entry.get("walk_forward") if isinstance(entry.get("walk_forward"), Mapping) else {}
+    try:
+        games, market, raw = float(wf.get("games") or 0.0), float(wf["market"]), float(wf["raw"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if games < MIN_WALK_FORWARD_GAMES:
+        return None
+    return FALLBACK_MARKET if market <= raw else None
 
 
 def walk_forward(by_date: Mapping[str, Sequence[tuple[float, float, float, float]]], *, min_train: float = 40.0,
@@ -350,6 +376,9 @@ def refresh(league: str, *, today: dt.date, window_days: int = WINDOW_DAYS, floo
             # and was no worse than the market. The fitted values stay in the file either way, for the record.
             verdict = _walk_forward_verdict(wf)
             payload["phases"][phase] = {"calibrated": verdict is None, **entry, **({"reason": verdict} if verdict else {})}
+            if verdict:
+                # For the reader: what the lookup serves instead (`failed_gate_fallback` decides it the same way).
+                payload["phases"][phase]["fallback"] = failed_gate_fallback(payload["phases"][phase]) or "raw"
         entry = payload["phases"][phase]
         print(f"[college_total_calibration] FIT league={league} phase={phase} as_of={as_of} level={payload['level']} games={entry.get('games')} "
               + (f"a={entry['a']:+.4f} c={entry['c']:.4f}" + (f" clamped={','.join(entry['clamped'])}" if entry.get("clamped") else "")
@@ -419,6 +448,14 @@ def calibration_for(league: str, phase: str, game_date: dt.date, *, env: Optiona
         payload = hit[1]
     entry = ((payload.get("phases") or {}).get(phase)) or {}
     if not entry.get("calibrated"):
+        if failed_gate_fallback(entry) == FALLBACK_MARKET:
+            # The fit failed its walk-forward and the market beat the engine there: serve the MARKET's probability
+            # (a = 0, c = 0, no fit error), never the engine's raw number -- user 2026-11-18 "fix the gate to fall back
+            # to market, not raw". Measured: the 11-18 refit failed NCAAB pregame (calibrated 0.25146 vs market 0.25,
+            # raw 0.27752), and the old rule served the raw 0.2775 number for the day's pregame totals.
+            return TotalCalibration(league=league, phase=phase, as_of=max(found), a=0.0, c=0.0,
+                                    games=float(entry.get("games") or 0.0), source=path.name,
+                                    level=str(entry.get("level") or LEVEL_FITTED), fallback=FALLBACK_MARKET)
         return None
     try:
         return TotalCalibration(league=league, phase=phase, as_of=max(found), a=float(entry["a"]), c=float(entry["c"]),

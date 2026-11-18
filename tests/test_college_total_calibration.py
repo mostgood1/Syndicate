@@ -304,7 +304,12 @@ def test_a_phase_that_lost_its_walk_forward_is_written_uncalibrated(monkeypatch,
     payload = _write_fit(monkeypatch, tmp_path)
     entry = payload["phases"]["pregame"]
     assert entry["calibrated"] is False and "worse than the market" in entry["reason"] and "a" in entry
-    assert tpc.calibration_for("ncaab", "pregame", dt.date(2026, 11, 17), directory=tmp_path) is None
+    # Not the fit, and (2026-11-18, user "fix the gate to fall back to market, not raw") not the engine's raw number
+    # either: the market beat raw in that walk-forward, so the lookup serves the MARKET (a = 0, c = 0).
+    assert entry["fallback"] == "market"
+    got = tpc.calibration_for("ncaab", "pregame", dt.date(2026, 11, 17), directory=tmp_path)
+    assert got is not None and got.fallback == "market" and got.a == 0.0 and got.c == 0.0
+    assert got.apply(0.71, 0.48) == pytest.approx(0.48, abs=1e-12) and got.std_err(0.71, 0.48, 0.03) == 0.0
 
 
 def test_an_unreadable_file_serves_raw(tmp_path):
@@ -426,3 +431,58 @@ def test_a_file_written_before_the_level_flag_reads_as_fitted(tmp_path):
     (tmp_path / "total_prob_calibration_2027_asof_20261116.json").write_text(json.dumps(payload), encoding="utf-8")
     got = tpc.calibration_for("ncaab", "live", dt.date(2026, 11, 17), directory=tmp_path)
     assert got is not None and got.level == tpc.LEVEL_FITTED
+
+
+# --------------------------------------------------------------------------------------------- failed gate -> market
+# 2026-11-18, user "fix the gate to fall back to market, not raw": the 11-18 refit failed NCAAB pregame (walk-forward
+# calibrated 0.25146 vs market 0.25, raw 0.27752), and the old rule served the engine's raw number for the day.
+
+@pytest.mark.parametrize("entry,expected", [
+    ({"calibrated": False, "walk_forward": {"games": 250.0, "market": 0.25, "raw": 0.2775, "calibrated": 0.2515}}, "market"),
+    ({"calibrated": False, "walk_forward": {"games": 250.0, "market": 0.25, "raw": 0.2400, "calibrated": 0.2515}}, None),
+    ({"calibrated": False, "walk_forward": {"games": 25.0, "market": 0.25, "raw": 0.2690, "calibrated": 0.2473}}, None),
+    ({"calibrated": False, "reason": "12 graded games < 60", "games": 12.0}, None),
+    ({"calibrated": True, "walk_forward": {"games": 250.0, "market": 0.25, "raw": 0.2775, "calibrated": 0.2400}}, None),
+])
+def test_the_failed_gate_fallback_rule(entry, expected):
+    """Market only when the fit was SCORED (>= 40 games) and the market beat raw; a thin phase stays raw as before."""
+    assert tpc.failed_gate_fallback(entry) == expected
+
+
+def _write_payload(tmp_path, phases):
+    (tmp_path / "total_prob_calibration_2027_asof_20261117.json").write_text(json.dumps({"phases": phases}), encoding="utf-8")
+
+
+def test_off_is_not_on_for_the_market_fallback_through_the_pregame_path(monkeypatch, tmp_path):
+    """The 11-18 shape: pregame failed, market beat raw. Served = the book's no-vig price, stamped as a fallback."""
+    _write_payload(tmp_path, {"pregame": {"calibrated": False, "a": -0.154, "c": 0.0, "games": 298.0,
+                                          "walk_forward": {"games": 250.0, "market": 0.25, "raw": 0.27752, "calibrated": 0.25146}}})
+    real = tpc.calibration_for
+    monkeypatch.setattr(tpc, "calibration_for", lambda league, phase, game_date, **kw: real(league, phase, game_date, directory=tmp_path, **kw))
+    monkeypatch.setattr(cgp, "_no_vig_over_probability", lambda row: 0.52)
+    prob, meta = cgp._served(0.71, {}, "totals", league="ncaab", game_date="2026-11-18", segment="full")
+    assert prob == pytest.approx(0.52, abs=1e-12) and meta["total_calibration"]["fallback"] == "market"
+    monkeypatch.setenv(tpc.ENV_SWITCH, "off")
+    prob_off, _meta_off = cgp._served(0.71, {}, "totals", league="ncaab", game_date="2026-11-18", segment="full")
+    assert prob_off == 0.71                                                  # the switch still means the engine's own
+
+
+def test_the_market_fallback_through_the_live_join_prices_no_edge(monkeypatch):
+    fb = tpc.TotalCalibration(league="ncaab", phase="live", as_of=dt.date(2026, 11, 17), a=0.0, c=0.0, games=285.0,
+                              source="fit.json", fallback="market")
+    _with_fit(monkeypatch, cal=fb)
+    rows = [_row()]
+    _attach(rows)
+    lg = rows[0]["live_gameline"]
+    assert lg["model_prob"] == pytest.approx(MARKET, abs=1e-9) and abs(lg["edge_pp"]) < 1e-6
+    assert lg["total_calibration"]["fallback"] == "market"
+    assert lg["model_prob_uncalibrated"] == pytest.approx(agresti_coull_point(0.70, 200), abs=1e-9)   # the refit still reads the engine
+
+
+def test_a_thin_or_raw_winning_phase_still_serves_raw(tmp_path):
+    _write_payload(tmp_path, {"live": {"calibrated": False, "a": 0.18, "c": 0.25, "games": 68.0,
+                                       "walk_forward": {"games": 25.0, "market": 0.2487, "raw": 0.2690, "calibrated": 0.2473}},
+                              "pregame": {"calibrated": False, "a": 0.0, "c": 0.0, "games": 300.0,
+                                          "walk_forward": {"games": 250.0, "market": 0.25, "raw": 0.24, "calibrated": 0.2515}}})
+    assert tpc.calibration_for("wncaab", "live", dt.date(2026, 11, 18), directory=tmp_path) is None
+    assert tpc.calibration_for("wncaab", "pregame", dt.date(2026, 11, 18), directory=tmp_path) is None
