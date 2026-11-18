@@ -143,3 +143,87 @@ def test_the_verdict_names_what_it_judged():
     assert verdict["overtime"] is False
     ot = lef.endgame_verdict("nhl", 4, 100, _ago(95), NOW)
     assert ot["overtime"] is True and ot["elapsed_share"] is None
+
+
+# ---------------------------------------------------------------- the engine expert (`live_resim_expert`)
+# Shapes copied from tests/test_engine_experts.py (`_evidence`, `_ledger`): a live NBA total, the evidence row's
+# state read at `as_of`, the line at `recorded_at`.
+
+LINE_AT = datetime(2026, 11, 10, 0, 20, 10, tzinfo=timezone.utc)
+
+
+def _evidence(*, period, clock, state_age, tick_age=None):
+    as_of = LINE_AT - timedelta(seconds=state_age)
+    t = LINE_AT - timedelta(seconds=state_age if tick_age is None else tick_age)
+    return {"t": t.isoformat(), "as_of": as_of.isoformat(), "event_id": "401909953",
+            "home_name": "Charlotte Hornets", "away_name": "Cleveland Cavaliers", "home": "CHA", "away": "CLE",
+            "refusal": None, "carried": False, "state": {"period": period, "clockSeconds": clock},
+            "totalRunsDist": {"210": 30, "214": 20, "218": 30, "222": 20},
+            "marginDist": {"-6": 25, "-2": 25, "3": 25, "8": 25}, "segments": {}, "modelHomeWinProb": 0.6,
+            "simsRun": 100}
+
+
+def _ledger(ev):
+    return {"v": 5, "sport": "nba", "recorded_at": LINE_AT.isoformat(), "event_id": "1df5ff8fe9c6d2dbff1d0ae176063b37",
+            "home_team": "Charlotte Hornets", "away_team": "Cleveland Cavaliers", "segment": "full",
+            "market": "totals", "line": 215.5, "market_fair_prob": 0.5, "model_home_win_prob": 0.5,
+            "live_state_as_of": ev["as_of"], "quote_age_seconds": 50.0, "sims_run": 100,
+            "point_estimator": "agresti_coull", "priceable": False}
+
+
+def _opine(ev, monkeypatch, *, mode=None, experts_off=None):
+    from syndicate.features.shared import engine_experts as ee
+
+    if mode is None:
+        monkeypatch.delenv(lef.MODE_ENV, raising=False)
+    else:
+        monkeypatch.setenv(lef.MODE_ENV, mode)
+    off = frozenset({experts_off}) if experts_off else frozenset()
+    return ee.live_resim_expert(_ledger(ev), ee.EvidenceIndex([ev]), ee.Reader(), off)
+
+
+def test_expert_off_differs_from_on_on_the_same_stale_end_game_input(monkeypatch):
+    """Reachability: one input, the switch the only difference. Off prices it as before; on refuses it by name."""
+    ev = _evidence(period=4, clock=60, state_age=45)
+    off = _opine(ev, monkeypatch, mode="off")
+    on = _opine(ev, monkeypatch, mode="on")
+    assert off.refusal is None and off.p_expert is not None
+    assert on.refusal == lef.REASON_STALE and on.p_expert is None and on.delta_logit is None
+    assert on.clock_bucket == "95-100" and on.inputs["state_age_s"] == 45.0
+
+
+def test_expert_absent_switch_is_shadow_it_records_and_refuses_nothing(monkeypatch):
+    ev = _evidence(period=4, clock=60, state_age=45)
+    shadow = _opine(ev, monkeypatch)
+    off = _opine(ev, monkeypatch, mode="off")
+    assert shadow.refusal is None and shadow.p_expert == off.p_expert and shadow.delta_logit == off.delta_logit
+    assert shadow.inputs["state_age_s"] == 45.0
+    assert shadow.inputs["endgame_freshness"] == lef.REASON_STALE
+
+
+def test_expert_off_and_the_experts_off_list_leave_the_opinion_exactly_as_before(monkeypatch):
+    ev = _evidence(period=4, clock=60, state_age=45)
+    for op in (_opine(ev, monkeypatch, mode="off"), _opine(ev, monkeypatch, mode="on", experts_off=lef.EXPERTS_FEATURE)):
+        assert op.refusal is None
+        assert "state_age_s" not in op.inputs and "endgame_freshness" not in op.inputs
+
+
+def test_expert_on_prices_a_fresh_end_game_state_and_any_state_before_the_end_game(monkeypatch):
+    fresh = _opine(_evidence(period=4, clock=60, state_age=20), monkeypatch, mode="on")
+    assert fresh.refusal is None and fresh.p_expert is not None and "endgame_freshness" not in fresh.inputs
+    early = _opine(_evidence(period=2, clock=360, state_age=600), monkeypatch, mode="on")
+    assert early.refusal is None and early.p_expert is not None and early.inputs["state_age_s"] == 600.0
+
+
+def test_expert_judges_the_state_time_not_the_tick(monkeypatch):
+    """NBA stamps its tick AFTER reading every game's state: a tick 5 s before the line can carry a state read 45 s
+    before it. `evidence_age_s` says 5; the rule must say 45 and refuse."""
+    ev = _evidence(period=4, clock=30, state_age=45, tick_age=5)
+    on = _opine(ev, monkeypatch, mode="on")
+    assert on.inputs["evidence_age_s"] == 5.0 and on.inputs["state_age_s"] == 45.0
+    assert on.refusal == lef.REASON_STALE
+
+
+def test_expert_overtime_is_end_game(monkeypatch):
+    on = _opine(_evidence(period=5, clock=200, state_age=60), monkeypatch, mode="on")
+    assert on.clock_bucket == "ot" and on.refusal == lef.REASON_STALE

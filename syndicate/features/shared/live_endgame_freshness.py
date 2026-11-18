@@ -60,6 +60,10 @@ MAX_STATE_AGE_SECONDS = 30.0
 REASON_STALE = "live_state_stale_in_endgame"
 REASON_TIME_ABSENT = "live_state_time_absent_in_endgame"
 
+# The engine experts' feature name for this rule in `SYNDICATE_ENGINE_EXPERTS_OFF` (the experts' `experts_off`):
+# listed, `live_resim_expert` neither records nor refuses anything for it, so its opinions are exactly what they were.
+EXPERTS_FEATURE = "endgame_freshness"
+
 # (regulation periods, seconds per period) -- the engine experts' `SPORT_CLOCK` for the same sports, so "the last 5%"
 # means here exactly what the engine read's 95-100 bucket meant. `tests/test_live_endgame_freshness.py` pins the two
 # tables equal, so neither can drift alone.

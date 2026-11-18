@@ -669,6 +669,29 @@ def live_resim_expert(ledger_row: Mapping[str, Any], index: EvidenceIndex, reade
     if p_prior is None:
         op.refusal = "no_prior"
         return op
+    # THE END GAME NEEDS A FRESH STATE (todo #836, lane live-resim-endgame-staleness, loan from engine-live-prior; user
+    # "Yes, lend it" 2026-11-18). In the last 5% of regulation or overtime, an opinion whose state was READ more than
+    # 30 s before the line lost to Kalshi by +0.174 nats (se 0.053, 767 dev line-instants, 85 games) while before 95%
+    # age barely mattered (`live_endgame_freshness` has the measurement). The age here is the line instant minus the
+    # row's own `as_of`, not `evidence_age_s`: NBA stamps its tick after reading every state, and NCAAF's state comes
+    # from a record older than its tick. Judged AFTER the refusals above, so they count exactly what they did before.
+    # `SYNDICATE_LIVE_ENDGAME_FRESHNESS` absent = shadow: the opinion records `state_age_s` and, when the rule would
+    # refuse, `endgame_freshness`, and refuses nothing; `on` refuses; `off` records nothing. `endgame_freshness` in
+    # `SYNDICATE_ENGINE_EXPERTS_OFF` also records nothing.
+    from syndicate.features.shared import live_endgame_freshness as endgame
+
+    endgame_mode = endgame.MODE_OFF if endgame.EXPERTS_FEATURE in off else endgame.mode()
+    if endgame_mode != endgame.MODE_OFF:
+        state, state_read_at = e("state"), e("as_of")
+        state_age = endgame.state_age_seconds(state_read_at, at)
+        op.inputs["state_age_s"] = None if state_age is None else round(state_age, 1)
+        state = state if isinstance(state, Mapping) else {}
+        verdict = endgame.endgame_verdict(sport, state.get("period"), state.get("clockSeconds"), state_read_at, at)
+        if verdict is not None:
+            op.inputs["endgame_freshness"] = verdict["withheld_reason"]
+            if endgame_mode == endgame.MODE_ON:
+                op.refusal = verdict["withheld_reason"]
+                return op
 
     if segment == "full":
         block_total, block_margin = e("totalRunsDist"), e("marginDist")
