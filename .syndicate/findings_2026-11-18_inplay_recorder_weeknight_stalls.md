@@ -205,3 +205,43 @@ Two probe changes landed on the branch after the registration above. Neither tou
 Smoke run at 9:34 AM CST through the same WMI launch, 3 slots per copy. The Idle copy read back class 64 and memory
 priority 2; the Normal copy read back class 32 and memory priority 5. All 6 requests answered in 0.20-0.29 s, with
 the host 58-78% busy.
+
+## 6. Fix LANDED on main, 2026-11-18 9:44 AM CST (`c0d9cf9b8`), before the probe reading
+
+**The user's yes.** The loan of `scripts/inplay_recorder.py` from lane `in-game-trading` (the process-priority setup
+only) was user-approved, "Approve the recorder loan for the priority fix", ~9:31 AM CST in session e6287e48. It is
+recorded in in-game-trading's block and in this lane's `Files:` line (`a554e13d1`, which `lane_claims` parses as
+honoured by in-game-trading). The landing yes was "Yes, land the priority fix", 9:33 AM CST in session e6287e48.
+Both were relayed by local_cbc2cd31, the session that started this lane. The user typed them there, not here.
+
+**Why landing before the reading is safe.**
+- The section 5 heading says "owed before landing", but the user's landing yes came first. Landing now and landing
+  after 9:30 PM CST reach the same 8:00 AM CST sync on 11-19, so the order changes nothing for any recording.
+- Tonight's (11-18) recording is untouched. The nightly syncs once, when its 8:00 AM run starts. Today's run (pid
+  21752, started 8:00:01 AM) synced before this landing. The task has one daily trigger with `IgnoreNew`.
+- So tonight's recorder still runs at Idle beside the probe's two arms.
+
+**What landed.** It is the drafted patch, byte for byte (+44/-11), plus `tests/test_inplay_recorder_priority.py`.
+- 20 tests pass: the 7 new ones, plus the existing discovery and repo-path tests.
+- The nightly does not fetch: it reads the primary tree's `origin/main` ref. That ref is shared by every worktree,
+  read `c0d9cf9b8` after this push, and carries `set_priority` and the `normal` default.
+- `inplay_nightly.py` passes no `--priority`, so the recorder takes the default, `normal`.
+
+**Live check of the raise.** A parent set itself to Idle class + memory priority 2, then started a child, the way
+the nightly starts the recorder.
+- The child inherited `0x40`/2.
+- After the patched `set_priority("normal")` it read back `0x20`/5.
+- With `set_priority("idle")` it stayed at `0x40`/2.
+- So raising out of the inherited Idle state needs no privilege the recorder lacks.
+
+**Verification owed (written before the 11-19 night).**
+1. **Branch reached.** At its 8:00 AM CST run on 11-19, the nightly's log shows a `SYNC` line with
+   `scripts/inplay_recorder.py` in `changed=`. Once the recorder starts on the 11-19 night, its process reads base
+   priority 8 (Normal), not 4.
+2. **Outcome on 11-19.** `inplay_poll_gaps` shows `loop_stalls` = 0, and no Kalshi request over 30 s in the 5-9 PM
+   CST window (11-16 and 11-17 each had several).
+   - This counts as a test only if the host is busy that evening. Without a host-busy reading (the probe does not
+     run on 11-19), a calm evening reads as NOT TESTABLE, not as a pass.
+   - The A/B that isolates priority is tonight's probe (section 5).
+3. **If tonight's probe FALSIFIES H1** (section 5's falsifier), the revert goes to the user before 8:00 AM CST on
+   11-19.
