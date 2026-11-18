@@ -60,7 +60,7 @@ No result guarantees future returns.
 | Layer 2 / evaluation ledger | first-sighting picks since ~10-07 | outcomes |
 | model scorecard / optimizer / sim-gap | daily since 09-17 | outcomes |
 | `book_quotes` (all books) | 120-day retention | closes |
-| in-play recorder (Kalshi 10 s, books, ESPN) | **29 nights, 14.4 GB; was only on C:\tmp; compressed copy started 11-18 to `~/syndicate-prod/data/research/inplay_recorder/`** | scores + settlement |
+| in-play recorder (Kalshi 10 s, books, ESPN) | **28 complete nights (10-20..11-17), 319 files, 14.1 GB; copied and compressed 11-18 to 1.4 GB in `~/syndicate-prod/data/research/inplay_recorder/` (319 of 319 verified; originals untouched on C:\tmp)** | scores + settlement |
 | Kalshi public trade prints | 3,566 games, 3.51M prints, 2025-07..2026-10-24 | results |
 | maker shadow, combos, cheat sheets / SGP paper, momentum-lag study | various | various |
 
@@ -91,7 +91,8 @@ No result guarantees future returns.
 
 ## Infrastructure that makes learning compound
 
-1. **I1: preserve history.** Copy the in-play recorder nightly into the fleet research store (11-18 backfill started, compressed; the
+1. **I1: preserve history.** Copy the in-play recorder nightly into the fleet research store (the 11-18 backfill is complete:
+   28 nights, 319 files, 1.4 GB compressed. Nights after 11-17 stay only on C:\tmp until a nightly copy exists; the
    recorder's owner, `in-game-trading`, should write there directly). Review retention for research families:
    `book_quotes` 120 d, `odds_history` 60 d, `venue_odds` 14 d.
 2. **I2: log the venue book at every fill:** both sides' asks and depth, at the moment of the order. Today 48% of
