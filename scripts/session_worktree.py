@@ -43,8 +43,9 @@ with `--with-data` and thereby says so out loud.
 STATUS: PROTOTYPE. `land` pushes to `main` and is the one command here that
 changes anything shared; it refuses on a dirty tree and prints what it would do
 under `--dry-run`. It REPORTS the ledger checkers rather than gating on them --
-see `_run_checkers`. `prune` deletes stale admin dirs under `.git/worktrees/`
-and is a dry run unless given `--apply`.
+see `_run_checkers`. `close` deletes only its own worktree's record. `prune`
+deletes other stale admin dirs under `.git/worktrees/` and is a dry run unless
+given `--apply`.
 """
 from __future__ import annotations
 
@@ -544,11 +545,57 @@ def _delete_branch(branch: str, main: Path, force: bool) -> int:
     return 0
 
 
-def _report_prune(pruned: subprocess.CompletedProcess) -> None:
-    stuck = (pruned.stderr or "").count("failed to delete")
-    if stuck:
-        print(f"note: `git worktree prune` could not delete {stuck} stale admin dir(s) -- "
-              "`session_worktree.py prune` says which are safe to remove.")
+def _own_admin_dir(path: Path, main: Path) -> Path | None:
+    """The `.git/worktrees/<id>` whose `gitdir` names `path` -- for when `path` is gone.
+
+    With the checkout deleted, `rev-parse` inside it cannot answer, so match the
+    record git keeps: `gitdir` holds `<path>/.git`. A husk whose `gitdir` is
+    already gone matches nothing and is left for `cmd_prune`. Nothing records
+    whose it was, and a basename guess could name another tree's record.
+    """
+    common = git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=main)
+    if common.returncode != 0:
+        return None
+    want = os.path.normcase(os.path.abspath(path / ".git"))
+    for gitdir in (Path(common.stdout.strip()) / "worktrees").glob("*/gitdir"):
+        try:
+            named = gitdir.read_text(encoding="utf-8", errors="replace").strip()
+        except OSError:
+            continue
+        if named and os.path.normcase(os.path.abspath(named)) == want:
+            return gitdir.parent
+    return None
+
+
+def _remove_own_admin(admin: Path | None) -> None:
+    """Delete THIS worktree's admin dir, and nothing else under `.git/worktrees/`."""
+    if admin is None or not admin.exists():
+        return
+    _clear_readonly(admin)
+    shutil.rmtree(admin, ignore_errors=True)
+    if admin.exists():
+        print(f"note: could not delete this worktree's own record {admin} -- "
+              "something holds a handle in it; `session_worktree.py prune` clears it later.")
+
+
+def _report_stale(main: Path) -> None:
+    """COUNT the stale admin dirs other worktrees left. Never delete them.
+
+    WHY close no longer runs `git worktree prune`. A real prune is repo-global:
+    it deletes EVERY record git judges stale, not this worktree's. That call came
+    in with `7e8715e8a` (2026-09-10), a week before learnings.md 2026-09-17 made
+    a session's `git worktree prune` FORBIDDEN, so every close by the book did
+    the forbidden step. Measured 2026-11-17 and again 2026-11-18: one close's
+    prune reached the same 20 other sessions' records, and only OneDrive's
+    READONLY bits stopped it, with exit 0. Close now removes its own record
+    (`_remove_own_admin`). The rest are `cmd_prune`'s, which holds any dir that
+    is a commit's last pointer or still has a checkout folder.
+    """
+    dry = git("worktree", "prune", "--dry-run", "--verbose", cwd=main)
+    stale = len(re.findall(r"^Removing worktrees/", dry.stdout + dry.stderr, re.M))
+    if stale:
+        print(f"note: {stale} stale admin dir(s) left by other worktrees -- close does not "
+              "touch them; `session_worktree.py prune` says which are safe to remove.")
 
 
 def cmd_close(args) -> int:
@@ -557,8 +604,10 @@ def cmd_close(args) -> int:
     main = _main_root()                  # resolved while REPO_ROOT still exists
     if not path.exists():
         print(f"nothing to close at {path}")
-        _report_prune(git("worktree", "prune", cwd=main))
-        # A close that died after deleting the directory left its branch here.
+        # A close that died after deleting the directory left its record and its
+        # branch here.
+        _remove_own_admin(_own_admin_dir(path, main))
+        _report_stale(main)
         return _delete_branch(branch, main, args.force)
 
     here = Path.cwd().resolve()
@@ -599,9 +648,10 @@ def cmd_close(args) -> int:
     # and a retry exits 128 "is not a working tree"), and the ones after the
     # fallback because `path` -- possibly REPO_ROOT itself -- is gone.
     #
-    # Falling back to a plain delete + prune is safe because the refusal checks
-    # above have already passed: the tree is clean and its commits are on
-    # origin/main, so there is nothing in it that git needs.
+    # Falling back to deleting the directory and THIS worktree's own record is
+    # safe because the refusal checks above have already passed: the tree is
+    # clean and its commits are on origin/main, so there is nothing in it that
+    # git needs. `admin` was read before the remove, so it names this tree only.
     removed = git("worktree", "remove", "--force", str(path), cwd=main)
     if removed.returncode != 0:
         shutil.rmtree(path, ignore_errors=True)
@@ -612,10 +662,9 @@ def cmd_close(args) -> int:
         said = (removed.stderr or removed.stdout).strip().splitlines()
         print(f"note: `git worktree remove` failed ({removed.returncode})"
               + (f": {said[-1][:200]}" if said else "")
-              + "; deleted the directory and pruned instead.")
-        if admin is not None and admin.exists():
-            _clear_readonly(admin)
-    _report_prune(git("worktree", "prune", cwd=main))
+              + "; deleted the directory and its own admin dir instead.")
+    _remove_own_admin(admin or _own_admin_dir(path, main))
+    _report_stale(main)
     code = _delete_branch(branch, main, args.force)
     print(f"closed {slug}" + ("" if code == 0 else " -- but its branch was KEPT (above)"))
     return code

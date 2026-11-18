@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import stat
 import subprocess
 from argparse import Namespace
@@ -231,6 +232,74 @@ def test_close_treats_an_uncountable_branch_as_unmerged(repo, monkeypatch):
     assert _branch_exists(repo, "session/uncountable")
 
 
+def _record_git(mod, monkeypatch) -> list[tuple]:
+    real, calls = mod.git, []
+
+    def git(*args, **kw):
+        calls.append(args)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(mod, "git", git)
+    return calls
+
+
+def _real_prunes(calls) -> list[tuple]:
+    return [a for a in calls if a[:2] == ("worktree", "prune") and "--dry-run" not in a]
+
+
+def test_close_leaves_other_worktrees_stale_records_alone(repo, monkeypatch, capsys):
+    """MEASURED 2026-11-17 and again 2026-11-18: close's own `git worktree prune` reached
+    the same 20 OTHER sessions' records, and only OneDrive's READONLY bits refused it
+    (exit 0). A prune is repo-global; close must take its own record and nothing else."""
+    mine = _open(repo, "mine")
+    peer = _open(repo, "peer")
+    shutil.rmtree(peer)                                            # its record is now stale
+    admin_root = repo.main / ".git" / "worktrees"
+    husk = admin_root / "peer-husk"                                # no gitdir: nobody's, by record
+    (husk / "logs").mkdir(parents=True)
+    (husk / "ORIG_HEAD").write_text(_git("rev-parse", "HEAD", cwd=repo.main) + "\n")
+    dry = subprocess.run(["git", "worktree", "prune", "--dry-run", "--verbose"],
+                         cwd=str(repo.main), capture_output=True, text=True)
+    said = dry.stdout + dry.stderr
+    assert "worktrees/peer:" in said and "worktrees/peer-husk:" in said, said   # CONTROL
+    mod = _load("scoped")
+    monkeypatch.setattr(mod, "REPO_ROOT", mine)
+    calls = _record_git(mod, monkeypatch)
+
+    assert _close(mod, repo, "mine") == 0
+
+    assert not mine.exists() and not (admin_root / "mine").exists()
+    assert not _branch_exists(repo, "session/mine")
+    assert (admin_root / "peer").exists() and husk.exists()
+    assert _branch_exists(repo, "session/peer")
+    assert _real_prunes(calls) == []
+    assert "2 stale admin dir(s) left by other worktrees" in capsys.readouterr().out
+
+
+def test_rerun_close_removes_its_own_stale_record_and_no_other(repo, monkeypatch, capsys):
+    """`nothing to close at <path>` used to prune the whole repo to clear its own record.
+    It now finds that record by its `gitdir` and deletes only it."""
+    admin_root = repo.main / ".git" / "worktrees"
+    for slug in ("crashed", "peer2"):
+        shutil.rmtree(_open(repo, slug))
+        assert (admin_root / slug / "gitdir").exists()
+    if ON_WINDOWS:
+        _set_readonly_dirs(admin_root / "crashed")                 # the shape OneDrive leaves
+    mod = _load("rerun_scoped")
+    monkeypatch.setattr(mod, "REPO_ROOT", repo.main)
+    calls = _record_git(mod, monkeypatch)
+
+    assert _close(mod, repo, "crashed") == 0
+
+    assert "nothing to close" in capsys.readouterr().out
+    assert not (admin_root / "crashed").exists()
+    assert "crashed" not in _listed_names(repo)
+    assert not _branch_exists(repo, "session/crashed")
+    assert (admin_root / "peer2").exists()
+    assert "peer2" in _listed_names(repo)
+    assert _real_prunes(calls) == []
+
+
 def test_prune_deletes_only_husks_whose_commits_live_on_elsewhere(repo, monkeypatch, capsys):
     """A husk may hold the last pointer to a commit. Delete it only when that commit is
     reachable, or was rebased (same author time, email and subject) onto something that is."""
@@ -248,7 +317,7 @@ def test_prune_deletes_only_husks_whose_commits_live_on_elsewhere(repo, monkeypa
         if ON_WINDOWS:
             _set_readonly_dirs(admin_root / name)
     if ON_WINDOWS:
-        _git("worktree", "prune", cwd=main, check=False)            # what every close does today
+        _git("worktree", "prune", cwd=main, check=False)            # what every close did to 2026-11-18
         assert all((admin_root / n).exists() for n in husks), "precondition: git cannot delete them"
 
     mod = _load("prune")
