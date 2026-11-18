@@ -22,11 +22,29 @@ LIVE hour, 0.007%/h of the 5M monthly cap.
 Stop: --until is a hard cap. --stop-after-final-minutes N also stops N minutes
 after every ESPN game of the slate (ESPN `dates=<date>`) is final/postponed.
 Finalized Kalshi tickers are polled once more for their result, then dropped.
+
+Which Kalshi markets (lane inplay-recorder-discovery, 2026-11-17): every
+--tickers-seconds, the union of (a) Kalshi's own public listing of tonight's
+full-game markets (`FULL_GAME_SERIES`, `discover_tickers`) and (b) the fleet's
+capture file `venue_odds/kalshi__<sport>__<date>.json`. A ticker stays polled
+until its result is recorded, even if both sources stop listing it. The capture
+file alone was capped at 8,000 markets (`venue_daily_odds.MAX_MARKETS_PER_FILE`),
+and on NCAAF Saturday 2026-11-14 it sat at the cap, so markets dropped in and out
+of the list for 10 to 80 minutes at a time.
+
+How fast: every Kalshi request, poll or discovery, waits its turn at
+--kalshi-rate (2.5/s), with --kalshi-batch (100) tickers per poll request. A 429
+ends that cycle; the next cycle starts at the batch that failed. Until 2026-11-17
+the loop fired each cycle's 50-ticker batches back to back (~5 req/s) and started
+every cycle at the top of the sorted list. A 429 then cut most Saturday cycles
+short, and the tail of the list went unpolled: on 11-14 that meant 90,485
+gaps > 120 s, against 387 from the cap.
 """
 
 from __future__ import annotations
 
 import argparse
+import bisect
 import ctypes
 import json
 import os
@@ -49,6 +67,18 @@ SPORTS = {
 }
 DONE_STATUS = {"STATUS_POSTPONED", "STATUS_CANCELED", "STATUS_FORFEIT"}
 FULL_GAME = {"h2h", "spreads", "totals"}
+# Kalshi's full-game series per sport, listed by `discover_tickers`. These are exactly
+# the families the capture file has fed this recorder on every night checked (11-07,
+# 11-13..11-16). KXNHLTOTAL is left out: it has never come through the capture file,
+# and adding it would put an NHL totals population into lane in-game-trading's stage-2
+# scoreboard (inplay_fair_score scores any *TOTAL family). That is the lane's call.
+FULL_GAME_SERIES = {
+    "nba": ("KXNBAGAME", "KXNBASPREAD", "KXNBATOTAL"),
+    "nhl": ("KXNHLGAME", "KXNHLSPREAD"),
+    "nfl": ("KXNFLGAME", "KXNFLSPREAD", "KXNFLTOTAL"),
+    "ncaaf": ("KXNCAAFGAME", "KXNCAAFSPREAD", "KXNCAAFTOTAL"),
+}
+MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
 
 
 def now() -> str:
@@ -99,6 +129,107 @@ def kalshi_tickers(root: Path, sports, date: str) -> list[str]:
     return sorted(set(out))
 
 
+def date_code(date: str) -> str:
+    """'2026-11-14' -> '26NOV14', the date segment of a Kalshi event ticker
+    (KXNCAAFGAME-26NOV14VALPSTET). Not strftime('%b'): that is locale-dependent."""
+    y, m, d = (int(x) for x in date.split("-"))
+    return f"{y % 100:02d}{MONTHS[m - 1]}{d:02d}"
+
+
+def on_date(event_ticker, code: str) -> bool:
+    parts = str(event_ticker or "").split("-", 2)
+    return len(parts) > 1 and parts[1].startswith(code)
+
+
+class Pacer:
+    """At most `rate` Kalshi requests per second, evenly spaced (no bursts)."""
+
+    def __init__(self, rate: float, clock=time.monotonic, sleep=time.sleep):
+        self.interval = 1.0 / rate if rate > 0 else 0.0
+        self.clock, self.sleep, self.next_at = clock, sleep, 0.0
+
+    def wait(self) -> None:
+        t = self.clock()
+        if t < self.next_at:
+            self.sleep(self.next_at - t)
+            t = self.next_at
+        self.next_at = t + self.interval
+
+
+def discover_tickers(sports, date: str, get=None, pace=None, sleep=time.sleep, max_pages: int = 20):
+    """Tonight's full-game Kalshi tickers from the PUBLIC listing: (sorted tickers, errors).
+
+    `status=open` lists every date's open markets in a series (measured 2026-11-17: 15
+    requests, ~11 MB, for all twelve series); the event ticker's date code keeps
+    tonight's. A market drops out of this listing once it closes, which is why the
+    caller keeps every ticker it has seen until the result is recorded. One series
+    failing leaves the others; a 429 also waits 5 s, as the poll loop does."""
+    get = get or get_json
+    code = date_code(date)
+    found: set[str] = set()
+    errors: list[str] = []
+    for s in sports:
+        for series in FULL_GAME_SERIES.get(s, ()):
+            cursor = ""
+            for _ in range(max_pages):
+                if pace:
+                    pace()
+                q = f"?series_ticker={series}&status=open&limit=1000"
+                if cursor:
+                    q += "&cursor=" + urllib.parse.quote(cursor, safe="")
+                try:
+                    d, _ = get(KALSHI + q, timeout=30.0)
+                except Exception as e:  # noqa: BLE001
+                    errors.append(f"{series}: {e!r}"[:200])
+                    if "429" in repr(e):
+                        sleep(5.0)
+                    break
+                ms = d.get("markets") or []
+                found.update(str(m["ticker"]) for m in ms if m.get("ticker") and on_date(m.get("event_ticker"), code))
+                cursor = d.get("cursor") or ""
+                if not cursor or not ms:
+                    break
+    return sorted(found), errors
+
+
+def refresh_tickers(known: set, root: Path, sports, date: str, extra, discover: bool, pace=None, get=None):
+    """Grow `known` with this refresh's tickers; return (sorted list, log fields).
+
+    Both sources are unioned and NOTHING is dropped here: a ticker leaves the poll
+    list only once its result is recorded (the caller's `settled`)."""
+    cap = kalshi_tickers(root, sports, date)
+    found, errors = discover_tickers(sports, date, get=get, pace=pace) if discover else ([], [])
+    known |= set(cap) | set(found) | set(extra)
+    cs, fs = set(cap), set(found)
+    return sorted(known), {"capture": len(cs), "discovered": len(fs), "discovered_only": len(fs - cs),
+                           "capture_only": len(cs - fs), "discover_errors": errors[:5]}
+
+
+def poll_cycle(polled, start_at: str, batch: int, get, pace, on_market, on_error, sleep=time.sleep) -> str:
+    """One pass over the sorted `polled` list, `batch` tickers per request, starting at
+    the first ticker >= `start_at` and wrapping round. Returns where the next cycle
+    starts: "" after a full pass, or the first ticker of the batch a 429 stopped. So a
+    429 delays that batch by one cycle instead of starving every ticker after it."""
+    if not polled:
+        return ""
+    i0 = bisect.bisect_left(polled, start_at) % len(polled) if start_at else 0
+    order = polled[i0:] + polled[:i0]
+    for i in range(0, len(order), batch):
+        chunk = order[i:i + batch]
+        pace()
+        try:
+            d, _ = get(KALSHI + f"?limit={max(100, batch)}&tickers=" + ",".join(chunk))
+            ts = now()
+            for m in d.get("markets", []):
+                on_market(ts, m)
+        except Exception as e:  # noqa: BLE001
+            on_error(e)
+            if "429" in repr(e):
+                sleep(5.0)
+                return chunk[0]
+    return ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", required=True)
@@ -107,6 +238,12 @@ def main() -> int:
     ap.add_argument("--fleet-root", default=r"\\wsl.localhost\Ubuntu-24.04\home\amyn\syndicate-prod\data\reports\intelligence\venue_odds")
     ap.add_argument("--env", default=default_env_file())
     ap.add_argument("--kalshi-seconds", type=float, default=10.0)
+    ap.add_argument("--kalshi-rate", type=float, default=2.5,
+                    help="ceiling on Kalshi requests per second, polls and discovery alike, evenly spaced")
+    ap.add_argument("--kalshi-batch", type=int, default=100, help="tickers per Kalshi poll request (measured: 200 work)")
+    ap.add_argument("--tickers-seconds", type=float, default=600.0, help="how often the Kalshi ticker list is refreshed")
+    ap.add_argument("--no-discover", action="store_true",
+                    help="take Kalshi tickers from the fleet capture file only (the pre-2026-11-17 source)")
     ap.add_argument("--fleet-seconds", type=float, default=60.0)
     ap.add_argument("--books-seconds", type=float, default=60.0)
     ap.add_argument("--regions", default="us,eu", help="OddsAPI regions; each adds 3 credits per call")
@@ -140,42 +277,45 @@ def main() -> int:
         files[name].write(json.dumps(row, separators=(",", ":")) + "\n")
         files[name].flush()
 
-    tickers, tick_at, last_k, last_f, last_b = [], 0.0, 0.0, 0.0, 0.0
+    tickers, tick_at, last_k, last_f, last_b = [], -1e9, 0.0, 0.0, 0.0
+    known: set[str] = set()  # every Kalshi ticker listed tonight by either source; never shrinks
+    resume_at = ""  # where the next Kalshi cycle starts ("" = the top); set by a 429
+    pacer = Pacer(a.kalshi_rate)
     poly_seen: dict[str, str] = {}
     settled: set[str] = set()  # tickers whose result has been recorded: not polled again
     espn_states: dict[str, dict[str, str]] = {}  # sport -> {event id: "pre"|"in"|"done"}
     last_open_t = time.time()  # last time any slate game was not done
     ymd = a.date.replace("-", "")
+
+    def on_market(ts, m):
+        if m.get("result") and m.get("status") in ("finalized", "settled", "determined"):
+            settled.add(m.get("ticker"))
+        emit("kalshi", {"ts": ts, "t": m.get("ticker"), "ev": m.get("event_ticker"),
+                        "st": m.get("status"), "ya": m.get("yes_ask_dollars"), "yb": m.get("yes_bid_dollars"),
+                        "na": m.get("no_ask_dollars"), "nb": m.get("no_bid_dollars"),
+                        "yas": m.get("yes_ask_size_fp"), "ybs": m.get("yes_bid_size_fp"),
+                        "lp": m.get("last_price_dollars"), "vol": m.get("volume_fp"),
+                        "sub": m.get("yes_sub_title"), "fs": m.get("floor_strike"), "res": m.get("result")})
+
+    def on_error(e):
+        emit("log", {"ts": now(), "event": "kalshi_error", "err": repr(e)[:300]})
+
     while datetime.now(timezone.utc) < until:
         t = time.time()
-        if t - tick_at > 600 or not tickers:
+        # Refresh: on schedule, or (when the list is still empty) once a minute -- not every
+        # 1 s loop, now that a refresh asks Kalshi ~15 requests.
+        if t - tick_at >= a.tickers_seconds or (not tickers and t - tick_at >= 60):
             extra = [x.strip() for x in a.extra_tickers.split(",") if x.strip()]
-            tickers, tick_at = sorted(set(kalshi_tickers(root, sports, a.date)) | set(extra)), t
-            emit("log", {"ts": now(), "event": "tickers", "n": len(tickers), "settled": len(settled & set(tickers))})
+            tickers, info = refresh_tickers(known, root, sports, a.date, extra, not a.no_discover, pace=pacer.wait)
+            tick_at = t
+            emit("log", {"ts": now(), "event": "tickers", "n": len(tickers), "settled": len(settled & set(tickers)), **info})
         polled = [x for x in tickers if x not in settled]
-        # A full NCAAF Saturday is ~3,400 tickers = 68 requests: stretch the
-        # cycle so the public endpoint is not asked for more than ~2.5 req/s.
-        if t - last_k >= max(a.kalshi_seconds, 0.4 * ((len(polled) + 49) // 50)):
+        # The pacer holds every request to --kalshi-rate, so a cycle of n requests takes
+        # n / rate seconds; a short list still waits --kalshi-seconds between cycles.
+        n_req = (len(polled) + a.kalshi_batch - 1) // a.kalshi_batch
+        if t - last_k >= max(a.kalshi_seconds, n_req / max(a.kalshi_rate, 1e-9)):
             last_k = t
-            for i in range(0, len(polled), 50):
-                batch = polled[i:i + 50]
-                try:
-                    d, _ = get_json(KALSHI + "?limit=100&tickers=" + ",".join(batch))
-                    ts = now()
-                    for m in d.get("markets", []):
-                        if m.get("result") and m.get("status") in ("finalized", "settled", "determined"):
-                            settled.add(m.get("ticker"))
-                        emit("kalshi", {"ts": ts, "t": m.get("ticker"), "ev": m.get("event_ticker"),
-                                        "st": m.get("status"), "ya": m.get("yes_ask_dollars"), "yb": m.get("yes_bid_dollars"),
-                                        "na": m.get("no_ask_dollars"), "nb": m.get("no_bid_dollars"),
-                                        "yas": m.get("yes_ask_size_fp"), "ybs": m.get("yes_bid_size_fp"),
-                                        "lp": m.get("last_price_dollars"), "vol": m.get("volume_fp"),
-                                        "sub": m.get("yes_sub_title"), "fs": m.get("floor_strike"), "res": m.get("result")})
-                except Exception as e:  # noqa: BLE001
-                    emit("log", {"ts": now(), "event": "kalshi_error", "err": repr(e)[:300]})
-                    if "429" in repr(e):
-                        time.sleep(5.0)
-                        break
+            resume_at = poll_cycle(polled, resume_at, a.kalshi_batch, get_json, pacer.wait, on_market, on_error)
         if t - last_f >= a.fleet_seconds:
             last_f = t
             for s in sports:
