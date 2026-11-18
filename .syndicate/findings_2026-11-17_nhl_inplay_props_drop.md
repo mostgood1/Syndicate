@@ -107,6 +107,10 @@ Today: the props drop. The overlay drops every lapsed line, and web falls back t
 shortlist. With one capture clock, every line lapses at once. The display choice is put to the user. See
 "Decisions owed".
 
+**DECIDED 2026-11-18 7:42 AM CST, the user, this session: "Drop it (today)".** A lapsed line keeps dropping, and nothing carries the last price. The fix is
+the capture cadence alone (the pull below). No change to `book_grid_artifact.py`; the per-line carry
+helper is not built.
+
 ## The props-side fix (built, OFF by default, on main `9f911cb98`, NOT loaded)
 
 An NHL in-play props pull on its own clock, outside the shared sweep: the lane every other live sport
@@ -158,6 +162,6 @@ oddsapi prop capture, from `refresh-worker.log` and the shard.
 
 ## Decisions owed (the user's)
 
-1. **Display when a line's quote lapses** — today it drops. The alternative: keep the last price, marked
-   as aged.
+1. **Display when a line's quote lapses** — DECIDED 2026-11-18 7:42 AM CST, the user, this session: "Drop it (today)". It keeps dropping; the
+   alternative (keep the last price, marked as aged) is not built.
 2. **Load the NHL in-play props pull** — the cost above, a live-odds-worker restart, and the switch on.
