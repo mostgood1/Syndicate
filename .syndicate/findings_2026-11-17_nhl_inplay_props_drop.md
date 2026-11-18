@@ -164,4 +164,28 @@ oddsapi prop capture, from `refresh-worker.log` and the shard.
 
 1. **Display when a line's quote lapses** — DECIDED 2026-11-18 7:42 AM CST, the user, this session: "Drop it (today)". It keeps dropping; the
    alternative (keep the last price, marked as aged) is not built.
-2. **Load the NHL in-play props pull** — the cost above, a live-odds-worker restart, and the switch on.
+2. **Load the NHL in-play props pull** — DECIDED 2026-11-18 ~7:45 AM CST, the user, this session: "Yes, load it".
+   LOADED 14:05:39Z (8:05 AM CST) by env key + a drained full down/up at `2ae0c646a`; deploys.md 2026-11-18 14:05:18Z.
+
+## Addendum 2026-11-18 8:15 AM CST — the whole night, and what the shard cannot see
+
+The 76-of-76 split above covers 00:07–02:41Z. Re-run over the whole night (23:30Z–05:54Z, 239 NHL
+overlay builds; `C:\tmp\nhlprops_load\reading\nhlprops_captures.py 2026-11-17 2026-11-17T23:30`):
+
+- **220 of 239 fit the 300 s rule** (163 full with fresh props, 57 dropped with stale props).
+- **First run read 41 "full but stale" builds. 34 were my join's error.** From ~03:20Z an OddsAPI prop capture
+  wrote over 1–4 minutes (e.g. 04:58:13–05:00:36Z), and the join aged each build from the previous capture
+  group's END. Aged from the newest prop row captured at or before the build, 7 remain.
+- **The 7 are the instrument, not the rule.** The quote shard holds a row only when a price MOVED. A capture
+  that saw every prop unmoved still refreshes the quote's last-seen, which is what the overlay ages on, and
+  leaves no row. The state file proves it: NHL prop keys last seen at 03:59Z (8), 04:33Z (6) and 04:53Z (6),
+  minutes with 0 prop rows in the shard. Those cover the 04:03Z and 04:53–04:57Z builds. The 03:16Z build
+  (114 rows) had Kalshi `venue_direct` prop rows that minute (104 rows; Kalshi totals over the night
+  1,170 rows in 26 captures, median gap 617 s).
+- **12 "drops" at 05:34–05:44Z are not drops.** They had 60–67 rows with props 23–237 s old, with one or two
+  games left. A fixed row cut (99) does not scale with the number of live games.
+- The grid-to-overlay lag is not a factor: 1–15 s (e.g. quote read 04:52:20.5Z, overlay 04:52:22.0Z).
+
+**Consequence for the reading:** a shard-only join undercounts captures late in a game, when prices move less.
+The NHL in-play pull prints one `[nhl_inplay_props] PULL {...}` line per capture, rows or not, and the join
+now counts those lines as capture instants. Pick the drop cut from the night's own full level.
