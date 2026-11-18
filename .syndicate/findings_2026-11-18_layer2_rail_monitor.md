@@ -225,3 +225,38 @@ chips 0.8 s; live-rail 0.09 s.
 - Today's own block in `state_meta.dates` read **2026-11-18 written 18:27:50Z (343 s)**, state 18:30:57Z. The state history
   appends every ~5 min (last at 12:31:29 PM).
 - Fixed in this lane's probe: it now also prints `query_today_age_s` from `state_meta.dates[<rail date>]`.
+
+## Reading 3 — Wed 11-18 1:14 PM CST (19:14Z)
+
+**Fleet:** **`db6a395ed` since 1:14:21 PM CST.**
+- That load was web's hard-recycle fix (lane `web-silent-worker-kills`, deploys.md 19:14:22Z). It is an ff of 84 commits.
+- Runtime ride-alongs: `nba/live_resim.py` total anchor (`88193c0a7`, **default OFF**, `SYNDICATE_NBA_LIVE_TOTAL_ANCHOR`) and
+  `live_endgame_freshness.py` / `live_gameline_join.py` #836 (**absent = shadow**, `SYNDICATE_LIVE_ENDGAME_FRESHNESS`).
+  Neither changes a price while its switch is unset.
+- Host load 7.2 (9.9 at 1:10 PM).
+
+**Slate:** 5 live. Flags 1 shown, 0 false, 0 missed, 0 dark. P1: 0 college totals flags, so 0 contradictions. P6: 0. #824: 0.
+
+**Live rows:** 18. 6 priced <= 120 s.
+
+**Overlay (since 12:33 PM):** **1 gap over 360 s: WNCAAB 691 s**, with **7 stale web merges (all WNCAAB)** of 55. Tick gap max 118 s.
+
+**Board: 3 builds, 497 / 547 / 646 s, all over 300 s**; the shortlist span reached 390 s. Today's board was 437 s old at the read.
+- **Board CPU per build, by hour (UTC):** 06-13Z p50 90-105 cpu-s; 14Z 117; 15Z 129; 16Z 219; 17Z 170; 18Z 239; 19Z 602.
+  The work per build grew about 5x since morning, while off-CPU stayed 5-17%. So it is the build's own work growing,
+  not contention.
+- The 1:14 PM ff cannot explain it: the board child is a long-running `--serve` process (up 3.5 h) that does not
+  reload code.
+- Signs of what grows: VENUE_REPRICE_KEYS unmatched nba 20,262 at 12:21 PM; ncaaf GRID_REPRICE sides 3,529.
+- **P2 is at risk before the evening starts.** The 1 PM median (547 s) is already 2x the 253 s evening target.
+  Becomes **A-1**; a session card is proposed (unowned; the board split's session is archived).
+
+**Live odds lane:** 8 launched, 3 refused (27%). One live run took **514 s**; one pregame run 574 s. NHL odds child 206 s old (under 600 s).
+
+**Load:** query 15.0 s (r2 16.1 s, r1 4.5 s); shortlist 1.2 s.
+
+**Team cards:** 0 defects.
+
+**Dashboard:** the user asked for a live dashboard like the portfolio monitor's: "Rail Watch",
+https://claude.ai/artifact/HoJ2n52ewHZnVDbN2LpxaJ. Each reading re-uploads `readings.json`, `findings.json` and
+`loads.json` (rows built by `C:\tmp\railmon\dash\dash_update.py` from the probe plus `dash\d4metrics.py`).
