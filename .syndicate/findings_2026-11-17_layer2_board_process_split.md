@@ -79,6 +79,36 @@ Per stage (median over the window; calm reference 22:41Z 11-17: overview 1.4 s, 
   level down: the VM's busy vCPUs (~7.8) get ~4 physical cores, and an Idle-priority job that does not preempt the
   fleet still costs it clock (all-core frequency at 56-64%).
 
+### Reading 2b — the host, again, with the commands (8:05-8:06 PM CST 11-17)
+
+Windows PowerShell, read-only, no admin:
+
+```powershell
+Get-Counter '\Processor Information(_Total)\% Processor Time','\Processor Information(_Total)\% Processor Performance',
+  '\Processor Information(_Total)\Processor Frequency','\Process(*)\% Processor Time' -SampleInterval 10 -MaxSamples 1
+Get-CimInstance Win32_Processor | Select Name, MaxClockSpeed, NumberOfCores      # X1E80100, 3,417 MHz, 12 cores
+Get-CimInstance Win32_Battery | Select BatteryStatus, EstimatedChargeRemaining   # 2 = on AC, 80%
+powercfg /getactivescheme   # Balanced; AC overlay (HKLM ...\Power\User\PowerSchemes ActiveOverlayAcPowerScheme) ded574b5-...
+```
+
+| 10 s sample (CST) | host busy | perf % of nominal | MHz | vmmemwsl (% of 1 core) | MsMpEng | System |
+|---|---|---|---|---|---|---|
+| 20:05:35 | 100% | 60 | 2,188 | 393 | 135 | 54 |
+| 20:05:45 | 100% | 64 | 2,188 | 501 | 114 | 42 |
+| 20:05:55 | 100% | 59 | 1,920 | 626 | 97 | 66 |
+
+Summed by Windows priority class at 20:06:26 (10 s): vmmemwsl 643%, `remoting_network` 95% + `remoting_desktop` 19%
+(a remote-desktop session), System 78%, MsMpEng 29%, Normal-class processes 85%, Idle-class 20%. So at this moment
+the saturation is mostly the fleet VM itself plus System / remoting / Defender; the Idle-class research jobs were small.
+Inside WSL at the same hour the rail monitor read load 8.6-10.1 with 2-3 vCPUs idle (its reading 14, 01:40Z) — the
+clock is the cost every role pays, not the VM's vCPU count.
+
+**Peer reading (rail monitor, reading 14, 7:39 PM CST; `findings_2026-11-17_layer2_rail_monitor.md`).** The 1,510 s
+build's same window (01:11-01:40Z) had 21 BOOK_GRID_TICKs (60-80 in earlier windows), NBA / NCAAB / NHL grid build
+p50 51.5 / 35 / 34 s, and web's in-play overlay merge stale on 19 of 36 lines. Two drains tonight (23:09-23:46Z,
+01:08-01:28Z) never reached an idle worker: **a refresh-worker load in the live evening is not feasible**, so any load of
+this change goes after the slate, and the first live evening after it is the reading.
+
 ## Reading 3 — tonight per stage, WSL-native sampler with `schedstat` (from 7:37 PM CST)
 
 `build_intelligence_overview` for board date 11-18, 7:51:46-7:54:32 PM CST (01:51:46-01:54:32Z), **165.6 s wall**
