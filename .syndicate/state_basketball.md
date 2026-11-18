@@ -1281,6 +1281,14 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Games history is re-fetched when the schedule shows newer finals,** not only when the newest game is more than 30 days old (`basketball_games_history_freshness.py`, 360-min cooldown).
   - WNBA in production 02:56-02:59Z 10-14: history 10-02 -> 10-09 (2,490 games); `features.csv` rebuilt.
   - **NBA half inert:** NBA `fetch-schedule` only writes `schedule_2025_26.csv` (fleet file ends 04-12). The 2026-27 season starts 10-20. Unfixed.
+- **The NBA games history is DUPLICATED and its fetch outlives the live lane's step** `[verified 2026-11-18 ~1:30 PM CST, fleet read-only, lane nba-midnight-bootstrap-hold, todo #843]`:
+  - `raw/games_nba_api.csv` holds 1,563 rows for 196 current-season games (up to 16 copies of a game); the newest game is 11-15.
+  - The cause is a game-id mismatch: the CSV round-trips `0022600001` as `22600001`. So:
+    - every completed `cli fetch` appends one more copy of the season;
+    - its quarter walk asks BoxScoreSummaryV2 for every game of the season.
+  - Pre-game Elo at each team's latest game, duplicated minus de-duplicated: mean |d| 119, max 293 (30 teams). `predict-date` builds `elo_diff` from this history.
+  - The bootstrap fetch timeout is 2,700 s against a 1,800 s step. 4 of 10 live-lane midnights (11-09..11-18) were killed inside it.
+  - Fix on main `4178ba866` behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED`, absent = OFF. **NOT LOADED; it is a betting change, so it waits for a window.**
 - **Readings owed at WNBA Finals G1 (10-17) lines:**
   - `player_logs.csv` rewritten through 10-09+.
   - A new `calibration_totals_*.json`.

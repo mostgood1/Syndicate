@@ -1557,6 +1557,18 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### nba-midnight-bootstrap-hold — OPEN — opened 2026-11-18 — session 11c3b7a0-f76e-4289-b46e-6120e246e907
+- **GOAL VERDICT 2026-11-18 1:35 PM CST.**
+  - Goal, verbatim: "The ~12:01 AM CST nba+ncaab+wncaab pregame run on live-odds-worker's live odds lane stops holding the lane for 1,800 s: the hung call and its launcher named with a nightly rate 11-10..11-19; the first night on the 2ae0c646a deadline read; the cause fixed on main behind a switch with an off != on reachability test and a pre-registered numeric prediction; findings file; the load decision put to the user"
+  - **GOAL: NOT MET.**
+  - Done:
+    - the hung call, the launcher and the rate (4 of 10 nights 11-09..11-18);
+    - the fix on main `4178ba866` behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED` (absent = OFF), with the off != on tests;
+    - the prediction (P1-P6), the findings file, and the load put to the user.
+  - Left:
+    - the 11-19 00:01 CST reading on `2ae0c646a` (not yet happened at the checkpoint; prediction in findings §7);
+    - the lane does not stop being held until the switch is on, and that load is a betting change for the user to
+      decide (11-24 window, or an exception);
+    - P1-P6 are read after that load.
 - Goal: The ~12:01 AM CST nba+ncaab+wncaab pregame run on live-odds-worker's live odds lane stops holding the lane for 1,800 s: the hung call and its launcher named with a nightly rate 11-10..11-19; the first night on the 2ae0c646a deadline read; the cause fixed on main behind a switch with an off != on reachability test and a pre-registered numeric prediction; findings file; the load decision put to the user
 - Files: scripts/refresh_nba_oddsapi_props.py (the source-bootstrap games-history fetch call + the new _games_history_fetch_timeout_seconds helper ONLY), syndicate/features/nba/source_cli/scrape_nba_api.py (the new bounded-fetch helpers + fetch_games_nba_api line-score and save sections ONLY), tests/test_nba_history_fetch_deadline.py (NEW), .syndicate/findings_2026-11-18_nba_midnight_bootstrap_hold.md (NEW), docs/ai_context/todo.md (the #843 item section ONLY)
 - Hypothesis: Stated 2026-11-18 1:10 PM CST. Already read when stated: the 11-18 run (odds_refresh_20261118_060115) and its NBA props log, which put the child in 'cli fetch --years 1' from 06:01:31Z to its kill at 06:30:40Z. H1 (the hung call): after the 00:00 CST roll the first NBA props run of the new date has no predictions_<D>.csv, so it runs the source bootstrap; the games history is behind the schedule (yesterday's finals), so it runs 'cli fetch --years 1' with a 2,700 s subprocess timeout, LONGER than the 1,800 s step timeout. The fetch re-requests BoxScoreSummaryV2 line scores for every current-season game whose home_q1 is missing; BoxScoreSummaryV2 has no data for games after 2025-04-10, so that is every 2026-27 game, every night, at >= 0.7 s a game plus 30 s timeouts x up to 4 attempts. Its length grows with games played and stats.nba.com latency and crosses 1,800 s; the kill writes no history, so the next night is behind again. H2 (the launcher): live-odds-worker's first pregame sweep after the 00:00 CST date roll (nba+ncaab+wncaab with --force-refresh-sports nba,wnba). H3 (the rate): every night 11-10..11-19 whose first NBA run fetched has a long NBA step; a night with no fetch (cooldown or not behind) has a short one. H4 (the 2ae0c646a deadline): the step still runs to 1,800 s and NBA's result for that run is lost, so the lane is still held ~30 min
