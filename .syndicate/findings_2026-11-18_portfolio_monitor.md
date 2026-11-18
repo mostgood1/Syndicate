@@ -467,3 +467,57 @@ paid at entry) and F12 (gate cadence), both waiting on the user.
 - Cap use: kalshi 15.5%, polymarket 15.0%.
 - `/portfolio` 2.17 s of 3.0 (slow-ish, same minute).
 - Gate: BC-048, 0 of 800.
+
+## Reading 40 — Wed 11-18 10:56 AM CST (16:56Z), window 35 min
+
+**Results first.** No new grades: 30 d -7.35% [-12.8, -1.9] on 673 games, fee-net CLV -0.36 pp.
+
+**Betting changes 6 and 7 in about 32 h: BC-049 (16:07:01Z) and BC-050 (16:45:40Z)**, lane `odds-lane-sport-deadline`.
+- **BC-049:** NHL pregame generation runs after every other sport's odds, with a 900 s deadline.
+- **BC-050:** an NHL stats-REST report cache, ff `cdab875d5..59fbefc71`, no restart.
+- The gate's clock is BC-050, 0 of 800. F12 updated: BC-042, 045, 046, 047, 048, 049, 050.
+
+**The board filled with tonight's NBA slate.** The plan's suggested rows went 30 -> **164** (of 4,647 board rows).
+- `beyond_max_positions` refused **138**: NBA 117, NHL 9, NCAAF 6, soccer 3, NFL 2, NCAAB 1. `max_positions` = 25.
+- So the cap now binds, and **the rank that picks 25 of 164 decides what is bet.**
+- **Optimization lead (to measure, no money):** do the ranked-in positions beat the ranked-out suggestions? The paper
+  ladder or the board's own grading of unbet suggestions would show it.
+
+**Health:**
+- Plan 4.7 min old; 13 positions, ceiling used 21.0%.
+- **Execution, 35 min:** 10 live ticks, 3 placed, 0 failed. Orders today 43 (41 filled, 2 maker posts resting).
+- Cap use: kalshi 16.3%, polymarket 15.0%.
+- All 7 endpoints 200, all under 0.5 s (the 25 s read was a one-off, F14). **Anomalies: 0.**
+
+## ROI against the spread paid at entry — PRE-REGISTRATION (written 2026-11-18 17:11:50Z, before any number below is computed; user "Yes, measure it")
+
+**Question.** F13 says the live book's shortfall sits in thin, one-sided markets. Does ROI fall as the spread we
+**paid at entry** widens?
+
+**Population.** Live bets with `selected_date` 10-18..11-17, decided (`live_book_edge_readout.bets_from_orders`, the
+gate's own predicate), **pregame only** (`submitted_at` < `commence_time`). In-play entries are reported apart, as
+descriptive only.
+
+**Entry prices.**
+- From the fleet's quote log (`clv_join.read_quote_rows_for_events`, same keys as the CLV resolver), at the bet's
+  venue: our selection's and the opposite selection's latest quote change at or before `submitted_at`, and before
+  kickoff. The flip is over<->under, home<->away, yes<->no, with spreads negating the line.
+- **Entry overround = ours + theirs - 1. Entry fair = ours / (ours + theirs).** Each quote's age at entry is reported.
+- A bet with no opposite quote before its fill is its own group, **"one-sided at entry"**.
+
+**Groups:** entry overround < 1 pp, 1-2, 2-4, 4-8, >= 8 pp, one-sided.
+
+**Metrics:** dollar ROI net of fees with the event-clustered SE (`summarize`), and won - entry fair (event-clustered).
+
+**Hypotheses.**
+- **H-spread:** ROI is lower where the entry spread is wide. The pooled wide group (>= 4 pp plus one-sided) has a
+  lower ROI than the pooled narrow group (< 2 pp), and the difference's 95% interval
+  (SE = sqrt(se_wide^2 + se_narrow^2)) excludes 0. *Falsified if* that interval includes 0 or the wide group's ROI
+  is higher.
+- **H-fair:** against the entry fair price, picks are calibrated in every group with >= 50 bets: won - fair within
+  95% of 0. *Falsified if* any such group's 95% interval excludes 0.
+
+**Decision use.**
+- H-spread survives: a **per-line entry-spread limit** (judge each line on its own spread, never a market switch) is
+  the candidate lever, and its threshold comes from this table. It is the user's call, and a betting change.
+- H-fair survives as well: the live book's loss is the spread and fees it pays, not its picks.
