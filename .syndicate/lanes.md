@@ -1316,6 +1316,14 @@ death, never life — do not invert it.
 - Verification: test on the recorded row_refs fixture (cards + build_picks identical off vs on, body carries row_refs); fleet: one flag-off and one row_refs POST at the same state version, decoded cards identical, encode/decode of the flag-off response identical; bytes per run read from both responses
 - Blocked by: none
 
+### nhl-inplay-props-drop — OPEN — opened 2026-11-17 — session 8edcf8eb-b191-4bb6-bd5c-1d7ac675f5c4
+- Goal: Find why the NHL in-play overlay drops its live player props for one or more builds at a time (rows_inplay ~600-790 -> 0-44) and fix the props side per line behind a switch with an off != on test (never a sport-wide switch); prediction for the next NHL night's drop builds per hour; any fleet load put to the user
+- Files: syndicate/features/shared/book_grid_artifact.py (the in-play row selection: is_inplay_fresh_row / select_inplay_rows / _remember_inplay_rows + a new per-line carry helper ONLY), tests/test_inplay_overlay_props_carry.py (NEW), .syndicate/findings_2026-11-17_nhl_inplay_props_drop.md (NEW)
+- Hypothesis: NHL live player-prop quotes are captured ONLY by scripts/refresh_nhl_oddsapi.py (collect_and_write_player_props -> _append_nhl_book_quotes kind=prop) inside the single live odds sweep (refresh_odds_sources.py --phase live, step nhl_oddsapi_refresh), so their capture cadence IS the sweep's. When a sweep runs long or is refused lane_busy, every NHL prop row's seen_age_seconds crosses the overlay's 300 s in-play window (SYNDICATE_INPLAY_OVERLAY_MAX_PRICE_AGE_SECONDS, book_grid_artifact.py:917, is_inplay_fresh_row) TOGETHER, and select_inplay_rows drops the whole props set in one build; the 0-44 rows left are game lines from other captures.
+- Falsification test: On the fleet's NHL 2026-11-17 quote shard: a drop build (rows_inplay <= 44) built within 300 s of the latest NHL prop capture, OR a full build (rows_inplay >= 464) built more than 300 s after it; or a read-only replay of select_inplay_rows over a drop-time grid that keeps the props rows.
+- Verification: Findings file with a per-build table over 11-17 (build time, rows_inplay, age of the latest prop capture, n of N builds explained), the replay result, a per-line change on main behind a switch with an off != on test, and a numeric prediction for the next NHL night.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
