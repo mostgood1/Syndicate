@@ -823,3 +823,16 @@ placement, so a stale plan costs missed bets, not bad ones.
   - Resting 0, unreconciled 0.
 - **Settlement:** 10 started and unsettled (the late games), 0 late. Cap use: kalshi 18.8%, polymarket 18.5%.
 - **Endpoints:** all 7 read 200, all under 0.25 s. 0 kills.
+
+## Reading 24 — Tue 11-17 11:39 PM CST (05:39Z 11-18), window 31 min
+
+- **Clean apart from the gate's clock.**
+- **Plan 0.7 min old.** Tonight's newest commit is 05:38:59Z. In 6 h: 37 commits, max completed gap 79.0 min.
+  37 suggested -> 15 sized -> 11 positions, most of the slate started.
+- **Execution, 31 min:** 10 live ticks, 0 placed, 0 failed (6 `outside_price_band`). Orders today 59, unchanged.
+  Resting 0, unreconciled 0.
+- **Settlement: the 10 ungraded started bets are tonight's late games.** 2 NHL at 9:10 PM, 1 NBA at 9:40 PM and 7 NBA
+  at 10:10 PM CST. 0 late. Expected to grade around 12:30-1:00 AM CST, and the daily summary follows.
+  - *Field note:* a bet is graded when `outcome` is set. `settled_at` is the venue's order-resolve time (an IOC has
+    one 2 s after submit). Counting by `settled_at` miscounts.
+- **Endpoints:** all 7 read 200, all under 0.25 s. 0 kills.
