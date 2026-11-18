@@ -88,6 +88,10 @@
 - **Verify:** the same scripts give an sd ratio of 0.95-1.05 and a calibration slope >= 0.8. Kit `C:\tmp\elp\engine_read` (`totals_ladder.py`, `ladder_analysis.py`, `staleness.py`).
 
 ### `#834` — **NBA LIVE RE-SIM TOTALS START ~2 POINTS HIGH: its pregame total is +1.95 (se 0.77) above Kalshi's, and the gap shrinks with the time left. This is the engine read's NBA over-lean** `[2026-11-17, lane engine-learner; `.syndicate/brief_2026-11-17_engine_read_kalshi.md`]` — OPEN; owner: the NBA live re-sim (`syndicate/features/nba/live_resim.py`)
+- **ON MAIN `88193c0a7` 2026-11-18 ~12:35 PM CST, user "Yes, push it"; DEFAULT OFF, NOT LOADED.**
+  - It is the branch commit `7dfa1f7fa` cherry-picked onto main, with no intervening change to its files.
+  - 160 NBA/WNBA live re-sim tests passed on the rebased code.
+  - A fleet ff alone changes nothing (absent = off; betting change: no). The load is `LIVE_ODDS_WORKER__SYNDICATE_NBA_LIVE_TOTAL_ANCHOR=on` + a drained full `down`/`up` (betting change: yes), and it needs the user's yes.
 - **STATUS 2026-11-18 11:55 AM CST: FIX BUILT, DEFAULT OFF, NOT ON MAIN** (lane `nba-live-resim-total-anchor`; branch `nba-live-total-anchor` = local `7dfa1f7fa`, pinned `refs/keep/nba-live-total-anchor-7dfa1f7fa`). Findings: `.syndicate/findings_2026-11-18_nba_live_total_anchor.md`.
   - **Cause:** two errors of opposite sign. The pre-sim blend (total_w 0.7) leaves the target 3.1 under the market (the lane's stated hypothesis, FALSIFIED). The NBA engine (loose solver, `league.py:108`) then overshoots its own target by +4.8. Net: pregame engine +1.7 over the close; the live first row +1.95 over Kalshi.
   - **It drifts:** engine - close by week was -0.94 / -1.68 / +0.31 / +1.90 (10-21..11-14). **Since F1 (`#821`, 11-17) it is +6.78 (se 1.04) on today's 12 pregame artifacts**: the raw total now sits at the market, so nothing cancels the engine's +6.5 overshoot. Tonight's live NBA totals start ~7 high unless the fix is on.

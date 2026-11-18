@@ -86,7 +86,7 @@ Every NBA pregame artifact on the fleet, by slate week (`offset_by_week.py`), me
   - The read used today's PREGAME artifacts and closes only. No outcome, Kalshi quote or evidence row in M2's
     11-15..11-22 window was read.
 
-## 4. The fix: a per-game total anchor (branch `nba-live-total-anchor`, local `7dfa1f7fa`, NOT on main)
+## 4. The fix: a per-game total anchor (ON MAIN `88193c0a7`, 2026-11-18 ~12:35 PM CST, user "Yes, push it"; built as `7dfa1f7fa`; default off, not loaded)
 
 The #780 margin anchor's rule, applied to the total, in `syndicate/features/nba/live_resim.py` "total anchor":
 - the full-game total histogram moves by (closing consensus total - pregame SmartSim `score.total_mean`) x the
