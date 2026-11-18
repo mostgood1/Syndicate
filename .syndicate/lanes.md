@@ -1533,6 +1533,14 @@ death, never life — do not invert it.
 - Verification: after the up: both keys read from /proc/<pid>/environ as intended; the first >= 10 new live orders have contracts == 1 (pregame and in-play); positions per plan unchanged in kind (same refusal mix); betting_changes.md row with the OUTSIDE WINDOW exception; deploys.md entry with the measurement
 - Blocked by: none
 
+### s1-freshness-study — OPEN — opened 2026-11-18 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: Study S1 of the profit learning program, read-only and pre-registered: on orders submitted 2026-11-08..2026-11-17 (TEST), does keeping only orders whose reference (Pinnacle) quote capture age at submit is <= N min (N fit on orders before 2026-11-08 from {1,2,5,10,15}) raise fee-net flat ROI over all orders, with an event-clustered 95% interval excluding 0; registered verdict and, if it survives, the precise per-line challenger rule written to the findings file. No live code, env or fleet change.
+- Files: scripts/s1_freshness_study.py (NEW), tests/test_s1_freshness_study.py (NEW), .syndicate/findings_2026-11-18_s1_freshness_study.md (NEW)
+- Hypothesis: Picks lose because the trigger fires on a stale reference price: fresh-only (age <= N) beats all on TEST
+- Falsification test: TEST difference fresh-only minus all <= 0, or its event-clustered 95% interval includes 0
+- Verification: Registered test run on the fleet ledger with refresh-worker env at nice 19; coverage, chosen N, TEST difference with CI, verdict written to the findings file on main
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
