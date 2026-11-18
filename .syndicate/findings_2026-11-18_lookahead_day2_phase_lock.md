@@ -270,3 +270,24 @@ studies.
 
 **A cheaper middle option is NOT built:** a separate, longer day-2 interval (e.g. every 6 h ≈ 3-4k credits/day). It
 would need its own switch.
+
+## 10. The user's decision and the load (2026-11-18 3:08 PM CST)
+
+- **The user chose (b):** "Fix day 1, retire day 2", answering "Which option for the day-2 look-ahead in the Tue 11-24 window?".
+- **The load:** `REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_LANE_WAIT=on` + `REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_48H_ENABLED=false` in `local_production.env`, then one drained full down/up.
+  - It rides the 11-24 window batch (`nfl-level-refit-load-1120`, 2:15 AM CST) as a droppable third change, so the window still has one ff and one down/up.
+  - Kit: `C:\tmp\la2_f905\kit_env_lookahead.sh`. It was self-tested on a dummy env file, and the self-test caught a backup-name collision: two applies in one second wrote the same name.
+- **Fleet now (read 2:56 PM CST):**
+  - neither key is set: not in the local file, the fleet_env snapshot, the role spec, or the running environ;
+  - the code (`2aff90c36`) reached the fleet checkout with the 3:02:52 PM CST ff to `a3104a5b6`;
+  - the running refresh-worker predates that ff.
+- **The chosen configuration is tested through the real tick:**
+  - `test_user_choice_b_fixes_day1_and_retires_day2_on_the_real_tick`.
+  - Against a 600 s foreign hold, day 1 launches on the first free tick instead of an hour later.
+  - Day 2 makes no launch, no refusal and no schedule fetch.
+- **The baseline for the readings** (`lookahead_b_reading.py`, 11-13..11-17 CST, 120 h):
+  - day 1: 73 launches in 74 idle hours (0.986), 5 refusals;
+  - day 2: 4 launches, 74 refusals;
+  - 79 `REFRESH_LAUNCH_REFUSED` lines, all lane_busy.
+- **The predictions** Pb0-Pb7 are in lane `lookahead-day2-phase-lock`. They are read by tasks `lookahead-b-reading-1125` and `lookahead-b-reading-1201`.
+- **What retiring day 2 gives up:** the D-2 snapshots in section 4. In practice day 2 ran only ~0.8 times a day, so little is lost.

@@ -259,3 +259,59 @@ def test_lane_busy_wait_decision_stamps_nothing_and_fetches_nothing(monkeypatch)
 
     assert decision == {"launch": False, "reason": "lane_busy_wait", "date": DAY2}
     assert recorded == []
+
+
+def _reset_markers_and_clock(tick_env) -> None:
+    for name in ("last_look_ahead_check.json", "last_look_ahead_check_day2.json"):
+        path = lrl._meta_dir() / name
+        if path.exists():
+            path.unlink()
+    tick_env["clock"].t = T0
+
+
+def test_user_choice_b_fixes_day1_and_retires_day2_on_the_real_tick(tick_env):
+    """The configuration the user chose 2026-11-18 ("Fix day 1, retire day 2"), against the fleet's today.
+
+    Both arms start with the lane held by another refresh-worker run for 600 s (the weekly soccer autorun held it
+    for 5 of day 1's 6 measured refusals). Fleet today (no keys): day 1 is refused, stamps, and loses the hour;
+    day 2 is refused behind it. Option (b) (SYNDICATE_LOOK_AHEAD_LANE_WAIT=on + SYNDICATE_LOOK_AHEAD_48H_ENABLED=false):
+    day 1 waits and launches on the first free tick; day 2 never decides to launch, so it makes no launch, no
+    refusal and no schedule fetch.
+    """
+    hold_s = 600.0
+    fleet = _FakeLane(tick_env["clock"], {DAY1: DAY1_RUN_S, DAY2: DAY1_RUN_S})
+    fleet.busy_until = T0 + hold_s
+    tick_env["install"](fleet)
+    tick_env["run"](3.0)
+    fleet_schedule_dates = {d for _s, d in tick_env["schedule_calls"]}
+
+    _reset_markers_and_clock(tick_env)
+    tick_env["schedule_calls"].clear()
+    tick_env["monkeypatch"].setenv("SYNDICATE_LOOK_AHEAD_LANE_WAIT", "on")
+    tick_env["monkeypatch"].setenv("SYNDICATE_LOOK_AHEAD_48H_ENABLED", "false")
+    chosen = _FakeLane(tick_env["clock"], {DAY1: DAY1_RUN_S, DAY2: DAY1_RUN_S})
+    chosen.busy_until = T0 + hold_s
+    tick_env["install"](chosen)
+    metas = tick_env["run"](3.0)
+
+    # Fleet today: day 1 refused once and loses the hour; day 2 refused, never launched.
+    assert len(fleet.refused(DAY1)) == 1
+    assert len(fleet.launched(DAY1)) == 2
+    assert fleet.launched(DAY1)[0] - T0 >= 3600.0
+    assert fleet.launched(DAY2) == [] and len(fleet.refused(DAY2)) >= 1
+    assert DAY2 in fleet_schedule_dates
+
+    # Option (b): day 1 launches on the first free tick after the hold, then once an hour, never refused.
+    day1 = chosen.launched(DAY1)
+    assert chosen.refusals == []
+    assert len(day1) == 3
+    assert hold_s <= day1[0] - T0 < hold_s + TICK_S
+    assert all(gap >= 3600.0 for gap in _gaps(day1))
+    # Day 2 is retired: no launch, no refusal, no schedule fetch for its date, and every tick says why.
+    assert chosen.launched(DAY2) == [] and chosen.refused(DAY2) == []
+    assert all(d == DAY1 for _s, d in tick_env["schedule_calls"])
+    reasons = {(m.get("lookAheadDay2") or {}).get("reason") for m in metas}
+    assert reasons <= {"disabled", "day1_launched_this_tick"} and "disabled" in reasons
+    # Day 1 waited (no stamp) while the other run held the lane.
+    waits = [m for m in metas if (m.get("lookAhead") or {}).get("reason") == "lane_busy_wait"]
+    assert len(waits) == int(hold_s // TICK_S) + 1
