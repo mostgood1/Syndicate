@@ -1,5 +1,27 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#841` — **UNDERSTAT IS DOWN SITE-WIDE ("We will come back soon", HTTP 200, since 2026-11-03 2:54 PM CST; DNS/connect failures from 11-01 6:34 PM CST), so every big-5 `soccer_<league>_history_current` / `_players` step fails (5,152 of 5,152 in 800 runs, 11-10..11-20 dirs) and the sim prices EPL/La Liga/Bundesliga/Serie A/Ligue 1 on history frozen at 10-31 (69 matches missing by 11-18). Outage guard ON MAIN behind `SYNDICATE_UNDERSTAT_OUTAGE_GUARD` (absent = ON): named `UNDERSTAT_UNAVAILABLE` exit, one probe per hour host-wide, auto-recovery. NOT LOADED; the alternative-source decision is the user's** `[2026-11-18, lane understat-fetch-failures; `.syndicate/findings_2026-11-18_understat_fetch_failures.md`; split from #840's lead]`
+- **Measured:**
+  - 7 GETs from the fleet host and 2 from another network all got the same 26,719-byte maintenance page (`/`, `/league/EPL/2026`, `getLeagueData` 2026 and 2025).
+  - The site has not changed and is not blocking the fleet; the season key is right.
+  - Last good writes: `teams_2026.csv` 10-31 7:12-8:47 PM CDT and `players_2026.csv` 11-01 2:09-4:12 AM CST.
+  - The red masked a real other soccer failure in 8 runs: 792 of 800 runs were red only from Understat.
+  - The DNS/timeout phase cost p50 324 s of Understat per run.
+- **Fix (no step added or reordered, 0 OddsAPI calls):**
+  - A step that cannot fetch still exits rc 1, with a last line naming the reason, status and page text.
+  - Players no longer asks the legacy page on the same host.
+  - A marker at `<soccer_root>/_understat_status.json` makes every Understat step exit `reason=cooldown` without a request for 3,600 s after a failed probe.
+  - The first JSON flips the marker to `up`.
+  - Tests: `tests/test_understat_fetch.py` 22 of 22 (off != on through the real step argv); neighbours 225 of 225.
+- **Load** = fleet ff to the fix SHA or later; no restart (child script). It needs claims, a preflight and a ride-along check. `betting change: no`: the files are identical while the site is down, and on recovery the first refetch lags OFF by at most 1 h on a 1-day cadence.
+- **Reading owed at load (P1-P5 in the lane block):** 100% of failing big-5 Understat step tails end `UNDERSTAT_UNAVAILABLE`; <= 2 requests per clock hour host-wide (about 990 a day before); Understat seconds per run p50 <= 11 s. On recovery the 10 steps go rc 0 within 1 h + 1 run.
+- **Owed to the user (a model change, not built):** a big-5 source while Understat is down.
+  - Players from ESPN aggregation: a different estimator and id space, so every season of a league must be re-sourced.
+  - Ratings from football-data goals: a mechanism change that needs a re-fit and backtest.
+- **Leads:**
+  - a sport-level "upstream unavailable" class so the standing red stops masking other soccer failures (`refresh_odds_sources.py`, lane `odds-lane-sport-deadline`);
+  - a history-freshness field in the soccer artifacts.
+
 ### `#840` — **SOCCER'S ~46-MIN PREGAME HOLDS ARE REFRESH-WORKER'S LOOK-AHEAD, NOT THE LIVE ODDS LANE: each hourly `warm_next_day_slate` re-simulated every soccer fixture in the next 7 days (it inherits refresh-worker's `SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7`, set for the weekly autorun). Fix on main behind `SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR` (absent = ON): a future-dated pregame run simulates its own date only. LOADED 2026-11-18 17:58:30Z (fleet ff, no restart); first look-ahead 386 s, soccer sims 45 s; P3-P5 owed** `[2026-11-18, lane soccer-pregame-odds-lane]`
 - **Corrects #838's "Not covered" soccer line:**
   - 0 of 430 live-odds-worker `lane_busy` refusals (11-14..11-18) had a soccer-led holder; 169 were NHL-led pregame runs.

@@ -18,7 +18,13 @@ xg_per90, xa_per90, expected_minutes_share, is_goalkeeper``.
 from __future__ import annotations
 
 import json
+import os
 import re
+import sys
+import time
+from datetime import datetime
+from datetime import timezone
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -37,22 +43,252 @@ _USER_AGENT = {"User-Agent": "Mozilla/5.0 (SyndicateSoccerSim)"}
 _UNDERSTAT_XHR_HEADERS = {**_USER_AGENT, "X-Requested-With": "XMLHttpRequest"}
 
 
-def fetch_understat_league_data(league: str, season_start_year: int, *, timeout: int = 30) -> dict[str, Any]:
+# --------------------------------------------------------------------------
+# Understat OUTAGE GUARD (lane `understat-fetch-failures`, 2026-11-18).
+#
+# WHAT HAPPENED. From 2026-11-03 2:54 PM CST every understat.com URL -- the
+# home page, every league page, every `getLeagueData` call -- answers HTTP 200
+# with the same 26,719-byte "We will come back soon" HTML page, from the fleet
+# and from another network alike. Before that, 11-01 6:34 PM .. 11-03 3:06 PM
+# CST, the name did not resolve and then connections timed out. The fetchers
+# met that as `requests.JSONDecodeError` (teams) and as `playersData not
+# available` (players, after a SECOND request to the same host's legacy page),
+# every soccer run, on all five Understat leagues: 5,152 of 5,152 steps failed
+# in 800 runs (manifests 11-10..11-20), ~990 requests a day to a site in
+# maintenance, and p50 324 s per run of connect timeouts during the DNS phase.
+#
+# WHAT THE GUARD DOES, AND WHAT IT DOES NOT. It cannot make the site return
+# data, and it does not pretend to: a fetch that gets no data still FAILS.
+# It (a) names what came back -- `UnderstatUnavailable` with the reason,
+# status, content type, size and visible page text -- instead of a JSON decode
+# traceback; (b) stops the players path from asking the same host again for
+# the legacy page after `getLeagueData` was unavailable; (c) when given a
+# status file, records the outage there and, for `UNDERSTAT_OUTAGE_COOLDOWN_
+# SECONDS` after a failed probe, raises `UnderstatUnavailable("cooldown")`
+# WITHOUT a request. The first probe after the cooldown that gets JSON clears
+# it, so recovery needs no human.
+#
+# Switch: ON unless `SYNDICATE_UNDERSTAT_OUTAGE_GUARD` is 0/false/off/no, and
+# OFF is today's code path exactly (the reachability test pins both).
+# --------------------------------------------------------------------------
+
+UNDERSTAT_OUTAGE_GUARD_ENV = "SYNDICATE_UNDERSTAT_OUTAGE_GUARD"
+#: After a failed probe, Understat steps exit without a request for this long.
+#: One probe an hour host-wide (~24 a day) against ~990 requests a day without it;
+#: on recovery the first refetch lags at most this, on a 1-day refresh cadence.
+UNDERSTAT_OUTAGE_COOLDOWN_SECONDS = 3600.0
+#: HTTP statuses that mean "the site is not serving", not "this URL is wrong".
+_UNDERSTAT_OUTAGE_STATUSES = frozenset({403, 429})
+
+
+class UnderstatUnavailable(RuntimeError):
+    """Understat did not serve data. ``reason`` is one of ``non_json`` (a 200
+    that is not JSON -- the maintenance page), ``http_<status>``,
+    ``unreachable`` (DNS / connect / read failure) or ``cooldown`` (no request
+    was sent: a recent probe failed). Never a silent outcome: callers exit
+    non-zero with :meth:`summary`."""
+
+    def __init__(self, reason: str, *, url: str, detail: str = "") -> None:
+        self.reason = reason
+        self.url = url
+        self.detail = detail
+        super().__init__(self.summary())
+
+    def summary(self) -> str:
+        return f"reason={self.reason} url={self.url}" + (f" {self.detail}" if self.detail else "")
+
+
+def understat_outage_guard_enabled() -> bool:
+    raw = str(os.environ.get(UNDERSTAT_OUTAGE_GUARD_ENV) or "").strip().lower()
+    return raw not in {"0", "false", "off", "no"}
+
+
+def _visible_text(html: str, limit: int = 80) -> str:
+    text = re.sub(r"<(script|style)\b.*?</\1>", " ", html, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()[:limit]
+
+
+def _understat_get_json(url: str, *, timeout: int, headers: dict[str, str]) -> Any:
+    """GET ``url`` and return its JSON, or raise `UnderstatUnavailable` naming
+    what came back. A 4xx other than 403/429 is a wrong URL, not an outage, and
+    raises ``requests.HTTPError`` as before."""
+    try:
+        response = requests.get(url, timeout=timeout, headers=headers)
+    except requests.exceptions.RequestException as exc:
+        raise UnderstatUnavailable("unreachable", url=url, detail=f"error={type(exc).__name__}") from exc
+    status = int(response.status_code)
+    content_type = str(response.headers.get("content-type") or "")
+    size = len(response.content or b"")
+    if status >= 500 or status in _UNDERSTAT_OUTAGE_STATUSES:
+        raise UnderstatUnavailable(
+            f"http_{status}", url=url, detail=f"content_type={content_type!r} bytes={size}"
+        )
+    response.raise_for_status()
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise UnderstatUnavailable(
+            "non_json",
+            url=url,
+            detail=(
+                f"status={status} content_type={content_type!r} bytes={size} "
+                f"text={_visible_text(response.text)!r}"
+            ),
+        ) from exc
+
+
+def read_understat_status(status_path: Path | None) -> dict[str, Any] | None:
+    """The outage marker, or None when absent or unreadable (unknown is not
+    "down": an unreadable marker must not stop a probe)."""
+    if status_path is None:
+        return None
+    try:
+        payload = json.loads(Path(status_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _write_understat_status(status_path: Path, payload: dict[str, Any]) -> None:
+    path = Path(status_path)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(payload, indent=1, sort_keys=True), encoding="utf-8")
+        tmp.replace(path)
+    except OSError as exc:
+        # The marker only saves requests; failing to write it must not turn a
+        # named UnderstatUnavailable into an OSError traceback.
+        print(f"UNDERSTAT_STATUS_WRITE_FAILED path={path} error={type(exc).__name__}", file=sys.stderr, flush=True)
+
+
+def _iso(ts: float) -> str:
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _record_understat_down(status_path: Path | None, exc: UnderstatUnavailable, now: float) -> None:
+    if status_path is None:
+        return
+    previous = read_understat_status(status_path) or {}
+    was_down = previous.get("state") == "down"
+    _write_understat_status(
+        status_path,
+        {
+            "state": "down",
+            "down_since": previous.get("down_since") if was_down else _iso(now),
+            "last_probe_at": _iso(now),
+            "last_probe_epoch": now,
+            "last_reason": exc.reason,
+            "last_url": exc.url,
+            "last_detail": exc.detail,
+            "probes": (int(previous.get("probes") or 0) if was_down else 0) + 1,
+            "cooldown_seconds": UNDERSTAT_OUTAGE_COOLDOWN_SECONDS,
+            "last_ok_at": previous.get("last_ok_at"),
+        },
+    )
+
+
+def _record_understat_up(status_path: Path | None, now: float) -> None:
+    if status_path is None:
+        return
+    previous = read_understat_status(status_path) or {}
+    payload: dict[str, Any] = {"state": "up", "last_ok_at": _iso(now)}
+    if previous.get("state") == "down":
+        payload["last_outage"] = {
+            "down_since": previous.get("down_since"),
+            "ended_at": _iso(now),
+            "probes": previous.get("probes"),
+            "last_reason": previous.get("last_reason"),
+        }
+    elif isinstance(previous.get("last_outage"), dict):
+        payload["last_outage"] = previous["last_outage"]
+    _write_understat_status(status_path, payload)
+
+
+def _raise_if_cooling_down(status_path: Path | None, url: str, now: float) -> None:
+    status = read_understat_status(status_path)
+    if not status or status.get("state") != "down":
+        return
+    try:
+        last_probe = float(status.get("last_probe_epoch"))
+    except (TypeError, ValueError):
+        return  # unknown probe time: probe rather than block
+    remaining = last_probe + UNDERSTAT_OUTAGE_COOLDOWN_SECONDS - now
+    if remaining <= 0:
+        return
+    raise UnderstatUnavailable(
+        "cooldown",
+        url=url,
+        detail=(
+            f"no_request_sent down_since={status.get('down_since')} "
+            f"last_probe_at={status.get('last_probe_at')} last_reason={status.get('last_reason')} "
+            f"probes={status.get('probes')} next_probe_in_s={int(remaining)}"
+        ),
+    )
+
+
+def _clock() -> float:
+    """Wall clock for the cooldown (a seam, so tests need not patch `time.time`)."""
+    return time.time()
+
+
+def _guarded_league_data(url: str, *, timeout: int, status_path: Path | None) -> Any:
+    now = _clock()
+    _raise_if_cooling_down(status_path, url, now)
+    try:
+        payload = _understat_get_json(url, timeout=timeout, headers=_UNDERSTAT_XHR_HEADERS)
+    except UnderstatUnavailable as exc:
+        _record_understat_down(status_path, exc, now)
+        raise
+    _record_understat_up(status_path, now)
+    return payload
+
+
+def fetch_understat_league_data(
+    league: str,
+    season_start_year: int,
+    *,
+    timeout: int = 30,
+    status_path: Path | None = None,
+) -> dict[str, Any]:
     """Fetch Understat's league bundle: ``players``, ``teams`` (with
-    per-match history: xG, xGA, PPDA, deep entries), and ``dates``."""
+    per-match history: xG, xGA, PPDA, deep entries), and ``dates``.
+
+    With the outage guard on (the default), an outage raises
+    `UnderstatUnavailable`; ``status_path`` (the host-wide marker) adds the
+    cooldown. Guard off: the original request, ``raise_for_status`` and
+    ``response.json()``, and ``status_path`` is ignored."""
     league_key = UNDERSTAT_LEAGUES[str(league).strip().lower()]
     url = f"https://understat.com/getLeagueData/{league_key}/{int(season_start_year)}"
+    if understat_outage_guard_enabled():
+        return _guarded_league_data(url, timeout=timeout, status_path=status_path)
     response = requests.get(url, timeout=timeout, headers=_UNDERSTAT_XHR_HEADERS)
     response.raise_for_status()
     return response.json()
 
 
-def fetch_understat_players(league: str, season_start_year: int, *, timeout: int = 30) -> list[dict[str, Any]]:
+def fetch_understat_players(
+    league: str,
+    season_start_year: int,
+    *,
+    timeout: int = 30,
+    status_path: Path | None = None,
+) -> list[dict[str, Any]]:
+    guard = understat_outage_guard_enabled()
     try:
-        league_data = fetch_understat_league_data(league, season_start_year, timeout=timeout)
+        league_data = fetch_understat_league_data(
+            league, season_start_year, timeout=timeout, status_path=status_path if guard else None
+        )
         players = league_data.get("players")
         if isinstance(players, list) and players:
             return players
+    except UnderstatUnavailable:
+        # Guard on only (it is never raised with the guard off). The legacy
+        # page is on the SAME host: asking it again during an outage is a
+        # second request that can only fail, and its "playersData not
+        # available" error hid the real reason for 15 days.
+        raise
     except Exception:
         pass
     # Fallback: legacy embedded-JSON page scrape.
@@ -405,6 +641,9 @@ def normalize_asa_players(
 
 __all__ = [
     "UNDERSTAT_LEAGUES",
+    "UNDERSTAT_OUTAGE_COOLDOWN_SECONDS",
+    "UNDERSTAT_OUTAGE_GUARD_ENV",
+    "UnderstatUnavailable",
     "fetch_asa_mls_players",
     "fetch_asa_mls_team_directory",
     "fetch_asa_mls_team_history",
@@ -413,4 +652,6 @@ __all__ = [
     "normalize_asa_players",
     "normalize_understat_players",
     "normalize_understat_team_history",
+    "read_understat_status",
+    "understat_outage_guard_enabled",
 ]

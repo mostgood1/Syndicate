@@ -43,6 +43,7 @@ from syndicate.features.soccer.ingestion.match_history import LEAGUE_HISTORY_COD
 from syndicate.features.soccer.ingestion.match_history import fetch_match_history_csv
 from syndicate.features.soccer.ingestion.match_history import normalize_match_history
 from syndicate.features.soccer.ingestion.player_history import UNDERSTAT_LEAGUES
+from syndicate.features.soccer.ingestion.player_history import UnderstatUnavailable
 from syndicate.features.soccer.ingestion.player_history import fetch_asa_mls_players
 from syndicate.features.soccer.ingestion.player_history import fetch_understat_league_data
 from syndicate.features.soccer.ingestion.player_history import fetch_understat_players
@@ -93,6 +94,30 @@ def _write_csv(rows: list[dict], out_path: Path) -> None:
     print(f"Wrote {len(frame)} rows to {out_path}")
 
 
+#: The Understat outage marker's name. ONE file for the whole host, in the soccer
+#: data root (lane `understat-fetch-failures`): an outage is site-wide, so one
+#: league's failed probe answers for all five.
+UNDERSTAT_STATUS_FILENAME = "_understat_status.json"
+
+
+def understat_status_path(out_dir: Path) -> Path:
+    """`<soccer_root>/_understat_status.json` for an out-dir shaped
+    `<soccer_root>/<league>/<kind dir>` -- the shape every producer step passes
+    (`refresh_odds_sources._soccer_current_history_step` / `_soccer_players_step`)
+    and the default `--out-dir` has. So the marker sits on the same data root as
+    the files it explains, and every role on the fleet shares it."""
+    return Path(out_dir).resolve().parent.parent / UNDERSTAT_STATUS_FILENAME
+
+
+def _exit_understat_unavailable(league: str, kind: str, season: int, exc: UnderstatUnavailable) -> None:
+    """A step that could not fetch says so: rc 1, and the last stderr line (what
+    the refresh manifest keeps as `stderr_tail`) names the outage."""
+    raise SystemExit(
+        f"UNDERSTAT_UNAVAILABLE league={league} kind={kind} season={season} {exc.summary()} "
+        "(nothing written; the previous file is KEPT and is now stale)"
+    ) from exc
+
+
 def fetch_matches(league: str, seasons: list[int], out_dir: Path) -> None:
     if league not in LEAGUE_HISTORY_CODES:
         raise SystemExit(f"match history not available for league '{league}' (supported: {sorted(LEAGUE_HISTORY_CODES)})")
@@ -127,7 +152,10 @@ def fetch_players(league: str, seasons: list[int], out_dir: Path, *, espn_date_w
             raw = fetch_asa_mls_players(season)
             rows = normalize_asa_players(raw, season=season)
         elif league in UNDERSTAT_LEAGUES:
-            raw = fetch_understat_players(league, season)
+            try:
+                raw = fetch_understat_players(league, season, status_path=understat_status_path(out_dir))
+            except UnderstatUnavailable as exc:
+                _exit_understat_unavailable(league, "players", season, exc)
             rows = normalize_understat_players(raw, league=league, season=season)
         elif espn_date_windows:
             rows = aggregate_season_player_stats(league, date_windows=espn_date_windows)
@@ -162,7 +190,10 @@ def fetch_teams(league: str, seasons: list[int], out_dir: Path) -> None:
     if league not in UNDERSTAT_LEAGUES:
         raise SystemExit(f"team xG history not available for league '{league}' (supported: {sorted(UNDERSTAT_LEAGUES)})")
     for season in seasons:
-        league_data = fetch_understat_league_data(league, season)
+        try:
+            league_data = fetch_understat_league_data(league, season, status_path=understat_status_path(out_dir))
+        except UnderstatUnavailable as exc:
+            _exit_understat_unavailable(league, "teams", season, exc)
         rows = normalize_understat_team_history(league_data, league=league, season=season)
         _write_csv(rows, out_dir / f"teams_{season}.csv")
 
