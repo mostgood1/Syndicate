@@ -1685,7 +1685,55 @@ def _soccer_sim_horizon_days() -> int:
 _SOCCER_SIM_HORIZON_DAYS = _soccer_sim_horizon_days()
 
 
-def _soccer_artifact_scope_args(league: str, fallback_date: str, *, pinned_date: str = "") -> tuple[str, ...]:
+# A FUTURE-DATED PREGAME RUN SIMULATES ITS OWN DATE, NOT THE WHOLE HORIZON
+# `[2026-11-18, lane soccer-pregame-odds-lane]`. On the fleet the only such run is
+# refresh-worker's look-ahead (`live_refresh_loop._launch_look_ahead_refresh`,
+# `warm_next_day_slate`): 86 of 86 pregame runs dated after Central today, 0 of 170
+# on every other lane, 11-13..11-18. It launches every sport for TOMORROW, hourly --
+# but soccer's step is week-scoped from TODAY with refresh-worker's
+# `SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7`, a value set for the weekly autorun's unit
+# list (`run_refresh_worker.py`), so each look-ahead re-simulated every fixture
+# in the next 7 days. Measured: 16.0 s per match uncontended (1.6 + 16.04 x matches
+# per league step, n=391); 50-62 matches per run by 11-16..11-18; run hold p50
+# 1,201 s, max 3,035 s; 4.65 / 5.59 sim-hours a day on 11-16 / 11-17 -- 61% of
+# refresh-worker's soccer sim time, re-writing the files the weekly autorun
+# (every league-date, 4 h) already owns. It never held the LIVE odds lane (0 of
+# 430 live-odds-worker lane_busy refusals 11-14..11-18 had a soccer-led holder):
+# this is a refresh-worker CPU/lane cost, bounded here per sport.
+#
+# Anchored, the run takes the week of ITS date and `--horizon-days 0 --date
+# <date>`: that date's fixtures only. A league with none exits 0 ("nothing to
+# simulate") and writes nothing, so no empty artifact and no new date-index entry.
+# Absent = ON; off / 0 / false / no = today's command exactly. Child script: a fleet
+# fast-forward loads it, no role restart.
+_SOCCER_LOOKAHEAD_DATE_ANCHOR_ENV = "SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR"
+
+
+def _soccer_lookahead_date_anchor_enabled() -> bool:
+    raw = str(os.environ.get(_SOCCER_LOOKAHEAD_DATE_ANCHOR_ENV) or "").strip().lower()
+    return raw not in {"0", "off", "false", "no"}
+
+
+def _soccer_lookahead_anchor_date(args: argparse.Namespace) -> str:
+    """The run's own date when it is a future-dated PREGAME run with no pinned
+    `--soccer-date`, else "". "" means the unchanged week + horizon scope."""
+    if not _soccer_lookahead_date_anchor_enabled():
+        return ""
+    if str(getattr(args, "phase", "") or "").strip().lower() != "pregame":
+        return ""
+    if str(getattr(args, "soccer_date", "") or "").strip():
+        return ""
+    run_date = str(getattr(args, "date", "") or "").strip()
+    try:
+        is_future = datetime.strptime(run_date, "%Y-%m-%d").date() > central_today()
+    except ValueError:
+        return ""
+    return run_date if is_future else ""
+
+
+def _soccer_artifact_scope_args(
+    league: str, fallback_date: str, *, pinned_date: str = "", anchor_date: str = ""
+) -> tuple[str, ...]:
     # PINNED DATE (#282). When the caller has already resolved a single
     # league-date -- which is what the per-league launcher in
     # run_refresh_worker.py does -- take it verbatim and skip the week
@@ -1722,6 +1770,18 @@ def _soccer_artifact_scope_args(league: str, fallback_date: str, *, pinned_date:
     # A league with nothing inside the horizon now writes nothing and exits 0
     # with a plain message -- deliberately NOT the `SystemExit` that made the
     # missing-schedule case invisible for two sessions.
+    if str(anchor_date or "").strip():
+        # See `_soccer_lookahead_anchor_date`: the week of the run's OWN date (so a
+        # date in the next matchweek resolves), horizon 0 from that date.
+        anchor = str(anchor_date).strip()
+        try:
+            season = soccer_default_season(league)
+            week = soccer_default_week(league, season, reference_date=anchor)
+            if soccer_week_date_list(league, season, week):
+                return ("--week", str(week), "--season", str(season), "--horizon-days", "0", "--date", anchor)
+        except Exception:
+            pass
+        return ("--date", fallback_date)
     try:
         season = soccer_default_season(league)
         week = soccer_default_week(league, season)
@@ -2438,6 +2498,16 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
         )
 
     pinned_date = str(getattr(args, "soccer_date", "") or "").strip()
+    # Lane `soccer-pregame-odds-lane`: a future-dated pregame run (refresh-worker's
+    # look-ahead) simulates only its own date. "" = the unchanged scope.
+    anchor_date = "" if pinned_date else _soccer_lookahead_anchor_date(args)
+    if anchor_date:
+        print(
+            f"SOCCER_LOOKAHEAD_DATE_ANCHOR date={anchor_date} phase={getattr(args, 'phase', '')} "
+            f"horizon_days_unanchored={_SOCCER_SIM_HORIZON_DAYS}",
+            file=sys.stderr,
+            flush=True,
+        )
     # `poll_soccer_live_state` is cheap and it is what WRITES the artifact
     # `_soccer_live_scope` reads, so leaving it at the back of a list that does
     # not reach its end would let the scope this whole block depends on go
@@ -2633,7 +2703,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                     "scripts/build_soccer_artifacts.py",
                     "--league",
                     league,
-                    *_soccer_artifact_scope_args(league, args.date, pinned_date=pinned_date),
+                    *_soccer_artifact_scope_args(league, args.date, pinned_date=pinned_date, anchor_date=anchor_date),
                     "--source-root",
                     str(soccer_root),
                     "--out-root",
@@ -2656,7 +2726,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                     "scripts/build_soccer_picks.py",
                     "--league",
                     league,
-                    *_soccer_artifact_scope_args(league, args.date, pinned_date=pinned_date),
+                    *_soccer_artifact_scope_args(league, args.date, pinned_date=pinned_date, anchor_date=anchor_date),
                     "--source-root",
                     str(soccer_root),
                     "--out-root",

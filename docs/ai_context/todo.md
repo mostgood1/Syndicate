@@ -1,5 +1,18 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#840` — **SOCCER'S ~46-MIN PREGAME HOLDS ARE REFRESH-WORKER'S LOOK-AHEAD, NOT THE LIVE ODDS LANE: each hourly `warm_next_day_slate` re-simulated every soccer fixture in the next 7 days (it inherits refresh-worker's `SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7`, set for the weekly autorun). Fix on main behind `SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR` (absent = ON): a future-dated pregame run simulates its own date only. NOT LOADED** `[2026-11-18, lane soccer-pregame-odds-lane]`
+- **Corrects #838's "Not covered" soccer line:**
+  - 0 of 430 live-odds-worker `lane_busy` refusals (11-14..11-18) had a soccer-led holder; 169 were NHL-led pregame runs.
+  - The 184-run sample mixed lanes: 88 refresh-worker + 84 live-odds-worker, and all 66 runs over 900 s were refresh-worker.
+- **Mechanism (measured):** 16.0 s per simulated match uncontended, 50-62 matches per look-ahead run by 11-16..11-18; run hold p50 1,201 s, max 3,035 s; 4.65 / 5.59 soccer sim-hours a day on 11-16 / 11-17 (61% of refresh-worker's soccer sim time), duplicating the weekly autorun, which is healthy (unit age at launch p90 17,146 s vs 14,400 s).
+- **Load** = fleet ff to the fix SHA or later; no restart (child script). Claims + preflight + ride-along check. `betting change: no` is the expected classification (it changes which soccer sim files a warm-up rewrites, not bets), but confirm at load.
+- **Reading owed at load (P1-P5 in the lane block):** `SOCCER_LOOKAHEAD_DATE_ANCHOR` in the look-ahead child's stderr and `--horizon-days 0 --date <D>` on its soccer steps; look-ahead run hold p50 <= 600 s and 0 over 1,800 s in 48 h; look-ahead soccer sim-hours <= 1.0/day; weekly autorun unit age p90 <= 18,900 s.
+- **Leads:**
+  - the day-2 look-ahead is phase-locked out (84 of 89 refused `lane_busy` 1-4 min after day 1 launches; it stamps its marker before launching);
+  - Understat fails every big-5 `history_current` / `players` step (`playersData not available`);
+  - three 1,800 s `nba,ncaab,wncaab` pregame runs at ~12:01 AM CST (11-14, 11-15, 11-18) held the live lane with no results.
+- Findings: `.syndicate/findings_2026-11-18_soccer_pregame_odds_lane.md`.
+
 ### `#839` — **THE NHL GENERATION RE-FETCHED 6 STATS-REST REPORTS PER SLATE TEAM EVERY RUN (180 for the 11-18 + 11-19 slates), the calls that hung 11-17's generations. A report cache is ON MAIN `59fbefc71` behind `SYNDICATE_NHL_STATS_REPORT_CACHE` (absent = ON): unscheduled playoff reports skipped (64 of 64 team-seasons empty), others reused from the data root while they hold every finished game before the slate date. Replay: 180 -> 0 calls warm, collection 129 -> 14 s, rows identical. NOT LOADED (the user's call)** `[2026-11-18, lane nhl-stats-rest-cache; `.syndicate/findings_2026-11-18_nhl_stats_rest_cache.md`; follow-up of #838]`
 - Load = fleet ff to `59fbefc71` or later (no restart; a fresh `refresh_nhl_oddsapi.py` child per sweep). Betting change (NHL generation inputs/timing): claims, preflight, ride-along check, `betting_change.py add --pending`.
 - Load in the DAY: a cold cache fetches ~100 reports, so the first pregame generation should warm it on a healthy API before the evening.
