@@ -240,8 +240,30 @@ and the two windows disagree bucket by bucket.
 
 ### EXPLORATORY: the venue's own quote between the reference fetch and submit
 
-Pending: the `book_quotes` join (`join --quotes`) was still running on the fleet when the registered verdict above was
-pushed. It does not touch the verdict.
+**EXPLORATORY, not a registered test.** Run 2026-11-18 ~19:12-19:21Z (563 s) on the fleet: `join --quotes`,
+refresh-worker env, nice 19, peak RSS about 4.4 GB, under a guard that would have killed it below 2.5 GB of fleet memory available (it
+never fired). It read `book_quotes` shards on 25 dates, 10-25..11-18, no gaps. The registered sections re-ran
+byte-identical on this join.
+
+- **Coverage:** our venue's own logged quote on our side and line, at both the reference fetch and submit, exists for
+  **4,673 of 13,606** orders with a Pinnacle age (34%).
+  - Most of the rest have no venue-direct quote at our key (8,184). The Kalshi capture writes game lines for soccer
+    only; other sports' game lines reach `book_quotes` only via OddsAPI.
+  - 581 had no reference fair at our line, and 126 have a side the join cannot flip.
+- **The venue quote moved between the fetch and submit for 1,048 of 4,673 (22%).** The rest were flat.
+
+| FIT + TEST | orders / events | flat ROI [95%] |
+|---|---|---|
+| venue moved TOWARD the reference fair | 747 / 326 | -6.07% [-13.13, +0.99] |
+| flat | 3,600 / 644 | -4.21% [-7.55, -0.87] |
+| venue moved AWAY from the reference fair | 301 / 222 | +6.54% [-7.30, +20.37] |
+
+- **Toward minus away: -12.6 pp [-28.2, +2.9]**, with the same sign in FIT (-13.5 [-32.6, +5.6]) and in TEST
+  (-8.6 [-34.4, +17.1]). It is not beyond noise in any window.
+- **The direction matches the second half of the plan's S1 rule** ("the venue has not moved toward the consensus").
+  The picks the venue was already re-pricing toward the consensus did worst. This is a lead for S6 (the venue's own
+  move as a feature at entry), not a result. It needs its own pre-registration, and the logged venue quote covers
+  only a third of the book (I2 in the plan).
 
 ### What it means
 
