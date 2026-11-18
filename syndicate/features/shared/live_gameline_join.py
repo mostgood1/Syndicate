@@ -2515,6 +2515,17 @@ def attach_live_gamelines(
     behind_mode = model_behind_score_mode()
     coverage["model_behind_score_guard"] = behind_mode
     coverage["model_behind_score_would_refuse"] = {}
+    # #836's end-game freshness gate (lane live-resim-endgame-staleness; loan from live-player-exit-gate, user "Lend it"
+    # 2026-11-18). Its switch, `SYNDICATE_LIVE_ENDGAME_FRESHNESS`, is ABSENT = SHADOW: price as before and count what it
+    # would refuse. `endgame_judged` is the denominator: full-game rows whose lane state is in the end game.
+    from syndicate.features.shared import live_endgame_freshness as endgame
+
+    endgame_mode = endgame.mode()
+    coverage["endgame_freshness"] = endgame_mode
+    coverage["endgame_judged"] = 0
+    coverage["endgame_would_refuse"] = {}
+    coverage["endgame_would_refuse_priced"] = {}
+    endgame_shadow: list[tuple[Mapping[str, Any], str]] = []
     if not isinstance(grid, (list, tuple)):
         return coverage
 
@@ -2732,13 +2743,27 @@ def attach_live_gamelines(
             coverage["lane_age_max_s"] = round(lane_age if seen is None else max(seen, lane_age), 1)
         lane_verdict = (lane_age_verdict(hit.get("as_of"), build_now, sport=hit.get("sport") or sport)
                         if lane_gate != "off" else None)
+        # #836: in the last 5% of regulation or overtime, a full-game lane whose state was read more than 30 s before this
+        # build is not priced (`live_endgame_freshness` has the measurement: those lost to Kalshi by +0.174 nats). Judged
+        # LAST, so every reason above counts exactly what it did, and only on full-game hits: a segment hit carries no
+        # state. NBA / NCAAF / NHL only; any other sport's verdict is None.
+        endgame_v = None
+        if endgame_mode != endgame.MODE_OFF and segment in _FULL_GAME_SEGMENTS:
+            endgame_sport = hit.get("sport") or sport
+            if endgame.in_endgame(endgame_sport, hit.get("state_period"), hit.get("state_clock_seconds")):
+                coverage["endgame_judged"] += 1
+                endgame_v = endgame.endgame_verdict(endgame_sport, hit.get("state_period"),
+                                                    hit.get("state_clock_seconds"), hit.get("as_of"), build_now)
         stale = (quote_age_verdict(row.get("age_seconds"), sport=hit.get("sport"))
                  or quote_behind_score_verdict(row.get("updated_at"), hit.get("as_of"), sport=hit.get("sport"),
                                                score_changed_at=hit.get("score_changed_at"))
-                 or (lane_verdict if lane_gate == "on" else None))
+                 or (lane_verdict if lane_gate == "on" else None)
+                 or (endgame_v if endgame_mode == endgame.MODE_ON else None))
         if stale is None and lane_verdict is not None:
             # SHADOW: priced exactly as before; tallied after the loop, once the row's own verdict is known.
             lane_shadow.append((row, str(lane_verdict.get("withheld_reason") or "unspecified")))
+        if stale is None and endgame_v is not None:
+            endgame_shadow.append((row, str(endgame_v.get("withheld_reason") or "unspecified")))
         if stale is not None:
             record(coverage, stale, projected=False)
             # The QUOTE is dead, not the game: the live number is about the game, so it is shown and nothing is
@@ -2892,6 +2917,20 @@ def attach_live_gamelines(
         verdict_block = shadow_row.get("live_gameline")
         if isinstance(verdict_block, Mapping) and verdict_block.get("priceable"):
             would_priced[reason] = int(would_priced.get(reason, 0)) + 1
+    # #836's shadow tally, the same way, and ONE line per build per sport that judged an end-game row: the denominator
+    # (`judged`), what shadow would refuse and how many of those were then priced, and what `on` refused.
+    eg_would, eg_priced = coverage["endgame_would_refuse"], coverage["endgame_would_refuse_priced"]
+    for shadow_row, reason in endgame_shadow:
+        eg_would[reason] = int(eg_would.get(reason, 0)) + 1
+        verdict_block = shadow_row.get("live_gameline")
+        if isinstance(verdict_block, Mapping) and verdict_block.get("priceable"):
+            eg_priced[reason] = int(eg_priced.get(reason, 0)) + 1
+    if coverage["endgame_judged"]:
+        by_reason = coverage.get("withheld_by_reason") or {}
+        refused = {r: n for r, n in by_reason.items() if r in (endgame.REASON_STALE, endgame.REASON_TIME_ABSENT)}
+        print(f"[live_gameline_join] LIVE_ENDGAME_FRESHNESS sport={str(sport or '').lower() or '-'} "
+              f"mode={endgame_mode} judged={coverage['endgame_judged']} would_refuse={eg_would or {}} "
+              f"would_refuse_priced={eg_priced or {}} refused={refused}", flush=True)
     return coverage
 
 

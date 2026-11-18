@@ -227,3 +227,142 @@ def test_expert_judges_the_state_time_not_the_tick(monkeypatch):
 def test_expert_overtime_is_end_game(monkeypatch):
     on = _opine(_evidence(period=5, clock=200, state_age=60), monkeypatch, mode="on")
     assert on.clock_bucket == "ot" and on.refusal == lef.REASON_STALE
+
+
+# ---------------------------------------------------------------- the board join (`attach_live_gamelines`)
+# Shapes from tests/test_live_gameline_lane_age_gate.py: one live lane (period / clock on its projection, as the NBA,
+# NCAAF and NHL producers publish them), one live moneyline row priced at 0.40 against the lane's 0.90.
+
+JOIN_AT = datetime(2026, 11, 18, 2, 0, 0, tzinfo=timezone.utc)
+HOME, AWAY = "Atlanta Hawks", "Washington Wizards"
+
+
+@pytest.fixture(autouse=False)
+def _join_env(monkeypatch):
+    from syndicate.features.shared import live_gameline_join as join
+
+    for key in (lef.MODE_ENV, lef.MAX_AGE_ENV, join.LANE_AGE_GATE_ENV, join.MAX_LANE_AGE_ENV):
+        monkeypatch.delenv(key, raising=False)
+    return join
+
+
+def _snapshot(*, state_age, period=4, clock=60, as_of="set"):
+    projection = {"total": 230.0, "homeMargin": 9.0, "totalRunsDist": {"220": 100, "240": 100},
+                  "marginDist": {"4": 100, "14": 100}, "period": period, "clockSeconds": clock}
+    lane = {"key": "live", "source": "live_resim", "modelHomeWinProb": 0.9, "simsRun": 200, "projection": projection}
+    if as_of == "set":
+        lane["liveStateAsOf"] = (JOIN_AT - timedelta(seconds=state_age)).isoformat()
+    return {"games": [{"home": HOME, "away": AWAY, "gameLens": [lane]}]}
+
+
+def _row():
+    return {"kind": "game", "market": "h2h", "segment": "full", "line": None, "sides": ["home", "away"],
+            "away_team": AWAY, "home_team": HOME, "age_seconds": 20.0,
+            "game": {"state": "live", "home_score": 100, "away_score": 92},
+            "projection": {"market_fair_prob_over": 0.40}}
+
+
+def _join(join, snapshot, *, sport="nba"):
+    rows = [_row()]
+    index = join.build_live_gameline_index(snapshot, sources=("live_resim",), sport=sport)
+    cov = join.attach_live_gamelines(rows, index, sport=sport, now=JOIN_AT)
+    return rows[0], cov
+
+
+def _priced(row, cov):
+    return (row["projection"].get("live_aware") is True and row.get("live_gameline", {}).get("priceable") is True
+            and cov["rows_live_gameline_priceable"] == 1)
+
+
+def test_join_off_shadow_and_on_differ_on_the_same_stale_end_game_row(_join_env, monkeypatch):
+    """Reachability through `attach_live_gamelines`: one row, one lane (Q4 1:00, state read 45 s before the build),
+    only the switch moves. Off and shadow price it identically; shadow counts it; on withholds the edge by name."""
+    join = _join_env
+    out = {}
+    for mode in ("off", "shadow", "on"):
+        monkeypatch.setenv(lef.MODE_ENV, mode)
+        out[mode] = _join(join, _snapshot(state_age=45))
+    row, cov = out["off"]
+    assert _priced(row, cov) and cov["endgame_judged"] == 0 and cov["endgame_would_refuse"] == {}
+    row, cov = out["shadow"]
+    assert _priced(row, cov) and row["live_gameline"] == out["off"][0]["live_gameline"]
+    assert cov["endgame_freshness"] == "shadow" and cov["endgame_judged"] == 1
+    assert cov["endgame_would_refuse"] == {lef.REASON_STALE: 1}
+    assert cov["endgame_would_refuse_priced"] == {lef.REASON_STALE: 1}
+    assert cov["withheld_by_reason"] == {}
+    row, cov = out["on"]
+    assert not _priced(row, cov)
+    assert "live_aware" not in row["projection"] and row["projection"].get("edge_vs_market_pct") is None
+    assert cov["withheld_by_reason"] == {lef.REASON_STALE: 1}
+    assert cov["endgame_would_refuse"] == {}
+
+
+def test_join_absent_switch_is_shadow(_join_env):
+    row, cov = _join(_join_env, _snapshot(state_age=45))
+    assert _priced(row, cov) and cov["endgame_freshness"] == "shadow"
+    assert cov["endgame_would_refuse_priced"] == {lef.REASON_STALE: 1}
+
+
+def test_join_on_prices_a_fresh_end_game_lane_and_any_lane_before_the_end_game(_join_env, monkeypatch):
+    monkeypatch.setenv(lef.MODE_ENV, "on")
+    row, cov = _join(_join_env, _snapshot(state_age=20))
+    assert _priced(row, cov) and cov["endgame_judged"] == 1
+    row, cov = _join(_join_env, _snapshot(state_age=300, period=3, clock=60))
+    assert _priced(row, cov) and cov["endgame_judged"] == 0
+
+
+def test_join_on_refuses_a_stale_nhl_end_game_lane_which_has_no_lane_age_ceiling(_join_env, monkeypatch):
+    """NHL lanes have no lane-age ceiling at the join; the end-game rule still applies to them."""
+    monkeypatch.setenv(lef.MODE_ENV, "on")
+    row, cov = _join(_join_env, _snapshot(state_age=45, period=3, clock=100), sport="nhl")
+    assert not _priced(row, cov) and cov["withheld_by_reason"] == {lef.REASON_STALE: 1}
+    row, cov = _join(_join_env, _snapshot(state_age=45, period=3, clock=400), sport="nhl")
+    assert _priced(row, cov) and cov["endgame_judged"] == 0
+
+
+def test_join_an_ungated_sport_is_never_judged(_join_env, monkeypatch):
+    monkeypatch.setenv(lef.MODE_ENV, "on")
+    row, cov = _join(_join_env, _snapshot(state_age=45, period=2, clock=30), sport="ncaab")
+    assert cov["endgame_judged"] == 0 and lef.REASON_STALE not in (cov.get("withheld_by_reason") or {})
+
+
+def test_join_the_reasons_before_it_keep_their_counts(_join_env, monkeypatch):
+    """An end-game lane with no state time is the LANE-AGE gate's refusal (it is judged first): the end-game rule must
+    not take it, and shadow must not count it as newly refused."""
+    monkeypatch.setenv(lef.MODE_ENV, "on")
+    row, cov = _join(_join_env, _snapshot(state_age=0, as_of=None))
+    assert cov["withheld_by_reason"] == {_join_env.REASON_LANE_TIME_ABSENT: 1}
+    monkeypatch.setenv(lef.MODE_ENV, "shadow")
+    row, cov = _join(_join_env, _snapshot(state_age=0, as_of=None))
+    assert cov["endgame_would_refuse"] == {} and cov["endgame_judged"] == 1
+
+
+def test_join_prints_one_line_with_its_denominator(_join_env, monkeypatch, capsys):
+    monkeypatch.setenv(lef.MODE_ENV, "shadow")
+    _join(_join_env, _snapshot(state_age=45))
+    line = [l for l in capsys.readouterr().out.splitlines() if "LIVE_ENDGAME_FRESHNESS" in l]
+    assert len(line) == 1
+    assert "sport=nba mode=shadow judged=1" in line[0] and "live_state_stale_in_endgame" in line[0]
+    _join(_join_env, _snapshot(state_age=45, period=2))
+    assert "LIVE_ENDGAME_FRESHNESS" not in capsys.readouterr().out
+
+
+def test_the_board_caller_reaches_the_gate_with_the_wall_clock(_join_env, monkeypatch):
+    """`board_enrichment.attach_live_gamelines_for_sport` passes no `now`: the gate must see the build's wall clock on
+    the one path that prices. Same row, same producer snapshot; only the switch moves."""
+    from syndicate.features.shared import board_enrichment, refresh_state_store
+
+    monkeypatch.setattr(board_enrichment, "_nba_live_priced", lambda: True)
+    wall = datetime.now(timezone.utc)
+    snap = _snapshot(state_age=0)
+    snap["games"][0]["gameLens"][0]["liveStateAsOf"] = (wall - timedelta(seconds=90)).isoformat()
+    monkeypatch.setattr(refresh_state_store, "read_json_file", lambda _path: snap)
+    out = {}
+    for mode in ("off", "on"):
+        monkeypatch.setenv(lef.MODE_ENV, mode)
+        rows = [_row()]
+        cov = board_enrichment.attach_live_gamelines_for_sport(rows, sport="nba", selected_date="2026-11-17")
+        out[mode] = (rows[0], cov)
+    assert _priced(*out["off"])
+    row, cov = out["on"]
+    assert not _priced(row, cov) and cov["withheld_by_reason"] == {lef.REASON_STALE: 1}
