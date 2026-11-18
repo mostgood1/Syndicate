@@ -470,7 +470,6 @@ once this index exists: re-splitting would orphan the parts.
 | [shipped-verified] | SHIPPED / VERIFIED — current status by item `[2026-08-18; replaces a dozen dated snapshot sections]` | `state.md` |
 | [live-sha-authority] | LIVE SHAs — ASK THE SERVICE, NOT THE LEDGER `[2026-08-18 ~21:2xZ]` | `state.md` |
 | [nba-betting-card-assets-404] | THE NBA BETTING-CARD CSS AND JS WERE 404 IN PRODUCTION -- FIXED, DEPLOYED AND VERIFIED ON THE SERVED PAYLOAD ` | `state_basketball.md` |
-| [wnba-boxscore-web-polling] | WNBA BOX-SCORE CALLS WERE 29.4% OF FLEET WEB REQUESTS IN THE OFFSEASON; the June "stuck backfill" was TESTS re | `state_basketball.md` |
 | [wnba-live-lens-directory] | THE WNBA LIVE-LENS READERS OPENED THE WRONG DIRECTORY — fixed and verified locally, NOT DEPLOYED `[verified 20 | `state_basketball.md` |
 | [wnba-recon-producer] | `recon_games` WAS WRITTEN PREGAME AND NEVER REWRITTEN; the producer now exists `[2026-08-31, lane wnba-accurac | `state_basketball.md` |
 | [wnba-consensus-price] | BOOK PRICES WERE AVERAGED ON THE AMERICAN SCALE; 43% OF CARD PRICES WERE IMPOSSIBLE `[2026-08-31, lane wnba-ac | `state_basketball.md` |
@@ -506,9 +505,10 @@ once this index exists: re-splitting would orphan the parts.
 | [nba-sim-minutes-allocation] | THE NBA SMARTSIM GIVES ~38 MIN/SIDE TO POOL PLAYERS WHO DNP AND RUNS STARTERS -4.2 MIN; A PRICED-FIRST SHRINK  | `state_basketball.md` |
 | [nba-injury-pdf-parser] | THE NBA OFFICIAL INJURY-PDF PARSER WROTE 17% OF ITS ROWS UNDER NAMES NO POOL MATCHES AND GAVE AVAILABLE PLAYER | `state_basketball.md` |
 | [wnba-injury-nba-report] | THE WNBA INJURY FETCH TOOK THE NBA'S OFFICIAL REPORT; ON 10-20 AND 10-21 THE DAY'S WNBA SNAPSHOT WAS THE NBA'S | `state_basketball.md` |
-| [nba-player-minutes-distribution] | THE RAW NBA ENGINE'S BENCH-MINUTES BANDS ARE HALF AS WIDE AS REALITY; A FROZEN MINUTES-SHAPE FIX AWAITS | `state_basketball.md` |
-| [college-basketball-boards] | NCAAB + WNCAAB ON THE BOARDS: WNCAAB MODULE LIVE, PREGAME SIMS FOR BOTH (MARGIN LINES MARKET-ANCHORED), RAIL RUN/BONUS LINE | `state_basketball.md` |
-| [nba-lens-live-state] | THE NBA LIVE LENS'S GAME STATE FROZE AT TIP: THE CARDS-CONTEXT CACHE NEVER SAW ITS OWN ESPN READ. FIX LOADED | `state_basketball.md` |
+| [nba-player-minutes-distribution] | THE RAW NBA ENGINE'S BENCH-MINUTES BANDS ARE HALF AS WIDE AS REALITY; A FROZEN MINUTES-SHAPE FIX (β 0.85 + σ)  | `state_basketball.md` |
+| [college-basketball-boards] | NCAAB + WNCAAB ON THE BOARDS: WNCAAB MODULE LIVE, PREGAME SIMS FOR BOTH (MARGIN LINES MARKET-ANCHORED), RAIL R | `state_basketball.md` |
+| [nba-lens-live-state] | THE NBA LIVE LENS'S GAME STATE FROZE AT TIP: THE CARDS-CONTEXT CACHE NEVER SAW ITS OWN ESPN READ. FIX `e213358 | `state_basketball.md` |
+| [wnba-boxscore-web-polling] | WNBA BOX-SCORE CALLS WERE 29.4% OF FLEET WEB REQUESTS IN THE OFFSEASON; the June "stuck backfill" was TESTS re | `state_basketball.md` |
 | [board-freshness] | BOARD FRESHNESS AND STALENESS | `state_board.md` |
 | [board-intelligence-engine] | BOARD / INTELLIGENCE ENGINE — structural facts, archived — **ARCHIVED 2026-08-19 to `state_archive_2026-08-19. | `state_board.md` |
 | [locked-cards-retuned-no-autorun] | `locked_cards_retuned` HAS NO AUTOMATIC TRIGGER, ANYWHERE `[measured 2026-08-18]` | `state_board.md` |
@@ -526,6 +526,7 @@ once this index exists: re-splitting would orphan the parts.
 | [intelligence-season-evidence] | INTELLIGENCE EXPLANATIONS NAMED METRICS THEY NEVER READ, AND THE READINESS GATE COULD NOT SEE THE DATA ROOT -- | `state_board.md` |
 | [live-winpct-blank] | LIVE NFL/NCAAF ROWS SHOW NO PREGAME SIM PROBABILITY -- the Win%, the "Our sim has..." sentence and the directi | `state_board.md` |
 | [ncaaf-polymarket-spread-no-fair] | 73 NCAAF SPREAD ROWS REACH THE BOARD WITH NO FAIR AND NO REASON, BECAUSE POLYMARKET ALONE QUOTES THEM AND PRIC | `state_board.md` |
+| [live-player-exit-gate] | LIVE PLAYER-EXIT GATE -- a key player out of a live game refuses its live lines, his props and its in-play bet | `state_board.md` |
 | [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROP PROBABILITY CARRIES NO INFORMATION AT THE | `state_football.md` |
 | [ncaaf-sim-view-coverage] | NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE | `state_football.md` |
 | [nfl-live-prop-capture] | NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[verifie | `state_football.md` |
@@ -582,13 +583,13 @@ once this index exists: re-splitting would orphan the parts.
 | [kalshi-quote-capture-coupling] | Kalshi quote capture ran ONLY inside the heavy board build — a refused heavy build stopped it for every sport  | `state_kalshi.md` |
 | [kalshi-exit-path] | KALSHI POSITIONS ARE SOLD BEFORE SETTLEMENT -- LIVE FOR TAKE-PROFIT SINCE 2026-10-20 23:34Z, PAPER FOR THE RES | `state_kalshi.md` |
 | [kalshi-maker-shadow] | KALSHI MAKER (RESTING-BID) SHADOW: PAPER ONLY, PRE-REGISTERED, RUNNING HOURLY ON THE FLEET VIA A USER-APPROVED | `state_kalshi.md` |
-| [kalshi-maker-pilot] | KALSHI MAKER PILOT: LIVE, $5/ORDER $10/DAY, PREGAME POST-ONLY BIDS ON EXISTING LIVE-PLAN POSITIONS; FIRST FILL VERIFIED MAKER | `state_kalshi.md` |
+| [kalshi-maker-pilot] | KALSHI MAKER PILOT: LIVE, $5/ORDER $10/DAY, PREGAME POST-ONLY BIDS ON EXISTING LIVE-PLAN POSITIONS; FIRST FILL | `state_kalshi.md` |
 | [kalshi-series-competition-identity] | KALSHI SERIES FOR ANOTHER COMPETITION (WOMEN'S, BASKETBALL, SECOND TIERS) REFUSE IN THE JOIN -- ON THE FLEET C | `state_kalshi.md` |
 | [kalshi-in-play-efficiency] | KALSHI IN-PLAY PRICES LEAD THE SPORTSBOOKS; BOOK-CONSENSUS IN-PLAY EDGES MARK OUT NEGATIVE; FIXED TAKE-PROFIT  | `state_kalshi.md` |
 | [kalshi-structural-price-map] | KALSHI SPORTS HAS NO PREGAME STRUCTURAL PRICE EDGE UNDER TODAY'S FEES; ONLY 95-99c IN-PLAY FAVOURITES SURVIVE; | `state_kalshi.md` |
-| [kalshi-combo-public-data] | KALSHI COMBOS (MVE) ARE PUBLIC WITH THEIR LEGS; SAME-GAME LEGS SIT INSIDE MULTI-LEG PARLAYS; THE VOLUME DEFEATS RE | `state_kalshi.md` |
-| [kalshi-combo-capture] | KALSHI COMBO CAPTURE: LIVE AS THE HOURLY FLEET SUPERVISOR JOB (STORE FROM 09-27; SINCE 2026-10-30 IT READS TRADE PRINTS FOR E4'S FOUR PASSING COMBO SHAPES); KALSHI PURGES UNTRADED COMBOS ~2.5-3 DAYS AFTER SETTLEMENT; AN NFL SUNDAY SETTLES ~5.5M COMBOS IN 12.5 H | `state_kalshi.md` |
-| [kalshi-derived-rung-pricing] | KALSHI'S MID ON DERIVED RUNGS IS AT LEAST AS GOOD AS A SHARP-ANCHORED SURFACE; NO PREGAME TAKER EDGE | `state_kalshi.md` |
+| [kalshi-combo-public-data] | KALSHI COMBOS (MVE) ARE PUBLIC WITH THEIR LEGS; SAME-GAME LEGS SIT INSIDE MULTI-LEG PARLAYS; THE VOLUME DEFEAT | `state_kalshi.md` |
+| [kalshi-combo-capture] | KALSHI COMBO CAPTURE: LIVE AS THE HOURLY FLEET SUPERVISOR JOB (STORE FROM 09-27; SINCE 2026-10-30 IT READS TRA | `state_kalshi.md` |
+| [kalshi-derived-rung-pricing] | KALSHI'S MID ON DERIVED RUNGS (ALT LADDERS, SEGMENTS, TEAM TOTALS) IS AT LEAST AS GOOD AS A SHARP-ANCHORED SUR | `state_kalshi.md` |
 | [layer2-board-keyvalue-ceiling] | THE BOARD'S CEILING IS THE COMBINED KEY, NOT THE SHARDS — and `per_sport=3000` corrupted production for ~29 mi | `state_layer2.md` |
 | [layer2-realized-accuracy] | THE LAYER 2 BOARD'S REALIZED ACCURACY — the portfolio book is the surface, and the measurement chain is broken | `state_layer2.md` |
 | [layer2-score-outcomes] | THE BOARD'S SCORE, GRADED ON OUTCOMES AND CLOSES FOR THE FIRST TIME -- real price edge, fee-blind ranking, non | `state_layer2.md` |
@@ -616,9 +617,9 @@ once this index exists: re-splitting would orphan the parts.
 | [forward-inputs-mirror] | FORWARD-TEST QUOTE LOGS ARE MIRRORED OUT OF RETENTION'S REACH -- the daily fleet job `preserve-forward-inputs` | `state_layer2.md` |
 | [news-collectors] | FREE NEWS COLLECTORS (ESPN injuries NBA/NHL/NFL/WNBA/MLB, NBA referee crews, NHL officials + scratches) -- acc | `state_layer2.md` |
 | [cheat-sheets] | CHEAT SHEETS + PLAY CARDS -- served in the app, scheduled daily; 10-14 is BETA, 10-15 the first official day ` | `state_layer2.md` |
-| [nhl-nfl-live-prop-actuals] | LIVE NHL / NFL PROPS GET A DISPLAY-ONLY BOX-SCORE ACTUAL -- LOADED 11-09 (b2a5013e2), VERIFIED LIVE 1 | `state_layer2.md` |
-| [layer2-live-display-other-sports] | LIVE GAME-LINE ROWS THE JOIN WON'T PRICE SHOW A DISPLAY-ONLY Live proj. IN NCAAB / WNCAAB / NFL / NH | `state_layer2.md` |
-| [layer2-live-rail-edges] | LIVE RAIL CARDS SHOW OUR LIVE RE-SIM VS THE BOOK'S LIVE LINE PER MARKET; "MODEL ≠ LINE" FLAG ONLY ON A <=120 s QUOTE | `state_layer2.md` |
+| [nhl-nfl-live-prop-actuals] | LIVE NHL / NFL PROPS GET A DISPLAY-ONLY BOX-SCORE ACTUAL -- LOADED 11-09 (b2a5013e2), VERIFIED LIVE 11-10 02:5 | `state_layer2.md` |
+| [layer2-live-display-other-sports] | LIVE GAME-LINE ROWS THE JOIN WON'T PRICE SHOW A DISPLAY-ONLY Live proj. IN NCAAB / WNCAAB / NFL / NHL (NBA's # | `state_layer2.md` |
+| [layer2-live-rail-edges] | LIVE RAIL CARDS SHOW OUR LIVE RE-SIM VS THE BOOK'S LIVE LINE PER MARKET; A "MODEL ≠ LINE" FLAG ONLY ON A QUOTE | `state_layer2.md` |
 | [segment-misgrade-regrade] | 53 OF 173 SETTLED SEGMENT ORDERS WERE GRADED AGAINST THE WRONG ACTUAL — 30.6%, AND THE ERRORS NEARLY CANCEL `[ | `state_ledger.md` |
 | [stale-test-triage] | "THE TEST IS STALE" IS A HYPOTHESIS, AND IT WAS WRONG FOR 4 OF 18 `[2026-09-05, lane stale-test-repair, commit | `state_ledger.md` |
 | [full-suite-completes] | THE FULL SUITE RAN TO COMPLETION FOR THE FIRST TIME -- 15,307 tests, 61m06s, and the 27 "NEW" failures are 6 p | `state_ledger.md` |
@@ -659,7 +660,7 @@ once this index exists: re-splitting would orphan the parts.
 | [mlb-traditional-doubleheader-join] | A TRADITIONAL DOUBLEHEADER COULD NEVER CLEAR THE 45-MINUTE SEPARATION RULE -- FIXED PREGAME; THE IN-PLAY FIX I | `state_mlb.md` |
 | [mlb-asof-backtest] | THE MAY–JULY MLB ENGINE BEATS THE DE-VIGGED BOOK IN 0 OF 23 MARKETS (10 WORSE); MOSTLY A LEVEL ERROR, LED BY S | `state_mlb.md` |
 | [mlb-postponed-grading] | A POSTPONED MLB GAME READS abstractGameState "Final", AND A RESCHEDULED gamePk's feed/live IS THE NEW GAME `[v | `state_mlb.md` |
-| [mlb-live-mc-batting-pitcher] | MLB LIVE MC PUTS A PULLED STARTER BACK ON THE MOUND WHEN HIS TEAM BATS (41% of live ticks, +0.069 runs total bias); FIX ON MAIN, DEFAULT OFF, NOT DEPLOYED `[verified 2026-11-16/17, lane mlb-live-mc-batting-pitcher, todo #819]` | `state_mlb.md` |
+| [mlb-live-mc-batting-pitcher] | MLB LIVE MC PUTS A PULLED STARTER BACK ON THE MOUND WHEN HIS TEAM BATS (41% of live ticks, +0.069 runs total b | `state_mlb.md` |
 | [scheduled-model-evaluation] | MODEL EVALUATION IS SCHEDULED NOW -- a daily Render cron grades the PRICED population per sport x market x seg | `state_model.md` |
 | [settlement-autorun-live-settles-zero] | THE EVALUATION-SETTLEMENT AUTORUN WAS LIVE ALL ALONG AND SETTLED ZERO — the switch was never the blocker, the  | `state_model.md` |
 | [ledger-and-primary-tree] | — MEASURED 2026-09-02, this machine | `state_model.md` |
@@ -718,7 +719,7 @@ once this index exists: re-splitting would orphan the parts.
 | [live-plan-empty-funnel] | THE LIVE PLAN IS EMPTY BECAUSE THE VENUE'S OWN PRICE IS <= 0 EV AFTER THE TAKER FEE -- NOT A CAP, NOT A CHOSEN | `state_portfolio.md` |
 | [ledger-price-units] | THE EXECUTION LEDGER HOLDS TWO PRICE UNITS; EVERY KNOWN READER NOW HANDLES BOTH `[verified 2026-10-22, code +  | `state_portfolio.md` |
 | [order-clv-opening-less] | AN ORDER WITH NO RECORDED CLV OPENING IS GRADED FROM THE QUOTE LOG ON ITS OWN IDENTITY -- LIVE ON THE FLEET, H | `state_portfolio.md` |
-| [live-book-edge-scale-gate] | THE LIVE BOOK HAS NO MEASURED EDGE AT THE PRICE PAID; THE USER ADOPTED A SCALE-UP GATE AND IT FAILS | `state_portfolio.md` |
+| [live-book-edge-scale-gate] | THE LIVE BOOK HAS NO MEASURED EDGE AT THE PRICE PAID; THE USER ADOPTED A SCALE-UP GATE AND IT FAILS ALL FOUR M | `state_portfolio.md` |
 | [soccer-team-strength] | SOCCER TEAM RATINGS: RATING V2 FAILED THE REAL-SIM A/B AND IS HELD (OFF ON MAIN); THE SERVED SIM IS NOT UNDER- | `state_soccer.md` |
 | [soccer-uefa-competitions] | UEFA CLUB COMPETITIONS (UCL / UEL / UECL): REGISTERED FOR FIXTURES, GAME ODDS, LIVE SCOREBOARD AND VENUE JOINS | `state_soccer.md` |
 | [soccer-roster-only-players] | SOCCER SIM SQUADS: ADDING ROSTER-ONLY PLAYERS (TEAM TOTALS FIXED) FAILED ITS PRE-REGISTERED TEST, AND THE ESPN | `state_soccer.md` |
@@ -752,19 +753,18 @@ once this index exists: re-splitting would orphan the parts.
 | [venue-candidate-key-ambiguity] | BOARD JOIN KEYS: a bare token could name another fixture's team, and the guard's own counter cannot see it fir | `state_venues.md` |
 | [odds-cadence] | ODDS CADENCE AND CAPTURE | `state_venues.md` |
 | [venue-odds-storage] | `venue_odds` LIVES ON DISK, NOT IN THE SHARED KEYVALUE `[measured + deployed 2026-09-02, lane venue-odds-byte- | `state_venues.md` |
-| [sharp-reference-price] | SHARP REFERENCE PRICE — WE HAVE ONE, BUT NOT IN EVERY SPORT (fleet re-read 2026-10-26: Pinnacle game lines all window only MLB/NCAAF; NHL props yes) | `state_venues.md` |
+| [sharp-reference-price] | SHARP REFERENCE PRICE — WE HAVE ONE, BUT NOT IN EVERY SPORT. `[re-read on the FLEET 2026-10-26 17:4xZ, lane sy | `state_venues.md` |
 | [board-quote-staleness] | Board freshness vs QUOTE staleness — verified 2026-08-26 (lane `board-staleness-visibility`) | `state_venues.md` |
 | [exchange-refresh-cadence] | — VERIFIED 2026-08-27, live-odds-worker `34b4d4b4` | `state_venues.md` |
 | [exchange-venues] | Crypto.com is NOT a third venue — VERIFIED 2026-08-28, local full-egress session | `state_venues.md` |
 | [venue-market-universe] | The venues list ~25,000 markets and the board acts on 277 — VERIFIED 2026-08-30 | `state_venues.md` |
 | [render-crons] | THE THREE CRON SERVICES: WHAT THEY ARE, AND FOUR FACTS THAT COST A SESSION TO LEARN `[2026-09-08, lane render- | `state_worker.md` |
-| [ci-suite-pytest-step] | THE FULL SUITE RUNS ONLY WHEN CHUNKED; THE BASELINE IS EMPTY, AND THE STEP IS GREEN (11-09 08:00Z on `7d48129c57`: 0 NEW, 0 of 10 steps failed, rc=0; RED 10-02..11-08) `[verified 2026-11-09, lane ci-suite-red-697, local fleet]` | `state_worker.md` |
-| [fleet-redis-test-pollution] | THE FLEET REDIS HELD 426 TEST-FIXTURE KEYS; A PYTEST GUARD AND A JANITOR ARE LIVE AND THE COUNT IS 0 `[verified 2026-10-23, lane fleet-redis-test-pollution, f2bf4d47 + c4a8aa8f]` | `state_worker.md` |
+| [ci-suite-pytest-step] | THE FULL SUITE RUNS ONLY WHEN CHUNKED; THE BASELINE IS EMPTY, AND THE STEP IS GREEN (11-09 08:00Z on `7d48129c | `state_worker.md` |
 | [odds-history-segment-keys] | THE odds_history SHARD CARRIES `segment=` KEYS NOW — and three separate key builders were segment-blind, in tw | `state_worker.md` |
 | [refresh-worker-headroom-2026-09-02] | THE ~1.4GB HEADROOM FIGURE IS STALE, AND THE METRIC EVERYONE READS IS THE WRONG ONE `[2026-09-02, lane m625-en | `state_worker.md` |
 | [accuracy-autorun-OOM-2026-09-02] | THE ACCURACY AUTORUN OOM-KILLED refresh-worker. **RESOLVED — DISARMED AND VERIFIED 19:32Z.** `[2026-09-02, lan | `state_worker.md` |
 | [execution-alerts] | LIVE EXECUTION ALERTS GO TO EMAIL FROM THE 5-MIN WATCHDOG -- LIVE ON THE FLEET since 2026-10-19 23:55:58Z (d38 | `state_worker.md` |
-| [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02; RE-VERIFIED 2026-11-17 on the fleet's env, | `state_worker.md` |
+| [local-fleet-runner] | THE THREE SERVICES RUN LOCALLY NOW — and doing it naively would have placed REAL ORDERS `[verified 2026-09-02, | `state_worker.md` |
 | [local-production-host] | PRODUCTION RUNS ON ONE MACHINE NOW — `scripts/local_production.py`, and self-publish MUST be off on a shared d | `state_worker.md` |
 | [artifact-allowlist-split] | THE ARTIFACT ALLOWLIST IS TWO LISTS NOW: READ WIDE, WRITE NARROW — and an allowlist-filtered inventory is NOT  | `state_worker.md` |
 | [service-memory-saturation] | BOTH PRODUCTION SERVICES WERE MEMORY-SATURATED 2026-09-02/03 — MEASURED, and it BLOCKS analysis work `[lane so | `state_worker.md` |
@@ -795,4 +795,5 @@ once this index exists: re-splitting would orphan the parts.
 | [refresh-run-lanes] | Refresh-run lane topology, and refusals are now LOGGED [verified 2026-09-25/26] | `state_worker.md` |
 | [pregame-sweep-cadence] | THE IDLE LOOP NOW WAKES WHEN A SPORT'S OWN PREGAME SWEEP IS DUE; soccer schedules refetch a near window betwee | `state_worker.md` |
 | [web-oom-leak] | WEB SERVICE MEMORY GROWTH — LIVE: UPDATE 37..44 + the 2026-09-09 block; UPDATE 1..36 archived to state_archive | `state_worker.md` |
-| [live-player-exit-gate] | LIVE PLAYER-EXIT GATE -- a key player out of a live game refuses its live lines, his props and its in-play bets | `state_board.md` |
+| [fleet-redis-test-pollution] | THE FLEET REDIS HELD 426 TEST-FIXTURE KEYS; A PYTEST GUARD AND A JANITOR ARE LIVE AND THE COUNT IS 0 `[verifie | `state_worker.md` |
+| [board-build-process-split] | THE LAYER 2 BOARD BUILD SHARES ONE INTERPRETER LOCK WITH THE BOOK-GRID TICK AND THE VENUE ODDS LOOP; A SWITCH  | `state_worker.md` |
