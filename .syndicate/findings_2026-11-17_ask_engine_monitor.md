@@ -1054,3 +1054,38 @@ Probe file `ask_reading_20261118T043502Z.json` (10:35 PM CST). Page 200 in 0.11 
 - 2e: newest deploys.md header is 8:46 PM CST (02:46Z, ops kill of a hung NHL odds child, no deploy); no fleet ff / deploy / restart in the last 40 min.
 
 - **ANOMALY:** `as_of_in_future` true on the pregame_prop ask (soccer, Ismael Boura shots on target Over 0.5, Le Havre @ Troyes, event `5dcc9d2b...`): `as_of` = 2026-11-20 (`as_of_kind=date`), 3 days ahead. First time in 25 readings. Check next: whether the soccer bet_analysis path stamps `as_of` from the fixture's game date rather than the snapshot's build time (a labelling bug, the answer itself 200/ok with 10 tables), by comparing that answer's `as_of` source with the event's commence date.
+
+## Reading 26 (11:05 PM CST)
+
+Probe file `ask_reading_20261118T050500Z.json` (11:05 PM CST). Page 200 in 0.04 s; shortlist 200 rows in 1.73 s.
+
+**Ask:** 6/6 answered, 0 past the 45 s cut-off, median 3.92 s, max 7.41 s. A game was live (a `live_row` ask exists: Charlotte Hornets @ Los Angeles Lakers, NBA h1 alt total).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text (spread) | 3.10 | yes | bet_analysis | 04:56:40Z (10:56 PM) | 0 |
+| free_text (Lakers vs Celtics) | 0.22 | yes | matchup_analysis | 04:56:40Z | 0 |
+| free_text (top edges) | 5.32 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (soccer, Under 4.5 Villarreal @ Barcelona) | 7.41 | yes | bet_analysis | 2026-11-18 (date) | 5 |
+| pregame_prop (soccer, Boura SOT o0.5, Le Havre @ Troyes) | 1.24 | yes | bet_analysis | **2026-11-20 (date, in future)** | 10 |
+| live_row (NBA Under 117.5 h1, Hornets @ Lakers) | 3.92 | yes | bet_analysis | 2026-11-15 (date) | 2 |
+
+`as_of_in_future` true on 1 / 6 (the same soccer prop as Reading 25). All 200, all `answer_source=snapshot`, no transport error, no user-seen timeout.
+
+**Web (10:35-11:05 PM CST, 291 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 23 (15 hard); max anon 953 MB vs limit 648 MB.
+- Overlay warms: 55; median 6.86 s; 1 over 20 s; 0 over 45 s; 0 over 60 s; max 21.8 s.
+- Requests over 20 s: 0; over 45 s: 0.
+- Asks from any client: 12; 0 over 45 s; 0 non-200. 0 were NOT this probe's (all `Python-urllib`; 6 from the previous probe at 10:35 PM).
+
+**Host:** load 2.22 / 2.53 / 2.75 on 12 cores; MemAvailable 7,264 MB. Top CPU: refresh-worker 94% (ni 0, 4.6 GB RSS), live-odds-worker 66% (ni 0), gunicorn worker 41% (ni 0, 52 s old), two live_resim_workers ~34% each (ni 5), refresh_odds_sources 18% (ni 0).
+
+**Engine:**
+- 2a: F2 task has 1 run total (10:30-11:17 AM CST, settled on main `c765eec64`); no newer run.
+- 2b: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 `c1a2c029c2a1816f...` (Amendment 2), unchanged.
+- 2d: 0 engine-file commits on origin/main in the last 40 min.
+- 2e: newest deploys.md header is still 8:46 PM CST (02:46Z, ops kill of a hung NHL odds child, no deploy); no fleet ff / deploy / restart in the last 40 min.
+
+- **ANOMALY:** `as_of_in_future` true again on the pregame_prop ask (soccer, Ismael Boura shots on target Over 0.5, Le Havre @ Troyes, event `5dcc9d2b...`): `as_of` = 2026-11-20 (`as_of_kind=date`). This is the 2nd reading in a row, same event, so it is persistent, not a one-off. Check next: the same as Reading 25. Find out whether the soccer bet_analysis path stamps `as_of` from the fixture's game date rather than the snapshot build time (a labelling bug; the answer itself is 200/ok with 10 tables).
