@@ -214,6 +214,46 @@ performance differs by more than 15 points or the live count by more than 30%, t
 Note the split adds up to ~0.5 core of VM demand during builds on a host already at 100% (reading 2): metric 5 may
 improve less than the board does.
 
+### Baseline B, filled 2026-11-18 ~06:40Z (12:40 AM CST) — the table above is NOT edited; these are its B values
+
+Instrument: `l2s_baseline.py 2026-11-18T00:00:00 2026-11-18T04:00:00` on the fleet's `refresh-worker.log` (pid 28948,
+switch absent, fleet head 3920a2d4d), output kept at `C:\tmp\l2split\baseline_B.txt`. "Today" = board date 2026-11-17.
+
+| # | B (6-10 PM CST 11-17) | n | so: predicted (switch on) | falsified if |
+|---|---|---|---|---|
+| 1 | board share median **0.44** over the builds the sampler saw (0.37-0.52) | 6 builds (01:37-04:00Z) | >= 0.80 | < 0.65 |
+| 2 | wall p50 **253.4 s**, p90 **882.2 s**, max 1,509.8 s; 8 of 19 over 300 s (today's date: n 17, p50 250.0; next day: n 2, p50 567.0) | 19 builds | p50 <= 165 s, p90 <= 573 s | p50 > 215 s |
+| 3 | today's shortlist gap p50 **363 s**, p90 1,361 s; **12 of 17** gaps over 300 s (0.71) | 18 publishes | p50 <= 300 s; share over 300 s <= 0.35 | p50 > 363 s |
+| 4 | today's `LIVE_PLAN_WRITTEN` gap p50 **351 s**, p90 1,658 s, max **4,739 s** | 17 writes | p50 <= 263 s; max <= 2,843 s | p50 > 351 s |
+| 5 | book-grid `build_seconds` p50: NCAAB **13.8 s**, NBA **19.7 s** | 183 / 147 ticks | NCAAB <= 10.4 s, NBA <= 14.8 s | either > B |
+
+**Comparability, B side.**
+- Live games at 7 PM CST (01:00-01:02Z, live-odds-worker log, `C:\tmp\l2split\l2s_live7pm.sh <UTC date>`): NCAAB 40,
+  WNCAAB 20, NBA 1 in progress of 5, NFL 0. One NHL-era line reads `LIVE_PLAYER_STATS liveGames=7`, but nothing on it
+  names the sport, so NHL is not counted as measured.
+- Host: reading 2b's Windows counters at 8:05-8:06 PM CST, inside the window: 100% busy at 56-64% of nominal clock.
+- Fixed-work benchmark (`l2s_bench.py`, nice 19, every 30 s): p50 **0.1664** CPU-s per unit of work over
+  01:35-04:00Z (n 291), against **0.0997** over 04:00-06:30Z (n 308). In the evening, one CPU-second inside the VM did
+  1.67x less work. That makes the bench a repeatable host-clock reading; the Windows counter is only a spot read. Next
+  evening's reading runs the same bench, and a bench p50 that differs from 0.1664 by more than 15% also marks the
+  reading CONFOUNDED.
+
+**Confounds inside B, stated now.**
+- A deploy drain held the MLB tick at 01:07:54Z-01:29:07Z (6 `DRAIN_HOLD` lines, 7:07-7:29 PM CST). B's max gaps in
+  metrics 3 and 4 (4,624 s and 4,739 s) span it, so **metric 4's max partly measures that drain, not the board**.
+  Metric 4's p50 is the clause that decides.
+- B is one evening.
+
+**Metric 1's ceiling, measured AFTER registration — the registered threshold is NOT moved.**
+- Calm hours, same instrument (`l2s_analyze.py`, 04:00-06:30Z, n 32 builds): the in-thread board share median is
+  **0.67**, while main's share is 0.25.
+- Inside a build, the named stages run at 0.83-0.96 board share; the rest of each build is the board thread off the
+  CPU. That is I/O and waits, not the tick.
+- So an uncontended build reached 0.67, below the registered >= 0.80. Metric 1 is therefore expected to read "not
+  met" even if the split removes all contention.
+- The reading will report both the registered verdict and the evening/calm ratio: B is 0.44 / 0.67 = 0.66, and a ratio
+  near 1.0 with the switch on means contention is gone.
+
 **Must also hold (safety), same window:** 0 `BOARD_PROCESS_EXITED` other than rc 75 (recycle) or a deliberate TERM;
 `BOARD_PROCESS_LEASE_WAIT` only within 60 s of a respawn; role-tree RSS max <= the 6,144 MB cap; never two
 `pipeline.board_build_process --serve` processes alive at once (`ps`, 3 reads across the window); `check_deploy_safety.py` lists the child under
@@ -239,5 +279,9 @@ plan. Record it with `scripts/betting_change.py add --kind yes` at the load.
 
 ## Open
 
-- The fixed-work benchmark across the slate and into the calm hours (separates CPU-second inflation from real work).
-- Tonight's per-stage reading with `schedstat` (WSL-native sampler from 01:37Z, to 06:30Z), and B for metrics 2-5.
+- DONE 06:40Z: the fixed-work benchmark (evening 1.67x calm, above) and B for metrics 1-5 (above).
+- Tonight's evening builds, sampler 01:37-04:00Z (n 6), `C:\tmp\l2split\analyze_B.txt`. Builds ran 506-1,254 s at board
+  share 0.37-0.52 (median 0.44), main 0.33-0.43, process 1.01-1.05, board runqueue wait 3-26 s per build.
+  - This repeats H1 (the lock) across whole builds, not one stage.
+  - The wait (at most 26 s of a 1,254 s build) is again too small to be host starvation inside Linux. The host cost is
+    the 1.67x clock.
