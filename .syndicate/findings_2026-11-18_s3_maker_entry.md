@@ -13,7 +13,7 @@ registering a third:
 | test | registration | decision point | where it stands 11-18 |
 |---|---|---|---|
 | **paper maker shadow** (resting bids on Kalshi, filled from public trade prints = model B) | `findings_2026-10-20_kalshi_maker_shadow_preregistration.md` (`023f3978`) | each cell at 200, 400, 600 B-filled orders; calendar stop 2027-01-31 | **no look yet** in any cell |
-| **live maker pilot** ($5/order, $10/day, pregame post-only on live-plan positions) | `findings_2026-10-31_maker_pilot_review.md`, "Pre-registered re-judge" | 11-14 or 30 timed fills, whichever is later | **about 22 of 30 timed fills**, due about 11-24, only if fill times are saved |
+| **live maker pilot** ($5/order, $10/day, pregame post-only on live-plan positions) | `findings_2026-10-31_maker_pilot_review.md`, "Pre-registered re-judge" | 11-14 or 30 timed fills, whichever is later | **about 21 of 30 timed fills**, due about 11-24, only if fill times are saved |
 
 Earlier context (not re-tested here):
 - `findings_2026-10-19_kalshi_maker_entry_paper.md`: maker entry NO-GO overall. Fills won 5.37 pp below the close,
@@ -62,8 +62,14 @@ Earlier context (not re-tested here):
     11-14 re-judge read the 11-10..11-14 times while they still existed.
 - **Saved 11-18 ~22:15Z (copy only):** every `MAKER_PILOT` line still on disk, 844 lines, including 8 FILL lines
   (11-15..11-18). Saved to `~/syndicate-prod/data/research/maker_pilot/maker_pilot_log_lines.txt`, deduplicated.
-- **Timed fills now:** 7 (October) + 7 (11-10..11-14, read 11-14) + 8 (saved today) = **about 22**.
-  - About 8 more are needed, so the re-judge is about 11-24, but only if each fill's line is saved within ~3 days.
+- **Also saved (11-18 ~22:30Z):**
+  - the 11-14 re-judge kept its own copy of the pilot lines for 11-09..11-14 in `C:\tmp\maker_rejudge`, which is not
+    backed up;
+  - those lines are merged into the same file (1,592 lines, deduplicated);
+  - its scripts and results (`paths5.py`, `paths5.json`) are copied to `research/maker_pilot/rejudge_2026-11-14/`.
+- **Timed fills now: 7 (October, from the 10-31 review) + 14 distinct filled orders with a FILL line 11-10..11-18
+  = about 21.** All 14 say `filled_as=maker`, so the pilot's stop rule (any TAKER fill) has not fired.
+  - About 9 more are needed, so the re-judge is about 11-24, but only if each fill's line is saved within ~3 days.
   - Durable fix: write `venue_filled_at` on the ledger row. That is a ledger-only change, not a betting change; it
     needs its own lane and a live-odds-worker restart.
   - Bridge: a daily copy of the lines, the same pattern as `SyndicateInplayPreserve`. This needs the user's yes, as

@@ -100,7 +100,7 @@ No result guarantees future returns.
        - soccer totals reaches its 200 look about 11-26/27 (171 now, -11.9% [-28.1, +4.9]);
        - soccer spreads will be INSUFFICIENT at the 01-31 stop.
      - **Live maker pilot:**
-       - about 22 of 30 timed fills, so the re-judge falls about 11-24;
+       - about 21 of 30 timed fills, so the re-judge falls about 11-24;
        - that holds only if fill times are saved: the ledger row has no fill time, and the log rotates in ~3.5 days;
        - 844 pilot log lines were saved 11-18 to `research/maker_pilot/`.
      - No maker challenger before the 12-08 window.
