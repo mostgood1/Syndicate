@@ -174,6 +174,14 @@ probit ladder fit), plus ONE step. Each evidence row's histogram goes through th
 
 ## 8. To load (the user's decision; betting change: yes)
 
+**Load hold:** proposed 2026-11-18 ~12:00 PM CST by the decision-engine session (local_898e5510).
+- **The hold:** load nothing before 2026-11-22 ends.
+  - M2's test window (11-15..11-22) and the learner re-run window end then.
+  - Holding keeps both windows on the re-sims they started with.
+  - After 11-22, M3 tags each bet with the live re-sim version (`findings_2026-11-17_m3_paper_book.md` Addendum 5).
+- **The cost of the hold** (§3): about 4 more nights of live NBA totals starting ~+6.8 high. The user weighs that.
+- **A push to main is not a load:** absent = off, so a fleet ff without the env key changes nothing.
+
 1. The user's yes to push `nba-live-total-anchor` to main.
 2. Fleet ff to that SHA.
 3. `LIVE_ODDS_WORKER__SYNDICATE_NBA_LIVE_TOTAL_ANCHOR=on` in `local_production.env`, then a drained full `down`/`up`,
