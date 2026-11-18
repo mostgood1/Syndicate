@@ -33,12 +33,18 @@ and on NCAAF Saturday 2026-11-14 it sat at the cap, so markets dropped in and ou
 of the list for 10 to 80 minutes at a time.
 
 How fast: every Kalshi request, poll or discovery, waits its turn at
---kalshi-rate (2.5/s), with --kalshi-batch (100) tickers per poll request. A 429
+--kalshi-rate (1.25/s), with --kalshi-batch (200) tickers per poll request. A 429
 ends that cycle; the next cycle starts at the batch that failed. Until 2026-11-17
 the loop fired each cycle's 50-ticker batches back to back (~5 req/s) and started
 every cycle at the top of the sorted list. A 429 then cut most Saturday cycles
 short, and the tail of the list went unpolled: on 11-14 that meant 90,485
 gaps > 120 s, against 387 from the cap.
+
+Why 200 x 1.25/s and not 100 x 2.5/s (dry A/B, 2026-11-18, 4,663 markets): the
+same tickers per second in half the requests drew 3-6 Kalshi 429s per 15 min
+against 6-16, and a gap's worst case is two 429s in a row (35-40 s idle). Do not
+retry sooner after a 429: tested, it drew about 3x the 429s.
+(.syndicate/findings_2026-11-17_inplay_recorder_discovery.md section 3.)
 """
 
 from __future__ import annotations
@@ -238,9 +244,10 @@ def main() -> int:
     ap.add_argument("--fleet-root", default=r"\\wsl.localhost\Ubuntu-24.04\home\amyn\syndicate-prod\data\reports\intelligence\venue_odds")
     ap.add_argument("--env", default=default_env_file())
     ap.add_argument("--kalshi-seconds", type=float, default=10.0)
-    ap.add_argument("--kalshi-rate", type=float, default=2.5,
+    ap.add_argument("--kalshi-rate", type=float, default=1.25,
                     help="ceiling on Kalshi requests per second, polls and discovery alike, evenly spaced")
-    ap.add_argument("--kalshi-batch", type=int, default=100, help="tickers per Kalshi poll request (measured: 200 work)")
+    ap.add_argument("--kalshi-batch", type=int, default=200,
+                    help="tickers per Kalshi poll request (Kalshi returned all of them at 50-200; 200 drew the fewest 429s)")
     ap.add_argument("--tickers-seconds", type=float, default=600.0, help="how often the Kalshi ticker list is refreshed")
     ap.add_argument("--no-discover", action="store_true",
                     help="take Kalshi tickers from the fleet capture file only (the pre-2026-11-17 source)")
