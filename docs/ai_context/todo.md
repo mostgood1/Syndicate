@@ -69,6 +69,12 @@
   - before 95% of game time the gap barely depends on age (+0.01 to +0.06 in every age bin).
 - **Knobs:** refresh the re-sim faster in the last 5% (about the last 3 minutes); or refuse a live opinion or bet there when its state is older than 30 s.
 - **Verify:** the 95-100% rows of a later engine read. Kit `C:\tmp\elp\engine_read` (`totals_ladder.py`, `ladder_analysis.py`, `staleness.py`).
+- **2026-11-18 (lane `live-resim-endgame-staleness`, `.syndicate/findings_2026-11-18_live_resim_endgame_staleness.md`):**
+  - **What sets the age:** each producer's loop. New-state gap p50 / p90: NBA 151 / 186 s (tick, then a 120 s wait), NCAAF 154 / 342 s (refresh-worker's main-loop cycle, on a live-state record up to 120 s old), NHL 91 / 128 s (the serial live-lens loop, then a 60 s wait). The evidence log adds nothing.
+  - **Who reads it late:** no live-money order today (the executor refuses entries after kickoff; the in-play program prices from the book median). The board's edges, the rail flag, the paper books and the engine's opinions do.
+  - **Fix chosen: the refusal** (`syndicate/features/shared/live_endgame_freshness.py`, absent = shadow; built locally with 47 tests, not on main). A faster refresh means three producers on two saturated roles, and its payoff rests on the thin fresh cell.
+  - **Re-measure (dev):** the rule refuses 92.5% of last-5% line-instants, which lose +0.174 (se 0.053). The kept -0.048 cell is 14 games, so it does not show a fresh state beats Kalshi.
+  - **Owed:** wiring into `live_gameline_join.attach_live_gamelines` and `engine_experts.live_resim_expert` (two loans), the off != on test through the join, then a shadow load (the user's decision).
 
 ### `#835` — **NCAAF LIVE RE-SIM TOTALS ARE OVER-CONFIDENT: their spread of final totals is ~20% narrower than Kalshi's at every stage, their centre wanders 3-4 pts, and in slow games they expect a catch-up Kalshi does not** `[2026-11-17, lane engine-learner; `.syndicate/brief_2026-11-17_engine_read_kalshi.md`]` — OPEN; owner: the NCAAF live re-sim (`syndicate/features/ncaaf/live_resim.py`)
 - **Evidence** (dev 11-14, 26 games, 630 game-instants with a fittable Kalshi strike ladder; Kalshi's centre and spread from a probit fit of its ladder at the same instant):
