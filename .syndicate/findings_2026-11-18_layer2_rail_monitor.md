@@ -343,3 +343,32 @@ The #816 lane (local_1f10ce63, on the user's ask to count books) found it: `.syn
   - Recorded as **I-27** on the dashboard.
   - P1's college counts are a lower bound until the bug is fixed.
 - **The fix is not built.** `book_grid.py` is held by OPEN lane `ncaaf-grid-build-speed`. It is a betting change, so it loads in the 11-24 window unless the user grants an exception.
+
+## Reading 6 — Wed 11-18 3:05 PM CST (21:05Z)
+
+**Fleet:** **`a3104a5b6` since 3:02:51 PM CST.** The NBA games-history fetch is bounded and de-duplicated, **default ON**: todo #843,
+lane `nba-midnight-bootstrap-hold`, user "Load it now", **BC-052, outside a window by the user's override** (deploys.md
+21:02:51Z). This is I-25's fix: duplicate history inflated NBA Elo by 119 points on average.
+- Ride-alongs: `live_refresh_loop.py` day-2 look-ahead wait (`2aff90c36`, `SYNDICATE_LOOK_AHEAD_LANE_WAIT` **default OFF**);
+  `refresh_nba_oddsapi_props.py` timeout.
+- Also recorded: the Understat outage naming half (`5a7cc60d2`, betting change no) reached the fleet with the 1:14 PM ff
+  (deploys.md 20:22Z reading).
+- Host load 3.2.
+
+**Slate: 1 live** (Rutgers @ Notre Dame, OT 4:11).
+- Flags: 1 shown, 0 false, 0 missed, 0 dark. P1, P6 and #824: 0.
+- Live rows: 9, 2 priced <= 120 s (row age; college row ages are lower bounds per #844).
+
+**Board: 8 builds, 145-253 s, median 166 s, 0 over 300 s.** Shortlist span max 121 s.
+
+**Overlay:** 0 gaps over 360 s (max WNCAAB 85 s).
+- Web merges 53, **12 stale, all WNCAAB**, with no WNCAAB game live.
+- The WNCAAB overlay built 0 cards in 14 of 29 builds with rows: games ending, and no WNCAAB cards to merge. **Benign.**
+
+**Live odds lane:** 12 launched, 1 refused (7.7%). Live runs 61-63 s; pregame 243 s.
+
+**Load:** query 10.8 s (2.4 s at r5); shortlist 2.4 s. Today's board was 430 s old at the read (one build in flight).
+
+**Team cards:** 0 defects.
+
+**Dashboard:** row 6, the 1:14 PM and 3:02 PM loads, and I-25 marked loaded.
