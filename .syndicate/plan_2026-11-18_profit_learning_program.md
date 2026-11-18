@@ -41,6 +41,9 @@ No result guarantees future returns.
 3. **Pay the minimum tuition.** While no challenger has passed, the champion's live stakes should sit at the smallest
    size that still measures fills and slippage. The user decides; it is a pure risk reduction, so it may load outside
    a window.
+   - **Measured 11-18:** the cut is worth about $1.30 a day of expected loss at the last week's volume. Its env keys
+     load only through a drained full down/up, which also loads every unloaded commit on main into the roles. So it
+     is best loaded in a window, unless the user takes those ride-alongs too (lane `live-stake-minimum`).
 4. **Slices are evidence for per-line rules, never a sport or market switch** (learnings line 1056).
 5. **Nothing is thrown away.** Every family below is kept, joined and reused.
 
@@ -106,9 +109,14 @@ No result guarantees future returns.
 
 ## The income arithmetic, plainly
 
-- **Volume today is about $100 a day staked live** (30 days, pinned 11-16: about $3,000).
-  - At the current -7.35%, that is about -$7 a day.
-  - At a proven +2% net it would be about +$2 a day.
+- **Volume (corrected 11-18 from the full live ledger; an earlier version said "about $100 a day today"):**
+  - The 30-day average is about $100 a day staked live (graded 10-19..11-17: $3,065).
+  - The current rate is lower: **about $49 a day over the last 7 graded dates** ($41 pregame, $8 in-play), and
+    about $28 a day on 11-16 and 11-17. Pregame orders are mostly one contract already (226 of 380 in 7 days).
+  - At the current -7.35%, $49 a day is about -$3.60 a day in expectation.
+  - One contract per order would have staked about $31 a day over the same 7 dates ($29 pregame, $2 in-play), about
+    -$2.30 a day. The stake cut is worth about $1.30 a day at this volume.
+  - At a proven +2% net, $49 a day would be about +$1 a day.
 - **Passive income comes from three things in order:**
   1. a selection that is positive after fees and proven by the gate (800 graded games, ROI lower bound > 0, CLV
      agreeing);
