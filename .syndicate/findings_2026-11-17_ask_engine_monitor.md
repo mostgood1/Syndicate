@@ -908,3 +908,46 @@ All `answer_source=snapshot`; `as_of_in_future` false on 6 / 6. A game was live:
 - 2e deploys.md: no header in the last 40 min (since 7:56 PM CST). Newest is the 7:46 PM CST web loop-stall black box `3920a2d4d` (`web-silent-worker-kills`), 50 min ago, so outside this window. The two recent gunicorn worker ages (35 s, 109 s) are recycles, not a load.
 
 No anomaly.
+
+## Reading 22 (9:06 PM CST)
+
+Probe `ask_reading_20261118T030512Z.json`, run 9:05 PM CST. The web window starts 8:35 PM CST (02:35Z).
+
+**Ask:** 6 of 6 answered. 0 of 6 went past the 45 s cut-off. Median 6.51 s, max 8.15 s. The page answered 200 in 0.07 s. The shortlist answered 200 in 0.86 s with 200 rows.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "this spread" | 7.92 | yes | bet_analysis | 02:01:14Z (3846 s old) | 0 |
+| free_text "Lakers vs Celtics" | 0.71 | yes | matchup_analysis | 02:01:14Z (3847 s old) | 0 |
+| free_text "top edges today" | 6.51 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NBA UTA@LAC Over 54.5, q2) | 8.15 | yes | bet_analysis | 2026-11-15 (date) | 2 |
+| pregame_prop (Wagler Over 12.5) | 3.31 | yes | bet_analysis | 00:33:24Z (9135 s old) | 7 |
+| live_row (NBA POR@MIN h2h) | 1.21 | yes | bet_analysis | 2026-11-16 (date) | 2 |
+
+No `as_of` is in the future. A game was live: the probe found a `live_row` ask. Every answer came from the snapshot path.
+
+**Web over the window (244 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 20, of which 17 were hard. Max anon 1152.2 MB against a 648.9 MB limit.
+- Overlay warms: 44. Median 16.87 s. Over 20 s: 18. Over 45 s: 3. Over 60 s: 1. Max 68.32 s.
+- Requests over 20 s: `POST /api/intelligence/query` 4, `GET /api/board/live-rail` 1.
+- Requests over 45 s: `GET /api/board/live-rail` 1.
+- Asks from any client: 12 (6 from the previous reading, 6 from this one). 0 over 45 s, 0 non-200. All 12 are `Python-urllib`, so 0 came from another client.
+
+**Host:**
+- Load 5.49 / 4.89 / 5.39 on 12 cores. MemAvailable 6423 MB.
+- Top CPU:
+  - refresh-worker 93.9% (nice 0, 4634 MB RSS);
+  - live-odds-worker 73.9% (nice 0);
+  - gunicorn web workers 57.2% and 30.7% (nice 0; one was 54 s old, the other 190 s old);
+  - two live_resim workers at 45.5% each (nice 5);
+  - this probe 3.3% (nice 19).
+
+**Engine:**
+- 2a: `engine-live-prior-f2-read-1117` still has 1 run (16:30-17:17Z, NOT PASSED, already recorded at `c765eec64`). No newer run.
+- 2b: `engine-learner-m2-gate-read-1124` is enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: The `m2_gate.py` sha256 starts `c1a2c029c2a1816f`, which matches Amendment 2.
+- 2d: No engine-file commits on origin/main in the last 40 min.
+- 2e: The newest deploys.md header is 02:46:25Z (8:46 PM CST), "OPS, NO DEPLOY": a hung `refresh_nhl_oddsapi.py` child was killed. That is a process kill, not a code or env load, so live pricing is unchanged. There is no FLEET ff, DEPLOY or role restart in the last 40 min.
+
+- **ANOMALY:** One overlay warm took 68.32 s, over the 60 s line. Three of 44 warms went past 45 s, and 1 `GET /api/board/live-rail` request went past 45 s. Next: check the web log for the warm's timestamp and whether it lines up with the 8:46 PM NHL odds child kill or with a hard recycle. 17 of 20 recycles were hard, and max anon was 1152 MB against a 649 MB limit.
