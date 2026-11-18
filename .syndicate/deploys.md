@@ -61959,3 +61959,33 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Harm check 19:14:22-19:14:54Z: 0 `WEB_MEMORY_GUARD_ERROR`, 0 Traceback, 0 `WORKER TIMEOUT`, 0 dumps. Only 32 s so far.
   - `double_hard_recycles_lt30s_non_emergency_per_day` 24 -> 0: **OWED.**
 - **verify:** the reading is scratchpad `wsk_pairs.py` over `WEB_WORKER_MEMORY_RECYCLE {` lines since 19:14:22Z: `double_lt30s` should be 0 apart from `"emergency": true` lines. The first `WEB_WORKER_MEMORY_RECYCLE_DEFERRED` with `"hard": true` should be followed by that pid's recycle with `hard_deferred_s` < ~35 and no `WORKER TIMEOUT`.
+## 2026-11-18 20:22Z (2:22 PM CST) -- READING (no deploy by this lane): the soccer Understat outage guard's NAMING half `5a7cc60d2` (todo #841, lane `understat-fetch-failures`; user "Load it now" to "Load the naming half on the fleet now (ff to 5a7cc60d2, betting change no)?") reached the fleet as a ride-along of lane `web-silent-worker-kills`'s ff `640c6d4fd` -> `db6a395ed` at 19:14:22Z (BC-051) -- **P1 MET 52 of 52, P2 MET, P3 MET, P5 MET; P4 (recovery) owed**
+- betting change: **no**. This entry loads nothing; the load is BC-051 (`no`), which lists this guard as a ride-along.
+  - Naming sends the same requests and writes the same bytes as OFF under 7 responses x 2 kinds (`tests/test_understat_fetch.py`, 46 of 46).
+  - The cooldown half (`SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN`, a betting change) stays default OFF. No fleet env layer sets either key (read by BC-051's lane, 19:1xZ).
+- **Gates, and why this lane did not ff:**
+  - claim live-odds-worker 19:14:00Z (holder `understat-fetch-failures`, ACQUIRED);
+  - baseline 19:13:52Z: fleet head `640c6d4fd`; since 18:00Z, 4 soccer runs with 24 big-5 Understat steps, 0 named tails; marker `soccer_source/_understat_status.json` absent; Understat seconds per run p50 14 s;
+  - preflight `--service live-odds-worker --target-commit 5a7cc60d2 --betting-change no`, 3 expect/baseline pairs (`fleet_head`, `understat_named_tail_share`, `understat_marker`): HOLD (3 jobs in flight), then **CLEAR 19:14:25Z**;
+  - the fleet head then read `db6a395ed`. Lane `web-silent-worker-kills` had ff'd at 19:14:22Z, and `5a7cc60d2` is an ancestor of `db6a395ed` (`git merge-base --is-ancestor`, rc 0). This lane's own ff would have been a no-op, so it was not run. Claim released 19:15:13Z.
+- **How it loads:** the fetcher is a child script of the odds refresh, so it loads at the next run with no restart. The first post-load run to reach a big-5 Understat step started 19:22:01Z (1:22 PM CST).
+- **expect / measured** (scratch `C:/tmp/understat_3fc3/reading2.py 2026-11-18T19:14:22Z`, read 20:21:22Z; 10 soccer runs, 52 big-5 Understat steps, 19:22-20:19Z):
+  - `fleet_head` 640c6d4fd -> a head containing 5a7cc60d2: **MET** (`db6a395ed`).
+  - P1 `understat_named_tail_share` 0.0 -> 1.0: **MET, 52 of 52.**
+    - 26 teams steps end `UNDERSTAT_UNAVAILABLE league=.. kind=teams season=2026 reason=non_json url=https://understat.com/getLeagueData/<L>/2026 status=200 content_type='text/html' bytes=26719 text='Understat.com We will come back soon' (nothing written; the previous file is KEPT and is now stale)`.
+    - 26 players steps end the same, plus `legacy_page=https://understat.com/league/<L>/2026 legacy_error=ValueError`.
+    - 0 old `JSONDecodeError` / bare `playersData not available` tails; 0 rc 0; soccer `ok` False in 10 of 10 runs. The step stays red on purpose, so the failure stays visible.
+  - `understat_marker` absent -> present: **MET** (`state` down, `down_since` 19:22:04Z, `last_probe_at` 20:19:05Z, `probes` 52, `last_ok_at` null).
+  - P2 (amended 1:06 PM CST) requests equal OFF's: **MET.**
+    - `probes` 52 = 52 steps x 1 `getLeagueData` request, so every marker write landed.
+    - The 26 players steps also asked the legacy page (their `legacy_page=` tails). That makes 78 requests: OFF's 1 per teams step plus 2 per players step.
+  - P3 Understat seconds per run p50 <= 11 s: **MET**, p50 5.0 s, max 16.0 s (baseline 14 s over 4 runs).
+    - 6 of the 10 runs carry only 2 Understat steps, so this is not a per-step speed-up claim.
+    - Naming adds one marker write per step.
+  - P5 nothing else moves: **MET** (scratch `p5.py 2026-11-18T19:14:22Z 6`, read 20:22:23Z; 31 soccer runs before, 10 after).
+    - 0 step sequences after the load that were not seen before.
+    - 1 command not seen before: `soccer_epl_artifacts --date 2026-11-23`. That is the look-ahead date advancing (#840), not this change.
+    - Non-Understat soccer steps: rc 0 in 258 of 258 after, against 892 of 894 before (2 `soccer_mls_artifacts`).
+  - P4 recovery: **OWED.** Understat still served the maintenance page at 20:19:05Z.
+- **Off switch:** `SYNDICATE_UNDERSTAT_OUTAGE_GUARD=off` in `~/syndicate-prod/local_production.env`, then a drained full `down`/`up` (env is built only at `up`).
+- **verify:** while Understat is down, every big-5 Understat step tail starts with `UNDERSTAT_UNAVAILABLE` (`reading2.py`). At recovery (P4): the marker flips to `state` up with `last_outage`, the next run's 10 steps go rc 0, and `teams_2026.csv` / `players_2026.csv` mtimes move, with rows past 2026-10-31.

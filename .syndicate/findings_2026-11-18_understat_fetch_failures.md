@@ -228,4 +228,20 @@ Switching it on would follow the windows rule:
   default flip that is ff'd in the window;
 - or now, if the user classifies it `no`.
 
-Both decisions were put to the user; nothing is loaded.
+Both decisions were put to the user. The user answered the naming one: "Load it now".
+
+**Naming LOADED 2026-11-18 1:14:22 PM CST.** Lane `web-silent-worker-kills` ff'd the fleet `640c6d4fd` ->
+`db6a395ed` at that instant (BC-051, `no`), and `db6a395ed` contains `5a7cc60d2`. This lane held a claim and a
+CLEAR preflight (19:14:25Z), and its own ff would have been a no-op, so it did not run one.
+
+Reading at 2:22 PM CST (10 soccer runs, 52 big-5 Understat steps, 1:22-2:19 PM CST; `deploys.md` 20:22Z):
+
+| prediction | result |
+|---|---|
+| P1: 100% of failing tails named | **MET, 52 of 52** (26 teams `reason=non_json`; 26 players add `legacy_page=.. legacy_error=ValueError`); 0 old tails; 0 rc 0; soccer `ok` False 10 of 10 |
+| P2 (amended): requests equal OFF's | **MET**: 78 requests (1 per teams step, 2 per players step); marker `probes` 52 = 52 steps |
+| P3: Understat seconds per run p50 <= 11 s | **MET**: p50 5.0 s, max 16 s (6 of 10 runs carry 2 steps) |
+| P4: recovery | **OWED**: Understat still in maintenance at 2:19 PM CST |
+| P5: nothing else moves | **MET**: 0 new step sequences (31 runs before, 10 after); non-Understat soccer steps rc 0 258 of 258 |
+
+The cooldown half stays default OFF; its decision is still the user's.
