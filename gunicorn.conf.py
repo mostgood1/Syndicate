@@ -187,6 +187,84 @@ def post_request(worker, req, environ, resp) -> None:  # noqa: ARG001 - gunicorn
         _log("WEB_MEMORY_GUARD_ERROR", {"hook": "post_request", "error": f"{type(exc).__name__}: {exc}"})
 
 
+# THE LOOP-STALL BLACK BOX -- lane `web-silent-worker-kills` `[2026-11-18]`.
+#
+# WHAT IT CATCHES. On 2026-11-17 gunicorn killed 4 web workers with `WORKER TIMEOUT` (15:23,
+# 16:38, 16:49, 21:36Z; 0 a day on 11-12..11-16) while they were alive and serving: none had
+# the `WEB_WORKER_MEMORY_RECYCLE` / `WEB_WORKER_DRAINED` lines of the older drain-path kills.
+# The master kills a worker whose heartbeat (`worker.notify()`, called once per turn of the
+# worker's main loop in `syndicate/web_worker.py`) is 60 s old, so for 60 s that loop did not
+# turn. The logs cannot say why:
+#   * each kill took ONE worker, while both heartbeat files share one filesystem, so a disk
+#     stall long enough to miss the heartbeat would have taken both -- and 3 of the 4 came after
+#     C: had been relieved (37-130 GB free);
+#   * the main loop's own calls are short by construction (non-blocking sockets; the fast
+#     /healthz answer is bounded by a 2 s send timeout);
+#   * which leaves a thread in the SAME process holding the GIL in one long C call, or a main-
+#     loop call blocking in a way the code does not show. Only a stack of every thread, taken
+#     while the loop is stuck, separates those.
+#
+# HOW. `faulthandler.dump_traceback_later` runs a C watchdog thread that writes every Python
+# thread's stack to fd 2 WITHOUT needing the GIL. Each heartbeat re-arms it (at most every
+# `STALL_DUMP_REARM_SECONDS`, so a busy loop does not churn its thread), so it fires only when
+# the loop has not turned for `stall_dump_seconds()` -- 40 s by default, always at least 10 s
+# before the master's kill. A loop that recovers just leaves the dump behind; one that does not
+# is killed ~20 s later with its stack already in web.log. The dump starts with
+# `Timeout (0:00:40)!`; the worker's pid is in the `WEB_LOOP_STALL_DUMP_ARMED` line it printed
+# at boot. Switch: `SYNDICATE_WEB_LOOP_STALL_DUMP_SECONDS` (0 disables).
+STALL_DUMP_REARM_SECONDS = 5.0
+
+
+def stall_dump_seconds(kill_timeout: float) -> float:
+    """Seconds without a loop turn before the stack dump: the env value (default 40), always at
+    least 10 s inside the master's kill timeout and never under 1 s. 0 or less disables it."""
+    raw = str(os.environ.get("SYNDICATE_WEB_LOOP_STALL_DUMP_SECONDS") or "").strip()
+    try:
+        wanted = float(raw) if raw else 40.0
+    except ValueError:
+        wanted = 40.0
+    if wanted <= 0:
+        return 0.0
+    ceiling = max(1.0, float(kill_timeout or 0) - 10.0)
+    return max(1.0, min(wanted, ceiling))
+
+
+def install_loop_stall_dump(worker, *, now=time.monotonic, dump_later=None, stream=None) -> str:
+    """Wrap `worker.notify` so every heartbeat re-arms the stall dump. Returns armed / disabled."""
+    import faulthandler
+
+    seconds = stall_dump_seconds(float(getattr(worker.cfg, "timeout", 0) or 0))
+    if seconds <= 0:
+        return "disabled"
+    arm = dump_later or faulthandler.dump_traceback_later
+    out = stream or getattr(sys, "__stderr__", None) or sys.stderr
+    original = worker.notify
+    state = {"armed_at": None}
+
+    def notify() -> None:
+        original()
+        t = now()
+        if state["armed_at"] is None or t - state["armed_at"] >= STALL_DUMP_REARM_SECONDS:
+            arm(seconds, repeat=False, file=out, exit=False)
+            state["armed_at"] = t
+
+    worker.notify = notify
+    _log("WEB_LOOP_STALL_DUMP_ARMED", {
+        "pid": os.getpid(),
+        "dump_after_s": seconds,
+        "rearm_every_s": STALL_DUMP_REARM_SECONDS,
+        "kill_timeout_s": float(getattr(worker.cfg, "timeout", 0) or 0),
+    })
+    return "armed"
+
+
+def post_worker_init(worker) -> None:
+    try:
+        install_loop_stall_dump(worker)
+    except Exception as exc:  # never take the worker down
+        _log("WEB_LOOP_STALL_DUMP_ERROR", {"hook": "post_worker_init", "error": f"{type(exc).__name__}: {exc}"})
+
+
 def decide_recycle(worker, *, now: float, anon_mb_reader, stamp_path: str) -> str:
     """Returns what happened: skipped / below_limit / too_young / deferred / recycled."""
     limit = float(getattr(worker, "_syndicate_limit_mb", 0.0) or 0.0)

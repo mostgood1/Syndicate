@@ -173,3 +173,90 @@ def test_loading_the_conf_drops_the_cached_worker_module(monkeypatch):
     monkeypatch.setitem(sys.modules, "syndicate.web_worker", sentinel)
     runpy.run_path(str(pathlib.Path(__file__).resolve().parents[1] / "gunicorn.conf.py"))
     assert sys.modules.get("syndicate.web_worker") is not sentinel
+
+
+# --------------------------------------------------------------------------------------------
+# The loop-stall black box -- lane `web-silent-worker-kills` [2026-11-18]. Each heartbeat re-arms a
+# faulthandler stack dump; a loop that stops turning gets every thread's stack written BEFORE the
+# master's 60 s kill. These pin: the wrapper still heartbeats, re-arms at most every 5 s, fires
+# inside the kill timeout, is switchable, never raises into gunicorn, and really dumps (off != on).
+# --------------------------------------------------------------------------------------------
+
+
+class _Clock:
+    def __init__(self):
+        self.t = 100.0
+
+    def __call__(self):
+        return self.t
+
+
+def _beating_worker(timeout=60):
+    calls = []
+    worker = types.SimpleNamespace(cfg=types.SimpleNamespace(timeout=timeout), notify=lambda: calls.append(1))
+    return worker, calls
+
+
+def test_each_heartbeat_still_beats_and_rearms_the_dump_at_most_every_5_s(monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_WEB_LOOP_STALL_DUMP_SECONDS", raising=False)
+    worker, beats = _beating_worker()
+    armed, clock = [], _Clock()
+    out = object()
+    assert conf.install_loop_stall_dump(worker, now=clock, dump_later=lambda *a, **k: armed.append((a, k)),
+                                        stream=out) == "armed"
+    worker.notify()
+    clock.t += 1.0
+    worker.notify()
+    clock.t += 4.5
+    worker.notify()
+    assert len(beats) == 3, "the original heartbeat runs on every turn"
+    assert len(armed) == 2, "armed at the first beat and again only once 5 s had passed"
+    args, kwargs = armed[0]
+    assert args == (40.0,) and kwargs == {"repeat": False, "file": out, "exit": False}
+    [line] = _lines(capsys, "WEB_LOOP_STALL_DUMP_ARMED")
+    assert line["dump_after_s"] == 40.0 and line["kill_timeout_s"] == 60.0
+
+
+@pytest.mark.parametrize("raw, timeout, expected", [
+    ("", 60, 40.0),          # default
+    ("100", 60, 50.0),       # never later than 10 s before the master's kill
+    ("abc", 60, 40.0),       # a typo keeps the default
+    ("5", 3, 1.0),           # a tiny timeout still dumps, at 1 s
+    ("0", 60, 0.0),          # off
+    ("-1", 60, 0.0),
+])
+def test_the_dump_always_fires_before_the_kill(monkeypatch, raw, timeout, expected):
+    monkeypatch.setenv("SYNDICATE_WEB_LOOP_STALL_DUMP_SECONDS", raw)
+    assert conf.stall_dump_seconds(timeout) == expected
+
+
+def test_off_leaves_the_heartbeat_untouched(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_WEB_LOOP_STALL_DUMP_SECONDS", "0")
+    worker, _ = _beating_worker()
+    original = worker.notify
+    assert conf.install_loop_stall_dump(worker, dump_later=lambda *a, **k: pytest.fail("armed while off")) == "disabled"
+    assert worker.notify is original
+
+
+def test_post_worker_init_never_raises_into_gunicorn(capsys):
+    conf.post_worker_init(types.SimpleNamespace())  # no cfg, no notify
+    assert _lines(capsys, "WEB_LOOP_STALL_DUMP_ERROR")[0]["hook"] == "post_worker_init"
+
+
+def test_a_loop_that_stops_turning_gets_every_threads_stack_dumped(monkeypatch, tmp_path):
+    """Reachability: the real faulthandler watchdog, armed by one heartbeat and then starved."""
+    import faulthandler
+    import time as _time
+
+    monkeypatch.setenv("SYNDICATE_WEB_LOOP_STALL_DUMP_SECONDS", "1")
+    worker, _ = _beating_worker(timeout=3)  # dump at max(1, min(1, 3 - 10)) = 1 s
+    path = tmp_path / "dump.txt"
+    with open(path, "w+", encoding="utf-8") as fh:
+        try:
+            conf.install_loop_stall_dump(worker, stream=fh)
+            worker.notify()  # the last turn of the loop
+            _time.sleep(1.6)  # the loop is stuck
+        finally:
+            faulthandler.cancel_dump_traceback_later()
+    text = path.read_text(encoding="utf-8", errors="replace")
+    assert "Timeout (0:00:01)!" in text and "test_a_loop_that_stops_turning" in text
