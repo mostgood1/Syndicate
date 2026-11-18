@@ -309,6 +309,16 @@ def main() -> int:
     reading["query"] = {k: q.get(k) for k in ("snapshot_generated_at", "state_last_updated", "selected_date")}
     snap = parse_ts(q.get("snapshot_generated_at"))
     reading["query"]["snapshot_age_s"] = round((now - snap).total_seconds(), 1) if snap else None
+    # `snapshot_generated_at` on the combined board window is the OLDEST date's stamp (a next-day
+    # look-ahead, rebuilt hourly by design), not today's board. Read today's own age from the
+    # window's per-date block. 11-18 r2: 2,348 s served vs today's 343 s.
+    try:
+        _resp = q.get("response") if isinstance(q.get("response"), dict) else {}
+        _dates = ((_resp.get("state_meta") or {}).get("dates") or {})
+        _today = parse_ts((_dates.get(rail_date) or {}).get("written_at"))
+        reading["query"]["today_written_age_s"] = round((now - _today).total_seconds(), 1) if _today else None
+    except Exception:
+        reading["query"]["today_written_age_s"] = None
     # ---- the served page's own rail code
     runner = HERE / "layer2_rail_monitor_run.mjs"
     out_json = rdir / "rail.json"
@@ -460,7 +470,7 @@ def summary(r):
         "read_at_ct": r["read_at_ct"], "rail_date": r["rail_date"], "load": load,
         "live_rail": [(x["rows"], x["newest_age_s"]) for x in r["live_rail"]],
         "board": {"shortlist_written_age_s": r["shortlist"]["written_age_s"], "build_age_s": r["shortlist"]["build_age_seconds"],
-                  "rows_live_state_stale": r["shortlist"]["rows_live_state_stale"], "query_snapshot_age_s": r["query"]["snapshot_age_s"], "board_built_age_s": r["query"].get("board_built_age_s")},
+                  "rows_live_state_stale": r["shortlist"]["rows_live_state_stale"], "query_snapshot_age_s": r["query"]["snapshot_age_s"], "query_today_age_s": r["query"].get("today_written_age_s"),"board_built_age_s": r["query"].get("board_built_age_s")},
         "rail": {"cards": lv["cards_on_rail"], "live_cards": lv["live_cards"], "by_sport": lv["by_sport"]},
         "flags": {"shown": lv["flags"], "cards_flagged": lv["live_cards_with_flag"], "false": len(lv["false_flags"]),
                   "missed": len(lv["missed_flags"]), "dark_rows": lv["dark_rows"], "dark_markets": lv["dark_markets"]},

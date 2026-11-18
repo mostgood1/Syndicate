@@ -179,3 +179,49 @@ Jackson St @ Baylor tipped at 11:01 AM, before this block was written.
   hands its 10:15 PM verdict to whoever takes it. **Not opened yet:** a lead until the evening reading.
 - **`wncaab_odds_snapshot` fails most pregame runs** ("No odds rows returned"). Already known to the odds-lane session; no owner named. I will
   measure the share against WNCAAB pregame runs at the next reading.
+
+## Reading 2 — Wed 11-18 12:33 PM CST (18:33Z)
+
+**Fleet:** **`640c6d4fd` since 11:58:30 AM CST.** The soccer look-ahead fix was ff'd by its lane, with no restart.
+- Host load 6.2 / 5.0 / 4.2; 6.6 GB available.
+
+**Slate: 2 live.** NCAAB Jackson St @ Baylor H2 9:56 (pre-registration-excluded) and WNCAAB East Texas A&M @ Texas A&M Q4.
+
+**Flags: 1 card (Baylor), 4 flagged rows, 0 false, 0 missed, 0 dark.**
+- The card's flag is o151.5 at 27.5 pp (model 0.79 vs fair 0.52), with ours 159.0. Ours is on the flagged side.
+- **P1 (I-17):** 0 contradictions. 9 of 9 NCAAB full total rows are `calibrated` (`i17check.py` 18:35:25Z: 0 flags by its |edge| >= 3,
+  <= 120 s rule at that instant).
+- **P6:** 0 pregame college totals flags.
+
+**Live rows:** 10. 9 priced <= 120 s; priced age p50 38 s; 1 of 3 markets with no price of ours.
+
+**Overlay (since 11:58 AM):** 0 gaps over 360 s (max WNCAAB 96 s); ticks 88, gap max 100 s; web merges 64, 0 stale.
+
+**Board:** 6 builds; wall **178-352 s, median 222 s**; cpu 150-320 s; off-CPU 9-16%.
+- 2 of 6 builds went over 300 s (12:24 PM 352 s, 12:30 PM 311 s); the shortlist span hit 192 s at 12:22 PM.
+- **The midday trend is up** (9 AM-noon p50 127 s; 11 AM-noon 199 s). P2's evening test starts from a heavier base than the
+  11-17 calm.
+
+**Live odds lane (since 11:58 AM):** 14 launched, **3 refused** (`lane_busy`).
+- The holder was a today-pregame sweep (nba, nhl, ncaab, wncaab; pid 207671) at 410 s at 12:37 PM, in its NHL odds step
+  (`refresh_nhl_oddsapi.py` 7 s old).
+- Live runs: 1, at 125 s. No odds child older than 600 s.
+
+**Soccer fix, first look-ahead on it (12:07 PM, 11-19 slate):** the run took **386 s, soccer 276 s**, against this morning's
+1,391-2,444 s / 1,189-2,225 s.
+- Its owner reads the sims at 45 s against a 62 s bound: MET.
+- Today's own pregame soccer run (12:16 PM) took 479 s (soccer 449 s). That path is not touched by the fix.
+
+**Load:** query **16.1 s** / 3.94 MB / 20.8 MB (reading 1: 4.5 s); a re-fetch at 12:36 PM took 8.6-10.3 s x3. Shortlist 7.2 s;
+chips 0.8 s; live-rail 0.09 s.
+- These are under host load 6.2. Watch whether the query stays over 8 s.
+
+**Team cards:** 0 flipped, det 0 / 0 / 0, 0 chip-less.
+
+**A monitor-instrument correction: no defect.** The probe's `query_snapshot_age_s` read **2,348 s** (served
+`snapshot_generated_at` 17:54:46Z, unchanged over 3 re-fetches).
+- That stamp is the combined window's OLDEST date (`pipeline/intelligence_state.py:10850-10889`). Here it was **11-19's
+  look-ahead** shortlist, rebuilt hourly by design.
+- Today's own block in `state_meta.dates` read **2026-11-18 written 18:27:50Z (343 s)**, state 18:30:57Z. The state history
+  appends every ~5 min (last at 12:31:29 PM).
+- Fixed in this lane's probe: it now also prints `query_today_age_s` from `state_meta.dates[<rail date>]`.
