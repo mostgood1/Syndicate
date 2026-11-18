@@ -64,6 +64,7 @@ The nightly took it at its 8:00 AM run: `C:/tmp/inplay_nightly.log` reads
 - the first live Saturday reading, `py -3 scripts/inplay_poll_gaps.py C:/tmp/inplay_2026-11-21`: its
   `share_time_no_quote_60s` against 11-14's 0.267, and `kalshi_429` against the dry A/B's 3-6 per 15 min;
 - its `kalshi.jsonl` size, against §2's ~3.6 GB ceiling.
+- **SCHEDULED 2026-11-18 9:56 AM CST** (the user: "schedule the 11-21 Saturday reading"): one-time Claude task `inplay-saturday-1121-gap-reading`, fires **Sun 11-22 10:00 AM CST** (the app must be open; otherwise it runs at next launch). It runs `inplay_poll_gaps.py` at Idle on `C:/tmp/inplay_2026-11-21`, writes `C:/tmp/inplay_2026-11-21/poll_gaps_reading.md`, and appends `## 4. Live reading: Saturday 2026-11-21` here plus a `.syndicate/log/2026-11-22.md` entry. Verdicts pre-registered in the task: MET = `share_time_no_quote_60s` <= 0.02 AND `share_any_gap_over_120` <= 0.05; PARTIAL = below 0.267 but not MET; NOT MET = >= 0.267. Flags: > 16 Kalshi 429s per 15 min, `kalshi.jsonl` > 3.6 GB, any loop stall > 60 s. 11-21 also carries the Normal-priority fix (`c0d9cf9b8`, from the 11-19 sync), so the reading measures both changes together. If `## 4` is absent after 11-22 noon, the task did not run: take the reading by hand.
 
 - **List:** every `--tickers-seconds` (600), union of Kalshi's public listing (`GET /markets?series_ticker=<s>&status=open`,
   kept to the event tickers carrying the slate's date code, e.g. `26NOV14`) and the capture file. A ticker stays polled
