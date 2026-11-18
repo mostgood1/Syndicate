@@ -153,3 +153,8 @@ Per team per run, 6 uncached `limit=-1` stats-REST calls (above):
 Fetching these once and caching them, validated against the finished game ids the usage window already reads,
 would cut ~168 calls per generation to ~0-12. The data is identical, so the model output is unchanged. That would
 make full generation fast on healthy nights and possible on slow ones.
+
+## Baseline addendum (rail monitor reading 16, 8:37 PM CST, relayed 11-17 ~9:40 PM CST)
+Prediction 4's in-play baseline: NHL in-play overlay rows were 0-16 for 02:06-02:37Z, except **600 at
+02:26-02:29Z**, right after the 02:24Z timeout freed the lane. Sweeps 02:06-02:37Z: 7 launched, 6 refused
+`lane_busy`. So NHL in-play rows track the lane being free, which is the mechanism this fix bounds.
