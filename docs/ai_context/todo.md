@@ -99,6 +99,7 @@
   - **On main** (user "Push it" 11-18): `3a04f43b0` the rule + 53 tests, `18d036bef` the engine expert's end-game refusal (absent = shadow). No role imports either; nothing loaded.
   - **Join gate on main** `52e68382a` (user "Push it" 11-18 12:50 PM CST; loan user "Lend it"): off != on through the join and the board caller; absent = shadow.
   - **Owed:** the first live evening's shadow reading once a fleet ff carries `52e68382a` (`LIVE_ENDGAME_FRESHNESS` lines: judged / would_refuse / would_refuse_priced per sport); the pinned experts' JOIN / PRIOR reproduction at 0 with the gate on; `on` only in a betting-change window, earliest 2026-12-08, with the user's yes (it is a betting change).
+  - **Lane `live-resim-endgame-staleness` CLOSED 2026-11-18 1:02 PM CST (goal met).** The owed steps above are unowned until a session takes them; findings `.syndicate/findings_2026-11-18_live_resim_endgame_staleness.md`.
 
 ### `#835` — **NCAAF LIVE RE-SIM TOTALS ARE OVER-CONFIDENT: their spread of final totals is ~20% narrower than Kalshi's at every stage, their centre wanders 3-4 pts, and in slow games they expect a catch-up Kalshi does not** `[2026-11-17, lane engine-learner; `.syndicate/brief_2026-11-17_engine_read_kalshi.md`]` — OPEN; owner: the NCAAF live re-sim (`syndicate/features/ncaaf/live_resim.py`)
 - **Evidence** (dev 11-14, 26 games, 630 game-instants with a fittable Kalshi strike ladder; Kalshi's centre and spread from a probit fit of its ladder at the same instant):
