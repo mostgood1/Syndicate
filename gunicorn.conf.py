@@ -27,8 +27,9 @@ TWO LEVERS, each with a proof line and an env switch.
    one. This is a ceiling, not a diagnosis: it holds whatever the cause. It never recycles a
    worker younger than `SYNDICATE_WEB_WORKER_MIN_AGE_SECONDS`, and it STAGGERS: if another
    worker in this container recycled within `SYNDICATE_WEB_WORKER_RECYCLE_SPACING_SECONDS`,
-   it waits -- unless it is over the HARD limit (limit + `SYNDICATE_WEB_WORKER_HARD_MARGIN_MB`),
-   where the kernel is closer than a cold worker. Proof lines: `WEB_MEMORY_GUARD_ARMED` per
+   it waits. Over the HARD limit (limit + `SYNDICATE_WEB_WORKER_HARD_MARGIN_MB`) it waits only
+   `SYNDICATE_WEB_WORKER_HARD_RECYCLE_SPACING_SECONDS` (see `decide_recycle`), and not at all
+   over the EMERGENCY ceiling (hard limit + `SYNDICATE_WEB_WORKER_EMERGENCY_MARGIN_MB`). Proof lines: `WEB_MEMORY_GUARD_ARMED` per
    worker, `WEB_WORKER_MEMORY_RECYCLE` per recycle, `WEB_WORKER_MEMORY_RECYCLE_DEFERRED` when
    the stagger holds one back. Switch: `SYNDICATE_WEB_WORKER_ANON_LIMIT_MB` (default 650, sized for overshoot;
    <= 0 disables).
@@ -120,6 +121,29 @@ def recycle_spacing_seconds() -> int:
     return _env_int("SYNDICATE_WEB_WORKER_RECYCLE_SPACING_SECONDS", 90)
 
 
+# A HARD RECYCLE WAITS FOR THE OTHER WORKER'S REPLACEMENT -- lane `web-silent-worker-kills`
+# `[2026-11-18]`. A hard recycle used to skip the stagger outright ("the kernel is closer than a
+# cold worker"), which was true on Render: one 2 GiB container held both workers. So two workers
+# over the hard limit recycled together and web had NO booted worker until a replacement came up:
+# 18:48:01.6Z and 18:48:03.3Z 2026-11-18, replacements booted 18:48:09.4Z and 18:48:31.0Z (the
+# portfolio probe's reads stalled 4-12 s). Measured: 2-59 such doubles (< 30 s apart) a day
+# 11-05..11-18, every one hard, the second worker 150-777 MB over its limit.
+# On the fleet the web role has no memory cap of its own (cgroup `memory.max` = max, read
+# 2026-11-18 19:3xZ; the WSL VM has 15.7 GB), so a short wait is cheap. A hard recycle within
+# this many seconds of another worker's recycle waits, re-checking on EVERY request, not every
+# 5th, so at most one request's growth lands past the threshold; 30 s covers the replacement's
+# boot (1-28 s measured that day). <= 0 restores the old behaviour.
+def hard_recycle_spacing_seconds() -> int:
+    return _env_int("SYNDICATE_WEB_WORKER_HARD_RECYCLE_SPACING_SECONDS", 30)
+
+
+# ...unless it is this far over the HARD limit: then it goes at once, stagger or not. 600 MB
+# puts the ceiling at ~1.4 GB per worker; one second worker of the 400+ doubles since 11-05 was
+# that far over (777 MB on 11-14).
+def emergency_margin_mb() -> int:
+    return _env_int("SYNDICATE_WEB_WORKER_EMERGENCY_MARGIN_MB", 600)
+
+
 def _log(event: str, payload: dict) -> None:
     print(f"{event} {json.dumps(payload, sort_keys=True, default=str)}", flush=True)
 
@@ -174,6 +198,8 @@ def post_fork(server, worker) -> None:  # noqa: ARG001 - gunicorn's hook signatu
             "hard_margin_mb": hard_margin_mb(),
             "min_age_s": min_age_seconds(),
             "spacing_s": recycle_spacing_seconds(),
+            "hard_spacing_s": hard_recycle_spacing_seconds(),
+            "emergency_margin_mb": emergency_margin_mb(),
             "anon_mb_at_fork": rss_anon_mb(),
         })
     except Exception as exc:  # never take the worker down
@@ -266,30 +292,43 @@ def post_worker_init(worker) -> None:
 
 
 def decide_recycle(worker, *, now: float, anon_mb_reader, stamp_path: str) -> str:
-    """Returns what happened: skipped / below_limit / too_young / deferred / recycled."""
+    """Returns what happened: skipped / below_limit / too_young / deferred / deferred_hard / recycled."""
     limit = float(getattr(worker, "_syndicate_limit_mb", 0.0) or 0.0)
     if limit <= 0 or not getattr(worker, "alive", True):
         return "skipped"
     count = int(getattr(worker, "_syndicate_requests", 0)) + 1
     worker._syndicate_requests = count
-    if count % CHECK_EVERY_REQUESTS:
+    # A worker holding back a HARD recycle checks on every request until it goes.
+    if count % CHECK_EVERY_REQUESTS and not getattr(worker, "_syndicate_hard_pending", False):
         return "skipped"
     anon = anon_mb_reader()
     if anon is None or anon < limit:
+        worker._syndicate_hard_pending = False
         return "below_limit"
     age = now - float(getattr(worker, "_syndicate_born", now))
     if age < min_age_seconds():
         return "too_young"
     hard = anon >= limit + hard_margin_mb()
+    emergency = anon >= limit + hard_margin_mb() + emergency_margin_mb()
     other = _recent_recycle_age(now, stamp_path)
     payload = {"pid": os.getpid(), "anon_mb": round(anon, 1), "limit_mb": round(limit, 1), "hard": hard,
-               "requests": count, "age_s": round(age, 1),
+               "emergency": emergency, "requests": count, "age_s": round(age, 1),
                "last_recycle_age_s": None if other is None else round(other, 1)}
     if not hard and other is not None and other < recycle_spacing_seconds():
         if not getattr(worker, "_syndicate_deferred_logged", False):
             worker._syndicate_deferred_logged = True
             _log("WEB_WORKER_MEMORY_RECYCLE_DEFERRED", payload)
         return "deferred"
+    hard_spacing = hard_recycle_spacing_seconds()
+    if hard and not emergency and hard_spacing > 0 and other is not None and other < hard_spacing:
+        worker._syndicate_hard_pending = True
+        if getattr(worker, "_syndicate_hard_deferred_at", None) is None:
+            worker._syndicate_hard_deferred_at = now
+            _log("WEB_WORKER_MEMORY_RECYCLE_DEFERRED", {**payload, "hard_spacing_s": hard_spacing})
+        return "deferred_hard"
+    held_since = getattr(worker, "_syndicate_hard_deferred_at", None)
+    if held_since is not None:
+        payload["hard_deferred_s"] = round(now - held_since, 1)
     _touch(stamp_path)
     worker.alive = False
     _log("WEB_WORKER_MEMORY_RECYCLE", payload)
