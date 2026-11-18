@@ -61476,3 +61476,22 @@ Lane `render-config-retirement` (session 267d8859).
   - Harm check 01:46:27-01:54:13Z: 0 `WORKER TIMEOUT`, 0 `Timeout (0:00:` dumps, 0 Traceback, 0 SIGKILL. 3 `WEB_WORKER_MEMORY_RECYCLE` drains ended without a dump, so each drain took under 40 s.
   - web.log's event mix matched the 7.8 min before the ff (`NCAAF_LIVE_STATE_FROM_WORKER` 98 before / 96 after, `NCAAF_LIVE_STATE` 49 / 48, drains 5 / 5). No loop started in web from the render-names ride-along.
 - **verify (owed):** `web_worker_timeout_kills_per_day` 4 -> below 4 is not measurable until 11-18 ends. The lane's real reading is the next `Timeout (0:00:40)!` dump: which thread held the loop. A dump from a draining worker (after `WEB_WORKER_MEMORY_RECYCLE` / during `WEB_WORKER_DRAINED`) is the older drain-path stall, not the new mode.
+
+## 2026-11-18 02:46:25Z (8:46 PM CST 11-17) -- OPS, NO DEPLOY: killed a hung `scripts/refresh_nhl_oddsapi.py` child in the live odds lane (user "kill the hung nhl odds process"; lane layer2-rail-monitor) -- **lane freed for one run; the next NHL child hung again within ~2.5 min**
+- betting change: no. No code or env loaded. One child process ended. Nothing that places, sizes, holds or exits a bet changed.
+- **Why:** the live-odds-worker's live odds lane runs one `refresh_odds_sources.py` at a time. Its NHL child hung on api-web.nhle.com:
+  - two runs back to back hit `TimeoutExpired` at 1,800 s: 01:21:11Z (1,929 s) and 01:54:27Z (1,817 s);
+  - the 02:25:36Z run hung the same way.
+  - Live sweeps refused `lane_busy`: 10 of 11 (01:39-02:06Z), 6 of 7 (02:06-02:37Z).
+  - NHL in-play overlay rows 0-16 for most of the evening.
+  - Evidence: `.syndicate/findings_2026-11-17_layer2_rail_monitor.md` readings 13-16.
+- **What:**
+  - **Target:** pid 138879, `refresh_nhl_oddsapi.py --date 2026-11-17 --days-ahead 1 --artifact-root .../nhl_source`. Age 1,252 s, 1.1% CPU; parent 138675 = the 02:25:36Z `refresh_odds_sources.py` run.
+  - **Signal:** `kill -TERM` at **02:46:25.515Z**; it exited in 1 s.
+  - **No stack captured:** `py-spy dump` was refused (needs root) and was not escalated.
+- **Measured after:**
+  - **The run finished:** parent 138675 exited 02:47:17Z; manifest `odds_refresh_20261118_022536` ok False rc 1, the NHL failure. The other sports ran in those 52 s.
+  - **The lane freed:** the next sweep was ACCEPTED at 02:48:06.927Z (`nba,nhl,ncaaf,ncaab,wncaab`).
+  - **Its NHL child re-hung:** pid 158782 at 148 s, 7.6% CPU, `poll_schedule_timeout`, an open connection to 104.16.144.251:443 (api-web.nhle.com). The 02:49:20Z sweep was refused `lane_busy` again.
+- **Verdict:** killing one child frees the lane for one run, not more. The fix is I-22's (session local_73a5d2dd, lane odds-lane-sport-deadline): a per-sport deadline / independent sport jobs.
+- **Revert:** none needed. The next run re-creates the child.

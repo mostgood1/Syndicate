@@ -1508,3 +1508,10 @@ after the 02:24Z timeout freed the lane. 5 of 11 NHL builds carried zero cards.
 
 **#824:** **2 of 6** college `LIVE_GAMELINE_JOIN` lines since 02:06Z carry the reason (refusals). 0 of 21 college
 totals flags below the points scored.
+
+- **OPS 8:46 PM CST (02:46:25Z):** on the user's "kill the hung nhl odds process", SIGTERM to the hung NHL odds
+  child pid 138879 (1,252 s, 1.1% CPU). It exited in 1 s.
+  - Its run finished 02:47:17Z (rc 1, the NHL failure; the other sports ran).
+  - The next sweep was accepted at 02:48:06Z, but **its NHL child (pid 158782) re-hung on api-web.nhle.com within
+    ~2.5 min**, and the 02:49:20Z sweep was refused `lane_busy` again.
+  - So a kill frees the lane for one run only. Recorded in deploys.md (betting change: no). The fix is I-22's.
