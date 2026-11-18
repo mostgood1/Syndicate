@@ -707,3 +707,44 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - orders today 45 (43 filled, 2 resting: a maker post at 721 min and a fresh one at 4.9 min);
   - unreconciled 1, inside the grace;
   - cap use 16.7% / 16.1%.
+
+## Reading 43 — Wed 11-18 1:07 PM CST (19:07Z), window 20 min
+
+- **Results first.** No new grades:
+  - 30 d -7.35% [-12.8, -1.9] on 673 events;
+  - last 7 d -2.71% [-13.3, +7.9] on 168 events;
+  - fee-net CLV -0.36 pp (se 0.21).
+  - Today's 45 orders (44 filled, 1 resting) settle from the evening.
+- **Stake cut ("Yes, cut stakes"): stood down before any restart, and waiting on the user.**
+  - Env keys load only through a drained full down/up. That would also load other lanes' unloaded commits into both
+    workers, outside a window: soccer #840, NHL `cdab875d5` / `59fbefc71`, `d1e14be46`, and `36a9f5501` on
+    live-odds-worker.
+  - Rolled back:
+    - env file restored from its backup;
+    - drain cleared (`DRAIN_CLEARED owner=live-stake-minimum`);
+    - all three claims released.
+  - Nothing loaded.
+  - **The cut's size, measured from the full ledger** (`C:\tmp\pfmon\stake_floor_effect.py`):
+    - over the last 7 graded dates, live staked $49 a day ($40.94 pregame + $7.95 in-play);
+    - one contract per order would have been $31 a day ($29.24 + $1.83);
+    - 226 of 380 pregame orders were already one contract;
+    - at -7.35% that is about $1.30 a day of expected loss.
+  - The plan's "about $100 a day" was the 30-day average. Corrected on main (`3c4fc9443`).
+- **Anomaly: `page` 6.17 s (budget 3).**
+  - *Hypothesis, written first:* a web recycle drain (F14).
+  - **Confirmed:** pid 218465 was hard-recycled at 19:07:10.7Z (824 MB vs a 631 MB limit, 15 requests). The page read
+    started at 19:07:07Z.
+  - **Rate:** web recycles per hour (hard in brackets):
+    - quiet 12Z-17Z at 1-4 (0-3);
+    - **18Z: 18 (16)**;
+    - overnight game hours 23Z-05Z: 17-45 (15-34).
+    - Every hard recycle in the last 15 min came after 10-20 requests at 800-990 MB.
+  - The evening will likely return to the overnight rate.
+  - F14, owned by lane `web-silent-worker-kills`; the rate is added here for that lane.
+- **Unchanged:**
+  - 1 unclassified load (the soccer ff at 17:58:30Z, before the window rule; its lane owes the classification);
+  - the gate's clock is BC-050 from 16:45:40Z, 0 of 800;
+  - the maker post is still resting (740 min);
+  - unreconciled 0;
+  - cap use 16.7% / 16.2%;
+  - plan 18.3 min old, 16 positions.
