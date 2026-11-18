@@ -123,3 +123,59 @@ Jackson St @ Baylor tipped at 11:01 AM, before this block was written.
 - **Load:** query, shortlist, chips and live-rail times.
 - **Team cards:** flipped, chip-less, det1-3.
 - **Improvements:** each with evidence and an owner.
+
+## Reading 1 — Wed 11-18 11:57 AM CST (17:57Z), full page
+
+**Fleet:** `59fbefc71` (ff 10:33:54 AM CST); refresh-worker 152916; live-odds-worker 23141.
+- Host: 12 cores, load 1.8 / 2.3 / 2.9; 7.4 GB available.
+- The soccer look-ahead fix `640c6d4fd` is not on the fleet yet. Its lane is loading it.
+
+**Slate:** 139 chips today, 3 live:
+- NCAAB Jackson St @ Baylor at the half (tipped 11:01 AM, before the pre-registration, so it is reported separately);
+- WNCAAB Bucknell @ UAlbany Q4 0:38;
+- WNCAAB East Texas A&M @ Texas A&M at the half.
+
+**Flags:** 0 shown, 0 false, 0 missed, 0 dark.
+- **P1 (I-17):** 8 of 8 college full-game total rows on `/api/board/live-rail` carry `live_total_basis: "calibrated"`. No flags yet, so there is no contradiction count.
+- **P6 (BC-048):** 1 pregame college totals row on the shortlist (Youngstown St @ Cincinnati u153). Model edge −0.0, basis `market_fair`. **0 pregame college totals flags.**
+
+**Live rows:** 12 (NCAAB 10, WNCAAB 2). 5 priced <= 120 s; priced age p50 312 s; 2 of 3 markets with no price of ours.
+
+**Overlay (since 11:00 AM):**
+- 0 gaps over 360 s (max WNCAAB 102 s, NCAAB 85 s).
+- Ticks 161, gap max 77 s, 0 `deferred_slow`.
+- Web merges 50, **0 stale**.
+
+**Board** (`BOARD_BUILD_TIMING`, since 11:00 AM): 10 builds.
+- Wall 164-545 s, median ~199 s. The latest was 187 s; the board was built 105 s before the read.
+- **Off-CPU only 5.6-17.6%:** the board child is CPU-bound.
+- Spans: shortlist 89-102 s, portfolio 8-22 s, overview 3-19 s. 0 deferred builds, no drain.
+- **Comparison:** 11-17 at the same hour (17-18Z) ran p50 164 s / max 534 s. Today 9 AM-noon ran p50 127 s.
+  **No regression from the split at midday.** The evening is P2's test.
+
+**Live odds lane (I-22, since 11:00 AM):**
+- 18 sweeps launched, 1 refused (`lane_busy`).
+- Live runs since 9 AM: 9, p50 69 s, max 134 s, 0 over 600 s.
+- No odds child older than 600 s at the read.
+
+**Odds runs since 9 AM CST (manifests by slate date):**
+- Today's pregame: 14 runs, p50 4 s, max 384 s. The 3 over 300 s are soccer at 308-328 s.
+- **Look-ahead (11-19):** 3 runs of 1,391 / 2,444 / 1,942 s, with soccer at **1,189 / 2,225 / 1,818 s**. This is exactly what
+  the soccer fix `640c6d4fd` targets (its prediction: p50 412 s, max 951 s).
+- Failing steps:
+  - soccer `*_history_current` 2-11 per league (Understat "playersData not available", todo #840 lead);
+  - `wncaab_odds_snapshot` 10. This one was already failing before today's loads (the odds-lane session counted 172 of 182 since 12:23 AM).
+
+**Load (full page):**
+- `/intelligence` 4.6 s / 4.21 MB wire / 21.5 MB raw.
+- Query 4.5 s / 3.90 MB / 20.7 MB.
+- Shortlist 1.5 s; chips 0.4 s; live-rail 0.015 s.
+
+**Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less, 0 live chips without a live card.
+
+**Improvement leads:**
+- **L-a (new, watch):** the board child is CPU-bound, and the shortlist span is about half its wall (89-102 s of ~190 s). If tonight's
+  builds stay over 300 s with the split ON, the next lever is the shortlist's own CPU, not more isolation. Owner: the split's lane
+  hands its 10:15 PM verdict to whoever takes it. **Not opened yet:** a lead until the evening reading.
+- **`wncaab_odds_snapshot` fails most pregame runs** ("No odds rows returned"). Already known to the odds-lane session; no owner named. I will
+  measure the share against WNCAAB pregame runs at the next reading.
