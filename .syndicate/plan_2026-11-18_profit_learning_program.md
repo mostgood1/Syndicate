@@ -93,6 +93,17 @@ No result guarantees future returns.
 3. **S3: maker entry.** Earn the spread instead of paying it, in zero- and low-fee cells (maker shadow, counted looks
    at 200 / 400 / 600). Today's tests say our picks are not worse than the venue's fair, so capturing the spread is a
    direct lever.
+   - **Started 11-18, read at the existing registrations** (`findings_2026-11-18_s3_maker_entry.md`). Neither test is
+     due yet:
+     - **Paper maker shadow:**
+       - no cell has a look;
+       - soccer totals reaches its 200 look about 11-26/27 (171 now, -11.9% [-28.1, +4.9]);
+       - soccer spreads will be INSUFFICIENT at the 01-31 stop.
+     - **Live maker pilot:**
+       - about 22 of 30 timed fills, so the re-judge falls about 11-24;
+       - that holds only if fill times are saved: the ledger row has no fill time, and the log rotates in ~3.5 days;
+       - 844 pilot log lines were saved 11-18 to `research/maker_pilot/`.
+     - No maker challenger before the 12-08 window.
 4. **S4: Kalshi as the in-play prior, the sim as the challenger.** Kalshi's in-play log loss beats the books by
    0.02-0.09 nats, and the sim earns weight only where it beats Kalshi out of sample.
 5. **S5: a calibration map by side and price band** (live + ladder + closes). The live book's 0.30-0.45 band is -12.6%,
