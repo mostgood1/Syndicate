@@ -719,3 +719,20 @@ placement, so a stale plan costs missed bets, not bad ones.
   the live tick's process"), which runs the load under its own claims, preflight and betting-change row. Sent with
   it: the clash with lane `ncaaf-grid-build-speed`'s 1:10 AM CST TERM-only refresh-worker load at `3920a2d4d`, which
   refuses if the fleet head moves. This lane keeps the `plan_commits` series running for that lane's metric 4.
+
+## Reading 18 — Tue 11-17 8:34 PM CST (02:34Z 11-18), window 35 min
+
+- **Only finding F7 is still open: tonight's plan is 76.1 min old.** Tonight's newest write is still 01:21:13Z, 72.5 min
+  ago. Today's build started at 02:24:34Z and was still running at this reading.
+  - In 6 h: 39 commits, max completed gap 45.0 min.
+  - Fix approved by the user (load after the slate). The owning lane sequences it after the 1:10-1:40 AM CST
+    `ncaaf-grid-build-speed` restart and the 1:50 AM I-17 task, starting about 2:00-2:15 AM CST. This lane reads
+    through that window.
+- **Endpoints:** all 7 read 200 inside budget (`live` 1.67 s of 3.0, the slowest). 0 kills, 0 5xx.
+  **Banner:** ok, armed, state 190 s.
+- **Execution, 35 min:** 10 live ticks, 0 placed, 0 failed (20 `outside_price_band`, 10 `game_started`).
+  - Orders today 54 (53 filled, 1 rejected maker expiry). Resting 0. Late settlements 0.
+  - 32 started bets are unsettled while their games are live.
+  - Cap use: kalshi 18.6%, polymarket 17.6%.
+- **Gate:** pending BC-041 (count 0). One unclassified load (16:17Z NFL rebuild) remains with its lane.
+- **No new anomaly.**
