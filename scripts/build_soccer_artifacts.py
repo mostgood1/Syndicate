@@ -139,7 +139,100 @@ def _load_team_ratings(league: str, source_root: Path, as_of: str) -> dict[str, 
     if not frames:
         raise SystemExit(f"no team history under {history_dir}; run fetch_soccer_history_local.py --kind teams first")
     rows = pd.concat(frames, ignore_index=True).to_dict("records")
+    if _understat_splice_enabled():
+        rows = rows + _understat_splice_rows(league, source_root, rows, as_of)
     return compute_team_ratings(rows, as_of=as_of, window=45, v2=_rating_v2(league))
+
+
+#: UNDERSTAT OUTAGE SPLICE (lane `understat-fallback-backtest`, 2026-11-18). OFF unless "1"/"true"/"on"/"yes":
+#: absent is today's code exactly, and switching it on is a BETTING CHANGE (it moves every big-5 rating, pregame and
+#: in-play -- `poll_soccer_live_state` reads `_load_team_ratings` too), so it loads only in a betting-change window.
+#:
+#: understat.com has served a maintenance page since 2026-11-03, so `teams_<season>.csv` stops at 2026-10-31 and the
+#: big five are rated on a 45-row window that is k rounds old. ON appends, for every league match the Understat rows
+#: do not hold yet, one goals-as-xG row per club from the ESPN schedule already on disk (`api/schedule/
+#: schedule_<season>.json`, status `post`) -- no new fetch. A spliced row carries ONLY the fields an Understat row
+#: carries that the engine reads (`xg_for`/`xg_against` = goals, `goals_for`/`goals_against`, `points`), so no new
+#: metric enters the sim; ppda stays the mean of the Understat rows. When Understat returns and refetches, its rows
+#: cover those matches and the splice adds nothing.
+#:
+#: Measured leak-free (`findings_2026-11-18_understat_fallback_backtest.md`, Stage A link + Stage B real sim): see the
+#: findings for the per-k numbers this was licensed on.
+_UNDERSTAT_SPLICE_ENV = "SYNDICATE_SOCCER_UNDERSTAT_SPLICE"
+_UNDERSTAT_SPLICE_SOURCE = "espn_goals_splice"
+
+
+def _understat_splice_enabled() -> bool:
+    return str(os.environ.get(_UNDERSTAT_SPLICE_ENV) or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def _understat_splice_rows(
+    league: str, source_root: Path, understat_rows: list[dict[str, Any]], as_of: str
+) -> list[dict[str, Any]]:
+    """Goals-as-xG club rows for the finished league matches `understat_rows` does not cover, dated before `as_of`.
+
+    A match counts as COVERED when its home club has an Understat row within a day of it (Understat stamps the
+    kickoff, ESPN the UTC kickoff, and the two can straddle midnight). Only matches from the day before the newest
+    Understat row onward are considered, so a gap the history always had (a season Understat never fetched) is
+    not back-filled from goals. ESPN club names are resolved to Understat's through production's own matcher over
+    the clubs of the newest Understat season; an unresolved club is skipped and named in the audit line.
+    """
+    from datetime import date as _date, timedelta as _timedelta
+
+    from syndicate.features.soccer.features.loaders import _as_iso_day, season_label
+
+    cutoff = _as_iso_day(as_of)
+    dated = [(day, row) for row in understat_rows for day in [_as_iso_day(row.get("date"))] if day]
+    if not dated or not cutoff:
+        return []
+    last_day = max(day for day, _ in dated)
+    # Clubs of the newest season only: a promoted club must not resolve to a relegated namesake's old rows.
+    newest_season = season_label(last_day)
+    clubs = sorted({str(row.get("team")) for day, row in dated if season_label(day) == newest_season})
+    covered = {(day, str(row.get("team"))) for day, row in dated}
+    floor = (_date.fromisoformat(last_day) - _timedelta(days=1)).isoformat()
+
+    out: list[dict[str, Any]] = []
+    unresolved: set[str] = set()
+    spliced = 0
+    for season in sorted({season_label(last_day), season_label(cutoff)}):
+        path = source_root / league / "api" / "schedule" / f"schedule_{season}.json"
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for match in (payload.get("matches") or []) if isinstance(payload, dict) else []:
+            if str(match.get("status_state") or "").lower() != "post":
+                continue
+            day = _as_iso_day(str(match.get("date") or "")[:10])
+            if not day or not (floor <= day < cutoff):
+                continue
+            try:
+                home_goals, away_goals = float(match.get("home_score")), float(match.get("away_score"))
+            except (TypeError, ValueError):
+                continue
+            home = match_team_name(str(match.get("home_team") or ""), clubs)
+            away = match_team_name(str(match.get("away_team") or ""), clubs)
+            if home is None or away is None:
+                unresolved.update(name for name, hit in ((match.get("home_team"), home), (match.get("away_team"), away)) if hit is None)
+                continue
+            near = {(_date.fromisoformat(day) + _timedelta(days=delta)).isoformat() for delta in (-1, 0, 1)}
+            if any((d, home) in covered for d in near):
+                continue
+            spliced += 1
+            for team, scored, conceded, side in ((home, home_goals, away_goals, "h"), (away, away_goals, home_goals, "a")):
+                out.append({
+                    "league": league, "season": season, "team": team, "date": day, "home_away": side,
+                    "xg_for": scored, "xg_against": conceded, "goals_for": scored, "goals_against": conceded,
+                    "points": 3.0 if scored > conceded else (1.0 if scored == conceded else 0.0),
+                    "source": _UNDERSTAT_SPLICE_SOURCE,
+                })
+    print(
+        f"[build_soccer_artifacts] SOCCER_UNDERSTAT_SPLICE league={league} as_of={cutoff} "
+        f"understat_last_day={last_day} spliced_matches={spliced} unresolved={sorted(unresolved)}",
+        flush=True,
+    )
+    return out
 
 
 def _current_roster_names(league: str, source_root: Path | None = None) -> set[str]:
