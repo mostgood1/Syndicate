@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#840` — **SOCCER'S ~46-MIN PREGAME HOLDS ARE REFRESH-WORKER'S LOOK-AHEAD, NOT THE LIVE ODDS LANE: each hourly `warm_next_day_slate` re-simulated every soccer fixture in the next 7 days (it inherits refresh-worker's `SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7`, set for the weekly autorun). Fix on main behind `SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR` (absent = ON): a future-dated pregame run simulates its own date only. NOT LOADED** `[2026-11-18, lane soccer-pregame-odds-lane]`
+### `#840` — **SOCCER'S ~46-MIN PREGAME HOLDS ARE REFRESH-WORKER'S LOOK-AHEAD, NOT THE LIVE ODDS LANE: each hourly `warm_next_day_slate` re-simulated every soccer fixture in the next 7 days (it inherits refresh-worker's `SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7`, set for the weekly autorun). Fix on main behind `SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR` (absent = ON): a future-dated pregame run simulates its own date only. LOADED 2026-11-18 17:58:30Z (fleet ff, no restart); first look-ahead 386 s, soccer sims 45 s; P3-P5 owed** `[2026-11-18, lane soccer-pregame-odds-lane]`
 - **Corrects #838's "Not covered" soccer line:**
   - 0 of 430 live-odds-worker `lane_busy` refusals (11-14..11-18) had a soccer-led holder; 169 were NHL-led pregame runs.
   - The 184-run sample mixed lanes: 88 refresh-worker + 84 live-odds-worker, and all 66 runs over 900 s were refresh-worker.

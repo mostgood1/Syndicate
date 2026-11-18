@@ -2948,7 +2948,7 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   over 900 s are refresh-worker's LOOK-AHEAD lane, not the live odds lane (0 of 430 live-odds-worker `lane_busy`
   refusals 11-14..11-18 had a soccer-led holder; 169 were NHL-led pregame). See `[soccer-lookahead-horizon]`.
 
-## [soccer-lookahead-horizon] REFRESH-WORKER'S HOURLY LOOK-AHEAD RE-SIMULATED 7 DAYS OF SOCCER EVERY RUN; A DATE ANCHOR IS ON MAIN `640c6d4fd`, NOT LOADED `[verified 2026-11-18, lane soccer-pregame-odds-lane, todo #840]`
+## [soccer-lookahead-horizon] REFRESH-WORKER'S HOURLY LOOK-AHEAD RE-SIMULATED 7 DAYS OF SOCCER EVERY RUN; A DATE ANCHOR IS LOADED (`640c6d4fd`, fleet ff 2026-11-18 17:58:30Z) `[verified 2026-11-18, lane soccer-pregame-odds-lane, todo #840]`
 
 - **Who:** `live_refresh_loop._launch_look_ahead_refresh` on refresh-worker (`warm_next_day_slate`), hourly while nothing is
   live: a `phase=pregame` run of every sport for tomorrow, on lane `refresh-worker`. It is the only launcher of future-dated
@@ -2964,4 +2964,7 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   marker before launching). Not caused by soccer. Lead, no owner.
 - **Fix `640c6d4fd`** (`SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR`, absent = ON, `off` = old command): a future-dated PREGAME run
   with no `--soccer-date` uses the week of its own date and `--horizon-days 0 --date <date>`. Child script: a fleet ff loads it.
-  NOT LOADED (fleet at `59fbefc71`, 11-18 10:33 AM CST). Prediction P1-P5 in the lane block.
+  LOADED by a fleet ff 17:58:30Z (11:58 AM CST), no restart. First look-ahead on it (`180720`, 12:07 PM CST): every soccer step
+  `--horizon-days 0 --date 2026-11-19`, soccer sims 45 s (2 matches), run hold 386 s (baseline today 1,326-2,444 s). The
+  `SOCCER_LOOKAHEAD_DATE_ANCHOR` stderr line is not readable (`odds_refresh.stderr.txt` keeps 32 KB + tail); read the step commands.
+  P3-P5 (48 h) owed.

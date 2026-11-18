@@ -798,4 +798,4 @@ once this index exists: re-splitting would orphan the parts.
 | [fleet-redis-test-pollution] | THE FLEET REDIS HELD 426 TEST-FIXTURE KEYS; A PYTEST GUARD AND A JANITOR ARE LIVE AND THE COUNT IS 0 `[verifie | `state_worker.md` |
 | [board-build-process-split] | THE LAYER 2 BOARD BUILD SHARES ONE INTERPRETER LOCK WITH THE BOOK-GRID TICK AND THE VENUE ODDS LOOP; SINCE 202 | `state_worker.md` |
 | [odds-lane-sport-deadline] | ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE; A PER-SPORT DEADLINE + DEFERRED NHL GENERATION IS O | `state_worker.md` |
-| [soccer-lookahead-horizon] | REFRESH-WORKER'S HOURLY LOOK-AHEAD RE-SIMULATED 7 DAYS OF SOCCER EVERY RUN; A DATE ANCHOR IS ON MAIN `640c6d4f | `state_worker.md` |
+| [soccer-lookahead-horizon] | REFRESH-WORKER'S HOURLY LOOK-AHEAD RE-SIMULATED 7 DAYS OF SOCCER EVERY RUN; A DATE ANCHOR IS LOADED (`640c6d4f | `state_worker.md` |

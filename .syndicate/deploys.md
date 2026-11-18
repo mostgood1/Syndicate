@@ -61882,3 +61882,38 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - It wrote `predictions_2026-11-19.csv` (18:13:45Z) and `predictions_2026-11-20.csv` (18:13:46Z), so the 15 s generation did write. The 170717 run's 15 s generation also wrote `predictions_2026-11-20.csv`, at 17:39:37Z. Generation time is the stats-REST cache's (`59fbefc71`), not this lane's.
 - **For this lane:** the look-ahead cost measured at 17:20Z (NHL's look-ahead rebuild landing ~31-37 min after NHL odds) is now ~5 min, on n=1.
 - **For the soccer lane** (theirs to judge): soccer 259 s against their stated expectation of <= 130 s.
+
+## 2026-11-18 17:58:30Z (11:58 AM CST) -- DEPLOY (ff only, no restart): fleet `59fbefc71` -> `640c6d4fd`, soccer's look-ahead date anchor (todo #840, lane `soccer-pregame-odds-lane`; user "Load it now" to "Load the soccer look-ahead fix on the fleet (ff to 640c6d4fd, no restart)?") -- **LOADED (child script at the next sweep); first look-ahead on the new code: P1 MET, P2 MET (n=1), run hold 386 s vs 1,326-2,444 s this morning; P3/P5 (48 h) owed**
+- betting change: **no**. It changes which soccer sim files refresh-worker's hourly look-ahead rewrites (its own date only, instead of today+7). The board ranks today and tomorrow; tomorrow is still built by the look-ahead and by both soccer producers; the exchanges execute no soccer. No step is added, dropped or reordered; 0 added OddsAPI calls.
+- **The change:** `SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR`, absent = ON (findings `.syndicate/findings_2026-11-18_soccer_pregame_odds_lane.md`). A PREGAME `refresh_odds_sources.py` run dated after Central today, with no `--soccer-date`, builds its soccer artifacts and picks with `--week <week of its date> --horizon-days 0 --date <date>`. On the fleet, only refresh-worker's look-ahead launches such runs (86 of 86, 11-13..11-18).
+- **Ride-alongs** (`59fbefc71..640c6d4fd`): `baef443cc`, a tooltip in `syndicate/templates/intelligence.html` (display only; its lane owner approved it riding along). Web picks it up at its next worker recycle. Also tests and ledger. None of the 14 dirty fleet paths is in the ff; 14 before and after.
+- **Gates:**
+  - Claim refresh-worker 17:16:17Z (ACQUIRED, rc 0).
+  - Preflight `--service refresh-worker --target-commit 640c6d4fd`: **HOLD** 17:16:32Z, then 17:40:14Z, then 24 tries 17:40:42-17:57:00Z (40 s apart). Every one was HOLD for "a board build is in flight". The stages were layer2_shortlist_build, kalshi_odds_refresh, portfolio_commit and build_intelligence_overview, so refresh-worker's daytime build was never out of flight at that sampling.
+  - That HOLD guards a RESTART throwing a build away, and an ff restarts nothing. So, as the 16:33:54Z NHL-cache ff did (it also loaded through refresh-worker's look-ahead), I claimed live-odds-worker 17:58:05Z (ACQUIRED, rc 0) and preflighted it.
+  - Baseline read 17:58:12Z. Preflight `--service live-odds-worker --target-commit 640c6d4fd`: **CLEAR 17:58:13Z** (0 processes). `--allow-mid-build` was NOT used.
+  - Look-ahead run `odds_refresh_20261118_170717` (old code) exited 17:39:52Z, before the ff.
+- **verify:** the step commands of every refresh-worker look-ahead run after 17:58:30Z (P1), its soccer artifact seconds against 16 x fixtures(D) + 30 (P2), and the 48 h run-hold population (P3, p50 <= 600 s, 0 over 1,800 s).
+- **ff:** `git fetch github` + `git merge --ff-only 640c6d4fd` at **17:58:30Z** (reflog). The fleet head was confirmed `59fbefc71` and an ancestor first. No role restarted (refresh-worker pid 152916, live-odds-worker 23141, supervisor 23057).
+- Claims released 17:59:16Z (both).
+- **expect / measured:**
+  - `fleet_head` 59fbefc71 -> 640c6d4fd: **MET** 17:58:30Z.
+  - `lookahead_soccer_horizon_days` 7 -> 0: **MET.** First post-ff look-ahead `odds_refresh_20261118_180720` (refresh-worker, pregame, date 11-19, launched 18:07:21Z = 12:07 PM CST): every soccer artifacts/picks step carries `--week <its own week> --season 2026 --horizon-days 0 --date 2026-11-19` (6 distinct week values across 9 leagues, one per league's own matchweek).
+  - `lookahead_soccer_artifact_s` 1704 -> <=130: **MET, 45 s** (2 matches simulated, both on 11-19: mls; the P2 bound 16 x 2 + 30 = 62 s). Soccer sport total 259 s; it includes the 10 Understat steps that fail rc 1 on every run (pre-existing).
+  - `lookahead_run_hold_s` 1942 -> <=600: **MET, 386 s** for this run (n=1; P3 is the 48 h population: p50 <= 600 s, 0 over 1,800 s).
+  - **Other producers unchanged:** refresh-worker's weekly soccer unit `odds_refresh_20261118_180124` (live phase, after the ff) kept `--date 2026-11-22` (68 s).
+  - **The marker line is NOT readable:** `SOCCER_LOOKAHEAD_DATE_ANCHOR` prints to the run's stderr, but `odds_refresh.stderr.txt` keeps only the first 32 KB plus a tail (2 of ~80 `STEP_END` lines survive). P1 is read from the manifest's step commands instead, which is the stronger reading (the branch, not a print).
+  - Run state `failed` is pre-existing (the Understat `history_current` / `players` steps), same as all 6 baseline runs today.
+- **Baseline (look-ahead runs today on 59fbefc71, target 11-19, horizon 7):**
+
+  | launched (CST) | run hold (s) | soccer artifact (s) |
+  |---|---|---|
+  | 6:04 AM | 1,326 | 978 |
+  | 7:04 AM | 1,344 | 996 |
+  | 8:06 AM | 2,034 | 1,585 |
+  | 9:06 AM | 1,391 | 1,038 |
+  | 10:07 AM | 2,444 | 2,042 |
+  | 11:07 AM | 1,942 | 1,704 |
+
+- **Off switch:** `SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR=off` in `local_production.env` + a drained `down`/`up` (the child reads env at launch, and env is built at `up`).
+- The user's go-ahead, quoted: "Load it now" (this session). The same yes was relayed by two sessions ("load the soccer fix", "load the soccer look-ahead fix too").

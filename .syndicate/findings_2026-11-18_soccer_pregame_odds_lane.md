@@ -166,3 +166,17 @@ The backtest window is unusually light: most of its target dates fell in the int
   `_20261115_060044` and `_20261118_060115` (`nba,ncaab,wncaab`). Each ran exactly 1,800 s, rc 1, with no step
   results. The step timeout escaped; all three predate the `2ae0c646a` load.
   - It holds the live lane 30 min at the hour a late NBA game is still live. For lane `odds-lane-sport-deadline`.
+
+## 7. Load and first reading `[2026-11-18 12:15 PM CST]`
+
+- **Loaded:** fleet ff `59fbefc71` -> `640c6d4fd` at 17:58:30Z (11:58 AM CST), no restart (deploys.md entry of that time).
+  - refresh-worker's preflight held 26 times for its in-flight board build. The CLEAR came on live-odds-worker, as the 16:33Z ff did.
+- **First look-ahead on the new code** (`odds_refresh_20261118_180720`, launched 12:07 PM CST, target 11-19):
+  - **P1 MET:** every soccer sim/picks step carried `--week <its own week> --horizon-days 0 --date 2026-11-19`.
+  - **P2 MET:** soccer sims took 45 s for the 2 matches on 11-19, against a bound of 62 s.
+  - **Run hold:** 386 s, against 1,326-2,444 s for today's six earlier look-ahead runs.
+- **Other soccer producers unchanged:** a weekly unit after the ff kept its pinned `--date 2026-11-22`.
+- **The marker line is not readable:** `odds_refresh.stderr.txt` keeps only the first 32 KB plus a tail. Read the step
+  commands instead.
+- **Owed:** P3-P5 over 48 h. The first Saturday-target run (launched 11-20, target 11-21, at least 27 fixtures listed)
+  is the real test of P2's bound.
