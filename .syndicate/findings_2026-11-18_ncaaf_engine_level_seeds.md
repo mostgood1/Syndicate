@@ -96,3 +96,28 @@ anchor on/off A/B, where the common luck cancels; it sets no production level.
 
 **Verdict:** the shared-seed offset is a smartsim2 property (NFL and NCAAF seed `range(1, N + 1)`). NBA / WNBA /
 NHL / college basketball production levels cannot carry it. MLB and soccer were not part of this check.
+
+## MLB and soccer (2026-11-18 1:07 PM CST, user "Check MLB and soccer"; lane `soccer-live-shared-seeds`)
+
+| path | how a game is seeded | shared across games? |
+|---|---|---|
+| MLB pregame (`mlb/native/tools/daily_update.py:8205`, sims `GameConfig(rng_seed=seed + i)` at `:757` / `:4552`) | `args.seed + idx * 100000` per game in the slate, 1,000 sims each; `--seed` is a fixed 1337 for today's date (`default_fixed`), fresh for a future date | not within a slate; slot k reuses its block day to day, far below anything a season's level could show at 1,000 sims a game |
+| MLB eval harness (`eval/eval_sim_day_vs_actual.py:2791`) | `seed + game_pk % 100000` | no |
+| soccer pregame (`soccer/adapters.py:44`) | `crc32(league:match_id:date) % 1_000_000 + 1`, then `+ offset` per sim | no (two matches' blocks can overlap by chance, partially) |
+| soccer market anchoring (`soccer/features/market_anchoring.py:259`) | `seed=1000 + index` per fixture, `+ offset` per sim: fixture blocks overlap almost entirely | YES, but OFF on the fleet: `SYNDICATE_SOCCER_MARKET_ANCHOR_WEIGHT` is absent from `local_production.env`, every `fleet_env/<role>.json` and `fleet_role_spec.json` (key names read only), so the weight is its default 0.0 |
+| **soccer live re-sim (`scripts/poll_soccer_live_state.py:434`)** | `simulate_live_paths(...)` with NO seed, so `live_lens.py`'s default `seed=1`; 300 sims (`--simulations` default) | **YES: every live match on seeds 1..300** |
+
+**Sizing the live one** (`C:\tmp\soccer813\soc_seeds.py`, `read_soc.py`): 60 synthetic matches (ratings uniform +-0.25,
+cap 0.35), the EPL league profile the poller uses, `simulate_match`'s own per-seed loop, seeds 1..900, from kickoff (the
+most play left, so an upper bound for remaining goals):
+- all-matches mean SD across seeds **0.948 goals** vs **0.213** independent (4.4x); shared share **~0.33** (NFL 0.34, NCAAF 0.23);
+- level by 300-seed block **3.012 / 3.065 / 3.029**; **seeds 1..300 minus the 900-seed mean -0.024 goals (-0.8%)**, SE ~0.045.
+
+**Verdict: the mechanism is real, the offset is not.** The seeds the live poller uses happen to sit at the long-run
+level. A different fixed 300-seed list could sit about +-0.11 goals (2 SE, ~3.6%) away, so the live default is safe by
+the luck of the draw, not by design. Per-match seeding (as NFL part 2) would make it safe by design and make concurrent
+live matches' errors independent. Not a level fix; optional.
+
+**Survey closed: every sport checked.** Only smartsim2 (NFL, NCAAF) and the soccer live default share a seed list in
+production. The NFL's is the one that moved a level (the fix loads in the 11-24 window); NCAAF's and soccer live's sit
+within noise.
