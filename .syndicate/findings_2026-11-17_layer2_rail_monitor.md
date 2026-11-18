@@ -1633,3 +1633,127 @@ scored.
 scored.
 
 **Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less.
+
+## Reading 20 — Tue 11-17 10:59 PM CST (04:59Z 11-18)
+
+- **Slate:** 8 live chips. NBA Charlotte @ LA Lakers Q2 and Utah @ LA Clippers Q3, the last finals ~12:15 AM CST.
+  Also Montana St @ Gonzaga at the half.
+- **Flags:** 6 shown, 0 false, 0 missed, 0 dark. I-17: NCAAB 1 of 2.
+- **Overlay (53 min):** 0 gaps over 360 s (max NHL 142 s). Ticks 152, gap max 125 s. Every live sport fresh
+  141 / 141.
+- **Load:** query 1.8 s / 3.25 MB / 17.4 MB.
+
+# DAILY SUMMARY — Tue 11-17 (day 3), the monitor + improvement hunt
+
+**Coverage:** 20 readings, noon → 10:59 PM CST; 5 with the full page. Peak 74 live chips and 65 flags (7:39 PM).
+
+**Flags: 0 false and 0 missed in every one of the 20 readings.**
+- Dark rows: r6 1, r13 1, r14 3, **r16 73** (NBA alternates aged past 300 s while the live odds lane was blocked),
+  r18 3. 0 in the others.
+- Team cards: 1 flipped (r9 Liberty / SIU, totals only, no price affected). 0 det1 / det2 / det3, 0 chip-less.
+
+### The grade (pre-registered T1-T4; `C:\tmp\railmon\grade1117.py`, output `grade1117_out.json`)
+
+Population: first sightings on 11-17 CT. 357 unique flags; **337 graded** (20 not final at 05:00Z); 67 games.
+Game-clustered bootstrap, 90% interval on hit − fair.
+
+| bucket | flags / games | W-L | hit | mean fair | Brier model / book | CI90 (hit − fair) |
+|---|---|---|---|---|---|---|
+| ALL | 337 / 67 | 162-175 | 0.481 | 0.500 | 0.2552 / 0.2409 | [−0.068, +0.032] |
+| T1 fair < 0.40 | 13 / 7 | 2-11 | 0.154 | 0.253 | 0.171 / 0.125 | [−0.238, +0.154] |
+| T1 fair >= 0.40 | 324 / 67 | 160-164 | 0.494 | 0.509 | 0.2586 / 0.2455 | [−0.068, +0.039] |
+| T2 NBA full spreads | 6 / 3 | 3-3 | 0.500 | 0.339 | 0.199 / 0.212 | [+0.04, +0.22] |
+| T3 NCAAB full spreads | 88 / 43 | 44-44 | 0.500 | 0.500 | 0.2625 / 0.2485 | [−0.097, +0.095] |
+| T4 NCAAB full totals (all unders) | 141 / 48 | 60-81 | 0.426 | 0.501 | 0.2736 / 0.2499 | [−0.156, +0.003] |
+| WNCAAB (all) | 29 / 11 | 16-13 | 0.552 | 0.491 | 0.2355 / 0.2441 | [−0.08, +0.22] |
+| NCAAF (all) | 11 / 3 | 8-3 | 0.727 | 0.531 | 0.2085 / 0.2278 | [+0.01, +0.38] |
+
+**Verdicts against the pre-registration:**
+- **T1:** the < 0.40 flags did NOT beat fair (−9.9 pp, 7 games): not falsified, the tail loses. The ≥ 0.40 half's
+  "hit above fair" is **not supported** (−1.5 pp). The withdrawn band-gate clause stays withdrawn. The evidence
+  points to I-1's per-line tail calibration.
+- **T2:** too few games (3; the falsifier needs ≥ 5). The direction ran opposite to the prediction.
+- **T3: FALSIFIED.** NCAAB full spreads hit exactly fair on 43 games. "Above fair" did not hold.
+- **T4:** clause A (|hit − fair| < 5 pp) fails at −7.5 pp. Clause B holds: 81 of 141 flagged under lines went
+  over, so the night ran over and the sign matches. Reported to the #816 owner; their 7-day grade (11-17..11-23)
+  is the verdict.
+
+**Exploratory, not pre-registered:** flags on a game's FIRST reading (no prior main line): 51 flags, hit 0.333 vs
+fair 0.500, CI90 [−0.272, −0.049]. A hypothesis for a pre-registration, not a finding.
+
+**Watched games:**
+- WNCAAB Tennessee St @ Louisville (final 39-88): the 4 under flags (u149.5 / u162.5 at 32.4 pp / u154.5 / u130.5)
+  all **won**.
+- Villanova @ Pittsburgh (final 61-81): ML PITT 24.4 pp **won**. Unders 4 of 4 won. Spreads 2-2.
+- **The r17 "ours below points" pair:**
+  - Lamar @ Omaha u173.5 (ours 168.65 vs 170 scored) **lost**: final 178.
+  - Bryant @ UMass u164.5 **won**: final 162.
+
+### Cadence and the evening peak
+
+**Board build wall:**
+- Calm: 82-150 s.
+- Live evening: 155-829 s, **1,254-1,510 s** at the 7-8 PM peak (refresh-worker at its ~1 core while the 12-core
+  host had 2-3 cores idle).
+- 300 s by 10:08 PM.
+- The today board went **37.7 min** (drain) and **26.8 min** (peak) without a publication.
+
+**Overlay gaps over web's 360 s:**
+- r14: NBA 2 (max 498 s), NCAAB 1 (453 s), with 19 of 36 web merges stale;
+- r16-r17: NHL 1 each.
+- 0 in the other readings.
+
+**Live odds lane (I-22):**
+- NHL odds child `TimeoutExpired` at 01:21Z and 01:54Z; hung again at 02:25Z and 02:48Z.
+- Sweeps refused `lane_busy`: 17 of 34 (00:00-01:10Z), 10 of 11, 6 of 7, 8 of 9, then 6 of 15 and 1 of 14 as it
+  recovered after ~03:14Z.
+
+**Interventions:**
+- **23:09-23:46Z:** a grid-lane drain held every board build (handed over, cleared 23:33Z, aborted).
+- **01:08-01:28Z:** the I-17 load's drain (aborted).
+- **02:46:25Z:** the user's kill of a hung NHL odds child (deploys.md `c9b6aff35`). It freed the lane for one
+  run; the next child re-hung.
+
+### I-2 recycle reading (`recycle.py`, web.log; recycles = `WEB_WORKER_MEMORY_RECYCLE`)
+
+| window (UTC) | code on web | requests | board queries | recycles (hard) | per query | per hour | requests per recycle | anon MB at recycle |
+|---|---|---|---|---|---|---|---|---|
+| Mon 11-16 23:00-05:00 (baseline) | full form, 11.9 MB mean | 2,716 | 347 | 192 (151) | 0.553 | 32.1 | 15 | 888 |
+| Tue 21:56-23:15 | #827 | 458 | 26 | 17 (13) | 0.654 | 12.9 | 15 | 932 |
+| Tue 23:15-01:46 | #827 + #828 | 746 | 133 | 61 (51) | 0.459 | 24.3 | 10 | 929 |
+| Tue 01:46-05:03 | + loop-stall box | 1,607 | 223 | 120 (97) | 0.538 | 36.9 | 15 | 879 |
+
+**Reading:** the board query is −56% in mean bytes (11.9 → 5.2 MB), but recycles per query (0.46-0.65 vs 0.55)
+and per hour did not drop. **Recycles track total requests (~1 per 10-15), not the query's size.** The I-2 memory
+benefit is not visible in the recycle rate. The wire and client savings stand. Recorded here; the de-dup
+session is archived.
+
+### Improvements: state at end of day 3
+
+| # | improvement | state | owner / session |
+|---|---|---|---|
+| I-1 | Per-line tail calibration (no band gate) | Evidence again: T1 < 0.40 hit 0.154 vs fair 0.253 | Unowned; candidate for a session |
+| I-2 | De-duplicate the board query (`row_refs`) | **LOADED** 12:58 PM: −61% wire / raw; recycles unchanged (above) | Closed |
+| I-3 | NBA slow-sport cadence | Decision owed by the user | local_208683f1 raised it |
+| I-4 | NBA alt lines stale | Downgraded; alt flags lose regardless of age | — |
+| I-5 / I-6 / I-9 | NFL segment lines; NFL #780 width gate; MNF ML | Owners' lanes (no NFL tonight) | NFL lanes |
+| I-7 / I-12 | #816 level / #824 refusal | #824 refused rows tonight (e.g. 2 of 6 at 02:06-02:37Z); 2 late "ours below points" flags | lane ncaab-total-overprojection |
+| I-8 / I-17 | "Ours" contradicts the calibrated flag | **Fix `923869cf3`**: web half live 7:46 PM, backend loads with the 1:10 AM refresh-worker TERM. Day count 58 of 155 NCAAB observations | lane ncaab-total-overprojection |
+| I-10 | WNCAAB coverage is the books | Nothing to change; WNCAAB flags 0.552 vs 0.491 (29) | — |
+| I-11 / I-15 | Monitor footprint; probe sends `row_refs` | Done | this lane |
+| I-13(a) | Serialise the query once | **LOADED** 5:15 PM (`64daca46f`): median 6.4 → 4.9 s | Closed |
+| I-14 | WNBA offseason polling | Live half **LOADED** 5:22 PM (WNBA share of web 40.1% → 0.8%); settlement half loads with refresh-worker | wnba-boxscore-polling |
+| I-16 | Cheat-sheet picks pull full form | **On main** `aaff7fb04`, not loaded: 12.8 → 4.5 MB per pull | Closed (local_1a1d1ce7) |
+| I-18 | A drain can freeze the board for 2.5 h | Lesson taken by both lanes (5-min capped waits) | Unowned (`check_deploy_safety --drain`) |
+| I-19 | Pregame shortlist quotes as the book on live cards | 6-22 of 28-180 live markets per reading | Rail lane / display decision |
+| I-20 | Board build shares one interpreter with the live tick | **Switch on main** `09eddabf2`; the user said "Yes, switch it on" (drained down/up after the 1:10 / 1:50 AM loads) | local_9c4bd078 |
+| I-21 | NHL live props drop off the board | **Fix on main** `9f911cb98` (OFF): NHL props pull on its own clock. Load + lapsed-line display owed to the user | local_ce6ce550 |
+| I-22 | One sport's hung odds child blocks every live sport | **Fix on main** `2ae0c646a` (todo #838), not loaded; the load is the user's call. Root: NHL stats REST in `collect_slate_inputs` | local_73a5d2dd |
+
+**Overnight, by the user:**
+- refresh-worker TERM after 1:10 AM CST (#809 + I-17 + NFL seeds, BC-041; user "Load it");
+- I-17 verify at 1:50 AM;
+- the board split ON after them.
+
+The pending question "keep killing hung NHL odds fetches?" was not answered. No kill since 02:46Z; the lane
+recovered on its own after ~03:14Z.
