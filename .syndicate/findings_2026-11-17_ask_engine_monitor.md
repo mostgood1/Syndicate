@@ -761,3 +761,44 @@ A game was live (a `live_row` ask exists). `as_of_in_future` true on 1 / 6 (the 
 - 2e deploys.md: newest header 23:54Z (5:54 PM CST, a READING, no deploy), 41 min before this reading; no fleet ff / deploy / restart in the last 40 min.
 
 - **ANOMALY:** `as_of_in_future` true on the pregame_prop ask (soccer, Ismael Boura SOT over 0.5, Le Havre @ Troyes): `as_of` = 2026-11-20 (date kind), 3 days ahead. Check next: whether the soccer prop answer stamps `as_of` from the event/kickoff date instead of the snapshot time (reading 16 had 0 of 6 in the future).
+
+## Reading 18 (7:05 PM CST)
+
+**Ask:** 6 of 6 answered, 0 of 6 past 45 s, 0 timeouts the user saw. Median 5.39 s, max 6.46 s. The page answered 200 in 0.19 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "spread?" | 1.12 | yes | bet_analysis | 2026-11-17T23:11:20Z | 0 |
+| free_text "Lakers vs Celtics" | 0.57 | yes | matchup_analysis | 2026-11-17T23:11:20Z | 0 |
+| free_text "top edges today" | 5.42 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NBA MIN h2h) | 6.46 | yes | bet_analysis | 2026-11-16 (date) | 2 |
+| pregame_prop (Clingan O12.5) | 2.35 | yes | bet_analysis | 2026-11-18T00:33:37Z | 7 |
+| live_row (NBA NYK@TOR alt spread h1) | 5.39 | yes | bet_analysis | 2026-11-15 (date) | 2 |
+
+A game was live: a `live_row` ask exists (NBA Knicks @ Raptors). Its `as_of` is a date two days back (2026-11-15). This is not on the anomaly list, but note it.
+
+**Web, 6:35-7:05 PM CST (106 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 11, of which 10 were hard. Max anon was 1146 MB against a 648.5 MB limit.
+- Overlay warms: 64. Median 8.05 s; 0 over 45 s and 0 over 60 s; max 18.79 s.
+- Requests over 20 s: 0. Over 45 s: 0.
+- Asks from any client: 12. None over 45 s and none non-200. 0 of 12 came from a client other than this probe.
+
+**Host (12 cores):**
+- Load 3.77 / 3.78 / 3.70.
+- MemAvailable 7704 MB.
+- Top CPU:
+  - WNBA fetch-injuries CLI, 315% (ni 0, transient);
+  - refresh-worker, 89% (ni 0, 4.2 GB RSS);
+  - gunicorn web, 63% (ni 0, 17 s old);
+  - live-odds-worker, 53% (ni 0);
+  - live_resim_workers ×2, about 35% each (ni 5).
+
+**Engine:**
+- 2a: F2 has one run in total (10:30-11:17 AM CST, "did NOT PASS"). It is the one already recorded at `c765eec64`, and no newer run exists.
+- 2b: `engine-learner-m2-gate-read-1124` is still enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: the `m2_gate.py` sha256 starts `c1a2c029c2a1816f` (Amendment 2), unchanged.
+- 2d: no commits to the engine files on origin/main in the last 40 minutes.
+- 2e: the newest deploys.md header is 23:54Z (5:54 PM CST, a reading with no deploy). No fleet ff, deploy or restart since 6:25 PM CST.
+
+No anomaly.
