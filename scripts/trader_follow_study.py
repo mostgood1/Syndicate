@@ -28,6 +28,7 @@ import datetime as dt
 import hashlib
 import json
 import math
+import os
 import random
 import sys
 import time
@@ -205,7 +206,10 @@ class Api:
                 self.calls += 1
                 time.sleep(self.pause)
                 if cache:
-                    path.write_text(json.dumps(body), encoding="utf-8")
+                    # Atomic: a run killed mid-write (or a second run reading the same cache) never sees half a file.
+                    tmp = path.with_suffix(f".{os.getpid()}.tmp")
+                    tmp.write_text(json.dumps(body), encoding="utf-8")
+                    os.replace(tmp, path)
                 return body
             except urllib.error.HTTPError as e:
                 if e.code in (429, 500, 502, 503, 504):
