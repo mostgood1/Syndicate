@@ -1356,15 +1356,169 @@ def apply_margin_anchor(result: Mapping[str, Any], facts: ResumeFacts, *, date: 
 
 
 def _anchor_lane_fields(result: Any) -> dict[str, Any]:
-    """The lane's anchor provenance: absent keys when the anchor never ran (WNBA, switch off), so those lanes are
-    byte-identical to before."""
+    """The lane's anchor provenance (margin #780, total #834): absent keys when an anchor never ran (WNBA, switch off),
+    so those lanes are byte-identical to before."""
     if not isinstance(result, Mapping):
         return {}
+    out: dict[str, Any] = {}
     if result.get("margin_anchor") is not None:
-        return {"rawModelHomeWinProb": result.get("raw_home_win_prob"), "marginAnchor": result["margin_anchor"]}
-    if result.get("margin_anchor_refusal"):
-        return {"marginAnchorRefusal": result["margin_anchor_refusal"]}
-    return {}
+        out.update({"rawModelHomeWinProb": result.get("raw_home_win_prob"), "marginAnchor": result["margin_anchor"]})
+    elif result.get("margin_anchor_refusal"):
+        out["marginAnchorRefusal"] = result["margin_anchor_refusal"]
+    if result.get("total_anchor") is not None:
+        out.update({"rawModelTotal": result.get("raw_total_mean"), "totalAnchor": result["total_anchor"]})
+    elif result.get("total_anchor_refusal"):
+        out["totalAnchorRefusal"] = result["total_anchor_refusal"]
+    return out
+
+
+# ------------------------------------------------------------------------------------------- total anchor (#834)
+#
+# THE NBA LIVE FULL-GAME TOTAL ANCHORED TO THE CLOSE, BY THE MARGIN ANCHOR'S RULE `[2026-11-18, todo #834, lane
+# nba-live-resim-total-anchor]`. ABSENT IS OFF: `SYNDICATE_NBA_LIVE_TOTAL_ANCHOR=on` (1 / true / yes) switches it on.
+#
+# WHY (`.syndicate/findings_2026-11-18_nba_live_total_anchor.md`, fleet artifacts, the 32 dev games 11-09..11-14 of
+# the engine read against Kalshi). The live re-sim's first total sat +1.95 (se 0.77) above Kalshi's ladder, and its
+# whole path is:
+#   raw model total            -10.39 vs the job's market total   (`basketball_props_smart_sim._simulate_quarters_local`)
+#   anchored target (w 0.7)    -3.12  vs the market total          (`_apply_market_anchor_local`; = the persisted
+#                                                                    `target_home_points + target_away_points`, +0.00)
+#   pregame ENGINE output      +4.83  vs its own target            (`basketball_engine/engine.py` steers efficiency
+#                                                                    toward target points per possession and overshoots)
+#   = pregame engine total     +1.71  vs the closing book total; the close is -0.37 (se 0.50) vs Kalshi
+#   live first row             +0.61  vs the pregame engine total  (it adds overtime; the pregame sum is regulation)
+# Two errors of opposite sign, and the engine's overshoot wins. It is the total's twin of the margin trace
+# (`findings_2026-11-13_nba_live_anchor_trace.md`): the engine follows its target loosely. Not a pace effect.
+#
+# THE RULE (the margin anchor's, on the total): the full-game total histogram moves by (the closing consensus total -
+# the pregame SmartSim's `score.total_mean`) x the share of REGULATION still to play, and the mean is re-derived. The
+# close is each book's last full-game OVER line before the commence, median across books
+# (`college_basketball/prior_calibration.closing_totals`, the same quote log the margin anchor reads). Known residual:
+# the pregame total is regulation-only and the live total includes overtime, so at the tip the anchored total is the
+# close plus the engine's overtime points (~0.2 at its ~2% overtime rate).
+#
+# NBA ONLY (WNBA shares this module). SEGMENT totals, live props, the margin and `overtime_prob` stay as they were.
+# NO ANCHOR IS NOT A REFUSAL: the raw total is served with `totalAnchorRefusal` naming why.
+#
+# THE TOTALS PROBABILITY SCALE: `live_gameline_join._TOTALS_PROB_SCALE_BY_SPORT["nba"]` (k 2.16) was fitted on the
+# UN-anchored totals, whose bias it partly absorbs (`model_engine_standard.md` 4.4). Re-fit it on anchored totals
+# (`scripts/replay_nba_live_total_anchor.py`) before this is switched on.
+TOTAL_ANCHOR_ENV = "SYNDICATE_NBA_LIVE_TOTAL_ANCHOR"
+_TOTAL_SOURCES: dict[tuple[str, str], tuple[float, Any]] = {}
+_TOTAL_ANCHOR_CACHE: dict[tuple[str, str, str], "NbaTotalAnchor"] = {}
+
+
+def total_anchor_enabled(env: Optional[Mapping[str, str]] = None) -> bool:
+    raw = str((env if env is not None else os.environ).get(TOTAL_ANCHOR_ENV, "") or "").strip().lower()
+    return raw in {"1", "true", "on", "yes"}
+
+
+@dataclass(frozen=True)
+class NbaTotalAnchor:
+    market_total: float  # closing consensus full-game total
+    sim_total: float     # the pregame sim's total mean (regulation)
+    books: int
+
+    @property
+    def offset(self) -> float:
+        return self.market_total - self.sim_total
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"marketTotal": round(self.market_total, 2), "simTotal": round(self.sim_total, 2),
+                "offset": round(self.offset, 2), "books": self.books, "source": "book_quotes_close+pregame_smart_sim"}
+
+
+def pregame_sim_total(date: str, home: str, away: str, *, root: Optional[Path] = None,
+                      league: str = LEAGUE) -> Optional[float]:
+    """The pregame SmartSim's total mean for the game, or None (no artifact, unreadable, no number)."""
+    import json as _json
+
+    try:
+        doc = _json.loads(smart_sim_path(date, home, away, root=root, league=league).read_text(encoding="utf-8"))
+        value = float(((doc or {}).get("score") or {}).get("total_mean"))
+    except Exception:  # noqa: BLE001 -- any miss is "no pregame total", named by the caller
+        return None
+    return value if math.isfinite(value) else None
+
+
+def closing_market_total(market: Mapping[Any, Any], home_name: str, away_name: str,
+                         *, league: str = LEAGUE) -> Optional[tuple[float, int]]:
+    """(closing consensus total, books) from `closing_totals`'s map; a total has no orientation, so both keys are tried."""
+    from syndicate.features.ncaab.live_resim import _join_key
+
+    home, away = _join_key(league, home_name), _join_key(league, away_name)
+    for key in ((home, away), (away, home)):
+        hit = market.get(key)
+        if hit is not None:
+            return float(hit[0]), int(hit[1])
+    return None
+
+
+def _total_anchor_market(league: str, date: str, clock: Callable[[], float] = time.monotonic) -> Any:
+    """The date's closing totals, re-read at most every `_ANCHOR_SOURCES_TTL_S` (the quote log grows all day)."""
+    from syndicate.features.college_basketball.prior_calibration import closing_totals
+
+    key = (str(league).lower(), str(date))
+    hit = _TOTAL_SOURCES.get(key)
+    if hit is not None and clock() - hit[0] < _ANCHOR_SOURCES_TTL_S:
+        return hit[1]
+    try:
+        market = closing_totals(league, str(date))
+    except Exception:  # noqa: BLE001 -- an unreadable log is "no closing total", named by the caller
+        market = {}
+    _TOTAL_SOURCES[key] = (clock(), market)
+    return market
+
+
+def total_anchor_for(date: str, event_id: str, home: str, away: str, *, league: str = LEAGUE,
+                     root: Optional[Path] = None, market: Optional[Mapping[Any, Any]] = None):
+    """The game's total anchor, or `NbaResimRefusal` naming why there is none. A found anchor is kept for the process
+    (the close is fixed once the game has started)."""
+    cache_key = (str(league).lower(), str(date), str(event_id))
+    if cache_key in _TOTAL_ANCHOR_CACHE:
+        return _TOTAL_ANCHOR_CACHE[cache_key]
+    sim = pregame_sim_total(date, home, away, root=root, league=league)
+    if sim is None:
+        return NbaResimRefusal("no_pregame_sim_total", smart_sim_path(date, home, away, root=root, league=league).name)
+    close = closing_market_total(market if market is not None else _total_anchor_market(league, date),
+                                 team_name(league, home), team_name(league, away), league=league)
+    if close is None:
+        return NbaResimRefusal("no_closing_total", f"{home}_{away}")
+    anchor = NbaTotalAnchor(market_total=float(close[0]), sim_total=float(sim), books=int(close[1]))
+    _TOTAL_ANCHOR_CACHE[cache_key] = anchor
+    return anchor
+
+
+def anchor_total_result(result: Mapping[str, Any], anchor: NbaTotalAnchor, *, remaining_fraction: float) -> dict[str, Any]:
+    """The full-game total histogram moved by the anchor's offset x `remaining_fraction` and its mean re-derived; the
+    sim's own mean kept as `raw_total_mean`. Margin, segments, props and `overtime_prob` untouched."""
+    from syndicate.features.ncaab.live_resim import _shift_margin_hist
+
+    fraction = max(0.0, min(1.0, float(remaining_fraction)))
+    offset = float(anchor.offset) * fraction
+    shifted = _shift_margin_hist(result.get("total_dist"), offset)
+    n = sum(shifted.values())
+    out = dict(result)
+    out["raw_total_mean"] = result.get("total_mean")
+    out["total_anchor"] = {**anchor.as_dict(), "remainingFraction": round(fraction, 4), "appliedOffset": round(offset, 2)}
+    if n <= 0:
+        return out
+    out["total_dist"] = {str(t): c for t, c in sorted(shifted.items())}
+    out["total_mean"] = sum(t * c for t, c in shifted.items()) / n
+    return out
+
+
+def apply_total_anchor(result: Mapping[str, Any], facts: ResumeFacts, *, date: str, home: str, away: str,
+                       league: str = LEAGUE, root: Optional[Path] = None,
+                       env: Optional[Mapping[str, str]] = None) -> dict[str, Any]:
+    """The tick's one call: NBA + switch on -> the total anchored, or the raw result with `total_anchor_refusal`."""
+    if str(league).lower() != "nba" or not total_anchor_enabled(env):
+        return dict(result)
+    anchor = total_anchor_for(date, facts.event_id, home, away, league=league, root=root)
+    if isinstance(anchor, NbaResimRefusal):
+        return {**result, "total_anchor_refusal": anchor.reason}
+    return anchor_total_result(result, anchor,
+                               remaining_fraction=remaining_regulation_fraction(facts.period, facts.clock_seconds))
 
 
 # ------------------------------------------------------------------------------------------- the snapshot
@@ -1628,6 +1782,9 @@ def build_live_lens_snapshot(date_str: str, *, sims: int = DEFAULT_SIMS, budget_
             # #780: NBA full-game margin anchored to the close (see "margin anchor"); props below read the raw remainders.
             result = apply_margin_anchor(result, facts, date=str(date_str), home=home, away=away, league=league,
                                          root=inputs_root)
+            # #834: the full-game total anchored to the close the same way (see "total anchor"); absent switch = raw.
+            result = apply_total_anchor(result, facts, date=str(date_str), home=home, away=away, league=league,
+                                        root=inputs_root)
         row = _lane_row(event_id, home, away, facts, result, match, league=league)
         if not isinstance(result, NbaResimRefusal):
             lines = lines_from_props_csv(props_csv_path(str(date_str), root=inputs_root, league=league),
@@ -1938,6 +2095,12 @@ def history_rows(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
                 rows[-1]["margin_anchor"] = lane.get("marginAnchor")
             elif lane.get("marginAnchorRefusal"):
                 rows[-1]["margin_anchor_refusal"] = lane.get("marginAnchorRefusal")
+            # #834 total anchor, the same way: the sim's own total and the anchor, only when it ran.
+            if lane.get("totalAnchor") is not None:
+                rows[-1]["total_raw"] = lane.get("rawModelTotal")
+                rows[-1]["total_anchor"] = lane.get("totalAnchor")
+            elif lane.get("totalAnchorRefusal"):
+                rows[-1]["total_anchor_refusal"] = lane.get("totalAnchorRefusal")
             if g.get(SLATE_DATE_KEY):
                 # #776: a previous date's game re-simmed after midnight. The row stays in the TICK's file under the
                 # tick's `date` (the live evidence log files it the same way); this says which slate it belongs to.
@@ -2039,6 +2202,7 @@ def _anchor_counts(games: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """`anchored=` fresh lanes carrying a margin anchor, `anchor_missing=` why the rest had none; empty when the anchor
     never ran this tick (switch off), so the tick line is unchanged then."""
     anchored, missing = 0, {}
+    t_anchored, t_missing = 0, {}
     for g in games:
         for lane in g.get("gameLens") or []:
             if lane.get("carriedForward") or lane.get("source") != LIVE_RESIM_LENS_SOURCE:
@@ -2048,9 +2212,18 @@ def _anchor_counts(games: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             elif lane.get("marginAnchorRefusal"):
                 reason = str(lane["marginAnchorRefusal"])
                 missing[reason] = missing.get(reason, 0) + 1
-    if not anchored and not missing:
-        return {}
-    return {"anchored": anchored, "anchor_missing": missing or "-"}
+            # #834: the total anchor's own tally, only when it ran (switch off = the line is unchanged).
+            if lane.get("totalAnchor") is not None:
+                t_anchored += 1
+            elif lane.get("totalAnchorRefusal"):
+                reason = str(lane["totalAnchorRefusal"])
+                t_missing[reason] = t_missing.get(reason, 0) + 1
+    out: dict[str, Any] = {}
+    if anchored or missing:
+        out.update({"anchored": anchored, "anchor_missing": missing or "-"})
+    if t_anchored or t_missing:
+        out.update({"total_anchored": t_anchored, "total_anchor_missing": t_missing or "-"})
+    return out
 
 
 def _loop() -> None:
