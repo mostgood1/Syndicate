@@ -182,7 +182,62 @@ and actually runs) on a host already at 100% busy — reading 2. +1 interpreter 
 the board's working set moves with it, it is not duplicated). Not addressed by this change: the host's own saturation
 and clock (56-64% of nominal), which inflate every CPU-second on the fleet.
 
+## On main — `09eddabf2` (2026-11-18 02:16Z = 8:16 PM CST 11-17), NOT LOADED
+
+`pipeline/board_build_process.py` + `tests/test_board_build_process_split.py` (27/27 on Linux incl. the flock busy
+signal and a REAL child that boots and exits on its stdin lifeline; on Windows 146 passed + 2 POSIX-only skipped with
+`tests/test_refresh_worker.py` and the deploy-safety suite) + `check_deploy_safety.SERVICE_CHILD_CMDLINE_MARKERS` +
+the boot call site in `scripts/run_refresh_worker.py` (loan from lane nfl-live-possession-map, granted by its owner
+session local_997aa897 after checking the diff; RETURNED `a72b6054a`). Off = the worker passes its own imported
+`start_intelligence_state_background_loop`, so absent calls the identical object as before. The only off-path
+difference is the text of one boot line (`INTELLIGENCE_LOOP_ENABLED calling start_board_loop_for_refresh_worker()`);
+nothing parses it (checked by grep and by the lender).
+
+## PRE-REGISTERED PREDICTION — first live evening with the switch ON `[written 2026-11-18 ~02:25Z, before any load]`
+
+**Reading window:** 6-10 PM CST (00:00-04:00Z) of the first evening after a load, on `refresh-worker.log`, with
+`C:\tmp\l2split\l2s_baseline.py <from> <to>` (metrics 1-5) and the sampler + `l2s_analyze.py` (metric 1).
+**Baseline B:** the same script over **2026-11-18 00:00-04:00Z** (tonight, switch absent), filled in below once that
+window closes; a second baseline is 11-17 00:00-04:00Z from the convoy lane's window.
+
+| # | metric | B (switch absent) | predicted (switch on) | falsified if |
+|---|---|---|---|---|
+| 1 | board share of a core during its builds (child process CPU / wall; sampler) | median 0.58 (11-16), 0.19-0.46 in tonight's sampled stages | median >= 0.80 | median < 0.65 |
+| 2 | board build wall p50 / p90 (`BOARD_BUILD_TIMING`) | filled at 04:00Z | <= 0.65 x B each | p50 > 0.85 x B |
+| 3 | today's shortlist publish gap (`LAYER2_SHORTLIST date=<today>`) p50; share of gaps > 300 s | filled at 04:00Z | p50 <= 300 s; share over 300 s <= half of B's | p50 > B's p50 |
+| 4 | today's `LIVE_PLAN_WRITTEN` gap (bursts within 60 s = one write) p50 / max | filled at 04:00Z | p50 <= 0.75 x B; max <= 0.6 x B | p50 > B's p50 |
+| 5 | book-grid `build_seconds` p50, NCAAB and NBA (`BOOK_GRID_TICK`) | filled at 04:00Z | <= 0.75 x B each | either > B |
+
+**Comparability (stated before, not after):** record for both windows the live-game count at 7 PM CST (NBA + NCAAB +
+NHL + NFL) and the Windows host `% Processor Time` / `% Processor Performance` (reading 2b's commands). If host
+performance differs by more than 15 points or the live count by more than 30%, the reading is CONFOUNDED and says so.
+Note the split adds up to ~0.5 core of VM demand during builds on a host already at 100% (reading 2): metric 5 may
+improve less than the board does.
+
+**Must also hold (safety), same window:** 0 `BOARD_PROCESS_EXITED` other than rc 75 (recycle) or a deliberate TERM;
+`BOARD_PROCESS_LEASE_WAIT` only within 60 s of a respawn; role-tree RSS max <= the 6,144 MB cap; never two
+`pipeline.board_build_process --serve` processes alive at once (`ps`, 3 reads across the window); `check_deploy_safety.py` lists the child under
+`service_children` and still reads a build in flight from the log. The MLB-sim gate cannot be exercised live in
+November (no MLB sims): its busy signal is covered by the flock tests only, and that is said in the reading.
+
+**Betting change: yes** — the portfolio plan's cadence follows the board (metric 4), and live-odds-worker executes the
+plan. Record it with `scripts/betting_change.py add --kind yes` at the load.
+
+## The load (the user's decision)
+
+1. Fleet ff to a SHA >= `09eddabf2` (`git merge --ff-only <sha>` in `~/Syndicate`, remote `github`) — it ships ALL of
+   main: run the ride-along diff first.
+2. `~/syndicate-prod/local_production.env`: add `REFRESH_WORKER__SYNDICATE_BOARD_BUILD_PROCESS=1` (env is built only at
+   `up`).
+3. Drained full `down` / `Start-ScheduledTask SyndicateLocalProduction`, AFTER the slate (two drains on 11-17's evening
+   never reached an idle worker): 3 claims, preflight from an `origin/main` worktree, `fleet_role_env_reading.py
+   snapshot` before / `compare` after.
+4. Verify at boot: `BOARD_PROCESS_MODE mode=process`, `BOARD_PROCESS_STARTED pid=...`, `BOARD_PROCESS_CHILD_READY`, the
+   first `BOARD_BUILD_TIMING` from the child, `check_deploy_safety` CLEAR with the child under `service_children`.
+5. Rollback = remove the line + another drained `down`/`up` (the switch is read at boot). A child-only restart
+   (`kill -TERM <child pid>`) is NOT a rollback; it only reloads board code.
+
 ## Open
 
 - The fixed-work benchmark across the slate and into the calm hours (separates CPU-second inflation from real work).
-- Tonight's per-stage reading with `schedstat` (WSL-native sampler from 01:37Z, to 06:30Z).
+- Tonight's per-stage reading with `schedstat` (WSL-native sampler from 01:37Z, to 06:30Z), and B for metrics 2-5.
