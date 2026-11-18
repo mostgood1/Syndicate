@@ -202,9 +202,12 @@ def analyse(out_dir: str) -> dict:
         for mode in MODES:
             req = [by[mode][s]["req_s"] for s in sel]
             late = [by[mode][s]["late_s"] for s in sel]
-            b[mode] = {"req_p50": _pct(req, 0.5), "req_p90": _pct(req, 0.9), "req_max": max(req) if req else None,
+            # req_p99 and share_req_over_5s are the statistics the findings' section 5 pre-registered (P1/P2).
+            b[mode] = {"req_p50": _pct(req, 0.5), "req_p90": _pct(req, 0.9), "req_p99": _pct(req, 0.99),
+                       "req_max": max(req) if req else None,
+                       "share_req_over_5s": round(sum(1 for x in req if x > 5) / len(req), 4) if req else None,
                        "share_req_over_10s": round(sum(1 for x in req if x > 10) / len(req), 4) if req else None,
-                       "late_p90": _pct(late, 0.9), "late_max": max(late) if late else None,
+                       "late_p90": _pct(late, 0.9), "late_p99": _pct(late, 0.99), "late_max": max(late) if late else None,
                        "errors": sum(1 for s in sel if not by[mode][s].get("ok"))}
         res["buckets"][f"{lo:.2f}-{min(hi, 1.0):.2f}"] = b
     return res

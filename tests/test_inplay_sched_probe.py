@@ -180,7 +180,11 @@ def test_analyse_pairs_by_slot_and_buckets_by_host_busy(tmp_path):
     assert hot["pairs"] == 3
     assert hot["idle"]["req_max"] == 45.0 and hot["idle"]["share_req_over_10s"] == pytest.approx(2 / 3, abs=1e-4)
     assert hot["normal"]["req_max"] == 0.4 and hot["normal"]["share_req_over_10s"] == 0.0
-    assert res["buckets"]["0.00-0.80"]["pairs"] == 2
+    # The pre-registered statistics (findings section 5): p99 and the share over 5 s.
+    assert hot["idle"]["req_p99"] == 45.0 and hot["idle"]["share_req_over_5s"] == pytest.approx(2 / 3, abs=1e-4)
+    assert hot["normal"]["req_p99"] == 0.4 and hot["normal"]["share_req_over_5s"] == 0.0
+    cool = res["buckets"]["0.00-0.80"]
+    assert cool["pairs"] == 2 and cool["idle"]["req_p99"] == 0.3 and cool["normal"]["share_req_over_5s"] == 0.0
 
 
 def test_main_requires_probe_args():
