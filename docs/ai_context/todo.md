@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#838` — **ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE: NHL full generation hung on the NHL stats REST API (21-44 s per call or 520, 168 uncached calls) for its 1,800 s timeout four sweeps in a row, the `TimeoutExpired` killed each run, and 23 of 26 sweep attempts 01:21-03:02Z were refused `lane_busy`. Fix on main `2ae0c646a` behind `SYNDICATE_ODDS_LANE_STEP_DEADLINE` (absent = ON), NOT loaded; the load is the user's** `[2026-11-17, lane odds-lane-sport-deadline; `.syndicate/findings_2026-11-17_odds_lane_sport_deadline.md`]`
+### `#838` — **ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE: NHL full generation hung on the NHL stats REST API (21-44 s per call or 520, 168 uncached calls) for its 1,800 s timeout four sweeps in a row, the `TimeoutExpired` killed each run, and 23 of 26 sweep attempts 01:21-03:02Z were refused `lane_busy`. Fix on main `2ae0c646a` behind `SYNDICATE_ODDS_LANE_STEP_DEADLINE` (absent = ON), LOADED 2026-11-18 13:47:14Z (fleet ff, no restart); the slow-API reading is owed** `[2026-11-17, lane odds-lane-sport-deadline; `.syndicate/findings_2026-11-17_odds_lane_sport_deadline.md`]`
 - **Cause (measured 11-18, read-only):**
   - live-odds-worker runs sports SERIALLY with one 1,800 s step timeout, and a timeout escaped `_run_command` to `main`: rc 1, the sports after NHL never ran, NBA's result was dropped (an 831-byte manifest).
   - A timed-out generation writes no predictions, so every later live sweep was full again (01:21Z, 01:54Z, 02:25Z, ~02:48Z).
@@ -11,7 +11,9 @@
   - NHL live generation, when due, runs as a deferred `nhl_live_generation` (`--mode generate`, no odds collection, so 0 added OddsAPI calls) after every sport, deadline 900 s (`SYNDICATE_NHL_LIVE_GENERATION_DEADLINE_SECONDS`);
   - a generation timeout holds NHL to fast sweeps for 1,800 s.
   - 26 tests incl. off != on through the real run loop.
-- **To load (user's call):** a fleet ff of `~/Syndicate` to `2ae0c646a` or later. Both changed scripts run only as fresh children per sweep, so **no TERM is needed**; the next live sweep runs it.
+- **Loaded 2026-11-18 13:47:14Z (7:47 AM CST)** on the user's "Load it now": a fleet ff `09eddabf2` -> `2ae0c646a`, no TERM (deploys.md `2582a45ce`, BC-046). Harm checks MET on the first sweep (13:47:44Z, pregame, 372 s).
+- **Owed:** the pre-registered reading in the first live NHL window with the stats API slow (findings file). The rail monitor reads it from noon CST 11-18.
+- **Not covered, measured 11-18:** pregame sweeps on the same lane still run NHL's full generation inline (181 runs 11-13..11-18: p50 218 s, max 532 s, 0 over 900 s). A stats-API slowdown before puck drop could still hold the lane for 1,800 s per sweep, though the run now continues to the other sports. Extending the split to pregame is the user's call.
   - The ff ships all of main up to that SHA: child scripts at once, in-process code at each role's next restart.
   - Claim + preflight for the exact SHA; `betting change: yes` (live odds freshness across the lane's sports, NHL generation timing).
 - **Verify (pre-registered in the findings):** in a slow-NHL-API window,

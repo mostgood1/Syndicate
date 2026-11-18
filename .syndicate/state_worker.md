@@ -2906,7 +2906,7 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   - The first live evening's reading is OWED (findings § PRE-REGISTERED PREDICTION, baseline B).
 - **The host is a second, separate cost:** Windows read 100% busy at 56-64% of nominal clock (1,920-2,188 of 3,417 MHz, Snapdragon X1E80100, on AC) at 7:36 and 8:05 PM CST 11-17, with vmmemwsl 3.9-6.4 cores and MsMpEng 1.0-2.4. Inside WSL that shows as clock, not runqueue wait. A WSL-side process appending to `/mnt/c` every second raised MsMpEng ~2.4 -> ~1.1 cores when stopped: write samplers to WSL-native paths.
 
-## [odds-lane-sport-deadline] ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE; A PER-SPORT DEADLINE + DEFERRED NHL GENERATION IS ON MAIN `2ae0c646a`, NOT LOADED `[verified 2026-11-18 03:02Z, lane odds-lane-sport-deadline, todo #838]`
+## [odds-lane-sport-deadline] ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE; A PER-SPORT DEADLINE + DEFERRED NHL GENERATION IS ON MAIN `2ae0c646a` AND LOADED (fleet ff 2026-11-18 13:47:14Z); THE SLOW-API READING IS OWED `[verified 2026-11-18 13:56Z, lane odds-lane-sport-deadline, todo #838]`
 
 - **The run (verified):**
   - live-odds-worker runs a live sweep's sports SERIALLY (`SYNDICATE_SERIAL_SPORT_REFRESH=true`), with one
@@ -2928,5 +2928,9 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   - per-step / per-sport deadlines;
   - NHL due generation deferred past every sport as `--mode generate` (0 added OddsAPI calls), deadline 900 s;
   - a 1,800 s cooldown after a timeout.
-- **Load = a fleet ff only.** Both scripts run as fresh children per sweep; no role restart is needed. It is NOT
-  loaded; the decision is the user's. Prediction: `findings_2026-11-17_odds_lane_sport_deadline.md`.
+- **Loaded 2026-11-18 13:47:14Z (verified):** a fleet ff `09eddabf2` -> `2ae0c646a`, no restart (both scripts run as
+  fresh children per sweep). The first sweep on it launched 13:47:44Z. Entry: deploys.md `2582a45ce`, BC-046.
+- **Owed:** the pre-registered slow-API reading in a live NHL window
+  (`findings_2026-11-17_odds_lane_sport_deadline.md`).
+- **Not covered (measured 11-18):** pregame sweeps on the same lane still run NHL's full generation inline,
+  under only the 1,800 s timeout. 181 runs 11-13..11-18: p50 218 s, max 532 s, 0 over 900 s.
