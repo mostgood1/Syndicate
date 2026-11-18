@@ -131,6 +131,17 @@ _ODDS_LANE_STEP_DEADLINE_ENV = "SYNDICATE_ODDS_LANE_STEP_DEADLINE"
 # the whole full step (odds ~46 s + generation) was p50 351 s, p90 545 s, max 987 s
 # over 60 live runs.
 _NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS = 900
+# THE SAME SPLIT FOR A PREGAME SWEEP `[2026-11-18, lane odds-lane-sport-deadline, user
+# "Yes, build it"]`. A pregame sweep still ran NHL's full step inline: odds + generation
+# under the 1,800 s run-wide timeout only, with no cooldown, so a stats-API stall before
+# puck drop could hold the live odds lane 30 min on EVERY pregame sweep (~31 min apart).
+# Measured 11-13..11-18: 258 pregame full NHL steps, p50 218 s (live odds lane) / 331 s
+# (direct), max 807 s, 0 over 900 s, ok 255 of 258 -- so the 900 s default cuts no
+# measured healthy generation. Absent = ON; it also needs `_ODDS_LANE_STEP_DEADLINE_ENV`
+# on (the deferred runner exists only then). `off` restores the inline full step.
+_NHL_PREGAME_GENERATION_SPLIT_ENV = "SYNDICATE_NHL_PREGAME_GENERATION_SPLIT"
+_NHL_PREGAME_GENERATION_DEADLINE_ENV = "SYNDICATE_NHL_PREGAME_GENERATION_DEADLINE_SECONDS"
+_NHL_PREGAME_GENERATION_DEADLINE_DEFAULT_SECONDS = 900
 _STEP_TIMEOUT_STDOUT_TAIL_CHARS = 800
 _ALL_PROCESS_MEMORY_HEARTBEAT_SECONDS = 60
 _MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
@@ -1048,28 +1059,53 @@ def _nhl_live_generation_due(artifact_root: Path, date: str) -> bool:
     return age >= ceiling
 
 
+def _positive_seconds_env(name: str, default: float) -> float:
+    """A positive number of seconds from env `name`; absent, unparseable or <= 0 = `default`."""
+    raw = str(os.environ.get(name) or "").strip()
+    try:
+        value = float(raw) if raw else float(default)
+    except ValueError:
+        value = float(default)
+    return value if value > 0 else float(default)
+
+
 def _nhl_live_generation_deadline_seconds() -> float:
     """`SYNDICATE_NHL_LIVE_GENERATION_DEADLINE_SECONDS`, default 900: the live NHL
     generation step's own deadline (see `_NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS`)."""
-    raw = str(os.environ.get("SYNDICATE_NHL_LIVE_GENERATION_DEADLINE_SECONDS") or "").strip()
-    try:
-        value = float(raw) if raw else float(_NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS)
-    except ValueError:
-        value = float(_NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS)
-    return value if value > 0 else float(_NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS)
+    return _positive_seconds_env("SYNDICATE_NHL_LIVE_GENERATION_DEADLINE_SECONDS", _NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS)
+
+
+def _nhl_pregame_generation_deadline_seconds() -> float:
+    """`SYNDICATE_NHL_PREGAME_GENERATION_DEADLINE_SECONDS`, default 900: the pregame NHL
+    generation step's own deadline (see `_NHL_PREGAME_GENERATION_SPLIT_ENV`)."""
+    return _positive_seconds_env(_NHL_PREGAME_GENERATION_DEADLINE_ENV, _NHL_PREGAME_GENERATION_DEADLINE_DEFAULT_SECONDS)
+
+
+def _nhl_pregame_generation_split_enabled() -> bool:
+    """`SYNDICATE_NHL_PREGAME_GENERATION_SPLIT`: absent = ON; off / 0 / false / no = the
+    inline full step. Needs `SYNDICATE_ODDS_LANE_STEP_DEADLINE` on as well."""
+    if not _odds_lane_step_deadline_enabled():
+        return False
+    raw = str(os.environ.get(_NHL_PREGAME_GENERATION_SPLIT_ENV) or "").strip().lower()
+    return raw not in {"0", "off", "false", "no"}
 
 
 def _nhl_live_generation_timeout_marker(artifact_root: Path, date: str) -> Path:
+    """The date's generation-timeout marker. ONE marker for both phases: it says "the NHL
+    stats API just stalled a generation for this date", which a live and a pregame sweep
+    share, so a timeout in either phase cools generation down in both."""
     return artifact_root / "data" / "processed" / f".nhl_live_generation_timeout_{date}.json"
 
 
-def _nhl_live_generation_cooling_down(artifact_root: Path, date: str, ceiling: float) -> bool:
-    """True for `ceiling` seconds after the date's live generation hit its deadline.
+def _nhl_live_generation_cooling_down(artifact_root: Path, date: str, ceiling: float, *, phase: str = "live") -> bool:
+    """True for `ceiling` seconds after the date's NHL generation hit its deadline.
 
     WHY. A generation that times out writes no predictions, so their age stays over the
     cadence and EVERY following live sweep was due again: 11-18 01:21Z, 01:54Z and
     02:25Z each spent 1,800 s on the same stalled NHL stats API. The cooldown spaces
     retries at the generation cadence; the sweeps in between refresh NHL odds (fast).
+    The log token names the phase that skipped: `NHL_LIVE_GENERATION_COOLDOWN` or
+    `NHL_PREGAME_GENERATION_COOLDOWN`.
     """
     path = _nhl_live_generation_timeout_marker(artifact_root, date)
     try:
@@ -1078,12 +1114,21 @@ def _nhl_live_generation_cooling_down(artifact_root: Path, date: str, ceiling: f
         return False
     if age < ceiling:
         print(
-            f"[refresh_odds_sources] NHL_LIVE_GENERATION_COOLDOWN date={date} "
+            f"[refresh_odds_sources] NHL_{str(phase).upper()}_GENERATION_COOLDOWN date={date} "
             f"since_timeout_seconds={int(age)} cooldown_seconds={int(ceiling)}",
             flush=True,
         )
         return True
     return False
+
+
+def _nhl_pregame_generation_cooling_down(artifact_root: Path, date: str) -> bool:
+    """A pregame sweep skips generation for one cadence (`_nhl_live_full_generation_seconds`,
+    default 1,800 s; 0 = never) after the date's generation timed out in either phase."""
+    ceiling = _nhl_live_full_generation_seconds()
+    if ceiling <= 0:
+        return False
+    return _nhl_live_generation_cooling_down(artifact_root, date, ceiling, phase="pregame")
 
 
 def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
@@ -1110,6 +1155,12 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
     collection, so no extra OddsAPI calls) runs after every other sport, under its own
     deadline. A deadline hit writes a cooldown marker so the next sweeps do not retry
     a stalled generation every time.
+
+    PREGAME (2026-11-18, same lane, `SYNDICATE_NHL_PREGAME_GENERATION_SPLIT`, absent =
+    on). A pregame sweep is split the same way on every sweep (pregame always
+    generates): `--mode fast` in NHL's turn, then a deferred `nhl_pregame_generation`
+    with its own 900 s deadline and the SAME per-date timeout marker. While that marker
+    is fresh the pregame sweep runs NHL odds only. `--phase all` stays one full step.
     """
     python_exe = _venv_python(REPO_ROOT)
     artifact_root = _local_source_artifact_root("nhl")
@@ -1124,11 +1175,14 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
         str(artifact_root),
     ]
     command = list(base_command)
-    live = str(getattr(args, "phase", "") or "").strip().lower() == "live"
+    phase = str(getattr(args, "phase", "") or "").strip().lower()
+    live = phase == "live"
     generation_due = live and _nhl_live_generation_due(artifact_root, str(args.date))
     live_fast = live and not generation_due
     split_generation = generation_due and _odds_lane_step_deadline_enabled()
-    if live_fast or split_generation:
+    pregame_split = phase == "pregame" and _nhl_pregame_generation_split_enabled()
+    pregame_cooling = pregame_split and _nhl_pregame_generation_cooling_down(artifact_root, str(args.date))
+    if live_fast or split_generation or pregame_split:
         command += ["--mode", "fast"]
     steps = [
         RefreshStep(
@@ -1142,9 +1196,33 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 "board is not empty the evening before a slate."
                 + (" LIVE FAST: odds only; generation not due." if live_fast else "")
                 + (" LIVE FAST: odds only; generation runs as nhl_live_generation after every sport." if split_generation else "")
+                + (" PREGAME FAST: odds only; generation cooling down after a timeout." if pregame_cooling else "")
+                + (
+                    " PREGAME FAST: odds only; generation runs as nhl_pregame_generation after every sport."
+                    if pregame_split and not pregame_cooling
+                    else ""
+                )
             ),
         ),
     ]
+    if pregame_split and not pregame_cooling:
+        steps.append(
+            RefreshStep(
+                name="nhl_pregame_generation",
+                phases=("pregame",),
+                cwd=REPO_ROOT,
+                command=tuple(base_command + ["--mode", "generate"]),
+                description=(
+                    "NHL owned generation (lineups, predictions, recommendations, props) for the slate "
+                    "date plus the look-ahead day, without odds collection; deferred past every sport's "
+                    "pregame odds and bounded by its own deadline."
+                ),
+                modes=("full",),
+                timeout_seconds=_nhl_pregame_generation_deadline_seconds(),
+                timeout_marker=str(_nhl_live_generation_timeout_marker(artifact_root, str(args.date))),
+                deferred=True,
+            )
+        )
     if split_generation:
         steps.append(
             RefreshStep(
