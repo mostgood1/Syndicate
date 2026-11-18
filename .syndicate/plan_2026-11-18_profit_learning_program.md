@@ -42,8 +42,10 @@ No result guarantees future returns.
    size that still measures fills and slippage. The user decides; it is a pure risk reduction, so it may load outside
    a window.
    - **Measured 11-18:** the cut is worth about $1.30 a day of expected loss at the last week's volume. Its env keys
-     load only through a drained full down/up, which also loads every unloaded commit on main into the roles. So it
-     is best loaded in a window, unless the user takes those ride-alongs too (lane `live-stake-minimum`).
+     load only through a drained full down/up, which also loads every unloaded commit on main into the roles.
+   - **Decided 11-18 ~1:20 PM CST, user: "Yes, drop the cut".** Sizing stays as it is: stakes compound off the venue
+     capital (fraction 1.0, its maximum), so volume follows the balances and falls as the book loses. Lane
+     `live-stake-minimum` closed; nothing loaded.
 4. **Slices are evidence for per-line rules, never a sport or market switch** (learnings line 1056).
 5. **Nothing is thrown away.** Every family below is kept, joined and reused.
 
