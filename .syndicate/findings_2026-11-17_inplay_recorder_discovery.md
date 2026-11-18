@@ -51,7 +51,19 @@ forwarded verbatim; I checked that session's transcript). It is recorded in both
 three commits on branch `claude/stoic-stonebraker-a6c9aa`: the list and loop, the gap tool's 60 s share, and the
 200 x 1.25 defaults. It has 8 tests in `tests/test_inplay_recorder_discovery.py` and 4 for the gap tool; with
 `tests/test_inplay_repo_paths.py`, 17 pass. It is not on main: the nightly re-syncs from `origin/main`, so landing it
-changes the next night's recording, and that needs the user's yes. The SHA on main gets recorded here when it lands.
+changes the next night's recording, and that needs the user's yes.
+
+**LANDED 2026-11-18 ~7:42 AM CST** with the user's "Yes, land it" (typed in session e6287e48): `e9eb52568` (list and
+loop), `8a5459b57` (the gap tool's 60 s share), `a2af81258` (the 200 x 1.25 defaults). 17 tests pass on the rebased tree.
+The nightly took it at its 8:00 AM run: `C:/tmp/inplay_nightly.log` reads
+`2026-11-18T14:00:03Z SYNC origin/main=fb95a5f07 changed=['scripts/inplay_recorder.py']`. The runner's copy
+`C:/tmp/inplay_runner/scripts/inplay_recorder.py` is byte-identical to `a2af81258`'s. The first night on it is the
+11-18 slate (NBA 12, NCAAF 2, NHL 3; first game 6 PM CST): a weeknight, so it is not the Saturday-sized reading.
+
+**OWED (not scheduled):**
+- the first live Saturday reading, `py -3 scripts/inplay_poll_gaps.py C:/tmp/inplay_2026-11-21`: its
+  `share_time_no_quote_60s` against 11-14's 0.267, and `kalshi_429` against the dry A/B's 3-6 per 15 min;
+- its `kalshi.jsonl` size, against §2's ~3.6 GB ceiling.
 
 - **List:** every `--tickers-seconds` (600), union of Kalshi's public listing (`GET /markets?series_ticker=<s>&status=open`,
   kept to the event tickers carrying the slate's date code, e.g. `26NOV14`) and the capture file. A ticker stays polled
