@@ -125,15 +125,16 @@ it or retire it is the user's call (section 7).
   - a day-1 run is 386 s now (after the soccer anchor);
   - a day-2 run should be about the same: its soccer step simulates only its own date's fixtures, and 11-11's seven
     day-2 runs took p50 360 s;
-  - restoring day 2 adds ~6-7 min of refresh-worker lane per idle hour;
+  - restoring day 2 adds ~6-10 min of refresh-worker lane per idle hour (the 1:11 PM day-2 run took 615 s in daytime
+    contention);
   - total look-ahead lane hold would be ~13 min/idle hour, against 20-40 min/hour from day 1 alone on 11-13..11-18,
     when the weekly soccer autorun was healthy (unit age at launch p90 17,146 s against a 14,400 s interval,
     `[soccer-lookahead-horizon]`).
 - **Idle hours:** look-aheads run only while nothing tracked is live. Day-1 launches were 10-18 per Central day, so
   day 2 would launch about as often.
 - **OddsAPI:** the fleet burns 5,054 credits/h, projected 3,639,008 per 30 days against the 5M cap (72.8%; quota read
-  1:04 PM CST). The cost of ONE look-ahead run is not recorded per caller anywhere. See section 8 for the bracket I
-  measured on the 1:11 PM day-2 run.
+  1:04 PM CST). The cost of ONE look-ahead run is not recorded per caller anywhere. I measured it on the live 1:11 PM
+  day-2 run: **≈ 950-1,070 credits per run** (section 8). Restoring day 2 hourly adds ~0.3-0.57M credits per 30 days.
 
 ## 6. The fix (on main, default OFF)
 
@@ -204,6 +205,68 @@ section 8.
     lane for the soccer autorun;
   - **(c) leave both as they are.** Day 2 stays mostly locked out and runs only when day 1 is knocked out.
 
-## 8. OddsAPI bracket and full-file test result
+## 8. OddsAPI cost of one day-2 run (measured), and the full-file test result
 
-(filled below once the sampler and the test run finished)
+**Method.**
+
+- `quota_sampler.py` read `/api/ops/oddsapi/quota` every 20 s from 1:05 PM CST.
+- The fleet-wide `used` counter and the per-sport credit counters were differenced per sample.
+- Each delta was lined up with the 1:11:22 PM day-2 run's own step start and finish times (`d2_steps.json`, from its
+  `odds_refresh.json`). The run is `20261118_191122`, date 11-20, 1:11:24-1:21:39 PM, 615 s.
+
+**Background (no look-ahead running)** is about 20 credits/min:
+
+- NCAAB 3-7 + WNCAAB 3 every 20 s;
+- NCAAF 9 + NFL 6 about every 2 min;
+- 1:18-1:25 PM read 0-15 credits per 20 s.
+
+**The day-2 run's own spikes** line up with its steps:
+
+| sport | credits | when (CST) |
+|---|---|---|
+| NHL | ~40 | 1:12:19-1:13:19 |
+| NFL | 124 | 1:13:19 |
+| NCAAF | ~32 | 1:13:39 |
+| NCAAB + WNCAAB | ~10 above background | |
+| soccer | 742 | 1:16:21-1:17:41 |
+| NBA | 0 | |
+
+- The soccer burst matches the run's 13 `soccer_*_odds` steps (1:16:03-1:16:33) and 13 `soccer_*_props` steps
+  (1:16:33-1:17:32) to the sample.
+- A further NFL 51 + 67 at 1:15:00-1:15:20 fell after the run's NFL step had finished (1:13:22). Its attribution is
+  uncertain.
+
+**One day-2 run ≈ 950-1,070 credits, ~75% of it soccer** (n = 1 run, daytime, D+2 a Thursday). A day-2 run on a
+weekend date may cost more (more soccer events with props).
+
+**What restoring day 2 costs:**
+
+- day 2 would launch about once per idle hour, 10-18 a day (day-1 launches per day 11-11..11-18);
+- that adds about 10-19k credits/day, or **0.3-0.57M per 30 days**;
+- on top of the 1:04 PM projection of 3.64M, that is about **4.0-4.2M, 80-84% of the 5M cap**;
+- today the locked-out day 2 already runs ~1 a day (5 launches 11-13..11-18), ~1k credits a day.
+
+**Fleet-wide context:** a burst of ~730 soccer credits at 1:09:18-1:11:18 PM was NOT this run. Day 1 had just been
+refused, and the lane held a weekly soccer autorun unit. Another producer spends soccer credits in bursts too.
+
+**Other notes:**
+
+- **Day-2 run lane time:** this run took 615 s (daytime contention; soccer 405 s of it). 11-11's seven took p50 360 s.
+- **NHL odds for D+2:** `nhl_oddsapi_refresh` exited rc 1 in both recent day-2 runs (4:06 AM and 1:11 PM; day-1 runs
+  rc 0). No error text was retained (`odds_refresh.stderr.txt` keeps 32 KB + tail). This is a lead, not chased.
+- **Tests:** full `tests/test_live_refresh_loop.py`: **227 passed, 13 subtests passed** (332 s) with the fix in place.
+
+## 9. Recommendation (the user decides)
+
+**My recommendation is (b): switch on and retire day 2.**
+
+- The value of day 2 is an earlier odds snapshot that no served row depends on.
+- Restoring it costs ~0.3-0.57M OddsAPI credits a month (+6-11 points of the cap) and ~6-10 min of refresh-worker lane
+  per idle hour.
+- The switch still fixes day 1, which today loses an hour each time the weekly soccer autorun holds the lane.
+
+**Choose (a)** if the earlier D-2 lines matter to the profit learning program, for example opening-to-close movement
+studies.
+
+**A cheaper middle option is NOT built:** a separate, longer day-2 interval (e.g. every 6 h ≈ 3-4k credits/day). It
+would need its own switch.

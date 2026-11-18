@@ -17,6 +17,7 @@
     - set `REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_LANE_WAIT=on` in `local_production.env`;
     - then a drained full `down`/`up`.
   - Option (b) also sets `REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_48H_ENABLED=false`, which retires day 2 and keeps the day-1 fix.
+- **Cost of restoring day 2 (measured on the 1:11 PM 11-18 day-2 run, n = 1):** ≈ 950-1,070 OddsAPI credits per run, ~75% soccer, and 615 s of lane. At 10-18 idle-hour runs a day that is +0.3-0.57M credits per 30 days, taking the projection from 3.64M to ~4.0-4.2M of the 5M cap. Recommendation: (b).
 - **Owed:** the user's choice (a / b / c), then P0-P7 in the lane block after the load.
 
 ### `#841` — **UNDERSTAT IS DOWN SITE-WIDE ("We will come back soon", HTTP 200, since 2026-11-03 2:54 PM CST; DNS/connect failures from 11-01 6:34 PM CST), so every big-5 `soccer_<league>_history_current` / `_players` step fails (5,152 of 5,152 in 800 runs, 11-10..11-20 dirs) and the sim prices EPL/La Liga/Bundesliga/Serie A/Ligue 1 on history frozen at 10-31 (69 matches missing by 11-18). Outage guard ON MAIN in two halves: NAMING `SYNDICATE_UNDERSTAT_OUTAGE_GUARD` (absent = ON, betting change no, tested equal to OFF) and COOLDOWN `SYNDICATE_UNDERSTAT_OUTAGE_COOLDOWN` (absent = OFF, betting change yes). NOT LOADED; the cooldown and the alternative-source decisions are the user's** `[2026-11-18, lane understat-fetch-failures; `.syndicate/findings_2026-11-18_understat_fetch_failures.md`; split from #840's lead]`
