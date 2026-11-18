@@ -559,3 +559,46 @@ sportsbook consensus (`market_fair`), with the model's sim weighted at 0. So the
 after fees. Read with F13 (thin, one-sided markets), the venue being "cheaper than the consensus" on thin markets
 looks like a stale or one-sided venue quote, not value. The candidate levers are unchanged: per-line spread and
 liquidity at entry, now under measurement.
+
+### ROI against the spread paid at entry — RESULT (run 2026-11-18 17:13-17:18:33Z, read-only, refresh-worker env)
+
+**Instrument:** `C:\tmp\pfmon\entry_spread.py`, the pre-registered method, run on the 13:49Z copy of
+`/api/portfolio/live?on=all&show=all`.
+- **Population:** live bets selected 10-18..11-17, decided, pregame, with a flippable side: **1,156** (419 in-play
+  excluded).
+- **Coverage, stated first:** **for 555 of 1,156 (48%) the quote log has no change for OUR OWN side at or before the
+  fill.** Those bets fall into the "no usable pair" group with any whose opposite side was missing. That group is
+  therefore mostly a logging gap, not a measured one-sided market.
+
+| entry overround | bets / games | ROI [95%] | won vs breakeven | won - entry fair | opposite quote age p50 |
+|---|---|---|---|---|---|
+| < 1 pp | 193 / 153 | -8.67% [-24.4, +7.0] | 48.2 vs 54.4 | -5.52 pp (se 3.72) | 82 min |
+| 1-2 pp | 118 / 100 | -9.17% [-31.4, +13.0] | 48.3 vs 54.4 | -4.40 pp (se 4.69) | 48 min |
+| 2-4 pp | 49 / 47 | -12.72% [-44.0, +18.6] | 46.9 vs 58.3 | -9.34 pp (se 7.23) | 139 min |
+| 4-8 pp | 18 / 18 | +22.26% [-28.5, +73.0] | 50.0 vs 53.2 | -2.10 pp (se 11.4) | 191 min |
+| >= 8 pp | 10 / 10 | -3.96% [-62.2, +54.3] | 30.0 vs 53.6 | -19.79 pp (se 15.0) | 1,014 min |
+| no usable pair | 768 / 371 | -8.39% [-16.6, -0.2] | 62.6 vs 62.3 | n/a | n/a |
+
+**Verdicts as registered:**
+- **H-spread is FALSIFIED.** Wide (>= 4 pp plus no pair) **-7.28%** (796 / 394) against narrow (< 2 pp) **-8.86%**
+  (311 / 226). The difference is +1.58 pp, 95% [-13.96, +17.12]: the interval includes 0 and the wide group is not
+  lower. **The spread paid at entry does not explain the losses.** Tight-spread bets lose as much. **A per-line
+  entry-spread limit is NOT supported.**
+- **H-fair is not falsified, but leans one way.** In both groups with >= 50 bets, the picks win less than the venue's
+  own fair price at entry implies: < 1 pp **-5.52 (se 3.72)**, 1-2 pp **-4.40 (se 4.69)**. Each 95% interval includes
+  0, and both point the same way.
+- **F13's exploratory thin-market split is partly a coverage artefact.** Its "unpaired" group was also mostly bets
+  the quote log never saw. F13 is downgraded.
+
+**Where that leaves the optimization.** Across five instruments the live book loses about 7-9% at every spread,
+every EV band above the floor, and both venues. The bets are chosen by **price shopping**: the venue's ask is "cheaper"
+than the sportsbook consensus fair, and the sim has 0 weight (trace above). In tight two-sided venue markets, those
+picks win about 4-5 pp less than the venue's own fair price says.
+- **The open question is the price-shopping premise itself:** when Kalshi or Polymarket disagrees with the sportsbook
+  consensus, is the consensus right?
+- **The next measurement (no money):** for the same bets, calibration of outcome against the consensus fair (the
+  staked probability) versus against the venue's own fair at entry. If the venue's fair is better calibrated than
+  the consensus on these selections, price shopping into these venues is adverse selection, and the "edge" is not
+  one.
+- **Also owed, separately:** the quote log's venue coverage. 48% of live fills have no logged own-side quote before
+  the fill. That blinds the CLV and spread instruments on about half the book.
