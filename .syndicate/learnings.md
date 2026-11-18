@@ -3564,3 +3564,25 @@ as a verdict.
 - **Rule:** the line-917 recipe is unchanged. Finish a half-close by hand, scoped to your own path: `rmdir <your empty dir>`, then `git branch -d session/<your slug>` after confirming 0 unique commits. Never `git worktree prune` or `remove` on paths you did not create. **Until close stops pruning,** its "could not delete N stale admin dir(s)" note is the protocol's own step reaching other sessions. Do not add another prune to "finish" it. Stale husks are cleared ONLY by `session_worktree.py prune` (dry run first, `--apply` on a user's word), which holds any dir that is a commit's last pointer or still has a folder. The fix belongs in the tool: report with `git worktree prune --dry-run --verbose` (which `cmd_prune` already parses) instead of a real prune, so close touches only its own record.
 - **Side trap, same session:** `MSYS_NO_PATHCONV=1 git worktree add ... /c/tmp/<name>` from Git Bash created the worktree at `C:\c\tmp\<name>`, because git.exe received the POSIX path literally. `C:\c\tmp` already held 15 other sessions' files, so this has happened before. Give git.exe `C:/tmp/<name>` whenever `MSYS_NO_PATHCONV` is set. (Mine was removed with `git worktree remove --force C:/c/tmp/<name>`; the others' files were left alone.)
 - **FIXED 2026-11-18 (lane `worktree-close-scoped-prune`):** close no longer runs a real prune. It deletes only its own record: the admin dir read before `remove`, or, when the checkout is already gone, the record whose `gitdir` names its path. Then it COUNTS other stale records with `--dry-run` and leaves them to `session_worktree.py prune`. Two new tests in `tests/test_session_worktree_close.py` keep a peer's stale record and a `gitdir`-less husk through a close. Both FAIL on the old close.
+
+
+## 2026-11-18 — OVERTURNED: "soccer holds the live-odds-worker's live odds lane for up to ~46 min in pregame sweeps" — the long soccer runs were refresh-worker's look-ahead, on a DIFFERENT lane `[lane soccer-pregame-odds-lane, session 9383ef18, todo #840]`
+- **What was believed (lane `odds-lane-sport-deadline`, 11-18 9:40 AM CST):**
+  - pregame runs launched by `run_refresh_odds_job.py` that include NHL: 184;
+  - 54 of them ran over 900 s, and soccer was the longest sport in 51;
+  - read as soccer holding the LIVE odds lane.
+- **Measured:**
+  - **The sample mixed two lanes:** 88 refresh-worker runs and 84 live-odds-worker runs. All 66 runs over 900 s were
+    refresh-worker's.
+  - **The holders:** of 430 live-odds-worker `lane_busy` refusals, 0 had a soccer-led holder.
+  - **Why the long runs:** refresh-worker's hourly look-ahead inherited `SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7`, a value
+    set for the weekly autorun, so each run re-simulated 7 days of soccer.
+- **Rule:**
+  - A run's LANE is in its `refresh_job_status.json` `latestPath` (`refresh_status_latest__<lane>.json`). The
+    wrapper shape and the launcher name do not tell lanes apart: both workers launch through `run_refresh_odds_job.py`.
+  - Attribute a refusal to a holder by the refusal's `run_stamp`, joined to that run's manifest. A long run on
+    another lane refuses nothing on yours.
+  - A role-wide env value (a horizon, a cadence) set for one launcher reaches every launcher in that role that
+    reads it. Name the launcher a value is meant for, and check what else reads it.
+- **Also, repeated, a known rule:** I wrote three lane stamps 40-70 min in the FUTURE by estimating the time instead
+  of reading it. Read the clock (`Get-Date`, or the commit's `%ci`) before every stamp.

@@ -2937,5 +2937,24 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   NHL odds fast in turn and a deferred `nhl_pregame_generation` (900 s deadline, the shared per-date
   marker, `NHL_PREGAME_GENERATION_COOLDOWN`). Baseline: 258 pregame full NHL steps 11-13..11-18, max 807 s,
   0 over 900 s. P3 (NHL p50 <= 280 s) read 371 s on n=1; the nhl-stats-rest-cache ff changes generation time after it.
-- **Not covered (measured 11-18):** pregame lane holds over 900 s are soccer, not NHL: 51 of 54 such runs,
-  soccer up to 2,763 s summed over its league steps, no single step over 900 s.
+- **Not covered (measured 11-18), CORRECTED 11-18 by lane soccer-pregame-odds-lane:** the 51-of-54 soccer-led runs
+  over 900 s are refresh-worker's LOOK-AHEAD lane, not the live odds lane (0 of 430 live-odds-worker `lane_busy`
+  refusals 11-14..11-18 had a soccer-led holder; 169 were NHL-led pregame). See `[soccer-lookahead-horizon]`.
+
+## [soccer-lookahead-horizon] REFRESH-WORKER'S HOURLY LOOK-AHEAD RE-SIMULATED 7 DAYS OF SOCCER EVERY RUN; A DATE ANCHOR IS ON MAIN `640c6d4fd`, NOT LOADED `[verified 2026-11-18, lane soccer-pregame-odds-lane, todo #840]`
+
+- **Who:** `live_refresh_loop._launch_look_ahead_refresh` on refresh-worker (`warm_next_day_slate`), hourly while nothing is
+  live: a `phase=pregame` run of every sport for tomorrow, on lane `refresh-worker`. It is the only launcher of future-dated
+  soccer pregame runs (86 of 86, 11-13..11-18; 0 of 170 on other lanes). Soccer runs last in it.
+- **Why long:** soccer's step is week-scoped from TODAY with refresh-worker's `SYNDICATE_SOCCER_SIM_HORIZON_DAYS=7` (set for the
+  weekly autorun's unit list, `run_refresh_worker.py:598`). Cost 16.0 s per simulated match uncontended (n=391 league steps),
+  25-45 s by day under host contention; 50-62 matches per run 11-16..11-18. Run hold p50 1,201 s, max 3,035 s (86 runs);
+  4.65 / 5.59 soccer sim-hours on 11-16 / 11-17 = 61% of refresh-worker's soccer sim time.
+- **Not the live lane:** soccer on live-odds-worker runs on lane `live-odds-worker-soccer-pregame` (164 runs, max 528 s) and
+  never led a live-lane `lane_busy` holder (0 of 430).
+- **Owner of days 2-7 is healthy:** the weekly autorun (610 runs, 11.72 sim-hours; unit age at launch p90 17,146 s vs 14,400 s).
+- **Day-2 look-ahead is phase-locked out:** 84 of 89 attempts refused `lane_busy`, p50 165 s after the day-1 launch (it stamps its
+  marker before launching). Not caused by soccer. Lead, no owner.
+- **Fix `640c6d4fd`** (`SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR`, absent = ON, `off` = old command): a future-dated PREGAME run
+  with no `--soccer-date` uses the week of its own date and `--horizon-days 0 --date <date>`. Child script: a fleet ff loads it.
+  NOT LOADED (fleet at `59fbefc71`, 11-18 10:33 AM CST). Prediction P1-P5 in the lane block.
