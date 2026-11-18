@@ -76,7 +76,7 @@ CLOSE_MIN_BOOKS = 3
 COMPLETED_AFTER_S = 6 * 3600.0
 CONTROL_LEAD_S = 7200.0                # control arm: a book's price 2 h before start
 DELAY_WINDOW_S = 600.0
-CONFIRM_MIN_S, CONFIRM_MAX_S = 300.0, 900.0   # arm B (fanduel-lead-forward): a re-read >= 5 min later
+CONFIRM_MIN_S, CONFIRM_MAX_S = 300.0, 1800.0  # arm B (fanduel-lead-forward): a re-read 5..30 min later
 # O'Brien-Fleming two-look boundaries, two-sided alpha 0.05 (z at look 1, look 2).
 OBF_BOUNDARY = {1: 2.797, 2: 1.977}
 FORWARD_LEADER = "fanduel"
@@ -619,7 +619,7 @@ def forward_read(acc: dict, theta: float, look: int | None) -> dict:
 
     Arm A: the in-sample FanDuel cell's exact definition (primary instance, leader == fanduel), EV vs the
     consensus close at the move's fetch. Arm B: the same bets, entered only if B still quotes the entry price or
-    better at the first fetch it answered 5..15 min later, EV at that price. z = mean / bootstrap SE (event
+    better at the first fetch it answered 5..30 min later, EV at that price. z = mean / bootstrap SE (event
     clusters). Boundaries are O'Brien-Fleming for two looks (2.797, 1.977). `look=None` labels a prior read.
     """
     inst = acc["instances"]
@@ -631,11 +631,14 @@ def forward_read(acc: dict, theta: float, look: int | None) -> dict:
     b = boot_ci(pairs(fd, "ev_close_confirmed"))
     out = {
         "look": look, "boundary_z": OBF_BOUNDARY.get(look) if look else None,
-        "arm_A_replication": a, "arm_B_still_there_5_15min": b,
+        "arm_A_replication": a, "arm_B_still_there_5_30min": b,
         "arm_B_status": dict(collections.Counter(i.get("confirm_status") for i in fd)),
         "arm_B_same_bets_at_move_fetch": boot_ci([(i["cluster"], i["ev_close"]) for i in fd
                                                   if i.get("ev_close_confirmed") is not None]),
         "context_all_leaders_primary": boot_ci(pairs(base, "ev_close")),
+        # Descriptive only: where arm A's effect sits by re-read status (in-sample it sat in "no_fetch").
+        "arm_A_by_confirm_status": {st: boot_ci(pairs([i for i in fd if i.get("confirm_status") == st], "ev_close"))
+                                    for st in ("confirmed", "moved", "gone", "no_fetch")},
         "fd_by_sport": {sp: boot_ci(pairs([i for i in fd if i["sport"] == sp], "ev_close"))
                         for sp in sorted({i["sport"] for i in fd})},
         "detection_window": [min((i["t_detect"] for i in fd), default=None), max((i["t_detect"] for i in fd), default=None)],
