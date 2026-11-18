@@ -8315,8 +8315,12 @@ def main() -> int:
     _bootstrap_soccer_schedule_seed_files()
     _bootstrap_soccer_history_seed_files()
     if str(os.environ.get("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP") or "").strip().lower() in {"1", "true", "yes", "on"}:
-        print("[refresh_worker] INTELLIGENCE_LOOP_ENABLED calling start_intelligence_state_background_loop()", flush=True)
-        loop_started = start_intelligence_state_background_loop()
+        print("[refresh_worker] INTELLIGENCE_LOOP_ENABLED calling start_board_loop_for_refresh_worker()", flush=True)
+        # Lane layer2-board-process-split: in-thread exactly as before unless SYNDICATE_BOARD_BUILD_PROCESS is on;
+        # then the board loop runs in its own process (`pipeline/board_build_process.py` says what crosses and how).
+        from pipeline.board_build_process import start_board_loop_for_refresh_worker
+
+        loop_started = start_board_loop_for_refresh_worker(start_intelligence_state_background_loop)
         print(f"[refresh_worker] INTELLIGENCE_LOOP_START_RESULT started={loop_started}", flush=True)
     else:
         print("[refresh_worker] INTELLIGENCE_LOOP_DISABLED", flush=True)

@@ -362,20 +362,23 @@ class BoardProcessSupervisor:
 _SUPERVISOR: Optional[BoardProcessSupervisor] = None
 
 
-def start_board_loop_for_refresh_worker() -> bool:
+def start_board_loop_for_refresh_worker(in_thread_starter: Callable[[], bool] | None = None) -> bool:
     """refresh-worker's ONE call to start the board loop. Returns what `INTELLIGENCE_LOOP_START_RESULT` prints.
 
-    Switch off (the default): exactly `start_intelligence_state_background_loop()`, nothing else.
+    Switch off (the default): exactly the in-thread starter, nothing else. The worker passes its OWN imported name
+    (`run_refresh_worker.start_intelligence_state_background_loop`), so the off path calls the very object it called
+    before this module existed -- and a test that patches that name still sees the call.
     """
     global _SUPERVISOR
     from pipeline import intelligence_state
 
+    starter = in_thread_starter or intelligence_state.start_intelligence_state_background_loop
     if not board_build_process_enabled():
-        return intelligence_state.start_intelligence_state_background_loop()
+        return starter()
     ready, why = _posix_ready()
     if not ready:
         _log(f"BOARD_PROCESS_MODE mode=thread reason={why} switch={SWITCH_ENV}=on")
-        return intelligence_state.start_intelligence_state_background_loop()
+        return starter()
     _log(f"BOARD_PROCESS_MODE mode=process parent={os.getpid()}")
     # What `start_intelligence_state_background_loop` starts beside the loop stays in the parent.
     try:

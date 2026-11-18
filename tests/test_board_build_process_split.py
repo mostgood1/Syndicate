@@ -128,8 +128,20 @@ def test_refresh_worker_boot_starts_the_loop_through_the_switch():
     source = (REPO_ROOT / "scripts" / "run_refresh_worker.py").read_text(encoding="utf-8")
     boot = source[source.index('print("[refresh_worker] INTELLIGENCE_LOOP_ENABLED'):]
     boot = boot[: boot.index("INTELLIGENCE_LOOP_START_RESULT")]
-    assert "start_board_loop_for_refresh_worker()" in boot
+    assert "start_board_loop_for_refresh_worker(start_intelligence_state_background_loop)" in boot
     assert "start_intelligence_state_background_loop()" not in boot
+
+
+def test_the_workers_own_starter_is_what_the_off_path_calls(monkeypatch):
+    """Off calls the object the worker passes (its own imported name), so patching that name still works."""
+    effects, _sup, _g = _wire_effects(monkeypatch)
+    monkeypatch.delenv(bbp.SWITCH_ENV, raising=False)
+    assert bbp.start_board_loop_for_refresh_worker(lambda: effects.append("workers_own") or True) is True
+    assert effects == ["workers_own"]
+    monkeypatch.setenv(bbp.SWITCH_ENV, "1")
+    effects.clear()
+    bbp.start_board_loop_for_refresh_worker(lambda: effects.append("workers_own") or True)
+    assert "workers_own" not in effects and effects == ["venue", "chips", "supervisor"]
 
 
 # ---------------------------------------------------------------------------------------------- the child's world
