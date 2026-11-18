@@ -984,3 +984,38 @@ A game was live: a `live_row` ask exists (Ducks @ Blues). No `as_of_in_future`.
 - 2e: newest deploys.md header is 8:46 PM CST (ops kill of a hung NHL odds child, no deploy); no fleet ff / deploy / restart in the last 40 min.
 
 No anomaly.
+
+## Reading 24 (10:05 PM CST)
+
+Probe file `ask_reading_20261118T040532Z.json` (10:05-10:06 PM CST). Page 200 in 0.21 s.
+
+**Ask:** 6/6 answered, 0 past the 45 s cut-off, median 5.8 s, max 6.5 s. A game was live (a `live_row` ask exists).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text (spread) | 5.96 | yes | bet_analysis | 03:44:18Z (9:44 PM) | 0 |
+| free_text (Lakers vs Celtics) | 4.97 | yes | matchup_analysis | 03:44:18Z | 0 |
+| free_text (top edges) | 5.67 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line | 5.67 | yes | bet_analysis | 03:44:18Z | 0 |
+| pregame_prop | 6.50 | yes | bet_analysis | 23:37:30Z (5:37 PM) | 6 |
+| live_row | 5.80 | yes | bet_analysis | 03:44:18Z | 0 |
+
+No `as_of_in_future`. All 200, no transport error.
+
+**Web (9:35-10:06 PM CST, 241 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 18 (12 hard); max anon 967 MB vs limit 649 MB.
+- Overlay warms: 47; median 9.3 s; 2 over 20 s; 0 over 45 s; 0 over 60 s; max 22.9 s.
+- Requests over 20 s: 0; over 45 s: 0.
+- Asks from any client: 9; 0 over 45 s; 0 non-200. 0 were NOT this probe's (all `Python-urllib`; 3 from the previous probe at 9:35 PM).
+
+**Host:** load 3.91 / 3.35 / 3.50 on 12 cores; MemAvailable 7,295 MB. Top CPU: refresh-worker 95% (ni 0, 4.5 GB RSS), live-odds-worker 71% (ni 0), gunicorn workers 67% and 39% (ni 0, 50 s and 33 s old), two live_resim_workers ~40% each (ni 5), ESPN live-status fetch 32% (ni 0).
+
+**Engine:**
+- 2a: F2 task has 1 run total (10:30-11:17 AM CST, settled on main `c765eec64`); no newer run.
+- 2b: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 `c1a2c029c2a1816f...` (Amendment 2), unchanged.
+- 2d: 0 engine-file commits on origin/main in the last 40 min.
+- 2e: newest deploys.md header is 8:46 PM CST (02:46Z, ops kill of a hung NHL odds child, no deploy); no fleet ff / deploy / restart in the last 40 min.
+
+No anomaly.
