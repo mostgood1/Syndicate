@@ -61845,3 +61845,19 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - **No log line carries the count:** `NHL_STATS_REPORT_CACHE` prints from the child, whose stdout `refresh_odds_sources` drops (only `_STEP_STDOUT_MARKERS` survive). Read the counts from the cache files' mtimes. Adding the marker token is a one-line follow-up in `refresh_odds_sources.py` (lane `odds-lane-sport-deadline`'s file).
 - **Off switch:** `SYNDICATE_NHL_STATS_REPORT_CACHE=off` in `local_production.env` + drained `down`/`up`, or an ff back to `cdab875d5`.
 - The user's go-ahead, quoted: "Load it now" (this session, to the question above).
+
+## 2026-11-18 17:20Z (11:20 AM CST) -- READING (no deploy): the first 7-sport pregame run on the pregame NHL split (deploy 2026-11-18 15:56:43Z, `cdab875d5`, lane `odds-lane-sport-deadline`, BC-049)
+- Run `odds_refresh_20261118_160701` (launched 16:07:01Z, date 11-19; nba, nhl, nfl, ncaaf, ncaab, wncaab, soccer), wrapper shape: 16:07:01-16:47:43Z, **2,442 s**, `ok False`.
+  - Soccer took 2,193 s of it. The 10 failed soccer steps (`*_history_current`, `*_players`, 5 leagues) failed in **28 of 28** soccer pregame runs on 11-18, before and after the ff, so they are pre-existing.
+  - The other sports: NBA 14 s, NFL 4 s, NCAAF 3 s, NCAAB 1 s, WNCAAB 0 s.
+- **NHL:**
+  - `nhl_oddsapi_refresh --mode fast` ran in NHL's turn, 16:07:15-16:08:17Z, **62 s**, ok.
+  - `nhl_pregame_generation` was deferred **2,243 s** behind soccer and ran 16:45:40-16:47:43Z, **123 s**, ok, not timed out.
+  - It wrote `predictions_2026-11-20.csv` at 16:47:43Z. `predictions_2026-11-19.csv` was rewritten at 16:59:47Z by a later same-day run (they build days-ahead 1).
+  - No timeout marker.
+- **The generation's 123 s belongs to the stats-REST cache, not this change.** That ff (`59fbefc71`) landed at 16:33:54Z, before this child started at 16:45:40Z.
+- **Measured cost of the deferral:** in a 7-sport run, NHL's rebuild for the next two dates now lands after soccer, about 37 min later here. Inline it would have run at about 16:08-16:10Z.
+  - The 11-19 slate is also rebuilt by every 4-sport same-day run (about every 31 min).
+  - So only the 11-20 look-ahead depends on these runs alone.
+  - Total lane hold is unchanged by the split, because NHL's work is in the run either way. NHL was 185 s here, against 175-195 s in today's three earlier 7-sport runs (cache-confounded).
+  - Same-day 7-sport runs with soccer (155812, 163704, 164353) carry no NHL, so no same-day NHL rebuild waits behind soccer.
