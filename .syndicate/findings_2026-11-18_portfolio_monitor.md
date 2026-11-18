@@ -165,3 +165,80 @@ and their fixes. Same probe (`scripts/portfolio_monitor_probe.py`), same page (P
   - Banner ok and armed, state 161 s: **the live-odds-worker is executing again after the restart.**
 - **Endpoints:** all 7 read 200, all under 0.3 s. **Gate:** BC-042 from 08:31:33Z, 0 of 800. The compaction loaded
   no code, so it is no betting change.
+
+## Reading 35 — Wed 11-18 7:20 AM CST (13:20Z), window 32 min
+
+- **The plan resumed after the compaction restart.** The gap across the outage was **14.7 min**, from 12:34:00Z to
+  the first write after boot; that is now the 6-h series' max gap. In 6 h: 73 commits, newest 13:19:16Z, plan 1.0 min
+  old. The restart is closed out.
+- **Execution, 32 min: 8 placed** (kalshi 5, polymarket 3), **0 failed**, in 10 live ticks: a morning pregame burst.
+  - Orders today 29: 27 filled, 2 maker posts resting about 6.6 h, exempt until kickoff.
+  - Unreconciled 0. Cap use: kalshi 14.0%, polymarket 8.6%.
+- **Endpoints:** all 7 read 200, all under 0.55 s. 0 kills. Lane `web-silent-worker-kills` read 0 web kills overnight
+  (01:46-12:37Z) and re-armed its watcher at 12:47Z.
+- **Gate:** BC-042 from 08:31:33Z, 0 of 800. Same 2 unclassified loads, with their lanes.
+
+## PERFORMANCE — added to every reading from 11-18 7:49 AM CST (user: "we need to be assessing PERFORMANCE and ROI of the portfolio and continue to optimize this as part of the monitoring")
+
+**What each reading now carries** (probe `performance`, built on `scripts/live_book_edge_readout.py`, the adopted gate's
+own instrument):
+- **Results by window** (yesterday, last 7, last 30, all): bets, games, ROI net of fees with an event-clustered 95%
+  range, won against the breakeven of the prices paid, and fees as a share of stake.
+- **Same-book CLV** gross and fee-net, plus the close's calibration on our sides.
+- **30-day slices** by venue, sport, market, sizing path, predicted-EV band, price band and stake quartile.
+- **Signals:** slices with at least 30 bets and 20 games whose 95% range excludes 0, plus EV bands whose realized upper
+  bound is below their predicted EV.
+- The Portfolio Watch page shows ROI tiles, a "where it makes and loses money" table, and the signals in the findings
+  table.
+- **Slices are evidence for per-line fixes only, never for switching off a sport or market** (learnings line 1056,
+  `by_dimension`'s own contract). Percentages and counts only here; dollars stay in the local reading JSON.
+
+### Baseline — Wed 11-18 7:49 AM CST (13:49Z), `/api/portfolio/live?on=all&show=all`
+
+| window | bets / games | ROI | 95% range | won vs breakeven | fees |
+|---|---|---|---|---|---|
+| yesterday (11-17) | 46 / 17 | -8.02% | -32.3 .. +16.2 | 63.0% vs 61.9% | 3.03% |
+| last 7 (11-10..11-17) | 401 / 168 | -2.71% | -13.3 .. +7.9 | 58.2% vs 59.6% | 2.71% |
+| **last 30 (10-18..11-17)** | **1,605 / 673** | **-7.35%** | **-12.8 .. -1.9** | 54.5% vs 56.3% | 2.92% |
+| all | 2,025 / 1,093 | -11.02% | -18.3 .. -3.7 | 51.5% vs 53.9% | 2.92% |
+
+- **CLV, same-book, last 30 (580 bets):** gross +1.28 pp, **fee-net -0.36 pp (se 0.21)**. The picks beat their close
+  by less than the venue fee. Close calibration on our sides: -6.28 pp (z -2.93).
+  - Last 7: fee-net -0.29 pp (se 0.39); calibration -9.67 pp (z -2.46).
+
+**Signals beyond noise (30 d):**
+- **The book as a whole:** -7.35% [-12.8, -1.9].
+- **Predicted EV 2-5% (953 bets / 502 games, 59% of bets):** predicted +4.09%, realized **-10.75% [-18.5, -3.1]**.
+  - Finer bands: [2,3) -20.5% [-40.0, -1.0] (96 / 81); [3,4) -12.1% [-24.5, +0.2] (267 / 193);
+    [4,5) -8.2% [-19.0, +2.5] (590 / 366); [5,7) +5.7% [-9.8, +21.3] (189 / 141).
+  - **The loss is spread, not concentrated.** Every sport is negative in the 2-5 band (only NCAAB beyond noise on
+    its own, 84 / 60). Both venues are negative. The `model_edge` sizing path is -11.25% [-19.4, -3.1].
+  - The 5-10 band's +5.7% is NOT supported by its CLV: fee-net -0.74 pp (se 0.31). Treat it as noise, not as
+    "higher EV is better".
+- **Largest-stake quartile (64.0% of dollars):** -9.2% [-16.9, -1.5]. Q1-Q3 are -6.8 / -5.9 / -2.8%.
+- **Other slices beyond noise:**
+  - market `totals` -12.2% [-23.9, -0.5] (391 / 297);
+  - price band 0.30-0.45 -12.6% [-23.8, -1.3] (315 / 206);
+  - venue kalshi -6.25% [-12.1, -0.4] (1,196 / 589).
+- **No slice wins beyond noise** at 30 bets / 20 games.
+
+### What it says, and the levers that already exist (each is a betting change, so each is the user's call)
+
+The live book buys at prices that need a 56.3% win rate after fees and wins 54.5%. Before fees it beats the same-book
+close by +1.28 pp; the fee (about 2.9% of stake) turns that into -0.36 pp. The model's claimed 2-5% edge is not there
+at the price paid after fees, and that band is most of the book.
+
+1. **The EV bar is the threshold lever, judged per line, never a market switch.**
+   - Base `SYNDICATE_PORTFOLIO_MIN_EV_PCT=0`; live net-of-fee floor `SYNDICATE_LIVE_NET_FLOOR_KALSHI=1.0`,
+     `_POLYMARKET=0.5`.
+   - The per-cell `min_ev_tuner` runs nightly in **shadow**, **95 of 95 cells hold**: each cell's marginal band is too
+     thin to reach its z. The pooled variant proposes 1 raise (11-17, 11-18).
+   - The book-level band evidence above is far stronger than any one cell's, and nothing reads it.
+   - **Cheapest next measurement, no money:** the paper ladder already records below-floor rows by net-EV band
+     (`LADDER_PLAN_WRITTEN bands={'m1to0','0to1','1to2','ge2'}`). Its graded results by band would show where a
+     higher net floor stops losing, before any live change.
+2. **Execution cost:** fees at 2.9% of stake are larger than the gross CLV. The Kalshi maker pilot is the fee lever;
+   its shadow job runs (`kalshi-maker-shadow`).
+3. **Sizing:** the top stake quartile loses more than the rest. Compounding/Kelly stakes are largest where the claimed
+   EV is highest, and the claimed EV is overstated.
+4. **Timing:** the gate's clock restarted at BC-042 (08:31:33Z) with 0 events. A betting change now costs no gate time.

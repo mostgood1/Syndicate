@@ -617,6 +617,117 @@ def gate_reading(orders: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------------------------- performance
+
+PERF_KEYS = ("bets", "events", "roi_pct", "roi_lo95_pct", "roi_hi95_pct", "flat_roi_pct", "win_pct",
+             "breakeven_win_pct", "excess_wins", "excess_z", "fee_pct_of_stake", "roi_before_fees_pct")
+EV_BANDS = ((None, 0.0, "ev<0"), (0.0, 2.0, "ev 0-2"), (2.0, 5.0, "ev 2-5"), (5.0, 10.0, "ev 5-10"),
+            (10.0, 20.0, "ev 10-20"), (20.0, None, "ev>=20"))
+PRICE_BANDS = ((None, 0.30, "p<.30"), (0.30, 0.45, "p.30-.45"), (0.45, 0.55, "p.45-.55"), (0.55, 0.70, "p.55-.70"),
+               (0.70, 0.85, "p.70-.85"), (0.85, None, "p>=.85"))
+SIGNAL_MIN_BETS = 30     # a slice needs this many decided bets before its 95% band is reported as a signal
+SIGNAL_MIN_EVENTS = 20
+
+
+def _band(value: float | None, bands: Sequence[tuple[float | None, float | None, str]]) -> str | None:
+    if value is None:
+        return None
+    for lo, hi, name in bands:
+        if (lo is None or value >= lo) and (hi is None or value < hi):
+            return name
+    return None
+
+
+def _perf_row(rb: Any, bets: Sequence[Any]) -> dict[str, Any]:
+    s = rb.summarize(bets) or {}
+    return {k: s.get(k) for k in PERF_KEYS} | {"staked": s.get("staked"), "pnl": s.get("pnl")}
+
+
+def performance(orders: Sequence[Mapping[str, Any]], today: str) -> dict[str, Any]:
+    """The LIVE book's results: what it made, with what certainty, and where. Asked for by the user 2026-11-18:
+    "we need to be assessing PERFORMANCE and ROI of the portfolio and continue to optimize this as part of the
+    monitoring". Built on `live_book_edge_readout` (the adopted gate's own instrument): dollar ROI with an
+    event-clustered 95% band, wins against the breakeven of the prices paid, fee-net same-book CLV.
+
+    Slices (venue, sport, market, sizing path, EV band, price band) are evidence for PER-LINE fixes only, never a
+    market or sport switch (learnings line 1056; `by_dimension`'s own contract). Dollars stay in reading.json; the
+    text report and the page carry percentages and counts (the repo is public)."""
+    sys.path.insert(0, str(HERE))
+    import live_book_edge_readout as rb
+
+    bets = rb.bets_from_orders(orders)
+    end = dt.date.fromisoformat(today)
+    yday = (end - dt.timedelta(days=1)).isoformat()
+    spans = {"yesterday": (yday, yday), "last 7": ((end - dt.timedelta(days=7)).isoformat(), yday),
+             "last 30": ((end - dt.timedelta(days=30)).isoformat(), yday), "all": ("0000-00-00", today)}
+    windows = {name: {"from": a, "to": b, **_perf_row(rb, rb.window_bets(bets, a, b))}
+               for name, (a, b) in spans.items()}
+    focus = rb.window_bets(bets, *spans["last 30"])
+    clv = {}
+    for name in ("last 7", "last 30"):
+        same = rb.clv_summary(rb.window_bets(bets, *spans[name])).get(rb.SCOPE_SAME_BOOK) or {}
+        clv[name] = {k: same.get(k) for k in ("bets", "events", "clv_gross_pp", "clv_net_pp", "clv_net_se_pp",
+                                               "beat_close_pct", "wins_minus_close_pp", "wins_minus_close_z")}
+    slices: dict[str, list[dict[str, Any]]] = {}
+    for dim, field in (("venue", "venue"), ("sport", "sport"), ("market", "market"), ("path", "path")):
+        slices[dim] = [{"key": row[field], **{k: row.get(k) for k in PERF_KEYS}}
+                       for row in rb.by_dimension(focus, field, min_bets=10)]
+    for dim, attr, bands in (("ev_band", "ev_pct", EV_BANDS), ("price_band", "p", PRICE_BANDS)):
+        groups: dict[str, list[Any]] = collections.defaultdict(list)
+        for b in focus:
+            key = _band(getattr(b, attr), bands)
+            if key:
+                groups[key].append(b)
+        rows = []
+        for _lo, _hi, key in bands:
+            if len(groups.get(key, [])) >= 10:
+                row = {"key": key, **{k: v for k, v in _perf_row(rb, groups[key]).items() if k in PERF_KEYS}}
+                if dim == "ev_band":
+                    evs = [b.ev_pct for b in groups[key] if b.ev_pct is not None]
+                    row["predicted_ev_pct"] = round(sum(evs) / len(evs), 2) if evs else None
+                rows.append(row)
+        slices[dim] = rows
+    quartiles = [{k: q.get(k) for k in ("quartile", "dollar_share_pct", "bets", "events", "roi_pct",
+                                        "roi_lo95_pct", "roi_hi95_pct")} for q in rb.stake_quartiles(focus)]
+    return {"today": today, "windows": windows, "clv": clv, "slices": slices, "stake_quartiles": quartiles,
+            "signals": perf_signals(windows, clv, slices, quartiles)}
+
+
+def perf_signals(windows: Mapping[str, Any], clv: Mapping[str, Any],
+                 slices: Mapping[str, Sequence[Mapping[str, Any]]],
+                 quartiles: Sequence[Mapping[str, Any]]) -> list[str]:
+    """What the numbers say to look at, beyond noise. Each line is a lead for a per-line fix, never an action."""
+    out = []
+    w30 = windows.get("last 30") or {}
+    if w30.get("roi_hi95_pct") is not None and w30["roi_hi95_pct"] < 0:
+        out.append(f"BOOK loses beyond noise over the last 30 days: ROI {w30['roi_pct']}% "
+                   f"[{w30['roi_lo95_pct']}, {w30['roi_hi95_pct']}] on {w30['events']} events")
+    c30 = clv.get("last 30") or {}
+    if (c30.get("clv_net_pp") is not None and w30.get("roi_pct") is not None
+            and (c30["clv_net_pp"] > 0) != (w30["roi_pct"] > 0)):
+        out.append(f"CLV and results disagree (30 d): fee-net CLV {c30['clv_net_pp']} pp vs ROI {w30['roi_pct']}%")
+    for dim, rows in slices.items():
+        for row in rows:
+            if (row.get("bets") or 0) < SIGNAL_MIN_BETS or (row.get("events") or 0) < SIGNAL_MIN_EVENTS:
+                continue
+            if row.get("roi_hi95_pct") is not None and row["roi_hi95_pct"] < 0:
+                out.append(f"{dim} {row['key']}: loses beyond noise, ROI {row['roi_pct']}% "
+                           f"[{row['roi_lo95_pct']}, {row['roi_hi95_pct']}], {row['bets']} bets / {row['events']} events")
+            elif row.get("roi_lo95_pct") is not None and row["roi_lo95_pct"] > 0:
+                out.append(f"{dim} {row['key']}: wins beyond noise, ROI {row['roi_pct']}% "
+                           f"[{row['roi_lo95_pct']}, {row['roi_hi95_pct']}], {row['bets']} bets / {row['events']} events")
+            if (dim == "ev_band" and row.get("predicted_ev_pct") is not None
+                    and row.get("roi_hi95_pct") is not None and row["roi_hi95_pct"] < row["predicted_ev_pct"]):
+                out.append(f"EV overstated in {row['key']}: predicted {row['predicted_ev_pct']}% vs realised "
+                           f"{row['roi_pct']}% (upper 95% {row['roi_hi95_pct']}%), {row['bets']} bets")
+    if quartiles:
+        top = quartiles[-1]
+        if top.get("roi_hi95_pct") is not None and top["roi_hi95_pct"] < 0:
+            out.append(f"SIZING: the largest-stake quartile ({top.get('dollar_share_pct')}% of dollars) loses beyond "
+                       f"noise, ROI {top['roi_pct']}% [{top['roi_lo95_pct']}, {top['roi_hi95_pct']}]")
+    return out
+
+
 def render(r: Mapping[str, Any]) -> str:
     lines = [f"PORTFOLIO READING {r['label']} ({r['at']}), log window {r['log_minutes']} min"]
     for name, ep in r["endpoints"].items():
@@ -671,6 +782,35 @@ def render(r: Mapping[str, Any]) -> str:
         fo = g.get("focus") or {}
         lines.append(f"  gate: clock {c.get('change_id')} from {c.get('start')} -> {fo.get('events')} of"
                      f" {c.get('need')} events ({fo.get('bets')} bets); all_pass={g.get('all_pass')}")
+    perf = r.get("performance") or {}
+    if perf.get("windows"):
+        lines.append("  PERFORMANCE (graded live bets; ROI on stake net of fees, event-clustered 95%):")
+        for name, w in perf["windows"].items():
+            if not w.get("bets"):
+                lines.append(f"    {name:9s} no graded bets")
+                continue
+            lines.append(f"    {name:9s} {w['bets']} bets / {w['events']} events: ROI {w['roi_pct']}% "
+                         f"[{w['roi_lo95_pct']}, {w['roi_hi95_pct']}], won {w['win_pct']}% vs breakeven "
+                         f"{w['breakeven_win_pct']}% (excess {w['excess_wins']}, z {w['excess_z']}), fees "
+                         f"{w['fee_pct_of_stake']}% of stake")
+        for name, c in (perf.get("clv") or {}).items():
+            if c.get("bets"):
+                lines.append(f"    CLV {name}: fee-net {c['clv_net_pp']} pp (se {c['clv_net_se_pp']}), gross "
+                             f"{c['clv_gross_pp']} pp, beat close {c['beat_close_pct']}% of {c['bets']}; close "
+                             f"calibration {c['wins_minus_close_pp']} pp (z {c['wins_minus_close_z']})")
+        for dim, rows in (perf.get("slices") or {}).items():
+            if rows:
+                lines.append(f"    30d by {dim}: " + "; ".join(
+                    f"{x['key']} {x['roi_pct']}% [{x['roi_lo95_pct']},{x['roi_hi95_pct']}] n={x['bets']}"
+                    + (f" ev~{x['predicted_ev_pct']}" if x.get("predicted_ev_pct") is not None else "")
+                    for x in rows))
+        if perf.get("stake_quartiles"):
+            lines.append("    30d stake quartiles: " + "; ".join(
+                f"{q['quartile']} {q['dollar_share_pct']}% of $ ROI {q['roi_pct']}%" for q in perf["stake_quartiles"]))
+        lines.append("    signals: " + ("none beyond noise" if not perf.get("signals") else ""))
+        lines += [f"      - {s}" for s in perf.get("signals") or []]
+    elif perf.get("error"):
+        lines.append(f"  PERFORMANCE error: {perf['error']}")
     lines.append("  ANOMALIES: " + ("none" if not r["anomalies"] else ""))
     lines += [f"    - {a}" for a in r["anomalies"]]
     return "\n".join(lines)
@@ -733,6 +873,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             reading["gate"] = gate_reading(all_orders)
         except Exception as exc:  # noqa: BLE001 -- the gate half is optional
             reading["gate"] = {"error": f"{type(exc).__name__}: {exc}"}
+        try:
+            reading["performance"] = performance(all_orders, today)
+        except Exception as exc:  # noqa: BLE001 -- the performance half is optional
+            reading["performance"] = {"error": f"{type(exc).__name__}: {exc}"}
     if not args.no_logs:
         cutoff = (now - dt.timedelta(minutes=args.log_minutes)).strftime("%Y-%m-%dT%H:%M:%S")
         plan_cutoff = (now - dt.timedelta(hours=PLAN_SERIES_H)).strftime("%Y-%m-%dT%H:%M:%S")

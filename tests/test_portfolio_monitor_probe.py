@@ -236,3 +236,33 @@ def test_an_unfilled_inplay_ioc_is_not_a_failed_order():
                       "position_key": "pregame:X", "contracts": None}
     flow = pm.order_flow([ioc, real, pregame_cancel], "2026-11-17", now)
     assert flow["inplay_ioc_unfilled"] == 1 and flow["failed_or_rejected"] == 2
+
+
+def test_bands_are_half_open_and_cover_the_ends():
+    assert pm._band(None, pm.EV_BANDS) is None
+    assert pm._band(-1.0, pm.EV_BANDS) == "ev<0" and pm._band(2.0, pm.EV_BANDS) == "ev 2-5"
+    assert pm._band(25.0, pm.EV_BANDS) == "ev>=20" and pm._band(0.30, pm.PRICE_BANDS) == "p.30-.45"
+    assert pm._band(0.999, pm.PRICE_BANDS) == "p>=.85"
+
+
+def test_perf_signals_flag_only_slices_beyond_noise_with_enough_events():
+    windows = {"last 30": {"roi_pct": -7.3, "roi_lo95_pct": -12.8, "roi_hi95_pct": -1.9, "events": 673}}
+    clv = {"last 30": {"clv_net_pp": -0.36}}
+    slices = {
+        "ev_band": [{"key": "ev 2-5", "roi_pct": -10.8, "roi_lo95_pct": -18.5, "roi_hi95_pct": -3.1, "bets": 953,
+                     "events": 502, "predicted_ev_pct": 4.1},
+                    {"key": "ev 5-10", "roi_pct": 5.7, "roi_lo95_pct": -9.8, "roi_hi95_pct": 21.3, "bets": 189,
+                     "events": 120, "predicted_ev_pct": 5.1}],
+        "sport": [{"key": "wnba", "roi_pct": -33.2, "roi_lo95_pct": -58.8, "roi_hi95_pct": -7.6, "bets": 22,
+                   "events": 9}],                     # beyond noise but too few bets: no signal
+        "market": [{"key": "h2h", "roi_pct": 9.0, "roi_lo95_pct": 1.0, "roi_hi95_pct": 17.0, "bets": 200,
+                    "events": 90}],
+    }
+    quartiles = [{"quartile": "Q4", "dollar_share_pct": 64.0, "roi_pct": -9.2, "roi_lo95_pct": -16.9,
+                  "roi_hi95_pct": -1.5}]
+    s = pm.perf_signals(windows, clv, slices, quartiles)
+    assert any(x.startswith("BOOK loses beyond noise") for x in s)
+    assert any(x.startswith("ev_band ev 2-5: loses") for x in s) and any(x.startswith("EV overstated in ev 2-5") for x in s)
+    assert not any("ev 5-10" in x for x in s) and not any("wnba" in x for x in s)
+    assert any(x.startswith("market h2h: wins beyond noise") for x in s) and any(x.startswith("SIZING") for x in s)
+    assert not any(x.startswith("CLV and results disagree") for x in s)    # both negative: they agree
