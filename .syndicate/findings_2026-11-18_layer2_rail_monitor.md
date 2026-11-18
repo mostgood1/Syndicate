@@ -397,3 +397,33 @@ lane `nba-midnight-bootstrap-hold`, user "Load it now", **BC-052, outside a wind
 
 **Dashboard:** row 7. I-26 is marked as the user's choice: fix day 1, retire day 2, queued for the 11-24 window. I-24 has an
 alternative-source session working.
+
+## Reading 8 — Wed 11-18 4:22 PM CST (22:22Z), full page
+
+**Fleet:** `a3104a5b6`, no new ff.
+- live-odds-worker is now pid 250752: `exited code=0 after 23442s -- restarting in 5s` (supervisor) around 2:36 PM CST. This is its own clean
+  recycle, not a deploy. Its in-process code is now `a3104a5b6`, including the day-2 look-ahead wait (default OFF).
+- Host load 4.6-5.7.
+
+**Slate: 7 live** (NCAAB Houston @ Florida H1; WNCAAB 6).
+- Flags: 3 shown, 0 false, 0 missed, 0 dark. P1: 2 college totals flags, 0 contradictions. P6: 0. #824: 0.
+- Live rows: 28, 9 priced <= 120 s (row age; a lower bound for college per #844).
+
+**Board: only 3 builds in 38 min.** 290 / 409 / 373 s, with CPU 260 / 385 / 346 s and off-CPU 7%. **Today's board was 730 s old at the read.**
+- At 4:23 PM the board child (74% CPU) shared the host with nice-0 batch jobs:
+  - `build_soccer_artifacts.py --league eredivisie --date 2026-11-22` at 99%;
+  - `refresh_odds_sources.py --sports wncaab` at 107%;
+  - `refresh_ncaab_odds_history.py` at 48%;
+  - `build_college_pregame_sims.py` at 98% (nice 15).
+- **Lead L-d:** per-build CPU tracks host load across today's readings: about 106-150 s at load 1-2, 240-385 s at about 5, and 500-600 s at 8-10.
+  Running non-urgent background builds at a lower priority (e.g. soccer artifacts for a date 4 days out) would protect
+  the 300 s board cadence. The evening's P2 readings add points before a session is proposed.
+
+**Overlay:** 0 gaps over 360 s (max NCAAB 98 s). Web merges 57, 6 stale (NCAAB).
+
+**Live odds lane:** 12 launched, 3 refused (20%). Live runs 3, max 248 s; pregame 472 s.
+- Look-ahead **798 s** (soccer 396 s). Still under this morning's 1,391-2,444 s, but up from 292-445 s.
+
+**Load (full page):** **`/intelligence` 22.1 s** (r4 9.0 s, r1 4.6 s); query 6.9 s; shortlist 2.4 s.
+
+**Team cards:** 0 defects.
