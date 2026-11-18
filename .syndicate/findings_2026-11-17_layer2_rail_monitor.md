@@ -1453,3 +1453,10 @@ points scored.
 - **Owner:** no lane claims `refresh_nhl_oddsapi.py` or `local_nhl_odds.py`. Proposed as a session card.
 - **Immediate mitigation:** none taken. Ending the stuck child early would free the lane ~10 min sooner; that is
   a production action for the user.
+
+- **USER DECISION ~8:25 PM CST (02:25Z): "Load it"**, answering "Let the 1:10 AM restart load the NFL re-sim seeds?".
+  - **Context:** lane ncaaf-grid-build-speed's refresh-worker TERM after 1:10 AM CST loads the fleet head
+    `3920a2d4d`. That carries #809, I-17 `923869cf3`, and `ee47c930a` NFL re-sim seeds (BC-041 yes). The seeds
+    lane had recorded that load as the user's call after TNF 11-19.
+  - **Relayed** to the TERM's lane (local_208683f1, delivered) and to the seeds lane's owner (local_997aa897,
+    queued). Nothing loaded by me.
