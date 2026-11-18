@@ -1452,6 +1452,7 @@ death, never life — do not invert it.
 ### nba-live-resim-total-anchor — OPEN — opened 2026-11-18 — session 7a9aef07-117a-4dfa-96b8-b401885c91ed
 - **ON MAIN `88193c0a7` 2026-11-18 ~12:35 PM CST** (user "Yes, push it"; cherry-pick of `7dfa1f7fa`; 160 NBA/WNBA live re-sim tests passed). **Default off, NOT LOADED.**
   - The lane stays open for the load, which is the user's call (betting change: yes).
+  - **QUEUED for the 2026-11-24 window** (08:00-13:00Z = Tue 2:00-7:00 AM CST; `.syndicate/betting_change_windows.md`, user rule 11-18). It is not a rule-5 exception: it is a model-accuracy fix.
   - It closes at the load's verification, or if the load is dropped.
 - **STATUS 2026-11-18 11:55 AM CST: GOAL MET ON THE BRANCH, NOT ON MAIN, NOTHING LOADED.** Branch `nba-live-total-anchor` = local `7dfa1f7fa` (pinned `refs/keep/nba-live-total-anchor-7dfa1f7fa`); findings `.syndicate/findings_2026-11-18_nba_live_total_anchor.md`.
   - **Hypothesis FALSIFIED:** the 0.7 pre-sim blend leaves the target 3.12 (se 0.33) UNDER the market. The engine then overshoots its own target by +4.83 (0.62), so the net is +1.71 over the close.

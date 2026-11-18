@@ -89,6 +89,9 @@
 - **Verify:** the same scripts give an sd ratio of 0.95-1.05 and a calibration slope >= 0.8. Kit `C:\tmp\elp\engine_read` (`totals_ladder.py`, `ladder_analysis.py`, `staleness.py`).
 
 ### `#834` — **NBA LIVE RE-SIM TOTALS START ~2 POINTS HIGH: its pregame total is +1.95 (se 0.77) above Kalshi's, and the gap shrinks with the time left. This is the engine read's NBA over-lean** `[2026-11-17, lane engine-learner; `.syndicate/brief_2026-11-17_engine_read_kalshi.md`]` — OPEN; owner: the NBA live re-sim (`syndicate/features/nba/live_resim.py`)
+- **QUEUED FOR THE 2026-11-24 BETTING-CHANGE WINDOW (08:00-13:00Z = Tue 2:00-7:00 AM CST)**, under the user's 11-18 rule "batch the betting changes into rare windows" (`.syndicate/betting_change_windows.md`, main `002a7e720`, effective 18:00Z).
+  - It is not an exception under rule 5: it is a model-accuracy fix, not a revert, a pure risk reduction or a broken money path.
+  - The load is still the user's yes. The steps are unchanged: ff >= `88193c0a7`, the env key, one drained `down`/`up`. Use preflight `--betting-change yes` and register it with `betting_change.py add --kind yes`.
 - **ON MAIN `88193c0a7` 2026-11-18 ~12:35 PM CST, user "Yes, push it"; DEFAULT OFF, NOT LOADED.**
   - It is the branch commit `7dfa1f7fa` cherry-picked onto main, with no intervening change to its files.
   - 160 NBA/WNBA live re-sim tests passed on the rebased code.

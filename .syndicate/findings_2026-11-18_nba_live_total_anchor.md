@@ -174,6 +174,12 @@ probit ladder fit), plus ONE step. Each evidence row's histogram goes through th
 
 ## 8. To load (the user's decision; betting change: yes)
 
+**Load window (since 2026-11-18 18:00Z):** under the user's rule "batch the betting changes into rare windows"
+(`.syndicate/betting_change_windows.md`), this load waits for the 2026-11-24 window, 08:00-13:00Z = Tue 2:00-7:00 AM
+CST.
+- It is not a rule-5 exception: it is a model-accuracy fix, not a revert, a pure risk reduction or a broken money path.
+- Preflight takes `--betting-change yes`.
+
 **Hold LIFTED, 2026-11-18 ~11:55 AM CST.**
 - **The decision:** the user's "Yes, lift it", typed in the decision-engine session (local_898e5510) and relayed from
   there. The question was "Lift the 11-22 load hold for the NBA total anchor (#834)?".
