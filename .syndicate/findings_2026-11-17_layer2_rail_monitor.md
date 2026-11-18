@@ -1602,3 +1602,34 @@ shortlist 4.7 s; chips 0.05 s; live-rail 0.02-0.22 s.
 scored.
 
 **Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less.
+
+## Reading 19 — Tue 11-17 10:08 PM CST (04:08Z 11-18)
+
+**Fleet:** unchanged. Web `3920a2d4d`; live-odds-worker 52087; refresh-worker 28948.
+
+**Slate: 13 live chips.**
+- NCAAB 7 (Montana St @ Gonzaga in H1).
+- WNCAAB 3.
+- NHL 2 (Dallas @ Vegas end P1; Calgary @ San Jose P2).
+- NBA 1 (Utah @ LA Clippers, end Q1): the last final, ~11:45 PM CST.
+
+**Flags: 17 shown, 0 false, 0 missed, 0 dark.** I-17 (P > 0.5): NCAAB 1 of 6 contradicts "ours".
+
+**Live rows: 401.** 52 priced <= 120 s; priced age p50 264 s.
+
+**I-22:**
+- The live odds lane is flowing: since 03:35Z, 14 sweeps launched and **1 refused**.
+- An NHL odds child (pid 235828) at 39 s was in `hrtimer_nanosleep`, a normal rate-limit sleep, not the hang.
+
+**Overlay (33 min): 0 gaps over 360 s** (max NBA 271 s).
+- Ticks 69, gap max 147 s. 0 `deferred_slow`.
+- Web merges: every live sport fresh 86 / 86. NCAAF 86 stale, but no NCAAF game is live (the lull pattern).
+
+**Board builds:** 506 s, 567 s, 417 s, **300 s** (04:08:43Z), easing toward the calm 82-150 s.
+
+**Load:** query 4.7 s / 3.60 MB / 19.9 MB; shortlist 0.84 s; chips 1.06 s; live-rail 0.03-0.22 s.
+
+**#824:** 0 of 8 college join lines since 03:35Z carry the reason. 0 of 10 college totals flags below the points
+scored.
+
+**Team cards:** 0 flipped, det1 / det2 / det3 0 / 0 / 0, 0 chip-less.
