@@ -3483,3 +3483,12 @@ as a verdict.
   - Before you name a caller from a log, check the request's user agent and its hour-of-day distribution against the nightly suite and session test runs.
   - A client whose default base URL is the fleet is reachable from the test suite. Pin it in `tests/conftest.py` at import, not in a fixture, because threads outlive tests.
   - A fixture date (June, September) asked of production in November is the signature of a test.
+
+## 2026-11-17 — REPEAT of the 2026-09-17 FORBIDDEN (`git worktree prune` from a session) `[lane render-name-cleanup, session ac50ee6a]`
+- **What happened:** I made a throwaway worktree at HEAD to show a test failure was pre-existing, removed it with `git worktree remove --force <path>` (which was enough), then chained `&& git worktree prune`. It tried to delete 20 OTHER sessions' stale `.git/worktrees/*` records; Windows refused every one (Permission denied), and `prune` still exited 0. Verified afterwards: the records are still present.
+- **Rule (unchanged):** `git worktree remove <your path>` and nothing else. A `&&`-chained cleanup line is where the forbidden step slips in, because it reads as tidying.
+
+## 2026-11-17 — RULE: a `Files:` scope note must hold no comma and no backticked path, or the claim parser splits or invents claims `[lane render-name-cleanup, session ac50ee6a]`
+- **Believed:** `` `a.py` (`f` , `g` and their call sites ONLY) `` declares one section-scoped claim.
+- **Measured (`lane_claims.sections_are_disjoint`, `check_lane_invariants.py`):** the parser splits a Files segment on EVERY comma, so the comma inside the parentheses left `a.py` with NO recognised section, and a co-holder's section-scoped claim on the same file became a contest (`sections_are_disjoint` -> None). Separately, a scope note that quotes another path in backticks (`` `CLAUDE.md` (the `syndicate/app.py` line ONLY) ``) is parsed as a CLAIM on that path with that scope, which silently replaced my real scope for `syndicate/app.py`.
+- **Rule:** join scope items with "and", never commas; never put a backticked path inside a scope note. Check with `py -3 -c "import sys; sys.path.insert(0,'.claude/hooks'); import lane_claims as lc; print(lc.sections_are_disjoint(open('.syndicate/lanes.md',encoding='utf-8').read(), '<slug>', '<path>'))"` before relying on a shared-file claim.

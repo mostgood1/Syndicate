@@ -7,8 +7,10 @@ stop. It now names three, because the invariant is **CHECKABILITY, not
 remoteness** — every incident behind the old wording came from a mirror that was
 PARTIAL and whose partiality was INVISIBLE.
 
-- **`render`** — the served payload, `/api/ops/artifacts/*`, the live env-vars
-  API. The ONLY substrate that answers *what is true right now*.
+- **`fleet`** (`render` until 2026-11-17, when `model_engine_standard.md` §3b was
+  relabelled in `abb0f192a`; read an older `render` citation as "production at the
+  time") — the served payload at `http://127.0.0.1:10000`, `/api/ops/artifacts/*`,
+  each role's running env. The ONLY substrate that answers *what is true right now*.
 - **`mirror:<manifest_id>`** — admissible only when the day was synced by
   `mirror_manifest.py`, `verify --date <D>` passes **TODAY**, and the question is
   in the reproducible class. **Cite the id.**
