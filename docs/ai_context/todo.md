@@ -15,6 +15,7 @@
   - Look 1 is skipped if arm A has fewer than 200 events.
 - **Write each look to `.syndicate/findings_fanduel_lead_forward_reads.md`.** Close the lane at the final verdict.
   - On KILL or REAL_NOT_ACTIONABLE, note the result where the decision engine's steam expert is planned.
+- **SCHEDULED 2026-11-17 (user: "Schedule them"):** one-time tasks `fanduel-forward-look1-1216` (2026-12-16 10:00 AM CST), backup `fanduel-forward-look1-backup-1217` (12-17 10:00 AM), `fanduel-forward-look2-0113` (2027-01-13 10:00 AM), backup `fanduel-forward-look2-backup-0114` (01-14 10:00 AM); all enabled, saved in bypassPermissions (read from the app registry). Each stops if its look is already in `findings_fanduel_lead_forward_reads.md`. A task listing proves dispatch, not execution: the look is done only when that section exists. If the registry is wiped (as on 10-28), run the commands above by hand.
 - **Do not** look at forward data before look 1. Do not change the bet definition. A bug fix is a dated amendment to the registration, committed before the read.
 
 ### `#832` — **THE LAYER 2 BOARD BUILD RAN 2-14x SLOWER IN THE LIVE EVENING BECAUSE IT SHARED ONE INTERPRETER LOCK WITH THE BOOK-GRID TICK AND THE VENUE ODDS LOOP: in the 165.6 s 11-18 overview stage (7:51-7:54 PM CST 11-17) the board thread got 0.19 of a core (tick 0.41, venue odds loop 0.36, runqueue wait ~0.03). A switch that runs the board loop in its own process is ON MAIN `09eddabf2`, NOT LOADED** `[2026-11-17, lane layer2-board-process-split, rail monitor I-20]`
