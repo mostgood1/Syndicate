@@ -89,6 +89,14 @@
 - **Verify:** the same scripts give an sd ratio of 0.95-1.05 and a calibration slope >= 0.8. Kit `C:\tmp\elp\engine_read` (`totals_ladder.py`, `ladder_analysis.py`, `staleness.py`).
 
 ### `#834` — **NBA LIVE RE-SIM TOTALS START ~2 POINTS HIGH: its pregame total is +1.95 (se 0.77) above Kalshi's, and the gap shrinks with the time left. This is the engine read's NBA over-lean** `[2026-11-17, lane engine-learner; `.syndicate/brief_2026-11-17_engine_read_kalshi.md`]` — OPEN; owner: the NBA live re-sim (`syndicate/features/nba/live_resim.py`)
+- **USER "Yes, in 11-24" (2026-11-18 ~12:50 PM CST): load in the 11-24 window. SCHEDULED** as three one-time tasks (saved in Bypass mode):
+  - `nba-total-anchor-load-1124` (Tue 11-24 2:20 AM CST). It loads the key with claims, a drained full `down`/`up`, preflight `--betting-change yes`, deploys.md and `betting_change.py add`.
+    - It stops if outside the window, if the load is already done, or if under 75 min of the window remain.
+    - It waits on deploy claims, so it runs after task `nfl-level-refit-load-1120` (2:15 AM: ff + refresh-worker TERM, same window).
+    - Its only recovery is a restore of the env backup.
+  - `nba-total-anchor-load-1124-backup` (4:45 AM CST) runs only if the first did not.
+  - `nba-total-anchor-verify-1124` (9:30 PM CST, read-only) checks the first live ticks (`total_anchored=` and history offsets vs close - pregame total) and closes the lane if MET.
+  - If the app's scheduler wipes them (as on 10-28), run the load by hand in a window per findings §8.
 - **QUEUED FOR THE 2026-11-24 BETTING-CHANGE WINDOW (08:00-13:00Z = Tue 2:00-7:00 AM CST)**, under the user's 11-18 rule "batch the betting changes into rare windows" (`.syndicate/betting_change_windows.md`, main `002a7e720`, effective 18:00Z).
   - It is not an exception under rule 5: it is a model-accuracy fix, not a revert, a pure risk reduction or a broken money path.
   - The load is still the user's yes. The steps are unchanged: ff >= `88193c0a7`, the env key, one drained `down`/`up`. Use preflight `--betting-change yes` and register it with `betting_change.py add --kind yes`.
