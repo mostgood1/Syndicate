@@ -1641,6 +1641,15 @@ death, never life — do not invert it.
 - Files: scripts/soccer_season_audit/understat_staleness_backtest.py (NEW), scripts/soccer_season_audit/understat_staleness_simcheck.py (NEW), scripts/soccer_season_audit/understat_players_fallback.py (NEW), .syndicate/findings_2026-11-18_understat_fallback_backtest.md (NEW), .syndicate/state_soccer.md (the [soccer-understat-outage] section ONLY), docs/ai_context/todo.md (one new item ONLY), scripts/build_soccer_artifacts.py (_load_team_ratings + NEW _understat_splice helpers ONLY, default-OFF switch SYNDICATE_SOCCER_UNDERSTAT_SPLICE, added 2026-11-18 3:37 PM CST before any edit), tests/test_soccer_understat_splice.py (NEW)
 - Status: CLOSED 2026-11-18 4:51 PM CST. Pre-registration (`13d4bb9f2`) and the full results line moved verbatim to `lanes_history.md`; narrative in `log/2026-11-18.md`.
 - Blocked by: none
+
+### layer2-suggested-grader — OPEN — opened 2026-11-18 — session ab77b427-6b1c-4647-b576-7308915d860f
+- Goal: A daily grader of the Layer 2 board's SUGGESTED set (earliest sg=true sighting per identity per phase), by sport and market, per day and 28-day rolling, built on the scorecard's own grader + settlers (score_ranking_backtest.grade_rows / bucket_search.grade_population), on main with tests; its results JSON on the fleet data root in the rail monitor's board-results row shape; findings with per-family coverage and the comparison with the scorecard's published and staked sets
+- Files: scripts/grade_suggested_set.py, tests/test_grade_suggested_set.py, .syndicate/findings_2026-11-18_suggested_set_grade.md
+- Hypothesis: Over the fleet's whole sg history (sg stamped from 2026-10-13), the suggested set's flat-unit ROI per bet is HIGHER than the scorecard's published (recommended) set over the same 28-day windows, in each sport with >= 60 graded games, and pooled across sports the game-clustered 95% interval of suggested ROI lies above the published set's point estimate
+- Falsification test: Pooled suggested ROI per bet <= published ROI per bet over the same window, or the suggested 95% interval contains the published point estimate (no separation beyond noise); per sport, any sport with >= 60 games where suggested <= published is reported as a falsifying slice
+- Verification: Grader run read-only (nice 19) over the fleet's recorder history writes reports/model_scorecard/suggested_set_*.json under ~/syndicate-prod/data; the 11-02 findings' pooled 10-17..11-01 reading (5,353 bets / 551 games, -1.1% per bet) is reproduced within rounding by the new grader before any new number is trusted; tests pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
