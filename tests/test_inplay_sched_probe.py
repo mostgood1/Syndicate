@@ -143,6 +143,24 @@ def test_run_sleeps_until_start():
     assert [json.loads(x)["event"] for x in fh.getvalue().splitlines()] == ["start", "stop"]
 
 
+def test_wait_for_start_survives_a_host_suspend():
+    # A Windows sleep does not count suspended time: a sleep(s) that spans a 300 s nap returns s + 300 s of wall
+    # clock later. One long sleep would then start the probe 300 s late; the chunked wait must start it on time.
+    clock = FakeClock(0.0)
+    chunks = []
+
+    def sleep(s):
+        chunks.append(s)
+        clock.t += s + (300.0 if len(chunks) == 1 else 0.0)
+
+    a = SimpleNamespace(start="1970-01-01T00:16:40Z", until="1970-01-01T00:16:40Z", n=1, period=10.0,
+                        priority="idle", out="unused")
+    probe.run(a, get=lambda u: ({"markets": []}, {}), clock=clock, sleep=sleep,
+              busy=SimpleNamespace(read=lambda: None), out_fh=io.StringIO(), prio=lambda: (0x40, 2))
+    assert clock.t == 1000.0  # on time, not 1300
+    assert max(chunks) <= 60.0
+
+
 def _write(p: Path, rows):
     p.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
 

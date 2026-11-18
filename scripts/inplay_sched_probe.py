@@ -138,8 +138,10 @@ def run(a, get=get_json, clock=time.time, sleep=time.sleep, busy=None, out_fh=No
         prio=read_priority) -> int:
     start = _ep(a.start) if a.start else clock()
     until = _ep(a.until)
-    if clock() < start:
-        sleep(start - clock())
+    # Wait for --start in short chunks against the wall clock: a Windows sleep does not count time the host spends
+    # suspended, so one 8-hour sleep across a Modern Standby nap would start the probe late by the nap's length.
+    while clock() < start:
+        sleep(min(60.0, start - clock()))
     tickers = pick_tickers(a.n, get=get)
     url = KALSHI + "?limit=100&tickers=" + ",".join(tickers)
     busy = busy or HostBusy()
