@@ -951,3 +951,36 @@ No `as_of` is in the future. A game was live: the probe found a `live_row` ask. 
 - 2e: The newest deploys.md header is 02:46:25Z (8:46 PM CST), "OPS, NO DEPLOY": a hung `refresh_nhl_oddsapi.py` child was killed. That is a process kill, not a code or env load, so live pricing is unchanged. There is no FLEET ff, DEPLOY or role restart in the last 40 min.
 
 - **ANOMALY:** One overlay warm took 68.32 s, over the 60 s line. Three of 44 warms went past 45 s, and 1 `GET /api/board/live-rail` request went past 45 s. Next: check the web log for the warm's timestamp and whether it lines up with the 8:46 PM NHL odds child kill or with a hard recycle. 17 of 20 recycles were hard, and max anon was 1152 MB against a 649 MB limit.
+
+## Reading 23 (9:35 PM CST)
+
+**Ask** (probe 9:35 PM CST, file `ask_reading_20261118T033509Z.json`): 6 / 6 answered, 0 past the 45 s cut-off, median 6.34 s, max 6.78 s. Page 200 in 0.07 s.
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text (spread) | 6.53 | yes | bet_analysis | 2026-11-18T02:01:14Z | 0 |
+| free_text (Lakers vs Celtics) | 6.78 | yes | matchup_analysis | 2026-11-18T02:01:14Z | 0 |
+| free_text (top edges) | 6.34 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NBA h2h) | 6.05 | yes | bet_analysis | 2026-11-15 (date) | 2 |
+| pregame_prop (NBA) | 2.48 | yes | bet_analysis | 2026-11-18T00:33:24Z | 7 |
+| live_row (NHL total) | 6.34 | yes | bet_analysis | 2026-11-16 (date) | 2 |
+
+A game was live: a `live_row` ask exists (Ducks @ Blues). No `as_of_in_future`.
+
+**Web, 9:05-9:35 PM CST** (265 requests):
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 19 (16 hard), max anon 999.7 MB vs limit 648.7 MB.
+- Overlay warms: 45, median 11.41 s, 8 over 20 s, 0 over 45 s, 0 over 60 s, max 43.56 s.
+- Requests over 20 s: 0; over 45 s: 0.
+- Asks from any client: 12, 0 over 45 s, 0 non-200; 0 not this probe's (all 12 `Python-urllib`: this probe and the 9:05 one).
+
+**Host:** load 5.57 / 3.88 / 4.19 on 12 cores; MemAvailable 6433 MB. Top CPU: refresh-worker 94% (ni 0, 4.6 GB RSS), live-odds-worker 73% (ni 0), soccer props fetch 68% (ni 0), 2x live_resim_workers 43% (ni 5), gunicorn web workers 42% / 21% (ni 0), refresh_odds_job 40% (ni 0).
+
+**Engine:**
+- 2a: F2 task has 1 run (10:30-11:17 AM CST, NOT PASSED, recorded `c765eec64`); no newer run.
+- 2b: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c: `m2_gate.py` sha256 `c1a2c029c2a1816f...` (Amendment 2), unchanged.
+- 2d: 0 engine-file commits on origin/main in the last 40 min.
+- 2e: newest deploys.md header is 8:46 PM CST (ops kill of a hung NHL odds child, no deploy); no fleet ff / deploy / restart in the last 40 min.
+
+No anomaly.
