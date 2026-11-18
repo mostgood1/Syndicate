@@ -3253,6 +3253,14 @@ def _launch_inplay_capture_autoruns(source: str) -> None:
             _launch_autorun_nfl_lines_refresh()
         except Exception as exc:  # noqa: BLE001
             print(f"[live_odds_worker] NFL_LINES_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
+        # NHL's in-play player props on their own clock (lane nhl-inplay-props-drop): before this, they rode
+        # only the shared live sweep, slower than the overlay's 300 s window. Absent = OFF (it spends credits).
+        try:
+            from syndicate.features.nhl.inplay_props_lane import launch_autorun_nhl_inplay_props
+
+            launch_autorun_nhl_inplay_props()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[live_odds_worker] NHL_INPLAY_PROPS_AUTORUN_ERROR source={source} {type(exc).__name__}: {exc}", flush=True)
 
 
 def _inplay_capture_background_loop() -> None:
