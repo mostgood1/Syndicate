@@ -1,5 +1,34 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#836` — **LIVE RE-SIMS GO STALE AT THE END OF GAMES: in the last 5% of game time, a state older than 30 s loses to Kalshi by 0.11-0.26 nats while a fresher one beats it** `[2026-11-17, lane engine-learner; `.syndicate/brief_2026-11-17_engine_read_kalshi.md`]` — OPEN; owner: the live re-sims' refresh cadence (`syndicate/features/<sport>/live_resim.py`) and the live evidence log
+- **Evidence** (dev 11-09..11-14 ex 11-12, 54,173 line-instants; state age = the line's tick minus its evidence row's tick):
+  - typical state age, p50 / p90: NBA 69-76 / 130-144 s (95 / 163 s in the last 5%), NCAAF 104-113 / 208-269 s, NHL 39-63 / 70-102 s;
+  - re-sim minus Kalshi log loss in the last 5% of game time: state <= 30 s old -0.048 (se 0.019, 62 line-instants), 30-60 s +0.208 (0.080), 60-120 s +0.109 (0.075), > 120 s +0.264 (0.078);
+  - before 95% of game time the gap barely depends on age (+0.01 to +0.06 in every age bin).
+- **Knobs:** refresh the re-sim faster in the last 5% (about the last 3 minutes); or refuse a live opinion or bet there when its state is older than 30 s.
+- **Verify:** the 95-100% rows of a later engine read. Kit `C:\tmp\elp\engine_read` (`totals_ladder.py`, `ladder_analysis.py`, `staleness.py`).
+
+### `#835` — **NCAAF LIVE RE-SIM TOTALS ARE OVER-CONFIDENT: their spread of final totals is ~20% narrower than Kalshi's at every stage, their centre wanders 3-4 pts, and in slow games they expect a catch-up Kalshi does not** `[2026-11-17, lane engine-learner; `.syndicate/brief_2026-11-17_engine_read_kalshi.md`]` — OPEN; owner: the NCAAF live re-sim (`syndicate/features/ncaaf/live_resim.py`)
+- **Evidence** (dev 11-14, 26 games, 630 game-instants with a fittable Kalshi strike ladder; Kalshi's centre and spread from a probit fit of its ladder at the same instant):
+  - the re-sim's sd over Kalshi's, median: 0.85 at 0-25% of game time, 0.81, 0.84, then 0.75 at 75-95%. Mean sd 12.8 vs 15.1 points at 0-25%;
+  - median |re-sim centre - Kalshi's|: 4.0 pts at 0-25% (p90 9.4), 3.0, 2.9, 2.5;
+  - slow games (pace 41% under Kalshi's pregame total; 182 rows, 13 games): the re-sim projects the rest of the game 9.7% over the pregame rate, Kalshi 2.0%. Weight on the pace so far: re-sim -0.14 (se 0.07), Kalshi -0.02 (0.05).
+- **What it costs:** in the engine read, calibration slope 0.41 against Kalshi's 1.35, and log loss +0.077 (se 0.054).
+- **Knobs:** widen the final-total distribution about 1.2x (its scoring variance); check how the rest-of-game rate reverts toward the pregame total in slow games.
+- **Thin:** one Saturday. Re-check on 11-21's data after M2's 11-24 read.
+- **Verify:** the same scripts give an sd ratio of 0.95-1.05 and a calibration slope >= 0.8. Kit `C:\tmp\elp\engine_read` (`totals_ladder.py`, `ladder_analysis.py`, `staleness.py`).
+
+### `#834` — **NBA LIVE RE-SIM TOTALS START ~2 POINTS HIGH: its pregame total is +1.95 (se 0.77) above Kalshi's, and the gap shrinks with the time left. This is the engine read's NBA over-lean** `[2026-11-17, lane engine-learner; `.syndicate/brief_2026-11-17_engine_read_kalshi.md`]` — OPEN; owner: the NBA live re-sim (`syndicate/features/nba/live_resim.py`)
+- **Evidence** (dev 11-09..11-14 ex 11-12, 37 games, 1,939 game-instants; Kalshi's implied total from a probit fit of its strike ladder at the same instant):
+  - re-sim minus Kalshi: +1.78 pts (se 0.40) at 0-25% of game time, +1.24 (0.42) at 25-50%, +1.10 (0.43) at 50-75%, +0.02 (0.23) at 75-95%;
+  - at the first row <= 3% elapsed: +1.95 (0.77, 32 games);
+  - median |gap| 2.3-2.6 pts (p90 ~6): a steady offset, not noise.
+- **Not pace:** neither side follows the pace so far (weight on it: re-sim -0.02, se 0.02; Kalshi -0.08, se 0.03). The re-sim's rest-of-game rate sits about +1.0% above Kalshi's at any pace.
+- **The spread is fine:** 1.05-1.09x Kalshi's.
+- **What it costs:** engine-read NBA totals log loss +0.034 (se 0.008) against Kalshi; in >= 5pp disagreements the outcome moved against the re-sim, -3.7pp (se 2.6).
+- **Knob:** the NBA live re-sim's pregame total or scoring rate. Anchor it to the market's pregame total, or scale it about -1%.
+- **Verify:** the same scripts give a 0-25% gap within +/-0.5 pts. Kit `C:\tmp\elp\engine_read` (`totals_ladder.py`, `ladder_analysis.py`, `staleness.py`).
+
 ### `#833` — **THE CHEAT SHEETS' 15-MINUTE BOARD PULL TOOK THE WHOLE 69 MB QUERY. `SyndicateCheatSheetPicks` (and the full build) now ask for `row_refs` and rebuild the cards: 69,000,099 -> 24,516,064 B per call, identical cards** `[2026-11-17, lane cheat-sheet-picks-row-refs; layer2-rail-monitor I-16]` — ON MAIN `aaff7fb04`; **NOT LOADED** (next fleet ff, the user's decision)
 - **Why:** `scripts/build_cheat_sheets.py` `fetch_board_cards` POSTed `/api/intelligence/query` with no `row_refs`. Python-urllib sends no Accept-Encoding, so each call took the whole body. Web's workers recycle on memory about once every 10 requests. The task runs 96 times a day.
 - **Measured on the fleet 2026-11-18 02:40Z, one board state** (both flag-off reads hashed `5d40df14`): 69,000,099 B / 17.6 and 12.6 s flag off; 24,516,064 B / 4.8 s with `row_refs`.
