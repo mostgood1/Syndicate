@@ -260,3 +260,40 @@ chips 0.8 s; live-rail 0.09 s.
 **Dashboard:** the user asked for a live dashboard like the portfolio monitor's: "Rail Watch",
 https://claude.ai/artifact/HoJ2n52ewHZnVDbN2LpxaJ. Each reading re-uploads `readings.json`, `findings.json` and
 `loads.json` (rows built by `C:\tmp\railmon\dash\dash_update.py` from the probe plus `dash\d4metrics.py`).
+
+## Reading 4 — Wed 11-18 1:49 PM CST (19:49Z), full page
+
+**Fleet:** `db6a395ed`, no new ff. Host load 1.6-2.7 (it was 7-10 at 12:33-1:14 PM).
+
+**Slate:** 5 live of 139.
+- Flags: 1 shown, 0 false, 0 missed, 0 dark.
+- P1: 1 college totals flag, 0 contradictions. P6: 0. #824: 0.
+
+**Live rows:** 16. 5 priced <= 120 s.
+
+**Overlay:** 0 gaps over 360 s (max WNCAAB 80 s). Web merges 24, 0 stale. **A-2 cleared.**
+
+**Board: 7 builds, wall 134-308 s, median 179 s.** Per-build CPU fell **602 -> 274 -> 165 -> 152 -> 131 -> 151 -> 120 -> 106 s**
+(11:11 AM to 1:48 PM). There was no board-child restart (pid 152953 up 4.2 h) and no code change.
+
+**CORRECTION to reading 3's A-1:** "the build's own work growing, not contention" is **WITHDRAWN.**
+- Per-build CPU tracked host load (8-10 then, ~2 now). On this host (SMT; the I-20 session measured 56-64% of nominal
+  clock), CPU time per unit of work inflates under contention even while the thread stays on-CPU. So a low off-CPU % does
+  not rule contention out.
+- The session card "Find why the board build's CPU grows 5x through the day" (task_88c5176a) was **withdrawn** before
+  anyone started it.
+- **Lead L-c:** at 1:10 PM, nice-0 whole-log `awk`/`grep` scans of `refresh-worker.log` (not this lane's; mine run at
+  nice 19) used 55-79% of a core each. Other sessions' replays were active 12:30-1:15 PM. Not attributed per process yet.
+- P2's evening reading has to state the host load beside the board times.
+
+**Live odds lane:** 7 launched, 1 refused (12.5%). Live runs 4: p50 118 s, max 137 s. Pregame run max 454 s. No NHL odds child running.
+
+**Load (full page):** `/intelligence` 9.0 s; query 5.0 s; shortlist 0.9 s. Today's board was 171 s old.
+
+**Team cards:** 0 defects.
+
+**From the soccer lane's side sessions** (local_68526c0a, reported 1:4x PM). These went into the dashboard's improvements as I-24..I-26:
+- **I-24:** Understat has been down since 11-03. The big-5 soccer leagues are priced on history frozen at 10-31.
+- **I-25:** NBA history is duplicated by a game-id format mismatch: 1,563 rows for 196 games, Elo shifted 119 points on average.
+  The fix `4178ba866` is off by default.
+- **I-26:** the day-2 look-ahead was refused 115 of 127 times.
