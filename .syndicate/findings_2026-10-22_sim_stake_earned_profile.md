@@ -383,3 +383,39 @@ the floor by then. Re-ask then only if a cell passes the beta > 0 gate.
 **Verdict.** H-EARN-POOLED still FALSIFIED at 41 dates. The new fact: NBA spreads_alt now has enough held-out data (269 rows / 36 events) and its train-picked beta 0.40 does NOT beat market on the hold-out (dFit CI [-0.011, +0.015]); the raw sim loses there too. **Recommendation: keep the current live file** (publishing changes only the order provenance label); the user's call, as on 11-02.
 
 **Next refit.** Measured 11-01 -> 11-12 pace (11 days) of held-out growth, slower than s11 projected: ncaaf h2h +20 test rows (needs +4: the 11-14/15 slate); nfl receptions +78 rows / +15 events (needs +24 rows / +2 events: ~4 days, the 11-16 Sunday); nba totals_alt needs +2 test events (~2-3 days); ncaaf totals +13 rows (needs +31: ~26 days, about 12-08, likely past the NCAAF regular season, so it may never fill in phase `regular`). **Next refit: 2026-11-18** (after the 11-14/15 NCAAF and 11-16 NFL slates settle). The diagnostic CIs give no sign a beta>0 cell is coming; the refit is about the floor, not an expected change.
+
+## s13. REFIT 2026-11-18T16:22:27Z (10:22 AM CST): the VENUE-POOLED fit again -- still 0 beta>0; THREE cells now market_only (ncaaf spreads, ncaaf h2h, nhl assists); four cells clear the floor and all FAIL the CI rule; shadow $0.00 by construction `[session 86fb3c40, on the user's "yes, archive them and run both checks" relayed verbatim by the fleet watcher local_379fd729, ~10:00 AM CST]`
+
+**Run.** Fleet `~/Syndicate` at `cdab875d5` (contains writer `0f4363b9`: `writer_present`), fleet venv, `nice -n 19`, keyvalue ledger read OK (no exit 4), 16:21:02Z..16:24:19Z. Outputs in `~/syndicate-prod/data/reports/staked_probability/`: `coverage_pooled_2026-11-18.json`, `fit_pooled_2026-11-18.json`, `candidate_pooled_2026-11-18.json`, `fit_pooled_diagnostic_2026-11-18.json`. `calibration/staked_probability_profile.json` NOT touched (mtime still 2026-10-22 17:16 CDT).
+
+**What it rests on.** execution_ledger records 55,570 -> **13,081 usable rows / 1,634 events, 2026-10-02..11-17** (cells span up to 46 dates; 11-12: 10,512 / 1,347 / 41). Dropped: not_portfolio_book 37,750, no_model_edge_pct 2,795, no_ev_pct 865, unsettled 800, push 143, no_price 131, model_out_of_range 5. Per-family coverage (rows / events / dates) near the floor: ncaaf spreads 1,428 / 319 / 45; ncaaf h2h 733 / 234 / 46; ncaaf totals 628 / 219 / 44 (last 11-14); nba spreads_alt 1,077 / 192 / 28; nba totals_alt 881 / 179 / 28; nba player_points 576 / 146 / 28; player_assists 556 / 137 / 28; player_rebounds 468 / 134 / 28; player_threes 331 / 121 / 28; nfl receptions 653 / 95 / 44; nhl assists 697 / 211 / 40; nhl sog 596 / 218 / 41; nhl points 536 / 193 / 35; soccer h2h 206 / 123 / 34. Full table in the coverage JSON.
+
+**Verdicts, 138 cells:** market_only 3, refused_does_not_beat_beta0 4, refused_n_test_events_below_floor 1, refused_n_test_below_floor 108, refused_no_chronological_split 22. **beta>0 written: 0.**
+
+| cell | train / test rows / test events | beta [CI] | dFit [95% CI] | dB1 | verdict |
+|---|---|---|---|---|---|
+| ncaaf spreads full regular | 990 / 438 / 133 | 0.00 [0, 0.10] | 0 | -0.0173 | **market_only** (written) |
+| ncaaf h2h full regular | 506 / 227 / 104 | 0.00 [0, 0.30] | 0 | -0.0021 | **market_only** (written, NEW) |
+| nhl assists full regular | 465 / 232 / 62 | 0.00 [0, 0.00] | 0 | -0.0132 | **market_only** (written, NEW) |
+| nba spreads_alt full regular | 752 / 325 / 49 | 0.45 [0, 1.00] | -0.0031 [-0.0093, +0.0037] | -0.0104 | refused: does not beat beta 0 |
+| nba totals_alt full regular | 605 / 276 / 51 | 0.30 [0, 0.75] | -0.0045 [-0.0090, +0.0000] | -0.0194 | refused: does not beat beta 0 |
+| nba player_points full regular | 359 / 217 / 47 | 0.45 [0, 0.95] | -0.0056 [-0.0140, +0.0028] | -0.0168 | refused: does not beat beta 0 |
+| nhl sog full regular | 396 / 200 / 55 | 0.15 [0, 0.65] | -0.0010 [-0.0029, +0.0010] | -0.0134 | refused: does not beat beta 0 |
+| nfl receptions full regular | 445 / 208 / 27 | (0.00 diag) | 0 | +0.0100 | refused (events 27 < 30) |
+
+(dFit = Brier_beta0 - Brier_fit on the hold-out; dB1 = Brier_beta0 - Brier_beta1, so dB1 > 0 means the raw sim beats market.) Every cell whose train fit picked beta > 0 did WORSE than market on the hold-out (all four point dFit < 0).
+
+**Diagnostic (floor waived, never written), 11 more cells:** nba player_assists (172 / 34), player_rebounds_assists (54 / 28), player_rebounds (173 / 44), player_threes (118 / 40); ncaab h2h (52 / 45), spreads (84 / 59), totals (71 / 46); ncaaf totals (190 / 86); nhl points (177 / 65); soccer h2h (66 / 46), totals (58 / 44). **No held-out dFit 95% CI excludes 0 from above in any of the 19 fitted cells.** One excludes it from BELOW: nba player_rebounds, dFit -0.0015 [-0.0029, -0.0001] (the train-picked beta is significantly worse than market). The raw sim beats market on the hold-out (dB1 > 0) in 4 of 19: nfl receptions +0.0100, soccer totals +0.0116 (58 rows), ncaab spreads +0.0054 (84 rows), nhl points +0.0014.
+
+**Candidate vs live.**
+- Live: `staked_probability_pooled_v1@2026-10-22T21:45:48Z`, 1 cell `ncaaf|spreads|full|regular` market_only.
+- Candidate: `staked_probability_pooled_v1@2026-11-18T16:22:27Z`, 3 cells, all market_only, beta 0: `ncaaf|spreads|full|regular` (kept), **`ncaaf|h2h|full|regular` and `nhl|assists|full|regular` (NEW)**. Changed betas 0 (0 -> 0), dropped 0.
+- **Unlike 11-01 and 11-12, the candidate is NOT only a new label: it adds two market_only cells. Neither changes a stake on the fleet as configured.**
+
+**Shadow stake change: $0.00 by construction, in every role.** No candidate cell has beta > 0. `StakedProbabilityProfile.staked_basis` (`syndicate/features/shared/staked_probability_profile.py:239`) returns BLEND only for a fitted cell; for a market_only or an absent cell it returns the same basis, decided by the mode alone, except under `market_only_cells`. Fleet env read right after the fit (~16:25-16:30Z) from `/proc/<pid>/environ` (key names only): refresh-worker 5/5 processes `SYNDICATE_STAKED_PROBABILITY_UNFITTED=market` (market_only and unfitted both -> market); live-odds-worker 6/6 and web 3/3 carry NO key (absent = `raw`, and under `raw` market_only and unfitted both -> raw). No role runs `market_only_cells`, the only mode in which a market_only cell differs from an absent one. No seam probe run: there is no beta>0 cell to probe. Publishing would change only the order provenance label.
+
+**Verdict.** H-EARN-POOLED still FALSIFIED at 13,081 rows. New facts: four cells now have enough held-out data to judge (nba spreads_alt, totals_alt, player_points; nhl sog); in all four the train-picked beta LOSES to market on the hold-out. **Recommendation: keep the current live file** (nothing a stake reads would change); the user's call, as on 11-02 and 11-15.
+
+**Lead (not acted on, outside this lane):** live-odds-worker carries no `SYNDICATE_STAKED_PROBABILITY_UNFITTED`, so any model-edge order it sizes stakes the RAW sim, while refresh-worker stakes market fair. Whether live-odds-worker sizes model-view rows through this seam at all was not checked here.
+
+**Next refit.** Pace 11-12 -> 11-18 (6 days) on total cell rows: nba ~+22 rows/day per prop family, nhl points ~+18/day, nfl receptions +13 events in 6 days, ncaaf totals ~+13/day. Needed: nfl receptions +3 test events (~+10 total events: the 11-22/23 NFL weekend); nba player_rebounds +27 and player_assists +28 test rows (~4 days); nhl points +23 test rows (~4-5 days); ncaaf totals +10 test rows (the 11-21 slate). **Next refit: about 2026-11-25** (after the 11-21/22 NCAAF and 11-22/23 NFL slates settle). The diagnostic gives no sign a beta>0 cell is coming; NFL receptions (raw sim beats market on the hold-out, +0.0100) is the one to watch once it clears the event floor.
