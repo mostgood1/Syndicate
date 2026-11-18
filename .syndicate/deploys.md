@@ -61917,3 +61917,7 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 
 - **Off switch:** `SYNDICATE_SOCCER_LOOKAHEAD_DATE_ANCHOR=off` in `local_production.env` + a drained `down`/`up` (the child reads env at launch, and env is built at `up`).
 - The user's go-ahead, quoted: "Load it now" (this session). The same yes was relayed by two sessions ("load the soccer fix", "load the soccer look-ahead fix too").
+
+## 2026-11-18 18:35Z (12:35 PM CST) -- CORRECTION (no deploy) to the 18:20Z reading (lane `odds-lane-sport-deadline`)
+- That entry's last bullet, "soccer 259 s against their stated expectation of <= 130 s", compared the wrong quantity. The soccer lane's bound was pre-registered per SIM step (`soccer_*_artifacts`), not for soccer's whole turn. My figure came from a peer message that said "soccer".
+- Re-derived from run `odds_refresh_20261118_180720`: the 10 `soccer_*_artifacts` steps sum to **45 s**. The other soccer steps sum to 214 s (schedule, odds, props), and the 10 failed Understat steps account for 14 s of that. The soccer lane reads its own P2 as MET (45 s against its 62 s bound for 2 matches). Everything else in the 18:20Z entry stands.
