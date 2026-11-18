@@ -1,5 +1,11 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#839` — **THE NHL GENERATION RE-FETCHED 6 STATS-REST REPORTS PER SLATE TEAM EVERY RUN (180 for the 11-18 + 11-19 slates), the calls that hung 11-17's generations. A report cache is ON MAIN `59fbefc71` behind `SYNDICATE_NHL_STATS_REPORT_CACHE` (absent = ON): unscheduled playoff reports skipped (64 of 64 team-seasons empty), others reused from the data root while they hold every finished game before the slate date. Replay: 180 -> 0 calls warm, collection 129 -> 14 s, rows identical. NOT LOADED (the user's call)** `[2026-11-18, lane nhl-stats-rest-cache; `.syndicate/findings_2026-11-18_nhl_stats_rest_cache.md`; follow-up of #838]`
+- Load = fleet ff to `59fbefc71` or later (no restart; a fresh `refresh_nhl_oddsapi.py` child per sweep). Betting change (NHL generation inputs/timing): claims, preflight, ride-along check, `betting_change.py add --pending`.
+- Load in the DAY: a cold cache fetches ~100 reports, so the first pregame generation should warm it on a healthy API before the evening.
+- Reading owed at load: first post-load generation's `NHL_STATS_REPORT_CACHE` lines (enabled=on, fetched <= ~100 cold, then <= 2 x teams with a new/live game), files under `~/syndicate-prod/data/nhl_source/data/ingestion_cache/statsrest_*`.
+- Leads: the boxscore cache resolves to the fleet CHECKOUT (no `SYNDICATE_ARTIFACT_ROOT_NHL`); the first availability load per process writes `captured_at` null.
+
 ### `#838` — **ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE: NHL full generation hung on the NHL stats REST API (21-44 s per call or 520, 168 uncached calls) for its 1,800 s timeout four sweeps in a row, the `TimeoutExpired` killed each run, and 23 of 26 sweep attempts 01:21-03:02Z were refused `lane_busy`. Fix on main `2ae0c646a` behind `SYNDICATE_ODDS_LANE_STEP_DEADLINE` (absent = ON), LOADED 2026-11-18 13:47:14Z (fleet ff, no restart); the slow-API reading is owed** `[2026-11-17, lane odds-lane-sport-deadline; `.syndicate/findings_2026-11-17_odds_lane_sport_deadline.md`]`
 - **Cause (measured 11-18, read-only):**
   - live-odds-worker runs sports SERIALLY with one 1,800 s step timeout, and a timeout escaped `_run_command` to `main`: rc 1, the sports after NHL never ran, NBA's result was dropped (an 831-byte manifest).
