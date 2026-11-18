@@ -29,7 +29,7 @@
   - No fresh props for 53% of the in-play window, 22% before the NHL step hangs began.
 - **Built, OFF:** `syndicate/features/nhl/inplay_props_lane.py` + `scripts/refresh_nhl_inplay_props.py`, on the live-odds-worker's capture thread.
   - Every 120 s, live games only, one call each, the sweep's own prop markets and books, through the sweep's own writer.
-  - Never calls the NHL web API.
+  - Never calls either NHL API (api-web or the stats REST, where the 11-17 sweep stalled; todo #838).
   - Switch `SYNDICATE_ENABLE_NHL_INPLAY_PROPS_AUTORUN` (absent = OFF); interval `..._INTERVAL_SECONDS` (120), kill `..._TIMEOUT_SECONDS` (90).
 - **Cost:** ~5 credits per live game per pull. That is ~4,300 on an 11-game night (upper estimate), 0.09% of the 5M monthly cap.
 - **To load (user's call):** `LIVE_ODDS_WORKER__SYNDICATE_ENABLE_NHL_INPLAY_PROPS_AUTORUN=1` in `local_production.env`, then a drained full `down`/`up`. The fleet builds env only at `up`, so a role restart is not enough.

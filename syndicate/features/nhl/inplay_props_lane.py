@@ -20,7 +20,8 @@ WHAT A PULL DOES (`scripts/refresh_nhl_inplay_props.py`):
 - the rows go through the sweep's own writer, `local_nhl_odds._append_nhl_book_quotes(kind="prop")`.
   That refreshes every line's last-seen stamp, so a quote the book still shows stays in-play-fresh
   line by line.
-It never calls the NHL web API, which is where the 11-17 sweep hangs sat.
+It never calls either NHL API: the 11-17 sweep hangs sat in `collect_slate_inputs` on the stats REST API
+(lane odds-lane-sport-deadline).
 
 COST: 5 credits per live game per pull (5 markets x 1 region; a 10-book list bills as one region).
 At the default 120 s, an 11-game night (~28.6 live game-hours) is ~4,300 credits, an upper estimate,

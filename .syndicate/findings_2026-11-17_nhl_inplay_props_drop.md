@@ -94,6 +94,12 @@ every NHL prop row's `seen_age_seconds` crosses the overlay's 300 s in-play wind
     leaves the predictions old, so the next sweep is FULL again. A self-reinforcing loop.
 - Sent to the I-22 session (local_73a5d2dd, lane `odds-lane-sport-deadline`) ~02:50Z. The lane fix is
   theirs.
+- **Their fix, on main `2ae0c646a`, NOT loaded (todo #838):**
+  - a timed-out NHL live generation backs off one 1,800 s cadence, so those sweeps run `--mode fast`;
+  - a due generation runs as its own step (`--mode generate`) AFTER every sport's odds, with a 900 s
+    deadline;
+  - worst case it holds the lane ~900 s per 30 min. That still crosses the overlay's 300 s for NHL props
+    without this lane's pull, so the "deadline only" row of the prediction stands.
 
 ## Q3 — what should the board show per line when a props quote lapses?
 
@@ -110,8 +116,9 @@ already has.
 - **Each pull:** one `event_odds` call per live game: the same 5 prop markets and 10 books as the sweep.
   No fallback retries, no historical calls.
 - **The same writer:** `_append_nhl_book_quotes(kind="prop")`.
-- **Bounded:** one child at a time, killed past 90 s. It never calls the NHL web API, which is what hung
-  tonight.
+- **Bounded:** one child at a time, killed past 90 s. It never calls either NHL API (api-web or the stats
+  REST). CORRECTED 11-17 ~9:10 PM CST by lane odds-lane-sport-deadline: tonight's stall was
+  `collect_slate_inputs` on `api.nhle.com/stats/rest`, not api-web; the two share Cloudflare IPs.
 
 Each line's last-seen stamp then refreshes every ~2 min, whether or not the sweep is blocked.
 
