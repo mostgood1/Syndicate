@@ -60,7 +60,7 @@ No result guarantees future returns.
 | Layer 2 / evaluation ledger | first-sighting picks since ~10-07 | outcomes |
 | model scorecard / optimizer / sim-gap | daily since 09-17 | outcomes |
 | `book_quotes` (all books) | 120-day retention | closes |
-| in-play recorder (Kalshi 10 s, books, ESPN) | **28 complete nights (10-20..11-17), 319 files, 14.1 GB; copied and compressed 11-18 to 1.4 GB in `~/syndicate-prod/data/research/inplay_recorder/` (319 of 319 verified; originals untouched on C:\tmp)** | scores + settlement |
+| in-play recorder (Kalshi 10 s, books, ESPN) | **27 nights (10-20, 10-22..11-17; 10-21 was not recorded), 319 files, 14.1 GB; copied and compressed 11-18 to 1.4 GB in `~/syndicate-prod/data/research/inplay_recorder/` (319 of 319 verified; originals untouched on C:\tmp); new nights copied daily by the Windows task `SyndicateInplayPreserve`** | scores + settlement |
 | Kalshi public trade prints | 3,566 games, 3.51M prints, 2025-07..2026-10-24 | results |
 | maker shadow, combos, cheat sheets / SGP paper, momentum-lag study | various | various |
 
@@ -100,10 +100,19 @@ No result guarantees future returns.
 
 ## Infrastructure that makes learning compound
 
-1. **I1: preserve history.** Copy the in-play recorder nightly into the fleet research store (the 11-18 backfill is complete:
-   28 nights, 319 files, 1.4 GB compressed. Nights after 11-17 stay only on C:\tmp until a nightly copy exists; the
-   recorder's owner, `in-game-trading`, should write there directly). Review retention for research families:
-   `book_quotes` 120 d, `odds_history` 60 d, `venue_odds` 14 d.
+1. **I1: preserve history.** Copy the in-play recorder nightly into the fleet research store. **Done 11-18 (user: "Yes, set it up"):**
+   - Backfill complete: 27 nights, 319 files, 1.4 GB compressed.
+   - Windows task `SyndicateInplayPreserve` runs daily at 7:15 AM local:
+     - it runs `C:\SyndicateProd\inplay_preserve\preserve_inplay_recordings.sh` (source:
+       `scripts/preserve_inplay_recordings.sh`);
+     - copy only, every file verified;
+     - it skips tonight and any night written in the last 90 min;
+     - it exits 1 if a file is still missing;
+     - log: `~/syndicate-prod/logs/inplay_preserve.log`.
+   - First run 11-18 19:40Z: 27 nights, 319 already copied, 0 failed, result 0.
+   - Later: the recorder's owner, `in-game-trading`, could write there directly.
+   - Still open: review retention for the research families (`book_quotes` 120 d, `odds_history` 60 d, `venue_odds`
+     14 d).
 2. **I2: log the venue book at every fill:** both sides' asks and depth, at the moment of the order. Today 48% of
    fills have no logged own-side quote before the fill, which blinds every spread and CLV test on half the book.
 3. **I3: one decision table:** every candidate, bet or passed, with its features at decision time, its outcome and its
