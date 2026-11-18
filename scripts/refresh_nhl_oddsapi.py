@@ -602,7 +602,9 @@ def main() -> int:
     parser.add_argument("--props-source", default="oddsapi")
     parser.add_argument("--props-boxscore-n-sims", type=int, default=1000)
     parser.add_argument("--days-ahead", type=int, default=0)
-    parser.add_argument("--mode", choices=("fast", "full"), default="full")
+    # `generate` (lane odds-lane-sport-deadline, 2026-11-17): the owned generation of `full`
+    # WITHOUT the odds collection -- the live sweep runs `fast` first, so this adds no OddsAPI call.
+    parser.add_argument("--mode", choices=("fast", "full", "generate"), default="full")
     args = parser.parse_args()
 
     # Phase 5 direct cutover: the vendor `nhl_betting` subprocess is fully retired. Both generation
@@ -614,16 +616,18 @@ def main() -> int:
     target_dates = _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0))
     warnings: list[str] = []
     mode = str(args.mode or "full").strip().lower()
+    collect = mode in ("fast", "full")
+    generate = mode in ("full", "generate")
 
     try:
-        for target_date in target_dates:
+        for target_date in target_dates if collect else []:
             _collect_owned_nhl_artifacts(
                 artifact_root=artifact_root,
                 date_str=target_date,
                 team_markets=str(args.team_markets or "h2h,spreads,totals"),
                 props_source=str(args.props_source or "oddsapi"),
             )
-        if mode == "full":
+        if generate:
             _run_owned_generation(
                 artifact_root=artifact_root,
                 target_dates=target_dates,
@@ -635,7 +639,7 @@ def main() -> int:
         return 1
 
     copied = _materialize_collected_only_artifact_bundle(artifact_root=artifact_root, date_str=args.date) if mode == "fast" else _materialize_artifact_bundle(source_root=source_root, artifact_root=artifact_root, date_str=args.date)
-    if mode == "full":
+    if generate:
         smart_sim_bundle_path = _write_smart_sim_bundle(artifact_root=artifact_root, date_str=args.date, copied=copied)
         copied.setdefault("smart_sim_files", []).append(str(smart_sim_bundle_path))
     missing_required = _missing_required_artifacts(artifact_root=artifact_root, date_str=args.date)
@@ -663,7 +667,7 @@ def main() -> int:
         )
         return 1
     lookahead_runs = []
-    if mode == "full":
+    if generate:
         for target_date in _date_window(date_str=args.date, days_ahead=int(args.days_ahead or 0))[1:]:
             lookahead_runs.append(
                 {

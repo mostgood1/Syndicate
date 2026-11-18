@@ -29,7 +29,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 from threading import enumerate as enumerate_threads
 from threading import Lock
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Sequence
@@ -113,6 +113,25 @@ _WNBA_DEFAULT_MARKETS = f"{_WNBA_GAME_MARKETS},{_WNBA_PLAYER_PROP_MARKETS}"
 # returns game lines only.
 _NBA_DEFAULT_MARKETS = f"{_DEFAULT_INTERVAL_MARKETS},{_WNBA_PLAYER_PROP_MARKETS}"
 _DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS = 1800
+# ONE SPORT'S HUNG CHILD MUST NOT TAKE THE WHOLE LIVE ODDS LANE `[2026-11-17, lane
+# odds-lane-sport-deadline]`. Measured on the fleet 11-18 01:21-02:55Z: three live
+# sweeps in a row ran `refresh_nhl_oddsapi.py` in full mode (generation due), its
+# lineup collection made ~6 NHL stats-REST calls per slate team (28 teams) while that
+# API answered in 21-44 s or 520, and the child sat at its 1,800 s timeout. The
+# TimeoutExpired then escaped `_run_command` / `_run_sport_refresh` / `_build_summary`
+# to main, so the run died rc 1: the sports after NHL in the serial order never ran,
+# NBA's finished result was dropped from the manifest, and 25 of 28 live sweeps
+# 01:21-02:36Z were refused `lane_busy`. Absent = ON, so a role restart loads it;
+# `off` restores the old behaviour exactly (a timeout raises, NHL generation runs
+# inline in full mode, no cooldown). Env is built at fleet `up`, so `off` needs a
+# drained down/up.
+_ODDS_LANE_STEP_DEADLINE_ENV = "SYNDICATE_ODDS_LANE_STEP_DEADLINE"
+# NHL's live generation step, run AFTER every sport's odds with its own deadline. The
+# 900 s default sits above every live NHL generation measured 11-13..11-17 but one:
+# the whole full step (odds ~46 s + generation) was p50 351 s, p90 545 s, max 987 s
+# over 60 live runs.
+_NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS = 900
+_STEP_TIMEOUT_STDOUT_TAIL_CHARS = 800
 _ALL_PROCESS_MEMORY_HEARTBEAT_SECONDS = 60
 _MEMORY_TRACE_LAST_RSS_BYTES: int | None = None
 _SPORT_REFRESH_REQUIRED_ARTIFACTS = ("snapshot", "snapshot_alias", "game_slate", "predictions", "board_contract", "manifest")
@@ -180,6 +199,14 @@ class RefreshStep:
     #: reads `full` on both workers (verified live via the Render env-vars API
     #: 2026-09-03), so every existing sweep keeps every step it has today.
     modes: tuple[str, ...] | None = None
+    #: `odds-lane-sport-deadline`: a deadline for THIS step, tighter than the run-wide
+    #: `SYNDICATE_REFRESH_STEP_TIMEOUT_SECONDS`. Honoured only while the switch is on.
+    timeout_seconds: float | None = None
+    #: A file written when this step hits its deadline (a cooldown its builder reads).
+    timeout_marker: str | None = None
+    #: Run after EVERY sport's own steps, so a long non-odds step cannot keep the
+    #: sports after it in the serial order waiting for their odds.
+    deferred: bool = False
 
 
 @dataclass(frozen=True)
@@ -1011,12 +1038,52 @@ def _nhl_live_generation_due(artifact_root: Path, date: str) -> bool:
     ceiling = _nhl_live_full_generation_seconds()
     if ceiling <= 0:
         return True
+    if _odds_lane_step_deadline_enabled() and _nhl_live_generation_cooling_down(artifact_root, date, ceiling):
+        return False
     path = artifact_root / "data" / "processed" / f"predictions_{date}.csv"
     try:
         age = time.time() - path.stat().st_mtime
     except Exception:
         return True
     return age >= ceiling
+
+
+def _nhl_live_generation_deadline_seconds() -> float:
+    """`SYNDICATE_NHL_LIVE_GENERATION_DEADLINE_SECONDS`, default 900: the live NHL
+    generation step's own deadline (see `_NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS`)."""
+    raw = str(os.environ.get("SYNDICATE_NHL_LIVE_GENERATION_DEADLINE_SECONDS") or "").strip()
+    try:
+        value = float(raw) if raw else float(_NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS)
+    except ValueError:
+        value = float(_NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS)
+    return value if value > 0 else float(_NHL_LIVE_GENERATION_DEADLINE_DEFAULT_SECONDS)
+
+
+def _nhl_live_generation_timeout_marker(artifact_root: Path, date: str) -> Path:
+    return artifact_root / "data" / "processed" / f".nhl_live_generation_timeout_{date}.json"
+
+
+def _nhl_live_generation_cooling_down(artifact_root: Path, date: str, ceiling: float) -> bool:
+    """True for `ceiling` seconds after the date's live generation hit its deadline.
+
+    WHY. A generation that times out writes no predictions, so their age stays over the
+    cadence and EVERY following live sweep was due again: 11-18 01:21Z, 01:54Z and
+    02:25Z each spent 1,800 s on the same stalled NHL stats API. The cooldown spaces
+    retries at the generation cadence; the sweeps in between refresh NHL odds (fast).
+    """
+    path = _nhl_live_generation_timeout_marker(artifact_root, date)
+    try:
+        age = time.time() - path.stat().st_mtime
+    except OSError:
+        return False
+    if age < ceiling:
+        print(
+            f"[refresh_odds_sources] NHL_LIVE_GENERATION_COOLDOWN date={date} "
+            f"since_timeout_seconds={int(age)} cooldown_seconds={int(ceiling)}",
+            flush=True,
+        )
+        return True
+    return False
 
 
 def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
@@ -1036,10 +1103,17 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
     pregame cadence, so a staggered slate's later games still get lineup/goalie-driven
     regeneration at most every ~30 min while an early game is live. Pregame and
     combined ("all") sweeps are unchanged.
+
+    LANE `odds-lane-sport-deadline` (2026-11-17). When a live sweep's generation IS due
+    and the switch is on, the one full step is split in two: the odds step runs
+    `--mode fast` in NHL's normal turn, and a `--mode generate` step (no odds
+    collection, so no extra OddsAPI calls) runs after every other sport, under its own
+    deadline. A deadline hit writes a cooldown marker so the next sweeps do not retry
+    a stalled generation every time.
     """
     python_exe = _venv_python(REPO_ROOT)
     artifact_root = _local_source_artifact_root("nhl")
-    command = [
+    base_command = [
         python_exe,
         "scripts/refresh_nhl_oddsapi.py",
         "--date",
@@ -1049,12 +1123,14 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
         "--artifact-root",
         str(artifact_root),
     ]
-    live_fast = str(getattr(args, "phase", "") or "").strip().lower() == "live" and not _nhl_live_generation_due(
-        artifact_root, str(args.date)
-    )
-    if live_fast:
+    command = list(base_command)
+    live = str(getattr(args, "phase", "") or "").strip().lower() == "live"
+    generation_due = live and _nhl_live_generation_due(artifact_root, str(args.date))
+    live_fast = live and not generation_due
+    split_generation = generation_due and _odds_lane_step_deadline_enabled()
+    if live_fast or split_generation:
         command += ["--mode", "fast"]
-    return [
+    steps = [
         RefreshStep(
             name="nhl_oddsapi_refresh",
             phases=("pregame", "live"),
@@ -1065,9 +1141,29 @@ def _build_nhl_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 "bundle, and build predictions for the slate date PLUS the next day so the cards "
                 "board is not empty the evening before a slate."
                 + (" LIVE FAST: odds only; generation not due." if live_fast else "")
+                + (" LIVE FAST: odds only; generation runs as nhl_live_generation after every sport." if split_generation else "")
             ),
         ),
     ]
+    if split_generation:
+        steps.append(
+            RefreshStep(
+                name="nhl_live_generation",
+                phases=("live",),
+                cwd=REPO_ROOT,
+                command=tuple(base_command + ["--mode", "generate"]),
+                description=(
+                    "NHL owned generation (lineups, predictions, recommendations, props) for the slate "
+                    "date plus the look-ahead day, without odds collection; deferred past every sport's "
+                    "odds and bounded by its own deadline."
+                ),
+                modes=("full",),
+                timeout_seconds=_nhl_live_generation_deadline_seconds(),
+                timeout_marker=str(_nhl_live_generation_timeout_marker(artifact_root, str(args.date))),
+                deferred=True,
+            )
+        )
+    return steps
 
 
 def _build_nfl_steps(args: argparse.Namespace) -> list[RefreshStep]:
@@ -2754,6 +2850,35 @@ def _refresh_step_timeout_seconds() -> int:
     return _DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS
 
 
+def _odds_lane_step_deadline_enabled() -> bool:
+    """`SYNDICATE_ODDS_LANE_STEP_DEADLINE`: absent = ON; off / 0 / false / no = today's
+    behaviour. See `_ODDS_LANE_STEP_DEADLINE_ENV`."""
+    raw = str(os.environ.get(_ODDS_LANE_STEP_DEADLINE_ENV) or "").strip().lower()
+    return raw not in {"0", "off", "false", "no"}
+
+
+def _sport_step_timeout_seconds(sport: str) -> float | None:
+    """`SYNDICATE_REFRESH_STEP_TIMEOUT_SECONDS__<SPORT>` (e.g. `..._SECONDS__NBA`): a
+    deadline for every step of ONE sport. Absent or unparseable = none."""
+    raw = str(os.environ.get(f"SYNDICATE_REFRESH_STEP_TIMEOUT_SECONDS__{str(sport or '').upper()}") or "").strip()
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _effective_step_timeout_seconds(step: RefreshStep) -> float:
+    """The run-wide deadline, tightened by the step's own while the switch is on."""
+    base = _refresh_step_timeout_seconds()
+    own = getattr(step, "timeout_seconds", None)
+    if own is not None and _odds_lane_step_deadline_enabled():
+        return min(float(base), float(own))
+    return base
+
+
 # `#390`. The refresh date, for the sim ledger. A module global because
 # RefreshStep is frozen and does not carry the date, and threading it through
 # every step builder would be a far larger change than the ledger warrants.
@@ -2939,10 +3064,12 @@ def _run_step_process(
         watcher.start()
     try:
         stdout, stderr = proc.communicate(timeout=timeout_seconds)
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as exc:
         _kill_process_tree(proc.pid)
         proc.kill()
-        proc.communicate()
+        # Kept on the exception (as subprocess.run does), so a timed-out step can say
+        # which stage it was in (`odds-lane-sport-deadline`).
+        exc.stdout, exc.stderr = proc.communicate()
         raise
     finally:
         stop.set()
@@ -2955,12 +3082,67 @@ def _run_step_process(
     return result, None
 
 
+def _partial_output_text(value: Any) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return str(value or "")
+
+
+def _timed_out_step_result(
+    step: RefreshStep,
+    exc: subprocess.TimeoutExpired,
+    *,
+    started: str,
+    finished: str,
+    runtime_seconds: int | None,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    """A deadline hit as a FAILED STEP, so the run carries on to the next sport.
+
+    `odds-lane-sport-deadline`: the caller's `continue_on_error` (default True) now
+    applies to a timeout exactly as to a non-zero exit. Writes `step.timeout_marker`.
+    """
+    marker = str(getattr(step, "timeout_marker", "") or "").strip()
+    if marker:
+        try:
+            path = Path(marker)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps({"step": step.name, "timed_out_at": finished, "timeout_seconds": timeout_seconds}),
+                encoding="utf-8",
+            )
+        except OSError as marker_exc:
+            print(f"[refresh_odds_sources] STEP_DEADLINE_MARKER_FAILED step={step.name} error={marker_exc}", flush=True)
+    print(
+        f"[refresh_odds_sources] STEP_DEADLINE step={step.name} timeout_seconds={timeout_seconds} "
+        f"runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} action=continue "
+        f"marker={'written' if marker else 'none'}",
+        flush=True,
+    )
+    return {
+        "name": step.name,
+        "description": step.description,
+        "cwd": str(step.cwd),
+        "command": list(step.command),
+        "return_code": None,
+        "started_at": started,
+        "finished_at": finished,
+        "stdout": _partial_output_text(getattr(exc, "stdout", None)),
+        "stderr": _partial_output_text(getattr(exc, "stderr", None)),
+        "ok": False,
+        "dry_run": False,
+        "status": "timeout",
+        "timed_out": True,
+        "timeout_seconds": timeout_seconds,
+    }
+
+
 def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     env = os.environ.copy()
     if step.env_updates:
         env.update({key: value for key, value in step.env_updates.items() if value is not None})
     started = _utc_now()
-    timeout_seconds = _refresh_step_timeout_seconds()
+    timeout_seconds = _effective_step_timeout_seconds(step)
     print(f"PRE_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
     print(f"STEP_START name={step.name} cwd={step.cwd} command={json.dumps(list(step.command))}", file=sys.stderr, flush=True)
     print(f"POST_STEP_LOG name={step.name}", file=sys.stderr, flush=True)
@@ -2997,7 +3179,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             timeout_seconds=timeout_seconds,
             cap_mb=rss_cap_mb,
         )
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as timeout_exc:
         log_runtime_memory("after_sport_launch", step=step.name, cwd=str(step.cwd), status="timeout")
         finished = _utc_now()
         runtime_seconds = _elapsed_seconds(started, finished)
@@ -3012,7 +3194,16 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
             flush=True,
         )
         print(f"[refresh_odds_sources] FAIL step={step.name} reason=timeout timeout_seconds={timeout_seconds}", flush=True)
-        raise
+        if not _odds_lane_step_deadline_enabled():
+            raise
+        return _timed_out_step_result(
+            step,
+            timeout_exc,
+            started=started,
+            finished=finished,
+            runtime_seconds=runtime_seconds,
+            timeout_seconds=timeout_seconds,
+        )
     finally:
         if result is not None:
             log_runtime_memory(
@@ -3145,6 +3336,10 @@ def _compact_step_result(step_result: dict[str, Any]) -> None:
     # and now the window can actually reach the traceback.
     if not bool(step_result.get("ok")) and isinstance(step_result.get("stderr"), str) and step_result["stderr"].strip():
         step_result["stderr_tail"] = _failed_step_stderr_tail(step_result["stderr"])
+    # A TIMED-OUT child's last stdout lines name the stage it stalled in (the NHL
+    # runner prints one line per stage); its stderr is mostly memory telemetry.
+    if step_result.get("timed_out") and isinstance(step_result.get("stdout"), str) and step_result["stdout"].strip():
+        step_result["stdout_tail"] = _redact_secrets(step_result["stdout"][-_STEP_TIMEOUT_STDOUT_TAIL_CHARS:])
     if isinstance(step_result.get("stdout"), str):
         step_result["stdout"] = ""
     if isinstance(step_result.get("stderr"), str):
@@ -3185,6 +3380,12 @@ def _compact_step_result_view(step_result: dict[str, Any] | None) -> dict[str, A
                 stderr_tail = raw_stderr[-_FAILED_STEP_STDERR_TAIL_CHARS:]
         if isinstance(stderr_tail, str) and stderr_tail.strip():
             compact["stderr_tail"] = _redact_secrets(stderr_tail)
+    if step_result.get("timed_out"):
+        compact["status"] = "timeout"
+        compact["timed_out"] = True
+        compact["timeout_seconds"] = step_result.get("timeout_seconds")
+        if isinstance(step_result.get("stdout_tail"), str) and step_result["stdout_tail"].strip():
+            compact["stdout_tail"] = step_result["stdout_tail"]
     row_counts = step_result.get("row_counts")
     if isinstance(row_counts, dict) and row_counts:
         compact["row_counts"] = row_counts
@@ -3705,7 +3906,92 @@ def _sport_force_refresh_scope(args: argparse.Namespace, sport: str) -> bool:
     return sport.strip().lower() in scoped_sports
 
 
-def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str) -> dict[str, Any]:
+def _launch_step(args: argparse.Namespace, sport: str, step: RefreshStep, refresh_mode: str) -> RefreshStep:
+    """The step as it is launched: the mode flags added, and (switch on) the sport's
+    own deadline folded into the step's. Every per-step field must be carried here --
+    this used to rebuild the step from six named fields and silently dropped the rest."""
+    timeout_seconds = step.timeout_seconds
+    sport_timeout = _sport_step_timeout_seconds(sport) if _odds_lane_step_deadline_enabled() else None
+    if sport_timeout is not None:
+        timeout_seconds = sport_timeout if timeout_seconds is None else min(float(timeout_seconds), sport_timeout)
+    return replace(
+        step,
+        command=_step_command_with_mode(
+            step,
+            refresh_mode,
+            force_refresh=_sport_force_refresh_scope(args, sport),
+            only_matchups=(str(getattr(args, "wnba_only_matchups", "") or "").strip() if sport == "wnba" else ""),
+            in_play_only=_in_play_only_scope(args, sport),
+        ),
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def _run_deferred_steps(
+    args: argparse.Namespace,
+    deferred: list[tuple[str, RefreshStep]],
+    results_by_sport: dict[str, dict[str, Any]],
+    execution_mode: str,
+) -> bool:
+    """Run the steps `_run_sport_refresh` deferred, after every sport's own turn.
+
+    Each result joins its sport's `refresh_steps`; a failure (a deadline hit included)
+    marks the sport failed. A success republishes the sport manifest with the step's
+    artifacts, as the inline step would have. Returns True when any deferred step failed.
+    """
+    refresh_mode = str(getattr(args, "mode", "full") or "full").strip().lower() or "full"
+    any_failure = False
+    for sport, step in deferred:
+        sport_result = results_by_sport.get(sport)
+        if not isinstance(sport_result, dict):
+            print(f"[refresh_odds_sources] DEFERRED_SKIP step={step.name} sport={sport} reason=no_sport_result", flush=True)
+            continue
+        print(f"[refresh_odds_sources] DEFERRED_START step={step.name} sport={sport}", flush=True)
+        step_result = _run_command(_launch_step(args, sport, step, refresh_mode), dry_run=bool(args.dry_run))
+        new_paths = _sport_artifact_paths(step_result)
+        _compact_step_result(step_result)
+        view = _compact_step_result_view(step_result)
+        steps_list = sport_result.setdefault("refresh_steps", [])
+        steps_list.append(view)
+        generation = sport_result.get("generation")
+        if isinstance(generation, dict) and isinstance(generation.get("steps"), list) and generation["steps"] is not steps_list:
+            generation["steps"].append(view)
+        artifact_paths = sport_result.setdefault("artifact_paths", [])
+        for path in new_paths:
+            if path not in artifact_paths:
+                artifact_paths.append(path)
+        if step_result.get("ok"):
+            if not args.dry_run:
+                published = _publish_sport_manifest_threadsafe(
+                    sport=REGISTRY[sport].slug,
+                    artifact_paths=list(artifact_paths),
+                    metadata=_sport_control_plane_metadata(
+                        sport_result,
+                        date=args.date,
+                        phase=args.phase,
+                        execution_mode=execution_mode,
+                        refresh_mode=refresh_mode,
+                    ),
+                )
+                if isinstance(published, dict):
+                    sport_result["sport_manifest"] = {"path": published.get("path"), "artifact_count": len(artifact_paths)}
+        else:
+            sport_result["ok"] = False
+            any_failure = True
+        print(
+            f"[refresh_odds_sources] DEFERRED_END step={step.name} sport={sport} ok={bool(step_result.get('ok'))} "
+            f"timed_out={bool(step_result.get('timed_out'))}",
+            flush=True,
+        )
+    return any_failure
+
+
+def _run_sport_refresh(
+    args: argparse.Namespace,
+    sport: str,
+    execution_mode: str,
+    deferred_out: list[tuple[str, RefreshStep]] | None = None,
+) -> dict[str, Any]:
     spec = REGISTRY[sport]
     refresh_mode = str(getattr(args, "mode", "full") or "full").strip().lower() or "full"
     source_root_resolution = _source_root_resolution(spec)
@@ -3769,23 +4055,11 @@ def _run_sport_refresh(args: argparse.Namespace, sport: str, execution_mode: str
             return _finalize_sport_result(sport_result)
 
     for step in refresh_steps:
-        step_result = _run_command(
-            RefreshStep(
-                name=step.name,
-                phases=step.phases,
-                cwd=step.cwd,
-                command=_step_command_with_mode(
-                    step,
-                    refresh_mode,
-                    force_refresh=_sport_force_refresh_scope(args, sport),
-                    only_matchups=(str(getattr(args, "wnba_only_matchups", "") or "").strip() if sport == "wnba" else ""),
-                    in_play_only=_in_play_only_scope(args, sport),
-                ),
-                env_updates=step.env_updates,
-                description=step.description,
-            ),
-            dry_run=bool(args.dry_run),
-        )
+        if deferred_out is not None and step.deferred:
+            deferred_out.append((sport, step))
+            print(f"[refresh_odds_sources] DEFER step={step.name} sport={sport} until=after_every_sport", flush=True)
+            continue
+        step_result = _run_command(_launch_step(args, sport, step, refresh_mode), dry_run=bool(args.dry_run))
         sport_result["refresh_steps"].append(step_result)
         sport_result["generation"]["steps"].append(step_result)
         for artifact_path in _sport_artifact_paths(step_result):
@@ -4046,6 +4320,9 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     any_failure = False
+    # `odds-lane-sport-deadline`: steps a sport defers (NHL's live generation) run after
+    # every sport's own turn. None = switch off: every step runs inline, as before.
+    deferred: list[tuple[str, RefreshStep]] | None = [] if _odds_lane_step_deadline_enabled() else None
     serial_sport_refresh_raw = os.environ.get("SYNDICATE_SERIAL_SPORT_REFRESH")
     serial_sport_refresh_enabled = _serial_sport_refresh_enabled()
     max_workers = 1 if serial_sport_refresh_enabled else min(len(selected), 4)
@@ -4061,7 +4338,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
         for sport in selected:
             log_all_process_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="sequential")
             log_runtime_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="sequential")
-            sport_result = _run_sport_refresh(args, sport, execution_mode)
+            sport_result = _run_sport_refresh(args, sport, execution_mode, deferred)
             log_all_process_memory(
                 "after_sport_launch",
                 sport=sport,
@@ -4087,6 +4364,10 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 summary["finished_at"] = _utc_now()
                 summary["ok"] = False
                 return summary
+        if deferred:
+            by_sport = {str(item.get("sport")): item for item in summary["results"] if isinstance(item, dict)}
+            if _run_deferred_steps(args, deferred, by_sport, execution_mode):
+                any_failure = True
     else:
         results_by_sport: dict[str, dict[str, Any]] = {}
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -4094,7 +4375,7 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
             for sport in selected:
                 log_all_process_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="parallel")
                 log_runtime_memory("before_sport_launch", sport=sport, execution_mode=execution_mode, concurrency="parallel")
-                futures[executor.submit(_run_sport_refresh, args, sport, execution_mode)] = sport
+                futures[executor.submit(_run_sport_refresh, args, sport, execution_mode, deferred)] = sport
             for future in as_completed(futures):
                 sport = futures[future]
                 try:
@@ -4134,6 +4415,10 @@ def _build_summary(args: argparse.Namespace) -> dict[str, Any]:
                 gc.collect()
                 if not args.continue_on_error and not sport_ok:
                     break
+
+        if deferred and (args.continue_on_error or not any_failure):
+            if _run_deferred_steps(args, deferred, results_by_sport, execution_mode):
+                any_failure = True
 
         for sport in selected:
             sport_result = results_by_sport.get(sport)

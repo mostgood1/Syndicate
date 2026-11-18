@@ -20,6 +20,10 @@ DATE = "2026-10-03"
 def root(tmp_path, monkeypatch):
     monkeypatch.setattr(ros, "_local_source_artifact_root", lambda slug: tmp_path)
     monkeypatch.delenv("SYNDICATE_NHL_LIVE_FULL_GENERATION_SECONDS", raising=False)
+    # These pin the switch-OFF shape (one full step when generation is due). With the
+    # switch on (absent) a due live generation is split into a fast odds step plus a
+    # deferred `nhl_live_generation` step: tests/test_refresh_odds_sport_deadline.py.
+    monkeypatch.setenv("SYNDICATE_ODDS_LANE_STEP_DEADLINE", "off")
     return tmp_path
 
 

@@ -108,7 +108,9 @@ class RefreshOddsSourcesTests(unittest.TestCase):
         stderr_capture = io.StringIO()
         timeout_exc = subprocess.TimeoutExpired(cmd=list(step.command), timeout=module._DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS)
 
-        with patch.dict(module.os.environ, {}, clear=True), patch.object(module.subprocess, "run", side_effect=timeout_exc) as mocked_run, patch.object(
+        # Switch OFF: the old raise. With it on (absent) a timeout is a failed step --
+        # tests/test_refresh_odds_sport_deadline.py.
+        with patch.dict(module.os.environ, {"SYNDICATE_ODDS_LANE_STEP_DEADLINE": "off"}, clear=True), patch.object(module.subprocess, "run", side_effect=timeout_exc) as mocked_run, patch.object(
             module,
             "sys",
             wraps=module.sys,
