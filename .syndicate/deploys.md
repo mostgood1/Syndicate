@@ -61868,3 +61868,17 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - fleet head `640c6d4fd` contains `baef443cc` (`git merge-base --is-ancestor`); the template on disk has the tooltip string (1 match).
   - `GET http://127.0.0.1:10000/intelligence` six times at 18:02-18:03Z: 6 of 6 responses carry both `oursTip` and the tooltip text, so every web worker that answered serves the new template.
 - **OWED:** the tooltip shows only on a live NCAAB/WNCAAB full-game totals card with `live_total_basis: "calibrated"`. College games are live this afternoon; the I-17 rail watcher's readings cover those rows tonight.
+
+## 2026-11-18 18:20Z (12:20 PM CST) -- READING (no deploy): NHL's deferred pregame generation in the first look-ahead run after the soccer look-ahead anchor (lane `odds-lane-sport-deadline`; soccer change `640c6d4fd`, fleet ff 17:58:30Z, lane `soccer-pregame-odds-lane`)
+- Run `odds_refresh_20261118_180720` (launched 18:07:20Z, date 11-19, 7 sports), wrapper: 18:07:21-18:13:47Z, **386 s**, `ok False` (the same 10 failed Understat soccer steps as in all 28 earlier soccer runs today, todo #840).
+
+  | run (date 11-19) | total | soccer | NHL generation waited | NHL generation |
+  |---|---|---|---|---|
+  | 160701 (old soccer) | 2,442 s | 2,193 s | 2,243 s | 123 s |
+  | 170717 (old soccer) | 1,940 s | 1,804 s | 1,843 s | 15 s |
+  | **180720 (new soccer)** | **386 s** | **259 s** | **294 s** | **15 s** |
+
+- NHL fast 65 s in turn (18:07:33-18:08:38Z), ok. `nhl_pregame_generation` 18:13:32-18:13:47Z, ok, not timed out.
+- It wrote `predictions_2026-11-19.csv` (18:13:45Z) and `predictions_2026-11-20.csv` (18:13:46Z), so the 15 s generation did write. The 170717 run's 15 s generation also wrote `predictions_2026-11-20.csv`, at 17:39:37Z. Generation time is the stats-REST cache's (`59fbefc71`), not this lane's.
+- **For this lane:** the look-ahead cost measured at 17:20Z (NHL's look-ahead rebuild landing ~31-37 min after NHL odds) is now ~5 min, on n=1.
+- **For the soccer lane** (theirs to judge): soccer 259 s against their stated expectation of <= 130 s.
