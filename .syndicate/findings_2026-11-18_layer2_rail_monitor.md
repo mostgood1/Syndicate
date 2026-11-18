@@ -448,3 +448,32 @@ alternative-source session working.
 **Load:** query 13.6 s; shortlist 1.5 s. Today's board was 284 s old.
 
 **Team cards:** 0 defects.
+
+## Reading 10 — Wed 11-18 5:26 PM CST (23:26Z): the evening window opens (P2 from 5:30 PM)
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 2.5.
+
+**Slate: 17 live.**
+- Flags: 4 shown, 0 false, 0 missed, 0 dark.
+- P1: 3 college totals flags, 0 contradictions. P6: 0. #824: 0.
+- Live rows: 25, 11 priced <= 120 s (college row ages are lower bounds per #844).
+
+**Board: 6 builds, 160 / 164 / 170 / 180 / 195 / 270 s, median 174 s, 0 over 300 s.** CPU per build 132-243 s.
+- No nice-0 batch job was in the top processes at 5:26 PM (L-d: none this time).
+
+**Overlay:** 0 gaps over 360 s (max WNCAAB 66 s); ticks 92, gap max 43 s; web merges 27, 0 stale.
+
+**Live odds lane:** 16 launched, 3 refused (15.8%). Live runs 106-137 s; pregame 296 s.
+- Look-ahead 410 s (soccer 187 s).
+
+**Load:** query 3.8 s; shortlist 2.1 s. Today's board was 218 s old.
+
+**Team cards:** 0 defects.
+
+**Dashboard (since reading 9):**
+- the user asked (~5:05 PM): "are we tracking recomendations and success of recomendations on the rail? can we
+  incorporate layer 2 board performance and suggested opportunities performance? We should have a lot of history to
+  look at for this as well".
+- Added **rail flag results by day** (11-15..11-17, grade outputs) and **board / shortlist-published / staked results**
+  (44 scorecard days, 10-06..11-18, 28-day rolling, by sport; `C:\tmp\railmon\dash\perf_series.py` + `perf_build.py`).
+- **Gap:** the shortlist's `suggested` flag is not graded as its own set. A session was offered to the user.
