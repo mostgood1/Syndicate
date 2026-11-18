@@ -694,3 +694,40 @@ No `live_row` ask: no live game row on the shortlist. as_of_in_future: 0 of 5.
 - **ANOMALY:** overlay warm of 73.42 s (> 60 s) in the window. Check next: the web log for which overlay and when; whether it sits with the 23:15:44Z reload-web or a hard recycle (18 recycles, 14 hard, in 30 min).
 - **ANOMALY:** new fleet load 23:15:44Z (5:15 PM CST), ff + reload-web to `64daca46f` (todo #828, board query serialize-once). Web-only display path, not pricing; check next: the 23:30Z deploys.md reading for #828 and whether the >45 s POST /api/intelligence/query is board-query traffic.
 - **ANOMALY:** new fleet load 23:22:26Z (5:22 PM CST), live-odds-worker TERM (todo #829 live-capture half, WNBA box-score poll). Touches the live-capture worker, not the experts' priced families directly; check next: whether the live join's served rows changed after 23:22Z before the next experts reproduction.
+
+## Reading 16 (6:05 PM CST)
+
+Probe 6:05:13-6:06:00 PM CST (00:05Z 11-18), file `ask_reading_20261118T000513Z.json`.
+
+**Ask:** 6 / 6 answered, 0 past the 45 s cut-off, median 6.79 s, max 11.76 s. Page 200 in 0.1 s; shortlist 200 in 1.17 s (200 rows).
+
+| kind | s | ok | schema | as_of | tables |
+|---|---|---|---|---|---|
+| free_text "this spread?" | 11.76 | yes | bet_analysis | 23:11:20Z (54 min) | 0 |
+| free_text "Lakers vs Celtics" | 4.81 | yes | matchup_analysis | 23:11:20Z | 0 |
+| free_text "top edges today" | 5.21 | yes | market_summary | 2026-11-17 (date) | 1 |
+| pregame_game_line (NCAAB h2h, Arkansas) | 6.43 | yes | bet_analysis | 23:11:20Z | 0 |
+| pregame_prop (NBA, Jrue Holiday U16.5 PR) | 6.79 | yes | bet_analysis | 22:28:46Z (97 min) | 6 |
+| live_row (NCAAB h2h, UMass Lowell) | 6.96 | yes | bet_analysis | 23:11:20Z | 0 |
+
+A game was live (a `live_row` ask exists). `as_of_in_future` false on 6 / 6. All answers `answer_source=snapshot`; the snapshot `as_of` is 54 min old (23:11:20Z).
+
+**Web, 5:35-6:05 PM CST (235 requests):**
+- WORKER TIMEOUT kills: 0.
+- Memory recycles: 17 (14 hard); max anon 1032.2 MB vs limit 649.6 MB.
+- Overlay warms: 44, median 10.26 s, 7 over 20 s, 0 over 45 s, 0 over 60 s, max 43.3 s.
+- Requests over 20 s: `POST /api/intelligence/query` 3; over 45 s: none.
+- Asks from any client: 11, 0 over 45 s, 0 non-200; 0 of 11 were NOT the probe (all `Python-urllib`: 5 from Reading 15's run at 5:35 PM, 6 from this one).
+
+**Host:** load 6.24 / 5.08 / 4.40 on 12 cores; MemAvailable 5354 MB. Top CPU: build_soccer_artifacts (serie_a) 104% ni 0; local_watchdog 100% ni 0 (0 s old); refresh-worker 88% ni 0 (RSS 3621 MB); gunicorn web 56.6% ni 0 (40 s old); live-odds-worker 52.7% ni 0; m3_launch replay --rehearse 40.6% ni 19 (RSS 2360 MB); refresh_ncaab_odds_history 25.7% ni 0; live_resim_workers 20.8% ni 5.
+
+**Engine:**
+- 2a F2: still 1 run (10:30-11:17 AM CST, succeeded, "did NOT PASS"), already on main `c765eec64`; no newer run.
+- 2b M2: `engine-learner-m2-gate-read-1124` enabled, fireAt 2026-11-24T16:30:00Z.
+- 2c gate hash: `c1a2c029c2a1816f...` (Amendment 2) unchanged.
+- 2d engine-file commits on origin/main in the last 40 min: none.
+- 2e deploys.md headers since 5:26 PM CST: 5:30 PM READING (no deploy); 5:46 PM DEPLOY ATTEMPT ABORTED, NOTHING LOADED (`3f337b2d9`, #809, lane `ncaaf-grid-build-speed`); 5:54 PM READING (no deploy). No new fleet load.
+
+No anomaly.
+
+Notes, not anomalies: 17 recycles (14 hard) in 30 min is high for 235 requests, and the web worker was 40 s old at the probe. No request was killed and no Ask passed 20 s. Check next: whether the recycle rate tracks the 5:15 PM serialize-once load (#828) or the refresh-worker's 3.6 GB RSS. The ask snapshot is 54 min old; Reading 15 attributed this to the refresh-worker deploy drain holding board builds.
