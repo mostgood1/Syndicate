@@ -1615,7 +1615,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Cost, measured on the fleet:** a cold cards build is ~0.3 s of work plus two ~0.2 s deepcopies of a 1.79 MB-pickle context; a hit is 0.22 s.
 - **Diacritics in the live prop join: FIXED `[verified 2026-11-09 02:30Z, lane nba-live-proj-actuals, 7d72f8e9d]`:** the join folds accents. Lens `Karlo Matković` joins board `Karlo Matkovic` (7 of 7 rows), and Dončić joined on 11-09 LAL@ATL.
 
-## [wnba-boxscore-web-polling] WNBA BOX-SCORE CALLS WERE 29.4% OF FLEET WEB REQUESTS IN THE OFFSEASON; the June "stuck backfill" was TESTS reaching the fleet `[verified 2026-11-17, lane wnba-boxscore-polling-per-date, todo #829]`
+## [wnba-boxscore-web-polling] WNBA BOX-SCORE CALLS WERE 29.4% OF FLEET WEB REQUESTS IN THE OFFSEASON; the June "stuck backfill" was TESTS reaching the fleet `[verified 2026-11-17; both halves loaded + measured 2026-11-18, lane wnba-boxscore-polling-per-date CLOSED, todo #829 closed]`
 
 - **The share.** The fleet's web.log, 10-31 03:14Z .. 11-17 21:39Z:
   - 29,449 of 100,005 web requests were `GET /wnba/api/live_player_boxscore` (17,756) or `GET /wnba/api/final_player_boxscore` (11,693);
@@ -1626,11 +1626,13 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
   - refresh-worker's settlement count (`intelligence_state._refresh_wnba_boxscores`, today + yesterday), ~550-770 a day;
   - **the test suite**. Both box clients fell back to `http://127.0.0.1:10000`, the fleet. About 76 a day arrive in the nightly `ci-checkout` shards (08:14-08:58Z), plus sessions' own runs. Every request for 2026-06-03..06-05 / 06-09/10 / 09-09/10 is one of these.
 - **EXONERATED: the WNBA postgame backfill** (`run_refresh_worker.py` `_run_wnba_postgame_producer_tick`). It calls ESPN directly over a 30-day window and settles hourly.
-- **The fix, ON MAIN `920c19e70`.** The live-capture half has been LOADED on live-odds-worker since 2026-11-17 23:22:26Z: `live_player_boxscore` to web went from 43/h to 0 (deploys.md 23:54Z). The settlement half on refresh-worker is NOT loaded; it loads at the next refresh-worker restart:
-  - both loops skip a DATE whose `schedule_<YYYY>.csv` is readable, has rows and lists no game on it;
-  - unknown polls and logs its reason;
-  - no sport or season switch;
-  - `tests/conftest.py` pins the box URL to a refusing port.
+- **The fix, `920c19e70`, is LOADED on both callers.** Verified 2026-11-18 22:17Z (deploys.md 2026-11-18 22:21Z):
+  - **Live capture (live-odds-worker),** since the 11-17 23:22:26Z TERM: `live_player_boxscore` to web 43/h -> 0, still 0 on 11-18.
+  - **Settlement count (refresh-worker),** since the 11-18 08:02:54Z TERM at `3920a2d4d`. The first `WNBA_BOXSCORES_COUNT_SKIPPED ... reason=schedule_has_no_games` came at 08:10:14Z, and there were 354 by 22:17Z, with 0 SLATE_UNKNOWN and 0 DISAGREES. `count_only` to web went 30-32/h -> 0.
+  - **Tests:** `tests/conftest.py` pins the box URL to a refusing port. Fixture-date requests to web: 80 in the 11-17 suite window -> 0 on 11-18 (a partial run, 3 of 8 chunks); daytime 549 on 11-17 -> 0 on 11-18.
+  - **Effect:** the WNBA share of web requests at 19:51-21:52Z went 58.0% -> 0.0% (0 of 80). Web recycles in that window went 10.46 -> 3.96/h, but that is NOT attributable to #829: the hard-recycle stagger `db6a395ed` loaded on web at 19:14:22Z 11-18, and the non-WNBA mix halved.
+  - **How it decides:** both loops skip a DATE whose `schedule_<YYYY>.csv` is readable, has rows and lists no game on it. Unknown polls and logs its reason. There is no sport or season switch.
+  - **January 2027:** `schedule_2027.csv` will be absent, so every date polls as UNKNOWN until `fetch-schedule` writes it (todo.md operational notes).
 - **The schedule is a safe skip signal.** Checked against the producer's ESPN finals, it never under-counts: 0 of 75 dates, and all 132 box files fall on listed dates.
 - **The published cards context is NOT a skip signal.** On 11-17 it said `games: []` while its `source_path` was absent.
 - Findings: `findings_2026-11-17_wnba_boxscore_polling.md`.

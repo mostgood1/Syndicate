@@ -17,6 +17,33 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#829` — **CLOSED 2026-11-18 (GOAL MET): WNBA BOX-SCORE POLLS ASKED FLEET WEB ABOUT DATES WITH NO WNBA GAMES: 29,449 of 100,005 web requests (29.4%) 10-31..11-17, 1,614 of 2,408 (67.0%) on 11-17. Now decided PER DATE from `schedule_<YYYY>.csv`; an unknown schedule polls and says why. The June 03-05 calls were TESTS reaching the fleet, not a stuck backfill** `[2026-11-17, lane wnba-boxscore-polling-per-date; rail monitor I-14, user "start the WNBA box-score polling session"]` — ON MAIN `920c19e70`; **LIVE-CAPTURE HALF LOADED 2026-11-17 23:22:26Z** (claimed live-odds-worker TERM, user "Load it"): `live_player_boxscore` to web 43/h -> 0 (deploys.md 23:22:26Z + 23:54Z); **settlement half NOT LOADED** -- loads at the next refresh-worker restart (refresh-worker was never idle in the live evening, deploys.md 23:46Z)
+- **STATUS 2026-11-18 4:21 PM CST (22:21Z): GOAL MET, closed** (scheduled task `wnba-829-readings-1118`, read-only; deploys.md 2026-11-18 22:21Z; lane `wnba-boxscore-polling-per-date` CLOSED).
+  - Settlement half LOADED by the 08:02:54Z refresh-worker TERM at `3920a2d4d`. First `WNBA_BOXSCORES_COUNT_SKIPPED date=2026-11-18 reason=schedule_has_no_games` at 08:10:14Z; 354 skips by 22:17Z, 0 SLATE_UNKNOWN, 0 DISAGREES. `count_only` to web went 30-32/h -> 0 after 08:10:14Z.
+  - Live capture: still 0 `live_player_boxscore` on 11-18.
+  - Suite window 08:00-09:30Z: 0 fixture-date requests (80 on 11-17), on a PARTIAL run. Chunks 1-2 of 8 completed and chunk 3 stopped at 86% at 08:27:54Z; the leak-spy file ran in chunk 1. Daytime fixture requests: 549 on 11-17, 0 on 11-18.
+  - Recycles 19:51-21:52Z: 10.46 -> 3.96/h, NOT attributable. The `db6a395ed` hard-recycle stagger loaded on web at 19:14:22Z, and non-WNBA requests halved. WNBA share of web requests 58.0% -> 0.0%.
+  - The January 2027 `schedule_2027.csv` check below stays scheduled. It is copied into todo.md's "Operational notes worth not rediscovering", so it is read without opening this archive.
+- **Callers:**
+  - live-odds-worker's live capture (`live_lens_loop._run_live_lens_tick_for_sport` -> `/wnba/api/live_player_boxscore`): ~1,000-1,160 a day, p50 731 ms;
+  - refresh-worker's settlement count (`intelligence_state._refresh_wnba_boxscores` -> `/wnba/api/final_player_boxscore?count_only=1`, today + yesterday): ~550-770 a day;
+  - tests: ~76 a day in the nightly suite's 08:14-08:58Z shards plus daytime runs. They fell back to `http://127.0.0.1:10000`. Postgame backfill EXONERATED (ESPN direct, settled hourly).
+- **Fix:**
+  - `syndicate/features/wnba/slate_schedule.py` `wnba_slate_verdict`: skips only on a readable schedule with rows and none on the date; `date_est` OR `date_utc`; the cards context can only un-skip;
+  - both callers log `*_SKIPPED` / `*_SLATE_UNKNOWN` by reason;
+  - ungraded WNBA orders on the date overrule an empty schedule;
+  - `tests/conftest.py` pins `SYNDICATE_WNBA_LIVE_BOX_BASE_URL` to `127.0.0.1:9`.
+- **Tests:** 24 in `test_wnba_slate_schedule.py` + `test_wnba_box_polling_per_date.py`; both reachability tests fail on the pre-change code.
+- **Validated on the fleet schedule:** 0 dates where ESPN had finals and the schedule lists none (75 producer dates, 132 box files).
+- **Load:**
+  - an ff of `~/Syndicate` plus a TERM of live-odds-worker (live capture) and of refresh-worker (settlement; check for an in-flight MLB sim first);
+  - web is not touched; betting change: no;
+  - the test-leak half needs no deploy (`ci-checkout` follows main).
+- **Owed after a load:** WNBA box share of web requests and web recycles per hour, before vs after (`C:\tmp\wnba_boxpoll\measure.py`). Before, 19:52-21:52Z 11-17 (to the 21:52:41Z down/up): 224/386 = 58.0%, 10.46 recycles/h; 92 of the 224 were test leaks. Also owed: tonight's suite window (08:14-08:58Z 11-18) with 0 June/September `final_player_boxscore` requests.
+- **SCHEDULED CHECK, first week of January 2027:** `schedule_2027.csv` will not exist, so every 2027 date is UNKNOWN and polls at the old rate (`reason=schedule_absent`) until `fetch-schedule` writes one with rows. This is deliberate (unknown never skips). Count `WNBA_LIVE_BOX_SLATE_UNKNOWN` in `live-odds-worker.log`; if `fetch-schedule` never writes 2027 in the offseason, decide what may stand in for it (per date, never a season flag).
+- Findings: `.syndicate/findings_2026-11-17_wnba_boxscore_polling.md`.
+
+
 ### `#822` — **CLOSED 2026-11-16 (GOAL MET): THE SESSION-START HOOK RAN PAST ITS 20 s TIMEOUT (primary tree 16.1-25.1 s, 3 of 5 runs over), AND A KILLED HOOK DELIVERS NO DIGEST. Every python check now starts at once through `scripts/session_start_jobs.py`, and one `wc` replaces 30 forks: 2.5-5.8 s, stdout byte-identical** `[2026-11-16, lane session-start-hook-runtime, session 2f342db9; lead from lane betting-change-session-check (#815)]`
 - **STATUS 2026-11-16 8:05 PM CST (02:05Z 11-17): GOAL MET, closed.** On main `73398cdf4`, and on the primary tree since the 01:57:41Z `primary_tree_ff.py --apply`.
   - Same-instant A/B on the primary, 5 pairs: old 10.9-12.3 s, new 2.7-5.4 s, stdout `cmp`-identical every pair (2056 B).

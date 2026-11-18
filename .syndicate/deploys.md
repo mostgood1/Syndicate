@@ -62046,3 +62046,59 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **What loading now costs:** the H4 reading (the `2ae0c646a` deadline alone, tonight) can no longer be taken. Tonight's run reads the fix instead.
 - **Off switch:** `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED=0` in `local_production.env` plus a drained `down`/`up`. Or revert `a3104a5b6` and ff, which loads at the child's next launch with no restart.
 - The user's go-ahead, quoted: "Load it now" (this session, answering "When should the NBA history fix load?").
+
+## 2026-11-18 22:21Z (4:21 PM CST) -- READING (no deploy): #829 settlement half, the nightly suite window and the 11-18 web recycles (lane `wnba-boxscore-polling-per-date`, scheduled task `wnba-829-readings-1118`, read-only) -- **settlement half LOADED since the 08:02:54Z refresh-worker TERM and skipping; suite-window fixture leaks 76 -> 0; recycle change NOT ATTRIBUTABLE to #829**
+- betting change: no
+- Nothing loaded, restarted, claimed or edited on the fleet. All reads were by file: `C:\tmp\wnba_boxpoll\r829_1118_probe{,2,3,4,5}.sh` (`powershell.exe -NoProfile -Command "wsl -- bash /mnt/c/tmp/wnba_boxpoll/<script>.sh"`), which wrap `baseline829.sh`, `measure.py` and `ci_window.py`. First read at 22:17:11Z.
+
+**Reading 1: is the settlement half loaded? LOADED.**
+
+| check | reading |
+|---|---|
+| the restart | refresh-worker TERM at 2026-11-18 08:02:54Z (2:02 AM CST), fleet `3920a2d4d` (deploys.md, lane `ncaab-total-overprojection`). It restarted again at the 08:30:50Z, 12:37:52Z and 14:05:18Z down/ups and the 14:42:44Z and 15:39:55Z TERMs. Current pid 152916 (etimes 23,899 s, so up since ~15:39Z), not 28948. |
+| code | fleet `~/Syndicate` HEAD `a3104a5b6`; `merge-base --is-ancestor 920c19e70 HEAD` = yes. Reflog: `3920a2d4d` checked out 2026-11-18 01:46:26Z, before the 08:02:54Z restart. The pid's `SYNDICATE_GIT_COMMIT=2ae0c646a` is the up-stamp (14:05Z), not its code. |
+| first skip line | `2026-11-18T08:10:14.508Z [intelligence_state] WNBA_BOXSCORES_COUNT_SKIPPED date=2026-11-18 reason=schedule_has_no_games games=0 schedule=schedule_2026.csv schedule_rows=374 -- no request to web`; 08:10:15.856Z the same for `date=2026-11-17` |
+| skip lines since | 354 by 22:17Z (11-17: 167, 11-18: 177, 11-19: 10, the last from 09:40Z on), 12-36 an hour |
+| SLATE_UNKNOWN / SCHEDULE_DISAGREES | 0 / 0 since 11-17 23:54Z |
+| tracebacks | refresh-worker: 5 since 11-17 23:54Z, 0 naming `slate_schedule` or `_refresh_wnba_boxscores` |
+| `count_only` to web | before: 30-32/h at 06-07Z 11-18 (today + yesterday, every ~3 min); last at 08:01:17Z (pre-restart code); **0 from 08:10:14Z to 22:17Z (~14.1 h)** |
+
+**Reading 2: the nightly suite, 08:00-09:30Z 11-18 (2:00-3:30 AM CST). 0 test-fixture requests on a partial run.**
+
+| check | 11-18 | 11-17 (control) |
+|---|---|---|
+| the suite ran | `ci-suite at 3920a2d4d634` 08:01:12Z. Chunk 1/8 08:01:49-08:17:44Z (collected 3,881); chunk 2/8 08:17:44-08:23:32Z (4,079); chunk 3/8 started 08:23:32Z, and the log STOPS at 86% at 08:27:54Z with no summary. Chunks 4-8 did not run. | 8 of 8 chunks, 08:01:34-08:58Z, 29,153 collected |
+| ci-checkout has the fix | HEAD `3920a2d4d`, `merge-base --is-ancestor 920c19e70` = yes (checked out 08:01:12Z) | `d7c183d8d` (no fix) |
+| web requests in window | 82 | 236 |
+| `final_player_boxscore`, fixture dates (not 11-16/17/18) | **0** | 80 (06-03 28, 06-04 37, 06-05 9, 06-09 2, 06-10 2, 09-09 1, 09-10 1) |
+| `final_player_boxscore`, real dates | 2 (11-17, 11-18, at 08:01:15-17Z, pre-restart code) | 70 |
+| `live_player_boxscore` | 0 | 79 (75 for 11-17; 4 fixture dates 07-13/07-20/08-08) |
+
+- **The population is live, but partial.** The one file the 11-17 leak spy caught (`tests/test_intelligence_state.py`, 10 of 10 hits) ran in chunk 1 on 11-18, which completed. On 11-17 it was chunk 8 (08:50-08:58Z), the window of 4 of the night's leaks. The other 76 leaks fell at 08:10-08:29Z on 11-17 (chunks 2-3); their files are not identified, and only ~3 of 8 chunks ran on 11-18.
+- **Corroborating, a larger population:** test-fixture WNBA box requests to web, daytime. 11-17 09:30-24:00Z: 549 (sessions' own runs). 11-18 00:00-08:00Z: 0; 11-18 09:30-22:17Z: 0.
+- **Lead (not this lane): the 11-18 nightly suite stopped mid-chunk 3 at 08:27:54Z and wrote no summary**, ~3 min before the 08:30:50Z drained down/up (lane `layer2-board-process-split`). Chunks 4-8 and the baseline gate did not run that night.
+
+**Reading 3: web recycles, 19:51:31-21:52:41Z (1:51-3:52 PM CST), the 11-17 baseline's clock window. NOT ATTRIBUTABLE.**
+
+| | 11-17 | 11-18 |
+|---|---|---|
+| web requests | 386 (192.3/h) | 80 (39.6/h) |
+| WNBA box share | 224/386 = 58.0% (92 test leaks) | **0/80 = 0.0%** |
+| non-WNBA requests | 162 | 80 |
+| recycles | 21 (18 hard), 10.46/h | 8 (8 hard), 3.96/h |
+| requests per recycle | 18.4 | 10.0 |
+| gunicorn master boots in window | 0 | 0 |
+| worker boots in window | 22 | 7 |
+| top non-WNBA routes | `/api/syndicate/query` 26, `/api/intelligence/query` 22+6, `/api/ops/version` 17, layer2-shortlist 9+5, live-rail 9 | live-rail 29+1, `/api/intelligence/query` 12+2, layer2-shortlist 9, `/api/ops/version` 5 |
+
+- **Confounders:**
+  - #828 serialize-once, loaded on web 11-17 23:15:44Z.
+  - The web reload at 11-18 01:46:27Z (loop-stall black box `3920a2d4d`).
+  - Drained full down/ups at 08:30:50Z, 12:37:52Z and 14:05:18Z.
+  - **The hard-recycle stagger `db6a395ed`, loaded on web at 19:14:22Z 11-18, 37 min before this window.** It changes exactly the quantity measured.
+  - Ff `a3104a5b6` at 21:02:51Z, inside the window. An ff reaches web at its next worker recycle.
+  - The mix is not comparable: non-WNBA requests halved (162 -> 80), and no `/api/syndicate/query` traffic on 11-18.
+  - The settlement half WAS loaded for the 11-18 window.
+- **Verdict: the recycle drop (10.46 -> 3.96/h) is NOT attributable to #829.** The WNBA share (58.0% -> 0.0%) IS #829's: every caller is gone, and the per-caller readings above show it.
+
+- **Still owed:** nothing for #829's goal. The full 8-chunk suite night is not separately owed: any future night's fixture-date count is the same check. The January 2027 `schedule_2027.csv` check stays in #829 (closed record).

@@ -290,26 +290,6 @@
 - **Ride-alongs loaded on web by that ff:** render-config 3b `f1a278ed8`. On disk for the workers' next restart: WNBA #829 `920c19e70`, the operator-fill helper `b96ea17a7`, engine experts `85af16b35` (offline scripts only).
 - The web memory-recycle rate is not attributable from this window; it stays with `#826`'s owed reading.
 
-### `#829` — **WNBA BOX-SCORE POLLS ASKED FLEET WEB ABOUT DATES WITH NO WNBA GAMES: 29,449 of 100,005 web requests (29.4%) 10-31..11-17, 1,614 of 2,408 (67.0%) on 11-17. Now decided PER DATE from `schedule_<YYYY>.csv`; an unknown schedule polls and says why. The June 03-05 calls were TESTS reaching the fleet, not a stuck backfill** `[2026-11-17, lane wnba-boxscore-polling-per-date; rail monitor I-14, user "start the WNBA box-score polling session"]` — ON MAIN `920c19e70`; **LIVE-CAPTURE HALF LOADED 2026-11-17 23:22:26Z** (claimed live-odds-worker TERM, user "Load it"): `live_player_boxscore` to web 43/h -> 0 (deploys.md 23:22:26Z + 23:54Z); **settlement half NOT LOADED** -- loads at the next refresh-worker restart (refresh-worker was never idle in the live evening, deploys.md 23:46Z)
-- **Callers:**
-  - live-odds-worker's live capture (`live_lens_loop._run_live_lens_tick_for_sport` -> `/wnba/api/live_player_boxscore`): ~1,000-1,160 a day, p50 731 ms;
-  - refresh-worker's settlement count (`intelligence_state._refresh_wnba_boxscores` -> `/wnba/api/final_player_boxscore?count_only=1`, today + yesterday): ~550-770 a day;
-  - tests: ~76 a day in the nightly suite's 08:14-08:58Z shards plus daytime runs. They fell back to `http://127.0.0.1:10000`. Postgame backfill EXONERATED (ESPN direct, settled hourly).
-- **Fix:**
-  - `syndicate/features/wnba/slate_schedule.py` `wnba_slate_verdict`: skips only on a readable schedule with rows and none on the date; `date_est` OR `date_utc`; the cards context can only un-skip;
-  - both callers log `*_SKIPPED` / `*_SLATE_UNKNOWN` by reason;
-  - ungraded WNBA orders on the date overrule an empty schedule;
-  - `tests/conftest.py` pins `SYNDICATE_WNBA_LIVE_BOX_BASE_URL` to `127.0.0.1:9`.
-- **Tests:** 24 in `test_wnba_slate_schedule.py` + `test_wnba_box_polling_per_date.py`; both reachability tests fail on the pre-change code.
-- **Validated on the fleet schedule:** 0 dates where ESPN had finals and the schedule lists none (75 producer dates, 132 box files).
-- **Load:**
-  - an ff of `~/Syndicate` plus a TERM of live-odds-worker (live capture) and of refresh-worker (settlement; check for an in-flight MLB sim first);
-  - web is not touched; betting change: no;
-  - the test-leak half needs no deploy (`ci-checkout` follows main).
-- **Owed after a load:** WNBA box share of web requests and web recycles per hour, before vs after (`C:\tmp\wnba_boxpoll\measure.py`). Before, 19:52-21:52Z 11-17 (to the 21:52:41Z down/up): 224/386 = 58.0%, 10.46 recycles/h; 92 of the 224 were test leaks. Also owed: tonight's suite window (08:14-08:58Z 11-18) with 0 June/September `final_player_boxscore` requests.
-- **SCHEDULED CHECK, first week of January 2027:** `schedule_2027.csv` will not exist, so every 2027 date is UNKNOWN and polls at the old rate (`reason=schedule_absent`) until `fetch-schedule` writes one with rows. This is deliberate (unknown never skips). Count `WNBA_LIVE_BOX_SLATE_UNKNOWN` in `live-odds-worker.log`; if `fetch-schedule` never writes 2027 in the offseason, decide what may stand in for it (per date, never a season flag).
-- Findings: `.syndicate/findings_2026-11-17_wnba_boxscore_polling.md`.
-
 ### `#827` — **THE BOARD QUERY STILL SENT 7.6 MB NOTHING READS. `drop_row_diagnostics` never stripped `top_live_opportunities` (not in `_DIAGNOSTIC_ROW_LISTS`), and `rationale` (4.2 MB over the two top lists) has no reader in any sender of the flag. Both now go: on the fleet's recorded 11-16 response the page's `row_refs` wire falls 33,144,917 -> 25,559,058 B raw, 5,689,938 -> 4,575,384 B gzip-1** `[2026-11-17, lane board-query-diag-strip; the two 11-17 leads from board-query-row-refs]` — ON MAIN `25fc2e4f0`; LOADED 2026-11-17 21:56:24Z (ff + reload-web, user "Load it"; page query 4,429,180 -> 3,962,869 B gzipped, rationale 0 of 4,500 rows, top_live diagnostics 0 of 7; deploys.md 21:56:24Z, BC-038 no)
 - **Survey before the change, every sender of the flag:**
   - the senders are `intelligence.html` (+ the five scripts it loads), `build_cheat_sheets.py` (+ `cheat_sheets.py`, `cheat_sheet_record.py`), the rail probe (+ runner, grader) and `verify_layer2_row_parity.py`;
@@ -50338,6 +50318,14 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 ---
 
 ## Operational notes worth not rediscovering
+
+### WNBA box polls go UNKNOWN in January 2027 until `schedule_2027.csv` exists (`#829`, closed 2026-11-18)
+
+Both WNBA box-score loops skip a date only on a readable `schedule_<YYYY>.csv` that has rows and lists no game on it
+(`syndicate/features/wnba/slate_schedule.py`). Unknown never skips. So from 2027-01-01, every date polls fleet web at the old
+rate (`reason=schedule_absent`) until `fetch-schedule` writes 2027. **First week of January 2027:** count
+`WNBA_LIVE_BOX_SLATE_UNKNOWN` in `live-odds-worker.log` and `WNBA_BOXSCORES_SLATE_UNKNOWN` in `refresh-worker.log`. If
+no 2027 schedule arrives in the offseason, decide what may stand in for it: per date, never a season flag.
 
 ### A faster pull only freshens what the PULL was delaying (`#810`, `#811`, 2026-11-15)
 
