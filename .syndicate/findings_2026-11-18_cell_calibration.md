@@ -73,7 +73,14 @@ never on A-5's gap.
 - **H-R (rail flags, time split, readable now):** fit the table on games dated before 2026-11-15 (window
   10-18..11-14); apply it, in the exact logit form, to pass C's 1,120 decided rail flags (11-15..11-17,
   `C_rail_rows.jsonl`: first sighting per chip × market × segment × side, live). A flag maps to the cell
-  `sport|market(+_alt)|segment|live`.
+  `sport|market|segment|live`.
+  - **CORRECTION 11-18 7:45 PM CST, before any fit:** the line above first said `market(+_alt)`. Pass C's `alt`
+    field is NOT the `_alt` market: `C_rail_build.py:116-120` sets it when the flagged line differs from the main
+    line at that reading, and the raw flag records (`C:	mpailmoneadingslags.jsonl`) carry only the rail's
+    family market (`liveRailMarketKey` folds `totals_alt` into `totals`). So the cell uses the family market. Effect
+    on what can be served: none found in the cell list — the optimizer's state has no college `*_alt` live cell (its
+    live cells are `full` segment only), and every NBA cell is floored. Interval flags (h1, h2, q*) have no live
+    cell, so they stay raw (gain 0, still flagged).
   - **Passes if** the mean log-likelihood gain of p' over the raw model is > 0 with game-clustered CI lower > 0.
   - **Gate check (a pass condition):** every served cell with >= 30 raw held-out flags keeps >= 1 flag under the
     calibrated test. A cell kept at 0 is a gate, and the rule is REJECTED for use (a) — with no refit on these dates.
