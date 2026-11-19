@@ -880,3 +880,51 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - cap use 22.7% / 21.7%.
 - **Unchanged:** gate clock BC-052 from 21:02:51Z, 0 of 800; 1 unclassified load (soccer ff 17:58:30Z, its lane owes
   it).
+
+## Reading 51 — Wed 11-18 7:03 PM CST (01:03Z), window 32 min
+
+- **Results first.** No new grades; 30 d -7.35% [-12.8, -1.9]. 35 games started and unsettled, none late.
+- **Anomalies: `live_today` 5.42 s (budget 3.0) and `page` 3.52 s (budget 3.0).** `live_all` was 2.16 s, inside its
+  budget.
+  - *Hypothesis, written first:* F14, web memory recycles under the slate.
+  - **Confirmed:**
+    - `/api/portfolio/live` finished at 01:03:19.4Z after 5,190 ms;
+    - at 01:03:21.8Z pid 392526 was hard-recycled (1,202 MB against a 625 MB limit, 15 requests);
+    - 0.1 s later pid 394203 also hit its hard limit (1,230 MB) and was **DEFERRED** by the double-recycle hold, so
+      the hold worked as designed;
+    - `/portfolio` took 3,460 ms across it.
+  - **The slate rate:** 6 hard recycles from 00:43 to 01:03Z (about 18 an hour). Each worker lasts 10-20 requests,
+    about 2-4 min.
+  - **The peaks keep climbing:** 970-1,082 MB at 3 PM, 1,157-1,230 MB now. Both workers can be over the limit at the
+    same moment, and the hold only orders their exits.
+  - F14 updated, and the numbers were sent to `web-silent-worker-kills`.
+- **Flow:**
+  - plan 2.1 min old: **358 suggested** (the widest today), 25 sized, 12 positions;
+  - **142 `in_play_market_fair`** refusals as the slate goes in play, so the sim-edge share fell to 0.56;
+  - 8 live ticks, 3 placed, 0 failed;
+  - orders today 66, all filled; unreconciled 0;
+  - cap use 24.2% / 22.5%.
+- **Unchanged:** gate clock BC-052, 0 of 800; 1 unclassified load (soccer ff 17:58:30Z).
+
+## Reading 52 — Wed 11-18 7:35 PM CST (01:35Z), window 32 min
+
+- **Results first.** No new grades; 30 d -7.35% [-12.8, -1.9]. 44 games started and unsettled, none late.
+- **No endpoint anomalies.** `live_today` 1.20 s (5.42 s last reading), `live_all` 1.02 s, page 0.84 s.
+- **New: the first `rejected` order today.**
+  - *Hypothesis, written first:* a maker-pilot post that expired, since the ledger marks those `rejected`.
+  - **Wrong; benign anyway.** It was an **in-play** Kalshi NHL spreads entry, $2.95 requested, submitted 01:11:00Z,
+    `error=venue_canceled` 11 s later. In-play entries are immediate-or-cancel, so an unfilled one comes back
+    cancelled. Not a failure.
+- **Watch: 1 in-play order still `submitted` at 4.1 min.**
+  - Kalshi NBA h2h, $2.95, submitted 01:31:05Z, with a `venue_resolved_at` 1.3 s later but no fill or cancel status
+    yet.
+  - It is inside the 10-min unreconciled grace (unreconciled 1). An immediate-or-cancel order should not rest for
+    minutes, so if it is still `submitted` at the next reading it is an anomaly.
+- **Flow:**
+  - plan 5.4 min old: 377 suggested, 25 sized, 14 positions; 167 `in_play_market_fair`; sim-edge share 0.52;
+  - 8 live ticks, 0 placed (14 `outside_price_band`);
+  - orders today 68 (66 filled, 1 rejected as above, 1 submitted);
+  - cap use 26.9% / 22.5%.
+- **F14:** the web-kills session re-checked reading 51's figures against the log and they hold: since the fix, 41
+  restarts, 0 back-to-back, 9 holds, 0 kills. Its 9-hour heartbeat run found no worker near the stall lines.
+- **Unchanged:** gate clock BC-052, 0 of 800; 1 unclassified load (soccer ff 17:58:30Z).
