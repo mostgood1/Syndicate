@@ -192,3 +192,23 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - orders today 23: 22 filled, 1 maker post resting (432 min);
   - cap use 14.9% / 7.3%.
 - **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 71 — Thu 11-19 8:37 AM CST (14:37Z), window 61 min
+
+- **Results first.** Unchanged: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **Program since reading 70:** S6 (adverse selection) has run (F22).
+  - No entry feature separates the losing orders; the frozen filter is in effect a price cut, TEST D +2.01 pp
+    [-0.85, +4.88].
+  - The forward test (orders from 11-20, first 150 games, about 11-22/23) decides; the monitor runs it.
+  - The fill-time and quote-at-submit logging is mapped and waits on the user approving a loan of
+    `execution_ledger.py` / `execute_portfolio.py` from the quiet lane `paper-alongside-live`.
+- **No anomaly.** Every endpoint was inside budget: `live_today` 0.34 s, page 0.23 s. The new `VENUE FEED` check is
+  quiet.
+- **F21 aftermath:** Polymarket is healthy. Its live plan has 18 placeable of 551 rows and 7 positions.
+- **Flow:**
+  - plan 8.3 min old: 67 suggested, 15 positions;
+  - 18 live ticks, 5 placed, 0 failed. `outside_price_band` refusals ran 74 over the window: a known guard, more
+    positions mean more checks;
+  - orders today 28: 27 filled, 1 maker post resting (493 min);
+  - cap use 17.2% / 8.1%.
+- **Gate:** 12 of 800 events on the BC-052 clock.
