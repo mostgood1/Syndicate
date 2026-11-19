@@ -81,3 +81,30 @@ Day-specific:
   - This is the baseline the 11-24 verdict compares against, not a pass/fail on its own.
 
 POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at or after this time are the population).
+
+## Reading 1 — 10:39 AM CST (16:39Z), day start
+
+- **Live:** 5 WNCAAB games, all in Q2. 13 live rail rows; **0 flags shown**, 0 false, 0 missed, 0 dark.
+- **P1 (card contradictions):** 0. **P6 (pregame college totals flags):** 0.
+- **P8 (score floor, before the parent restart):** 0 violations of 26 calibrated college full-game total rows.
+- **Team cards:** 94 chips today, 0 defects (flipped, detail, chip-less).
+- **Load:**
+  - `/intelligence` 8.42 s (4.59 MB on the wire);
+  - `/api/intelligence/query` 6.19 s (4.24 MB);
+  - shortlist 0.89 s; chips 0.22 s.
+- **Board (9:30-10:39 AM):**
+  - 12 builds, wall median 161 s, max 205 s, 0 over 300 s;
+  - publication gap median 274 s, max 628 s;
+  - today's board 259 s old at the read.
+- **Memory guard (since 9:30 AM):**
+  - 11 `MEMORY_GUARD_ABORT` refusals (guard reading 5,288-5,881 MB of 7,168);
+  - 2 child recycles, both **rc -6**: 9:42 AM (attempt 26) and 10:21 AM (attempt 27);
+  - parent pid 152916 RSS 2.33 GB, not restarted since 11-18. The child is at 2.66 GB, 18 min after its respawn.
+  - The #850 load (local_d0f83044) is due ~11 AM.
+- **Live odds:**
+  - WNCAAB overlay gap max 64 s, 0 over 360 s; 35 web merges, 0 stale;
+  - 20 sweeps launched, 2 refused (`lane_busy`, 9.1%);
+  - live rows priced age p50 183 s, p90 730 s, max 816 s (4 of 13 rows over 300 s old at the read).
+- **#844 sampler (R-B):** ran at 9:19 AM with 0 rows, before any NCAAB game. It starts with the NCAAB tips (1:30 PM).
+- **Improvement hunt:** nothing new at this volume (5 games). Watch the WNCAAB quote-age tail as more games go live: 4 of 13
+  rows over 300 s, with p90 730 s.
