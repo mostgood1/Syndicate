@@ -967,3 +967,95 @@ The suggested recorder fix (local_fbe07d8c) was waiting for the in-flight build 
 - DAY_START 11-18 06:00Z; population = games commencing >= 18:05Z. The 11:01 AM game goes to an EARLY bucket.
 - New buckets: P3 first-reading flags (within 600 s of the game's first rail reading), P4 fair < 0.40, P5 NCAAB full totals with the flagged lines' over share.
 - A trial run at 11:40 PM graded 590 flags over 86 games, with 14 not yet final. The final grade runs after the last game.
+
+## Reading 25 — Thu 11-19 12:05 AM CST (06:05Z): 0 live; the slate is done
+
+0 live chips, 0 flags. 11-18 finals fetched with `/api/board/game-chips?...&date=2026-11-18` (137 final) into `C:\tmp\railmon\final1118\chips.json`, because the probe's own chips had rolled to 11-19.
+
+# DAILY SUMMARY — Wed 11-18 (day 4)
+
+**Coverage:** 25 readings, 11:57 AM → 12:05 AM CST; 6 with the full page. Peak 80 live chips and 104 flags (7:34 PM).
+**Live dashboard:** Rail Watch, https://claude.ai/artifact/HoJ2n52ewHZnVDbN2LpxaJ. The user asked for it at ~1:10 PM; it was updated every reading.
+
+**Flags: 0 false and 0 missed in all 25 readings.**
+- Dark rows: r14 7; 0 elsewhere.
+- Team cards: 0 defects all day.
+- **Caveat (#844):** "missed" reads the grid's row age, and #844 makes fresh college rows read stale, so college "0 missed" cannot see lines the gate wrongly withheld.
+
+### The grade (`C:\tmp\railmon\grade1118.py`, output `grade1118_out.json`)
+
+**Population:** first sightings on 11-18 CT for games commencing at or after 12:05 PM CST (pre-registered). 605 unique flags; **569 graded** (35 not final, 1 early game); 87 games. Game-clustered bootstrap, 90% interval on hit − fair.
+
+| bucket | flags / games | W-L | hit | mean fair | Brier model / book | CI90 (hit − fair) |
+|---|---|---|---|---|---|---|
+| ALL | 569 / 87 | 264-305 | 0.464 | 0.472 | 0.2440 / 0.2238 | [−0.054, +0.042] |
+| P3 first reading | 119 / 58 | 56-63 | 0.471 | 0.484 | 0.2463 / 0.2358 | [−0.090, +0.065] |
+| P3 later readings | 450 / 84 | 208-242 | 0.462 | 0.469 | 0.2433 / 0.2206 | [−0.053, +0.043] |
+| **P4 fair < 0.40** | 76 / 16 | **9-67** | **0.118** | 0.191 | 0.1544 / 0.1074 | **[−0.131, −0.016]** |
+| P4 fair >= 0.40 | 493 / 87 | 255-238 | 0.517 | 0.515 | 0.2578 / 0.2417 | [−0.051, +0.055] |
+| P5 NCAAB full totals | 124 / 54 | 71-53 | 0.573 | 0.503 | 0.2480 / 0.2517 | [−0.031, +0.169] |
+| NBA (all) | 182 / 10 | 57-125 | **0.313** | 0.392 | 0.2298 / 0.1853 | **[−0.141, −0.013]** |
+| NCAAB (all) | 338 / 58 | 186-152 | 0.550 | 0.512 | 0.2498 / 0.2427 | [−0.028, +0.102] |
+| WNCAAB (all) | 36 / 15 | 18-18 | 0.500 | 0.495 | 0.2572 / 0.2454 | [−0.157, +0.167] |
+| moneyline (full) | 28 / 26 | 13-15 | 0.464 | 0.595 | 0.2115 / 0.1728 | [−0.250, −0.020] |
+| early game (before the pre-registration) | 1 / 1 | 1-0 | — | — | — | — |
+
+**Verdicts against the pre-registration:**
+- **P1 (I-17):**
+  - At the row level it held: every flagged row's own calibrated total sat on its side.
+  - **At the card level it did not.** 1-2 card contradictions per reading from 6:40 to 10:36 PM. The card showed the FIRST calibrated row's total, not the flagged row's (I-17 owner's diagnosis).
+  - The card fix went live on web at 10:59 PM; 0 after it.
+  - Separately, the calibrated level crossed the score late in one game (5 of 980 row reads). The score floor is built, and the parent loads it at its next restart.
+- **P2 (board split): FALSIFIED.** 5:30-10:30 PM, 25 builds:
+  - median wall **301 s** (target < 253 s); longest 507 s (< 1,510 s, holds);
+  - publication gap median **572 s**, 11 of 24 gaps over 10 min, longest 26.3 min.
+  - The split's own verdict (10:20 PM): CONFOUNDED, the slowdown did not go away. Board CPU share 0.44 → 0.90, but the shortlist gap p50 went 363 → 1,070 s, and container memory peaked at 6,194 MB, over the 6,144 MB line.
+- **P3: not separable.** −1.3 pp on 58 games, CI spans 0. The 11-17 exploratory −16.7 pp did not replicate.
+- **P4: HOLDS.** The tail hit 0.118 vs fair 0.191 (−7.3 pp, CI excludes 0), and the model's Brier is worse than the book's. This is evidence for per-line calibration (#847, built default-off), **never a band gate**.
+- **P5 (report):** NCAAB calibrated live totals hit +7.0 pp over fair (CI spans 0); 121 of 124 flags were unders, and the flagged lines went over in 56 of 124 (45%). This night ran under; 11-17 ran over. The #816 owner's 7-day grade is the verdict.
+- **P6: HOLDS.** 0 pregame college totals flags in all 25 readings (BC-048).
+- **P7 (I-22, the owner's 11:05 PM verdict):** healthy path MET on 4 of 5 checks. NHL odds were older than 1,200 s in 1 of 63 gaps (not an NHL hold). **The slow-API case was not exercised.** In the monitor's readings, the longest live run was 51-267 s and refused sweeps ran 6-36% per window (11-17: up to 88%).
+- **P8 (I-21):** NHL in-play rows held at 154-177 on the overlay through the NHL window. The owner's reading runs at 12:30 AM.
+
+### The day's anomalies
+
+| id | what | measured | owner / state |
+|---|---|---|---|
+| **A-3** | The board child recycles on **memory-guard refusals** (`MEMORY_GUARD_ABORT ... floor_mb=1900`), sooner each time, and crashes on exit | **7 recycles: 6:29, 7:52, 8:42, 9:25, 9:58, 10:29, 11:17 PM** (uptime 8.8 h, 83, 50, 42, 33, 31, 31 min); every exit rc −6. 0 refusals on the 11-17 evening before the split. Board gaps up to 26.3 min. A child restart does not reset the parent (11:17 PM, 31 min after the 10:46 PM restart) | **#850**, session "Fix board child memory-guard recycles" (user "Start it"). Cause: the guard counts parent + child against 7,168 MB; the split added ~777 MB; the parent grows ~1.1 GB per evening. Fixes on main `38c3a6905`, default-off, counted as a betting change. **Rollback of the split is the user's open decision.** |
+| A-4 | The today board publishes every 8-18 min, not 5: a `LAYER2_TODAY_CADENCE` step (114-537 s) runs before each build | publication gap median 490-572 s | recorded for the split verdict and #850 |
+| #844 | The grid's newest stamp is taken by text: fresh college rows read stale | NCAAB moneyline fresh 81% of live minutes by time vs 25.5% by row age | fix `25a5e480d` default-off; in the **11-24 window** (user "Yes, add it") |
+| I-17 card | The card showed another line's calibrated total | 1-2 contradictions per reading, 6:40-10:36 PM | **fixed**, live on web 10:59 PM |
+| A-1 (withdrawn) | Midday "board CPU grows 5x" | per-build CPU tracked host load (602 → 106 s with no change) | withdrawn at 1:49 PM, unstarted card dismissed |
+
+### Loads on the fleet, 11-18 (deploys.md)
+
+| time (CST) | change | betting change |
+|---|---|---|
+| 2:02 AM | refresh-worker TERM: I-17 calibrated total + NFL seeds | yes (BC-041) |
+| 2:30 AM | the board split (I-20) | yes (BC-042) |
+| 6:37 AM | WSL vhdx compaction | no |
+| 7:47 AM | I-22 live odds lane deadline | yes (BC-046) |
+| 8:05 AM | NHL in-play props pull ON | yes |
+| 8:42 AM | #816 gate fallback (pregame college totals serve the market) | yes (BC-048) |
+| 9:39 AM | lean game-state chips (#790) | see deploys.md |
+| 9:56 AM | pregame NHL split | yes (BC-049) |
+| 10:33 AM | NHL stats-REST cache | yes (BC-050) |
+| 11:58 AM | soccer look-ahead date anchor | no |
+| **12:00 PM** | **NEW RULE:** live-betting changes load only in windows, the first Tue 11-24 | — |
+| 1:14 PM | web hard-recycle fix (ride-alongs default-off) | no |
+| 3:02 PM | NBA history bounded / de-duplicated (Elo) | yes (BC-052, user override) |
+| 10:46 PM | suggested-pick recorder (first suggested sighting) | no |
+| 10:58 PM | I-17 card fix plus score floor (#844 and #847 rode along, off) | no |
+
+### Sessions and improvements opened today, all on the user's words
+
+| item | state |
+|---|---|
+| **Rail Watch** live dashboard (user ~1:10 PM) | live; results sections added: rail flags by day, board / shortlist / suggested / staked over 44 days, cheat sheets over 35 days, and the optimization levers |
+| Pregame NHL split; NHL stats cache; soccer look-ahead; NBA history | all LOADED (above) |
+| Suggested picks graded as their own set (local_fbe07d8c) | 28-day ROI −3.0% [−5.6, −0.5] vs +3.4% promised; recorder fix LIVE; daily 7:15 AM grade registered |
+| **Optimization program** (local_09a95c0b) | ranked levers on main. No live-money lever clears noise (fees are 78% of the live loss). Calibration does (#847): built default-off, forward grade 11-26. #848: soccer suspicion false, NHL stale-quote grading fixed default-off. #849 closed (6 s per build) |
+| Board child memory-guard recycles (local_d0f83044, #850) | diagnosed; fixes on main default-off; load or rollback is the user's call |
+| Cheat sheet picks (dashboard) | season: Consistency +0.3%, Hot streaks +2.3%, Matchups +1.5% (beat matched non-members +3.5 [+0.6, +6.5]); Value −5.4% (trails its fair −4.1 [−7.1, −0.8]); Syndicate picks −7.0% |
+
+**Open for the user:** the board-split rollback vs #850's fix (11-24 window, or an exception), and whether to monitor 11-19 (TNF, the NFL seeds' first game).
