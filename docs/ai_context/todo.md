@@ -96,7 +96,7 @@
 - **Not book coverage:** median 9 books quote each live NCAAB game, and spreads/totals had a fresh book about 90% of live minutes.
 - **BUILT, ON MAIN `25a5e480d`, DEFAULT OFF** (user "Yes, build it", then "get 844 landed default off for 11-24"): `book_grid._newest_stamp`, enabled by `SYNDICATE_BOOK_GRID_NEWEST_BY_TIME=on` on refresh-worker + web (global key is simplest); absent = the old text max exactly. 22 tests (5 fail on the old code). Fleet-shard A/B absent vs on: NBA/NHL byte-identical; NCAAB 11-17 190 of 2,139 rows younger, 58 cross the 120 s gate. Prediction P1-P4 in the findings. Queued for the 11-24 window via the window package (session product-optimization-program); loading is the user's call. Superseded plan: **Fix (not built):** newest stamp by parsed time in `book_grid.py` (claimed by OPEN lane `ncaaf-grid-build-speed`; coordinate), with a test where a space-format sportsbook stamp is newer than a `T`-format venue stamp. BETTING CHANGE: loads in a betting-change window (next Tue 11-24 2:00-7:00 AM CST) unless the user calls it a broken money path. Owed after load: college moneyline fresh-by-row-age share near the 81% fresh-by-time, and the count of college live rows priced per build before and after.
 
-### `#843` — **THE ~12:01 AM CST 1,800 s HOLDS OF THE LIVE ODDS LANE ARE THE NBA PROPS JOB'S GAMES-HISTORY FETCH, AND THE SAME BUG HAS DUPLICATED THE NBA HISTORY: a game-id mismatch (`0022600001` vs the CSV round-trip's `22600001`) makes every `cli fetch --years 1` walk BoxScoreSummaryV2 for the WHOLE season under a 2,700 s timeout (longer than the 1,800 s step), and makes every completed fetch append another copy of the season (1,563 rows for 196 games; NBA Elo off by a mean 119, max 293, at each team's latest game). Fix on main behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED`; LOADED 11-18 3:02 PM CST, default ON (`a3104a5b6`, user "Load it now", BC-052 outside a window). The effect readings are owed tonight** `[2026-11-18, lane nba-midnight-bootstrap-hold; `.syndicate/findings_2026-11-18_nba_midnight_bootstrap_hold.md`; from #840's lead]`
+### `#843` — **THE ~12:01 AM CST 1,800 s HOLDS OF THE LIVE ODDS LANE ARE THE NBA PROPS JOB'S GAMES-HISTORY FETCH, AND THE SAME BUG HAS DUPLICATED THE NBA HISTORY: a game-id mismatch (`0022600001` vs the CSV round-trip's `22600001`) makes every `cli fetch --years 1` walk BoxScoreSummaryV2 for the WHOLE season under a 2,700 s timeout (longer than the 1,800 s step), and makes every completed fetch append another copy of the season (1,563 rows for 196 games; NBA Elo off by a mean 119, max 293, at each team's latest game). Fix on main behind `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED`; LOADED 11-18 3:02 PM CST, default ON (`a3104a5b6`, user "Load it now", BC-052 outside a window). FIRST NIGHT MET 11-19: the fetch took 630 s with to_fetch 56, the history is 221 rows / 221 ids (newest 11-18), and the midnight run took 760 s against 1,765-1,801 s. Nights 2-7, P5 and P6 owed** `[2026-11-18, lane nba-midnight-bootstrap-hold; `.syndicate/findings_2026-11-18_nba_midnight_bootstrap_hold.md`; from #840's lead]`
 - **Measured (fleet, read-only):**
   - 4 of 10 midnights (11-09..11-18) ran 1,765-1,801 s: 11-12, 11-14, 11-15 and 11-18, plus 11-05 before that.
     Every one fetched at midnight; none of the 6 others did.
@@ -119,19 +119,29 @@
   - Fleet ff `db6a395ed` -> `a3104a5b6` at 21:02:51Z, with no restart.
   - BC-052 is a betting change OUTSIDE a window, by user override; deploys.md has the entry.
   - A fleet child reads the switch as on.
-- **Owed:**
-  - **The first bootstrap fetch for 11-19** (refresh-worker's evening look-ahead or the 00:01 CST run):
-    - P1: its log carries `GAMES_HISTORY_FETCH_BOUNDED timeout_s=900` and `LINESCORE_WALK bounded=1` with
-      `to_fetch <= 60`;
-    - P2: it ends within 900 s;
-    - P4: after it, the season's rows equal its unique ids, and the newest game is 11-18.
-  - **The 11-19 00:01 CST `nba,ncaab,wncaab` run:** <= 1,100 s.
-  - **P3 over 11-19..11-25.**
-  - Tonight's switch-off prediction (H4) can no longer be read: the fix loaded first.
+- **First night MET, 2026-11-19** (findings §10; deploys.md "2026-11-19 06:45:42Z ... READING"). Read at 12:45 AM CST by the
+  scheduled task `nba-history-fix-first-night-1119`; re-read by session 11c3b7a0.
+  - P1: `timeout_s=900`, `to_fetch=56`.
+  - P2: 630 s.
+  - P3, night 1: run `20261119_060116` took 760 s; NBA step 755 s, no timeout; 0 sweeps refused behind it.
+  - P4: 221 rows / 221 ids, newest 11-18.
+  - The walk hit its 600 s deadline with 23 of 56 games left for the next fetch (by design).
+  - Lane `nba-midnight-bootstrap-hold` CLOSED 11-19.
+- **Owed** (unowned since the lane closed; any session can take them, read-only):
+  - **P3 over nights 11-20..11-25:** each ~00:01 CST `nba,ncaab,wncaab` run on live-odds-worker <= 1,100 s, with 0 NBA
+    step timeouts. The 11-19 reading script takes `MN1800_LOAD` and `MN1800_MIDNIGHT` (one night each) and reads the
+    fetch, the history and the run in one pass: `C:\tmp\mn1800\mn1800_reading_1119.py` (its header has the
+    command).
+  - **P4's completion rate:** >= 90% of fetches over the 7 nights (baseline 61%).
+  - **P5:** the Elo shift at the 11-19 06:12Z `build-features`. The pre-run features file was overwritten, so this
+    is a recompute from the de-duplicated vs the duplicated history (the latter is the git mirror or a backup).
+  - **P6:** 0 added OddsAPI calls.
+  - Tonight's switch-off prediction (H4) could not be read: the fix loaded first.
 - **Leads:**
   - `wncaab_odds_snapshot` reports ok false on every run;
   - the WNBA twin's id handling is unchecked;
-  - the live NBA bets that read `predictions_<D>.csv` are untraced.
+  - the live NBA bets that read `predictions_<D>.csv`: SIZED by session 9383ef18 in
+    `.syndicate/findings_2026-11-18_nba_elo_money_impact.md` (main `20c9f9f45`).
 
 ### `#842` — **REFRESH-WORKER'S DAY-2 LOOK-AHEAD IS PHASE-LOCKED OUT BY ITS OWN DAY-1 RUN: both look-ahead decisions stamp their marker BEFORE launching, so a `lane_busy` refusal waits a full 3,600 s and meets the next day-1 run again. Day 2 refused 115 of 127 attempts over 7.6 days, 114 of them held by the same hour's day-1 run. Fix on main behind `SYNDICATE_LOOK_AHEAD_LANE_WAIT` (absent = OFF). Switching it on is a betting change (window); restore day 2, fix day 1 only, or leave it -- the user's call** `[2026-11-18, lane lookahead-day2-phase-lock]`
 - **USER DECISION 2026-11-18 3:08 PM CST: "Fix day 1, retire day 2"** (option (b)): `REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_LANE_WAIT=on` + `REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_48H_ENABLED=false`, betting change yes. **QUEUED** as droppable CHANGE C of the 11-24 window batch task `nfl-level-refit-load-1120` (Tue 11-24 2:15 AM CST, one ff + one drained down/up); otherwise the 12-08 window. Predictions Pb0-Pb7 in lane `lookahead-day2-phase-lock`; readings by tasks `lookahead-b-reading-1125` and `lookahead-b-reading-1201`. The code (`2aff90c36`, default off) is on the fleet checkout since the 3:02:52 PM CST ff; it is not yet in the running refresh-worker. **USER 2026-11-18 ~4:10 PM CST: "Keep it in the batch"** (typed in session f9057c3a, after being told the merge into the batch was my call): CHANGE C stays in `nfl-level-refit-load-1120`'s single down/up; the batch prompt now quotes it (read back identical 4:12 PM CST).

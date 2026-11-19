@@ -1281,7 +1281,7 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
 - **Games history is re-fetched when the schedule shows newer finals,** not only when the newest game is more than 30 days old (`basketball_games_history_freshness.py`, 360-min cooldown).
   - WNBA in production 02:56-02:59Z 10-14: history 10-02 -> 10-09 (2,490 games); `features.csv` rebuilt.
   - **NBA half inert:** NBA `fetch-schedule` only writes `schedule_2025_26.csv` (fleet file ends 04-12). The 2026-27 season starts 10-20. Unfixed.
-- **The NBA games history is DUPLICATED and its fetch outlives the live lane's step** `[verified 2026-11-18 ~1:30 PM CST, fleet read-only, lane nba-midnight-bootstrap-hold, todo #843]`:
+- **The NBA games history WAS duplicated, and its fetch outlived the live lane's step. The bounded fetch fixed both on 2026-11-19 (below)** `[pre-fix reading verified 2026-11-18 ~1:30 PM CST, fleet read-only, lane nba-midnight-bootstrap-hold, todo #843]`:
   - `raw/games_nba_api.csv` holds 1,563 rows for 196 current-season games (up to 16 copies of a game); the newest game is 11-15.
   - The cause is a game-id mismatch: the CSV round-trips `0022600001` as `22600001`. So:
     - every completed `cli fetch` appends one more copy of the season;
@@ -1293,7 +1293,14 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     - Fleet ff `db6a395ed` -> `a3104a5b6` with no restart: the child scripts load it at their next launch.
     - BC-052 yes, outside a window, user "Load it now".
     - A fleet child reads the switch as on.
-  - The history above is the pre-fix reading. It is de-duplicated at the first bootstrap fetch for 11-19, which is owed.
+  - The history above is the pre-fix reading.
+  - **First night on the fix, 2026-11-19** `[verified 06:45:42Z, fleet read-only; findings §10]`:
+    - The bootstrap fetch (00:01 CST live-lane run) took 630 s, against the 900 s cap: `to_fetch=56`, 33 walked, and 23
+      left at the 600 s deadline.
+    - `raw/games_nba_api.csv` holds **221 season rows for 221 ids** (0 duplicates), newest 2026-11-18; written 06:12:05Z.
+    - The midnight `nba,ncaab,wncaab` run took **760 s** (NBA step 755 s, no timeout), against 1,765-1,801 s on fetch
+      nights before.
+    - Nights 11-20..11-25 are still owed (todo #843).
 - **Readings owed at WNBA Finals G1 (10-17) lines:**
   - `player_logs.csv` rewritten through 10-09+.
   - A new `calibration_totals_*.json`.

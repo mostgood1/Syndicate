@@ -62271,3 +62271,30 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - **the NUMBER registered at the load MISSED, and the instrument is why:** `lean_join.py` pivot -> flag 3.37 s (n 127) -> 3.47 s (n 300) over the whole windows; in-play 3.01 s (n 122) -> 3.50 s (n 265). It placed each NBA build at `BOOK_GRID_TICK - build_seconds.nba`, but that line is written after EVERY sport of the tick has built, so it found NBA's markers only when NBA built near last: 127 of 292 builds on 11-17, 300 of 377 on 11-18, a different subset each night, and with no live-count filter (the registered bar said ">= 2 NBA games live"). The overlay split finds the markers in 244 of 250 and 323 of 323. learnings.md 2026-11-19.
   - **pregame NOT MET as written, and not attributable:** NBA build median from the load to 00:00Z 7.20 s (n 45), against the registered 2.30 s (06:00-15:39Z, the early hours) and 11-17's same hours 6.00 s (n 31). 11-17's pregame builds rarely carry both markers (5 of 31), so the span cannot be compared. The only pregame chip measure is the 0-live probe before the load (0.36 s CPU saved).
 - claims: none taken (read-only). Lane `nba-grid-lean-chips` CLOSED. Off switch unchanged: `SYNDICATE_BOOK_GRID_LEAN_CHIPS=off` + a drained full down/up.
+
+## 2026-11-19 06:45:42Z (12:45 AM CST 2026-11-19) -- READING: NBA history fetch bounded + de-duplicated (todo #843, lane `nba-midnight-bootstrap-hold`), the first night after the 2026-11-18 21:02:51Z load of `a3104a5b6` -- **MET for night 1: the first fetch took 630 s (`timeout_s=900`, `to_fetch` 56); the history is 221 rows / 221 ids, newest 11-18; the 00:01 CST `nba,ncaab,wncaab` run took 760 s, against 1,765-1,801 s on fetch nights before. Nights 2-7 owed.**
+
+- betting change: no (a reading of the 21:02:51Z load, BC-052; nothing loaded)
+- source: read-only, nice 19. The scheduled task `nba-history-fix-first-night-1119` ran `C:\tmp\mn1800\mn1800_reading_1119.py` at 06:45:42Z, writing `C:\tmp\mn1800\reading_1119.txt`. Session 11c3b7a0 re-read the output at 06:56Z.
+  - The script was dry-run on the 11-18 night first. It reproduced that night's numbers: 1,765 s, the NBA step timeout, 1,563 / 196, and 1 refusal behind the run.
+  - Fleet head `d78a448c4` (contains `a3104a5b6`). `history_fetch_bounded()` = True, and 0 of 5 env layers name the key.
+- verify (against the 21:02:51Z entry's OWED):
+  - **`nba_season_rows_minus_unique_ids_after_first_fetch` 1367 -> 0: MET.** `games_nba_api.csv` was written at 06:12:05Z and holds 221 season rows for 221 ids, with 0 duplicates and the newest game 2026-11-18.
+    - It was 1,563 / 196, newest 11-15.
+    - The first fetch after the load came from the 00:01 CST live-lane run; nothing fetched earlier.
+  - **`midnight_nba_run_max_s_7_nights` 1801 -> at most 1100. Night 1 of 7: 760 s.**
+    - Run `odds_refresh_20261119_060116`, live-odds-worker, 06:01:16Z.
+    - NBA step 755 s, rc 0, no step timeout.
+    - 0 sweeps were refused behind the run (1 refresh-worker refusal at 06:02:03Z was for its own lane).
+    - The run's rc is 1 from `wncaab_odds_snapshot`, the known lead.
+    - Nights 11-20..11-25 are **OWED**.
+  - **The props log** (`syndicate_refresh_oddsapi_props_2026-11-19.log`):
+    - 06:01:36Z `GAMES_HISTORY_BEHIND_SCHEDULE` (11-16..11-18, 25 finals);
+    - 06:01:36Z `GAMES_HISTORY_FETCH_BOUNDED timeout_s=900`, then `cli fetch --years 1`;
+    - 06:12:05Z `LINESCORE_WALK bounded=1 to_fetch=56 attempted=33 success=33 failures=0 skipped_deadline=23 deadline_hit=1 elapsed_s=627.6`;
+    - 06:12:05Z `HISTORY_SAVE bounded=1 history_rows_read=13532 rows_written=12190 fetched_games=221`.
+    - The fetch took **630 s**. `predictions_2026-11-19.csv` was written at 06:12:26Z.
+  - **P1, P2, P3 (night 1) and P4 are MET** (findings §10).
+    - The walk hit its 600 s deadline and left 23 of 56 games for the next fetch, by design.
+    - P5 (the Elo shift) and P6 (0 added OddsAPI calls) were not read.
+- claims: none taken (read-only). Lane `nba-midnight-bootstrap-hold` CLOSED. The off switch is unchanged: `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED=0` in `local_production.env` plus a drained `down`/`up`.

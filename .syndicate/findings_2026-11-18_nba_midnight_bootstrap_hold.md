@@ -44,6 +44,7 @@ NBA props log.
 | 11-16 | 060237 | 42 s | no (predictions built by refresh-worker 05:24Z) | ok |
 | 11-17 | 060133 | 125 s | no (cooldown: refresh-worker's 05:24Z fetch) | ok |
 | **11-18** | 060115 | **1,765 s** | yes (behind 11-16, 11-17; 11 finals) | killed in the fetch |
+| 11-19 (fix ON) | 060116 | **760 s** | yes (behind 11-16..11-18; 25 finals) | ok: the bounded fetch took 630 s; see §10 |
 
 - **4 of 10 nights** ran into the timeout, not 3: the soccer lane's list missed 11-12. All 4 fetched at midnight, and
   none of the 6 other nights did.
@@ -179,3 +180,43 @@ If refresh-worker's evening look-ahead fetched first, the midnight run does not 
 - The §7 switch-off prediction for tonight can no longer be read. 11-19 is the first night ON the fix, read against
   P1-P4.
 - Entry: `.syndicate/deploys.md` "2026-11-18 21:02:51Z".
+
+## 10. First night on the fix (2026-11-19): P1-P4 MET
+
+Read at 12:45 AM CST (06:45:42Z) by the scheduled task `nba-history-fix-first-night-1119`, which ran
+`C:\tmp\mn1800\mn1800_reading_1119.py` (fleet, read-only, nice 19). This session re-read the output
+(`C:\tmp\mn1800\reading_1119.txt`) at 06:56Z.
+
+Before the run, the script was dry-run on the 11-18 night. It reproduced that night's §3/§4 numbers: 1,765 s, the NBA
+step timeout, 1,563 / 196, and 1 refusal behind the run.
+
+**Code and switch:** fleet head `d78a448c4` (contains `a3104a5b6`). `history_fetch_bounded()` = True, and 0 of 5 env
+layers name the key.
+
+**The fetch** was the first after the load. It came from the 00:01 CST live-lane run; nothing fetched earlier that
+evening. From the props log:
+- 06:01:36Z: `GAMES_HISTORY_BEHIND_SCHEDULE` (11-16..11-18, 25 finals), then `GAMES_HISTORY_FETCH_BOUNDED timeout_s=900`.
+- 06:12:05Z: `LINESCORE_WALK bounded=1 to_fetch=56 attempted=33 success=33 failures=0 skipped_deadline=23
+  deadline_hit=1 elapsed_s=627.6`.
+- 06:12:05Z: `HISTORY_SAVE bounded=1 history_rows_read=13532 rows_written=12190 fetched_games=221`.
+- The fetch took **630 s**. `build-features` followed, and `predictions_2026-11-19.csv` was written at 06:12:26Z.
+
+| prediction | reading | baseline | verdict |
+|---|---|---|---|
+| P1 | `timeout_s=900`; `to_fetch` 56 (<= 60) | 2,700 s; the whole season, 196-210 games | MET |
+| P2 | 630 s; 0 of 1 fetches timed out | 7 of 18 past 1,775 s | MET |
+| P3, night 1 of 7 | `odds_refresh_20261119_060116` (live-odds-worker): **760 s**; NBA step 755 s, rc 0, no timeout; 0 sweeps refused behind it | 1,765-1,801 s on fetch nights | MET |
+| P4 | 221 season rows / 221 ids (0 duplicates); newest 2026-11-18; 1 of 1 fetches completed | 1,563 / 196, newest 2026-11-15; 61% complete | MET |
+
+- **The walk hit its 600 s deadline.** It left 23 of 56 quarter-less games for the next fetch. That is the designed
+  bound, and those games come back newest-first on the next walk.
+  - `to_fetch` = 56 sat near P1's bar of 60, because this fetch covered three nights of finals (25), not the usual
+    one or two.
+- **A fetching night still costs the lane about 760 s,** against under 300 s on nights with no fetch. The ceiling is
+  the 900 s cap plus `build-features` and `predict-date`, which stays under the live lane's 1,800 s step timeout.
+- **Owed:**
+  - P3, and P4's completion rate, over nights 11-20..11-25;
+  - P5 (the Elo shift at this `build-features`; the pre-run features file was overwritten, so it needs a recompute
+    from the old history, not a before/after read);
+  - P6 (0 added OddsAPI calls).
+  - Todo `#843` carries them.
