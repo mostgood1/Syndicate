@@ -843,3 +843,30 @@ The owner's 6-9 PM read passed 4 of 5 checks. The miss was one 27-min NHL odds g
 **Next on the fleet:**
 - the board-split verdict task at 10:15 PM CST;
 - the suggested recorder fix's refresh-worker restart after 10:31 PM (local_fbe07d8c). That restart also resets the parent's memory, so post-restart readings measure a fresh process.
+
+## Reading 21 — Wed 11-18 10:09 PM CST (04:09Z 11-19): the fifth memory-guard recycle
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 4.1 (4.6 / 4.7). A nice-0 `build_soccer_artifacts.py --league championship` was at 98% at the read (L-d is closed: ~6 s per build).
+
+**A-3, the fifth recycle:**
+- `MEMORY_GUARD_ABORT` at 9:53:47, 9:57:20 and 9:58:36 PM (headroom 1,866 / 1,832 / 1,841 MB; container 5.30-5.34 GB).
+- `RECYCLE_EXIT ... uptime_s 1960` at 9:58:38 PM, then `BOARD_PROCESS_EXITED pid=613542 rc=-6`.
+- Child 662924 READY at 9:59:04 PM (attempt 6); RSS 2.40 GB at 10:09 PM.
+- **Intervals: 8.8 h, 83, 50, 42, 33 min.**
+- Board publications: 9:35:01, 9:42:20, 9:52:07, then **10:07:51 PM (944 s gap)**. Median gap 766 s. Today's board was 299 s old at the read.
+- **The fix session is running** on the user's "Start it" (~9:45 PM): "Fix board child memory-guard recycles", local_d0f83044. The recycle table and RSS-after-respawn figures were sent to it.
+
+**Slate: 17 live.**
+- Flags: 12 shown, 0 false, 0 missed, 0 dark.
+- P1: 4 college totals flags, 1 card contradiction (the card bug).
+- #824: 0. P6: 0.
+- Live rows: 795, **78 priced <= 120 s**.
+- Web merges: 52, **68 stale (NCAAF 52, WNCAAB 16)**, as those games end.
+
+**Live odds lane:** 11 launched, 2 refused (15.4%); live runs 150-166 s.
+
+**Overlay:** 0 gaps over 360 s (max WNCAAB 159 s); tick gap max 81 s.
+
+**Load:** query 7.8 s.
+
+**Team cards:** 0 defects.
