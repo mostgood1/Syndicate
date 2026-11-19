@@ -264,3 +264,31 @@ lane's session now and schedule the rest ("Archive now, schedule").
     - Otherwise 11-18 stalled at a load below that bar. Then 11-19 is TESTABLE if it was at least as busy:
       n95 >= min(100, 11-18's n95) when 11-18's n95 >= 10, else n80 >= min(100, 11-18's n80).
   - **Findings.** With the lane closed, it appends its verdict here as section 8.
+
+## 7. A/B probe result, 11-18 evening (close-out task, written 9:47 PM CST)
+
+**VERDICT: FALSIFIED.** The rules are applied exactly as pre-registered in section 5, by `C:\tmp\inplay_sched_probe\closeout\closeout_1118.py`. The lane's session wrote and tested that script, then was archived at the user's choice ("Archive now, schedule"). The one-time task `inplay-stalls-closeout-1118` ran it.
+
+- Idle copy: class 64, memory priority 2, 1440 slots, 15 errors, stopped=True, stderr 0 bytes.
+- Normal copy: class 32, memory priority 5, 1440 slots, 12 errors, stopped=True, stderr 0 bytes.
+- Pairs: 1440, idle only 0, normal only 0.
+
+| host busy | pairs | Idle p50 / p99 / max (s) | Idle share > 5 s | Normal p50 / p99 / max (s) | Normal share > 5 s |
+|---|---|---|---|---|---|
+| 0.00-0.80 | 944 | 0.197 / 0.6906 / 1.7875 | 0.0 | 0.1943 / 0.4699 / 1.1894 | 0.0 |
+| 0.80-0.95 | 287 | 0.2166 / 1.1209 / 1.2144 | 0.0 | 0.2041 / 0.6946 / 1.0218 | 0.0 |
+| 0.95-1.00 | 209 | 0.275 / 1.2059 / 1.434 | 0.0 | 0.2553 / 0.9646 / 1.0452 | 0.0 |
+
+- **P1** (busy >= 0.95): testable=True (209 pairs), holds=False. Idle p99 1.2059 s and share > 5 s 0.0, against >= 5 s and >= 0.01. Normal p99 0.9646 s and share > 5 s 0.0, against <= 2 s and <= 0.002.
+- **P2** (busy < 0.80): testable=True (944 pairs), holds=True. Idle p99 0.6906 s, Normal p99 0.4699 s, both against <= 2 s.
+- **Falsifier 1** (they slow together: Normal's share > 5 s at least half of Idle's, with Idle's > 0): False.
+- **Falsifier 2** (the Idle copy is fast in busy slots inside the live recorder's > 30 s stalls): 84 such slots, Idle p99 there 1.2671 s, triggered=True. The live recorder also had low I/O priority, which the probe did not copy. So if F2 triggers, I/O priority is the next suspect.
+
+**11-18 recorder baseline** (paced loop `a2af81258` at Idle: the same loop as 11-19, before the fix). 5-9 PM CST: 6 slow gaps (> 30 s, no kalshi_error between), longest 433 s, over 5196 batches. Last batch read at 9:47:07 PM CST (the recording continues after this task). For comparison, on the OLD loop: 11-16 had 7 (max 136 s) and 11-17 had 18 (max 579 s).
+Gaps, 5-9 PM CST: 6:19:48 PM 76 s, 6:35:16 PM 93 s, 7:02:24 PM 107 s, 7:04:11 PM 129 s, 7:06:45 PM 433 s, 8:02:57 PM 38 s.
+
+**Host load over 5:30-9:00 PM CST, from the Normal copy's 10 s slots:** 208 slots at >= 95% busy and 479 at >= 80%, out of 1259.
+
+**The 11-20 reading's TESTABLE rule:** >= 100 samples at >= 95% busy in 5-9 PM CST (unchanged). Kept because 11-18 had 208 samples at >= 95%, so 100 is reachable.
+
+**REVERT DECISION OWED TO THE USER BEFORE 8:00 AM CST 11-19.** Priority is not the lever this run measured. Reverting `c0d9cf9b8` (git revert, pushed to main before the 8:00 AM sync) puts the recorder back at Idle. Doing nothing leaves it at Normal, which costs ~4% of one core. The lane stays OPEN and the loan stays out until the user decides.
