@@ -7,6 +7,11 @@ Same rules as state.md: when a fact changes, EDIT THE LINE.
 
 ## [board-freshness] BOARD FRESHNESS AND STALENESS
 
+- **FAR-DATED SOCCER BUILDS COST THE BOARD LITTLE, AND `nice` CANNOT BUY IT BACK** `[verified on the fleet 2026-11-18 7:16-7:55 PM CST, lane board-build-priority, todo #849 CLOSED]`:
+  - refresh-worker's soccer weekly autorun units (one league-date each, 387 of 391 dated today+2 or later) cost the evening board ~6 s per build and ~19 s of a 371 s mean publication gap;
+  - the extra is board CPU-seconds, not waiting: run-delay share 0.005-0.007 with or without a unit, on 12 vCPUs;
+  - each co-running busy core costs ~13% [+5.6, +20.2] of a board build, whatever its nice value;
+  - findings `.syndicate/findings_2026-11-18_board_build_priority.md`.
 - **STALENESS IS NOW JUDGED AGAINST THE BOOK'S OWN CAPTURE, NOT THE MARKET'S FRESHEST BOOK** `[verified on the fleet 2026-10-16 23:34Z, 7d4cce94, lane book-grid-own-capture-staleness]`. A cell is stale only when (a) it is > 15 min older than that book's freshest quote on the same event (the book stopped quoting the line) or (b) the book's freshest quote on the event is > 2 h behind the event's freshest (pregame; 10 min once started, read off the LATEST start time on the line). The 10-06 rule (15 min behind the market's most recently SEEN book) collapsed `books_quoting` to the last-captured venue: Martinez K 2.5 read 1 of 10 books (Kalshi polled every few minutes vs hourly MLB sportsbook props) -> now **9 of 10**; MLB sides with 1 fresh book while >= 2 quote **59/484 -> 7/483**. NFL 405/2,411 still read that way and are CORRECT (369 = moved lines, 36 = pulled Anytime TDs). `SYNDICATE_BOOK_GRID_STALE_BASIS=market_seen` restores the old rule. **Board: no suggested pick when the fair rests on one venue** (`single_book_fair`): 0 such picks on any date at 23:35Z (was 19-23 of ~66). Findings: `findings_2026-10-16_one_book_staleness.md`.
 **THE BOARD HAS TWO INDEPENDENT CAUSES, and fixing one is not enough.**
 

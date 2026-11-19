@@ -3629,3 +3629,13 @@ as a verdict.
 - **Pass C's +0.024 answered a different question:** its k was fitted ON rail flags, NBA and NCAAB totals included.
 - **Rule (a repeat of the 2026-09-21 FORBIDDEN: re-check a population correction on the subset you will act on):** before predicting a correction's gain on a surface, count how much of THAT surface's population the correction can reach. Report the coverage beside the gain.
 - *(evidence in `.syndicate/findings_2026-11-18_cell_calibration.md` §2)*
+
+## 2026-11-18 — OVERTURNED: "running non-urgent background builds at a lower priority protects the Layer 2 board's cadence" (rail monitor lever L-d, todo #849) — on this host the board is not WAITING for a CPU, so `nice` has nothing to give it; a co-runner costs it a slower CPU-second `[lane board-build-priority, session b2be7822]`
+- **What was believed:** the board's CPU per build tracks host load (106-150 s at load 1-2, 500-600 s at 8-10), and nice-0 soccer builds dated 4-6 days out ran beside the board child. So launching them at nice 10 would protect the 300 s cadence.
+- **Measured (fleet, 762 builds 11-16..11-18, within Central hour):**
+  - A build fully overlapped by a far-dated soccer unit runs +12.9% [+5.6, +20.2] longer. The extra is board CPU-seconds (+23.4 s), not off-CPU (-1.3 s [-3.7, +1.0]).
+  - The board child's run-delay share (schedstat) was 0.007 with a nice-0 unit beside it and 0.005 without; PSI cpu some 0.017; 12 vCPUs at load 5-10.
+  - Windows read 67.5% of nominal clock with a unit vs 74.8% without (descriptive, one window).
+  - The units are 0.13 of one core in the evening, so they cost the board ~6 s per build and ~19 s (5%) of a 371 s publication gap.
+- **Rule:** before proposing a priority change (nice, Idle, ionice) to protect a process, read the protected process's run-delay share (`/proc/<pid>/task/*/schedstat`, field 2 over fields 1 + 2) or its off-CPU share. If it is small, priority cannot help: the co-runner still gets its own vCPU and still draws the power that sets the shared clock. What helps is fewer busy cores in the window (defer or batch), at ~13% of a board build per co-running core here, whatever its nice value. Corollary: nice 19 keeps research jobs out of the runqueue, but it does not stop them slowing the fleet's clock.
+- *(evidence in `.syndicate/findings_2026-11-18_board_build_priority.md` §2-§4; scripts and data `C:\tmp\bbp_849\`)*

@@ -1,14 +1,5 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#849` — **BACKGROUND BUILDS AT FULL PRIORITY SLOW THE LAYER 2 BOARD: soccer artifact builds for dates 4-6 days ahead run at nice 0, at 80-99% of a core, beside the board child. Launch the non-urgent ones (dated more than 1 day out) at a lower priority, behind a switch** `[2026-11-18, the rail monitor's lever L-d, recorded by lane product-optimization-program (M4)]` — UNOWNED; proposed as its own session
-- **Measured** (the rail monitor's `ps` plus `BOARD_BUILD_TIMING`, 11-18; `.syndicate/findings_2026-11-18_layer2_rail_monitor.md` readings 3, 4, 8, 9, 12):
-  - Board CPU per build tracks host load: 106-150 s at load 1-2, 240-385 s at ~5, 500-600 s at 8-10. It fell 602 -> 106 s at 1:49 PM CST with no restart and no code change.
-  - Three nice-0 soccer builds dated days ahead: 4:22 PM `--league eredivisie --date 2026-11-22` (board 290-409 s; today's board 730 s old), 4:55 PM `championship --date 2026-11-24`, 6:14 PM `epl --date 2026-11-23` at host load 8.0.
-  - The cadence target is 300 s (`LAYER2_TODAY_CADENCE`); the 11-17 evening peak was 1,254-1,510 s.
-- **Not #840:** #840's date anchor (loaded 11:58 AM CST 11-18) covers only the hourly look-ahead. These look like refresh-worker's soccer WEEKLY autorun. Confirm the launcher before building.
-- **Fix:** per launch, by the artifact's own date: run it at nice 10 when it is dated more than 1 day out, behind a switch (absent = off), with an off != on test through the real launcher. The I-20 board split already isolates the build from the live tick's interpreter lock, but not from CPU contention.
-- **Betting change: likely no, confirm at load.** It delays only inputs for dates not bet live yet, and learnings 11-18 says an input delay can be one.
-
 ### `#848` — **TWO SUSPECTED SCORECARD GRADING DEFECTS DISTORT THE BOARD'S RESULTS: soccer board player props return about -55% against about -7% market EV (players who did not play graded as losses?), and NHL live goal-scorer rows return +153% at 8.4% hit (priced after the goal?). Verify each, then fix the grading** `[2026-11-18, lane product-optimization-program (M2, M3), evidence pass A]` — UNOWNED; proposed as its own session
 - **Soccer props (M2):**
   - player_shots live: 25,549 bets / 267 games, hit 21.8%.
