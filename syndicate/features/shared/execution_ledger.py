@@ -267,6 +267,14 @@ _LEAN_FIELDS = (
     # computed and then dropped by the projection -- an unfed field that looks
     # exactly like a working one. See `_prior_attempts_for_retry`.
     "prior_attempts",
+    # THE VENUE'S QUOTE AT SUBMIT and WHEN THE ORDER FILLED [2026-11-19, lane
+    # fill-quote-logging]. Present on EVERY row from creation (None until a LIVE
+    # order fills them) so a paper row stays shaped exactly like a live one
+    # (`test_a_paper_record_is_shaped_exactly_like_a_live_one`). See
+    # `note_submit_quote` and `_stamp_filled_at`.
+    "venue_quote_at_submit",
+    "venue_filled_at",
+    "venue_filled_at_basis",
 )
 
 
@@ -1326,6 +1334,7 @@ def operator_fill_from_venue(
             "reconciled_at": at,
             "reconciled_from": before,
         })
+        _stamp_filled_at(order, at, "operator")
         order["operator_fill"] = {
             "evidence": {k: view.get(k) for k in (
                 "order_id", "client_order_id", "ticker", "state", "venue_status", "filled_count",
@@ -1859,6 +1868,10 @@ def _record_into_state(
         "settled_at": None,
         "venue_order_id": None,
         "error": None,
+        # Filled in for LIVE orders only; see `_LEAN_FIELDS` [lane fill-quote-logging].
+        "venue_quote_at_submit": None,
+        "venue_filled_at": None,
+        "venue_filled_at_basis": None,
         # EVERY EARLIER ATTEMPT ON THIS KEY. Empty for a first submit; see
         # `_prior_attempts_for_retry` for why a retry must not drop it.
         "prior_attempts": prior_attempts,
@@ -1876,6 +1889,7 @@ def complete_order(
     venue_order_id: str | None = None,
     error: str | None = None,
     fee_fields: Mapping[str, Any] | None = None,
+    quote_at_submit: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Close out a write-ahead record with what actually happened."""
     state = _load()
@@ -1888,6 +1902,7 @@ def complete_order(
         venue_order_id=venue_order_id,
         error=error,
         fee_fields=fee_fields,
+        quote_at_submit=quote_at_submit,
     )
     if updated is not None:
         _persist(state)
@@ -1904,6 +1919,7 @@ def _complete_in_state(
     venue_order_id: str | None = None,
     error: str | None = None,
     fee_fields: Mapping[str, Any] | None = None,
+    quote_at_submit: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """`complete_order` against a ledger ALREADY LOADED, writing nothing.
 
@@ -1929,9 +1945,37 @@ def _complete_in_state(
         # live callers never pass this. See `paper_fill_fee_fields`.
         for field, value in (fee_fields or {}).items():
             order[field] = value
+        # THE VENUE'S QUOTE AT SUBMIT and THE FILL TIME, live rows only. See
+        # `note_submit_quote` and `_stamp_filled_at` for why they exist.
+        if quote_at_submit:
+            order["venue_quote_at_submit"] = dict(quote_at_submit)
+        if status == STATUS_FILLED:
+            _stamp_filled_at(order, resolved_at, "submit_response")
         updated = dict(order)
         break
     return updated
+
+
+def _stamp_filled_at(order: dict[str, Any], at: str, basis: str) -> None:
+    """Record WHEN a LIVE order became filled, once  [2026-11-19, lane fill-quote-logging].
+
+    The row had no fill time. `venue_resolved_at` is when the SUBMIT resolved and
+    `reconciled_at` is overwritten on every reconcile pass, so a resting order
+    that filled hours later (the maker pilot) left its fill time only in a log
+    line that rotates away in ~3.5 days. Measured 2026-11-18: 0 of 35 maker-pilot
+    fills carried a fill time, and the pilot's pre-registered re-judge is judged
+    on the edge AT FILL (`findings_2026-11-18_s3_maker_entry.md`).
+
+    `basis` says how good the time is: `submit_response` (the order filled on the
+    submit itself) or `reconcile_observed` (the first reconcile pass that saw the
+    fill, so up to one pass late). Paper rows are left alone: a paper fill is its
+    decision time by construction. Not a betting change: nothing reads it to
+    place, size, hold or exit.
+    """
+    if str(order.get("mode") or "") != LIVE or order.get("venue_filled_at"):
+        return
+    order["venue_filled_at"] = at
+    order["venue_filled_at_basis"] = basis
 
 
 def _place_paper_into_state(
@@ -2323,6 +2367,43 @@ def _venue_rejected_unchanged(request: OrderRequest) -> str | None:
     )
 
 
+# THE VENUE'S QUOTE AT SUBMIT  [2026-11-19, lane fill-quote-logging, user "Approve loan"].
+#
+# The executor already reads the venue's live market immediately before every
+# Kalshi order (`execute_portfolio._kalshi_price_for`), and that read carries both
+# legs' bid and ask and the size at the touch. Only our leg's ask was kept, and
+# nothing was stored, so 48% of live fills had no recorded own-side quote and the
+# opposite leg was never recorded at all. That blinded every spread, CLV and
+# adverse-selection test on half the book (`plan_2026-11-18_profit_learning_program.md`
+# item I2; study S6 had the venue move on only 36-42% of orders).
+#
+# The price read runs inside the adapter's BUILD, before `record_order` writes the
+# row, so it hands its quote here keyed by the order's idempotency key and
+# `place_order` attaches it when it completes the row. Bounded, and popped on every
+# path, so a refused or duplicate order cannot leave a quote behind for another.
+# Not a betting change: nothing reads it to place, size, hold or exit.
+_SUBMIT_QUOTES: dict[str, dict[str, Any]] = {}
+_SUBMIT_QUOTES_MAX = 512
+
+
+def note_submit_quote(request: OrderRequest, quote: Mapping[str, Any]) -> None:
+    """Remember the venue quote the executor priced `request` from, until its row completes."""
+    try:
+        key = idempotency_key(request)
+    except Exception:  # noqa: BLE001 -- a logging aid must never stop an order
+        return
+    if not quote:
+        return
+    _SUBMIT_QUOTES.pop(key, None)
+    while len(_SUBMIT_QUOTES) >= _SUBMIT_QUOTES_MAX:
+        _SUBMIT_QUOTES.pop(next(iter(_SUBMIT_QUOTES)))
+    _SUBMIT_QUOTES[key] = dict(quote)
+
+
+def _take_submit_quote(key: str) -> dict[str, Any] | None:
+    return _SUBMIT_QUOTES.pop(key, None)
+
+
 def place_order(
     request: OrderRequest,
     *,
@@ -2396,9 +2477,11 @@ def place_order(
 
     send, refusal = _build_before_record(request, submit)
     if refusal is not None:
+        _take_submit_quote(idempotency_key(request))
         return _unrecorded_refusal(request, *refusal)
 
     record, created = record_order(request, mode=resolved_mode)
+    quote = _take_submit_quote(record["idempotency_key"])
     if not created:
         return record
 
@@ -2429,6 +2512,7 @@ def place_order(
             record["idempotency_key"],
             status=STATUS_FAILED if contacted else STATUS_REJECTED,
             error=f"{type(exc).__name__}: {exc}",
+            quote_at_submit=quote,
         ) or record
 
     return complete_order(
@@ -2437,6 +2521,7 @@ def place_order(
         fill_price=result.get("fill_price"),
         fill_stake_dollars=result.get("fill_stake_dollars"),
         venue_order_id=result.get("venue_order_id"),
+        quote_at_submit=quote,
     ) or record
 
 
@@ -3736,6 +3821,15 @@ def reconcile_live_orders(*, limit: int = 100, venue: str = "kalshi") -> dict[st
             continue
         if before != after:
             order["reconciled_from"] = before
+            # THE FILL TIME, once, on the transition INTO filled (a resting maker
+            # post, a partial). A row the submit marked filled but the venue shows
+            # never traded (the phantom-fill repair above) loses the stamp. See
+            # `_stamp_filled_at` [lane fill-quote-logging].
+            if after == STATUS_FILLED:
+                _stamp_filled_at(order, stamp["reconciled_at"], "reconcile_observed")
+            elif before == STATUS_FILLED and order.get("venue_filled_at"):
+                order["venue_filled_at"] = None
+                order["venue_filled_at_basis"] = f"cleared_{after}"
         changed.append(
             {
                 "idempotency_key": key,

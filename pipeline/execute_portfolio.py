@@ -1438,6 +1438,10 @@ def _kalshi_price_for(request) -> float | None:
             market = result.get("market") or {}
             live = dollars_to_probability(market.get(key))
             event_ticker = str(market.get("event_ticker") or "")
+            # KEEP THE WHOLE QUOTE, not only our leg's ask [lane fill-quote-logging,
+            # user "Approve loan" 2026-11-19]. The read already carries both legs and
+            # the size at the touch; see `execution_ledger.note_submit_quote`.
+            _note_kalshi_submit_quote(request, market, live)
         else:
             print(
                 f"[execute_portfolio] LIVE_PRICE_UNAVAILABLE ticker={ticker}"
@@ -1477,6 +1481,57 @@ def _kalshi_price_for(request) -> float | None:
             flush=True,
         )
     return live
+
+
+def _kalshi_submit_quote(request, market: Mapping[str, Any], price_used: float | None) -> dict[str, Any]:
+    """The venue's two-sided quote at submit, from the market read `_kalshi_price_for` makes.
+
+    Probabilities (dollars on a $1 contract) for both legs' bid and ask, the size at
+    the touch, last price and flow, our leg, the price we used and when it was read.
+    Recorded on the ledger row as `venue_quote_at_submit` [lane fill-quote-logging].
+    """
+    from datetime import datetime, timezone
+
+    from syndicate.features.shared.kalshi_client import dollars_to_probability
+
+    def prob(field: str) -> float | None:
+        try:
+            return dollars_to_probability(market.get(field))
+        except Exception:  # noqa: BLE001
+            return None
+
+    def num(field: str) -> float | None:
+        value = market.get(field)
+        try:
+            return None if value in (None, "") else float(value)
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "source": "kalshi_live_market",
+        "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+        "contract_side": _kalshi_contract_side(request),
+        "price_used": price_used,
+        "yes_bid": prob("yes_bid_dollars"),
+        "yes_ask": prob("yes_ask_dollars"),
+        "no_bid": prob("no_bid_dollars"),
+        "no_ask": prob("no_ask_dollars"),
+        "yes_bid_size": num("yes_bid_size_fp"),
+        "yes_ask_size": num("yes_ask_size_fp"),
+        "last_price": prob("last_price_dollars"),
+        "volume_24h": num("volume_24h_fp"),
+        "open_interest": num("open_interest_fp"),
+    }
+
+
+def _note_kalshi_submit_quote(request, market: Mapping[str, Any], price_used: float | None) -> None:
+    """Hand the quote to the ledger. A logging aid: it must never stop an order."""
+    try:
+        from syndicate.features.shared.execution_ledger import note_submit_quote
+
+        note_submit_quote(request, _kalshi_submit_quote(request, market, price_used))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[execute_portfolio] SUBMIT_QUOTE_NOT_KEPT {type(exc).__name__}: {exc}", flush=True)
 
 
 class _SlippageExceeded(Exception):
@@ -2780,6 +2835,26 @@ def _polymarket_resolve_market(request) -> tuple | None:
             )
             if _yes_leg_corroboration_required():
                 return None
+
+    # THE QUOTE THIS ORDER WAS PRICED FROM, kept on the ledger row [lane
+    # fill-quote-logging, user "Approve loan" 2026-11-19]. Polymarket's is the slate
+    # artifact's `outcomePrices` (sizeless, no bid or ask; see the docstring) with
+    # its age, labelled as such. A logging aid: it must never stop an order.
+    try:
+        from syndicate.features.shared.execution_ledger import note_submit_quote
+
+        note_submit_quote(request, {
+            "source": "polymarket_slate_artifact",
+            "fetched_at": fetched_at,
+            "slate_age_s": round(time.time() - float(fetched_at), 1) if fetched_at is not None else None,
+            "outcomes": list(outcomes) if isinstance(outcomes, (list, tuple)) else outcomes,
+            "outcome_prices": list(prices) if isinstance(prices, (list, tuple)) else prices,
+            "outcome_index": outcome_index,
+            "quoted": quoted,
+            "price_used": price,
+        })
+    except Exception as exc:  # noqa: BLE001
+        print(f"[execute_portfolio] SUBMIT_QUOTE_NOT_KEPT venue=polymarket {type(exc).__name__}: {exc}", flush=True)
 
     return (
         slug,
