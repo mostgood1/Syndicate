@@ -93,3 +93,35 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - orders today 13: 11 filled and 2 maker-pilot posts resting (276 / 268 min, exempt until kickoff); unreconciled 0;
   - cap use 9.0% / 6.7%.
 - **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 67 — Thu 11-19 6:00 AM CST (12:00Z), window 60 min
+
+- **Results first.** Unchanged overnight: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **NEW anomaly: Polymarket's live plan has 0 placeable rows. All 329 are refused `aggregator_priced`** (4 AM: 137 of
+  444, 3 positions).
+  - *Hypothesis, written first:* Polymarket's own quotes went stale or missing, so every row fell back to an
+    aggregator price.
+  - **Confirmed, and the cause is upstream of the join:**
+    - `[live_odds_worker] POLYMARKET_DAILY_BOOK` went from **91 unpriced of 16,258 listed (11:08:32Z) to 16,792 of
+      16,797 (11:19:37Z)**. It has stayed there since: 16,925 of 16,929 at 11:59:47Z.
+    - Sampled moneyline shapes show `prices='["0","0"]'` (`[polymarket_us_markets] MONEYLINE_YES_LEG_SHAPE`).
+    - The board join still matches 488 rows (`POLYMARKET_BOARD_JOIN ... matched=488`), but with no venue price;
+      `PAPER2_PLAN_WRITTEN ... venue_priced=0 feed=venue_feed`.
+    - `LIVE_PLAN_WRITTEN venue=polymarket` placeable went 14 (11:07:39Z) -> 4 (11:14:36Z) -> **0 (11:18:13Z)**.
+  - **First time in the logs on disk (11-15 onward):** 19 runs with > 1,000 unpriced, all since 11:14:05Z.
+  - **Only the prices are zero:**
+    - balances (`VENUE_BALANCES polymarket=ok`), order reads, settlement reads and the catalogue all work;
+    - the market list still grows (16,258 -> 16,929);
+    - `outcomePrices` reads "0".
+    - That points at Polymarket's side (an outage or a change in the price field), not at our join.
+  - **It fails safe:** no order can be priced from a zero, so Polymarket places nothing (`EXECUTION ... placed=0`).
+    Existing positions and Kalshi are unaffected.
+  - **F21, owner: none open** (`polymarket_us_markets` was held by `live-venue-order-placement`, closed). Watched each
+    reading. If it is still out by midday CST, Polymarket will place nothing on tonight's slate; the user is told
+    then. A code fix, if the price field moved, gets its own lane.
+- **Other flow:**
+  - `live_all` 2.28 s (inside its 5 s budget);
+  - plan 0.1 min old: 54 suggested, 17 positions (all Kalshi);
+  - orders today 15: 14 filled, 1 maker post resting (336 min);
+  - cap use 10.0% / 6.7%.
+- **Gate:** 12 of 800 events on the BC-052 clock.
