@@ -784,3 +784,33 @@ The 2 contradictions are **real**, but my "rows with `live_total_basis: None`" a
 **Load:** query 5.4 s.
 
 **Team cards:** 0 defects.
+
+## Reading 19 — Wed 11-18 9:16 PM CST (03:16Z 11-19)
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 5.9 (4.8 / 5.0). A web worker recycled at ~9:15 PM (gunicorn pid 597534, up 75 s).
+
+**Board (P2):**
+- Builds at 8:55:36 PM (485 s, the first after the 8:43 PM respawn) and 9:04:40 PM (301 s). Publication gap 544 s.
+- Then `MEMORY_GUARD_ABORT` at 9:08:14 and 9:09:33 PM, headroom 1,895 / 1,815 MB. **That is 2 of the 3 refusals that trigger the next recycle.**
+- At the read, the next build had reached its shortlist exit (9:15:23 PM). Today's board was 1,268 s old by the query's own block.
+
+**Slate: 32 live.**
+- Flags: 43 shown, 0 false, 0 missed, 0 dark.
+- P1: 7 college totals flags, 1 card contradiction (the card bug).
+- #824: 0. P6: 0.
+- Live rows: 1,277, 744 priced <= 120 s (NBA 949 / 643 fresh; NCAAB 317 / 95).
+
+**P7 (NHL window over):** no NHL live rows at this read (38 NHL overlay builds, 0 in-play rows now). 7 sweeps, 1 refused (12.5%).
+
+The owner's 6-9 PM read passed 4 of 5 checks. The miss was one 27-min NHL odds gap around the 6:30 PM puck drop, not caused by NHL. Its full-window verdict comes at 11 PM.
+
+**Overlay:** 0 gaps over 360 s (max NCAAF 152 s); tick gap max 58 s. Web merges 41, 0 stale.
+
+**Load:** query 12.3 s.
+
+**Team cards:** 0 defects.
+
+**Optimization items** (local_09a95c0b, ~9:00 PM). All default-off on main; nothing loaded.
+- **#847:** built. Scorecard test passed; the rail test failed on coverage; forward grade 11-26.
+- **#848:** the soccer "mis-grade" was false (players who did not play are already voided; the error is the assumed market EV). The NHL stale-quote goal-scorer rows were real (780 of 782); fix default-off.
+- **#849:** closed without building. Far-ahead soccer builds cost ~6 s per board build. **This closes L-d.** The evening board cost is A-3 (memory), not CPU priority.
