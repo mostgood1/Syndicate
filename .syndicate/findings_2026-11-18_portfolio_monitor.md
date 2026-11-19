@@ -849,3 +849,34 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - cap use 18.6% / 18.6%.
 - **Unchanged:** gate clock BC-052 from 21:02:51Z, 0 of 800; 1 unclassified load (soccer ff 17:58:30Z, its lane owes
   it).
+
+## Reading 49 — Wed 11-18 5:59 PM CST (23:59Z), window 31 min
+
+- **Results first.** No new grades; 30 d -7.35% [-12.8, -1.9]. The slate has started: 4 games started and unsettled,
+  none late.
+- **No anomalies.** Every endpoint was inside budget: `live_all` 0.36 s, page 0.31 s.
+  - 15 plan reads in the window (p95 237 ms), against 2 in quiet readings: the slate's in-play polling.
+- **Flow:**
+  - plan 3.8 min old: 235 suggested, 25 sized, 17 positions; 201 refused `beyond_max_positions`; 6
+    `in_play_market_fair`;
+  - 12 live ticks, 7 placed, 0 failed (1 `already_held_venue_contract`, a known guard);
+  - orders today 61: 59 filled and 2 submitted (0.6 and 0.7 min old). Unreconciled 2 = those two, inside the
+    grace;
+  - cap use 20.6% / 22.3%.
+- **Unchanged:** gate clock BC-052 from 21:02:51Z, 0 of 800; 1 unclassified load (soccer ff 17:58:30Z, its lane owes
+  it).
+
+## Reading 50 — Wed 11-18 6:31 PM CST (00:31Z), window 32 min
+
+- **Results first.** One more grade (all-time 2,027 bets / 1,095 events, -11.01%). 30 d is unchanged at -7.35%
+  [-12.8, -1.9] until tonight settles. 21 games started and unsettled, none late.
+- **No anomalies.** Every endpoint was inside budget: `live_all` 0.39 s, page 0.28 s. 18 plan reads (p95 128 ms).
+- **Flow:**
+  - plan 15.9 min old (newest write 00:15:40Z; max gap 16.3 min over 6 h): 219 suggested, 25 sized, 14 positions;
+  - **46 `in_play_market_fair`** refusals (6 at 5:59 PM) as games go in play, so the sim-edge share fell to 0.70 from
+    0.89. Expected in a slate;
+  - 9 live ticks, 4 placed, 0 failed (3 `game_started`, 3 `already_held_venue_contract`, known guards);
+  - orders today 63, all filled; nothing resting; unreconciled 0;
+  - cap use 22.7% / 21.7%.
+- **Unchanged:** gate clock BC-052 from 21:02:51Z, 0 of 800; 1 unclassified load (soccer ff 17:58:30Z, its lane owes
+  it).
