@@ -108,3 +108,38 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **#844 sampler (R-B):** ran at 9:19 AM with 0 rows, before any NCAAB game. It starts with the NCAAB tips (1:30 PM).
 - **Improvement hunt:** nothing new at this volume (5 games). Watch the WNCAAB quote-age tail as more games go live: 4 of 13
   rows over 300 s, with p90 730 s.
+
+## Reading 2 — 11:23 AM CST (17:23Z), first reading after the #850 load
+
+**The load (BC-053, lane `board-split-memory-guard`, session local_d0f83044):**
+- 11:00 AM (17:00:09Z): a drained full down/up, ff `d78a448c4` -> `38c3a6905`, plus 4 `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_*` keys.
+- The user typed "11-19 midday" in that session. It is recorded as a betting change, outside the window, as a broken money path.
+- **Load checks, read here from the fleet log: MET.**
+  - `BOARD_PROCESS_CHILD_SWITCHES pid=1011359 raw_lifeline=1 recycle_after_build=1 ceiling_credit=7168+768` (17:00:31Z);
+  - `BOARD_PROCESS_CEILING_CREDIT from_mb=7168 to_mb=7936`;
+  - `ALL_PROCESS_MEMORY container_memory_max_mb: 7936.0`.
+- **The new processes:** refresh-worker parent pid 1011283 at 785 MB; board child pid 1011359 at 3.00 GB, 23 min up;
+  live-odds-worker pid 1011284. The parent now carries the I-17 score floor, so **P8 is live from here**.
+- **Before the load (the old parent, 10:39-11:00 AM):** 3 more refusals (10:47-10:49 AM) and a third rc -6 recycle (10:52 AM,
+  attempt 28). That makes 3 rc -6 child exits today before the fix.
+- **After the load (11:00-11:23 AM):** 0 `MEMORY_GUARD_ABORT`, 0 child exits.
+
+**The reading:**
+- **Live:** 6 WNCAAB games; 17 rail rows; **0 flags shown**, 0 false, 0 missed, 0 dark.
+- **P1:** 0. **P6:** 0. **P8 (score floor, first reading on the new parent):** 0 of 21 rows.
+- **Team cards:** 94 chips, 0 defects.
+- **Load:** `/api/intelligence/query` **2.24 s** (6.19 s at reading 1, before web restarted); shortlist 0.77 s; chips 0.02 s.
+  The page was not fetched this reading.
+- **Board (10:39-11:23 AM):**
+  - 7 builds, wall median 213 s, max 229 s;
+  - publication gap median 338 s, **max 722 s**: the down/up gap, from the last old build to the new child's first, published at
+    11:07 AM;
+  - today's board 144 s old at the read.
+- **Live odds:**
+  - WNCAAB overlay gap max 103 s, 0 over 360 s; 63 web merges, 0 stale;
+  - 10 sweeps, 1 refused (`lane_busy`);
+  - priced age p50 133 s, p90 540 s; 6 of 17 rows over 300 s old at the read.
+- **#844 (R-B):** 0 NCAAB rows at 11:23 AM. NCAAB tips at 1:30 PM.
+- **Improvement hunt:** the WNCAAB quote-age tail persists (6 of 17 rows over 300 s; p90 540 s), with every overlay gap
+  <= 103 s. That points at the books' own quote updates, not the pipeline: `seen_age_at_pricing` p50 5 s. Not a lever yet;
+  keep measuring when NCAAB adds volume.
