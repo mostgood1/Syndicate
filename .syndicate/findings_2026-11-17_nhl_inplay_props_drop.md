@@ -189,3 +189,45 @@ overlay builds; `C:\tmp\nhlprops_load\reading\nhlprops_captures.py 2026-11-17 20
 **Consequence for the reading:** a shard-only join undercounts captures late in a game, when prices move less.
 The NHL in-play pull prints one `[nhl_inplay_props] PULL {...}` line per capture, rows or not, and the join
 now counts those lines as capture instants. Pick the drop cut from the night's own full level.
+
+## READING -- first NHL night with the pull ON, 11-18 (6:30 PM-~11:30 PM CST; 00:30-~05:30Z 11-19)
+
+Read 2026-11-19 06:30:46Z (12:30 AM CST) by the scheduled task `nhl-inplay-props-first-night-reading-1118`,
+read-only. Output: `C:\tmp\nhlprops_load\reading\reading_out_1118.txt`. Graded against the deploys.md
+2026-11-18 14:05:18Z OWED registration; no threshold moved.
+
+- **Preconditions.** healthz 200. Switch line present in the live-odds-worker environ (1 line); worker pid 561403
+  `started=Wed Nov 18 20:50:43` (ps lstart, ~2:50 PM CST, before the window; the switch survived that restart).
+  Log coverage holds the whole window: live-odds-worker.log.1 11-18 11:18:34Z..11-19 05:16:44Z + .log from
+  05:16:44Z (one rotation, contiguous); refresh-worker.log.1 to 00:11:22Z + .log from 00:11:22Z.
+- **Window: complete in practice, partial by the scoreboard.** BOS@DET and MTL@NJ OFF; COL@UTA still `CRIT` at
+  06:30Z, but the pull saw `events_live=0` on 11 consecutive pulls from 06:10:04Z (12:10 AM CST). The in-play
+  window (first..last live pull) is 00:41:17Z..06:08:02Z = 19,605 s (6:41 PM-12:08 AM CST), longer than the
+  task's ~11:30 PM estimate.
+- **M1 -- MET.** 0 of 157 live pulls (0 of 173 total) with errors or an append_error (100% clean, >= 95%
+  predicted). LAUNCHED 173 = PULL 173; DONE rc=0 172 (the 06:30:25Z launch was finishing at the read).
+- **M2 -- MET.** Live-pull gap n=156: median 125 s (<= 130), max 154 s (<= 300). 11-17: sweep median 335 s,
+  max 1,869 s. No gap > 300 s, so no launcher miss to name.
+- **M3 -- MET.** 1,166 credits over 173 pulls (<= 1,800).
+- **M4b -- MET.** 0 of 19,605 s of in-play time without fresh props (0.0%; <= 5%). 11-17: 4,938 of 9,357 s (53%).
+  The shard's own prop|oddsapi class agrees: 110 captures, gap median 128 s (it holds moved prices only, so
+  its max 1,181 s is not a capture gap).
+- **Drop rule (`auto`, fixed before the night):** threshold 26 rows = 25% of the median 106.0 over 314 fresh
+  builds; fresh rows min/p25/max 0/97/367.
+- **M4a -- MET.** Drop builds per UTC hour with NHL live: 00Z 0 of 14, 01Z 0 of 52, 02Z 0 of 51, 03Z 1 of 57,
+  04Z 0 of 65, 05Z 0 of 74, 06Z 1 of 1 (<= 1 per hour; 11-17 9-13). 2 drops of 315 builds tonight vs 33 of 76.
+- **Each drop build (both `DROP&fresh!`, a new mode, not the 11-17 staleness mode):**
+  - 03:15:23Z (9:15 PM CST): rows 0, opps 0, cards 0, newest prop capture 55 s old. The previous five
+    builds carried 59 rows; the next (03:18:39Z) 221. It falls as COL@UTA came live (pulls show
+    events_live 2 -> 3 -> 2 -> 3 around 03:10-03:20Z).
+  - 06:00:51Z (12:00 AM CST): rows 0, opps 0, cards 0, capture 57 s old. The last build of the night; the last
+    live game was ending (the pull's rows fell 111 -> 11 at 06:08Z, 0 live from 06:10Z).
+  - Both empty the WHOLE NHL overlay (opps and cards 0 too), with fresh props on disk: not a capture lapse.
+    Cause not traced tonight; likely a game-state transition in the build. Lead only, 2 of 315 builds.
+- **`full&stale!`: 1** -- 00:40:38Z (31 rows, capture 1,142 s old), 39 s before the first live pull (00:41:17Z).
+  It predates the window; the pull covered every later build (312 `full&fresh`).
+- **Safety.** 0 `NHL_INPLAY_PROPS_AUTORUN_ERROR`, 0 `NHL_INPLAY_PROPS_TIMEOUT`, 0 `PULL_FAILED` in both
+  live-odds-worker logs; healthz 200; pull elapsed 0.5-4.3 s. Sample: `00:45:47Z rows 1653 events_live 2
+  events_with_props 2 credits 10 elapsed 1.0 errors [] append_error None`.
+- **Overall: YES -- NHL live props stopped leaving the board.** 2 of 315 builds empty (both with fresh props,
+  whole-overlay empties), vs 33 of 76 builds without props on 11-17.

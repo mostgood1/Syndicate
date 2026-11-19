@@ -62244,3 +62244,16 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - With the stats-REST cache loaded (180 -> 14 stats calls per generation), the 11-17 stall may now be rare.
   - To read it when it happens: scan manifests for a `timed_out` `nhl_live_generation` / `nhl_pregame_generation` step, or `data/nhl_source/data/processed/.nhl_live_generation_timeout_<date>.json`.
 - **Lead, not built:** retrying a `lane_busy`-refused sweep when the holder exits would have cut tonight's one miss by ~4.6 min. It changes how fresh live quotes are, so it is a betting change: default-off, or the 11-24 window.
+
+## 2026-11-19 06:35Z (12:35 AM CST) -- READING (no deploy): NHL in-play props pull, first NHL night (BC-047) -- **all 5 registered metrics MET: 2 drop builds of 315 (11-17: 33 of 76), 0% in-play time without fresh props (11-17: 53%)**
+- betting change: no (a reading of BC-047's load)
+- lane: nhl-inplay-props-drop; scheduled task `nhl-inplay-props-first-night-reading-1118`, read-only, read at 06:30:46Z. Output `C:\tmp\nhlprops_load\reading\reading_out_1118.txt`; full write-up in `.syndicate/findings_2026-11-17_nhl_inplay_props_drop.md` READING section.
+- preconditions: healthz 200; switch in the live-odds-worker environ (1 line; worker started ~20:50Z 11-18, before the window); logs cover the window (one contiguous rotation at 05:16:44Z). In-play window 00:41:17Z..06:08:02Z = 19,605 s; COL@UTA still `CRIT` on the scoreboard at 06:30Z but 0 live events on 11 pulls from 06:10Z.
+- verify (against the 2026-11-18 14:05:18Z OWED registration):
+  - M1 MET: 0 of 157 live pulls with errors/append_error; LAUNCHED 173 = PULL 173.
+  - M2 MET: live-pull gap n=156, median 125 s (<= 130), max 154 s (<= 300); 11-17 sweep 335 / 1,869 s.
+  - M3 MET: 1,166 credits over 173 pulls (<= 1,800).
+  - M4a MET: drop builds per UTC hour 0/14, 0/52, 0/51, 1/57, 0/65, 0/74, 1/1 (00Z..06Z; <= 1 per hour); drop threshold `auto` = 26 rows (25% of median 106.0 over 314 fresh builds).
+  - M4b MET: 0 of 19,605 s without fresh props (<= 5%).
+- drops: 03:15:23Z and 06:00:51Z, both `DROP&fresh!` (props 55 / 57 s old) with opps and cards 0 too, at a game coming live and the last game ending: a whole-overlay empty build, not a props lapse. Lead only.
+- safety: 0 AUTORUN_ERROR, 0 TIMEOUT, 0 PULL_FAILED; healthz 200.

@@ -231,7 +231,7 @@
 - **Follow-up (separate task, not this item):** cache the stats-REST reports (last season's are immutable; this season's playoffs are empty before April; this season's change only with a finished game). That takes 168 calls to ~0-12 per generation with identical data, so NHL predictions can regenerate on a slow-API night.
 - **Related:** `#837` (NHL in-play props on their own clock) is complementary. This item bounds the hold; `#837` removes NHL props' dependence on the sweep.
 
-### `#837` — **NHL LIVE PROPS LEAVE THE BOARD WHENEVER THEIR ONE CAPTURE CLOCK LAPSES PAST 300 s: they rode only the shared live sweep (median gap 335 s), so 33 of 76 NHL overlay builds on 11-17 carried no props. An NHL in-play props pull (`9f911cb98`) is LOADED since 2026-11-18 14:05:39Z (BC-047); the first NHL night's reading is owed (a lapsed line keeps dropping, user 11-18)** `[2026-11-17, lane nhl-inplay-props-drop; `.syndicate/findings_2026-11-17_nhl_inplay_props_drop.md`]`
+### `#837` — **NHL LIVE PROPS LEAVE THE BOARD WHENEVER THEIR ONE CAPTURE CLOCK LAPSES PAST 300 s: they rode only the shared live sweep (median gap 335 s), so 33 of 76 NHL overlay builds on 11-17 carried no props. An NHL in-play props pull (`9f911cb98`) is LOADED since 2026-11-18 14:05:39Z (BC-047); the first NHL night's reading (11-18) MET all 5 registered metrics: 2 drop builds of 315, 0% of in-play time without fresh props (a lapsed line keeps dropping, user 11-18)** `[2026-11-17, lane nhl-inplay-props-drop; `.syndicate/findings_2026-11-17_nhl_inplay_props_drop.md`]`
 - **Cause (measured 11-17, read-only):** NHL's live props are written only by `refresh_nhl_oddsapi.py` inside the live sweep. The overlay keeps a live row while `seen_age_seconds <= 300` (`book_grid_artifact.is_inplay_fresh_row`).
   - 18 captures, median gap 335 s, max 1,869 s.
   - 76 of 76 builds split at 300 s: 43 with 464-956 rows (capture 3.8-298.3 s old), 33 with 0-99 rows (327.8-1,825 s).
@@ -246,6 +246,7 @@
   - Claims + preflight; `betting change: yes`, because live NHL prop prices reach the board and its in-play rows.
 - **Verify:** `NHL_INPLAY_PROPS_LAUNCHED` / `[nhl_inplay_props] PULL` lines in live-odds-worker.log, plus the findings file's join on the next NHL night.
   - Predicted: <= 1 drop build per hour and <= 5% of in-play time without props, vs 11-17's 9-13 per hour.
+- **READING 11-18 night (read 2026-11-19 12:30 AM CST): MET.** 0 of 157 live pulls with errors; live-pull gap median 125 s, max 154 s (n=156); 1,166 credits over 173 pulls; drop builds per hour <= 1 (2 of 315 builds, both whole-overlay empties with props 55-57 s old, at a game coming live and the last game ending); 0 of 19,605 s without fresh props (11-17: 53%). Safety clean. Closing the lane is the user's call; deploys.md 2026-11-19 06:35Z.
 - **Display, DECIDED 2026-11-18 7:42 AM CST** (the user, this session: "Drop it (today)"): a lapsed line keeps dropping. No carry of the last price is built.
 - **Related:** I-22 (lane odds-lane-sport-deadline) owns the sweep hang. After the first failed full generation, every later live sweep was `--mode full` again, because predictions stayed > 30 min old. That loop was sent to that session 11-17 ~02:50Z.
 
