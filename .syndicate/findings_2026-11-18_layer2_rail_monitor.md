@@ -672,3 +672,39 @@ The 2 contradictions are **real**, but my "rows with `live_total_basis: None`" a
 **Team cards:** 0 defects.
 
 **Sessions:** all three duplicate #847-#849 sessions confirmed "stood down", having created nothing. The optimization program's three sessions own the work.
+
+## Reading 16 — Wed 11-18 8:01 PM CST (02:01Z 11-19), full page: the second recycle, and its cause is memory
+
+**Fleet:** `a3104a5b6`, no new ff. **Host load 10.2** (7.0 / 6.1).
+- On the CPU: the new board child 477538 (86%); `build_soccer_schedule.py --league la_liga` at nice 0 (71%); `build_cheat_sheets.py` at nice 19; #848's read-only scorecard replay (`/mnt/c/tmp/g848/scorecard_ro.py`) at nice 19.
+
+**A-3 re-diagnosed: the board child recycles because of memory-guard refusals, not on a schedule.**
+- `[board_process] BOARD_PROCESS_RECYCLE pid=363665` at 7:52:39 PM came after only 4,991 s, and it again exited `rc=-6 reason=exit` (WSL CaptureCrash signal 6, pid 363665). The child 477538 is READY since 7:53:21 PM.
+- The trigger, both times: `[worker_recycle] RECYCLE_EXIT reason=heavy_build_refused {'consecutive_refusals': 3, 'last_refusal_stage': 'pre_source_state_fingerprint', 'threshold': 3, ...}` at 6:29:18 PM (uptime 31,813 s) and 7:52:39 PM (4,955 s).
+- The refusals: `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` at 7:33:21, 7:46:37, 7:50:23 and 7:51:47 PM, with headroom 1,736 / 1,712 / 1,638 / 1,867 MB against the 1,900 MB floor. The container was at 5.30-5.53 GB of 7,168 MB.
+- **22 refusals on 11-18:** 17Z 1, 21Z 2, 22Z 2, 23Z 7, 00Z 5, 01Z 5. **The 11-17 evening (23Z-05Z, before the split) had 0**, with the container at 3.7-5.0 GB (same `refresh-worker.log.1`, which starts 11-17 17:46Z).
+- **So the board split's first evening runs refresh-worker into its own memory guard.** The child holds ~3.8 GB RSS beside a ~1.5 GB parent.
+- Each refusal skips a build. Every third one recycles the child, which loses the in-flight build and needs a ~526 s cold first build.
+- Board publications: 7:31:49 and **7:45:02 PM (373 s)**, then none through the read at 8:01 PM. Today's board was 1,031 s old.
+- `today_cadence_step_max_s` 245.
+- **Session card replaced:** "Fix the board child's recycle crash and timing" (task_2c78e053, uptime premise wrong) is withdrawn. The new card is **"Fix board child memory-guard recycles"** (task_d36c12ca): memory measurement, a clean rc-75 exit, a guard matched to the stage cost, and recycling only between builds.
+- These numbers go to the board-split verdict (10:15 PM) through this file.
+
+**Slate: 66 live.**
+- Flags: 97 shown, 0 false, 0 missed, 0 dark.
+- P1: 18 college totals flags, **1 card contradiction** (the card bug; fix pending).
+- #824: **2** ours-below-points (likely the same card bug picking another row's total; to check).
+- P6: 0.
+- Live rows: 1,680, 744 priced <= 120 s.
+
+**P7:** 9 sweeps launched, 4 refused (30.8%); live runs 4, max 168 s; an NHL odds child was 96 s old; 0 `NHL_LIVE_GENERATION` markers.
+
+**Overlay:** 0 gaps over 360 s (max NBA 230 s); 1 `deferred_slow` tick; tick gap max 84 s. Web merges 24, 0 stale.
+
+**Load (full page):** `/intelligence` **25.2 s**; query 8.9 s.
+
+**Team cards:** 0 defects.
+
+**Also since r15:**
+- #847 (local_7746cb20) built per-cell calibration default-off (`75a787964`). The rail use FAILED its held-out test: +0.0010 nats/flag [−0.0030, +0.0051], with only 182 of 1,120 flags reachable. Not recommended to load yet. The scorecard test passed.
+- All three duplicate sessions stood down.
