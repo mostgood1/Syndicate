@@ -708,3 +708,39 @@ The 2 contradictions are **real**, but my "rows with `live_total_basis: None`" a
 **Also since r15:**
 - #847 (local_7746cb20) built per-cell calibration default-off (`75a787964`). The rail use FAILED its held-out test: +0.0010 nats/flag [−0.0030, +0.0051], with only 182 of 1,120 flags reachable. Not recommended to load yet. The scorecard test passed.
 - All three duplicate sessions stood down.
+
+## Reading 17 — Wed 11-18 8:28 PM CST (02:28Z 11-19)
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 4.6 (5.2 / 5.8).
+- Board child 477538 RSS 3.65 GB; refresh-worker 1.99 GB; live-odds-worker 1.96 GB.
+- #848's read-only scorecard replay is also running (nice 19, 1.69 GB RSS).
+
+**A-3:** **0** `MEMORY_GUARD_ABORT` and **0** `RECYCLE_EXIT` since 8:01 PM.
+
+**Board (P2):**
+- builds at 8:04:49 PM (**507 s**: the first after the 7:53 PM respawn), 8:14:01 PM (278 s) and 8:23:19 PM (286 s);
+- median 286 s; 1 over 300 s;
+- publication gap 555-558 s; today-cadence step max 164 s; today's board 326 s old.
+
+**Slate: 53 live.**
+- Flags: 91 shown, 0 false, 0 missed, 0 dark.
+- P1: 16 college totals flags, 1 card contradiction (the card bug).
+- #824: 0 at this read. P6: 0.
+- Live rows: 1,775, 759 priced <= 120 s: NBA 1,061 (505); NCAAB 659 (241); WNCAAB 26 (11); NCAAF 25 (0); NHL 4 (2).
+
+**The r16 "ours below points" pair:**
+- **Vermont @ Yale u129.5:** the card bug. It showed 127.5 from the u128.5 row; the flagged row's own total of 128.1 sits above the 128 points scored.
+- **Coppin St @ La Salle u149.5:** a candidate. The flagged row's own `live_total` was 147.6, priced 110 s before the read, with 149 points on the chip at the read. Either a #824 miss or end-game staleness (#836).
+- Both were sent to the #824 / I-17 owner.
+
+**P7:** 7 sweeps launched, 4 refused (36.4%); live run 163 s; no odds child running; 0 `NHL_LIVE_GENERATION` markers.
+
+**P8:** 33 NHL overlay builds, 171 in-play rows.
+
+**Overlay:** 0 gaps over 360 s (max WNCAAB 173 s); tick gap max 114 s. Web merges 10, 0 stale.
+
+**Load:** query 10.3 s.
+
+**Team cards:** 0 defects.
+
+**Monitor slip:** the first dashboard upload this reading went out without rebuilding `readings.json`, so it carried 16 rows. It was rebuilt and re-uploaded, with 17 rows.
