@@ -67,3 +67,43 @@ mean log loss over FIT rows.
 - the TEST log loss of both;
 - D with its CI;
 - the share of TEST rows where the blend moves p by more than 1 pp.
+
+## RESULT — KILL in both markets: the sim earns no weight on top of Kalshi (run 2026-11-19 03:54Z = 9:54 PM CST, read-only; pre-registration on main `ba0fb2812` at 03:53:04Z)
+
+Script: `C:\tmp\pfmon\s4_blend.py`, exactly as registered. Result: `C:\tmp\pfmon\s4_blend_result.json`.
+
+| kind | FIT rows / games | **w_FIT** | FIT log loss at w=0 / at w_FIT | TEST rows / games | TEST log loss: mid / blend | D [95%] | verdict |
+|---|---|---|---|---|---|---|---|
+| GAME | 4,192 / 95 | **0.00** | 0.51493 / 0.51493 | 3,484 / 81 | 0.43886 / 0.43886 | 0 (blend = mid) | **KILL** |
+| TOTAL | 91,145 / 95 | **0.00** | 0.46474 / 0.46474 | 71,679 / 82 | 0.41430 / 0.41430 | 0 (blend = mid) | **KILL** |
+
+- **On the FIT nights, every positive weight on the sim made the log loss worse**, so the fitted weight is the grid
+  edge, 0. The registered rule needs w_FIT > 0, so the verdict is KILL in both markets.
+- TEST is then Kalshi's mid itself: no row moves by more than 1 pp.
+- **Kalshi's in-play mid is the in-play prior**, and the NBA re-sim gets weight 0 on top of it.
+
+**Descriptive only (not the registered decision): log-loss change against Kalshi alone at fixed small weights**
+(`C:\tmp\pfmon\s4_blend_sens.py`):
+
+| w | GAME FIT | GAME TEST | TOTAL FIT | TOTAL TEST |
+|---|---|---|---|---|
+| 0.01 | +0.00062 | -0.00005 | +0.00011 | +0.00010 |
+| 0.10 | +0.00656 | **-0.00023** | +0.00140 | +0.00129 |
+| 0.25 | +0.01813 | +0.00047 | +0.00474 | +0.00470 |
+| 1.00 (sim alone) | +0.10757 | +0.02439 | +0.04615 | +0.05722 |
+
+- TOTAL is worse at every weight on both sides.
+- **GAME on TEST alone is slightly better at a small weight** (-0.00023 nats at w = 0.10) while FIT was clearly
+  worse. A drift toward the sim on later nights is possible, since the NBA re-sim has changed over the period: BC-052
+  changed its history inputs on 11-18 itself. The size is about a hundredth of the Kalshi-vs-books gap.
+- **Lead, not a result:** re-register a GAME-only blend once at least 80 new NBA game-nights accrue after 11-18
+  (about mid-December at the current slate).
+
+## What it means for the program
+
+- S4 is closed. The in-play prior is Kalshi's mid: no in-play edge may come from "the sim disagrees with Kalshi" in
+  NBA. The scoreboard's NO-GO says the same of books and the score-time baseline in every sport.
+- An in-play challenger has to beat Kalshi's mid by being faster or better-informed, not by disagreeing with it.
+  Examples: the score-change lag window, or depth and imbalance signals. That points at S6 (adverse selection
+  features) and the recorder's score-change timing, not at the sim.
+- Nothing goes to the 11-24 window from S4.

@@ -106,6 +106,16 @@ No result guarantees future returns.
      - No maker challenger before the 12-08 window.
 4. **S4: Kalshi as the in-play prior, the sim as the challenger.** Kalshi's in-play log loss beats the books by
    0.02-0.09 nats, and the sim earns weight only where it beats Kalshi out of sample.
+   - **Result 11-18: KILL** (`findings_2026-11-18_s4_inplay_prior.md`; pre-registration `ba0fb2812` pushed before
+     the run).
+     - The stage-2 scoreboard (27 nights): Kalshi's in-play mid beats books, the score-time baseline and the NBA
+       re-sim in every sport and market. The re-sim is furthest behind: dBrier +0.024 [+0.013, +0.036] on 176 NBA
+       games.
+     - A logit blend fit on nights <= 11-02 gives the sim **weight 0.00** for both GAME and TOTAL. The NBA re-sim
+       earns no weight on top of Kalshi.
+     - Lead for later: GAME looked very slightly better at w = 0.10 on the later nights (-0.0002 nats). Re-register
+       after about 80 more game-nights.
+     - No challenger.
 5. **S5: a calibration map by side and price band** (live + ladder + closes). The live book's 0.30-0.45 band is -12.6%,
    and longshots lose in every phase. It feeds S1's features.
 6. **S6: an adverse-selection model.**
