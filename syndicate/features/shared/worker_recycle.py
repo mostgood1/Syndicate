@@ -60,6 +60,7 @@ __all__ = [
     "note_heavy_build_refused",
     "note_heavy_build_completed",
     "consecutive_refusals",
+    "heavy_builds_completed",
     "child_process_pids",
     "recycle_decision",
 ]
@@ -116,6 +117,16 @@ def note_heavy_build_completed() -> None:
 def consecutive_refusals() -> int:
     with _lock:
         return int(_state["consecutive_refusals"])
+
+
+def heavy_builds_completed() -> int:
+    """Candidate-pool builds that ran every guard in this process, ever. Read-only.
+
+    Lane `board-split-memory-guard`: the board child watches this count advance to recycle RIGHT AFTER a
+    completed build (`pipeline/board_build_process.py`, `SYNDICATE_BOARD_PROCESS_RECYCLE_AFTER_BUILD`).
+    """
+    with _lock:
+        return int(_state["total_completed"])
 
 
 def _last_refusal_stage() -> str | None:

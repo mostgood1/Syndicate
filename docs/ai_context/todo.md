@@ -1,5 +1,24 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#850` — **SINCE THE 11-18 BOARD SPLIT THE MEMORY GUARD REFUSES THE BOARD 5 TIMES AN HOUR IN THE LIVE EVENING (26 refusals 5-10 PM CST vs 0 in-thread on 11-17), THE CHILD RECYCLES 4 TIMES AND EACH ONE ABORTS rc -6, AND THE BOARD GOES UP TO 26.3 MIN UNBUILT: the guard measures parent + child RSS against the declared 7,168 MB; the split added a second interpreter (parent calm p50 777 MB, n 476) and the parent's tick grows +1.1 GB 5-9 PM, which a child recycle cannot return. Four fixes on main DEFAULT-OFF; LOAD = the user's decision (a betting change by BC-042's rule)** `[2026-11-19, lane board-split-memory-guard]`
+- **Cause, measured read-only** (`.syndicate/findings_2026-11-18_board_split_memory_guard.md` §2): RSS = PSS within 85 MB of 5,377, so nothing is miscounted. The 1,900 MB floor is still right for the stage (warm-build child rise at 60 s: p50 4, p90 259, max 1,136 MB, n 101), so it is NOT lowered.
+- **rc -6 is the lifeline:** a daemon thread blocked in `sys.stdin.buffer.read(1)` holds the BufferedReader lock at interpreter shutdown. Reproduced on the fleet's Python 3.11.16: buffered rc 134 (SIGABRT), `os.read(0, 1)` rc 75.
+- **On main, each absent = BC-042 unchanged** (all `REFRESH_WORKER__` keys):
+  - `SYNDICATE_BOARD_PROCESS_RAW_LIFELINE=1` (clean rc 75);
+  - `SYNDICATE_BOARD_PROCESS_CEILING_CREDIT_MB=768` (the second interpreter's measured base, process mode only; 11-18's evening would have crossed the line in 2 of 293 minutes instead of 113);
+  - `SYNDICATE_BOARD_PROCESS_PARENT_TRIM_SECONDS=300` (the parent is never trimmed; the child's trims free 250-290 MB each);
+  - `SYNDICATE_BOARD_PROCESS_RECYCLE_AFTER_BUILD=1` (recycle right after a publication when the next build would be refused).
+  - Tests: `tests/test_board_split_memory_guard.py`, 33, each switch off != on through the real path.
+- **Pre-registered** (findings §5), for 5-10 PM CST of the first evening after the load:
+  - refusals <= 1 an hour and <= 3 total;
+  - recycles <= 2, all rc 75;
+  - longest board-build gap <= 900 s;
+  - falsified at > 2 an hour or > 6 total, any rc -6, or a gap > 1,200 s.
+- **OWED:**
+  - (1) the user's load decision: 11-19 midday outside the window as "broken money path", or the 11-24 window batch;
+  - (2) after a load, the evening reading against §5 (the rail monitor reads it);
+  - (3) if the parent still outgrows the credit, the parent itself cannot recycle under the split: its refusal count is always 0, and the board child always counts as a running child. Not built.
+
 ### `#848` — **TWO SUSPECTED SCORECARD GRADING DEFECTS: soccer props EXONERATED (the -55% is the real hold of one-way ladders; the cell's market EV is what is wrong) except a `no`-side inversion; NHL live goals CONFIRMED (780 of 782 ev10+ rows priced on a quote their own book never returned after puck drop). Both fixed per line on main DEFAULT-OFF behind `SYNDICATE_SCORECARD_848_GRADING`; loading is a BETTING CHANGE (the soccer / NHL version reset drops their overlay cells) and must refill in ONE run (the daily refill order would gut soccer's live history), so it waits for a window and the user** `[2026-11-18, lane scorecard-grading-defects, session 3095af15; findings `.syndicate/findings_2026-11-18_scorecard_grading_defects.md`]`
 - **Soccer props (M2) -- H-S FALSIFIED for the bulk.** DNPs are voided (6,601 `dnp_void` in 4 board dates); boxes are consistent (player shots = team shots, 101 matches); starters with 60+ min still hit 8.5 pp under the fair (8,456 shots overs, ROI -41.1%, pregame = live); the NHL API settler shows the same shape on one-way NHL goals pregame (-40.0% vs -5.7%). The realised -55% is the return of one-way prop ladders at the recorded prices; the one-way `book_margin_model` fair (~7% margin) is what makes "market EV" read -7%. That belongs to #847 / the fair lanes, not the settler.
 - **The real soccer defect:** goal-scorer rows ignored their side, so every `no` graded as `yes` (Haaland and Kane, 0 goals 11-07, `no` settled LOSS). 152 of 143,878 anytime records 10-01..11-18. Fix `soccer/2`: settle on the row's own side.

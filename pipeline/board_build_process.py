@@ -45,6 +45,28 @@ LIFETIME -- WHAT RESTARTS
 - Recycle: heavy-build refusals are counted where the build runs (`worker_recycle`, in the child). The child runs
   `maybe_recycle` on its OWN uptime and exits rc 75; the parent respawns it. Under the switch a refusal streak restarts
   the board process, not the whole worker -- the parent's own refusal count stays 0, so it never recycles for them.
+
+MEMORY UNDER THE SPLIT -- three more switches, each absent = everything above unchanged (lane `board-split-memory-guard`,
+todo #850, `.syndicate/findings_2026-11-18_board_split_memory_guard.md`). Measured on the fleet's first live evening
+under the split (11-18, 5-10 PM CST): the heavy-build guard (`MEMORY_GUARD_ABORT ... floor_mb=1900`) refused 26 builds
+(0 the evening before, in-thread), the child recycled 4 times, and the longest gap between board builds was 26.3 min.
+The guard measures the ROLE TREE's RSS (parent + child) against the declared `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` (7,168).
+RSS is real here (PSS within 85 MB of it); the split added a second interpreter (the parent's calm RSS, p50 777 MB,
+n 476), and the parent (tick / overlay) grows ~+1.1 GB from 5 to 9 PM. A child recycle cannot return parent memory.
+- `SYNDICATE_BOARD_PROCESS_RAW_LIFELINE=1`: the lifeline reads fd 0 with `os.read`, not `sys.stdin.buffer.read`. The
+  buffered read holds the BufferedReader's lock in a daemon thread, and interpreter shutdown then aborts ("Fatal Python
+  error: _enter_buffered_busy ... <stdin>"), so every recycle exited rc -6 instead of 75 (4 of 4 on 11-18).
+- `SYNDICATE_BOARD_PROCESS_CEILING_CREDIT_MB=<n>`: in the PARENT, before the child is spawned, the role's declared
+  local ceiling gains `n` MB -- the second interpreter's cost -- so every headroom gate in both processes keeps the
+  margin it had in-thread. Only where a local ceiling is declared (the fleet), only in process mode, once per tree.
+  `SYNDICATE_BOARD_PROCESS_PARENT_TRIM_SECONDS=<s>`: the parent `malloc_trim`s every `s` seconds (no gc). In-thread,
+  the board loop's trims (250-290 MB released per call, p50) also trimmed the tick's freed heap; the parent has none.
+- `SYNDICATE_BOARD_PROCESS_RECYCLE_AFTER_BUILD=1`: the child also recycles RIGHT AFTER a completed build when its next
+  build would be refused (the guard's own snapshot and floor, re-read under the build guard after a trim), instead of
+  only after N refused cycles. It takes the build guard first, so no build starts in the exiting process; the respawned
+  child's cold build then starts right after a publication. Held for: other processes' transient jobs (the board
+  pair alone fits under the floor), uptime below the recycle minimum, children, a drain, recycling disabled. The
+  refusal-streak recycle above stays as the fallback.
 """
 
 from __future__ import annotations
@@ -57,7 +79,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Callable, Mapping, MutableMapping, Optional
 
 try:  # POSIX only; the switch refuses without it
     import fcntl
@@ -71,6 +93,12 @@ CHILD_MARKER_ENV = "SYNDICATE_BOARD_BUILD_PROCESS_CHILD"
 PARENT_PID_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_PID"
 PARENT_BOOTED_AT_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_BOOTED_AT"
 DRY_RUN_ENV = "SYNDICATE_BOARD_PROCESS_DRY_RUN"
+# Lane `board-split-memory-guard` (todo #850): each absent = unchanged behaviour. See the module doc, "MEMORY".
+RAW_LIFELINE_ENV = "SYNDICATE_BOARD_PROCESS_RAW_LIFELINE"
+CEILING_CREDIT_ENV = "SYNDICATE_BOARD_PROCESS_CEILING_CREDIT_MB"
+CEILING_CREDIT_APPLIED_ENV = "SYNDICATE_BOARD_PROCESS_CEILING_CREDIT_APPLIED"
+PARENT_TRIM_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_TRIM_SECONDS"
+RECYCLE_AFTER_BUILD_ENV = "SYNDICATE_BOARD_PROCESS_RECYCLE_AFTER_BUILD"
 CHILD_MODULE = "pipeline.board_build_process"
 # `check_deploy_safety.SERVICE_CHILD_CMDLINE_MARKERS` carries this exact string.
 CHILD_CMDLINE_MARKER = f"{CHILD_MODULE} --serve"
@@ -80,6 +108,7 @@ LOOP_DIED_EXIT_CODE = 70
 _BACKOFF_FIRST_S = 5.0
 _BACKOFF_MAX_S = 300.0
 _BACKOFF_RESET_AFTER_UP_S = 600.0
+_SERVE_POLL_SECONDS = 5.0  # the child's main-loop poll; a test shortens it
 
 _TRUE = {"1", "true", "yes", "on"}
 
@@ -95,6 +124,20 @@ def _log(message: str) -> None:
 def board_build_process_enabled(env: Mapping[str, str] | None = None) -> bool:
     raw = str((os.environ if env is None else env).get(SWITCH_ENV) or "").strip().lower()
     return raw in _TRUE
+
+
+def _switch_on(name: str, env: Mapping[str, str] | None = None) -> bool:
+    return str((os.environ if env is None else env).get(name) or "").strip().lower() in _TRUE
+
+
+def _positive_int_env(name: str, env: Mapping[str, str] | None = None) -> int:
+    """Absent, junk, zero or negative -> 0 (off)."""
+    raw = str((os.environ if env is None else env).get(name) or "").strip()
+    try:
+        value = int(float(raw)) if raw else 0
+    except ValueError:
+        return 0
+    return value if value > 0 else 0
 
 
 def _posix_ready() -> tuple[bool, str]:
@@ -359,6 +402,79 @@ class BoardProcessSupervisor:
                     pass
 
 
+def apply_ceiling_credit(env: MutableMapping[str, str] | None = None) -> dict[str, int] | None:
+    """PARENT side, process mode only: credit the role's declared local ceiling with the second interpreter's cost.
+
+    `SYNDICATE_BOARD_PROCESS_CEILING_CREDIT_MB` absent / 0 / junk: nothing (returns None). Set: the declared
+    `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` becomes base + credit in THIS process's env, before `child_env()` copies it, so
+    the parent's gates and the child's guard read the same ceiling (`_local_memory_limit_bytes` reads the env on every
+    call). A host with no declared local ceiling (a cgroup host) is left alone. Once per tree: the child inherits the
+    applied marker, and a respawned parent starts from the supervisor's env again.
+    """
+    target = os.environ if env is None else env
+    credit = _positive_int_env(CEILING_CREDIT_ENV, target)
+    if credit <= 0 or str(target.get(CEILING_CREDIT_APPLIED_ENV) or "").strip():
+        return None
+    from syndicate.features.shared.memory_observability import LOCAL_MEMORY_LIMIT_ENV
+
+    raw = str(target.get(LOCAL_MEMORY_LIMIT_ENV) or "").strip()
+    try:
+        base = int(float(raw)) if raw else 0
+    except ValueError:
+        base = 0
+    if base <= 0:
+        _log(f"BOARD_PROCESS_CEILING_CREDIT skipped reason=no_local_limit credit_mb={credit}")
+        return None
+    target[LOCAL_MEMORY_LIMIT_ENV] = str(base + credit)
+    target[CEILING_CREDIT_APPLIED_ENV] = f"{base}+{credit}"
+    _log(f"BOARD_PROCESS_CEILING_CREDIT from_mb={base} to_mb={base + credit} credit_mb={credit}")
+    return {"from_mb": base, "to_mb": base + credit, "credit_mb": credit}
+
+
+_PARENT_TRIM_MIN_SECONDS = 60
+_PARENT_TRIM_STOP = threading.Event()
+_PARENT_TRIM_THREAD: Optional[threading.Thread] = None
+
+
+def start_parent_trim(
+    env: Mapping[str, str] | None = None,
+    *,
+    trim: Callable[[], Any] | None = None,
+) -> Optional[threading.Thread]:
+    """PARENT side, process mode only: `malloc_trim` (no gc) every `SYNDICATE_BOARD_PROCESS_PARENT_TRIM_SECONDS`.
+
+    Absent / 0: no thread (returns None). Each trim logs `MALLOC_TRIM {... "reason": "board_split_parent_periodic",
+    "rss_released_mb": ...}` -- the reading that says whether the parent's evening growth was freed heap.
+    """
+    global _PARENT_TRIM_THREAD
+    seconds = _positive_int_env(PARENT_TRIM_ENV, env)
+    if seconds <= 0:
+        return None
+    if _PARENT_TRIM_THREAD is not None and _PARENT_TRIM_THREAD.is_alive():
+        return _PARENT_TRIM_THREAD
+    seconds = max(_PARENT_TRIM_MIN_SECONDS, seconds)
+
+    def _default_trim() -> Any:
+        from syndicate.features.shared.memory_observability import release_freed_memory_to_os
+
+        return release_freed_memory_to_os("board_split_parent_periodic", collect_first=False)
+
+    do_trim = trim or _default_trim
+
+    def _loop() -> None:
+        while not _PARENT_TRIM_STOP.wait(seconds):
+            try:
+                do_trim()
+            except Exception as exc:  # noqa: BLE001 - a trim must never cost the parent
+                _log(f"BOARD_PROCESS_PARENT_TRIM_FAILED {type(exc).__name__}: {exc}")
+
+    _PARENT_TRIM_STOP.clear()
+    _PARENT_TRIM_THREAD = threading.Thread(target=_loop, name="board-process-parent-trim", daemon=True)
+    _PARENT_TRIM_THREAD.start()
+    _log(f"BOARD_PROCESS_PARENT_TRIM_STARTED interval_s={seconds} pid={os.getpid()}")
+    return _PARENT_TRIM_THREAD
+
+
 _SUPERVISOR: Optional[BoardProcessSupervisor] = None
 
 
@@ -395,6 +511,15 @@ def start_board_loop_for_refresh_worker(in_thread_starter: Callable[[], bool] | 
         _log(f"CHIP_PUBLISHER_START_FAILED {type(exc).__name__}: {exc}")
     service = intelligence_state._INTELLIGENCE_STATE_SERVICE
     service._execution_guard = ParentGuardProbe(getattr(service, "_execution_guard", None))
+    # Lane `board-split-memory-guard`: both no-ops unless their switch is set. The credit must precede child_env().
+    try:
+        apply_ceiling_credit()
+    except Exception as exc:  # noqa: BLE001 - never cost the board its start
+        _log(f"BOARD_PROCESS_CEILING_CREDIT_FAILED {type(exc).__name__}: {exc}")
+    try:
+        start_parent_trim()
+    except Exception as exc:  # noqa: BLE001
+        _log(f"BOARD_PROCESS_PARENT_TRIM_FAILED {type(exc).__name__}: {exc}")
     if _SUPERVISOR is None:
         _SUPERVISOR = BoardProcessSupervisor(env=child_env())
     _SUPERVISOR.start()
@@ -410,6 +535,20 @@ def apply_role_clock(parent_booted_at: float) -> None:
 
     deploy_drain._PROCESS_BOOTED_AT = float(parent_booted_at)
     live_refresh_loop._PROCESS_STARTED_AT = datetime.fromtimestamp(float(parent_booted_at), timezone.utc)
+
+
+def lifeline_reader(env: Mapping[str, str] | None = None) -> Callable[[], bytes]:
+    """One byte from the parent's pipe; b"" at EOF.
+
+    Off (default): `sys.stdin.buffer.read(1)`, as before. On (`SYNDICATE_BOARD_PROCESS_RAW_LIFELINE`): `os.read(0, 1)`.
+    The buffered read keeps the BufferedReader's lock while it blocks, in a daemon thread; at interpreter shutdown,
+    closing `sys.stdin` cannot get that lock and CPython aborts ("Fatal Python error: _enter_buffered_busy"), so a
+    child that returns rc 75 dies of SIGABRT (rc -6) instead -- 4 of 4 recycles on 11-18. `os.read` holds no Python
+    lock, so shutdown passes it by. Reproduced on the fleet's Python 3.11.16: buffered rc 134 (SIGABRT), raw rc 75.
+    """
+    if _switch_on(RAW_LIFELINE_ENV, env):
+        return lambda: os.read(0, 1)
+    return lambda: sys.stdin.buffer.read(1)
 
 
 def _start_lifeline(parent_pid: int, gone: threading.Event) -> None:
@@ -430,9 +569,11 @@ def _start_lifeline(parent_pid: int, gone: threading.Event) -> None:
             gone.set()
             os._exit(0)
 
+    read_one = lifeline_reader()
+
     def _read_stdin() -> None:
         try:
-            while sys.stdin.buffer.read(1):
+            while read_one():
                 pass
         except Exception:  # noqa: BLE001
             pass
@@ -474,6 +615,192 @@ def _acquire_builder_lease(gone: threading.Event) -> Any:
     return None
 
 
+# ----------------------------------------------------------------------- the post-build recycle (child side, #850)
+
+
+def post_build_recycle_decision(
+    *,
+    snapshot: Mapping[str, Any] | None,
+    pair_rss_mb: float | None,
+    floor_mb: float,
+    uptime_s: float,
+    min_uptime_s: float,
+    recycle_enabled: bool,
+    children: list[int] | None,
+    draining: bool,
+) -> tuple[bool, str, dict[str, Any]]:
+    """(recycle, reason, detail). Pure. Would the NEXT build be refused, and would recycling THIS process help?
+
+    `snapshot` is the heavy guard's own `memory_headroom_snapshot(floor)`; `sufficient` is exactly what the next
+    build's guard would decide. `pair_rss_mb` is the parent's RSS plus this child's: when the pair alone leaves the
+    floor free, the shortfall is someone else's transient job (an odds sweep, a sim) and a recycle would cost a cold
+    build for nothing, so it holds. The rest are `worker_recycle`'s own conditions.
+    """
+    snap = snapshot or {}
+    detail: dict[str, Any] = {
+        "headroom_mb": snap.get("headroom_mb"),
+        "current_mb": snap.get("current_mb"),
+        "max_mb": snap.get("max_mb"),
+        "floor_mb": round(float(floor_mb), 1),
+        "pair_rss_mb": None if pair_rss_mb is None else round(float(pair_rss_mb), 1),
+        "uptime_s": int(uptime_s),
+        "min_uptime_s": int(min_uptime_s),
+    }
+    if not recycle_enabled:
+        return False, "disabled", detail
+    if snapshot is None:
+        return False, "headroom_unknown", detail  # the guard itself proceeds on an unreadable snapshot
+    if snapshot.get("sufficient", True):
+        return False, "headroom_ok", detail
+    max_mb = snapshot.get("max_mb")
+    if pair_rss_mb is not None and isinstance(max_mb, (int, float)) and float(max_mb) - float(pair_rss_mb) >= float(floor_mb):
+        return False, "transient_jobs", detail
+    if uptime_s < min_uptime_s:
+        return False, "min_uptime", detail
+    if children is None:
+        return False, "children_unknown", detail
+    detail["children"] = len(children)
+    if children:
+        return False, "children_running", detail
+    if draining:
+        return False, "drain_requested", detail
+    return True, "recycle", detail
+
+
+def _pair_rss_mb(parent_pid: int) -> float | None:
+    try:
+        import psutil
+
+        total = int(psutil.Process(os.getpid()).memory_info().rss)
+        if parent_pid > 0:
+            total += int(psutil.Process(parent_pid).memory_info().rss)
+        return total / (1024.0 * 1024.0)
+    except Exception:  # noqa: BLE001 - unknown pair: fall back to the guard's own verdict
+        return None
+
+
+def _gather_post_build_decision(parent_pid: int, started_monotonic: float, *, trim: bool) -> tuple[bool, str, dict[str, Any]]:
+    """The live inputs for `post_build_recycle_decision`. `trim` first, as the build's own guards do before reading."""
+    from pipeline import intelligence_state
+    from syndicate.features.shared import worker_recycle
+    from syndicate.features.shared.memory_observability import memory_headroom_snapshot, release_freed_memory_to_os
+
+    if trim:
+        try:
+            release_freed_memory_to_os("post_build_recycle_check", collect_first=False)
+        except Exception:  # noqa: BLE001
+            pass
+    floor_bytes = int(intelligence_state._MIN_SAFE_MEMORY_HEADROOM_BYTES)
+    try:
+        snapshot = memory_headroom_snapshot(floor_bytes)
+    except Exception:  # noqa: BLE001
+        snapshot = None
+    try:
+        children = worker_recycle.child_process_pids(os.getpid())
+    except Exception:  # noqa: BLE001
+        children = None
+    try:
+        from syndicate.features.shared.deploy_drain import drain_active
+
+        draining = bool(drain_active())
+    except Exception:  # noqa: BLE001 - worker_recycle reads an unreadable drain the same way
+        draining = False
+    return post_build_recycle_decision(
+        snapshot=snapshot,
+        pair_rss_mb=_pair_rss_mb(parent_pid),
+        floor_mb=floor_bytes / (1024.0 * 1024.0),
+        uptime_s=max(0.0, time.monotonic() - started_monotonic),
+        min_uptime_s=worker_recycle.recycle_min_uptime_seconds(),
+        recycle_enabled=worker_recycle.recycle_after_refusals() > 0,
+        children=children,
+        draining=draining,
+    )
+
+
+_POST_BUILD_RETRY_REASONS = frozenset({"children_running", "children_unknown", "drain_requested"})
+_POST_BUILD_QUIET_REASONS = frozenset({"headroom_ok", "headroom_unknown", "disabled"})
+
+
+class PostBuildRecycler:
+    """CHILD side. After each completed build, recycle now if the next build would be refused. One per child.
+
+    `completed()` is `worker_recycle.heavy_builds_completed`; when it advances, a check is PENDING. The check runs
+    unguarded first (cheap); only a "recycle" verdict takes the build guard (blocking, bounded -- a running build
+    finishes first), and the verdict is re-read under it after a trim. Recycle -> `poll()` returns True and the guard
+    stays HELD, so no build starts in a process that is about to exit. Anything else releases it. Retry reasons keep
+    the check pending; every other reason settles it until the next completed build.
+    """
+
+    def __init__(
+        self,
+        guard: Any,
+        *,
+        decide: Callable[[bool], tuple[bool, str, dict[str, Any]]],
+        completed: Callable[[], int],
+        acquire_timeout_s: float = 30.0,
+    ) -> None:
+        self._guard = guard
+        self._decide = decide
+        self._completed = completed
+        self._acquire_timeout_s = float(acquire_timeout_s)
+        self._seen = int(completed())
+        self.pending = False
+        self._held_logged: Optional[str] = None
+
+    def poll(self) -> bool:
+        done = int(self._completed())
+        if done != self._seen:
+            self._seen = done
+            self.pending = True
+            self._held_logged = None
+        if not self.pending:
+            return False
+        recycle, reason, detail = self._decide(False)
+        if not recycle:
+            return self._settle(reason, detail)
+        if not self._guard.acquire(True, self._acquire_timeout_s):
+            return False  # a build holds it; ask again after it
+        try:
+            recycle, reason, detail = self._decide(True)
+        except Exception as exc:  # noqa: BLE001
+            recycle, reason, detail = False, "decide_failed", {"error": f"{type(exc).__name__}: {exc}"}
+        if recycle:
+            _log(f"BOARD_PROCESS_RECYCLE pid={os.getpid()} reason=post_build_headroom {detail} -- the parent respawns this process")
+            return True
+        self._guard.release()
+        return self._settle(reason, detail)
+
+    def _settle(self, reason: str, detail: dict[str, Any]) -> bool:
+        if reason in _POST_BUILD_RETRY_REASONS:
+            if reason != self._held_logged:
+                self._held_logged = reason
+                _log(f"BOARD_PROCESS_POST_BUILD_CHECK held={reason} pending=1 {detail}")
+            return False
+        if reason not in _POST_BUILD_QUIET_REASONS:
+            _log(f"BOARD_PROCESS_POST_BUILD_CHECK held={reason} {detail}")
+        self.pending = False
+        return False
+
+
+def make_post_build_recycler(
+    service: Any,
+    *,
+    parent_pid: int,
+    started_monotonic: float,
+    env: Mapping[str, str] | None = None,
+) -> Optional[PostBuildRecycler]:
+    """None unless `SYNDICATE_BOARD_PROCESS_RECYCLE_AFTER_BUILD` is on: then `_serve_main` behaves exactly as before."""
+    if not _switch_on(RECYCLE_AFTER_BUILD_ENV, env):
+        return None
+    from syndicate.features.shared.worker_recycle import heavy_builds_completed
+
+    return PostBuildRecycler(
+        service._execution_guard,
+        decide=lambda trim: _gather_post_build_decision(parent_pid, started_monotonic, trim=trim),
+        completed=heavy_builds_completed,
+    )
+
+
 def _serve_main() -> int:
     parent_pid = int(os.environ.get(PARENT_PID_ENV) or 0)
     try:
@@ -510,12 +837,27 @@ def _serve_main() -> int:
     service._execution_guard = CrossProcessGuard(service._execution_guard, busy_lock_path())
     service.start()
     _log(f"BOARD_PROCESS_CHILD_READY pid={os.getpid()} parent={parent_pid}")
+    recycler: Optional[PostBuildRecycler] = None
+    try:
+        recycler = make_post_build_recycler(service, parent_pid=parent_pid, started_monotonic=started)
+    except Exception as exc:  # noqa: BLE001 - the post-build check must never cost the board
+        _log(f"POST_BUILD_RECYCLE_SETUP_FAILED {type(exc).__name__}: {exc}")
+    _log(
+        f"BOARD_PROCESS_CHILD_SWITCHES pid={os.getpid()} raw_lifeline={int(_switch_on(RAW_LIFELINE_ENV))} "
+        f"recycle_after_build={int(recycler is not None)} ceiling_credit={os.environ.get(CEILING_CREDIT_APPLIED_ENV) or 'none'}"
+    )
     last_recycle_check = time.monotonic()
-    while not gone.wait(5.0):
+    while not gone.wait(_SERVE_POLL_SECONDS):
         thread = getattr(service, "_thread", None)
         if thread is None or not thread.is_alive():
             _log(f"BOARD_PROCESS_LOOP_DIED pid={os.getpid()} uptime_s={int(time.monotonic() - started)}")
             return LOOP_DIED_EXIT_CODE
+        if recycler is not None:
+            try:
+                if recycler.poll():
+                    return RECYCLE_EXIT_CODE
+            except Exception as exc:  # noqa: BLE001
+                _log(f"POST_BUILD_RECYCLE_CHECK_FAILED {type(exc).__name__}: {exc}")
         if time.monotonic() - last_recycle_check >= 60.0:
             last_recycle_check = time.monotonic()
             try:
