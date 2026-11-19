@@ -1,5 +1,65 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#849` — **BACKGROUND BUILDS AT FULL PRIORITY SLOW THE LAYER 2 BOARD: soccer artifact builds for dates 4-6 days ahead run at nice 0, at 80-99% of a core, beside the board child. Launch the non-urgent ones (dated more than 1 day out) at a lower priority, behind a switch** `[2026-11-18, the rail monitor's lever L-d, recorded by lane product-optimization-program (M4)]` — UNOWNED; proposed as its own session
+- **Measured** (the rail monitor's `ps` plus `BOARD_BUILD_TIMING`, 11-18; `.syndicate/findings_2026-11-18_layer2_rail_monitor.md` readings 3, 4, 8, 9, 12):
+  - Board CPU per build tracks host load: 106-150 s at load 1-2, 240-385 s at ~5, 500-600 s at 8-10. It fell 602 -> 106 s at 1:49 PM CST with no restart and no code change.
+  - Three nice-0 soccer builds dated days ahead: 4:22 PM `--league eredivisie --date 2026-11-22` (board 290-409 s; today's board 730 s old), 4:55 PM `championship --date 2026-11-24`, 6:14 PM `epl --date 2026-11-23` at host load 8.0.
+  - The cadence target is 300 s (`LAYER2_TODAY_CADENCE`); the 11-17 evening peak was 1,254-1,510 s.
+- **Not #840:** #840's date anchor (loaded 11:58 AM CST 11-18) covers only the hourly look-ahead. These look like refresh-worker's soccer WEEKLY autorun. Confirm the launcher before building.
+- **Fix:** per launch, by the artifact's own date: run it at nice 10 when it is dated more than 1 day out, behind a switch (absent = off), with an off != on test through the real launcher. The I-20 board split already isolates the build from the live tick's interpreter lock, but not from CPU contention.
+- **Betting change: likely no, confirm at load.** It delays only inputs for dates not bet live yet, and learnings 11-18 says an input delay can be one.
+
+### `#848` — **TWO SUSPECTED SCORECARD GRADING DEFECTS DISTORT THE BOARD'S RESULTS: soccer board player props return about -55% against about -7% market EV (players who did not play graded as losses?), and NHL live goal-scorer rows return +153% at 8.4% hit (priced after the goal?). Verify each, then fix the grading** `[2026-11-18, lane product-optimization-program (M2, M3), evidence pass A]` — UNOWNED; proposed as its own session
+- **Soccer props (M2):**
+  - player_shots live: 25,549 bets / 267 games, hit 21.8%.
+  - Soccer board props realise about -55% ROI against market EV of about -7%.
+  - That drives the scorecard's soccer board to -43.3% and published to -34.8% (window to 11-18).
+  - Cause NOT verified. The first check: are void / did-not-play outcomes settled as losses?
+- **NHL live goals (M3):**
+  - 723 bets / 113 games, hit 8.4%, ROI +152.9% against market EV +174.5%.
+  - That inflates NHL's board / published ev10+ bands to +111% / +130%. Not staked.
+  - Cause NOT verified. The first check: was the quote that priced each row observed after the goal it settles on?
+- **Why it matters:** both feed the optimizer's per-cell numbers and the rail monitor's board-results history, which this program ranks on.
+- **Done:** each cause named with evidence; the grading fixed or the rows voided per line (never a market switch), and the scorecard re-run to show the cell move. Scripts from pass A: `C:/tmp/optprog/A_*`.
+- **Betting change: no** (grading only), unless the fix touches what the board offers live.
+
+### `#847` — **THE MODEL'S PROBABILITY IS OVER-CONFIDENT EVERYWHERE IT IS MEASURED, SO CALIBRATE IT ONCE, PER CELL, AND USE THE CALIBRATED NUMBER EVERYWHERE: the rail flag test, the board's shown EV, rank and stake (below the 0.5 floor where the evidence says so), and the shared live probability. This replaces backlog I-1 (the long-shot tail was not a separate effect)** `[2026-11-18, lane product-optimization-program (P1, theme T2)]` — UNOWNED; proposed as its own session
+- **Measured, game-clustered 95% CIs:**
+  - Rail flags hit 9.1 pp below the model's own probability [-12.7, -5.3] (1,120 flags / 177 games / 3 dates, 11-15..11-17). 27 of 41 slices clear BH at q 0.10 and LODO holds.
+  - The shortfall grows with the claimed gap: 3-5 pp -0.3, 15+ pp -19.2.
+  - Fitted `logit p' = logit fair + k (logit model - logit fair)`: pooled k 0.16 [-0.10, +0.42].
+  - Per cell, k runs from NCAAB totals -0.24 to NBA totals +0.59 and NCAAB moneyline +1.57. **Cheat-sheet NBA props are UNDER-confident (k 1.68). Never a global k.**
+  - Fitted on two dates and tested on the third: +0.024 nats/flag [+0.003, +0.047] over the raw model; ~326 of ~373 flags/day stop, worth about 0 at book prices.
+  - The optimizer: 61 of 63 validated cells sit below 1 in both halves. In 28 the w* CI upper is below the 0.5 floor (7,137 rows/day; NBA live player points w* 0.165 [0.07, 0.26]). The overlay reaches rank and stake only. It does not reach the suggested flag, admission or the shown EV.
+  - Pregame away picks: model 0.491, fair 0.389, hit 0.167 (30 / 30 / 15 dates). Sim vs the line at favourite prices -20.8% [-34.0, -8.4] (127 / 70 / 5).
+- **Four uses, in order of safety:**
+  - (a) the rail's >= 3 pp flag test (display);
+  - (b) the board's shown EV (display; the suggested set promises +3.41% and returns -3.02%);
+  - (c) rank and stake below the 0.5 floor where the w* CI upper says so (betting change; default-off; 12-08 at the earliest);
+  - (d) the shared live probability, generalising #816's college-totals fit (betting change; default-off).
+  - (a) and (b) are not betting changes and can load any time with the user's OK.
+- **Re-read NBA after I-25:** every NBA k and w* before 11-18 3:02 PM CST rests on the duplicated history. #844 filters the NCAAB cells (it is fixed default-off in `25a5e480d`).
+- **Rules:** k comes from the optimizer's validated w*, partially pooled per sport x market. Every line is its own decision: no band, side or market gate. A rule that keeps zero lines in a cell is a gate and is rejected (pass A's R3 was).
+- **Evidence:** `.syndicate/findings_2026-11-18_product_optimization_program.md` §3.2 P1; pass C `C:/tmp/optprog/C_rail_cellk_out.txt`; pass A `C:/tmp/optprog/A_*`.
+
+### `#846` — **PRODUCT OPTIMIZATION PROGRAM (user 11-18 ~6:05 PM CST, rail monitor session: "we need to then take all this data to optimize the overall Syndicate product"): one ranked lever table from the scorecard, rail flags, cheat sheets, live book and suggested set. RESULT: no live-money lever clears the bar (fees are 78% of the live loss); what clears is CALIBRATION (#847)** `[2026-11-18, lane product-optimization-program, session 3bf4646c]`
+- **Findings:** `.syndicate/findings_2026-11-18_product_optimization_program.md` (pre-registration `4294294e1`, before any evidence).
+- **Live book** (since 11-03): -4.94% [-12.15, +2.26], 914 bets / 391 events. Fees 3.85 pp of stake (78% of the loss); selection +0.65 [-8.63, +9.92]. 0 of 182 slice tests clear BH.
+- **Top levers and owners:**
+  - L1 hold-value exits (`kalshi-exit-path`, ~$0.5/day; default-off + shadow, switch-on 12-08 at the earliest);
+  - T1 lower-bound EV (`decision-policy-paper` P1 `ev_lb`, already registered);
+  - T2 calibration everywhere (#847, unowned);
+  - #844 (`25a5e480d`, default off);
+  - #834, NFL t0.925 and #842 (already in the 11-24 batch);
+  - grading defects (#848);
+  - board build priority (#849).
+  - Hand-off notes are in each owner's lanes.md block, dated 11-18 ~7:05 PM CST.
+- **11-24 package:** the existing batch (NFL t0.925, #834, #842) plus #844's global key `SYNDICATE_BOOK_GRID_NEWEST_BY_TIME=on`. Adding #844 is the user's call, put to them 11-18 ~7:10 PM CST. It is worth about $0/day of live money; its value is board and paper accuracy.
+- **Hypothesis:**
+  - H1 FALSIFIED: the long-shot tail gap is noise pooled over three days, -1.4 pp [-10.7, +8.0].
+  - H2 holds: 7 of 26 statistical levers clear BH + LODO, all on calibration metrics, none on money.
+- **Owed:** the user's answer on the 11-24 addition; sessions for #847-#849 if the user starts them; re-rank when the 11-24 window's readings and M2 (11-24) land.
+
 ### `#845` — **QUEUED for the 12-08 betting-change window (user "queue the splice for the 12-08 window", 2026-11-18 4:57 PM CST): switch the Understat-outage SPLICE on then IF understat.com is still down. `SYNDICATE_SOCCER_UNDERSTAT_SPLICE` is on main default OFF; nothing to do now or at 11-24** `[2026-11-18, lane understat-fallback-backtest; `.syndicate/findings_2026-11-18_understat_fallback_backtest.md`; follows #841]`
 - **QUEUED 2026-11-18 4:57 PM CST** (user "queue the splice for the 12-08 window", 2026-11-18 4:57 PM CST). Nothing loads it automatically: it goes into the 12-08 window's batch (Tue 12-08 2-7 AM CST, one ff + ONE drained full down/up with that window's other changes). Owner of the entry: this item and the fleet-watcher's window queue (lane `understat-fetch-failures` CLOSED, user "close the lane", 2026-11-18 6:42 PM CST). Before loading, check:
   - **Understat still down:** `~/syndicate-prod/data/soccer_source/_understat_status.json` `state` = down, and the big-5 Understat steps still fail. If it is up, DROP the splice from the batch and close this item.
