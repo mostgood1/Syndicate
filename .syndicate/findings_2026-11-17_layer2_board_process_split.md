@@ -306,3 +306,80 @@ plan. Record it with `scripts/betting_change.py add --kind yes` at the load.
   - This repeats H1 (the lock) across whole builds, not one stage.
   - The wait (at most 26 s of a 1,254 s build) is again too small to be host starvation inside Linux. The host cost is
     the 1.67x clock.
+
+## READING 1 -- first live evening, 11-18 6-10 PM CST (00:00-04:00Z 11-19)
+
+Read 2026-11-19 04:15:43Z (10:15 PM CST 11-18) by scheduled task `board-split-first-evening-reading-1118`, read-only, nice 19:
+`run_reading.sh 2026-11-19T00:00:00 2026-11-19T04:00:00 2026-11-19 /home/amyn/l2split_1118`, output
+`C:\tmp\l2split\reading_1118\reading_out.txt`; extra reads `r1118_extra_out.txt` beside it. "Today" = board date 2026-11-18.
+Thresholds are the registered ones, unmoved.
+
+- **Coverage.** `refresh-worker.log.1` 11-17 17:46Z .. 11-19 00:11:21Z and `refresh-worker.log` 00:11:22Z .. 04:15Z: the
+  whole window is inside the two files. The bridge ran (instruments 23:58:07Z .. 04:02:33Z): 14,118 child samples, the parent
+  samples, 244 child-count rows, 476 bench rows. The samplers re-found the child across all 5 respawns (6 child pids).
+
+| # | metric | B | evening (switch on) | n | verdict |
+|---|---|---|---|---|---|
+| 1 | board share (child board thread CPU / wall) | 0.44 (n 6) | **0.90** median (0.83-0.92) | 18 builds | **PREDICTED** (>= 0.80) |
+| 2 | board wall p50 / p90 | 253.4 / 882.2 s (n 19) | **334.9 / 485.3 s**, max 525.7; 13 of 18 over 300 s | 18 builds (14 today, 4 next day) | **FALSIFIED** (p50 > 215); p90 clause met |
+| 3 | today's shortlist gap p50; share > 300 s | 363 s; 0.71 (12 of 17) | **1,070 s**; 1.00 (13 of 13); p90 1,479, max 1,491 | 14 publishes | **FALSIFIED** (p50 > 363) |
+| 4 | today's LIVE_PLAN gap p50 / max | 351 / 4,739 s (n 17) | **1,098 / 1,533 s**; p90 1,446 | 14 writes | **FALSIFIED** (p50 > 351); max clause met |
+| 5 | grid build_seconds p50 NCAAB / NBA | 13.8 / 19.7 s (n 183 / 147) | **10.2 / 21.0 s** (p90 18.8 / 39.9) | 248 / 221 ticks | **FALSIFIED** (NBA > B), attribution shared with nba-grid-lean-chips; NCAAB clause met |
+
+- **Metric 1 detail.** `l2s_analyze.py` fixes ONE board tid across pids (363712, the child of 00:30-01:53Z), so its summary
+  line reads 0.0 for the other 5 pids' builds. Per build, the dominant thread of each child pid carries all of the child's
+  CPU (main 0.00 in every build), so the board share is that thread's share: median 0.90, n 18. Against the calm-hours
+  in-thread ceiling 0.67 it is 1.34x (B was 0.66x). Child whole-process share median 0.90; parent main (tick) share median
+  0.63, parent whole-process 0.82 (n 18 build spans). Runqueue wait 1.2-3.8 s per build where measured.
+- **What the wall is now.** Each build is CPU-bound on its own work: process CPU (log) 223-465 s per build, wall = CPU /
+  ~0.9. Contention is gone, but the build's own CPU at the evening host clock (bench 1.14x B) sets a p50 of ~335 s. The
+  slowdown that is left is the build's cost, not the shared lock. Metrics 3-4 are worse than B mainly because cycles are
+  lost to memory-guard refusals and child recycles (below) and 4 of 18 builds were next-day builds (B: 2 of 19).
+
+**Comparability (rule stated before the reading).**
+- Fixed-work bench p50 **0.1901** CPU-s (n 476) = 1.14x B's 0.1664: within 15%, passes (barely).
+- Live at 7 PM CST: NCAAB 41 + NBA 6 in progress (in=6 pre=6) + NFL 0 = **47** vs B's 41 = +15%, within 30%, passes.
+  WNCAAB 36 vs B's 20 (+80%, shown separately). NHL 2 live (in-play props launch line).
+- C3: no `DRAIN_HOLD`, `DEFERRED_BOARD_BUILD`, refresh-worker `BOOTED` or `WORKER_SHUTDOWN` in the window. BUT deferred builds
+  of another kind: `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` refused board builds **5 / 5 / 3 / 8** times at
+  00Z / 01Z / 02Z / 03Z (21 in the window; 7 at 23Z before it, 1 at 04Z after; the in-thread 11-17 evening had 0), and the
+  child **recycled 5 times** (`RECYCLE_EXIT reason=heavy_build_refused`, 3 refusals in a row each): 00:29:18Z, 01:52:39Z,
+  02:42:57Z, 03:25:30Z, 03:58:38Z (6:29, 7:52, 8:42, 9:25, 9:58 PM CST), uptimes 31,813 / 4,955 / 2,977 / 2,518 / 1,960 s;
+  each respawn's first build was cold. **So the reading is CONFOUNDED** (memory-guard refusals + 5 child recycles).
+- **Mixed code in the tree:** the parent loaded `d1e14be46` at 15:39:55Z; every respawned child (00:30Z on) imported the
+  fleet head `a3104a5b6` (ff-only loads 15:56Z, 16:33Z, 17:58Z, 21:02Z). `pipeline/` + `syndicate/` differ in 11 files,
+  among them `live_refresh_loop.py` / `live_gameline_join.py` (`52e68382a` #836 board join end-game staleness, shadow by
+  default; `2aff90c36` #842 default OFF). The board-process module itself is unchanged.
+
+**Co-loaded changes** (deploys.md loads on refresh-worker / live-odds-worker between 11-18 00:00Z and 11-19 04:00Z, other than
+08:30:50Z):
+- 08:02:54Z I-17 calibrated college total + NFL re-sim seeds (BC-041/045), refresh-worker: board-side display + NFL live re-sim
+  tick (0 NFL live tonight) -- could move metric 2 marginally; attribution shared for metric 2.
+- 13:47:14Z #838 odds-lane sport deadline (ff only; odds-lane child processes) and 15:56:43Z its pregame NHL split: host CPU
+  only -- could move the bench, so metrics 2 and 5 indirectly.
+- 14:05:18Z NHL in-play props on live-odds-worker (2 NHL games live): host CPU -- same, metrics 2 / 5 indirectly.
+- 14:42:44Z #816 gate fallback (refresh-worker TERM): college totals calibration read by the board -- metric 2, shared.
+- 15:39:55Z nba-grid-lean-chips (refresh-worker TERM): the NBA book-grid join -- **metric 5 NBA and the parent tick share;
+  metric 5's verdict is "attribution shared with nba-grid-lean-chips"** (and NBA had 6 games in progress vs B's 1).
+- 16:33:54Z NHL stats-REST cache, 17:58:30Z soccer look-ahead anchor, 21:02:51Z NBA games-history fetch (all ff only; child
+  scripts): none of metrics 1-5 directly, but they reached the respawned board children as code (above).
+
+**Safety.**
+- `BOARD_PROCESS_EXITED` **5, every one rc -6**, each logged `RECYCLE_EXIT` first and preceded by `Fatal Python error:
+  _enter_buffered_busy ... <stdin> at interpreter shutdown, possibly due to daemon threads` (the lifeline thread in
+  `sys.stdin.buffer.read(1)`). Intended recycle exits that aborted at shutdown -- not unexplained crashes, but not rc 75:
+  **FAILS as registered (explained)**. The 5th (03:58:58Z) is beyond the 4 the guard lane listed.
+- `LEASE_WAIT` 0: passes.
+- Never 2 children: 244 rows, 243 `children=1`, 1 `children=0` at 02:43:29Z inside the 5-s respawn gap: passes.
+- refresh-worker `container_memory_mb` (`ALL_PROCESS_MEMORY`, n 649 lines, ~12 s apart): p50 **5,047**, max **6,194** at
+  03:15:06Z (1 of 649 over 6,144): **FAILS by 50 MB** (in-thread B p50 4,190 / max 5,341, n 580; B's 00-04Z window p50
+  4,332 / max 5,207). Sampler parent+child RSS max 5,654 MB.
+- Child listed as refresh-worker's own server (`check_deploy_safety`, pid 662924): passes.
+- Traceback **1** (B 0): 03:01:36Z `prop_evidence soccer: unreadable .../epl/api/live_state/live_state_2026-11-18.json`
+  (`JSONDecodeError` on an empty file, logged and handled in the parent's tick) -- not the board process, but 0 is not met.
+
+**Overall: did the evening slowdown go away (metrics 2-4)? NO, and CONFOUNDED.** The split did its mechanical job (board
+share 0.44 -> 0.90, tails cut: p90 882 -> 485 s, max 1,510 -> 526 s), but p50 wall rose 253 -> 335 s and today's cadence
+got worse (shortlist and LIVE_PLAN gaps ~3x B) under 21 memory-guard refusals and 5 child recycles. Rollback, the user's
+decision, not run: remove `REFRESH_WORKER__SYNDICATE_BOARD_BUILD_PROCESS=1` from `local_production.env` + a drained full
+down/up. Lane `board-split-memory-guard` (#850) owns the refusal / recycle-exit fix, which may be preferable to a rollback.
