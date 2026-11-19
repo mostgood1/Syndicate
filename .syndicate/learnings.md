@@ -3662,3 +3662,11 @@ as a verdict.
   - Read a lifeline pipe with `os.read` on the fd.
 - **Under a process split, recycling one process cannot free the other's memory.** A guard that measures the whole tree (`SYNDICATE_LOCAL_MEMORY_ROOT_PID`) charges the parent's growth to the child's build, and the child's recycles then only buy one cold build each. A split also needs a second look at every guard sized for one interpreter.
 - *(evidence in `findings_2026-11-18_board_split_memory_guard.md` §2-3)*
+
+## 2026-11-19 — A per-sport span cut from a MULTI-SPORT tick line selects the builds where that sport ran last `[lane nba-grid-lean-chips, todo #790]`
+
+- `lean_join.py` placed each NBA grid build at `BOOK_GRID_TICK - build_seconds.nba`. That line is written after EVERY sport of the tick has built, so NBA's own markers fell inside the window only when NBA built near last.
+  - It matched 127 of 292 builds on 11-17 and 300 of 377 on 11-18: a different subset each night. The bar registered at the load (3.37 s) came from the first subset.
+  - It read +0.10 s where the full split read -0.39 s (all live counts) and -0.76 s (>= 2 live).
+- Anchor a sport's build on a line that sport writes at its own end (here `INPLAY_OVERLAY sport=nba`; start = its time - `build_seconds.nba`), and print the match rate (matched / builds) beside every median. A match rate that differs between the two sides of a comparison means the instrument is selecting.
+- *(evidence: deploys.md 2026-11-19 06:38:15Z READING; `C:\tmp\railload\lean_join.py` vs `lean_live_split.py`)*
