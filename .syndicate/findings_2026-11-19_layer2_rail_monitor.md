@@ -235,3 +235,42 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
   - Its fix is todo #853 (`9931a787b`, `SYNDICATE_COMBINED_BOARD_SHARED_COPY`, default off): a shared copy in `/dev/shm`.
     Prediction: cold <= 25%, query p50 <= 5.5 s, p90 <= 13 s.
   - The load (env key + a drained full down/up) is the user's decision, asked in that session.
+
+## Reading 6 — 2:13 PM CST (20:13Z)
+
+- **Live:** 1 game, NCAAB WVU / Florida (ESPN 401920517), H1 3:38, Florida 32-23; 18 rail rows. **0 flags.**
+- **P1:** 0. **P6:** 0. **P8:** 0 of 0 calibrated rows; there are none (see I-29). **Team cards:** 94 chips, 0 defects.
+- **P7 (#850), 1:36-2:13 PM:** 0 refusals, 0 child exits. The child is at 3.83 GB after 3.2 h.
+  - Board: 9 builds, wall median 165 s, max 197 s; publication gap median 246 s, **max 264 s**.
+- **R-B (#844 sample 2):** NCAAB 11 rows (4 venue), h2h 1, row-fresh 1 = cell-fresh 1, `mismatch` 1. NBA 0 rows.
+- **R-E:** 3 NHL steps, 0 timed out.
+- **Live odds:**
+  - NCAAB's own live lane ran 37 times in 37 min (`NCAAB_LIVE_AUTORUN_LAUNCHED`, 60 s);
+  - overlay gap max 147 s; priced age p50 191 s, p90 324 s.
+  - `ODDS_SWEEP_LAUNCHED` showed a 26-min gap (1:41-2:07 PM). That is the 1,800 s pregame cadence (`PREGAME_CADENCE_SKIPPED`), not live. Not a defect.
+  - 39 of 39 web merges list `wncaab` as stale; no WNCAAB game is live.
+- **Load:** query 3.05 s, shortlist 1.13 s, chips 0.17 s. **I-28:** 7 queries since 1:36 PM, 3 cold (43%).
+
+**I-29 (new, live defect): a mid-game home/away flip blacked out the game's live model for 30+ minutes.**
+- **The flip:** ESPN 401920517 / odds event `5246df44...` read **"Florida Gators @ West Virginia Mountaineers"** on the chip
+  and the rail rows at 10:37 AM and 1:36 PM (away Florida 4, home WVU 0). At 2:13 PM both read **"West Virginia
+  Mountaineers @ Florida Gators"** (away WVU 23, home Florida 32).
+- **The join since then** (`LIVE_GAMELINE_BUILD sport=ncaab`, `C:\tmp\railmon\lgb.py`):
+  - 1:33-1:43 PM: projected 1-14 a build, full_games 1 (flags at reading 5).
+  - 1:44:43 PM: considered 0, the rows re-keyed.
+  - **From 1:47:41 PM to 2:16:41 PM (latest read), every build has projected 0 and full_games 0.** All full-game
+    lines are withheld `no_live_gameline_projection` (21-27 a build), while
+    `index_why: games_in_snapshot 1, indexed 1, sources_seen live_resim 1`.
+  - The re-sim keeps running: `NCAAB_LIVE_RESIM_TICK live=1 resimmed=1 written=True` every ~8 min, last at 2:17 PM.
+  - So the model exists and is indexed under the other orientation; the rows look it up under the new one.
+- **Effect:** the live rail cannot flag this game (0 of 18 rows carry `live_model_probability`). The P8 floor and P1 have
+  nothing to read. The probe's `dark_rows` / `missed` (0) cannot see it either, because they need a model on the row.
+  That is an instrument gap to close.
+  - It fails closed: no model, no flag, no bet.
+- **Why #791 does not cover it:** the team-alias join is NCAAF-only (`_TEAM_ALIAS_JOIN_SPORTS`) and keys an ordered
+  `(away, home)` pair.
+- **Open questions for the owner:**
+  - which feed flipped: ESPN, the odds API, or both, and at what time;
+  - whether this is a neutral-site game listed differently by the two sources;
+  - how many of tonight's NCAAB / WNCAAB games could flip.
+- Proposed as its own session (below). The monitor will also count rows without a live model per live game.
