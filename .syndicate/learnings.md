@@ -3686,3 +3686,27 @@ as a verdict.
     correlation 0.43.
   - Anchoring the level to the close took the slope to 0.95.
   - Read the slope before choosing between a spread fix and a centre fix. A width match is necessary, not sufficient.
+
+## 2026-11-19 — OVERTURNED: "the NCAAF live re-sim scores too much late, because #808's end-game mechanisms are off for NCAAF" — the error is MARGIN-BLIND, not a surplus, and #808 makes the larger half worse `[lane ncaaf-live-endgame-surplus, todo #852, session 617b553b]`
+
+**The belief** (#835's H-ENDGAME, passed on as a brief). At 75-95% of game time the re-sim expects the rest of the game
+at 1.29x the close's even pace against Kalshi's 0.82x, so the engine adds a late surplus; the suspected seat was #808's
+kneel-out / clock mechanisms being off for NCAAF.
+
+**What the measurement showed.**
+- **The pooled mean is small.** Against the ledger's FINALS (not Kalshi) the late error is +0.56 (se 0.52) over 173
+  games.
+- **Split by the score margin, it has two signs.** +2.1 / +2.9 at leads of 17-24 / 25+, through the LEADER, which
+  keeps scoring at full rate. About -0.3 to -1.8 in one-score games, through the trailer's last two minutes and an
+  overtime block worth 3.6 points per OT game against 12.4.
+- The 1.29x / 0.82x was a mean of RATIOS on one slate's Kalshi-listed games. A ratio with 3 minutes left in its
+  denominator explodes, and that slate's listed games went under.
+- **#808's switches** add +1.1 at EVERY margin. They fix the one-score end and worsen the blowouts (net log loss
+  +0.016).
+- **The lever** was a default-off field already in the engine (#686's leader-only `blowout_damping_strength`):
+  2024 slope 0.67 -> 0.77; on 2026 on top of #835, log loss -0.0076 (se 0.0040).
+
+**Rule.** Before calling a late-game error a "surplus", split it by the score margin AND by which team scores (leader /
+trailer). Opposite-signed errors cancel in the mean and show only in the calibration slope. Grade a "the market expects
+less" gap against the FINALS before treating the market as truth. Quote pace as a ratio of means, never a mean of
+ratios, when the remaining-time denominator can approach zero.

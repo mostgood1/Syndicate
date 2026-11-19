@@ -2607,6 +2607,18 @@ t=17.2), not a live-path fault, and the board withholds the projection for it.
 is not a stable two-instance split. Single observation, cause unknown, not
 chased. Worth a second look if a live probability is ever seen to un-move.
 
+**THE RESUMED ENGINE'S LATE SCORING IS BLIND TO THE MARGIN** `[measured 2026-11-19, lane
+ncaaf-live-endgame-surplus, todo #852; production profile ncaaf-goal-line-refit-1 (fleet md5 da203b45),
+nothing loaded or changed]`.
+- **Blowouts over, through the leader.** At 75-95% of game time on the live ledger's finals (10-24..11-14), engine
+  minus actual rest-of-game is +2.12 (se 0.94) at |margin| 17-24 and +2.86 (0.96) at 25+. One-score margins sit at
+  -0.30 (0.80). Resumed at real 2024 Q4 states (450 games), the 17+ surplus is the LEADER's (+2.2 at Q4 15:00).
+- **One-score games under**, through the trailer's last two minutes (4.7 vs 7.3 snaps) and overtime: the OT block
+  is one drive from the team's OWN 25, giving 3.6 points per OT game against a real 12.4.
+- **The mean cancels**, so the calibration slope pays.
+- #808's switches and #686's default-off `blowout_damping_strength` were measured as arms; none is on for NCAAF.
+  Findings: `.syndicate/findings_2026-11-19_ncaaf_live_endgame_surplus.md`.
+
 
 ## [nfl-season-open-date] THE 09-09 vs 09-10 DISAGREEMENT IS A TIMEZONE, NOT AN ERROR — READ 2026-09-07 `[lane soccer-unfed-inputs]`
 

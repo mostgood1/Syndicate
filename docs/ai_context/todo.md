@@ -1,5 +1,22 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#852` — **THE NCAAF LIVE RE-SIM'S LATE "SURPLUS" (#835's H-ENDGAME) IS A MARGIN-BLIND END-GAME: blowouts run OVER because the LEADER keeps scoring (ledger finals 2026, 75-95%: +2.12 at 17-24 and +2.86 at 25+; 2024 resumed real states: leader +2.2 of a +2.05 surplus at Q4 15:00), one-score games run UNDER through the trailer's last two minutes and overtime (engine OT 3.6 pts per OT game vs 12.4). The mean cancels; the slope pays. #808's switches are reachable (+1.17 at every margin) but make blowouts worse. #686's existing default-off leader-only `blowout_damping_strength` is the lever: 0.9 lifts the 2024 late slope 0.67 -> 0.77 (log loss -0.026, se 0.0075) and, on top of #835 on the 2026 ledger, slope 0.84 -> 0.89, log loss -0.0076 (se 0.0040). NOTHING BUILT: a live-only default-off switch waits on the user's yes** `[2026-11-19, lane ncaaf-live-endgame-surplus, session 617b553b; from #835's lead; findings `.syndicate/findings_2026-11-19_ncaaf_live_endgame_surplus.md`]`
+
+- **What was believed** (brief, from #835): smartsim2's NCAAF end-game scores too much late (1.29x the close's even pace at 75-95% vs Kalshi's 0.82x; late centre +2.0 to +2.2 over Kalshi), suspected seat #808's end-game mechanisms being off for NCAAF.
+- **What was measured:**
+  - Mean over the ledger's finals at 75-95% (173 games): engine 9.23 rest pts, actual 8.67. Not significant (+0.56, se 0.52).
+  - By margin the picture flips sign: one-score games are UNDER and leads of 17+ OVER, so the error is in the shape.
+  - 11-14's Kalshi gap is the same split: +0.45 / +1.95 / +3.33 at 0-8 / 9-16 / 17+.
+  - Pace outside the last 5:00 is right (snaps within 10%). The phantom possession after a TD is exonerated.
+- **Owed, in order (the user's calls):**
+  1. Build the live-only switch? `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING` (absent = off) in `ncaaf/live_resim.py`'s profile resolution. No smartsim2 edit.
+     - Re-fit strength x threshold on 2024 FIT: the untuned 0.9 / 14 over-damps 17-24 and under-damps 25+.
+     - Then #835's late k on top.
+     - Hold-out: 11-21 / 11-28 after M2's verdict.
+  2. Load only in a betting-change window, together with #835's switch.
+  3. Follow-ups, each an engine mechanism plus a re-fit (`football-scenario-calibration`'s files, so a loan): college overtime (opponent's 25, both teams), then #808's end-game clock for one-score games once real timeouts are fed live.
+- **Kit:** `C:\tmp\t852` (`resume.py` harness, `ledger_score2.py`, all tables as `*.txt`).
+
 ### `#851` — **LIVE-ODDS-WORKER'S MAIN LOOP RAN THE POLYMARKET US SLATE SWEEP SYNCHRONOUSLY, AND EVERY ODDS SWEEP WAITED FOR IT: 25.9% of the live loop's time (92-233 s a sweep), the larger part of 117 of 125 slow iterations, so every sport's odds-sweep attempts were p50 100 s / p90 299 s apart. Fix on main `8f0d73a2e` DEFAULT OFF behind `SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND`; loading is a BETTING CHANGE (window, the user's decision)** `[2026-11-19, lane polymarket-slate-off-odds-loop, session bb342d07; user "Yes, build it"; findings `.syndicate/findings_2026-11-19_live_odds_loop_attempt_spacing.md`]`
 - **READING OWNED BY lane `layer2-rail-monitor` (runbook R-D, `scripts/rail_monitor/RUNBOOK.md`, reader `scripts/rail_monitor/p851_loopstages.py`, main `823dae648`) from 2026-11-19 ~11:50 AM CST; the user's "Yes, take it" to "Should the monitor take #851's 11-24 reading so its session can be archived?", relayed by the monitor. If deploys.md shows CHANGE E loaded, it reads 00-05Z 2026-11-25 after 11 PM CST and writes the P1-P5 verdict here, in a deploys.md READING entry and in todo #851. Session bb342d07 owes nothing further on this lane.**
 - **Measured** (lane `live-odds-loop-attempt-spacing`, 482 main-loop iterations in the 00-05Z live windows 11-15..11-18):
