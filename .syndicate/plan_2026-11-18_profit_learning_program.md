@@ -166,6 +166,14 @@ No result guarantees future returns.
      14 d).
 2. **I2: log the venue book at every fill:** both sides' asks and depth, at the moment of the order. Today 48% of
    fills have no logged own-side quote before the fill, which blinds every spread and CLV test on half the book.
+   - **Built 11-19, on main `3d636d88e`** (lane `fill-quote-logging`; loan approved by the user).
+     - Kalshi: every live row gets the two-sided quote and the size at the touch from the market read the executor
+       already makes.
+     - Polymarket: the slate quote it priced from.
+     - Every live row gets `venue_filled_at`, which also ends the maker pilot's reliance on log lines.
+     - Not a betting change. It loads at the next role restart (the 11-24 window at the latest) and is verified on
+       the first live fills after that.
+     - Full order-book depth beyond the touch would need an extra call per order and is not included.
 3. **I3: one decision table:** every candidate, bet or passed, with its features at decision time, its outcome and its
    close. `decision_records` (#709, shadow) is the start; passes are what make the adverse-selection model possible.
 4. **I4: a learning scoreboard in each portfolio reading:** the champion against each challenger on the same dates,
