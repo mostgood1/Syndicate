@@ -269,6 +269,27 @@ def seen_key(row: Mapping[str, Any], key: str, *, now: datetime) -> str:
     return key + LIVE_KEY_SUFFIX if phase == "live" else key
 
 
+# THE FIRST SUGGESTED SIGHTING `[2026-11-18, lane layer2-suggested-grader, user "Yes, go ahead"]`. The dedup above
+# writes a side once per (board date, phase), at its FIRST sighting, so `sg` is the flag AT THAT SIGHTING. A line that
+# turns suggested at a later build of the same day was already recorded with `sg=false`, and the suggested set's grade
+# (`scripts/grade_suggested_set.py`) could not see it. Measured on the fleet: of 610 lines suggested at a day's last
+# build (decision records, 10-23..11-17), 304 had an `sg=true` record (findings_2026-11-18_suggested_set_grade §2).
+#
+# So a side is also written ONCE MORE per (board date, phase): the first build that marks it suggested, keyed
+# `<dedup>#sg` in the sidecar. Where the first sighting is already suggested, that one record is both, and both keys
+# go in the sidecar. The record's `k` is unchanged and it is LATER than the first sighting, so every reader that takes
+# the earliest sighting per (sport, k, phase) -- `grade_population`, the scorecard, the optimizer, the sim-gap study --
+# grades exactly what it graded before. Off switch: `SYNDICATE_OPPORTUNITY_POPULATION_SUGGESTED_SIGHTING=off`; absent
+# is ON. Not a betting change: nothing places, sizes or holds a bet off this file.
+SUGGESTED_KEY_SUFFIX = "#sg"
+SUGGESTED_SIGHTING_ENV = "SYNDICATE_OPPORTUNITY_POPULATION_SUGGESTED_SIGHTING"
+
+
+def suggested_sighting_enabled() -> bool:
+    """On unless the switch says off."""
+    return str(os.environ.get(SUGGESTED_SIGHTING_ENV) or "").strip().lower() not in {"0", "off", "false", "no"}
+
+
 def _load_keys(path: Path) -> set[str]:
     seen: set[str] = set()
     if not path.exists():
@@ -303,8 +324,10 @@ def record_population(
     seen = _load_keys(sidecar)
     already = len(seen)
 
-    rows_in = unkeyable = duplicate = live_written = 0
-    pending: list[tuple[str, dict[str, Any]]] = []
+    rows_in = unkeyable = duplicate = live_written = suggested_written = 0
+    track_suggested = suggested_sighting_enabled()
+    # (sidecar keys, record): a first sighting that is already suggested carries both of its keys.
+    pending: list[tuple[tuple[str, ...], dict[str, Any]]] = []
     for row in rows or ():
         rows_in += 1
         if not isinstance(row, Mapping):
@@ -315,13 +338,24 @@ def record_population(
             unkeyable += 1
             continue
         dedup = seen_key(row, key, now=stamp)
+        suggested_key = dedup + SUGGESTED_KEY_SUFFIX if track_suggested and row.get("suggested") is True else None
         if dedup in seen:
-            duplicate += 1
+            if suggested_key is None or suggested_key in seen:
+                duplicate += 1
+                continue
+            # Seen unsuggested earlier on this board date; this is its first suggested sighting.
+            seen.add(suggested_key)
+            suggested_written += 1
+            pending.append(((suggested_key,), population_record(row, key, captured_at, sport=sport)))
             continue
         seen.add(dedup)
         if dedup != key:
             live_written += 1
-        pending.append((dedup, population_record(row, key, captured_at, sport=sport)))
+        keys: tuple[str, ...] = (dedup,)
+        if suggested_key is not None:
+            seen.add(suggested_key)
+            keys = (dedup, suggested_key)
+        pending.append((keys, population_record(row, key, captured_at, sport=sport)))
 
     written = 0
     truncated = False
@@ -335,7 +369,7 @@ def record_population(
         written_keys: list[str] = []
         handle = None
         try:
-            for key, record in pending:
+            for keys, record in pending:
                 line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
                 size = len(line.encode("utf-8"))
                 if day_bytes + size > max_day_bytes:
@@ -356,7 +390,7 @@ def record_population(
                 part_size += size
                 day_bytes += size
                 written += 1
-                written_keys.append(key)
+                written_keys.extend(keys)
         finally:
             if handle is not None:
                 handle.close()
@@ -386,15 +420,18 @@ def record_population(
         "duplicate": duplicate,
         "unkeyable": unkeyable,
         "live_pending": live_written,
+        "suggested_pending": suggested_written,
+        "suggested_sighting": "on" if track_suggested else "off",
         "truncated_at_day_ceiling": truncated,
         "parts_touched": len(touched),
         "parts_published": published,
     }
     print(
         "[opportunity_population] POPULATION sport=%s date=%s rows_in=%d written=%d already=%d "
-        "duplicate=%d unkeyable=%d live_pending=%d parts_touched=%d published=%d truncated=%s"
+        "duplicate=%d unkeyable=%d live_pending=%d parts_touched=%d published=%d truncated=%s "
+        "suggested_pending=%d suggested_sighting=%s"
         % (sport, date, rows_in, written, already, duplicate, unkeyable, live_written, len(touched), published,
-           truncated),
+           truncated, suggested_written, "on" if track_suggested else "off"),
         flush=True,
     )
     return report

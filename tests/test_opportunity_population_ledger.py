@@ -262,6 +262,83 @@ def test_an_absent_game_state_falls_back_to_the_sighting_clock(tmp_path):
     assert before["written"] == 1 and after["written"] == 1 and after["live_pending"] == 1
 
 
+LATER = datetime(2026, 9, 14, 19, 0, tzinfo=timezone.utc)  # pregame, two hours after NOW
+
+
+def _records(root, day="2026-09-14", sport="mlb"):
+    return [json.loads(line) for line in
+            pop.part_path(day, sport, 0, root=root).read_text(encoding="utf-8").splitlines()]
+
+
+def test_off_vs_on_a_line_that_turns_suggested_later_in_the_day_is_written_again(tmp_path, monkeypatch):
+    """Reachability: off records the later suggested sighting NOT at all; on writes it once, `sg` true, later `t`."""
+    for mode, root in (("off", tmp_path / "off"), ("", tmp_path / "on")):
+        monkeypatch.setenv(pop.SUGGESTED_SIGHTING_ENV, mode)
+        first = pop.record_population([_row(suggested=False)], sport="mlb", date="2026-09-14", now=NOW, root=root)
+        later = pop.record_population([_row(suggested=True)], sport="mlb", date="2026-09-14", now=LATER, root=root)
+        again = pop.record_population([_row(suggested=True)], sport="mlb", date="2026-09-14", now=LATER, root=root)
+        assert first["written"] == 1
+        if mode == "off":
+            assert later["written"] == 0 and later["suggested_pending"] == 0 and later["suggested_sighting"] == "off"
+            assert [r["sg"] for r in _records(root)] == [False]
+        else:
+            assert later["written"] == 1 and later["suggested_pending"] == 1 and later["suggested_sighting"] == "on"
+            assert again["written"] == 0 and again["duplicate"] == 1
+            records = _records(root)
+            assert [(r["sg"], r["t"]) for r in records] == [(False, "2026-09-14T17:00:00Z"),
+                                                            (True, "2026-09-14T19:00:00Z")]
+            assert records[0]["k"] == records[1]["k"], "same identity key; only the sidecar tells them apart"
+            assert pop.keys_path("2026-09-14", "mlb", root=root).read_text(encoding="utf-8").split() == [
+                pop.population_key(_row()), pop.population_key(_row()) + pop.SUGGESTED_KEY_SUFFIX]
+
+
+def test_a_first_sighting_already_suggested_is_one_record_with_both_keys(tmp_path, monkeypatch):
+    monkeypatch.delenv(pop.SUGGESTED_SIGHTING_ENV, raising=False)
+    first = pop.record_population([_row(suggested=True)], sport="mlb", date="2026-09-14", now=NOW, root=tmp_path)
+    again = pop.record_population([_row(suggested=True)], sport="mlb", date="2026-09-14", now=LATER, root=tmp_path)
+    assert first["written"] == 1 and first["suggested_pending"] == 0
+    assert again["written"] == 0
+    key = pop.population_key(_row())
+    assert pop.keys_path("2026-09-14", "mlb", root=tmp_path).read_text(encoding="utf-8").split() == [
+        key, key + pop.SUGGESTED_KEY_SUFFIX]
+
+
+def test_the_suggested_sighting_is_per_phase_and_unsuggested_rows_never_add_one(tmp_path, monkeypatch):
+    monkeypatch.delenv(pop.SUGGESTED_SIGHTING_ENV, raising=False)
+    pop.record_population([_row(suggested=False)], sport="mlb", date="2026-09-14", now=NOW, root=tmp_path)
+    pop.record_population([_row(suggested=True)], sport="mlb", date="2026-09-14", now=LATER, root=tmp_path)
+    live_first = pop.record_population([_row(suggested=False, game_state="live")], sport="mlb", date="2026-09-14",
+                                       now=LIVE_NOW, root=tmp_path)
+    live_sg = pop.record_population([_row(suggested=True, game_state="live")], sport="mlb", date="2026-09-14",
+                                    now=LIVE_NOW, root=tmp_path)
+    unflagged = pop.record_population([_row(game_state="live")], sport="mlb", date="2026-09-14", now=LIVE_NOW,
+                                      root=tmp_path)
+    assert live_first["written"] == 1 and live_first["live_pending"] == 1 and live_first["suggested_pending"] == 0
+    assert live_sg["written"] == 1 and live_sg["suggested_pending"] == 1
+    assert unflagged["written"] == 0
+    assert [(r["gs"], r["sg"]) for r in _records(tmp_path)] == [
+        ("pregame", False), ("pregame", True), ("live", False), ("live", True)]
+
+
+def test_earliest_sighting_readers_are_unchanged_by_the_suggested_record(tmp_path, monkeypatch):
+    """`grade_population`'s selection keeps the FIRST sighting; the suggested grader's keeps the first sg=true one."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    monkeypatch.delenv(pop.SUGGESTED_SIGHTING_ENV, raising=False)
+    pop.record_population([_row(suggested=False)], sport="mlb", date="2026-09-14", now=NOW, root=tmp_path)
+    pop.record_population([_row(suggested=True)], sport="mlb", date="2026-09-14", now=LATER, root=tmp_path)
+    source = Path(__file__).resolve().parents[1] / "scripts" / "score_ranking_backtest.py"
+    spec = importlib.util.spec_from_file_location("_srb_for_sg_test", source)
+    srb = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = srb
+    spec.loader.exec_module(srb)
+    records = _records(tmp_path)
+    assert [r["t"] for r in srb.earliest_per_phase(records)] == ["2026-09-14T17:00:00Z"]
+    assert [r["t"] for r in srb.earliest_per_phase([r for r in records if r["sg"]])] == ["2026-09-14T19:00:00Z"]
+
+
 def test_the_sidecar_distinguishes_the_live_sighting(tmp_path):
     pop.record_population([_row(game_state="live")], sport="mlb", date="2026-09-14", now=LIVE_NOW, root=tmp_path)
     keys = pop.keys_path("2026-09-14", "mlb", root=tmp_path).read_text(encoding="utf-8").split()
