@@ -1,0 +1,565 @@
+<meta name="dash-one-writer">
+<style>
+  .rw { display: grid; gap: var(--cds-gap-xl); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+  .rw-head { display: grid; gap: var(--cds-gap-sm); }
+  .rw-title { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+  .rw-take { margin: 0; max-width: 72ch; line-height: 1.5; }
+  .rw-muted { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); margin: 0; max-width: 80ch; line-height: 1.45; }
+  .rw-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--cds-gap-md); }
+  .rw-tile { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: grid; gap: var(--cds-gap-xs); align-content: start; min-width: 0; }
+  .rw-tile h3 { margin: 0; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); letter-spacing: 0.02em; text-transform: uppercase; }
+  .rw-big { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 2rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .rw-sub { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+  .rw-ok { color: var(--color-ok); }
+  .rw-warn { color: var(--color-warn); }
+  .rw-bad { color: var(--color-bad); }
+  .rw-section { display: grid; gap: var(--cds-gap-sm); min-width: 0; }
+  .rw-section h2 { margin: 0; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+  .rw-chart { position: relative; min-height: 240px; min-width: 0; }
+  .rw-chart svg text { fill: var(--cds-text-secondary); font-size: var(--cds-font-size-caption); }
+  .rw-tip { position: absolute; pointer-events: none; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); box-shadow: var(--cds-shadow-popover); border-radius: var(--cds-radius); padding: var(--cds-pad-sm); font-size: var(--cds-font-size-caption); white-space: nowrap; font-variant-numeric: tabular-nums; z-index: 2; }
+  .rw-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rw-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .rw-legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+  .rw-legend i.rw-ref { background: none; border-top: 2px dashed var(--cds-chart-reference); height: 0; }
+  .rw-scroll { overflow-x: auto; min-width: 0; }
+  .rw-table { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+  .rw-table th, .rw-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--color-border-line); vertical-align: top; }
+  .rw-table th { color: var(--color-fg-muted); font-weight: var(--cds-font-weight-medium); white-space: nowrap; }
+  .rw-table td.num, .rw-table th.num { text-align: right; }
+  .rw-table td.wrap { min-width: 260px; max-width: 520px; }
+  .rw-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--cds-gap-xl); }
+  .rw-sub-h { margin: var(--cds-gap-sm) 0 0; font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); }
+</style>
+
+<div class="rw">
+  <header class="rw-head" id="summary">
+    <h1 class="rw-title">Rail Watch</h1>
+    <p class="rw-take">Latest reading <b data-draw="field" data-source="latest" data-field="label" data-row="0">—</b>:
+      <b data-draw="field" data-source="latest" data-field="live_games" data-row="0">—</b> live games,
+      <b data-draw="field" data-source="latest" data-field="flags_shown" data-row="0">—</b> model-vs-line flags shown,
+      <b data-draw="field" data-source="latest" data-field="flags_false" data-row="0">—</b> false,
+      <b data-draw="field" data-source="latest" data-field="flags_missed" data-row="0">—</b> missed and
+      <b data-draw="field" data-source="latest" data-field="dark_rows" data-row="0">—</b> dark rows.
+      Board builds ran a median of <b data-draw="field" data-source="latest" data-field="board_wall_median_s" data-row="0">—</b> s
+      against a 300 s target.</p>
+    <p class="rw-take" id="note-line"><span data-draw="field" data-source="latest" data-field="note" data-row="0">—</span></p>
+    <p class="rw-muted">A read-only watch of the fleet's Layer 2 Games Rail, one reading every 20 to 40 minutes while games
+      are live. Each reading covers the time since the one before. All times are Central.</p>
+  </header>
+
+  <section class="rw-tiles" id="tiles" aria-label="Latest reading">
+    <div class="rw-tile" id="tile-flags">
+      <h3>Flags on live games</h3>
+      <div class="rw-big" data-draw="field" data-source="latest" data-field="flags_shown" data-row="0">—</div>
+      <div class="rw-sub"><span data-draw="field" data-source="latest" data-field="flags_false" data-row="0">—</span> false,
+        <span data-draw="field" data-source="latest" data-field="flags_missed" data-row="0">—</span> missed,
+        <span data-draw="field" data-source="latest" data-field="dark_rows" data-row="0">—</span> dark rows</div>
+    </div>
+    <div class="rw-tile" id="tile-ours">
+      <h3>"Ours" against its own flag</h3>
+      <div class="rw-big" data-draw="field" data-source="latest" data-field="ours_contradictions" data-row="0">—</div>
+      <div class="rw-sub">of <span data-draw="field" data-source="latest" data-field="college_total_flags" data-row="0">—</span> flagged college totals;
+        <span data-draw="field" data-source="latest" data-field="ours_below_points" data-row="0">—</span> projected below the points already scored</div>
+    </div>
+    <div class="rw-tile" id="tile-pregame">
+      <h3>Pregame college total flags</h3>
+      <div class="rw-big" data-draw="field" data-source="latest" data-field="pregame_college_total_flags" data-row="0">—</div>
+      <div class="rw-sub">expected 0 today: these serve the market price</div>
+    </div>
+    <div class="rw-tile" id="tile-board">
+      <h3>Board build</h3>
+      <div class="rw-big"><span data-draw="field" data-source="latest" data-field="board_wall_median_s" data-row="0">—</span><span class="rw-sub"> s median</span></div>
+      <div class="rw-sub">longest <span data-draw="field" data-source="latest" data-field="board_wall_max_s" data-row="0">—</span> s;
+        <span data-draw="field" data-source="latest" data-field="board_over_300" data-row="0">—</span> of
+        <span data-draw="field" data-source="latest" data-field="board_builds" data-row="0">—</span> builds over 300 s</div>
+    </div>
+    <div class="rw-tile" id="tile-lane">
+      <h3>Live odds sweeps refused</h3>
+      <div class="rw-big"><span data-draw="field" data-source="latest" data-field="sweeps_refused_pct" data-row="0">—</span><span class="rw-sub">%</span></div>
+      <div class="rw-sub"><span data-draw="field" data-source="latest" data-field="sweeps_refused" data-row="0">—</span> refused,
+        <span data-draw="field" data-source="latest" data-field="sweeps_launched" data-row="0">—</span> launched; longest live run
+        <span data-draw="field" data-source="latest" data-field="live_run_max_s" data-row="0">—</span> s</div>
+    </div>
+    <div class="rw-tile" id="tile-overlay">
+      <h3>In-play overlay gaps</h3>
+      <div class="rw-big" data-draw="field" data-source="latest" data-field="overlay_gaps_over_360" data-row="0">—</div>
+      <div class="rw-sub">over 360 s (longest <span data-draw="field" data-source="latest" data-field="overlay_gap_max_s" data-row="0">—</span> s);
+        <span data-draw="field" data-source="latest" data-field="web_merges_stale" data-row="0">—</span> stale of
+        <span data-draw="field" data-source="latest" data-field="web_merges" data-row="0">—</span> web merges</div>
+    </div>
+    <div class="rw-tile" id="tile-query">
+      <h3>Board query</h3>
+      <div class="rw-big"><span data-draw="field" data-source="latest" data-field="query_s" data-row="0">—</span><span class="rw-sub"> s</span></div>
+      <div class="rw-sub">shortlist <span data-draw="field" data-source="latest" data-field="shortlist_s" data-row="0">—</span> s; today's board
+        <span data-draw="field" data-source="latest" data-field="today_board_age_s" data-row="0">—</span> s old</div>
+    </div>
+    <div class="rw-tile" id="tile-cards">
+      <h3>Team card defects</h3>
+      <div class="rw-big" data-draw="field" data-source="latest" data-field="team_defects" data-row="0">—</div>
+      <div class="rw-sub">flipped, chip-less or mismatched, across
+        <span data-draw="field" data-source="latest" data-field="chips_today" data-row="0">—</span> games today</div>
+    </div>
+  </section>
+
+  <section class="rw-section" id="board-chart">
+    <h2>Board build time per reading</h2>
+    <p class="rw-muted">Seconds per board build in each reading's window: the median and the longest. The dashed line is the
+      300 s cadence the today board is built for. The board split's evening test is 5:30-10:30 PM: a median under 253 s and
+      nothing over 1,510 s (Tuesday evening's figures).</p>
+    <div class="rw-legend" aria-hidden="true">
+      <span><i data-draw="swatch" data-i="0"></i>Median build</span>
+      <span><i data-draw="swatch" data-i="1"></i>Longest build</span>
+      <span><i class="rw-ref"></i>300 s target</span>
+    </div>
+    <div class="rw-chart" data-draw="chart-board" data-source="readings"></div>
+  </section>
+
+  <div class="rw-grid2">
+    <section class="rw-section" id="lane-chart">
+      <h2>Live odds lane</h2>
+      <p class="rw-muted">Share of live odds sweeps refused because another run held the lane. The dashed line is tonight's
+        50% limit. On Tuesday evening it reached 88%.</p>
+      <div class="rw-legend" aria-hidden="true">
+        <span><i data-draw="swatch" data-i="2"></i>Sweeps refused</span>
+        <span><i class="rw-ref"></i>50% limit</span>
+      </div>
+      <div class="rw-chart" data-draw="chart-lane" data-source="readings"></div>
+    </section>
+    <section class="rw-section" id="load-chart">
+      <h2>Load times</h2>
+      <p class="rw-muted">Seconds for the board query and the shortlist, as the probe fetched them in each reading.</p>
+      <div class="rw-legend" aria-hidden="true">
+        <span><i data-draw="swatch" data-i="3"></i>Board query</span>
+        <span><i data-draw="swatch" data-i="4"></i>Shortlist</span>
+      </div>
+      <div class="rw-chart" data-draw="chart-load" data-source="readings"></div>
+    </section>
+  </div>
+
+  <section class="rw-section" id="rail-results">
+    <h2>How the rail's flags did</h2>
+    <p class="rw-muted">Every model-vs-line flag the rail showed, graded at the first reading it appeared in, against the
+      game's final result. "Fair" is the book's no-vig probability for the flagged side, so a flag set that only matches
+      the book hits at about its fair rate. The 90% range is a bootstrap over games. Today's row is added after the last game.</p>
+    <div class="rw-scroll">
+      <table class="rw-table" data-source="rail_days" data-row-key="id">
+        <thead><tr><th data-field="day">Day</th><th class="num" data-field="flags">Flags graded</th><th class="num" data-field="games">Games</th>
+          <th class="num" data-field="won">Won</th><th class="num" data-field="lost">Lost</th><th class="num" data-field="hit_pct">Hit %</th>
+          <th class="num" data-field="fair_pct">Fair %</th><th class="num" data-field="edge_pp">Hit minus fair, pp</th>
+          <th class="num" data-field="ci90_lo_pp">90% low</th><th class="num" data-field="ci90_hi_pp">90% high</th>
+          <th class="num" data-field="brier_model">Brier, model</th><th class="num" data-field="brier_book">Brier, book</th></tr></thead>
+        <tbody data-draw="rail-days-rows"></tbody>
+      </table>
+    </div>
+    <h3 class="rw-sub-h" id="rail-split-head">By sport and market, latest graded day</h3>
+    <div class="rw-scroll">
+      <table class="rw-table" data-source="rail_split" data-row-key="id">
+        <thead><tr><th data-field="day">Day</th><th data-field="scope">Slice</th><th class="num" data-field="flags">Flags</th><th class="num" data-field="games">Games</th>
+          <th class="num" data-field="hit_pct">Hit %</th><th class="num" data-field="fair_pct">Fair %</th><th class="num" data-field="edge_pp">Hit minus fair, pp</th>
+          <th class="num" data-field="ci90_lo_pp">90% low</th><th class="num" data-field="ci90_hi_pp">90% high</th></tr></thead>
+        <tbody data-draw="rail-split-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rw-section" id="board-results">
+    <h2>Board, shortlist and staked bets: results</h2>
+    <p class="rw-muted">From the fleet's daily model scorecard, which grades every line against its final result. Each day's
+      value covers the 28 days before it, so the lines move slowly. Whole board is every priced line; published is what
+      the Layer 2 shortlist put on the board; suggested is the subset the board marked as suggested (graded at the first
+      sighting of each line, so it sees about half of the lines suggested later in a day, from 10-13); staked is what the
+      portfolio actually bet, graded as paper at a flat stake (the live-money book is on Portfolio Watch). ROI is profit
+      per unit staked. Predicted EV is what the model expected; price vs fair is the price against the no-vig fair.</p>
+    <div class="rw-legend" aria-hidden="true">
+      <span><i data-draw="swatch" data-i="0"></i>Whole board</span>
+      <span><i data-draw="swatch" data-i="1"></i>Published to the shortlist</span>
+      <span><i data-draw="swatch" data-i="3"></i>Suggested by the board</span>
+      <span><i data-draw="swatch" data-i="2"></i>Staked by the portfolio (paper)</span>
+    </div>
+    <div class="rw-chart" data-draw="chart-board-roi" data-source="board_daily_all"></div>
+    <h3 class="rw-sub-h" id="board-latest-head">By sport, latest scorecard</h3>
+    <div class="rw-scroll">
+      <table class="rw-table" data-source="board_latest" data-row-key="id">
+        <thead><tr><th data-field="sport">Sport</th><th data-field="set">Set</th><th class="num" data-field="bets">Lines or bets graded</th>
+          <th class="num" data-field="games">Games</th><th class="num" data-field="roi_pct">ROI %</th>
+          <th class="num" data-field="predicted_ev_pct">Predicted EV %</th><th class="num" data-field="market_ev_pct">Price vs fair %</th>
+          <th class="num" data-field="roi_ci95_lo_pct">ROI 95% low</th><th class="num" data-field="roi_ci95_hi_pct">ROI 95% high</th></tr></thead>
+        <tbody data-draw="board-latest-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rw-section" id="cheat-sheets">
+    <h2>Cheat sheet picks</h2>
+    <p class="rw-muted">From the cheat sheets' own daily review (official record). ROI is profit per unit at a flat stake.
+      "Against its fair" is hits minus the probability the price implied, in points; "against other lines" compares the
+      section's picks with the same sheets' lines it did not feature (same sport, side and price band). Both carry a 95%
+      range over games; a range that crosses 0 is not separable from the price. The review flags a record only at 30+
+      bets and |z| of 2 or more.</p>
+    <div class="rw-legend" aria-hidden="true">
+      <span><i data-draw="swatch" data-i="0"></i>Syndicate picks, season to date</span>
+      <span><i data-draw="swatch" data-i="1"></i>Syndicate picks, last 7 days</span>
+    </div>
+    <div class="rw-chart" data-draw="chart-cheat" data-source="cheat_picks"></div>
+    <h3 class="rw-sub-h" id="cheat-sections-head">Every section, latest review</h3>
+    <div class="rw-scroll">
+      <table class="rw-table" data-source="cheat_sections" data-row-key="id">
+        <thead><tr><th data-field="section">Section</th><th class="num" data-field="season_record">Season W-L</th>
+          <th class="num" data-field="season_roi_pct">Season ROI %</th><th data-field="season_verdict">Season verdict</th>
+          <th class="num" data-field="last7_record">7-day W-L</th><th class="num" data-field="last7_roi_pct">7-day ROI %</th>
+          <th class="num" data-field="vs_fair_pts">Against its fair, pts</th><th class="num" data-field="vs_fair_lo">95% low</th><th class="num" data-field="vs_fair_hi">95% high</th>
+          <th class="num" data-field="vs_others_pts">Against other lines, pts</th><th class="num" data-field="vs_others_lo">95% low</th><th class="num" data-field="vs_others_hi">95% high</th></tr></thead>
+        <tbody data-draw="cheat-sections-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rw-section" id="optimization">
+    <h2>Optimization program: ranked levers</h2>
+    <p class="rw-muted">From the optimization session's program (lane product-optimization-program, 11-18 evening). Each lever
+      is a per-line change; none withholds a sport, market or band. "Clears" means it beat noise on both bars
+      (Benjamini-Hochberg at q 0.10 and leave-one-date-out), with 95% ranges clustered by game. Tier 1 is live money,
+      tier 2 the board and paper book, tier 3 defects in the evidence itself. The headline: no live-money lever clears
+      the bar yet (venue fees are 78% of the live loss); calibration does, because the model is over-confident
+      everywhere it is measured. Betting changes load only in the scheduled windows (next: Tue 11-24, 2-7 AM).</p>
+    <div class="rw-scroll">
+      <table class="rw-table" data-source="levers" data-row-key="id">
+        <thead><tr><th data-field="id">Rank</th><th data-field="tier">Tier</th><th data-field="lever">Lever</th><th data-field="evidence">Evidence</th>
+          <th data-field="clears">Clears?</th><th data-field="ev">Value</th><th data-field="confidence">Confidence</th><th data-field="owner">Owner</th><th data-field="betting_change">Betting change</th></tr></thead>
+        <tbody data-draw="levers-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rw-section" id="findings">
+    <h2>Predictions, anomalies and improvements</h2>
+    <p class="rw-muted">Predictions were written before the first afternoon game and are graded tonight. Anomalies are
+      what a reading flagged. Improvements are changes worth making, each with an owner. A slice of results is
+      evidence for fixing individual lines, never for switching off a sport or market.</p>
+    <div class="rw-scroll">
+      <table class="rw-table" data-source="findings" data-row-key="id">
+        <thead><tr><th data-field="id">ID</th><th data-field="kind">Kind</th><th data-field="title">What</th><th data-field="status">Status</th><th data-field="owner">Owner</th><th data-field="first_seen">First seen</th></tr></thead>
+        <tbody data-draw="findings-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rw-section" id="loads">
+    <h2>What loaded on the fleet today</h2>
+    <p class="rw-muted">Each change that reached the fleet today, in order. From 12:00 PM, live-betting changes load only
+      in scheduled windows; the first is Tuesday 11-24.</p>
+    <div class="rw-scroll">
+      <table class="rw-table" data-source="loads" data-row-key="at">
+        <thead><tr><th data-field="time">Time</th><th data-field="change">Change</th><th data-field="betting_change">Betting change</th><th data-field="how">How it loaded</th></tr></thead>
+        <tbody data-draw="loads-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rw-section" id="readings">
+    <h2>Readings</h2>
+    <p class="rw-muted">Newest first. Dark rows are live lines with no recent price of ours. An overlay gap is the time
+      between two in-play refreshes of one sport. The web marks an overlay stale after 360 s.</p>
+    <div class="rw-scroll">
+      <table class="rw-table" data-source="readings" data-row-key="at">
+        <thead><tr>
+          <th data-field="label">Reading</th>
+          <th class="num" data-field="live_games">Live games</th>
+          <th class="num" data-field="flags_shown">Flags</th>
+          <th class="num" data-field="flags_false">False</th>
+          <th class="num" data-field="flags_missed">Missed</th>
+          <th class="num" data-field="dark_rows">Dark</th>
+          <th class="num" data-field="ours_contradictions">"Ours" against flag</th>
+          <th class="num" data-field="board_wall_median_s">Board median s</th>
+          <th class="num" data-field="board_wall_max_s">Board longest s</th>
+          <th class="num" data-field="sweeps_refused_pct">Sweeps refused %</th>
+          <th class="num" data-field="live_run_max_s">Longest live run s</th>
+          <th class="num" data-field="overlay_gap_max_s">Longest overlay gap s</th>
+          <th class="num" data-field="query_s">Query s</th>
+          <th data-field="fleet_head">Fleet code</th>
+          <th data-field="note">Note</th>
+        </tr></thead>
+        <tbody data-draw="readings-rows"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+  dash.calc('latest', {
+    inputs: ['readings'],
+    title: 'Latest reading',
+    description: 'The newest row of the readings.',
+    fn: (readings) => (readings.length ? [readings[readings.length - 1]] : []),
+  });
+
+  window.rwFmt = (v) => {
+    if (v === null || v === undefined || v === '') return '—';
+    if (typeof v === 'number') return Number.isInteger(v) ? d3.format(',')(v) : d3.format(',.1f')(v);
+    return String(v);
+  };
+  window.rwBadIfPositive = ['flags_false', 'flags_missed', 'dark_rows', 'ours_contradictions', 'ours_below_points',
+    'pregame_college_total_flags', 'overlay_gaps_over_360', 'web_merges_stale', 'team_defects'];
+
+  dash.draw('field', (el) => {
+    const d = dash.data('latest');
+    el.classList.remove('dash-skeleton', 'rw-ok', 'rw-bad', 'rw-warn');
+    if (d.status !== 'ok' || !d.data || !d.data.length) { el.textContent = '—'; return; }
+    const f = el.dataset.field;
+    const v = d.data[0][f];
+    el.textContent = window.rwFmt(v);
+    if (typeof v !== 'number') return;
+    if (window.rwBadIfPositive.includes(f)) el.classList.add(v > 0 ? 'rw-bad' : 'rw-ok');
+    if (f === 'board_wall_median_s' || f === 'board_wall_max_s') el.classList.add(v > 300 ? 'rw-bad' : 'rw-ok');
+    if (f === 'sweeps_refused_pct') el.classList.add(v > 50 ? 'rw-bad' : (v > 25 ? 'rw-warn' : 'rw-ok'));
+  });
+
+  dash.onData(() => {
+    const d = dash.data('latest');
+    const show = !!(d.status === 'ok' && d.data && d.data.length && d.data[0].note);
+    document.querySelectorAll('#note-line').forEach((el) => { el.hidden = !show; });
+  });
+
+  dash.draw('swatch', (el) => {
+    el.style.background = dash.colors[Number(el.dataset.i) % dash.colors.length];
+  });
+
+  // One line chart: series [{field, name, ci}], an optional dashed reference line, a unit.
+  window.rwLine = (el, series, ref, unit, label) => {
+    const d = dash.data('readings');
+    el.replaceChildren();
+    if (d.status !== 'ok') { el.textContent = d.status === 'error' ? 'Failed to load' : '—'; return; }
+    const rows = d.data.map((r) => ({...r, t: new Date(r.at)}));
+    if (!rows.length) { el.textContent = 'No readings yet.'; return; }
+    const W = Math.max(280, el.clientWidth || 600), H = 240, m = {t: 14, r: 16, b: 28, l: 46};
+    const x = d3.scaleTime().domain(d3.extent(rows, (r) => r.t)).range([m.l, W - m.r]);
+    if (rows.length === 1) x.domain([new Date(+rows[0].t - 3.6e6), new Date(+rows[0].t + 3.6e6)]);
+    const ymax = Math.max(ref || 0, d3.max(rows, (r) => d3.max(series, (s) => +r[s.field] || 0)) || 1);
+    const y = d3.scaleLinear().domain([0, ymax * 1.12]).nice().range([H - m.b, m.t]);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`)
+      .attr('role', 'img').attr('aria-label', label);
+    svg.append('g').attr('transform', `translate(0,${H - m.b})`)
+      .call(d3.axisBottom(x).ticks(Math.max(2, Math.floor(W / 110))).tickFormat(d3.timeFormat('%-I:%M %p')))
+      .call((g) => g.selectAll('line,path').style('stroke', 'var(--cds-chart-axis)'));
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat((v) => v + unit))
+      .call((g) => g.select('.domain').remove())
+      .call((g) => g.selectAll('line').attr('x2', W - m.l - m.r).style('stroke', 'var(--cds-chart-grid)'));
+    if (ref) {
+      svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(ref)).attr('y2', y(ref))
+        .style('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '5 4').attr('stroke-width', 1.5);
+    }
+    series.forEach((s) => {
+      const pts = rows.filter((r) => r[s.field] !== null && r[s.field] !== undefined);
+      const color = dash.colors[s.ci % dash.colors.length];
+      svg.append('path').datum(pts).attr('fill', 'none').style('stroke', color).attr('stroke-width', 2)
+        .attr('d', d3.line().x((r) => x(r.t)).y((r) => y(+r[s.field])));
+      svg.append('g').selectAll('circle').data(pts).join('circle').attr('r', 3.5)
+        .attr('cx', (r) => x(r.t)).attr('cy', (r) => y(+r[s.field]))
+        .style('fill', (r) => (ref && +r[s.field] > ref ? 'var(--cds-chart-status-critical)' : color));
+    });
+    const tip = d3.select(el).append('div').attr('class', 'rw-tip').style('display', 'none');
+    svg.on('pointermove', (ev) => {
+      const [px] = d3.pointer(ev);
+      const r = rows.reduce((a, b) => (Math.abs(x(b.t) - px) < Math.abs(x(a.t) - px) ? b : a));
+      tip.style('display', null);
+      tip.node().replaceChildren();
+      tip.append('div').text(r.label);
+      series.forEach((s) => tip.append('div').text(`${s.name}: ${window.rwFmt(r[s.field])}${unit}`));
+      (window.rwTipExtra[label] || []).forEach((f) => tip.append('div').text(`${f[1]}: ${window.rwFmt(r[f[0]])}`));
+      const left = Math.min(Math.max(0, x(r.t) * el.clientWidth / W + 8), Math.max(0, el.clientWidth - 230));
+      tip.style('left', left + 'px').style('top', '8px');
+    }).on('pointerleave', () => tip.style('display', 'none'));
+  };
+  window.rwTipExtra = {
+    'Board build seconds per reading': [['board_builds', 'Builds'], ['board_over_300', 'Over 300 s'], ['shortlist_span_max_s', 'Longest shortlist step s']],
+    'Share of live odds sweeps refused per reading': [['sweeps_refused', 'Refused'], ['sweeps_launched', 'Launched'], ['live_run_max_s', 'Longest live run s']],
+    'Board query and shortlist seconds per reading': [['page_s', 'Full page s'], ['host_load', 'Host load']],
+  };
+
+  dash.draw('chart-board', (el) => window.rwLine(el,
+    [{field: 'board_wall_median_s', name: 'Median build', ci: 0}, {field: 'board_wall_max_s', name: 'Longest build', ci: 1}],
+    300, ' s', 'Board build seconds per reading'));
+  dash.draw('chart-lane', (el) => window.rwLine(el,
+    [{field: 'sweeps_refused_pct', name: 'Sweeps refused', ci: 2}], 50, '%', 'Share of live odds sweeps refused per reading'));
+  dash.draw('chart-load', (el) => window.rwLine(el,
+    [{field: 'query_s', name: 'Board query', ci: 3}, {field: 'shortlist_s', name: 'Shortlist', ci: 4}], 0, ' s',
+    'Board query and shortlist seconds per reading'));
+
+  window.rwRows = (tb, source, fields, numFrom, key, reverse, wrapField) => {
+    const d = dash.data(source);
+    tb.replaceChildren();
+    if (d.status !== 'ok') return;
+    const data = reverse ? d.data.slice().reverse() : d.data;
+    data.forEach((r) => {
+      const tr = document.createElement('tr');
+      tr.dataset.key = r[key];
+      fields.forEach((f, i) => {
+        const td = document.createElement('td');
+        td.textContent = (f === 'brier_model' || f === 'brier_book') && typeof r[f] === 'number' ? d3.format('.4f')(r[f]) : window.rwFmt(r[f]);
+        if (numFrom !== null && i >= numFrom && i < numFrom + 99 && typeof r[f] === 'number') td.className = 'num';
+        if (f === wrapField || f === 'note') td.classList.add('wrap');
+        if (window.rwBadIfPositive.includes(f) && typeof r[f] === 'number' && r[f] > 0) td.classList.add('rw-bad');
+        if ((f === 'board_wall_median_s' || f === 'board_wall_max_s') && typeof r[f] === 'number' && r[f] > 300) td.classList.add('rw-bad');
+        if (f === 'sweeps_refused_pct' && typeof r[f] === 'number' && r[f] > 50) td.classList.add('rw-bad');
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+  };
+
+  dash.calc('rail_days', {
+    inputs: ['rail_results'],
+    title: 'Rail flags by day',
+    description: 'The all-flags row of each graded day.',
+    fn: (rail_results) => rail_results.filter((r) => r.kind === 'all'),
+  });
+  dash.calc('rail_split', {
+    inputs: ['rail_results'],
+    title: 'Rail flags by sport and market, latest day',
+    description: 'The sport and market rows of the latest graded day.',
+    fn: (rail_results) => {
+      const last = rail_results.reduce((m, r) => (r.day > m ? r.day : m), '');
+      return rail_results.filter((r) => r.day === last && r.kind !== 'all');
+    },
+  });
+  dash.calc('board_latest', {
+    inputs: ['board_results'],
+    title: 'Board results by sport, latest scorecard',
+    description: 'Every sport and set on the newest scorecard day.',
+    fn: (board_results) => {
+      const last = board_results.reduce((m, r) => (r.day > m ? r.day : m), '');
+      return board_results.filter((r) => r.day === last);
+    },
+  });
+  dash.calc('board_daily_all', {
+    inputs: ['board_results'],
+    title: 'All-sport ROI by day and set',
+    description: 'Per scorecard day and set, ROI weighted by lines graded across sports (28-day rolling).',
+    fn: (board_results) => {
+      const g = d3.rollups(board_results.filter((r) => typeof r.roi_pct === 'number' && r.bets > 0),
+        (v) => ({bets: d3.sum(v, (r) => r.bets), roi_pct: d3.sum(v, (r) => r.roi_pct * r.bets) / d3.sum(v, (r) => r.bets)}),
+        (r) => r.day, (r) => r.set);
+      const out = [];
+      g.forEach(([day, sets]) => sets.forEach(([set, v]) => out.push({id: `${day}|${set}`, day, set, bets: v.bets, roi_pct: Math.round(v.roi_pct * 100) / 100})));
+      return out.sort((a, b) => (a.day < b.day ? -1 : 1));
+    },
+  });
+
+  dash.draw('rail-days-rows', (tb) => window.rwRows(tb, 'rail_days',
+    ['day', 'flags', 'games', 'won', 'lost', 'hit_pct', 'fair_pct', 'edge_pp', 'ci90_lo_pp', 'ci90_hi_pp', 'brier_model', 'brier_book'], 1, 'id', true, null));
+  dash.draw('rail-split-rows', (tb) => window.rwRows(tb, 'rail_split',
+    ['day', 'scope', 'flags', 'games', 'hit_pct', 'fair_pct', 'edge_pp', 'ci90_lo_pp', 'ci90_hi_pp'], 2, 'id', false, null));
+  dash.draw('board-latest-rows', (tb) => window.rwRows(tb, 'board_latest',
+    ['sport', 'set', 'bets', 'games', 'roi_pct', 'predicted_ev_pct', 'market_ev_pct', 'roi_ci95_lo_pct', 'roi_ci95_hi_pct'], 2, 'id', false, null));
+
+  dash.draw('chart-board-roi', (el) => {
+    const d = dash.data('board_daily_all');
+    el.replaceChildren();
+    if (d.status !== 'ok' || !d.data) { el.textContent = d.status === 'error' ? 'Failed to load' : '—'; return; }
+    const sets = ['Whole board', 'Published to the shortlist', 'Staked by the portfolio (paper)', 'Suggested by the board'];
+    const rows = d.data.map((r) => ({...r, t: d3.utcParse('%Y-%m-%d')(r.day)}));
+    if (!rows.length) { el.textContent = 'No scorecard days yet.'; return; }
+    const W = Math.max(280, el.clientWidth || 600), H = 240, m = {t: 14, r: 16, b: 28, l: 46};
+    const x = d3.scaleUtc().domain(d3.extent(rows, (r) => r.t)).range([m.l, W - m.r]);
+    const ext = d3.extent(rows, (r) => r.roi_pct);
+    const y = d3.scaleLinear().domain([Math.min(0, ext[0]) * 1.1, Math.max(0, ext[1]) * 1.1 || 1]).nice().range([H - m.b, m.t]);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`)
+      .attr('role', 'img').attr('aria-label', 'All-sport ROI by scorecard day for the whole board, the shortlist, the suggested picks and staked bets');
+    svg.append('g').attr('transform', `translate(0,${H - m.b})`)
+      .call(d3.axisBottom(x).ticks(Math.max(2, Math.floor(W / 110))).tickFormat(d3.utcFormat('%b %-d')))
+      .call((g) => g.selectAll('line,path').style('stroke', 'var(--cds-chart-axis)'));
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat((v) => v + '%'))
+      .call((g) => g.select('.domain').remove())
+      .call((g) => g.selectAll('line').attr('x2', W - m.l - m.r).style('stroke', 'var(--cds-chart-grid)'));
+    svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(0)).attr('y2', y(0))
+      .style('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '5 4');
+    sets.forEach((s, i) => {
+      const pts = rows.filter((r) => r.set === s);
+      const color = dash.colors[i % dash.colors.length];
+      svg.append('path').datum(pts).attr('fill', 'none').style('stroke', color).attr('stroke-width', 2)
+        .attr('d', d3.line().x((r) => x(r.t)).y((r) => y(r.roi_pct)));
+      svg.append('g').selectAll('circle').data(pts).join('circle').attr('r', 2.5)
+        .attr('cx', (r) => x(r.t)).attr('cy', (r) => y(r.roi_pct)).style('fill', color);
+    });
+    const tip = d3.select(el).append('div').attr('class', 'rw-tip').style('display', 'none');
+    const days = Array.from(new Set(rows.map((r) => r.day))).sort();
+    svg.on('pointermove', (ev) => {
+      const [px] = d3.pointer(ev);
+      const day = days.reduce((a, b) => (Math.abs(x(d3.utcParse('%Y-%m-%d')(b)) - px) < Math.abs(x(d3.utcParse('%Y-%m-%d')(a)) - px) ? b : a));
+      tip.style('display', null);
+      tip.node().replaceChildren();
+      tip.append('div').text(`${day} (28 days to here)`);
+      sets.forEach((s) => {
+        const r = rows.find((q) => q.day === day && q.set === s);
+        if (r) tip.append('div').text(`${s}: ${window.rwFmt(r.roi_pct)}% on ${window.rwFmt(r.bets)}`);
+      });
+      const left = Math.min(Math.max(0, x(d3.utcParse('%Y-%m-%d')(day)) * el.clientWidth / W + 8), Math.max(0, el.clientWidth - 280));
+      tip.style('left', left + 'px').style('top', '8px');
+    }).on('pointerleave', () => tip.style('display', 'none'));
+  });
+
+  dash.calc('cheat_picks', {
+    inputs: ['cheat_history'],
+    title: 'Syndicate picks by review day',
+    description: 'The Syndicate picks section of each daily cheat sheet review.',
+    fn: (cheat_history) => cheat_history.filter((r) => r.section_key === 'picks'),
+  });
+  dash.draw('cheat-sections-rows', (tb) => window.rwRows(tb, 'cheat_sections',
+    ['section', 'season_record', 'season_roi_pct', 'season_verdict', 'last7_record', 'last7_roi_pct', 'vs_fair_pts', 'vs_fair_lo', 'vs_fair_hi',
+      'vs_others_pts', 'vs_others_lo', 'vs_others_hi'], 1, 'id', false, 'season_verdict'));
+  dash.draw('chart-cheat', (el) => {
+    const d = dash.data('cheat_picks');
+    el.replaceChildren();
+    if (d.status !== 'ok' || !d.data) { el.textContent = d.status === 'error' ? 'Failed to load' : '—'; return; }
+    const rows = d.data.map((r) => ({...r, t: d3.utcParse('%Y-%m-%d')(r.day)})).filter((r) => r.t);
+    if (!rows.length) { el.textContent = 'No review days yet.'; return; }
+    const series = [{f: 'season_roi_pct', n: 'Season to date', ci: 0}, {f: 'last7_roi_pct', n: 'Last 7 days', ci: 1}];
+    const W = Math.max(280, el.clientWidth || 600), H = 240, m = {t: 14, r: 16, b: 28, l: 46};
+    const x = d3.scaleUtc().domain(d3.extent(rows, (r) => r.t)).range([m.l, W - m.r]);
+    const vals = rows.flatMap((r) => series.map((s) => r[s.f]).filter((v) => typeof v === 'number'));
+    const y = d3.scaleLinear().domain([Math.min(0, d3.min(vals)), Math.max(0, d3.max(vals))]).nice().range([H - m.b, m.t]);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`)
+      .attr('role', 'img').attr('aria-label', 'Syndicate picks ROI by cheat sheet review day, season to date and last 7 days');
+    svg.append('g').attr('transform', `translate(0,${H - m.b})`)
+      .call(d3.axisBottom(x).ticks(Math.max(2, Math.floor(W / 110))).tickFormat(d3.utcFormat('%b %-d')))
+      .call((g) => g.selectAll('line,path').style('stroke', 'var(--cds-chart-axis)'));
+    svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat((v) => v + '%'))
+      .call((g) => g.select('.domain').remove())
+      .call((g) => g.selectAll('line').attr('x2', W - m.l - m.r).style('stroke', 'var(--cds-chart-grid)'));
+    svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(0)).attr('y2', y(0))
+      .style('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '5 4');
+    series.forEach((s) => {
+      const pts = rows.filter((r) => typeof r[s.f] === 'number');
+      const color = dash.colors[s.ci % dash.colors.length];
+      svg.append('path').datum(pts).attr('fill', 'none').style('stroke', color).attr('stroke-width', 2)
+        .attr('d', d3.line().x((r) => x(r.t)).y((r) => y(r[s.f])));
+      svg.append('g').selectAll('circle').data(pts).join('circle').attr('r', 2.5)
+        .attr('cx', (r) => x(r.t)).attr('cy', (r) => y(r[s.f])).style('fill', color);
+    });
+    const tip = d3.select(el).append('div').attr('class', 'rw-tip').style('display', 'none');
+    svg.on('pointermove', (ev) => {
+      const [px] = d3.pointer(ev);
+      const r = rows.reduce((a, b) => (Math.abs(x(b.t) - px) < Math.abs(x(a.t) - px) ? b : a));
+      tip.style('display', null);
+      tip.node().replaceChildren();
+      tip.append('div').text(r.day);
+      tip.append('div').text(`Season: ${window.rwFmt(r.season_roi_pct)}% on ${window.rwFmt(r.season_n)} bets`);
+      tip.append('div').text(`Last 7 days: ${window.rwFmt(r.last7_roi_pct)}% on ${window.rwFmt(r.last7_n)} bets`);
+      const left = Math.min(Math.max(0, x(r.t) * el.clientWidth / W + 8), Math.max(0, el.clientWidth - 240));
+      tip.style('left', left + 'px').style('top', '8px');
+    }).on('pointerleave', () => tip.style('display', 'none'));
+  });
+
+  dash.draw('levers-rows', (tb) => window.rwRows(tb, 'levers',
+    ['id', 'tier', 'lever', 'evidence', 'clears', 'ev', 'confidence', 'owner', 'betting_change'], null, 'id', false, 'lever'));
+
+  dash.draw('findings-rows', (tb) => window.rwRows(tb, 'findings',
+    ['id', 'kind', 'title', 'status', 'owner', 'first_seen'], null, 'id', false, 'title'));
+  dash.draw('loads-rows', (tb) => window.rwRows(tb, 'loads',
+    ['time', 'change', 'betting_change', 'how'], null, 'at', false, 'change'));
+  dash.draw('readings-rows', (tb) => window.rwRows(tb, 'readings',
+    ['label', 'live_games', 'flags_shown', 'flags_false', 'flags_missed', 'dark_rows', 'ours_contradictions',
+      'board_wall_median_s', 'board_wall_max_s', 'sweeps_refused_pct', 'live_run_max_s', 'overlay_gap_max_s', 'query_s',
+      'fleet_head', 'note'], 1, 'at', true, 'note'));
+</script>
