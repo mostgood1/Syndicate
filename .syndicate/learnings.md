@@ -3670,3 +3670,19 @@ as a verdict.
   - It read +0.10 s where the full split read -0.39 s (all live counts) and -0.76 s (>= 2 live).
 - Anchor a sport's build on a line that sport writes at its own end (here `INPLAY_OVERLAY sport=nba`; start = its time - `build_seconds.nba`), and print the match rate (matched / builds) beside every median. A match rate that differs between the two sides of a comparison means the instrument is selecting.
 - *(evidence: deploys.md 2026-11-19 06:38:15Z READING; `C:\tmp\railload\lean_join.py` vs `lean_live_split.py`)*
+
+## 2026-11-19 — RULE: a slate's live evidence spans TWO date files; and an over-confident total is not fixed by widening it `[lane ncaaf-live-total-dispersion, session 89312a71]`
+
+- **The file trap.** The live evidence log (and the NCAAF re-sim's snapshot date) is keyed by the UTC date, so the
+  11-14 Saturday's evening games sit in `live_evidence/ncaaf/2026-11-15.jsonl`. The engine read's own 11-14 opinions
+  point at rows up to 06:00Z 11-15. A replay that reads only the 11-14 file joins 564 of 1,944 line-instants and
+  reports slope 0.63 instead of the 0.41 it is reproducing.
+  - In a held-out window, read the next file only through a hard time cut, e.g. `t < 10:00Z` = 4 AM CST. Drop later
+    rows on their `t`; never keep or print them.
+  - Prove the population first: the identity transform must reproduce every k and p.
+- **The modelling lesson (the 2026-10-03 rule again, on a new market).** Re-sim sd 0.75-0.85 of Kalshi's looked like
+  the defect, but widening to Kalshi's width moved the calibration slope only 0.41 -> 0.50.
+  - The loss was per-game CENTRE noise: the live engine's kickoff total sits |5.7| pts from the close on average, with
+    correlation 0.43.
+  - Anchoring the level to the close took the slope to 0.95.
+  - Read the slope before choosing between a spread fix and a centre fix. A width match is necessary, not sufficient.

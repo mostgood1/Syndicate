@@ -294,6 +294,22 @@
   - **Lane `live-resim-endgame-staleness` CLOSED 2026-11-18 1:02 PM CST (goal met).** The owed steps above are unowned until a session takes them; findings `.syndicate/findings_2026-11-18_live_resim_endgame_staleness.md`.
 
 ### `#835` — **NCAAF LIVE RE-SIM TOTALS ARE OVER-CONFIDENT: their spread of final totals is ~20% narrower than Kalshi's at every stage, their centre wanders 3-4 pts, and in slow games they expect a catch-up Kalshi does not** `[2026-11-17, lane engine-learner; `.syndicate/brief_2026-11-17_engine_read_kalshi.md`]` — OPEN; owner: the NCAAF live re-sim (`syndicate/features/ncaaf/live_resim.py`)
+- **UPDATE 2026-11-19 ~11:30 AM CST: FIX BUILT, DEFAULT OFF, NOT ON MAIN** (lane `ncaaf-live-total-dispersion`; findings `.syndicate/findings_2026-11-19_ncaaf_live_total_dispersion.md`; kit `C:\tmp\t835`).
+  - **Cause:** the centre more than the spread. The live engine's kickoff total sits a mean |5.7| pts from the closing consensus total (corr 0.43, 55 games): the live level shrink compresses each game. Widening alone moves the slope only 0.41 -> 0.50.
+  - **Fix:** `syndicate/features/ncaaf/live_total_dispersion.py`, switch `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION` (absent = off). Each draw moves by (close - E0) x the regulation share left (#834's rule, with E0 = the re-sim itself at kickoff). It is then widened 1.2x to half-time, ramping to 1.6x at 95%, floored at the score without moving the mean. It runs as a post-pass in `run_refresh_worker._run_ncaaf_live_resim_tick`; `live_resim.py` is untouched. 42 tests, reachability first through the tick; 123 neighbouring tests pass.
+  - **11-14, the engine read's own scripts:**
+    - sd ratio 0.85/0.81/0.84/0.75 -> **1.02/0.97/1.05/0.96**;
+    - calibration slope 0.41 -> **0.95**;
+    - log loss vs Kalshi +0.077 -> **+0.014 (0.016)**;
+    - median centre gap 4.0/3.0/2.9/2.5 -> 1.5/1.5/1.5/2.0;
+    - slow-game catch-up +9.7% -> +6.0% (Kalshi +2.0%).
+  - **Earlier slates:** 11-11 and 11-13 have no Kalshi ladder. On the ledger's finals for 10-24/10-31/11-07 (109 games, the hold-out), the slope goes 0.41 -> 0.94. The PRICED probability (raw x the join's k 2.48) is beaten by -0.026 nats (se 0.009).
+  - **Owed, in order:**
+    1. The user's yes to push to main.
+    2. 11-21's check after `C:\tmp\elp\m2gate_kit\out\m2_verdict.txt` exists: `bash /c/tmp/t835/check_slate.sh 2026-11-21 12`. Its expectation is pre-registered in the findings: sd ratio, slope >= 0.8, centre, and the priced log loss.
+    3. 11-28 the same way (week 13).
+    4. Switch-on only in a betting-change window, earliest **Tue 12-08 2-7 AM CST**, on the user's own yes. Load it TOGETHER with `SYNDICATE_LIVE_TOTALS_PROB_SCALE_NCAAF=1`: k 2.48 would correct the same over-confidence twice. It is a betting change (yes).
+  - **Not fixed (lead):** smartsim2's NCAAF late-game scoring. At 75-95% the rest-of-game pace is 1.29x the close's even pace vs Kalshi's 0.82x; the anchor leaves the +2 late gap. That is an engine mechanism (#808's end-of-half mechanisms are off for NCAAF), for the smartsim2 lanes.
 - **Evidence** (dev 11-14, 26 games, 630 game-instants with a fittable Kalshi strike ladder; Kalshi's centre and spread from a probit fit of its ladder at the same instant):
   - the re-sim's sd over Kalshi's, median: 0.85 at 0-25% of game time, 0.81, 0.84, then 0.75 at 75-95%. Mean sd 12.8 vs 15.1 points at 0-25%;
   - median |re-sim centre - Kalshi's|: 4.0 pts at 0-25% (p90 9.4), 3.0, 2.9, 2.5;
