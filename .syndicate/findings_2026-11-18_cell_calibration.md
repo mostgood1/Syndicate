@@ -24,6 +24,11 @@ and `http://127.0.0.1:10000`. Never the git `data/` mirror.
      DerSimonian–Laird over the group's cells, with each cell's se = (CI upper − CI lower) / 3.92. A cell's
      posterior is the normal-normal precision-weighted mean of its own w* and the group mean, with posterior sd
      sqrt(1 / (1/se² + 1/τ²)). A group of one cell, or τ² undefined, is not pooled (posterior = the cell).
+     - **AMENDMENT 11-18 7:35 PM CST, before any fit or held-out read:** the formula above treats the group mean
+       as known, so at τ² = 0 it gives sd 0 and the served "CI upper" would be the bare group mean. The posterior
+       variance therefore also carries the group mean's own uncertainty (Morris):
+       `var = 1/(1/se² + 1/τ²) + B² · V_g`, with B = se²/(se² + τ²) the cell's shrinkage and
+       V_g = 1 / Σ_group (1/se_i²). At τ² = 0: posterior = group mean, variance V_g.
   3. **Served k = clip(posterior mean + 1.96 · posterior sd, K_FLOOR = 0.10, 1.0)** — the CI UPPER, the optimizer's
      own convention ("the smallest shrink the evidence supports") — on a cell whose OWN verdict is
      `overconfident`. Every other cell is not served (k = 1, the line as today).
