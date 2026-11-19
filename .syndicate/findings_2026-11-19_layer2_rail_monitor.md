@@ -415,3 +415,22 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
   - overlay gap max 74 s; 78 web merges, 28 list `wncaab` stale;
   - priced age p50 183 s, p90 317 s, max 734 s (16 of 60 over 300 s).
 - **Load:** query 3.16 s, chips 0.08 s, shortlist 1.06 s. **I-28:** 20 queries since 4:50 PM, 13 cold (65%), all p50 4.87 s.
+
+## Reading 12 — 5:50 PM CST (23:50Z), full page
+
+- **Live:** 15 games (2 NCAAB, 13 WNCAAB); 6 with rail rows (43 rows).
+- **0 flags**, 0 false, 0 missed. P1 0; #824 0; P6 0; **P8 0 of 14**. Team cards 94 chips, 0 defects.
+- **`live_games_no_model` 2 of 6:**
+  - **Auburn @ Notre Dame:** re-sim REVERSED (I-29), H2 7:51, 13 rows, 0 with a model.
+  - **Stetson @ UCF (WNCAAB):** 7 rows, 0 with a model; re-sim **direct**, so not an orientation miss.
+    - The WNCAAB re-sim tick refused 10 of 13 live games: `no_margin_anchor` 9, `on_floor_incomplete` 1.
+    - Most refused games have no live market (no rows). This one does: books quote it live, but the re-sim has no
+      pregame margin anchor for it.
+    - Lead, not chased: WNCAAB games with a live market and no anchor.
+  - Murray St @ NC State: 8 of 14 rows with a model, direct (H1 2:34; some half rows unpriced).
+- **P7 (#850), 5:25-5:50 PM:** 0 refusals, 0 exits. Child 4.10 GB after 6.8 h.
+  - Board: 5 builds, wall median 182 s, max 218 s; publication gap median 260 s, max 353 s.
+- **R-B (#844 sample 8):** NCAAB 23 rows (9 venue), **h2h 2, row-fresh 0 vs cell-fresh 2, mismatch 6**. NBA 0 (tips 7:10 PM).
+- **R-E:** 1 NHL step, 0 timed out (NHL starts 6 PM).
+- **Live odds:** overlay gap max 69 s; 23 web merges, 0 stale; priced age p50 214 s, p90 327 s.
+- **Load:** `/intelligence` 9.27 s; query 2.89 s; shortlist 1.02 s; chips 0.31 s. **I-28:** 6 queries, 3 cold.
