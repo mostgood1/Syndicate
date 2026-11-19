@@ -1720,6 +1720,14 @@ death, never life — do not invert it.
 - Verification: (1) cause in the findings with n and Central times; (2) three switches on main with off != on tests green; (3) next-evening prediction pre-registered before any load; (4) load put to the user; rail monitor told; (5) after a load, the evening reading against the prediction.
 - Blocked by: none
 
+### nhl-puckdrop-odds-freshness — OPEN — opened 2026-11-19 — session bb342d07-377f-4970-b4d6-da56ed921547
+- Goal: Measure, per NHL game over every night the fleet's logs and manifests cover, how long after puck drop the first in-game NHL odds refresh lands, and split each wait into: NHL not yet due in the live loop's sweep set, a lane_busy refusal (lane held), the loop idle after the lane freed, and the run itself; name the dominant part with counts and denominators; read-only; any fix is a betting change (default-off or the 11-24 window) and is put to the user
+- Files: .syndicate/findings_2026-11-19_nhl_puckdrop_odds_freshness.md (NEW)
+- Hypothesis: Written 2026-11-19 ~8:00 AM CST, before any per-game measurement (the one reading is 11-18's 6:30 PM drop: ~19 min to the first in-game refresh). H1: on most NHL nights the first in-game NHL odds refresh lands more than 10 min after the first puck drop, and the largest part is NOT-DUE -- the live loop keeps NHL on its pre-game per-sport interval until it sees an NHL game live, so the sweep set omits NHL for minutes after the drop. H2: when a sweep naming NHL is refused lane_busy, most of the lost time is the loop not attempting again after the lane frees (11-18: 4 min 38 s idle vs 4 min 11 s held), not the holder's run.
+- Falsification test: H1 wrong if the median first-drop-to-first-in-game-refresh is <= 5 min, or if refusals + loop idle carry more of the summed wait than not-due across the covered nights. H2 wrong if, across refusals of an NHL-naming sweep, the next attempt typically comes within 2 min of the holder's run ending.
+- Verification: Findings file with per-family coverage (score_<date>.json puck drops, manifests 11-09.., live-odds-worker logs ~11-14..), a per-game table (drop, last pre-drop refresh, first in-game refresh, wait, parts), totals with denominators, H1/H2 verdicts; deploys/state untouched (read-only).
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
