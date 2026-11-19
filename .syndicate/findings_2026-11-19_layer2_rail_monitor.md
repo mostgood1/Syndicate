@@ -274,3 +274,28 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
   - whether this is a neutral-site game listed differently by the two sources;
   - how many of tonight's NCAAB / WNCAAB games could flip.
 - Proposed as its own session (below). The monitor will also count rows without a live model per live game.
+
+## Reading 7 — 2:52 PM CST (20:52Z)
+
+- **Live:** 1 game, NCAAB WVU / Florida, H2 13:14; 20 rail rows. 0 flags. P1 0; P6 0; P8 0 of 0. Team cards: 94 chips,
+  0 defects.
+- **New `live_games_no_model`: 1 of 1 live game** (`ncaab West Virginia Mountaineers @ Florida Gators`).
+- **I-29 PERSISTS:**
+  - `lgb.py ncaab` shows every build from 1:47:41 PM to 2:52:11 PM (65 min, ~35 builds) at projected 0, full_games 0,
+    withheld `no_live_gameline_projection` 14-22 a build.
+  - **Cause located:** the re-sim snapshot (Redis `syndicate:refresh-state:/home/amyn/syndicate-prod/data/live/ncaab_live_resim.json`,
+    `generatedAt 2026-11-19T14:52:10-06:00`) still holds **away "Florida Gators", home "West Virginia Mountaineers"**,
+    `event_id 401920517`, `nameSource: odds`.
+  - The odds rows and the chip now read West Virginia @ Florida. The re-sim took its team names from the odds feed's
+    orientation at the start and kept them; the odds feed flipped orientation mid-game. The join looks up
+    (away, home) by name and misses.
+  - Open for the owner: is the re-sim's home-court side also inverted, and does its score mapping follow the ids or
+    the names? (`home_id 277`, `away_id 57`.)
+  - Card task_dcdd0d3d proposed; not started.
+- **P7 (#850), 2:13-2:52 PM:** 0 refusals, 0 child exits. Child 3.87 GB after 3.9 h.
+  - Board: 9 builds, wall median 172 s, max 196 s; publication gap median 248 s, max 354 s.
+- **R-B (#844 sample 3):** NCAAB 13 rows (6 venue), h2h 1, row 1 = cell 1, `mismatch` 1.
+- **R-E:** 1 NHL step, 0 timed out.
+- **Live odds:** NCAAB overlay gap max 70 s; priced age p50 119 s, p90 397 s (8 of 20 rows over 300 s); 8 sweeps,
+  1 refused.
+- **Load:** query 2.64 s. **I-28:** 7 queries since 2:13 PM, 4 cold (57%), cold total p50 5.63 s vs warm 2.83 s.
