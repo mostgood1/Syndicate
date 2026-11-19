@@ -274,3 +274,27 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - cap use 20.4% / 11.5%;
   - Polymarket 13 placeable of 519 (feed healthy).
 - **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 75 — Thu 11-19 12:37 PM CST (18:37Z), window 66 min
+
+- **Results first.**
+  - 30 d: -7.15% [-12.6, -1.7] on 705 events, unchanged. Fees are 3.87% of stake.
+  - Last 7 d: -3.96% [-15.0, +7.1] on 177 events. Won 60.1% against a 60.1% breakeven.
+  - Yesterday: +3.9% [-23.3, +31.1] on 33 events.
+  - CLV over 30 d, net of fees: -0.42 pp (se 0.21).
+- **Gate clock reset:**
+  - BC-053 loaded at 11:00 AM: board child memory (todo #850).
+  - It went in outside a window under the broken-money-path exception (user, 11-19 midday).
+  - The gate now stands at 0 of 800 events, against 12 on the BC-052 clock at Reading 74.
+- **Did BC-053 do what it was for?** The plan cadence it was meant to restore is back:
+  - 56 plan writes in 6 h;
+  - the largest gap is 15.4 min, against up to 26 min on the 11-18 evening.
+- **No new anomaly.**
+  - Every endpoint is inside its budget. `live_all` took 3.72 s against a 5.0 s budget (read at :37, the picks minute).
+  - The probe's GATE line is the same 2 unclassified loads the digest lists. Other lanes owe those.
+- **Flow:**
+  - Plan 3.2 min old: 80 suggested, 13 positions (6 at Reading 74). 53 refused as `beyond_max_positions`.
+  - Live ticks: 10 on Kalshi and 10 on Polymarket, 0 placed. All 60 refusals are `outside_price_band` (also seen 11-18).
+  - Orders today: 39, of which 38 filled and 1 maker post still resting (734 min).
+  - Cap use: 20.4% Kalshi, 11.5% Polymarket.
+  - Polymarket: 14 placeable of 560 rows, so its feed is healthy.
