@@ -165,6 +165,10 @@ def view_from_record(record: Mapping[str, Any]) -> dict[str, Any]:
         "book_age_seconds": _num(record.get("ba")),
         "books_quoting": _num(record.get("bq")),
         "fair_method": _norm(record.get("fm")),
+        # Not bucket dimensions (`dimension_bands` reads neither). They let a settler ask whether the row's
+        # OWN book was still quoting when the row was priced (todo #848, `population_outcomes_nhl` nhl/2).
+        "sighted_at": record.get("t"),
+        "bookmaker": _norm(record.get("bk")),
     }
 
 

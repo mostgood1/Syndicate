@@ -37,6 +37,8 @@ WHAT IS REFUSED, BY NAME:
 
 DECISIONS A READER SHOULD KNOW:
 - own goals score for nobody: excluded from anytime, first and last scorer;
+- a goal-scorer row settles on its own side: `no` wins exactly when `yes` loses (`soccer/2`, only with
+  `SYNDICATE_SCORECARD_848_GRADING` on; off, `soccer/1` ignores the side);
 - a player who did not appear is `dnp_void` in every player market, the first/last scorer
   markets included;
 - first/last scorer with no qualifying goal is a loss for every player who appeared, and a
@@ -48,6 +50,7 @@ DECISIONS A READER SHOULD KNOW:
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, timedelta, timezone
@@ -55,7 +58,21 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-GRADER_VERSION = "soccer/1"
+# THE #848 GRADING FIXES SHIP DEFAULT-OFF `[2026-11-18, lane scorecard-grading-defects]`. Absent (or anything but
+# on / 1 / true / yes) grades EXACTLY as `soccer/1` did. On: goal-scorer rows settle on their own side (`soccer/2`).
+# Why a switch for a grading fix: the version bump makes the scorecard, the optimizer and the suggested-set grader
+# drop and re-grade soccer (`model_scorecard.load_state`), and while they refill (~4 daily runs at 10 board dates
+# each) the optimizer overlay's soccer cells -- rank AND stake factors -- fall out. That is a betting change, so it
+# loads in a betting-change window, never with somebody else's fast-forward. `population_outcomes_nhl` reads the
+# same key.
+GRADING_848_ENV = "SYNDICATE_SCORECARD_848_GRADING"
+
+
+def grading_848_on() -> bool:
+    return str(os.environ.get(GRADING_848_ENV) or "").strip().lower() in {"1", "on", "true", "yes"}
+
+
+GRADER_VERSION = "soccer/2" if grading_848_on() else "soccer/1"
 
 LIVE_STATE_PATH_TEMPLATE = "soccer_source/{league}/api/live_state/live_state_{date}.json"
 
@@ -101,6 +118,8 @@ _SEGMENT_LINE_MARKETS = frozenset(
 )
 _FULL_SEGMENTS = frozenset({"", "full", "full_game", "game"})
 _NO_SCORER_NAMES = frozenset({"no scorer", "no goalscorer", "no goal scorer", "no goal"})
+# A goal-scorer row's side. Empty is the recorder's `yes` (a scorer key with no side token).
+_GOALSCORER_SIDES = frozenset({"", "yes", "no"})
 
 _EASTERN = ZoneInfo("America/New_York")
 _CENTRAL = ZoneInfo("America/Chicago")
@@ -499,6 +518,26 @@ class SoccerPopulationSettler:
         return self._settle_corners(box, market, shaped)
 
     def _settle_goalscorer(self, box, kind, shaped):
+        """The row's OWN side: a `no` selection wins exactly when `yes` loses (void and refusals alike).
+
+        Until `soccer/2` (todo #848, 2026-11-18) the side was never read, so every `no` row was graded as
+        its `yes`: Haaland and Kane `player_goal_scorer_anytime|...|no` with 0 goals settled LOSS on
+        2026-11-07. 152 of 143,878 anytime records in the 10-01..11-18 recorder were `no`; first and last
+        scorer had none, and are handled the same way so a first `no` is not inverted either.
+
+        Only with `SYNDICATE_SCORECARD_848_GRADING` on; off, the side is ignored exactly as before.
+        """
+        if not grading_848_on():
+            return self._goalscorer_yes(box, kind, shaped)
+        side = _norm(shaped.get("side"))
+        if side not in _GOALSCORER_SIDES:
+            return None, REASON_UNSETTLEABLE
+        result, why = self._goalscorer_yes(box, kind, shaped)
+        if result is None or side != "no":
+            return result, why
+        return ("loss" if result == "win" else "win"), None
+
+    def _goalscorer_yes(self, box, kind, shaped):
         goals, why = qualifying_goals(box)
         if goals is None:
             return None, why

@@ -3639,3 +3639,15 @@ as a verdict.
   - The units are 0.13 of one core in the evening, so they cost the board ~6 s per build and ~19 s (5%) of a 371 s publication gap.
 - **Rule:** before proposing a priority change (nice, Idle, ionice) to protect a process, read the protected process's run-delay share (`/proc/<pid>/task/*/schedstat`, field 2 over fields 1 + 2) or its off-CPU share. If it is small, priority cannot help: the co-runner still gets its own vCPU and still draws the power that sets the shared clock. What helps is fewer busy cores in the window (defer or batch), at ~13% of a board build per co-running core here, whatever its nice value. Corollary: nice 19 keeps research jobs out of the runqueue, but it does not stop them slowing the fleet's clock.
 - *(evidence in `.syndicate/findings_2026-11-18_board_build_priority.md` §2-§4; scripts and data `C:\tmp\bbp_849\`)*
+
+
+## 2026-11-18 — OVERTURNED: "soccer board props realise -55% against -7% market EV, so the grader settles void or did-not-play rows as losses" — the settler is right; the one-way fair is not, and the real grading defect was a PRICE no book offered, in NHL `[lane scorecard-grading-defects, session 3095af15, todo #848]`
+- **What was believed:** pass A's M2 / M3 read both anomalies as grading defects: soccer props as DNPs settled LOSS, NHL live goals (+153% at 8.4% hit) as rows priced after the goal they settle on.
+- **What is true:**
+  - Soccer: DNPs void (6,601 `dnp_void`), boxes are consistent, and starters who played 60+ minutes still hit 8.5 pp under the fair (ROI -41.1%, 8,456 rows). An unrelated settler (NHL goals pregame, the NHL API) shows the same -40% vs -6%. Realised = the hold of one-way ladders; "market EV" is the `book_margin_model` fair's ~7% margin. The only soccer defect: `no` goal-scorer sides graded as `yes` (152 rows).
+  - NHL: only 3 of 782 ev10+ rows came after their deciding goal, but 780 of 782 were priced on a quote their own book NEVER returned after puck drop. BetRivers pulls its goals props at puck drop; the board kept its pregame price as the live best price.
+- **Rule:**
+  - Before calling realised << market EV a grader defect, check whether the cell is one-way (`book_margin_model`) and whether an INDEPENDENT settler shows the same shape. A grader bug does not repeat across settlers; a fair's margin assumption does.
+  - A live row's price is only a price if its OWN book was quoting it then. `ba` (`book_age_seconds`) is time since the price MOVED and the quote store is change-deduped, so neither says the book was still quoting. Use the store's last-seen sidecar (`<sport>_source/tracking/book_quotes/<date>.state.json`, third element).
+  - A settler version bump resets that sport's optimizer history, and the overlay's cells for the sport drop out (factor 1.0, larger stakes) until ~4 runs refill it. So a "grading only" change can be a betting change: check the overlay for the sport's cells before calling it one.
+- *(evidence in `.syndicate/findings_2026-11-18_scorecard_grading_defects.md` §1-§3; scripts `C:/tmp/g848/`)*
