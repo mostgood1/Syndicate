@@ -319,3 +319,56 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **Load:** `/intelligence` 10.44 s; query **9.19 s**; shortlist 1.11 s; chips 0.41 s.
   - **I-28:** 7 queries since 2:52 PM, 3 cold (43%), cold total p50 6.63 s vs warm 2.70 s.
   - Its fix #853 waits on the user's load decision (local_a5513c97).
+
+## Reading 9 — 4:09 PM CST (22:09Z)
+
+- **Live:** 2 games.
+  - NCAAB Auburn / Notre Dame, H1 17:57: 18 rail rows, **no model**.
+  - WNCAAB High Point @ Vermont, Q3: 0 rows; no book quotes it live.
+- WVU / Florida went final ~3:35 PM.
+- 0 flags; P1 0; P6 0; P8 0 of 0; team cards 94 chips, 0 defects.
+
+**I-29 is a neutral-site orientation mismatch, and it will recur tonight.**
+- **Second game, dark from the tip:**
+  - the rail and chip read "Auburn Tigers @ Notre Dame Fighting Irish";
+  - the re-sim snapshot (generated 4:09:35 PM, `resimmed 1`) holds **away "Notre Dame Fighting Irish", home "Auburn Tigers"**,
+    event 401920519, `nameSource: odds`;
+  - `lgb.py ncaab` at 4:08:35 PM: considered 19, projected 0, withheld `no_live_gameline_projection` 12.
+- **The mechanism:**
+  - `syndicate/features/ncaab/slate.py:202` `orient_neutral_site_games` (since 11-02, commit `92d9e9193`) swaps a
+    neutral-site game's home/away to the odds feed's orientation when the feed has only the reversed pair.
+  - The Games rail, chips and the rows' matchup follow the reoriented slate.
+  - The live re-sim keys its game on ESPN's raw orientation.
+  - So every REORIENTED neutral-site game has rows in one order and the model in the other, and the join misses.
+  - WVU / Florida flipped mid-game, presumably at the moment the odds feed's pair set first held only the reversed pair. The slate file (fetched 22:10:33Z) shows `reoriented_neutral_site: 4` of 29 NCAAB games.
+- **Exposure tonight**, NCAAB neutral-site games on the 11-19 slate (7, of which 4 reoriented):
+
+  | CST | game | venue |
+  |---|---|---|
+  | 1:30 PM | WVU @ Florida (dark 1:47 PM-final) | Michelob ULTRA Arena |
+  | 4:00 PM | Auburn @ Notre Dame (dark from the tip) | Michelob ULTRA Arena |
+  | 5:00 PM | NC State @ Murray State | Baha Mar Convention Center |
+  | 7:30 PM | Wisconsin @ Seton Hall | Baha Mar Convention Center |
+  | 7:30 PM | UNLV @ Rutgers | Michelob ULTRA Arena |
+  | 8:00 PM | Oregon State @ Oregon | Moda Center |
+  | 10:00 PM | Houston @ Kansas | Michelob ULTRA Arena |
+
+  - 2 more of these 5 should be reoriented, and so dark.
+  - WNCAAB has 3 neutral-site games, 0 reoriented.
+- **Effect:** these games fail closed (no model, no flag, no bet), so the cost is missed live opportunities, not losses.
+  - The fix (re-key the re-sim to the slate's orientation, or an orientation-free join with side mapping) is the
+    proposed session task_dcdd0d3d, not yet started.
+  - A fix that changes live joins is a betting change. Loading tonight would need the user's
+    `--outside-window` reason; otherwise the 11-24 window.
+
+**The rest:**
+- **P7 (#850), 3:31-4:09 PM:** 0 refusals, 0 exits. Child 4.08 GB after 5.1 h.
+  - Board: 8 builds, wall median 161 s, max 224 s; publication gap median 237 s, max 288 s.
+- **R-B (#844 sample 5):** NCAAB 11 rows (3 venue), h2h 1, row 1 = cell 1. NBA 0.
+- **R-E:** 1 NHL step, 0 timed out.
+- **Live odds:**
+  - NCAAB overlay gap max 1,713 s: the lull between WVU / Florida's final and Auburn / ND's tip, with no rows;
+  - priced age p50 85 s, p90 262 s.
+- **Load: query 24.55 s, chips 9.19 s** (usually 0.2-0.4 s), shortlist 1.16 s.
+  - Host load 3.5, with two soccer artifact builds at nice 0 (132% and 102% CPU) at the read.
+  - **I-28:** 3 queries since 3:31 PM, all cold, cold total p50 9.0 s.
