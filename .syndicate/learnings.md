@@ -3614,3 +3614,11 @@ as a verdict.
 - **What is true:** the recorder dedups per (board date, phase) at the first sighting (`seen_key`). A line that turns suggested at a later build is already recorded with `sg=false` and is never written again that day. Of 610 lines suggested at a day's last build (decision records, 10-23..11-17), 304 (49.8%) have an `sg=true` record, 304 only `sg=false`, and 2 none. The staked set has no such gap: the paper book stakes from every build.
 - **Rule:** before grading any per-build flag from the opportunity recorder, cross-check it against a second view of the flag, such as the decision records' last build, and state the capture rate. Call the set "suggested at first sight" until a recorder change writes the first suggested sighting (`#sg`, findings §7).
 - *(evidence in `.syndicate/findings_2026-11-18_suggested_set_grade.md` section 2; `C:\tmp\sgset_1118\gap.json`)*
+
+
+## 2026-11-18 — OVERTURNED: "the Games Rail's long-shot flags are their own per-line tail-calibration lever (I-1: fair < 0.40 hit 0.154 vs 0.253)" — pooled over the three graded days it is noise, and the over-confidence it pointed at is GENERAL `[lane product-optimization-program, session 3bf4646c]`
+- **What was believed:** backlog I-1, carried for three days, and this lane's pre-registered H1. The rail's long shots were over-flagged, so they needed their own tail calibration.
+- **What is true:** across 11-15..11-17 (1,120 flags / 177 games), fair < 0.40 hits 0.224 against 0.238, −1.4 pp [−10.7, +8.0], and LODO fails. The 0.154 was one day.
+  - What survives is the model over-stating its own probability on every kind of line: −9.1 pp [−12.7, −5.3], 27 of 41 slices clear BH. It grows with the claimed gap, and the tail (−13.7) cannot be separated from the body (−9.1).
+- **Rule:** before a slice becomes a lever, pool every graded day, cluster the CI by game, and correct over the family of slices looked at. A one-day band effect names a hypothesis, not a lever. Same family as 2026-11-04 ("a one-night signed edge median is not a direction").
+- *(evidence in `.syndicate/findings_2026-11-18_product_optimization_program.md` §5, §7; pass C `C:/tmp/optprog/C_rail_analyze_out.txt`)*
