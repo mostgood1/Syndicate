@@ -1796,6 +1796,14 @@ death, never life — do not invert it.
 - Verification: Findings file with the sized split; the 75-95% rest-of-game pace ratio (engine vs Kalshi vs ACTUAL finals) and calibration slope against the ledger finals (10-24 to 11-14) for production and for each tested switch arm; a fix only with an off != on reachability test and a re-fit plan per model_engine_standard 4.4
 - Blocked by: none
 
+### s7-combos-props — OPEN — opened 2026-11-19 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: Study S7 of the profit learning program, read-only: (A) E4 Stage 2 re-read under its own registration (A3-A6) on the #742 combo capture, or, if its registration does not allow a read yet, the allowed funnel-only counts and a projection of when each cell clears minimum n; (B) a pre-registered, time-split test of whether a per-line PLAYER-PROP selection rule (sim probability minus the venue's own breakeven price, threshold chosen on FIT) beats breakeven fee-net on Kalshi/Polymarket prop orders, with an event-clustered 95% CI and GO / KILL / forward-test rules; verdicts written to the findings file
+- Files: scripts/s7_prop_model_edge.py (NEW), tests/test_s7_prop_model_edge.py (NEW), .syndicate/findings_2026-11-19_s7_combos_props.md (NEW)
+- Hypothesis: Written 2026-11-19 ~12:20 PM CST before any outcome: (A) NBA SP-nested still cannot reach A3's minimum n (200 combos / 20 games) by the A5 window end; (B) among pregame venue prop orders, those whose sim probability exceeds the venue breakeven (price + fee) by >= T (T chosen on orders before 2026-11-08) return more than breakeven fee-net on later orders
+- Falsification test: (B) FIT stop if no T gives FIT kept ROI > 0 (NO CHALLENGER); early KILL if kept ROI's 95% upper bound < 0 on TEST 11-08..11-18; else a forward test from 2026-11-20 decides at 150 events (GO iff kept ROI lower bound > 0)
+- Verification: pre-registration pushed to main before any outcome number; results appended to the same findings file and pushed
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
