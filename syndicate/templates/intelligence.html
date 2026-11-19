@@ -3558,7 +3558,16 @@
           // I-17 (#816 lane, user chose the calibrated total, 2026-11-17): a college total under the totals
           // calibration shows the total its CALIBRATED probability implies (`live_total_basis: "calibrated"`), not the
           // sim's projected final -- which sat on the other side of the line from 23 of 74 NCAAB under flags on 11-17.
-          const calibratedRow = marketRows.find((row) => row.live_total_basis === "calibrated" && liveRailNum(row.live_total) !== null);
+          //
+          // WHICH ROW'S calibrated total (rail monitor, 11-18 6:40 PM CST): each row's calibrated total comes from ITS OWN
+          // quote and snapshot, so rows of one market disagree (Chattanooga @ Winthrop 153.4-157.0, ages 46-277 s). Taking
+          // the first calibrated row put "ours 156.0" (the 157.5 row, 152 s old) beside an UNDER 154.5 flag whose own row
+          // said 153.4 -- a contradiction the rows themselves did not have. So OURS is the shown row's own (`main`: the
+          // flagged row, else the main line), falling back to the FRESHEST calibrated row only when `main` has none.
+          const calibrated = (row) => row && row.live_total_basis === "calibrated" && liveRailNum(row.live_total) !== null;
+          const calibratedAge = (row) => liveRailNum(row.book_age_seconds) ?? Infinity;
+          const calibratedRow = calibrated(main) ? main
+            : marketRows.filter(calibrated).sort((a, b) => calibratedAge(a) - calibratedAge(b))[0];
           const total = calibratedRow ? liveRailNum(calibratedRow.live_total)
             : (liveRailNum(final.total) ?? marketRows.map((row) => liveRailNum(row.live_total)).find((v) => v !== null) ?? null);
           ours = total === null ? null : total.toFixed(1);

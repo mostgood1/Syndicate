@@ -115,6 +115,16 @@ def test_the_rail_card_prefers_the_calibrated_total():
     assert 'row.live_total_basis === "calibrated"' in html
 
 
+def test_the_rail_card_takes_the_shown_rows_own_calibrated_total():
+    # Rail monitor 11-18 6:40 PM CST: the card took the FIRST calibrated row of the market, so an UNDER 154.5 flag
+    # (its own row: 153.4) showed "ours 156.0" from the 157.5 row. OURS must be the shown row's (`main`) own, with the
+    # freshest calibrated row only as a fallback.
+    html = (Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "intelligence.html").read_text(encoding="utf-8")
+    assert "const calibratedRow = calibrated(main) ? main" in html
+    assert "marketRows.filter(calibrated).sort((a, b) => calibratedAge(a) - calibratedAge(b))[0]" in html
+    assert 'marketRows.find((row) => row.live_total_basis === "calibrated"' not in html
+
+
 def test_the_rail_card_tooltip_names_the_calibrated_total_and_the_sims():
     """User 2026-11-18 "show the calibrated total in the rail card tooltip too": the OURS cell and the callout carry a
     tooltip naming the number as the calibrated total and giving the sim's own projected final beside it."""
