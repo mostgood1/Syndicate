@@ -246,6 +246,10 @@ A row's `games` is the set's own games; the monitor's other sets carry the sport
 
 ## 7. Follow-ups
 
+- **BUILT 2026-11-18 (user "Yes, go ahead"):** `199d6c529`, on main, default ON, off switch
+  `SYNDICATE_OPPORTUNITY_POPULATION_SUGGESTED_SIGHTING=off`. 4 new tests, plus 291 tests of the recorder's readers.
+  It loads with a refresh-worker restart after 10:30 PM CST 11-18; `deploys.md` has the load. The original plan
+  follows.
 - **The recorder's missing half (§2).** In `opportunity_population_ledger.record_population`, write a second record
   the first time a line is seen suggested on a board date, under a `#sg` sidecar suffix, the way `#live` works.
   - Every earliest-sighting reader keeps its row, because the new record is later. So the scorecard, the optimizer
