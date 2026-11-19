@@ -2896,6 +2896,14 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
     snapshot["inseasonBlend"] = blend_reason
     snapshot["espnFetch"] = fetch_stats
 
+    # THE LIVE TOTAL CALIBRATION (todo #835, lane ncaaf-live-total-dispersion): each live re-sim lane's full-game
+    # total anchored to the closing consensus total and widened 1.2x, on the ratings this tick just ran on.
+    # `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION` absent = off: returns None and touches nothing, so the snapshot and
+    # this tick's status stay byte-identical (`ncaaf/live_total_dispersion.py`).
+    from syndicate.features.ncaaf.live_total_dispersion import calibrate_snapshot_totals
+
+    total_calibration = calibrate_snapshot_totals(snapshot, ratings=ratings, date_str=now_utc.date().isoformat())
+
     written = False
     valid, reason = validate_live_lens_snapshot(snapshot)
     if valid:
@@ -2923,6 +2931,8 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
         "coverage": snapshot.get("coverage") or {},
         "fcs": fcs_stats,
     }
+    if total_calibration is not None:  # only when on, so the status is byte-identical when off
+        result["total_calibration"] = total_calibration
     # CAPTURED PREGAME LINES OUTLIVE THE TICK, bounded: a line is only needed
     # until its game is final, so anything captured more than two days ago goes.
     cutoff = now_utc - timedelta(days=2)
