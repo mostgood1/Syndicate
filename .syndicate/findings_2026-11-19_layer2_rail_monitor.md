@@ -391,3 +391,27 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **Live odds:** overlay gap max 68 s; priced age p50 207 s, p90 293 s (4 of 16 rows over 300 s).
 - **Load:** query 5.52 s, chips 0.38 s, shortlist 0.77 s.
   - **I-28:** 38 queries since 4:09 PM (the page is open), 22 cold (58%); cold total p50 5.08 s, warm 2.66 s; all p50 4.84 s.
+
+## Reading 11 — 5:25 PM CST (23:25Z), the evening opens
+
+- **Live:** 11 games: 2 NCAAB, 9 WNCAAB. 5 have rail rows (60 rows).
+- **Flags: 1 shown, 0 false, 0 missed, 0 dark.** NCAAB Murray St / NC State full-game u160.5 (model 0.555 vs fair 0.500,
+  ours 157.9).
+- **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 31.** Team cards: 94 chips, 0 defects.
+- **I-29 (`p29_orient.py`):**
+  - Auburn @ Notre Dame: 14 rows, 0 with a model, re-sim **REVERSED**. Dark since the 4:00 PM tip.
+  - **Murray St @ NC State** (neutral, Baha Mar; ESPN listed "NC State @ Murray State"): 16 of 16 with a model, re-sim
+    **direct**. A neutral-site game whose re-sim matches the rows joins normally.
+  - WNCAAB: 3 games with rows, all direct, all with a model (15/15, 10/10, 6/6). The WNCAAB re-sim refused 6 of 9 live games;
+    those have no rows to join.
+- **The live-odds-worker restarted ~5:11 PM CST** (pid 1011284 -> 1111191). The supervisor log reads `exited code=0 after
+  22277s -- restarting in 5s`: its routine ~6 h self-recycle (earlier: 19,874 s, 22,723 s). Not a deploy, not a crash.
+- **P7 (#850), 4:50-5:25 PM:** 0 refusals, 0 exits. Child 3.92 GB after 6.4 h.
+  - Board: 8 builds, wall median 164 s, max 193 s; publication gap median 250 s, max 275 s.
+- **R-B (#844 sample 7):** NCAAB 22 rows (7 venue), **h2h 2, row-fresh 0 vs cell-fresh 2, mismatch 3**. This is the predicted
+  baseline shape. NBA 0.
+- **R-E:** 2 NHL steps, 0 timed out.
+- **Live odds:**
+  - overlay gap max 74 s; 78 web merges, 28 list `wncaab` stale;
+  - priced age p50 183 s, p90 317 s, max 734 s (16 of 60 over 300 s).
+- **Load:** query 3.16 s, chips 0.08 s, shortlist 1.06 s. **I-28:** 20 queries since 4:50 PM, 13 cold (65%), all p50 4.87 s.
