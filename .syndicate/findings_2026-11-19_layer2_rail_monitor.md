@@ -184,3 +184,25 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
   - lane `web-silent-worker-kills` owns the recycle path (the double-recycle fix is loaded);
   - the I-13 response cache was rejected because read-time merges change every response (todo #828).
   - Neither covers the cold board read itself. Owner: none yet; proposed as its own session (below).
+
+## Reading 4 — 12:45 PM CST (18:45Z), full page
+
+- **Live:** 1 WNCAAB game between windows, 0 rail rows. 0 flags; P1 0; P6 0; P8 0 of 0 rows. Team cards: 94 chips, 0 defects.
+- **P7 (#850), 12:02-12:45 PM:** 0 `MEMORY_GUARD_ABORT`, 0 child exits.
+  - Board child at 3.41 GB, 105 min up.
+  - Board: 7 builds, wall median 215 s, max 416 s (3 over 300 s); publication gap median 353 s, max 544 s.
+  - These are midday numbers with pregame look-ahead (602 s) and pregame (485 s) runs in the window. P2 is graded on the evening.
+- **R-E:** 3 NHL generation steps since 12:02 PM, 0 timed out.
+- **Live odds:** 18 sweeps launched, 4 refused (`lane_busy`, 18.2%). Overlay gap max 73 s. The 603 s refresh-tick gap is
+  the lull between game windows, the same shape as reading 1's.
+- **Load:** `/intelligence` page 11.59 s; **`/api/intelligence/query` 21.09 s**; shortlist 1.42 s; chips 1.30 s.
+
+**I-28 update: a new board version alone makes the read cold.**
+- The probe's query logged `board_read` 16,461 ms of 20,823 ms total (18:45:45Z), on worker 1033465. That worker had been
+  up 1,533 s and had served 25 requests, so this was not a fresh worker: the board had changed since its last read.
+- **So both causes are real:**
+  - (a) worker recycles: 18:20:04Z hard recycle, then the new worker's first `board_read` took 10,819 ms;
+  - (b) new board versions, each read by each worker for itself.
+- **Since 12:02 PM (`qstage.py`):** 12 queries, 6 cold (50%). Cold `board_read` p50 8.77 s, cold total p50 13.56 s, warm
+  total p50 4.86 s.
+- Cold reads ranged 4.4-16.5 s this window. Session card task_6b228341 is proposed and not yet started.
