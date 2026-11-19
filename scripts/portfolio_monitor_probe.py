@@ -65,6 +65,10 @@ NEVER_READ = ("/api/portfolio/summary", "/api/portfolio/paper")
 SETTLE_LAG_H = 8.0      # a filled bet still unsettled this long after its start is late
 RESTING_OLD_MIN = 120.0  # a resting order older than this is worth naming
 PLAN_STALE_MIN = 45.0    # the refresh-worker rewrites the plan every ~15 min; three missed is stale
+# A live venue whose plan has at least this many rows, none placeable, every one `aggregator_priced`: the venue's own
+# feed priced nothing (F21, 2026-11-19 11:14-13:09Z: Polymarket returned zero prices and placed nothing for ~2 h,
+# and no anomaly fired; it was caught by reading the plan line).
+VENUE_FEED_MIN_ROWS = 50
 PLAN_SERIES_H = 6  # how far back the per-date plan-write series reads
 PLAN_COMMIT_GAP_S = 180  # LIVE_PLAN_WRITTEN lines of one date closer than this are one commit
 
@@ -512,6 +516,19 @@ def anomalies(reading: Mapping[str, Any]) -> list[str]:
             out.append(f"EXECUTION {venue}: {v['failed']} failed order(s) over {v['ticks']} live ticks")
         if v.get("armed_false"):
             out.append(f"EXECUTION {venue}: {v['armed_false']} of {v['ticks']} live ticks ran unarmed")
+    ex = reading.get("execution") or {}
+    live_venues = set((ex.get("live_ticks") or {}).keys())
+    for venue, pl in (ex.get("plans") or {}).items():
+        if venue not in live_venues:
+            continue  # novig / prophetx: aggregator-priced by design and never placed live
+        try:
+            rows, placeable = int(pl.get("rows_in") or 0), int(pl.get("placeable_in") or 0)
+            agg = int((pl.get("refusals") or {}).get("aggregator_priced") or 0)
+        except (TypeError, ValueError):
+            continue
+        if rows >= VENUE_FEED_MIN_ROWS and placeable == 0 and agg >= rows:
+            out.append(f"VENUE FEED {venue}: live plan has 0 placeable of {rows} rows, all aggregator_priced "
+                       f"(the venue's own feed priced none)")
     clock = (reading.get("gate") or {}).get("clock") or {}
     if clock.get("pending"):
         out.append("GATE clock PENDING a load: the count is 0")

@@ -113,6 +113,18 @@ def test_execution_sums_live_ticks_only_and_keeps_the_newest_plan():
     assert "EXECUTION polymarket: 2 failed order(s) over 2 live ticks" in pm.anomalies({"execution": e})
 
 
+def test_a_live_venue_whose_feed_priced_nothing_is_an_anomaly_and_an_aggregator_venue_is_not():
+    dead = PLAN.replace("rows_in=428 placeable_in=9 positions=5", "rows_in=306 placeable_in=0 positions=0").replace(
+        "refusals={'aggregator_priced': 158, 'below_live_net_floor': 261}", "refusals={'aggregator_priced': 306}")
+    novig = dead.replace("venue=polymarket", "venue=novig")
+    e = pm.execution([EXECUTED, dead, novig], "2026-11-17T16:00:00")
+    found = [a for a in pm.anomalies({"execution": e}) if a.startswith("VENUE FEED")]
+    assert found == ["VENUE FEED polymarket: live plan has 0 placeable of 306 rows, all aggregator_priced "
+                     "(the venue's own feed priced none)"]
+    healthy = pm.execution([EXECUTED, PLAN], "2026-11-17T16:00:00")
+    assert not any(a.startswith("VENUE FEED") for a in pm.anomalies({"execution": healthy}))
+
+
 def test_the_two_endpoints_that_cost_a_worker_are_never_fetched():
     for path in pm.NEVER_READ:
         with pytest.raises(ValueError):

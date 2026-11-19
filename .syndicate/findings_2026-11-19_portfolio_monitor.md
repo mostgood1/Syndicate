@@ -161,3 +161,34 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - orders today 18: 17 filled, 1 maker post resting (400 min);
   - cap use 12.6% / 6.7%.
 - **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 70 — Thu 11-19 7:36 AM CST (13:36Z), window 32 min
+
+- **Results first.** Unchanged: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **F21 RESOLVED by itself (no deploy). Polymarket prices came back between 13:07:17Z and 13:09:45Z.**
+  - `POLYMARKET_DAILY_BOOK` unpriced over the recovery:
+    - 17,077 of 17,079 (13:07:17Z);
+    - 10,037 of 16,879 (13:09:45Z);
+    - 1,741 (13:12:26Z);
+    - 680 of 16,625 (13:34:16Z).
+  - The Polymarket live plan was back to **19 placeable, 4 positions at 13:12:04Z**. Now: 20 placeable, 7 positions;
+    2 placed this window.
+  - **Outage: 11:14:05Z -> ~13:09Z, about 1 h 55 min (5:14 -> 7:09 AM CST).** No game was in play and the 11-19 slate
+    starts in the evening, so the cost was a pre-game window with 0 Polymarket placements. Nothing was mis-priced or
+    mis-placed.
+  - **Residue to watch:** 680 unpriced against about 90 before the outage, and still falling.
+- **Probe fixed (lane `portfolio-monitor`):** `portfolio_monitor_probe.py` now raises **`VENUE FEED <venue>: live
+  plan has 0 placeable of N rows, all aggregator_priced`**.
+  - It fires for a venue with live execution ticks whose plan has >= 50 rows, 0 placeable and every refusal
+    `aggregator_priced`. Novig and ProphetX, aggregator-priced by design, are excluded.
+  - The outage raised no anomaly before this; it was caught by reading the plan line.
+  - **Replayed on this morning's saved readings:** it fires on exactly the 3 outage readings (12:00, 12:33, 13:04Z)
+    and on none of 10:00, 11:00 or 13:36Z.
+  - Test added; 21 of 21 pass.
+- **No anomaly.** Every endpoint was inside budget: `live_today` 0.19 s, page 0.20 s.
+- **Flow:**
+  - plan 1.0 min old: 80 suggested, 14 positions;
+  - 12 live ticks, 5 placed, 0 failed;
+  - orders today 23: 22 filled, 1 maker post resting (432 min);
+  - cap use 14.9% / 7.3%.
+- **Gate:** 12 of 800 events on the BC-052 clock.
