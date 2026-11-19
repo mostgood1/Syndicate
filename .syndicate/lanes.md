@@ -1809,7 +1809,7 @@ death, never life — do not invert it.
 ### board-read-cold-share — OPEN — opened 2026-11-19 — session eb973f38-791a-4e17-b512-b496ae1f9592
 - STATUS 2026-11-19 ~1:45 PM CST: GOAL: NOT MET. Done:
   - (1) H-a NOT falsified: 69 of 75 cold reads (92%) on 11-18 5-11 PM CST, and 151 of 198 (76%) on 11-17, were a new worker's first board read. TTL was 3-12% (32% on the quiet 11-19 morning) and overlay 5-12%.
-  - (2) The fix is on main DEFAULT-OFF behind `SYNDICATE_COMBINED_BOARD_SHARED_COPY`: tests 20 + 1 POSIX skip, off != on, plus 217 in 18 existing files.
+  - (2) The fix is on main `9931a787b` (ledger `4a6515566`) DEFAULT-OFF behind `SYNDICATE_COMBINED_BOARD_SHARED_COPY`: tests 20 + 1 POSIX skip, off != on, plus 217 in 18 existing files.
   - (3) P1-P6 are pre-registered in `.syndicate/findings_2026-11-19_board_read_cold_share.md`.
   - Todo #853. Betting change: no (web-only reader).
   - Left: (4) the user's load decision (`WEB__` env key + a drained full down/up); (5) the first-evening reading.

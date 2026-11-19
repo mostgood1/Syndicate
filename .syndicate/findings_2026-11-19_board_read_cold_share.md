@@ -107,7 +107,7 @@ H-a was NOT falsified: 92% and 76% are both well above the registered 50%.
   - 11-17 evening: 53.5% -> 4.9%;
   - 11-19 morning: 68.3% -> 40%. Its TTL misses have no recent build anywhere, so sharing cannot help.
 
-## The fix (on main, DEFAULT-OFF)
+## The fix (on main `9931a787b`, DEFAULT-OFF)
 
 - **Switch:** `SYNDICATE_COMBINED_BOARD_SHARED_COPY`. Absent, empty or any other value = off, the old
   behaviour, and nothing touches the filesystem; a test asserts the directory is never created.
