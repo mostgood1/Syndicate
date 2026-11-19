@@ -3653,3 +3653,12 @@ as a verdict.
   - A settler's reachability test must go through the SCORECARD's own state, not a raw record: `merge_board_date` strips every record to `KEEP_FIELDS`, which dropped `bk`, and the first read-only run with the fix on moved no NHL cell at all.
   - A version reset's refill is not the steady state: `grade_pending` commits a game before its later board dates are fetched (10 per run, oldest first), so a sport recorded days ahead (soccer) loses its game-day and live rows. Refill in one pass, and A/B a grader on one pass over every board date.
 - *(evidence in `.syndicate/findings_2026-11-18_scorecard_grading_defects.md` §1-§3; scripts `C:/tmp/g848/`)*
+
+## 2026-11-19 — FORBIDDEN: a stdin lifeline that blocks in `sys.stdin.buffer.read` inside a daemon thread `[lane board-split-memory-guard, todo #850]`
+
+- **CPython aborts at interpreter shutdown when a daemon thread holds the BufferedReader lock** ("Fatal Python error: _enter_buffered_busy ... <stdin>"). So a child that returns a clean exit code dies of SIGABRT (rc -6) instead.
+  - The board child's 4 of 4 recycles on 11-18 hit this.
+  - Reproduced on the fleet's Python 3.11.16: buffered rc 134, `os.read(0, 1)` rc 75.
+  - Read a lifeline pipe with `os.read` on the fd.
+- **Under a process split, recycling one process cannot free the other's memory.** A guard that measures the whole tree (`SYNDICATE_LOCAL_MEMORY_ROOT_PID`) charges the parent's growth to the child's build, and the child's recycles then only buy one cold build each. A split also needs a second look at every guard sized for one interpreter.
+- *(evidence in `findings_2026-11-18_board_split_memory_guard.md` §2-3)*

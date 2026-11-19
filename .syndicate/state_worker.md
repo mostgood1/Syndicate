@@ -2911,6 +2911,13 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   - TERMing the child only restarts it, with backoff. Rollback = remove the env line + a drained full `down`/`up`.
   - The first live evening's reading is OWED (findings § PRE-REGISTERED PREDICTION, baseline B).
     - Scheduled task `board-split-first-evening-reading-1118` takes it at 10:15 PM CST 11-18, and commits from the session-independent worktree `C:\tmp\syndicate-sessions\layer2-board-process-split`.
+- **The split's first live evening (11-18 5-10 PM CST) ran out of the guard's memory line** `[verified 2026-11-19 04:10Z, read-only, lane board-split-memory-guard, todo #850]`.
+  - `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` refused 26 builds (0 on the in-thread evening of 11-17).
+  - The child recycled 4 times by 9:25 PM, and every one exited **rc -6**: the buffered-stdin lifeline aborts at interpreter shutdown (reproduced on the fleet's Python 3.11.16).
+  - The longest gap between `BOARD_BUILD_TIMING` lines was 1,580 s.
+  - Cause: the guard reads parent + child RSS against the declared 7,168 MB. The second interpreter is p50 777 MB (n 476), and the parent's tick grows +1.1 GB 5-9 PM, which a child recycle cannot return.
+  - Fixes are on main `38c3a6905`, **DEFAULT-OFF and NOT LOADED**: `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_{RAW_LIFELINE,CEILING_CREDIT_MB,PARENT_TRIM_SECONDS,RECYCLE_AFTER_BUILD}`.
+  - Detail: `findings_2026-11-18_board_split_memory_guard.md`.
 - **The host is a second, separate cost:** Windows read 100% busy at 56-64% of nominal clock (1,920-2,188 of 3,417 MHz, Snapdragon X1E80100, on AC) at 7:36 and 8:05 PM CST 11-17, with vmmemwsl 3.9-6.4 cores and MsMpEng 1.0-2.4. Inside WSL that shows as clock, not runqueue wait. A WSL-side process appending to `/mnt/c` every second raised MsMpEng ~2.4 -> ~1.1 cores when stopped: write samplers to WSL-native paths.
 
 ## [odds-lane-sport-deadline] ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE; A PER-SPORT DEADLINE + DEFERRED NHL GENERATION IS ON MAIN `2ae0c646a` AND LOADED (fleet ff 2026-11-18 13:47:14Z); THE SLOW-API READING IS OWED `[verified 2026-11-18 13:56Z, lane odds-lane-sport-deadline, todo #838]`
