@@ -96,3 +96,54 @@ never on A-5's gap.
 
 Rows/day and cells moved, the factor distribution, Brier per row and the stake or probability shift, each from the
 frozen table and a fleet replay, with the reading that would refute each prediction.
+
+## 2. Results of the pre-registered held-out tests (read 11-18 ~7:55 PM CST, once each, 2,000 resamples)
+
+Substrate: a read-only copy of the fleet's `model_scorecard_optimizer_state.json` (written 11-18 05:36 CST; 2,417
+games, 35 dates 10-14..11-17) and pass C's `C:\tmp\optprog\C_rail_rows.jsonl`. Script: `scripts/fit_cell_calibration.py`
+(`grade` / `rail`), outputs in the session scratchpad (`HS_grade.json`, `HR_rail.json`).
+
+### 2.1 H-S (scorecard rows, fit 10-14..11-10, graded 11-11..11-17): **PASSES**
+
+- Fit: 1,414 games / 28 dates; **43 cells served** (NBA floored out; college totals floored out; NCAAF, NHL, NCAAB
+  spreads live, soccer and others validated).
+- Held-out: **ΔBrier −0.0062 per row [−0.0102, −0.0021]** (served p′ minus raw model), 23,564 rows / 367 games /
+  7 dates, 29 served cells with held-out rows. **22 of 29 cells improve** (bar: 2/3 = 19.3).
+- Secondary (reported, not a pass condition), same rows:
+
+  | variant | ΔBrier per row | 95% CI | cells better |
+  |---|---|---|---|
+  | served (pooled CI upper, floor 0.10) | −0.00621 | [−0.01021, −0.00209] | 22 / 29 |
+  | today's overlay factor (max(0.5, own CI upper)) | −0.00526 | [−0.00774, −0.00278] | 22 / 29 |
+  | pooled posterior mean | −0.00570 | [−0.01019, −0.00123] | 19 / 29 |
+  | unpooled CI upper, floor 0.10 | −0.00623 | [−0.00978, −0.00259] | 22 / 29 |
+
+  Pooling did not add accuracy over the unpooled CI upper here (−0.00621 vs −0.00623); it is kept because it was
+  registered and because it steadies thin cells (it moved no held-out number by more than its noise).
+- Cells that got worse held-out (7): NCAAF spreads live (+0.0128/row, 61 games) and pregame (+0.0065, 66), NCAAF
+  passing yards (+0.0016), spreads q4 (+0.0035), h2h q1/q4 (+0.0028/+0.0021), NHL h2h pregame (+0.0064, 51 games).
+  NCAAF spreads full live/pregame share one pooled k 0.303 (τ² 0 in the group).
+
+### 2.2 H-R (rail flags 11-15..11-17, table fit 10-18..11-14): **FAILS**
+
+- 1,120 decided flags / 175 games / 3 dates. **Log-likelihood gain of p′ over the raw model +0.0010 per flag
+  [−0.0030, +0.0051]**: the CI includes 0, so the pass rule fails.
+- **Gate check: passes** (0 served cells with >= 30 raw flags kept at 0). NCAAF totals live kept 0 of 7 (k 0.10),
+  under the 30-flag bar.
+- **Why it fails: coverage, not a wrong sign.** Only **182 of 1,120 flags (16%)** sit in a cell the table serves
+  (NCAAB spreads full live 169, NCAAF 13). The rest are, by the registered rule:
+  - NBA (412 flags): floored until games on or after 11-19 (I-25);
+  - NCAAB totals (447): floored until 11-17 (#816 calibrates them upstream; a residual k needs post-#816 dates);
+  - interval flags (h1 / h2 / q*): the optimizer has no live interval cell, so they stay raw;
+  - NCAAB h2h live, WNCAAB: not validated in the window.
+- Reported (not pass conditions): flags kept 1,003 of 1,120 (11-15 471/506, 11-16 240/257, 11-17 292/357); kept
+  flags hit **−10.1 pp below p′** [−14.1, −6.3] and +1.1 vs fair [−2.8, +4.8]; all flags −9.05 below the raw model
+  [−12.6, −5.4] and −8.06 below p′ [−11.5, −4.4]. Within the 182 served-cell flags alone (post hoc):
+  +0.0062 nats/flag vs raw [−0.018, +0.031], +0.0037 vs fair [−0.008, +0.015].
+- **Consequence, as registered:** use (a) does not show a held-out gain on these dates, so loading (a) is not
+  recommended on this evidence. It is still built behind its switch (it is display, and inert off); its grade is
+  re-run forward once NBA and post-#816 college-totals cells reach the sample floor (60 games / 5 dates). No refit
+  on 11-15..11-17.
+- Pass C's +0.024 nats/flag out of sample was a k fitted ON rail flags (two dates, test the third), including
+  NCAAB totals and NBA. This rule takes k from the scorecard population and excludes those two cells by design, so
+  the two numbers answer different questions.
