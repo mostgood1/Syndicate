@@ -1133,3 +1133,29 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   - 14 flags on the served page over 4 of 10 readings. Every one matched a qualifying row at the same line, quote age and edge; 0 false.
   - Flags go dark when refresh-worker's book-grid tick saturates. With NBA live, the NBA in-play overlay takes 94-234 s per build, so the college overlays refresh every ~5 min and their quotes pass 300 s before they are shown (todo #790).
   - A DOM reader must wait for the page's own query, which lands ~80 s after the cached embed paints.
+
+## [board-query-cold-read] THE LAYER 2 BOARD QUERY'S COLD `board_read` IS A NEW WEB WORKER BUILDING A BOARD THE OTHER WORKER ALREADY HOLDS -- fix on main `9931a787b` DEFAULT-OFF, NOT LOADED `[verified 2026-11-19 ~1:50 PM CST from the fleet web log, read-only; lane board-read-cold-share, todo #853]`
+
+- **The cache:** `read_combined_intelligence_response`'s cache is PER gunicorn worker, keyed on `(dates, sport, limit)`.
+  - It expires on TTL (fleet web: 180 s) or on a newer in-play overlay past a 22 s floor (fleet web values, read
+    11-19).
+  - Nothing reads the published board's version: a new board reaches a worker only through one of those two
+    expiries.
+- **The overlay warmer** rebuilds only the keys this process's own requests watched in the last 600 s, and only on
+  a newer overlay. It never refreshes on TTL. It starts at the process's first board call.
+- **Cold reads** (board_read > 2 s):
+
+  | window (CST) | cold | new worker's first read | TTL | overlay |
+  |---|---|---|---|---|
+  | 11-18 5-11 PM | 75 of 125 | 69 | 2 | 4 |
+  | 11-17 5-11 PM | 198 of 370 | 151 | 24 | 23 |
+  | 11-19 7 AM-1 PM | 41 of 60 | 24 | 13 | 4 |
+
+  Instrument: `scripts/rail_monitor/coldread_attrib.py`.
+- **Memory:** a worker that has built the board is recycled at anon p50 980 MB, against a limit p50 634 MB (11-18
+  evening, n 82, 75 hard, 13.7/h). So warming a board at worker boot would raise the recycle rate.
+- **Switch:** `SYNDICATE_COMBINED_BOARD_SHARED_COPY` (absent = off) shares one worker's build through
+  `/dev/shm/syndicate-combined-board-<uid>`.
+  - Not on the fleet: no `WEB__` key is set.
+  - Loading it is an env change (a drained full down/up). It is not a betting change: every reader is a web route.
+  - First-evening P1-P6: `.syndicate/findings_2026-11-19_board_read_cold_share.md`.
