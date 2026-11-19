@@ -991,3 +991,34 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - cap use 27.1% / 21.0%;
   - paper book 14,986 settled, -1.25%.
 - **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it).
+
+## Reading 57 — Wed 11-18 10:13 PM CST (04:13Z), window 32 min
+
+- **Results first.** No new grades since reading 56: all-time 2,076 bets / 1,117 events, -10.89%; 30 d -7.33%
+  [-12.8, -1.9]. 14 games started and unsettled, unchanged, none late.
+- **Program since reading 56 (on main):**
+  - **S4 KILL**: Kalshi's in-play mid is the prior, and the NBA re-sim earns weight 0.00 on top of it (F19).
+  - **S5 pre-registered and early-read**: the band map does not carry over (FIT's excluded .55-.70 band was the
+    best in 11-01..11-17). The forward test, on bets >= 11-19 at 150 events, decides (F20).
+- **No anomalies.** Every endpoint was inside budget: `live_today` 0.25 s, page 0.27 s.
+- **Flow:**
+  - plan 0.8 min old: 98 suggested, 8 positions;
+  - 10 live ticks, 0 placed (4 `game_started`);
+  - orders today 70 (69 filled, 1 unfilled in-play IOC); unreconciled 0;
+  - cap use 27.1% / 21.0%;
+  - paper book 15,042 settled, -1.17%.
+- **Unchanged:** gate 8 of 800 on the BC-052 clock; 1 unclassified load (soccer ff 17:58:30Z).
+
+## Reading 58 — Wed 11-18 10:44 PM CST (04:44Z), window 31 min
+
+- **Results first.** One grade: all-time 2,077 bets / 1,118 events, -10.89%; 30 d -7.33% [-12.8, -1.9].
+- **14 games started and unsettled**, the same count since 9:42 PM. None is past the 8 h late line. These are the late
+  (West Coast) games in progress. If the count has not moved after midnight CST, it is checked.
+- **No anomalies.** Every endpoint was inside budget: `live_today` 0.12 s, page 0.22 s. 17 plan reads in the window
+  (p95 177 ms).
+- **Flow:**
+  - plan 7.5 min old: 89 suggested, 15 positions; 35 `in_play_market_fair`;
+  - 10 live ticks, 1 placed, 0 failed (20 `game_started`, 4 `axis_held_live`);
+  - orders today 72 (71 filled, 1 unfilled in-play IOC); unreconciled 0;
+  - cap use 29.6% / 21.0%.
+- **Unchanged:** gate 8 of 800 on the BC-052 clock; 1 unclassified load (soccer ff 17:58:30Z).
