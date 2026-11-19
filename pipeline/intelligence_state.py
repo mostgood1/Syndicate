@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from syndicate.features.shared.single_flight import SingleFlight
+from syndicate.features.shared import combined_board_shared_copy
 from syndicate.features.shared.branch_profiler import profile_branch
 from flask import Flask
 from flask import current_app
@@ -10264,6 +10265,92 @@ def _ensure_combined_board_overlay_warmer() -> None:
         )
 
 
+def _combined_board_overlay_min_age_seconds() -> float:
+    """The overlay floor `_combined_board_overlay_state` applies, for a shared copy. A failed
+    read returns 0, the strict direction: any newer overlay then refuses the copy."""
+    try:
+        from syndicate.features.shared.book_grid_artifact import inplay_overlay_cache_min_age_seconds
+
+        return float(inplay_overlay_cache_min_age_seconds())
+    except Exception:  # noqa: BLE001
+        return 0.0
+
+
+def _combined_board_install_copy(cache_key: tuple[Any, ...], copy: Any) -> dict[str, Any]:
+    """Put another worker's copy in THIS worker's cache under ITS build stamp and overlay, so
+    every later freshness decision here is the one the builder's own cache would make."""
+    _COMBINED_INTELLIGENCE_RESPONSE_CACHE[cache_key] = (copy.built_at, copy.payload)
+    _COMBINED_OVERLAY_MTIME_BY_KEY[cache_key] = copy.overlay_mtime
+    _prune_combined_intelligence_response_cache()
+    for stale_key in [key for key in _COMBINED_OVERLAY_MTIME_BY_KEY if key not in _COMBINED_INTELLIGENCE_RESPONSE_CACHE]:
+        _COMBINED_OVERLAY_MTIME_BY_KEY.pop(stale_key, None)
+    return dict(copy.payload)
+
+
+def _combined_board_try_shared_copy(
+    cache_key: tuple[Any, ...],
+    cached: tuple[float, dict[str, Any]] | None,
+    overlay_mtime: float,
+    ttl_seconds: float,
+    *,
+    warm: bool,
+) -> tuple[dict[str, Any] | None, Any]:
+    """(board to serve, None) or (None, build lease or None). Lane `board-read-cold-share`.
+
+    Runs only with `SYNDICATE_COMBINED_BOARD_SHARED_COPY` on, in the thread that owns this
+    key's in-process rebuild, so a worker loads a copy at most once per miss. In order:
+      1. ADOPT another worker's copy that is newer than ours and fresh by our own TTL and
+         overlay rules (`COMBINED_BOARD_SHARED_ADOPTED`).
+      2. Take the cross-worker build lease; the caller builds and publishes.
+      3. Another live worker holds the lease: serve the newest copy <= TTL x 10 old, shared or
+         ours, the same rule the in-process single flight applies between threads
+         (`COMBINED_BOARD_SHARED_SERVED_STALE`). With nothing that young, build, as before.
+    """
+    shared = combined_board_shared_copy
+    now = time.time()
+    own_built_at = cached[0] if cached is not None else None
+    own = "empty" if cached is None else "expired"
+    started = time.perf_counter()
+    copy = shared.adopt_fresh(
+        cache_key, newer_than=own_built_at, newest_overlay=overlay_mtime, ttl_s=ttl_seconds,
+        overlay_min_age_s=_combined_board_overlay_min_age_seconds(), now=now,
+    )
+    if copy is not None:
+        print(
+            f"[intelligence_state] COMBINED_BOARD_SHARED_ADOPTED pid={os.getpid()} from_pid={copy.from_pid} "
+            f"age_s={now - copy.built_at:.1f} load_s={time.perf_counter() - started:.2f} rows={copy.rows} "
+            f"own={own} warm={int(warm)}",
+            flush=True,
+        )
+        return _combined_board_install_copy(cache_key, copy), None
+    lease = shared.acquire_lease(cache_key, now=now)
+    if lease is not None:
+        print(f"[intelligence_state] COMBINED_BOARD_SHARED_BUILD pid={os.getpid()} own={own} warm={int(warm)}", flush=True)
+        return None, lease
+    if not shared.held_elsewhere(cache_key, now=now):
+        return None, None  # no usable directory or lease file: build, as before
+    max_age = ttl_seconds * _COMBINED_BOARD_STALE_TTL_MULTIPLE
+    stale = shared.stale_copy(cache_key, newer_than=own_built_at, max_age_s=max_age, now=now)
+    if stale is not None:
+        print(
+            f"[intelligence_state] COMBINED_BOARD_SHARED_SERVED_STALE pid={os.getpid()} source=shared "
+            f"from_pid={stale.from_pid} age_s={now - stale.built_at:.1f} "
+            f"load_s={time.perf_counter() - started:.2f} own={own} warm={int(warm)}",
+            flush=True,
+        )
+        return _combined_board_install_copy(cache_key, stale), None
+    if cached is not None and now - cached[0] <= max_age:
+        print(
+            f"[intelligence_state] COMBINED_BOARD_SHARED_SERVED_STALE pid={os.getpid()} source=own "
+            f"age_s={now - cached[0]:.1f} own={own} warm={int(warm)}",
+            flush=True,
+        )
+        return dict(cached[1]), None
+    print(f"[intelligence_state] COMBINED_BOARD_SHARED_BUILD pid={os.getpid()} own={own} warm={int(warm)} "
+          f"lease=elsewhere_no_copy", flush=True)
+    return None, None
+
+
 def _combined_board_response_cache_ttl_seconds() -> float:
     return max(1.0, float(_env_int("SYNDICATE_INTELLIGENCE_COMBINED_BOARD_CACHE_SECONDS", 15)))
 
@@ -10479,6 +10566,20 @@ def read_combined_intelligence_response(
         # The in-flight rebuild failed or timed out. Fall through and build --
         # returning nothing to a caller that asked for a board is worse than
         # doing the work twice.
+
+    # Lane `board-read-cold-share` (rail monitor I-28). Each gunicorn worker keeps its own
+    # copy of this board, and the memory guard recycles workers ~14 times an hour on a live
+    # evening. So on 11-18 5-11 PM CST, 69 of 75 cold `board_read`s (92%) were a NEW worker
+    # building a board the other worker already held (`scripts/rail_monitor/coldread_attrib.py`).
+    # With the switch on, adopt another worker's copy if it is fresh by this cache's own rules,
+    # or serve the newest copy while another worker rebuilds, before building here.
+    # Absent switch: skipped, and nothing touches the filesystem.
+    shared_lease = None
+    if combined_board_shared_copy.enabled():
+        served, shared_lease = _combined_board_try_shared_copy(cache_key, cached, overlay_mtime, ttl_seconds, warm=_warm)
+        if served is not None:
+            _COMBINED_INTELLIGENCE_SINGLE_FLIGHT.finish(cache_key)
+            return served
 
     merged_recommendations: list[dict[str, Any]] = []
     by_date_summary: dict[str, dict[str, Any]] = {}
@@ -10942,7 +11043,8 @@ def read_combined_intelligence_response(
     sliced = slice_intelligence_board_state_for_request(combined, sport=sport, limit=limit)
     sliced["board_contract"] = board_contract
 
-    _COMBINED_INTELLIGENCE_RESPONSE_CACHE[cache_key] = (time.time(), sliced)
+    built_at = time.time()
+    _COMBINED_INTELLIGENCE_RESPONSE_CACHE[cache_key] = (built_at, sliced)
     _COMBINED_OVERLAY_MTIME_BY_KEY[cache_key] = overlay_mtime
     _prune_combined_intelligence_response_cache()
     for stale_key in [key for key in _COMBINED_OVERLAY_MTIME_BY_KEY if key not in _COMBINED_INTELLIGENCE_RESPONSE_CACHE]:
@@ -10953,6 +11055,14 @@ def read_combined_intelligence_response(
     # cost a duplicate build, never a wrong answer. Carrying an ownership flag
     # 260 lines down would be the more fragile of the two.
     _COMBINED_INTELLIGENCE_SINGLE_FLIGHT.finish(cache_key)
+    # Lane `board-read-cold-share`: AFTER the release, so this worker's waiters are not held
+    # for the write. `built_at` is the in-process stamp, so another worker that adopts this
+    # copy applies the TTL from the moment it was built, not from the moment it was loaded.
+    if combined_board_shared_copy.enabled():
+        combined_board_shared_copy.publish(
+            cache_key, built_at=built_at, overlay_mtime=overlay_mtime, payload=sliced,
+            rows=_combined_intelligence_cache_rows(sliced), lease=shared_lease,
+        )
     return dict(sliced)
 
 
