@@ -71,6 +71,7 @@ Then:
   - flags: false, missed, dark;
   - P1 (`ours_contradictions`) and #824 (`ours_below_points`);
   - the score floor (`floor_violations`, owned reading R-A) and, while NCAAB is live, the #844 sampler (R-B);
+  - on NHL days, the NHL timeout watcher `p838_watch.py <prev Z>` (R-E);
   - P6;
   - overlay gaps over 360 s and stale web merges;
   - board publication gaps and the memory guard;
@@ -124,6 +125,21 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
   - P4: 0 `POLYMARKET_ARTIFACT_STALE`;
   - P5: 0 slow iterations (post > 120 s) where the slate is the larger part (was 117).
 - Each is PREDICTED, FALSIFIED or NEITHER. Name any restart in the window (it CONFOUNDS the reading). Write the verdict to the lane `polymarket-slate-off-odds-loop`, a deploys.md READING entry, and todo #851.
+
+**R-E. #838 slow-NHL-API case (lane `odds-lane-sport-deadline`, OPEN, goal not met until this is read).** Taken over 11-19 from session local_73a5d2dd (handover on main `ab4877f6e`; the user's "keep it open" from 11-19 still stands).
+- **Trigger:** the first NHL odds rebuild that hits its time limit (900 s). That is a manifest step `nhl_live_generation` / `nhl_pregame_generation` with `timed_out: true`, or `data/nhl_source/data/processed/.nhl_live_generation_timeout_<date>.json` on the fleet. Before 11-19 none had happened: 11-18 6-11 PM had 8 of 8 rebuilds OK, at 169-299 s. The stats cache (`59fbefc71`) may make a timeout rare.
+- **Watch at every reading on a day with NHL:**
+  `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p838_watch.py <prev Z>"`
+  It prints `nhl_steps`, `nhl_timed_out` (with the run, step, start and seconds), `markers` and `cooldown_lines`. Test from 11-18 00Z: 67 steps, 0 timed out.
+- **When it fires,** grade the window around the timeout with the lane's reader:
+  `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/odds_lane_838/livewin.py <W0> <W1> <slate>"`
+  `puckdrop.py` and `gap0022.py` are beside it. The checks:
+  - the longest live odds run <= 1,200 s;
+  - `lane_busy` refusals <= 50% of `ODDS_SWEEP_LAUNCHED` attempts (11-17 baseline: 23 of 26);
+  - after the timeout, NHL sweeps run fast-only for 1,800 s (`NHL_LIVE_GENERATION_COOLDOWN`, the fallback);
+  - in-game NHL rows are not stuck at 0-5 for longer than one hold;
+  - NHL odds age <= ~1,200 s, **measured from the actual first puck drop** (the ESPN state flip in `C:\tmp\inplay_<date>\espn.jsonl`), not the scheduled start. The owner's 11-18 reading got this wrong; see the deploys.md correction at 2026-11-19 14:15Z.
+- **Write the verdict** to the lane `odds-lane-sport-deadline`, a deploys.md READING entry, and todo #838. A MET verdict closes the lane's goal; closing the lane is the user's call.
 
 ## NIGHTLY CLOSE
 
