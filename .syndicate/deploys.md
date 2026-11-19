@@ -62167,3 +62167,27 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Watcher miss:** both earlier watchers keyed on `refused_*=N` in `PLAYER_EXIT_TICK`, and NCAAF's tick line carries no refused counter (it is on `NCAAF_LIVE_RESIM`). It surfaced in watcher v2's dry run. v2 (`C:\tmp\lpeg\lpeg_watch_refusal2.ps1`, task bmt6m5hie, from 04:34:00Z to 06:00:00Z 11-23) stops on any key `PLAYER_OUT` whose reason is not foul_out, on `EXIT_HOLD` / `KEY_PLAYER_OUT_REFUSED`, or on a refusal on 2+ consecutive ticks. It logs foul-out flickers and keeps going.
 - **Also tonight (modelled foul-out flickers, one tick each):** NCAAB UConn's Silas Demary Jr. at Arizona (401909742), refused at 04:30:26Z.
 - **#814 measurement status:** NCAAF gamelines MET (one tick, board withdrawn). Every other sport still owes an unmodelled exit; NCAAF's plan and hold reads are still owed.
+
+## 2026-11-19 04:58:14Z (10:58 PM CST 11-18) -- DEPLOY (ff only, no restart): fleet `199d6c529` -> `d78a448c4`, the I-17 rail-card OURS fix `523357e7f` + the calibrated-total score floor `d78a448c4` (lane `ncaab-total-overprojection`; user "Load it tonight" to "Load the card fix to web tonight?", and "Yes, build it" to the floor) -- **CARD FIX LOADED on web (4 of 4 /intelligence fetches at 04:59:30Z); FLOOR ON DISK, live in the board child at its next respawn, NOT in the refresh-worker parent until its next restart**
+- betting change: no. Both are display only: the card's OURS number and the shown calibrated total. No served probability, flag, rank or stake reads either.
+- **Why not before 10:30 PM:** main is linear, so any SHA with the card fix carries `199d6c529`, the recorder fix the user approved "after 1030". Lane `layer2-suggested-grader` ff'd its own `199d6c529` at 04:46:22Z, restarted the board child only, and released refresh-worker about 04:55Z. This ff followed.
+- **Ride-alongs** (`199d6c529..d78a448c4`, runtime):
+  - `25a5e480d`: #844 book-grid newest stamp, DEFAULT OFF.
+  - `75a787964`: #847 per-cell calibration, every use DEFAULT OFF.
+  - Neither key is set: 0 `SYNDICATE_CELL_CALIBRATION_*` / `SYNDICATE_BOOK_GRID_NEWEST_BY_TIME` keys in refresh-worker's (pid 152916) or web's (pid 23074) environ, and 0 in `local_production.env`. Key names only were read.
+  - The rest of the 34 commits are ledger, tests and docs.
+- **Gates:**
+  - claim web 04:57:13Z (holder `ncaab-total-overprojection`, rc 0).
+  - Baseline 04:57:23Z: head `199d6c529`, refresh-worker pid 152916, web tracebacks 0 in 10 min, card fix served on 0 of 4 fetches.
+  - Preflight `--service web --target-commit d78a448c4...`, `--betting-change no`, 4 expect/baseline pairs, from a worktree at origin/main: **CLEAR 04:58:01Z**.
+- **ff:** `git fetch github` + `git merge --ff-only d78a448c4635962a9e79d932d7ae91340ffd92e4`, done 04:58:14Z. On disk: `def points_scored_from_game` (1), the card's `calibrated(main) ? main` (1). 14 dirty paths (data and report files, as before). No role restarted, no drain.
+- **expect / measured:**
+  - `fleet_checkout_head` -> d78a448c4: **MET**.
+  - `web_serves_card_fix` -> yes: **MET**. 3 of 4 fetches at 04:58:28Z, 4 of 4 at 04:59:30Z; web workers recycled (704891/705038 -> 706266/706880).
+  - `refresh_worker_pid` 152916 unchanged: **MET**.
+  - `web_tracebacks_10min` at most 1: **MET** (0 at 04:59:38Z).
+- **NOT LOADED / OWED:**
+  - **The floor in the refresh-worker parent:** the grid artifact and its in-play overlay, which is where the rail's rows come from. The parent (pid 152916) runs `d1e14be4` and loads the floor only at its next restart. It was not TERMed tonight: that needs a drain in the live evening, and the floor is display only and rare (5 of 980 calibrated rows on 11-18).
+  - **The board child** loads it at its next respawn (memory-guard restarts every ~30-50 min tonight).
+  - **Reading owed:** the next late-game college total near the score shows its calibrated total at or above the points scored. The rail check counts card contradictions after this load: 0 expected.
+- claims: web released after this entry.
