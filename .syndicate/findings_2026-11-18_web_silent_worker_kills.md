@@ -230,5 +230,24 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
     - Behaviour is unaffected. 0 of the 8 completed holds were exposed: a dip resets the pending flag, so the next
       non-5th request would have skipped the check, and every one recycled within 1-3 requests.
     - Fix: clear it in that branch, at the next web load.
+- Reading 4: the heartbeat sampler's full run, 2026-11-18 16:30:52Z - 11-19 01:29:51Z (9 h at 1 Hz, read-only).
+  - 130 gaps >= 3 s: 89 at 3-5 s, 33 at 5-10 s, 6 at 10-20 s, 2 at 20-40 s.
+  - Both 20-40 s gaps came before the fix: 18:48Z 27.2 s (the double) and 18:54Z 25.7 s. None reached 40 s (the dump
+    threshold) or 60 s (the kill line), which matches 0 dumps and 0 WORKER TIMEOUT.
+  - After the fix, all 5 gaps >= 8 s sit in a worker's exit-to-replacement window, not on a serving worker (log lines
+    matched by time):
+    - 00:42Z, 18.4 s: 374502 drained with 1 request still in flight, waited 13.5 s at `web_worker.py:105`, then its
+      replacement booted 5.5 s after it exited.
+    - 01:03Z and 01:07Z, 14.9 / 15.4 s: the master took 15.8 s from `Worker exiting` to `Booting worker`.
+    - 00:36Z and 00:26Z, 8.7 / 8.4 s: the same window. The 00:36Z respawn took 6.4 s.
+  - Before the fix, 16:52Z 11.7 s was a serving worker at a picks slot (H5, above). The other pre-fix gaps >= 8 s were
+    not classified.
+  - Lead, not this lane's goal metric: evening respawns take 6-16 s, against p50 1.7-3.9 s.
+    - That path is all gunicorn's master (reap, `WorkerTmp` create in /tmp, fork); none of our hooks runs in it.
+      Cause unknown: H2's disk path or host CPU. Web runs on one worker meanwhile.
+  - Also noted: `web_worker.py:105`'s `futures.wait(..., graceful_timeout)` (30 s on the fleet), and the interpreter
+    joining executor threads at exit, are un-heartbeated. That is the old drain-path kill mode.
+    - A kill there logs a recycle first, so it is not "silent".
+    - `wsk_day.py`: every WORKER TIMEOUT on 11-17 was silent; 0 of any kind 11-18 / 11-19 so far.
 - Correction: the lane status said the widening happened at "19:30Z". The fleet clock read 19:13:44Z at the baseline, so it
   was ~19:05Z.
