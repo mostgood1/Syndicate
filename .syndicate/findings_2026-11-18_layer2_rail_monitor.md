@@ -632,3 +632,43 @@ The 2 contradictions are **real**, but my "rows with `live_total_basis: None`" a
   - local_3ab5373b was stopped mid-turn and told to stand down;
   - local_e0b3696b and local_63ca956d were still starting, so the stop is retried at each reading.
 - The user said "add 844 to the 11-24 window" (relayed to the optimization session).
+
+## Reading 15 — Wed 11-18 7:34 PM CST (01:34Z 11-19)
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 6.1 (5.7 / 6.3). Board child 363665; no new `[board_process]` events.
+
+**Slate: 80 live.**
+- Flags: 104 shown, 0 false, 0 missed, 0 dark.
+- P1: 24 college totals flags, **0 card contradictions** this read.
+- #824: **1** college totals flag with ours below the points already scored (to check next read).
+- P6: 0.
+- Live rows: 1,937, 844 priced <= 120 s.
+  - **NBA 1,092 rows, 583 fresh** (13 of 1,032 at 7:06 PM).
+  - NCAAB 734 (218). WNCAAB 77 (31). NCAAF 30 (10). NHL 4 (2).
+
+**Board (P2): builds at 7:21 PM (369 s) and 7:31 PM (315 s), median 342 s, both over 300 s.**
+
+**A-4: the today board publishes every 8-18 min, not every 5.**
+- Each cycle runs a separate `LAYER2_TODAY_CADENCE` step before `BOARD_BUILD_TIMING`:
+  - `LAYER2_TODAY_CADENCE ... ran=yes age_before_s=330 limit_s=300 elapsed_s=536.8` at 7:14:41 PM;
+  - `elapsed_s=164.2` at 7:26:29 PM.
+- Publications: 6:42:41, 6:53:35, 7:02:30, **7:21:01 (18.5 min after the previous one)**, 7:31:49 PM.
+- **Evening 5:26-7:34 PM:** 13 builds; publication gap median **490 s**, max **1,580 s** (the recycle crash, A-3).
+- `BOARD_BUILD_TIMING` wall alone understates the cycle. The monitor's metrics now also record `board_pub_gap_*` and `today_cadence_step_max_s`.
+- Recorded for the board-split verdict (10:15 PM) and the build-priority session (#849).
+
+**P7 (NHL window):**
+- 7 sweeps launched, 3 refused (30%);
+- live run 88 s; pregame 325 s;
+- an NHL odds child was 186 s old at the read (`refresh_nhl_oddsapi.py --days-ahead 1`, under 600 s);
+- 0 `NHL_LIVE_GENERATION` markers.
+
+**P8:** 31 NHL overlay builds, **177 in-play rows**, 0 gaps over 360 s.
+
+**Overlay:** 0 gaps over 360 s (max NBA 314 s); 1 `deferred_slow` tick; tick gap max 161 s. Web merges 19, 0 stale.
+
+**Load:** query 14.5 s. Today's board was 397 s old.
+
+**Team cards:** 0 defects.
+
+**Sessions:** all three duplicate #847-#849 sessions confirmed "stood down", having created nothing. The optimization program's three sessions own the work.
