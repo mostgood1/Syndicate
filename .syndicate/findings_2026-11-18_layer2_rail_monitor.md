@@ -814,3 +814,32 @@ The owner's 6-9 PM read passed 4 of 5 checks. The miss was one 27-min NHL odds g
 - **#847:** built. Scorecard test passed; the rail test failed on coverage; forward grade 11-26.
 - **#848:** the soccer "mis-grade" was false (players who did not play are already voided; the error is the assumed market EV). The NHL stale-quote goal-scorer rows were real (780 of 782); fix default-off.
 - **#849:** closed without building. Far-ahead soccer builds cost ~6 s per board build. **This closes L-d.** The evening board cost is A-3 (memory), not CPU priority.
+
+## Reading 20 — Wed 11-18 9:41 PM CST (03:41Z 11-19), full page: the fourth memory-guard recycle
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 3.8 (4.5 / 4.8).
+
+**A-3, the fourth recycle:**
+- `MEMORY_GUARD_ABORT` at 9:19:33, 9:23:17 and 9:24:33 PM (headroom 1,554 / 1,724 / 1,642 MB; container 5.44-5.61 GB).
+- `RECYCLE_EXIT reason=heavy_build_refused ... uptime_s 2518` at 9:25:30 PM, then `BOARD_PROCESS_EXITED pid=549989 rc=-6 reason=exit uptime_s=2541`.
+- Child 613542 READY at 9:25:59 PM (attempt 5); RSS 2.88 GB at 9:41 PM.
+- **The intervals keep shrinking: 8.8 h, 83 min, 50 min, 42 min.** Each new child refills to the guard's floor faster.
+- Board publications: 9:18:02 PM (316 s), then **9:35:01 PM (359 s)**, a **17 min (1,019 s)** gap. Today's board was 427 s old at the read.
+
+**Slate: 25 live.**
+- Flags: 50 shown, 0 false, 0 missed, 0 dark.
+- P1: 9 college totals flags, 1 card contradiction (the card bug).
+- #824: 0. P6: 0.
+- Live rows: 1,190, 665 priced <= 120 s.
+
+**Live odds lane:** 10 launched, 3 refused (23.1%). Live runs 4, max 171 s; pregame 262 s.
+
+**Overlay:** 0 gaps over 360 s (max NCAAF 171 s); tick gap max 52 s. Web merges 45, 0 stale.
+
+**Load (full page):** `/intelligence` 10.4 s; query **27.5 s**.
+
+**Team cards:** 0 defects.
+
+**Next on the fleet:**
+- the board-split verdict task at 10:15 PM CST;
+- the suggested recorder fix's refresh-worker restart after 10:31 PM (local_fbe07d8c). That restart also resets the parent's memory, so post-restart readings measure a fresh process.
