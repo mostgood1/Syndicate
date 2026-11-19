@@ -62215,3 +62215,32 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - On disk, read at 04:5xZ: **103** `sg=true` records stamped >= 04:46:47Z in the 11-18/11-19 recorder parts, and **103** `#sg` sidecar keys, one per record.
   - Build health: BOARD_BUILD_TIMING 04:54:22Z, wall 277.5 s, ok=True, in the 211-365 s range of the evening's builds.
 - **verify:** the reading above. The daily suggested grade (task `SyndicateSuggestedSet`, 7:15 AM CT) counts these records from the 11-19 run on: every suggested line, not only those suggested at first sight.
+
+## 2026-11-19 05:05Z (11:05 PM CST 11-18) -- READING (no deploy): lane `odds-lane-sport-deadline` (todo #838), the first live NHL window on the per-sport deadline and both NHL generation splits -- **healthy path MET on 4 of 5 checks; NHL odds age over 1,200 s in 1 of 63 gaps (not an NHL hold); the slow-API case NOT EXERCISED (0 timeouts)**
+- betting change: no (a reading; nothing loaded)
+- **Window:** 2026-11-19 00:00-05:00Z (6:00-11:00 PM CST 11-18), slate 2026-11-18, 3 NHL games.
+  - Code on the fleet: the deadline `2ae0c646a` (BC-046), the pregame split `cdab875d5` (BC-049) and the stats-REST cache `59fbefc71` (BC-050), all carried by later ffs.
+  - Read-only at nice 19, from manifests (`odds_refresh.json` step `started_at`/`finished_at`) and the live-odds-worker and refresh-worker logs (+`.1`).
+  - The reader (session scratchpad `livewin.py`) was validated on 11-17 first: 26 attempts, 23 refused, 01:21-03:02Z. That is the baseline below.
+  - A 9 PM CST mid-window read (00:00-03:00Z) agreed: 19 of 49 refused (39%), max 441 s, 5 of 5 generations ok.
+
+  | prediction (findings file) | bound | 11-17 (slow API) | 11-18 6-11 PM CST | verdict |
+  |---|---|---|---|---|
+  | longest live odds run | <= 1,200 s | 4 runs killed at 1,800 s | **441 s** (70 live lane sweeps, p50 79 s; 0 of 826 live runs over 1,200 s; 0 of 834 runs in any phase over 1,800 s) | MET |
+  | sweep attempts refused `lane_busy` | <= 50% | 23 of 26 (88%) 01:21-03:02Z | **27 of 100 (27%)** (11-17 22:00-00:00Z, healthy: 9 of 42, 21%) | MET |
+  | NHL steps | odds fast in turn, generation deferred, 0 timeouts | full inline | **64 of 64** live NHL odds steps `--mode fast` (p50 47 s, max 69 s). 8 deferred `nhl_live_generation`: 8 ok, 169-299 s, 0 timed out. 0 timed-out steps in any sport. | MET (healthy path) |
+  | cooldown after a timeout | NHL odds-only for 1,800 s | -- | no timeout marker for the slate | NOT EXERCISED |
+  | NHL in-play overlay rows | not at 0-5 for more than one hold | -- | **1 of 240** builds at 0: 03:15:23Z (9:15 PM), between 59 rows at 03:14:20Z and 221 at 03:18:39Z. Rows p50 168. | MET |
+  | NHL odds age | <= ~1,200 s | -- | 63 gaps between ok NHL odds refreshes, 00:20-04:58Z: max **1,604 s** (00:22:15Z -> 00:48:59Z), 1 over 1,200 s | MISSED once |
+
+- **The one miss, traced** (sweep lines + manifests, 00:10-00:55Z). No NHL fetch held the lane:
+  - The 00:20:55Z live sweep (6 sports) refreshed NHL odds by 00:22:15Z. Its deferred generation ran to 00:27:36Z (400 s run).
+  - The live loop's next four sweeps (00:22:45Z, 00:29:10Z, 00:30:44Z, 00:37:40Z) did not include NHL. Measured: their `sports=` lists. Why NHL was not due before and around the 6:30 PM puck drop is NOT read from code.
+  - The first sweep naming NHL, at 00:39:08Z, was refused `lane_busy`. The holder was run 20261119_003741: live, 00:37:42-00:43:19Z, 337 s, ok False. Its time was soccer 161 s (10 Understat steps failed, todo #840) and NBA 99 s.
+  - The lane was free from 00:43:19Z. The next NHL attempt came at 00:47:57Z, **4 min 38 s later**, and refreshed NHL odds at 00:48:59Z. Believed, not checked in code: a refused sweep is not retried when the lane frees, only at the loop's next due tick.
+- **The slow-API case had 0 qualifying windows tonight.** That is the case the 900 s deadline and the cooldown exist for. Generation max was 299 s against 900 s.
+  - Per learnings 2026-10-13, a slow API is a production condition this lane cannot schedule. Tonight is a DISCARDED window for that arm, not a pass.
+  - The deadline path itself is pinned by the off != on tests through the real run loop (`tests/test_refresh_odds_sport_deadline.py`).
+  - With the stats-REST cache loaded (180 -> 14 stats calls per generation), the 11-17 stall may now be rare.
+  - To read it when it happens: scan manifests for a `timed_out` `nhl_live_generation` / `nhl_pregame_generation` step, or `data/nhl_source/data/processed/.nhl_live_generation_timeout_<date>.json`.
+- **Lead, not built:** retrying a `lane_busy`-refused sweep when the holder exits would have cut tonight's one miss by ~4.6 min. It changes how fresh live quotes are, so it is a betting change: default-off, or the 11-24 window.

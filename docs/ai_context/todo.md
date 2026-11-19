@@ -199,7 +199,7 @@
 - `NHL_STATS_REPORT_CACHE` never reaches a role log: `refresh_odds_sources` keeps only `_STEP_STDOUT_MARKERS` from child stdout. Adding the token is a one-line follow-up in that file (lane `odds-lane-sport-deadline`'s); until then read counts from the cache files' mtimes.
 - Leads: the boxscore cache resolves to the fleet CHECKOUT (no `SYNDICATE_ARTIFACT_ROOT_NHL`); the first availability load per process writes `captured_at` null.
 
-### `#838` — **ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE: NHL full generation hung on the NHL stats REST API (21-44 s per call or 520, 168 uncached calls) for its 1,800 s timeout four sweeps in a row, the `TimeoutExpired` killed each run, and 23 of 26 sweep attempts 01:21-03:02Z were refused `lane_busy`. Fix on main `2ae0c646a` behind `SYNDICATE_ODDS_LANE_STEP_DEADLINE` (absent = ON), LOADED 2026-11-18 13:47:14Z (fleet ff, no restart); the slow-API reading is owed** `[2026-11-17, lane odds-lane-sport-deadline; `.syndicate/findings_2026-11-17_odds_lane_sport_deadline.md`]`
+### `#838` — **ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE: NHL full generation hung on the NHL stats REST API (21-44 s per call or 520, 168 uncached calls) for its 1,800 s timeout four sweeps in a row, the `TimeoutExpired` killed each run, and 23 of 26 sweep attempts 01:21-03:02Z were refused `lane_busy`. Fix on main `2ae0c646a` behind `SYNDICATE_ODDS_LANE_STEP_DEADLINE` (absent = ON), LOADED 2026-11-18 13:47:14Z (fleet ff, no restart); the first live NHL window (11-18 6-11 PM CST) held on the healthy path; the slow-API case is not yet exercised** `[2026-11-17, lane odds-lane-sport-deadline; `.syndicate/findings_2026-11-17_odds_lane_sport_deadline.md`]`
 - **Cause (measured 11-18, read-only):**
   - live-odds-worker runs sports SERIALLY with one 1,800 s step timeout, and a timeout escaped `_run_command` to `main`: rc 1, the sports after NHL never ran, NBA's result was dropped (an 831-byte manifest).
   - A timed-out generation writes no predictions, so every later live sweep was full again (01:21Z, 01:54Z, 02:25Z, ~02:48Z).
@@ -211,8 +211,15 @@
   - a generation timeout holds NHL to fast sweeps for 1,800 s.
   - 26 tests incl. off != on through the real run loop.
 - **Loaded 2026-11-18 13:47:14Z (7:47 AM CST)** on the user's "Load it now": a fleet ff `09eddabf2` -> `2ae0c646a`, no TERM (deploys.md `2582a45ce`, BC-046). Harm checks MET on the first sweep (13:47:44Z, pregame, 372 s).
-- **Owed:** the pre-registered reading in the first live NHL window with the stats API slow (findings file). The rail monitor reads it from noon CST 11-18.
-- **Pregame half on main `cdab875d5`, NOT LOADED** (user "Yes, build it" 11-18): `SYNDICATE_NHL_PREGAME_GENERATION_SPLIT` (absent = on) splits pregame NHL the same way, as fast odds plus a deferred `nhl_pregame_generation` with a 900 s deadline and the shared cooldown marker; 17 new test cases. Baseline 258 pregame full NHL steps 11-13..11-18, max 807 s, 0 over 900 s. **LOADED 2026-11-18 15:56:43Z** (fleet ff d1e14be46 -> cdab875d5, user "Yes, load it", BC-049): first pregame NHL sweep 162338 402 s ok, NHL fast 78 s + generation 293 s, predictions rewritten; P3 above its bound on n=1 (371 s vs <= 280 s).
+- **First live NHL window, 11-18 6:00-11:00 PM CST (deploys.md 2026-11-19 05:05Z):**
+  - max live run 441 s (bound 1,200 s);
+  - `lane_busy` 27 of 100 attempts (27%; 11-17: 23 of 26);
+  - 64 of 64 NHL odds steps fast; 8 of 8 deferred generations ok, 169-299 s, 0 timeouts;
+  - in-play rows low in 1 of 240 builds;
+  - NHL odds age over 1,200 s in 1 of 63 gaps (1,604 s; not an NHL hold).
+- **Not yet exercised:** a generation at its 900 s deadline, and the cooldown. Tonight had 0 slow-API windows.
+- **Lead:** a `lane_busy`-refused sweep waited 4 min 38 s after the lane freed. Retrying on lane-free is a betting change.
+- **Pregame half on main `cdab875d5`** (user "Yes, build it" 11-18): `SYNDICATE_NHL_PREGAME_GENERATION_SPLIT` (absent = on) splits pregame NHL the same way, as fast odds plus a deferred `nhl_pregame_generation` with a 900 s deadline and the shared cooldown marker; 17 new test cases. Baseline 258 pregame full NHL steps 11-13..11-18, max 807 s, 0 over 900 s. **LOADED 2026-11-18 15:56:43Z** (fleet ff d1e14be46 -> cdab875d5, user "Yes, load it", BC-049): first pregame NHL sweep 162338 402 s ok, NHL fast 78 s + generation 293 s, predictions rewritten; P3 above its bound on n=1 (371 s vs <= 280 s).
 - **Not covered, measured 11-18:** pregame lane holds over 900 s are SOCCER (51 of 54 runs; up to 2,763 s summed over its league steps, no single step over 900 s), which a per-step deadline cannot bound.
   - The ff ships all of main up to that SHA: child scripts at once, in-process code at each role's next restart.
   - Claim + preflight for the exact SHA; `betting change: yes` (live odds freshness across the lane's sports, NHL generation timing).

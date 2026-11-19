@@ -201,3 +201,16 @@ Prediction 4's in-play baseline: NHL in-play overlay rows were 0-16 for 02:06-02
     max 855 s (`soccer_championship_artifacts`). The hold is the SUM over leagues.
   - So a per-step deadline cannot bound it, and this lane's goal ("no single sport ... for 30 min") is not met
     for soccer.
+
+## Live window reading, 11-18 6:00-11:00 PM CST `[2026-11-19 05:05Z]`
+
+Full table and trace: deploys.md `2026-11-19 05:05Z`.
+
+- **MET on the healthy path:**
+  - max live run 441 s against <= 1,200 s;
+  - `lane_busy` 27 of 100 attempts (27%) against <= 50%;
+  - 64 of 64 NHL odds steps fast;
+  - 8 of 8 deferred generations ok, 0 timeouts;
+  - NHL in-play rows low in 1 of 240 builds.
+- **MISSED once:** NHL odds age, 1 of 63 gaps, 1,604 s. NHL was not in the sweep set, then one refusal behind a 337 s soccer + NBA run.
+- **NOT EXERCISED:** the slow-API arm. Generation max was 299 s against the 900 s deadline, so no window qualified; this one is discarded for that arm.

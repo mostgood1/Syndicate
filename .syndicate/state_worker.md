@@ -2920,7 +2920,7 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   - Detail: `findings_2026-11-18_board_split_memory_guard.md`.
 - **The host is a second, separate cost:** Windows read 100% busy at 56-64% of nominal clock (1,920-2,188 of 3,417 MHz, Snapdragon X1E80100, on AC) at 7:36 and 8:05 PM CST 11-17, with vmmemwsl 3.9-6.4 cores and MsMpEng 1.0-2.4. Inside WSL that shows as clock, not runqueue wait. A WSL-side process appending to `/mnt/c` every second raised MsMpEng ~2.4 -> ~1.1 cores when stopped: write samplers to WSL-native paths.
 
-## [odds-lane-sport-deadline] ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE; A PER-SPORT DEADLINE + DEFERRED NHL GENERATION IS ON MAIN `2ae0c646a` AND LOADED (fleet ff 2026-11-18 13:47:14Z); THE SLOW-API READING IS OWED `[verified 2026-11-18 13:56Z, lane odds-lane-sport-deadline, todo #838]`
+## [odds-lane-sport-deadline] ONE SPORT'S HUNG ODDS CHILD TOOK THE WHOLE LIVE ODDS LANE; A PER-SPORT DEADLINE + DEFERRED NHL GENERATION IS ON MAIN `2ae0c646a` AND LOADED (fleet ff 2026-11-18 13:47:14Z); THE FIRST LIVE NHL WINDOW HELD ON THE HEALTHY PATH; THE SLOW-API CASE IS NOT YET EXERCISED `[verified 2026-11-19 05:05Z, lane odds-lane-sport-deadline, todo #838]`
 
 - **The run (verified):**
   - live-odds-worker runs a live sweep's sports SERIALLY (`SYNDICATE_SERIAL_SPORT_REFRESH=true`), with one
@@ -2944,8 +2944,17 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   - a 1,800 s cooldown after a timeout.
 - **Loaded 2026-11-18 13:47:14Z (verified):** a fleet ff `09eddabf2` -> `2ae0c646a`, no restart (both scripts run as
   fresh children per sweep). The first sweep on it launched 13:47:44Z. Entry: deploys.md `2582a45ce`, BC-046.
-- **Owed:** the pre-registered slow-API reading in a live NHL window
-  (`findings_2026-11-17_odds_lane_sport_deadline.md`).
+- **First live NHL window, 11-18 6-11 PM CST (verified 2026-11-19 05:05Z, deploys.md):**
+  - max live run 441 s; 0 of 826 live runs over 1,200 s;
+  - `lane_busy` 27 of 100 attempts (27%; 11-17's slow API: 23 of 26);
+  - 64 of 64 live NHL odds steps fast (p50 47 s); 8 of 8 deferred `nhl_live_generation` ok, 169-299 s,
+    0 timeouts, so the cooldown never ran;
+  - NHL in-play rows <= 5 in 1 of 240 builds;
+  - NHL odds age over 1,200 s in 1 of 63 gaps (1,604 s, 6:22-6:48 PM CST): NHL was not in the loop's sweep set,
+    then one `lane_busy` refusal behind a 337 s soccer + NBA live run.
+- **Not yet exercised:** a generation hitting its 900 s deadline (the 11-17 case). With the stats-REST cache
+  (`59fbefc71`) it may be rare. Read it from a `timed_out` `nhl_*_generation` manifest step or
+  `.nhl_live_generation_timeout_<date>.json` (`findings_2026-11-17_odds_lane_sport_deadline.md`).
 - **Pregame half: on main `cdab875d5`, LOADED 2026-11-18 15:56:43Z (fleet ff, BC-049; first sweep 162338 verified 16:31Z: NHL fast 78 s + deferred `nhl_pregame_generation` 293 s ok):** behind
   `SYNDICATE_NHL_PREGAME_GENERATION_SPLIT` (absent = on; needs the lane switch too) a pregame sweep runs
   NHL odds fast in turn and a deferred `nhl_pregame_generation` (900 s deadline, the shared per-date
