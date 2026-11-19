@@ -1659,6 +1659,14 @@ death, never life — do not invert it.
 - Reproduction (11-18, finished 5:57 PM CST): EXACT. Pooled regular season 5,353 bets / 551 games -1.1% [-5.1, +3.0] (11-02: -1.1% [-5.2, +3.0]); every sport to 0.1 pt (NBA 3,849/91 -2.1, NCAAF 406/153 +8.1, NFL 340/40 -2.7, NHL 405/104 +5.9, soccer 353/163 -7.2, MLB post 24/7 -11.2, WNBA post 128/7 +25.6); graded 5,505 = 5,505; reasons not_yet 24 (23), push 23, DNP 18, NHL name 4. The recorder read 1,389,517 records (11-02: 1,387,319) and 5,599 sg (5,598).
 - Blocked by: none
 
+### product-optimization-program — OPEN — opened 2026-11-18 — session 3bf4646c
+- Goal: One ranked, evidence-backed optimization program from Syndicate's own performance data (scorecard board/shortlist/staked, rail flag grades, cheat-sheet sections, live book, suggested set): every lever with denominators + 95% game-clustered CI + EV + owner + betting-change flag, each lever handed to an owning lane or laned, and an 11-24 window package (default-off, with predictions) put to the user
+- Files: .syndicate/findings_2026-11-18_product_optimization_program.md
+- Hypothesis: Ranked by EV x confidence, the top levers are per-line calibration and selection (long-shot tail I-1, the board-to-staked selection gap) and input defects (#844), not new mechanisms; at most a third of the candidate levers clear the scorecard's FDR + leave-one-date-out bar
+- Falsification test: The long-shot tail gap (0.154 hit vs 0.253 fair) loses significance under a game-clustered CI across the graded rail days, OR more than half of the candidate levers clear FDR + LODO
+- Verification: Findings file with the ranked lever table on main; each lever handed to its owner lane (message or ledger note) or laned; 11-24 window package put to the user; rail monitor told
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
