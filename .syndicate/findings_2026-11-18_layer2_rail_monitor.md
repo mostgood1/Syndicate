@@ -756,3 +756,31 @@ The 2 contradictions are **real**, but my "rows with `live_total_basis: None`" a
   - (a) The card's wrong-row pick. The fix `523357e7f` loads after the 10:31 PM recorder load.
   - (b) The calibrated level pulls the 50/50 total under the sim's final, and late in a game that can cross the score. Rare: 5 of 980 calibrated row reads across 12 readings, all in this one game.
   - A display floor (never below the points scored) has been put to the user by the owner. It is not built.
+
+## Reading 18 — Wed 11-18 8:52 PM CST (02:52Z 11-19): the third memory-guard recycle
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 4.9 (5.9 / 6.0).
+- live-odds-worker: `exited code=0 after 22453s -- restarting in 5s` at ~8:50:44 PM. Its own clean recycle; new pid 561403.
+
+**A-3, the third recycle, and the intervals are shrinking: 8.8 h, then 83 min, then 50 min.**
+- `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint floor_mb=1900` at 8:32:14, 8:37:39 and 8:42:12 PM. Headroom was 1,678 / 1,545 / 1,598 MB; the container was at 5.49-5.62 GB.
+- `RECYCLE_EXIT reason=heavy_build_refused ... uptime_s 2977` at 8:42:57 PM, then `BOARD_PROCESS_EXITED pid=477538 rc=-6 reason=exit uptime_s=3007`.
+- Child 549989 READY at 8:43:33 PM (attempt 4). New child RSS 2.43 GB at 8:52 PM.
+- Board publications: last at **8:30:23 PM** (335 s). The new child's first build reached its shortlist exit at 8:50:33 PM and had not finished by the read.
+- **Today's board was 1,343 s (22.4 min) old at the read.**
+
+**Slate: 42 live.**
+- Flags: 42 shown, 0 false, 0 missed, 0 dark.
+- P1: 16 college totals flags, 2 card contradictions (the card bug; fix `523357e7f` after 10:31 PM).
+- #824: 0. P6: 0.
+- **Live rows: 1,412, only 167 priced <= 120 s** (NBA 846 rows, 43 fresh; NCAAB 536, 119), with the board 22 min old.
+
+**P7:** 7 sweeps launched, 3 refused (30%); live run 51 s; an NHL odds child was 27 s old; 0 `NHL_LIVE_GENERATION` markers.
+
+**P8:** 36 NHL overlay builds, 154 in-play rows.
+
+**Overlay:** 0 gaps over 360 s (max NBA 283 s); 1 `deferred_slow` tick. Web merges 5, 0 stale.
+
+**Load:** query 5.4 s.
+
+**Team cards:** 0 defects.
