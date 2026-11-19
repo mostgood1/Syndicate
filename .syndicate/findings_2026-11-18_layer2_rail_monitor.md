@@ -744,3 +744,15 @@ The 2 contradictions are **real**, but my "rows with `live_total_basis: None`" a
 **Team cards:** 0 defects.
 
 **Monitor slip:** the first dashboard upload this reading went out without rebuilding `readings.json`, so it carried 16 rows. It was rebuilt and re-uploaded, with 17 rows.
+
+### The r16 pair resolved (~8:40 PM CST, the #824 / I-17 owner local_1f10ce63, from the fleet's NCAAB live ledger)
+
+- **Coppin St @ La Salle u149.5 is NOT a #824 miss. It is BOARD STALENESS (A-3's cost).**
+  - #824 refused the 148.5 total at 02:00:29Z with `model_projected_final_below_points_scored` (score 149 vs the sim's final 146.83).
+  - The 149.5 row's last ledger record was 01:52:02Z: score 132, `priceable False`.
+  - So the flag at 02:01:11Z came from a board built before that refusal. The board was 17 min old because of the 7:52 PM memory-guard recycle. The stale board showed a line the gate had already withdrawn.
+  - End-game re-sim lag in that game: the sim's state ran 6-13 points behind the score in the last ~4 minutes. This is #836, already known.
+- **Vermont @ Yale u129.5:**
+  - (a) The card's wrong-row pick. The fix `523357e7f` loads after the 10:31 PM recorder load.
+  - (b) The calibrated level pulls the 50/50 total under the sim's final, and late in a game that can cross the score. Rare: 5 of 980 calibrated row reads across 12 readings, all in this one game.
+  - A display floor (never below the points scored) has been put to the user by the owner. It is not built.
