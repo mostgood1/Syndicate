@@ -261,3 +261,16 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - cap use 20.0% / 9.4%;
   - Polymarket 5 placeable of 319.
 - **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 74 — Thu 11-19 11:34 AM CST (17:34Z), window 57 min
+
+- **Results first.** Unchanged: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **No anomaly.** Taken off the picks minute (:34 instead of :37): `live_today` 0.17 s, page 0.20 s, every endpoint
+  inside budget.
+- **Flow:**
+  - plan 0.6 min old: 74 suggested, 6 positions; 48 `beyond_max_positions`;
+  - 20 live ticks, 3 placed, 0 failed;
+  - orders today 39: 38 filled, 1 maker post resting (670 min);
+  - cap use 20.4% / 11.5%;
+  - Polymarket 13 placeable of 519 (feed healthy).
+- **Gate:** 12 of 800 events on the BC-052 clock.

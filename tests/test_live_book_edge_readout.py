@@ -115,6 +115,17 @@ def test_roi_se_is_clustered_by_event():
     assert together["roi_se_pct"] == pytest.approx(100 * math.sqrt(2 * 2.0 ** 2) / 4.0, abs=0.01)
 
 
+def test_an_exited_position_counts_its_exit_fee_once():
+    """Hand-off L6 (2026-11-18): `fees_dollars` is the entry fee only on a sold position; `exit_applied` has both."""
+    sold = _order(1, stake=10.0, fees=0.2, exit_applied={"entry_fee_dollars": 0.2, "exit_fee_dollars": 0.15})
+    held = _order(2, stake=10.0, fees=0.2)
+    already_total = _order(3, stake=10.0, fees=0.35, exit_applied={"entry_fee_dollars": 0.2, "exit_fee_dollars": 0.15})
+    bets = R.bets_from_orders([sold, held, already_total])
+    assert [b.fees for b in bets] == [pytest.approx(0.35), pytest.approx(0.2), pytest.approx(0.35)]
+    # ROI is P&L-based and unchanged; only the fee fields move.
+    assert R.summarize(bets)["fees"] == pytest.approx(0.9)
+
+
 def test_fees_are_reported_and_backed_out():
     s = R.summarize(R.bets_from_orders([_order(1, stake=10.0, fees=0.2), _order(2, stake=10.0, fees=0.2, outcome="lost")]))
     assert s["fees"] == 0.4

@@ -117,6 +117,16 @@ def bets_from_orders(orders: Iterable[Mapping[str, Any]]) -> list[Bet]:
         if stake <= 0 or p is None or not 0.0 < p < 1.0:
             continue
         fees = _as_float(order.get("fees_dollars")) or 0.0
+        # THE EXIT FEE TOO [2026-11-19, lane portfolio-monitor, hand-off L6 from product-optimization-program].
+        # On a position the exit lane sold, `fees_dollars` holds the ENTRY fee only (558 of 560 exited rows on
+        # 11-18); the exit fee is inside `pnl_dollars` but was missing here, so the fee, fee-% and "ROI before
+        # fees" fields understated fees by 0.83-0.95 pp (ROI itself, from P&L, was right). `exit_applied` carries
+        # both halves, so they are taken from it and nothing is counted twice.
+        exit_applied = order.get("exit_applied") if isinstance(order.get("exit_applied"), Mapping) else None
+        if exit_applied is not None:
+            entry_fee = _as_float(exit_applied.get("entry_fee_dollars"))
+            exit_fee = _as_float(exit_applied.get("exit_fee_dollars")) or 0.0
+            fees = (entry_fee if entry_fee is not None else fees) + exit_fee
         mark = order.get("closing_mark") if isinstance(order.get("closing_mark"), Mapping) else {}
         scope = clv_gross = clv_net = fee_pp = close_implied = None
         if str(mark.get("reason") or "") == "resolved" and mark.get("close_price") is not None:
