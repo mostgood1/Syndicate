@@ -1737,6 +1737,7 @@ death, never life — do not invert it.
 - Verification: pre-registration pushed to main before any outcome number; result section in the same file
 - Blocked by: none
 - Note `[2026-11-19 14:06Z]`: this lane is run by a subagent of the portfolio-monitor session and shares its session id (69d80317). Per the user's instruction no marker was written, so lane-guard read the parent's marker (`portfolio-monitor`) and refused Write on this lane's own files. The two files were written outside the repo and copied in (lane-postwrite-check warned, as expected). No other lane's file was touched.
+- RESULT `[2026-11-19 14:07Z]`: pre-registration `96d2f75a7` (pushed 14:06:48Z). TEST D = +2.01 pp [-0.85, +4.88] (9,445 orders / 802 events): no early kill, so the FORWARD TEST is owed (orders from 11-20, first 150 events, about 11-22/23; GO iff lower bound > 0; a GO needs about +6.6 pp). CV shrank all 8 entry features to about 0, so the frozen filter is in effect "breakeven >= 0.56" (a price floor), not an adverse-selection model; the kept set was still -1.34% on TEST. Lane stays OPEN for the forward reading.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

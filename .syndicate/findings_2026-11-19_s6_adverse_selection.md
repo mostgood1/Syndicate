@@ -172,3 +172,122 @@ on its own, and none is a sport or market switch.
   duplicate 427, unsettled 65; live no event_id 552, in game 422, not filled 118, unsettled 57, no times 30, no
   stake 2.
 - The FIT population matches S1's exactly (8,684 orders), as it should: same population, same window.
+
+## RESULT -- no early kill, so the registered forward test decides; but the fitted filter is a PRICE CUT, not an adverse-selection model (run 2026-11-19 14:07Z = 8:07 AM CST, read-only; pre-registration on main `96d2f75a7`, pushed 14:06:48Z)
+
+**Run.** `s6_adverse_selection.py report` on the pre-registered join (the coverage above; same dump, same rows file),
+exactly as registered. Nothing in the method changed after the push.
+
+**Coverage actually used.** FIT 8,684 orders / 723 events (8,659 won/lost; 10-25 18:36Z..11-07). TEST 9,445 orders /
+802 events (11-08..11-18). The feature coverage is the table above. The ladder is 91-93% of each window.
+
+### FIT
+
+- **All FIT orders: -6.02% [-9.28, -2.75]** (8,684 / 723).
+- **Penalty (5-fold event-grouped, time-ordered CV log loss):** 1: 0.615746; 10: 0.615674; 100: 0.615194;
+  1,000: 0.614053; 10,000: 0.613375; **100,000: 0.613288, chosen**. That is the largest penalty on the grid, which is
+  also what the synthetic null chose in the dry run.
+- **Out-of-fold keep shares** (kept orders / events, kept ROI, D = kept - all [95%]):
+
+| keep | kept | kept ROI | D_FIT [95%] |
+|---|---|---|---|
+| **0.5** | 4,342 / 572 | -4.45% | **+1.57 [-1.40, +4.53]** |
+| 0.6 | 5,211 / 598 | -4.69% | +1.33 [-1.34, +4.00] |
+| 0.7 | 6,079 / 617 | -4.89% | +1.13 [-1.05, +3.31] |
+| 0.8 | 6,948 / 634 | -5.52% | +0.50 [-1.44, +2.43] |
+| 0.9 | 7,816 / 690 | -5.40% | +0.61 [-0.85, +2.08] |
+
+- **Chosen keep share 0.5** (largest D_FIT > 0). Score cut = -0.06534 (predicted flat return).
+
+**The fitted model** (standardised: logit shift per +1 SD, against breakeven):
+
+| term | coef |
+|---|---|
+| intercept | **-0.1475** |
+| pin_age | -0.0010 |
+| cons_age | -0.0013 |
+| n_books | +0.0006 |
+| disp | -0.0000 |
+| t_start | +0.0006 |
+| price | +0.0002 |
+| vmove | +0.0001 |
+| ev | -0.0002 |
+
+- **Every one of the 8 entry features is shrunk to about 0.** Across TEST orders the whole feature term has an SD of
+  0.002 logit (range -0.007..+0.007). The cross-validation found no information in them beyond breakeven.
+- **What is left is the intercept:** our orders win as if the price were 0.15 logit worse than breakeven, uniformly.
+  This is the adverse selection the 11-18 calibration found, now on 8,659 FIT orders. But it is the same at every
+  value of every feature tested.
+
+### TEST: the registered test (11-08..11-18; 9,445 orders / 802 events)
+
+| set | orders / events | flat ROI | 95% |
+|---|---|---|---|
+| all (the champion) | 9,445 / 802 | -3.35% | [-6.31, -0.39] |
+| **kept** | 4,819 / 581 | **-1.34%** | [-4.94, +2.27] |
+| dropped | 4,626 / 724 | -5.45% | [-10.11, -0.79] |
+
+- **D = kept - all = +2.01 pp, 95% [-0.85, +4.88]** (se 1.46). The bootstrap check agrees: [-0.89, +4.89].
+  Kept minus dropped is +4.11 [-1.75, +9.97]. The fixed cut kept 51.0% of TEST.
+- **Verdict as registered: no early KILL** (the upper bound is +4.88 > 0), and the FIT stop did not fire. **So the
+  FORWARD TEST decides.** The historical TEST cannot GO (rule 4).
+
+**Slices (TEST, descriptive, deciding nothing).** No interval excludes 0.
+
+| slice | all: orders / events, ROI | kept: orders / events, ROI | D [95%] |
+|---|---|---|---|
+| live | 629 / 284, -4.29% | 362 / 167, -1.02% | +3.27 [-2.93, +9.47] |
+| paper, twin + ladder | 8,816 / 802, -3.28% | 4,457 / 581, -1.36% | +1.92 [-0.95, +4.79] |
+| paper twin | 214 / 129, +0.16% | 162 / 101, -3.11% | -3.27 [-11.13, +4.59] |
+| ladder | 8,602 / 800, -3.37% | 4,295 / 579, -1.30% | +2.07 [-0.85, +5.00] |
+| Kalshi | 5,563 / 761, -3.99% | 2,736 / 544, -2.68% | +1.31 [-1.56, +4.18] |
+| Polymarket | 3,882 / 677, -2.44% | 2,083 / 443, +0.42% | +2.86 [-0.82, +6.54] |
+
+### What the filter is (POST-HOC, descriptive: `C:\tmp\s6adv\posthoc.py`, reading the frozen model only)
+
+- With the features at about 0, the score is a monotone function of breakeven alone. The predicted flat return is
+  -11.3% at breakeven .20, -8.7% at .40, -6.0% at .60 and -3.1% at .80.
+- **So the cut is, in effect, "keep orders whose breakeven at submit is >= 0.560".** That is 9,374 of 9,445 TEST
+  orders. Kept orders had breakeven .548-.991 (median .743); dropped orders had .138-.577 (median .498).
+- **Why it gains:** a uniform logit shortfall costs more per dollar on a cheap contract than on a dear one. So
+  dropping the cheap half loses less, mechanically. It does not make the book positive: **the kept set was still
+  -1.34% on TEST**, and -4.45% out of fold on FIT.
+
+### What it means
+
+- **The adverse-selection features do not separate losing orders, in a regularised multivariable model, out of
+  sample:** quote age (Pinnacle or consensus), book count, dispersion, time to start, the claimed EV and the venue's own
+  move. The CV preferred dropping all of them.
+  - That includes S1's venue-move lead. Its coefficient is +0.0001 per SD, on 36-42% coverage (the I2 gap).
+  - It is not tested here as a standalone rule. It would need its own registration, ideally after I2 widens the
+    venue quote.
+- **The one thing the model kept is the price.** The trigger's picks under-win breakeven by a roughly constant
+  0.15 logit. Under that shape, a favourites-only cut loses less per dollar but does not reach a positive ROI.
+  - This is consistent with S1 and the 11-18 calibration (the shortfall is real and uniform).
+  - It sits uneasily with S5, where a live-only band rule did not carry over, and with the 11-18 close calibration,
+    where favourite-longshot was falsified on live bets with a two-sided close.
+  - The pooled population here is 91% ladder.
+- **No challenger exists until the forward test reads. If it reads GO, the challenger is a price floor**
+  (breakeven >= 0.56 at submit), a line property under the PRIME DIRECTIVE. A GO would mean "lose less", not "make
+  money". The scale-up gate (800 graded events with ROI lower bound > 0) is a separate and much higher bar.
+
+### Forward test (registered; owed)
+
+- **Set:** population orders submitted from 2026-11-20T00:00Z, settled. The decision set is the first 150 events by
+  first submit.
+- **Rule:** GO iff D's 95% lower bound > 0, else NO-GO.
+- **Timing:** TEST averaged about 73 events a day, so 150 events is about 11-20..11-21 submits. **The reading falls
+  about 11-22/23**, once those games settle.
+- **Command** (fleet join as in the coverage section, then):
+  `py -3 scripts/s6_adverse_selection.py forward --rows <rows.json> --model-from .syndicate/findings_2026-11-19_s6_adverse_selection.md`.
+  It prints NOT YET below 150 events.
+- **Power, stated now, before any forward number:** TEST's se of 1.46 pp at 802 events scales to about 3.4 pp at
+  150 events. So **a GO needs D of about +6.6 pp or more, about 3 times TEST's +2.0.** NO-GO is the likely reading
+  even if the price effect is real. The rule stands as registered; only the user can change it.
+- Nothing changes live from this study, and nothing is queued for a window.
+
+### S6_MODEL_JSON (frozen 2026-11-19 14:07Z; the forward test reads this block)
+
+```json
+{"features":["pin_age","cons_age","n_books","disp","t_start","price","vmove","ev"],"scaler":{"pin_age":{"mean":2.561217723893779,"sd":1.359681652539368,"n":7239},"cons_age":{"mean":2.633276993448257,"sd":1.4601288459565112,"n":8654},"n_books":{"mean":6.924385859796285,"sd":5.6342170408297125,"n":8345},"disp":{"mean":3.153683090157077,"sd":2.1813228418597808,"n":7729},"t_start":{"mean":2.4702895520208057,"sd":1.228416729367897,"n":8684},"price":{"mean":0.4617220247217501,"sd":0.9062753564267492,"n":8684},"vmove":{"mean":0.09877734877734878,"sd":0.5232524838626971,"n":3108},"ev":{"mean":2.7738487333026294,"sd":1.493854338517888,"n":8684}},"theta":[-0.14750479443928025,-0.001010184465993903,-0.0013440732071124584,0.0005845129684608608,-4.498152637874893e-05,0.0005813092178178048,0.000198708098015205,0.00014243945598907244,-0.0001831946390099571],"lambda":100000.0,"keep":0.5,"cut":-0.06533858872957998,"clip_z":4.0,"fit_end":"2026-11-08T00:00:00Z","test_end":"2026-11-19T00:00:00Z","forward_start":"2026-11-20T00:00:00Z","forward_events":150}
+```
