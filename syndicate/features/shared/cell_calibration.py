@@ -142,7 +142,8 @@ def enabled(use: str, env: Mapping[str, str] | None = None) -> bool:
 
 
 _LOCK = threading.Lock()
-_STATE: dict[str, Any] = {"checked_at": None, "table": None, "meta": {"reason": "not_checked"}, "logged": None}
+_STATE: dict[str, Any] = {"checked_at": None, "table": None, "sd": {}, "meta": {"reason": "not_checked"},
+                         "logged": None}
 
 
 def _table_file() -> Path | None:
@@ -203,16 +204,19 @@ def active_table(*, now: datetime | None = None, path: Path | None = None) -> di
             return _STATE["table"]
         _STATE["checked_at"] = clock
         target = path or _table_file()
-        table, meta = None, {"reason": "table_absent"}
+        table, meta, sd = None, {"reason": "table_absent"}, {}
         try:
             if target is not None and target.is_file():
                 payload = json.loads(target.read_text(encoding="utf-8"))
                 table, reason = validate_table(payload, now=now)
                 meta = {"reason": reason, "generated_at": payload.get("generated_at"),
                         "expires_at": payload.get("expires_at"), "cells": len(table or {})}
+                for cell in table or {}:
+                    value = _num((payload["cells"][cell] or {}).get("post_sd"))
+                    sd[cell] = value if value is not None and value >= 0.0 else 0.0
         except Exception as exc:
-            table, meta = None, {"reason": f"error:{type(exc).__name__}"}
-        _STATE["table"], _STATE["meta"] = table, meta
+            table, meta, sd = None, {"reason": f"error:{type(exc).__name__}"}, {}
+        _STATE["table"], _STATE["meta"], _STATE["sd"] = table, meta, sd
         _log(meta)
         return table
 
@@ -223,7 +227,7 @@ def status() -> dict[str, Any]:
 
 def reset_cache() -> None:
     """Tests only."""
-    _STATE.update({"checked_at": None, "table": None, "meta": {"reason": "not_checked"}, "logged": None})
+    _STATE.update({"checked_at": None, "table": None, "sd": {}, "meta": {"reason": "not_checked"}, "logged": None})
 
 
 def cell_of_row(row: Mapping[str, Any], *, now: Any = None) -> str:
@@ -336,16 +340,36 @@ def live_probability(sport: Any, market: Any, segment: Any, model_prob: Any, mar
         if sport_key in _LIVE_PROB_SKIP[0] and market_key.startswith(_LIVE_PROB_SKIP[1]):
             return None
         segment_key = str(segment or "").strip().lower() or "full"
-        cell = f"{sport_key}|{market_key}|{'full' if segment_key == 'game' else segment_key}|live"
+        cell = f"{sport_key}|{market_key}|{'full' if segment_key in ('game', 'full_game') else segment_key}|live"
         k = k_for_cell(cell, table=table)
         if k is None:
             return None
         p = calibrate(model_prob, market_prob, k)
         if p is None:
             return None
-        return p, {"cell": cell, "k": round(k, 4), "p_raw": round(float(model_prob), 6), "version": VERSION}
+        sd = float((_STATE.get("sd") or {}).get(cell, 0.0)) if table is None else 0.0
+        return p, {"cell": cell, "k": round(k, 4), "k_sd": round(sd, 4), "p_raw": round(float(model_prob), 6),
+                   "version": VERSION}
     except Exception:
         return None
+
+
+def live_std_err(p_raw: float, fair: float, p_cal: float, std_err: Any, stamp: Mapping[str, Any]) -> Any:
+    """The precision gate's error for p', carried through the transform the way #816 carries its own.
+
+    The sim's error times the transform's slope at p (`k p'(1-p') / (p(1-p))`), plus the fit's own error on k
+    (`p'(1-p') |logit p - logit fair| sd_k`), added in quadrature. So a k the data barely supports cannot by itself
+    clear the gate, and a shrink does not by itself withhold a line: the edge and the sim error shrink together.
+    """
+    se = _num(std_err)
+    k = _num(stamp.get("k"))
+    if se is None or k is None:
+        return std_err
+    p = min(1.0 - _EPS, max(_EPS, float(p_raw)))
+    q = min(1.0 - _EPS, max(_EPS, float(p_cal)))
+    slope = k * q * (1.0 - q) / (p * (1.0 - p))
+    fit = q * (1.0 - q) * abs(_logit(p) - _logit(fair)) * float(_num(stamp.get("k_sd")) or 0.0)
+    return math.sqrt((slope * se) ** 2 + fit ** 2)
 
 
 def rank_stake_factor(cell: str | None, *, table: Mapping[str, float] | None = None) -> float | None:

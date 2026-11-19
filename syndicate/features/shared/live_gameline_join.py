@@ -1547,6 +1547,7 @@ def price_distribution_market(
     prob_scale: float = 1.0,
     total_calibration: Any = None,
     points_scored: Any = None,
+    live_cell: Any = None,
 ) -> dict[str, Any]:
     """Price a live TOTALS or SPREADS row off the re-sim's own histogram.
 
@@ -1586,6 +1587,9 @@ def price_distribution_market(
         "model_prob_uncalibrated": None,
         "total_calibration": None,
         "calibrated_total": None,
+        # todo #847 (d): set only when the per-cell calibration moved this row's probability.
+        "model_prob_cell_uncalibrated": None,
+        "live_cell_calibration": None,
     }
     if not isinstance(dist, Mapping) or not dist:
         out["withheld_reason"] = REASON_NO_LIVE_DISTRIBUTION
@@ -1679,6 +1683,7 @@ def price_distribution_market(
             out["calibrated_total"] = college_calibrated_total(
                 dist, sims=sims, prob_scale=float(prob_scale), calibration=total_calibration, line=line_value,
                 market_prob_over=market_p, points_scored=points_scored)
+    std_err, model_prob = _cell_calibrate(out, live_cell, float(model_prob), market_p, std_err)
     edge = _edge_pp(float(model_prob), market_p)
     out["edge_pp"] = round(edge, 2)
     # THE SAME BAR AS THE MONEYLINE, deliberately. A histogram answers "what is
@@ -1868,6 +1873,34 @@ def _count_display(coverage: dict[str, Any]) -> None:
     coverage["rows_live_display"] = int(coverage.get("rows_live_display") or 0) + 1
 
 
+def _cell_calibrate(out: dict[str, Any], live_cell: Any, model_prob: float, market_prob: float,
+                    std_err: Any) -> tuple[Any, float]:
+    """todo #847 (d), lane cell-calibration-847: the per-cell calibrated live probability, or the inputs unchanged.
+
+    `SYNDICATE_CELL_CALIBRATION_LIVE_PROB` off (absent), an unserved cell, or a college total (#816 owns those)
+    returns `(std_err, model_prob)` exactly. When it acts it stamps `live_cell_calibration` and keeps the
+    uncalibrated number beside it, and the precision gate's error is carried through the transform
+    (`cell_calibration.live_std_err`), so the edge and its error shrink together. A BETTING change.
+    """
+    if live_cell is None:
+        return std_err, model_prob
+    try:
+        from syndicate.features.shared import cell_calibration as _cc
+
+        found = _cc.live_probability(*live_cell, model_prob, market_prob)
+        if found is None:
+            return std_err, model_prob
+        p_new, stamp = found
+        new_err = _cc.live_std_err(model_prob, market_prob, p_new, std_err, stamp)
+    except Exception:
+        return std_err, model_prob
+    out["model_prob_cell_uncalibrated"] = float(model_prob)
+    out[_cc.LIVE_PROB_MARKER] = stamp
+    out["model_prob"] = p_new
+    out["prob_std_err"] = new_err
+    return new_err, p_new
+
+
 def price_moneyline(
     *,
     model_prob: Any,
@@ -1876,6 +1909,7 @@ def price_moneyline(
     sigma: float = PRICEABLE_SIGMA,
     analytic_std_err: Any = None,
     sport: Any = None,
+    live_cell: Any = None,
 ) -> dict[str, Any]:
     """Price one side, or refuse it by name.
 
@@ -1969,6 +2003,7 @@ def price_moneyline(
         return out
     out["market_prob"] = q
 
+    se, p = _cell_calibrate(out, live_cell, p, q, se)
     edge = _edge_pp(p, q)
     out["edge_pp"] = edge
 
@@ -2873,6 +2908,8 @@ def attach_live_gamelines(
                     total_calibration=college_live_total_calibration(market_key, segment, sport, row.get("commence_time")),
                     # I-17's calibrated total never shows below the points already scored (display only).
                     points_scored=points_scored_from_game(game),
+                    # todo #847 (d): the per-cell calibration's cell; it acts only with its switch on.
+                    live_cell=(sport, market_key, segment),
                 )
             # A DISPLAY-ONLY HISTOGRAM IS NOT A PRICE (`#773`, NHL puck line). The row keeps the pricer's own
             # no-distribution refusal -- no model probability, so `_apply_verdict` publishes no
@@ -2926,6 +2963,8 @@ def attach_live_gamelines(
             # The h2h half of the switch. f5c2468a threaded `sport` everywhere
             # but here, so on this path it was inert even with the env set.
             sport=sport,
+            # todo #847 (d): the per-cell calibration's cell; it acts only with its switch on.
+            live_cell=(sport, market_key, segment),
         )
 
         _apply_verdict(row, projection, verdict, hit, coverage, sport=sport)
@@ -3053,6 +3092,9 @@ def _apply_verdict(
             # reintroduce it.
             updated["live_model_prob_over"] = live_projected
             updated["live_projected"] = live_projected
+        # todo #847 (d): the per-cell calibration's stamp, so the rail's (a) never calibrates this number twice.
+        if verdict.get("live_cell_calibration"):
+            updated["live_cell_calibration"] = verdict.get("live_cell_calibration")
         if verdict.get("priceable"):
             updated["edge_vs_market_pct"] = verdict.get("edge_pp")
             # **WHICH PROBABILITY THIS EDGE IS COMPUTED AGAINST.** On a

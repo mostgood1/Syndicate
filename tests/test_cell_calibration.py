@@ -361,3 +361,78 @@ def test_the_cron_writes_the_table_beside_the_optimizer_and_not_when_it_is_off(c
     (root / cc.TABLE_PATH).unlink()
     assert pms.main(["--weekly", "off", "--sports", "mlb", "--optimizer", "off", "--resamples", "50"]) == 0
     assert not (root / cc.TABLE_PATH).exists()
+
+
+# --------------------------------------------------------------------- (d) wired into the live join
+
+
+DIST = {"220": 40, "226": 60, "234": 60, "240": 40}
+
+
+def _dist_kw(**extra):
+    kw = {"dist": DIST, "line": 229.5, "side": "over", "market": "totals", "market_prob": 0.40, "sims": 2000,
+          "sport": "nhl"}
+    kw.update(extra)
+    return kw
+
+
+def test_d_the_distribution_pricer_off_is_todays_verdict_and_on_calibrates_it(tmp_path, monkeypatch):
+    from syndicate.features.shared.live_gameline_join import price_distribution_market
+
+    _write_table(tmp_path, {"nhl|totals|full|live": 0.3})
+    off = price_distribution_market(**_dist_kw(live_cell=("nhl", "totals", "full")))
+    assert off == price_distribution_market(**_dist_kw())  # off: the cell argument changes nothing
+    assert off["live_cell_calibration"] is None
+
+    monkeypatch.setenv(cc.SWITCHES[cc.USE_LIVE_PROB], "on")
+    cc.reset_cache()
+    on = price_distribution_market(**_dist_kw(live_cell=("nhl", "totals", "full")))
+    raw = off["model_prob"]
+    assert on["model_prob_cell_uncalibrated"] == pytest.approx(raw)
+    assert on["model_prob"] == pytest.approx(cc.calibrate(raw, 0.40, 0.3))
+    assert abs(on["edge_pp"]) < abs(off["edge_pp"])
+    assert on["live_cell_calibration"]["cell"] == "nhl|totals|full|live" and on["live_cell_calibration"]["k"] == 0.3
+    # The gate's error shrinks with the edge (sim error times the slope, plus the fit's own error).
+    assert on["prob_std_err"] < off["prob_std_err"]
+
+
+def test_d_college_totals_stay_with_816(tmp_path, monkeypatch):
+    from syndicate.features.shared.live_gameline_join import price_distribution_market
+
+    _write_table(tmp_path, {"ncaab|totals|full|live": 0.3})
+    monkeypatch.setenv(cc.SWITCHES[cc.USE_LIVE_PROB], "on")
+    v = price_distribution_market(**_dist_kw(sport="ncaab", live_cell=("ncaab", "totals", "full")))
+    assert v["live_cell_calibration"] is None
+
+
+def test_d_the_moneyline_pricer_off_is_todays_verdict_and_on_calibrates_it(tmp_path, monkeypatch):
+    from syndicate.features.shared.live_gameline_join import price_moneyline
+
+    _write_table(tmp_path, {"soccer|h2h|full|live": 0.2})
+    kw = {"model_prob": 0.80, "market_prob": 0.55, "sims": 2000, "sport": "soccer",
+          "live_cell": ("soccer", "h2h", "full_game")}
+    off = price_moneyline(**kw)
+    assert "live_cell_calibration" not in off
+    monkeypatch.setenv(cc.SWITCHES[cc.USE_LIVE_PROB], "on")
+    cc.reset_cache()
+    on = price_moneyline(**kw)
+    assert on["model_prob"] == pytest.approx(cc.calibrate(off["model_prob"], 0.55, 0.2))
+    assert on["edge_pp"] < off["edge_pp"] and on["live_cell_calibration"]["cell"] == "soccer|h2h|full|live"
+
+
+def test_d_apply_verdict_carries_the_stamp_so_a_never_applies_twice(tmp_path, monkeypatch):
+    from syndicate.features.shared.layer2_board import _live_projection_columns
+    from syndicate.features.shared.live_gameline_join import _apply_verdict, new_coverage, price_distribution_market
+
+    _write_table(tmp_path, {"nhl|totals|full|live": 0.3})
+    monkeypatch.setenv(cc.SWITCHES[cc.USE_LIVE_PROB], "on")
+    monkeypatch.setenv(cc.SWITCHES[cc.USE_RAIL], "on")
+    verdict = price_distribution_market(**_dist_kw(live_cell=("nhl", "totals", "full")))
+    row = {"kind": "game", "sport": "nhl", "market": "totals", "segment": "full", "side": "over",
+           "game_state": "live", "quote": {"fair_probability": 0.40}}
+    hit = {"sport": "nhl", "sims_run": 2000}
+    _apply_verdict(row, {}, verdict, hit, new_coverage(), live_projected=verdict.get("model_prob"), sport="nhl")
+    assert row["projection"][cc.LIVE_PROB_MARKER]["k"] == 0.3
+    cols = _live_projection_columns(row)
+    assert cols["live_model_probability"] == pytest.approx(verdict["model_prob"])
+    assert "live_model_probability_cal" not in cols
