@@ -298,3 +298,53 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - Orders today: 39, of which 38 filled and 1 maker post still resting (734 min).
   - Cap use: 20.4% Kalshi, 11.5% Polymarket.
   - Polymarket: 14 placeable of 560 rows, so its feed is healthy.
+
+## Reading 76 — Thu 11-19 1:31 PM CST (19:31Z), window 54 min
+
+- **Results first.**
+  - Unchanged, because nothing has settled since Reading 75.
+  - 30 d: -7.15% [-12.6, -1.7] on 705 events.
+  - 7 d: -3.96% [-15.0, +7.1] on 177 events.
+  - Gate: 0 of 800 on the BC-053 clock.
+- **No new anomaly.** All endpoints are fast (`live_all` 0.25 s against 3.72 s at the :37 read). The GATE line is the
+  same 2 unclassified loads.
+- **Flow:**
+  - Plan 0.7 min old: 56 suggested, 10 positions. 58 plan writes in 6 h, max gap 15.4 min.
+  - Live ticks: 8 Kalshi and 8 Polymarket; 1 placed on Kalshi. The 31 refusals are all `outside_price_band`.
+  - Orders today 40: 39 filled, 1 maker post resting (787 min).
+  - Cap use: 20.8% Kalshi, 11.5% Polymarket.
+  - Polymarket placeable: 3 of 384 rows (162 `aggregator_priced`, not all).
+
+## Reading 77 — Thu 11-19 2:31 PM CST (20:31Z), window 60 min
+
+- **Results first.**
+  - Unchanged, because nothing has settled.
+  - 30 d: -7.15% [-12.6, -1.7] on 705 events.
+  - 7 d: -3.96% [-15.0, +7.1] on 177 events.
+  - Gate: 0 of 800 (BC-053 clock).
+- **No new anomaly.**
+  - Every endpoint returned in 0.3 s or less.
+  - The GATE line is the same 2 unclassified loads.
+  - One `in_play_market_fair` refusal appeared (a game is in play), which is expected.
+- **Flow:**
+  - Plan 0.4 min old: 55 suggested, 14 positions. 59 writes in 6 h, max gap 15.4 min.
+  - Live ticks: 10 Kalshi and 10 Polymarket; 1 placed on Kalshi. The 30 refusals are all `outside_price_band`.
+  - Orders today 41: 40 filled, 1 maker post resting (847 min).
+  - Cap use: 21.2% Kalshi, 11.5% Polymarket.
+  - Polymarket placeable: 6 of 367 rows.
+
+## Reading 78 — Thu 11-19 3:31 PM CST (21:31Z), window 60 min
+
+- **Results first.**
+  - Unchanged, because nothing has settled.
+  - 30 d: -7.15% [-12.6, -1.7] on 705 events.
+  - 7 d: -3.96% [-15.0, +7.1] on 177 events.
+  - Gate: 0 of 800 (BC-053 clock).
+- **No new anomaly.** Every endpoint returned in 0.3 s or less. The GATE line is the same 2 unclassified loads.
+- **Flow:** tonight's slate is filling.
+  - Plan: 90 suggested, 14 positions. 63 refused as `beyond_max_positions`.
+  - Live ticks: 6 placed (3 Kalshi, 3 Polymarket) in 20.
+  - Orders today: 47 (41 at Reading 77). 46 filled, 1 maker post resting (907 min).
+  - Cap use: 22.7% Kalshi, 12.7% Polymarket.
+  - Polymarket placeable: 14 of 519 rows.
+  - 61 plan writes in 6 h, max gap 15.4 min.
