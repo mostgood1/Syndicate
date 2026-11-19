@@ -212,3 +212,52 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - orders today 28: 27 filled, 1 maker post resting (493 min);
   - cap use 17.2% / 8.1%.
 - **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 72 — Thu 11-19 9:37 AM CST (15:37Z), window 75 min
+
+- **Results first.** Unchanged: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **Built since reading 71: fill-quote logging (lane `fill-quote-logging`, user-approved loan), on main `3d636d88e`.**
+  - Live rows will carry `venue_quote_at_submit` (Kalshi two-sided plus size at the touch; Polymarket's slate quote)
+    and `venue_filled_at`.
+  - Not a betting change. It loads at the next role restart (the 11-24 window at the latest) and is verified on the
+    first live fills.
+- **No anomaly.** Every endpoint was inside budget: page 0.61 s, `live_today` 0.39 s.
+- **Checked, not an anomaly:** Polymarket's live plan is 309 rows / 4 placeable (551 / 18 an hour ago), and Kalshi
+  has 37 `aggregator_priced` (2-6 usual).
+  - The F21 shape was checked first. Polymarket's feed is healthy: 164 unpriced of 16,896 at 15:36:47Z, the
+    post-outage residue of 680 now near the ~90 baseline.
+  - The board join matched 454-480 markets.
+  - The row counts follow the board (4,858 rows now against 5,192 an hour ago).
+- **Flow:**
+  - plan 3.1 min old: 48 suggested, 18 positions;
+  - 26 live ticks, 7 placed, 0 failed;
+  - orders today 33: 32 filled, 1 maker post resting (553 min);
+  - cap use 19.1% / 8.3%.
+- **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 73 — Thu 11-19 10:37 AM CST (16:37Z), window 60 min
+
+- **Results first.** Unchanged: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **Anomaly: `live_today` 6.73 s (budget 3.0)**, server-side 6,649 ms. It is the second slow read of this endpoint
+  today (7:04 AM: 2,996 ms, cause not found), so it was investigated.
+  - *Hypotheses, written first:* (1) an F14 web recycle; (2) else the request itself stalls on what it reads.
+  - **Found: a collision with the cheat-sheet picks client.**
+    - `POST /api/intelligence/query` (script client, **4.2 MB response, 6,813 ms**) finished at 16:37:08.7Z.
+    - The probe's `/api/portfolio/live` started then and finished at 16:37:14.8Z (6,649 ms).
+    - Then pid 978464 soft-recycled (736 MB, 15 requests), and pid 983801 hit its HARD limit at **1,056 MB after 1
+      request** (limit 648) and was deferred by the hold.
+  - The picks client is the Windows task `SyndicateCheatSheetPicks`, every 15 min at :07 / :22 / :37 / :52 CST
+    (`web-silent-worker-kills` identified it as the 4,906-row client).
+  - **My readings had drifted onto :37**, so the probe itself was colliding. The 7:04 AM read does not fit this (no
+    picks run, no overlap) and stays unexplained.
+  - **Fixes:**
+    - The probe moves off the picks minutes (next reading about :45). Nothing to change on the fleet from here.
+    - F14 updated: a single picks query takes a worker past 1 GB, and any portfolio read in that minute pays for
+      it.
+- **Flow:**
+  - plan 0.8 min old: 47 suggested, 15 positions;
+  - 19 live ticks, 3 placed, 0 failed;
+  - orders today 36: 35 filled, 1 maker post resting (613 min);
+  - cap use 20.0% / 9.4%;
+  - Polymarket 5 placeable of 319.
+- **Gate:** 12 of 800 events on the BC-052 clock.
