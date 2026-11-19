@@ -2950,8 +2950,10 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   - 64 of 64 live NHL odds steps fast (p50 47 s); 8 of 8 deferred `nhl_live_generation` ok, 169-299 s,
     0 timeouts, so the cooldown never ran;
   - NHL in-play rows <= 5 in 1 of 240 builds;
-  - NHL odds age over 1,200 s in 1 of 63 gaps (1,604 s, 6:22-6:48 PM CST): NHL was not in the loop's sweep set,
-    then one `lane_busy` refusal behind a 337 s soccer + NBA live run.
+  - NHL odds age from the actual first puck drop (6:38:54 PM CST, not the 6:30 scheduled start): 0 gaps over
+    1,200 s (CORRECTED 11-19 14:15Z: the 1,604 s gap was 999 s pre-game; in-game 605 s, one refusal + 279 s idle).
+  - Puck-drop freshness, 43 games 11-10..11-18 (lane `nhl-puckdrop-odds-freshness`): drop -> first in-game NHL
+    odds refresh median 194 s, max 851 s; mostly the loop's launch-attempt cadence (p50 93 s, p90 299 s).
 - **Not yet exercised:** a generation hitting its 900 s deadline (the 11-17 case). With the stats-REST cache
   (`59fbefc71`) it may be rare. Read it from a `timed_out` `nhl_*_generation` manifest step or
   `.nhl_live_generation_timeout_<date>.json` (`findings_2026-11-17_odds_lane_sport_deadline.md`).

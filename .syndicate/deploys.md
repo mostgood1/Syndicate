@@ -62298,3 +62298,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
     - The walk hit its 600 s deadline and left 23 of 56 games for the next fetch, by design.
     - P5 (the Elo shift) and P6 (0 added OddsAPI calls) were not read.
 - claims: none taken (read-only). Lane `nba-midnight-bootstrap-hold` CLOSED. The off switch is unchanged: `SYNDICATE_NBA_HISTORY_FETCH_BOUNDED=0` in `local_production.env` plus a drained `down`/`up`.
+
+## 2026-11-19 14:15Z (8:15 AM CST) -- CORRECTION to the 2026-11-19 05:05Z READING (lane `odds-lane-sport-deadline`): the one NHL odds-age miss was mostly PRE-GAME time; measured from the actual first puck drop the check is MET
+- betting change: no (a correction; nothing loaded)
+- **What was wrong.** The 05:05Z entry measured NHL odds age from the first live-phase NHL run (00:20:55Z, the T-10 sweep). It took the 6:30 PM scheduled start as the puck drop, and called the 1,604 s gap (00:22:15Z -> 00:48:59Z) a miss. Its cause was given as "NHL not in the sweep set".
+- **Measured** (lane `nhl-puckdrop-odds-freshness`, findings `.syndicate/findings_2026-11-19_nhl_puckdrop_odds_freshness.md`): the first NHL drop was **00:38:54Z (6:38:54 PM CST)**, from the ESPN state flip in the in-play recorder (polls ~61 s apart).
+  - NHL was correctly on its pregame cadence until then.
+  - The loop's `SLATE_PHASE sport=nhl ... to=live` line is at 00:38:59Z.
+  - 999 s of the 1,604 s gap was before any NHL game started.
+  - The in-game part was **605 s**: 14 s to the first NHL attempt, 250 s refused behind the 337 s soccer + NBA live run, 279 s idle until the next attempt, then a 61 s run.
+- **Corrected grade:** NHL odds age from the actual first drop: **0 gaps over 1,200 s -> MET** (was "MISSED once"). Every other row of the 05:05Z table stands.

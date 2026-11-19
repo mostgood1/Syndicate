@@ -226,9 +226,9 @@
   - `lane_busy` 27 of 100 attempts (27%; 11-17: 23 of 26);
   - 64 of 64 NHL odds steps fast; 8 of 8 deferred generations ok, 169-299 s, 0 timeouts;
   - in-play rows low in 1 of 240 builds;
-  - NHL odds age over 1,200 s in 1 of 63 gaps (1,604 s; not an NHL hold).
+  - NHL odds age from the actual first drop (6:38:54 PM): 0 gaps over 1,200 s (CORRECTED 11-19; the 1,604 s gap was 999 s pre-game).
 - **Not yet exercised:** a generation at its 900 s deadline, and the cooldown. Tonight had 0 slow-API windows.
-- **Lead:** a `lane_busy`-refused sweep waited 4 min 38 s after the lane freed. Retrying on lane-free is a betting change.
+- **Lead, measured 11-19 (lane `nhl-puckdrop-odds-freshness`):** puck drop -> first in-game NHL odds refresh, median 194 s over 43 games, 0 over 900 s. The tail is the 3 refusal games: idle 391, 279 and 111 s after the lane freed. Faster launch attempts while live, or a retry on lane-free, would be betting changes.
 - **Pregame half on main `cdab875d5`** (user "Yes, build it" 11-18): `SYNDICATE_NHL_PREGAME_GENERATION_SPLIT` (absent = on) splits pregame NHL the same way, as fast odds plus a deferred `nhl_pregame_generation` with a 900 s deadline and the shared cooldown marker; 17 new test cases. Baseline 258 pregame full NHL steps 11-13..11-18, max 807 s, 0 over 900 s. **LOADED 2026-11-18 15:56:43Z** (fleet ff d1e14be46 -> cdab875d5, user "Yes, load it", BC-049): first pregame NHL sweep 162338 402 s ok, NHL fast 78 s + generation 293 s, predictions rewritten; P3 above its bound on n=1 (371 s vs <= 280 s).
 - **Not covered, measured 11-18:** pregame lane holds over 900 s are SOCCER (51 of 54 runs; up to 2,763 s summed over its league steps, no single step over 900 s), which a per-step deadline cannot bound.
   - The ff ships all of main up to that SHA: child scripts at once, in-process code at each role's next restart.
