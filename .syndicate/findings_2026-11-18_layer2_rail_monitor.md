@@ -594,3 +594,41 @@ The 2 contradictions are **real**, but my "rows with `live_total_basis: None`" a
 - The owner's row-level watcher saw 0 because it checks each row against its own line. Its deploys.md 00:50Z "MET" is being corrected to "measured rows, not cards".
 - **WNCAAB live: 0 of 111 calibrated is by design.** It has no fitted calibration (thin sample) and serves the sim total. BC-048 is the PREGAME market fallback.
 - Lesson: the monitor's P1 counter (card edge vs card "ours") and the owner's watcher (row vs own line) measure different things. The card one is what the user sees.
+
+## Reading 14 — Wed 11-18 7:06 PM CST (01:06Z 11-19)
+
+**Fleet:** `a3104a5b6`, no new ff. **Host load 7.9** (7.9 / 7.2). Board child 363665, up since 6:30 PM; no new `[board_process]` events.
+
+**Slate: 80 live.**
+- Flags: 27 shown, 0 false, 0 missed, **7 dark**.
+- **P1: 2 card contradictions again** (the I-17 owner's card bug: the card shows the first calibrated row's total, not the flagged row's; fix in progress). `i17check.py` 7:11 PM: NCAAB 274 of 290 rows calibrated, 16 flags; WNCAAB 0 of 84 (by design).
+- P6: 0. #824: 0.
+- Live rows: 1,530, 122 priced <= 120 s.
+  - **NBA: 1,032 rows, 13 priced <= 120 s** (I-3 / I-4).
+  - NCAAB 388 (77). WNCAAB 87 (23). NCAAF 18 (5). NHL 5 (4).
+
+**Board (P2): 3 builds since 6:40 PM.**
+- 526 s (6:42 PM: the respawned child's first build), then 343 s (6:53 PM), then 284 s (7:02 PM).
+- Median 343 s; 2 of 3 over 300 s.
+- Host load ~8. The top processes were the board child (85%), the live-odds worker (56%) and short-lived children.
+- **The evening median now exceeds P2's 253 s target.**
+
+**P7 (NHL window, 6:40-7:06 PM):**
+- longest live run 162 s;
+- 2 of 7 sweeps refused (28.6%);
+- no NHL odds child running at the read;
+- 0 `NHL_LIVE_GENERATION` markers.
+
+**P8 (NHL props, I-21):** 19 NHL overlay builds, **176 in-play rows**, 0 gaps over 360 s. Not stuck at 0-5.
+
+**Overlay:** 0 gaps over 360 s (max NBA 330 s); 1 `deferred_slow` tick; tick gap max 125 s. Web merges 51, 0 stale.
+
+**Load:** **query 31.6 s** (the evening payload). Today's board was 473 s old.
+
+**Team cards:** 0 defects.
+
+**Sessions:**
+- The user said "start 847, 848, and 849". The optimization session started its own three at the same time (local_7746cb20, local_4010ce82, local_2e89ebdd). Mine are duplicates and are being stood down:
+  - local_3ab5373b was stopped mid-turn and told to stand down;
+  - local_e0b3696b and local_63ca956d were still starting, so the stop is retried at each reading.
+- The user said "add 844 to the 11-24 window" (relayed to the optimization session).
