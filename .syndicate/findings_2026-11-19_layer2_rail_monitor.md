@@ -372,3 +372,22 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **Load: query 24.55 s, chips 9.19 s** (usually 0.2-0.4 s), shortlist 1.16 s.
   - Host load 3.5, with two soccer artifact builds at nice 0 (132% and 102% CPU) at the read.
   - **I-28:** 3 queries since 3:31 PM, all cold, cold total p50 9.0 s.
+
+## Reading 10 — 4:50 PM CST (22:50Z)
+
+- **Live:** 2 games.
+  - NCAAB Auburn / Notre Dame, H1 3:31: 16 rail rows.
+  - WNCAAB High Point @ Vermont, Q4 0:32: no live market.
+- 0 flags; P1 0; P6 0; P8 0 of 0; team cards 94 chips, 0 defects.
+- **I-29:**
+  - New instrument `C:\tmp\railmon\p29_orient.py` compares each live game's rail rows with the re-sim snapshot's away/home.
+  - **Auburn @ Notre Dame: 18 rows, 0 with a model, re-sim `REVERSED`** (event 401920519; snapshot generated 4:49:20 PM).
+  - `lgb.py ncaab` shows projected 0 on every build from 4:09 to 4:49 PM.
+  - Next exposed tip: NC State @ Murray State at 5:00 PM.
+- **P7 (#850), 4:09-4:50 PM:** 0 refusals, 0 exits. Child 4.00 GB after 5.8 h; parent 870 MB.
+  - Board: 10 builds, wall median 172 s, max 229 s; publication gap median 248 s, max 355 s.
+- **R-B (#844 sample 6):** NCAAB 13 rows (5 venue), h2h 1, **row-fresh 0 vs cell-fresh 1**, mismatch reported. NBA 0.
+- **R-E:** 1 NHL step, 0 timed out.
+- **Live odds:** overlay gap max 68 s; priced age p50 207 s, p90 293 s (4 of 16 rows over 300 s).
+- **Load:** query 5.52 s, chips 0.38 s, shortlist 0.77 s.
+  - **I-28:** 38 queries since 4:09 PM (the page is open), 22 cold (58%); cold total p50 5.08 s, warm 2.66 s; all p50 4.84 s.
