@@ -23,7 +23,13 @@
 - **Done:** each cause named with evidence; the grading fixed or the rows voided per line (never a market switch), and the scorecard re-run to show the cell move. Scripts from pass A: `C:/tmp/optprog/A_*`.
 - **Betting change: no** (grading only), unless the fix touches what the board offers live.
 
-### `#847` — **THE MODEL'S PROBABILITY IS OVER-CONFIDENT EVERYWHERE IT IS MEASURED, SO CALIBRATE IT ONCE, PER CELL, AND USE THE CALIBRATED NUMBER EVERYWHERE: the rail flag test, the board's shown EV, rank and stake (below the 0.5 floor where the evidence says so), and the shared live probability. This replaces backlog I-1 (the long-shot tail was not a separate effect)** `[2026-11-18, lane product-optimization-program (P1, theme T2)]` — UNOWNED; proposed as its own session
+### `#847` — **THE MODEL'S PROBABILITY IS OVER-CONFIDENT EVERYWHERE IT IS MEASURED, SO CALIBRATE IT ONCE, PER CELL, AND USE THE CALIBRATED NUMBER EVERYWHERE: the rail flag test, the board's shown EV, rank and stake (below the 0.5 floor where the evidence says so), and the shared live probability. This replaces backlog I-1 (the long-shot tail was not a separate effect)** `[2026-11-18, lane product-optimization-program (P1, theme T2)]` — OWNED by lane `cell-calibration-847` (session c124edc4, opened 11-18 7:13 PM CST)
+- **STATUS `[2026-11-18 ~7:40 PM CST, lane cell-calibration-847]`** (`.syndicate/findings_2026-11-18_cell_calibration.md`):
+  - Pre-registered on main before any fit (`941874243`, amended `f33c606c7` / `2743c3b99` before any fit).
+  - **H-S PASSES:** a table fitted before 11-11 lowers held-out Brier on 11-11..11-17 by −0.0062/row [−0.0102, −0.0021] (23,564 rows / 367 games / 7 dates; 22 of 29 cells better).
+  - **H-R FAILS:** on the rail's 1,120 flags (11-15..11-17) the log-likelihood gain is +0.0010 [−0.0030, +0.0051]. Only 182 flags sit in a served cell: NBA (I-25) and college totals (#816) are floored by design, and interval cells have no live optimizer cell. No cell is gated.
+  - **Built, all default-off:** the daily table (cron), (a) rail flag test, (b) board Sim / model EV display, (c) rank + stake below the 0.5 floor (BETTING; 12-08 window; predictions in findings §4.1). (d) is a tested function, NOT WIRED: its call site in `live_gameline_join.py` needs a loan from `live-player-exit-gate` (user decision).
+  - **Owed:** H-F forward grade of the frozen 11-18 table on games 11-19..11-25 (Thu 11-26 after 5:30 AM CST); re-run H-R once NBA (games >= 11-19) and post-#816 college-totals cells reach 60 games / 5 dates; the user's calls on loading (b) and on (d)'s loan.
 - **Measured, game-clustered 95% CIs:**
   - Rail flags hit 9.1 pp below the model's own probability [-12.7, -5.3] (1,120 flags / 177 games / 3 dates, 11-15..11-17). 27 of 41 slices clear BH at q 0.10 and LODO holds.
   - The shortfall grows with the claimed gap: 3-5 pp -0.3, 15+ pp -19.2.
