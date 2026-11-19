@@ -70,6 +70,7 @@ Then:
 - Check:
   - flags: false, missed, dark;
   - P1 (`ours_contradictions`) and #824 (`ours_below_points`);
+  - the score floor (`floor_violations`, owned reading R-A) and, while NCAAB is live, the #844 sampler (R-B);
   - P6;
   - overlay gaps over 360 s and stale web merges;
   - board publication gaps and the memory guard;
@@ -85,6 +86,28 @@ Then:
   ```
 
 - Then `ScheduleWakeup` for the next reading.
+
+## OWNED READINGS (handed over 11-19 by lane ncaab-total-overprojection; the user said "Yes, consolidate")
+
+These two readings now belong to this monitor. The lane's findings: `.syndicate/findings_2026-11-16_ncaab_total_overprojection.md` and `.syndicate/findings_2026-11-18_college_quote_age_text_max.md`.
+
+**R-A. I-17 score floor (`d78a448c4`).**
+- What it measures: college (NCAAB / WNCAAB) full-game totals rows on the live rail with `live_total_basis: calibrated` whose `live_total` is below the points already scored (chip home + away).
+- Built into every reading: `dash_update.py row` writes `floor_calibrated_rows`, `floor_violations` and up to 3 `floor_examples`.
+- Prediction: **0 violations** once the refresh-worker PARENT has `d78a448c4`, i.e. after the memory-guard session's full down/up (planned 11-19 11:15 AM to noon; confirm it in deploys.md and add it to `loads.json`). Before that restart, violations are expected (11-18 r16: 11 of 262).
+- If any appear after the restart: send the game, the row's line, side and quote age, and the score to lane `ncaab-total-overprojection` (append to its findings file; message its session only if it is still open).
+
+**R-B. #844 newest-stamp-by-time (`25a5e480d`, default off; CHANGE D in the 11-24 2:15 AM betting-change batch).**
+- Instrument: `C:\tmp\railmon\p844_grid_sample.py` (a copy of `C:\tmp\ncal816\p844_grid_sample.py`). Wrapper, NCAAB then NBA, appending to `C:\tmp\railmon\p844_<D>.jsonl`:
+  `wsl -- nice -n 19 bash /mnt/c/tmp/railmon/p844.sh <D>`
+  It prints `rows`, `venue_rows`, `p1_sportsbook_newest`, `h2h`, `h2h_row_fresh`, `h2h_cell_fresh`, `mismatch`.
+- **11-19 evening (baseline):** run at every reading while NCAAB is live. Expected: `mismatch` > 0, and `h2h_row_fresh` well below `h2h_cell_fresh`.
+- **11-24 evening (only if CHANGE D loaded in the window; check deploys.md):** grade
+  - P1: `p1_sportsbook_newest` > 0;
+  - P2: `h2h_row_fresh / h2h` >= 70% across the evening's samples, close to `h2h_cell_fresh`;
+  - P3: NBA / NHL grids unchanged (`nba` mismatch 0 on both nights);
+  - P4: NCAAB `stale_quote` refusals per build fall versus 11-19.
+- Write the verdict to `findings_2026-11-18_college_quote_age_text_max.md`, a deploys.md READING entry, and todo #844.
 
 ## NIGHTLY CLOSE
 
@@ -109,6 +132,7 @@ Then:
 
 ## Where things are
 
+- **Repo backup of this runbook and scripts:** `scripts/rail_monitor/` on main.
 - **Live dashboard:** https://claude.ai/artifact/HoJ2n52ewHZnVDbN2LpxaJ. It is a Dashboard type; the datasets are uploaded JSON files.
   - Datasets: `readings`, `findings`, `loads`, `rail_results`, `board_results`, `cheat_sections`, `cheat_history`, `levers`.
   - Page code is in `files/index.html` (source `C:\tmp\railmon\dash\index.html`). Re-read the stored copy before changing it.

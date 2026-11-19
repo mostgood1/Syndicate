@@ -76,6 +76,33 @@ def row(args):
             if ours is not None and gk in pts and ours < pts[gk]:
                 below += 1
 
+    # I-17 score floor (d78a448c4, handed over 11-19): calibrated college full-game total rows on the live rail
+    # whose live_total is below the points already scored on the chip. Expected 0 once the parent has it.
+    card_chip = {}
+    for card in rail.get("cards") or []:
+        k = str(card.get("key") or "")
+        if "|" in k:
+            card_chip[k.split("|", 1)[1]] = str((card.get("chip") or {}).get("game_key"))
+    floor_rows = floor_viol = 0
+    floor_examples = []
+    lr_path = os.path.join(rdir, "liverail_0.json")
+    if os.path.exists(lr_path):
+        for r in (json.load(open(lr_path, encoding="utf-8")).get("rows") or []):
+            if r.get("sport") not in COLLEGE or r.get("player_name") or str(r.get("segment") or "full") != "full":
+                continue
+            if not str(r.get("market") or "").startswith("totals") or r.get("live_total_basis") != "calibrated":
+                continue
+            gk = card_chip.get(str(r.get("event_id")))
+            try:
+                lt = float(r.get("live_total"))
+            except (TypeError, ValueError):
+                continue
+            floor_rows += 1
+            if gk in pts and lt < pts[gk]:
+                floor_viol += 1
+                if len(floor_examples) < 3:
+                    floor_examples.append(f"{r.get('matchup')} {r.get('side')} {r.get('line')}: total {lt} < {pts[gk]:.0f} scored, age {r.get('book_age_seconds')}")
+
     # BC-048: pregame college totals flags on the shortlist (model edge > 0 on a non-live row)
     sl = json.load(open(os.path.join(rdir, "shortlist.json"), encoding="utf-8"))
     p6 = 0
@@ -98,6 +125,9 @@ def row(args):
         "college_total_flags": college_flags,
         "ours_contradictions": i17,
         "ours_below_points": below,
+        "floor_calibrated_rows": floor_rows,
+        "floor_violations": floor_viol,
+        "floor_examples": floor_examples,
         "pregame_college_total_flags": p6,
         "live_rows": lr.get("n"),
         "priced_le_120": lr.get("priced_le_120"),
