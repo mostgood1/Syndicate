@@ -928,3 +928,33 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
 - **F14:** the web-kills session re-checked reading 51's figures against the log and they hold: since the fix, 41
   restarts, 0 back-to-back, 9 holds, 0 kills. Its 9-hour heartbeat run found no worker near the stall lines.
 - **Unchanged:** gate clock BC-052, 0 of 800; 1 unclassified load (soccer ff 17:58:30Z).
+
+## Reading 53 — Wed 11-18 8:08 PM CST (02:08Z), window 33 min
+
+- **Results first.** 3 more grades: all-time 2,030 bets / 1,098 events, -11.04% [-18.3, -3.8]. 30 d is unchanged
+  until tonight's date settles. 44 games started and unsettled, none late.
+- **Watch item from reading 52: resolved.** The in-play Kalshi NBA order submitted at 01:31:05Z is now `filled`.
+  Orders today: 68 = 67 filled + 1 rejected (the unfilled in-play IOC); resting 0; unreconciled 0.
+- **No anomalies.** Every endpoint was inside budget: `live_today` 0.30 s, page 0.39 s.
+- **Flow:**
+  - plan 7.0 min old: 306 suggested, 25 sized, 12 positions; 122 `in_play_market_fair`;
+  - 10 live ticks, 0 placed (5 `game_started`, 13 `outside_price_band`);
+  - cap use 26.6% / 22.5%;
+  - paper book 14,881 settled, -1.27%.
+- **Unchanged:** gate clock BC-052, 0 of 800; 1 unclassified load (soccer ff 17:58:30Z).
+
+## Reading 54 — Wed 11-18 8:39 PM CST (02:39Z), window 32 min
+
+- **Results first.** Tonight's grades are landing: all-time 2,042 bets / 1,105 events (+12 bets / +7 events since
+  reading 53), -10.99% [-18.3, -3.7]. The 30-day and 7-day windows move once 11-18 is a full graded date. 33 games
+  started and unsettled (44 last reading), none late.
+- **Gate:** 2 of 800 events (4 bets) since the BC-052 clock (21:02:51Z). These are the first graded games on the
+  current clock.
+- **No anomalies.** Every endpoint was inside budget: `live_today` 0.47 s, page 0.41 s.
+- **Flow:**
+  - plan 10.7 min old (newest write 02:29:16Z): 226 suggested, 25 sized, 11 positions; 84 `in_play_market_fair`;
+  - 9 live ticks, 0 placed (4 `game_started`, 14 `outside_price_band`);
+  - orders today 68 (67 filled, 1 unfilled in-play IOC); unreconciled 0;
+  - cap use 26.5% / 22.4%;
+  - paper book 14,893 settled, -1.25%.
+- **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it).
