@@ -1713,15 +1713,7 @@ def _polymarket_us_slate_refresh_tick() -> None:
     # The floor drops to 60s so the override can go further when a slate is
     # worth watching closely; it stays a floor because the write is ~2.1MB and
     # an unbounded value here would put that on the keyvalue store in a loop.
-    from syndicate.features.shared.polymarket_us_markets import SLATE_INTERVAL_SECONDS
-
-    interval = SLATE_INTERVAL_SECONDS
-    raw = str(os.environ.get("SYNDICATE_POLYMARKET_US_SLATE_INTERVAL_SECONDS") or "").strip()
-    if raw:
-        try:
-            interval = max(60, int(raw))
-        except ValueError:
-            pass
+    interval = _polymarket_us_slate_interval_seconds()
 
     # SINGLE-FLIGHT (lane `layer2-freshness-1h`, 2026-10-03). Two threads call
     # this -- the venue poll and the main loop -- and the gate below was a
@@ -1737,6 +1729,25 @@ def _polymarket_us_slate_refresh_tick() -> None:
         _polymarket_us_slate_refresh_locked(interval)
     finally:
         _POLYMARKET_SLATE_LOCK.release()
+
+
+def _polymarket_us_slate_interval_seconds() -> int:
+    """The slate writer's cadence: `SLATE_INTERVAL_SECONDS`, or the env override floored at 60 s.
+
+    One resolver for the writer's own gate and for the main loop's due check
+    (`_main_loop_polymarket_slate_step`), so the two can never disagree about
+    when a sweep is due.
+    """
+    from syndicate.features.shared.polymarket_us_markets import SLATE_INTERVAL_SECONDS
+
+    interval = SLATE_INTERVAL_SECONDS
+    raw = str(os.environ.get("SYNDICATE_POLYMARKET_US_SLATE_INTERVAL_SECONDS") or "").strip()
+    if raw:
+        try:
+            interval = max(60, int(raw))
+        except ValueError:
+            pass
+    return interval
 
 
 def _polymarket_us_slate_refresh_locked(interval: int) -> None:
@@ -1794,6 +1805,89 @@ def _polymarket_us_slate_refresh_locked(interval: int) -> None:
 
 _POLYMARKET_SLATE_LAST_RUN: float = 0.0
 _POLYMARKET_SLATE_LOCK = threading.Lock()
+
+
+# ---------------------------------------------------------------------------
+# THE MAIN LOOP'S SLATE CALL, OFF THE MAIN THREAD (todo #851, lane
+# `polymarket-slate-off-odds-loop`).
+#
+# MEASURED 2026-11-19 (lane `live-odds-loop-attempt-spacing`), 482 main-loop
+# iterations in the 00-05Z live windows of 11-15..11-18:
+# - The slate sweep run synchronously HERE was 25.9% of all loop time. It took
+#   92-233 s each time, and it was the larger part of 117 of the 125 iterations
+#   with more than 120 s of post-tick work.
+# - Every odds-sweep launch comes from this loop's odds tick (482 of 482), so
+#   iteration length IS the odds-sweep attempt spacing: p50 100 s, p90 299 s.
+# - The sweep is single-flight with the venue-poll thread, and
+#   whichever thread finds it due pages the whole catalogue. This loop won 153
+#   of 387 writes. On the other 234 its call returned at once and the order
+#   below was priced off the last completed slate anyway.
+#
+# SWITCHED ON, a due sweep starts on a daemon thread and the loop goes straight
+# on to the execution tick. The lock, the interval gate and the cadence are the
+# writer's own and unchanged. The trade: an order placed on a pass where this
+# loop would have run the sweep is priced off the previous completed slate
+# (<= one interval plus one sweep old), still under `execute_portfolio`'s 3x
+# ceiling (540 s by default), which fails closed by name (`POLYMARKET_ARTIFACT_STALE`;
+# 0 such refusals 11-15..11-19).
+#
+# ABSENT = OFF = the inline call exactly as before. This is a betting change:
+# it lands default-off and loads only in a betting-change window.
+# ---------------------------------------------------------------------------
+_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND_ENV = "SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND"
+_POLYMARKET_SLATE_BG_THREAD: threading.Thread | None = None
+
+
+def _polymarket_slate_main_loop_background_enabled() -> bool:
+    """On only for an explicit 1/true/yes/on. Absent or anything else = the inline call."""
+    raw = str(os.environ.get(_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND_ENV) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _polymarket_slate_background_run() -> None:
+    """The background thread's body: the writer itself, which never raises past its own guard."""
+    try:
+        _polymarket_us_slate_refresh_tick()
+    except Exception as exc:  # noqa: BLE001 -- a daemon thread's exception is otherwise silent
+        print(
+            f"[live_odds_worker] POLYMARKET_SLATE_BACKGROUND_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def _main_loop_polymarket_slate_step() -> str:
+    """The main loop's one slate call. Returns what it did: inline | background | in_flight | not_due.
+
+    Off: `_polymarket_us_slate_refresh_tick()` on this thread, as before.
+    On: nothing that pages the venue ever runs on this thread --
+      * a sweep already running (this loop's previous background run, or the
+        venue poll holding the lock) -> `in_flight`, and no second one;
+      * the writer's own gate not yet due -> `not_due`, no thread started;
+      * otherwise start the writer on a daemon thread and return `background`.
+    The due check reads the same last-run stamp and interval the writer gates on,
+    and the writer re-checks both under its lock, so a race costs one no-op thread.
+    """
+    global _POLYMARKET_SLATE_BG_THREAD
+
+    if not _polymarket_slate_main_loop_background_enabled():
+        _polymarket_us_slate_refresh_tick()
+        return "inline"
+    if _POLYMARKET_SLATE_BG_THREAD is not None and _POLYMARKET_SLATE_BG_THREAD.is_alive():
+        return "in_flight"
+    if _POLYMARKET_SLATE_LOCK.locked():
+        return "in_flight"
+    last = _POLYMARKET_SLATE_LAST_RUN
+    if last and (time.time() - last) < _polymarket_us_slate_interval_seconds():
+        return "not_due"
+    thread = threading.Thread(
+        target=_polymarket_slate_background_run,
+        name="polymarket-slate-main-loop",
+        daemon=True,
+    )
+    _POLYMARKET_SLATE_BG_THREAD = thread
+    thread.start()
+    print("[live_odds_worker] POLYMARKET_SLATE_MAIN_LOOP mode=background", flush=True)
+    return "background"
 
 
 def _polymarket_us_slate_probe_at_boot() -> None:
@@ -2955,8 +3049,11 @@ def main() -> int:
             # writer means an order priced off a slate of unbounded age.
             #
             # Called BEFORE the execution tick so an order placed this pass is
-            # priced from the freshest slate this pass can get.
-            _polymarket_us_slate_refresh_tick()
+            # priced from the freshest slate this pass can get. With
+            # SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND on (todo #851) a due
+            # sweep runs on its own thread instead, so it no longer holds up the
+            # next odds sweep; off (absent) = the inline call, as before.
+            _main_loop_polymarket_slate_step()
             _run_execution_tick()
             _ledger_rebuild_tick()
             # Use the adaptive interval (900s idle/pregame, 60s once a game is

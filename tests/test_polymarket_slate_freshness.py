@@ -53,11 +53,16 @@ def test_the_slate_writer_is_called_INSIDE_the_loop_not_only_at_boot():
     before_loop, _, inside_loop = source.partition("while not _LIVE_REFRESH_LOOP_STOP.is_set():")
 
     assert inside_loop, "could not locate the worker's main loop in main()"
-    assert "_polymarket_us_slate_refresh_tick()" in inside_loop, (
+    # Todo #851: the loop calls the writer through `_main_loop_polymarket_slate_step`,
+    # which runs it inline (switch off) or on a daemon thread (switch on). Either
+    # way the writer is reached from inside the loop; the step's own tests pin both.
+    assert "_main_loop_polymarket_slate_step()" in inside_loop, (
         "the slate writer is not called inside the loop, so the artifact only "
         "refreshes when the worker restarts -- the 99-minute gap measured "
         "2026-08-25"
     )
+    step_source = inspect.getsource(worker._main_loop_polymarket_slate_step)
+    assert "_polymarket_us_slate_refresh_tick()" in step_source
 
 
 def test_the_slate_writer_runs_BEFORE_the_execution_tick():
@@ -69,7 +74,11 @@ def test_the_slate_writer_runs_BEFORE_the_execution_tick():
     source = inspect.getsource(worker.main)
     _, _, inside_loop = source.partition("while not _LIVE_REFRESH_LOOP_STOP.is_set():")
 
-    slate_at = inside_loop.find("_polymarket_us_slate_refresh_tick()")
+    # Todo #851: with SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND on, a sweep
+    # due on this pass STARTS here and the order below is priced off the last
+    # completed slate -- deliberately, and the same as every pass where the venue
+    # poll already holds the sweep. Off (absent), the step runs the writer inline.
+    slate_at = inside_loop.find("_main_loop_polymarket_slate_step()")
     execution_at = inside_loop.find("_run_execution_tick()")
 
     assert slate_at != -1 and execution_at != -1
