@@ -62102,3 +62102,16 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Verdict: the recycle drop (10.46 -> 3.96/h) is NOT attributable to #829.** The WNBA share (58.0% -> 0.0%) IS #829's: every caller is gone, and the per-caller readings above show it.
 
 - **Still owed:** nothing for #829's goal. The full 8-chunk suite night is not separately owed: any future night's fixture-date count is the same check. The January 2027 `schedule_2027.csv` check stays in #829 (closed record).
+
+## 2026-11-19 00:11:55Z (6:11 PM CST 11-18) -- READING (no deploy): second real exit refusal, NCAAB Boogie Fland foul-out (lane `live-player-exit-gate`, #814)
+- **The refusal:** event 401920514, Houston @ Florida (NCAAB).
+  - 23:48:34Z: `PLAYER_OUT team=FLA player='Boogie Fland' reason=foul_out key=True source=boxscore`.
+  - Tick 23:48:50.605Z: `players_out=1 key_players_out=1 refused_games=1`; `NCAAB_LIVE_RESIM_TICK ... refused=1 refusals={'key_player_out': 1}`.
+  - The fleet store's `ncaab_live_resim.json` (read 23:50:32Z) carried `playersOut=[{player 'Boogie Fland', reason foul_out, key true, modelled false}]`.
+- **Lifted:** tick 23:51:17Z read `players_out=1 key_players_out=1 refused_games=0`. The engine state now carried the 5th foul, so the exit was modelled and the game priced again (user 11-16 rule). It stayed priced through 23:55:55Z, and the game left the live set by 23:58:16Z.
+- **Same shape as Kemp (11-17 03:12Z):** the box showed the foul-out about one tick before the engine state did. Refused window 23:48:50Z-23:51:17Z (~2.5 min).
+- **Board / plan:**
+  - The book grid built NCAAB at 23:48:52Z, 2 s after the refusal; its summary does not name games, so the Florida rows are not attributed.
+  - Portfolio plans were generated at 23:44:52Z, 23:51:29Z, 23:56:11Z and 00:03:41Z (CST 17:44:52 ... 18:03:41). None fell inside the refused window, and none carries `key_player_out`. That is correct: no plan was built while the game was refused.
+  - **Not a test of the plan refusal.** A plan-side reading needs a refusal that outlasts a plan cycle (~5-7 min), i.e. an UNMODELLED exit (injury, ejection, goalie or keeper change).
+- **Watcher:** b93mxzijs and bx09bg0u6 are done. New: `lpeg_watch_refusal.ps1` task bltzp0icb from 00:11:00Z 11-19 to 06:00:00Z 11-23 (covers Saturday's NCAAF and Sunday's NFL).
