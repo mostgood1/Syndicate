@@ -125,3 +125,39 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - orders today 15: 14 filled, 1 maker post resting (336 min);
   - cap use 10.0% / 6.7%.
 - **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 68 — Thu 11-19 6:33 AM CST (12:33Z), window 33 min
+
+- **Results first.** Unchanged: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **F21 (Polymarket zero prices): still out, 1 h 19 min.**
+  - `POLYMARKET_DAILY_BOOK` at 12:32:57Z: 17,010 unpriced of 17,012 listed. It now runs about every 2.5 min (it ran
+    about every 10 min before the outage).
+  - Polymarket live plan: 306 rows, **0 placeable**, all `aggregator_priced`.
+  - Execution placed 0 on Polymarket with 0 refusals (nothing reached it). Kalshi is unaffected: 20 placeable, 5
+    positions, 2 placed this window.
+  - The midday check stands: if it is still out at noon CST, the user is told that Polymarket sits out tonight's
+    slate.
+- **No other anomaly.** Every endpoint was inside budget: `live_today` 0.17 s, page 0.11 s.
+- **Flow:**
+  - plan 2.6 min old: 61 suggested, 17 positions;
+  - orders today 17: 16 filled, 1 maker post resting (369 min);
+  - cap use 11.5% / 6.7%.
+- **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 69 — Thu 11-19 7:04 AM CST (13:04Z), window 31 min
+
+- **Results first.** Unchanged: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **F21 (Polymarket zero prices): still out, 1 h 50 min.**
+  - At 13:03:39Z, 17,067 of 17,069 markets are unpriced.
+  - Polymarket's live plan: 304 rows, 0 placeable.
+  - Kalshi is unaffected: 31 placeable, 5 positions, 1 placed this window.
+- **Marginal anomaly: `live_today` 3.05 s (budget 3.0).**
+  - *Hypothesis, written first:* an F14 web recycle.
+  - **Wrong:** no recycle and no worker boot in 13:02-13:05Z. The request itself took 2,996 ms server-side
+    (13:04:10.05Z), and no other request of 500 ms or more overlapped it.
+  - A single marginal slow read with no cause found. Read again only if it repeats.
+- **Flow:**
+  - plan 0.3 min old: 78 suggested, 14 positions;
+  - orders today 18: 17 filled, 1 maker post resting (400 min);
+  - cap use 12.6% / 6.7%.
+- **Gate:** 12 of 800 events on the BC-052 clock.
