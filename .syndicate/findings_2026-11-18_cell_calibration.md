@@ -76,7 +76,9 @@ never on A-5's gap.
   `sport|market|segment|live`.
   - **CORRECTION 11-18 7:45 PM CST, before any fit:** the line above first said `market(+_alt)`. Pass C's `alt`
     field is NOT the `_alt` market: `C_rail_build.py:116-120` sets it when the flagged line differs from the main
-    line at that reading, and the raw flag records (`C:	mpailmoneadingslags.jsonl`) carry only the rail's
+    line at that reading, and the raw flag records (`C:	mp
+ailmon
+eadingslags.jsonl`) carry only the rail's
     family market (`liveRailMarketKey` folds `totals_alt` into `totals`). So the cell uses the family market. Effect
     on what can be served: none found in the cell list — the optimizer's state has no college `*_alt` live cell (its
     live cells are `full` segment only), and every NBA cell is floored. Interval flags (h1, h2, q*) have no live
@@ -132,10 +134,12 @@ games, 35 dates 10-14..11-17) and pass C's `C:\tmp\optprog\C_rail_rows.jsonl`. S
   under the 30-flag bar.
 - **Why it fails: coverage, not a wrong sign.** Only **182 of 1,120 flags (16%)** sit in a cell the table serves
   (NCAAB spreads full live 169, NCAAF 13). The rest are, by the registered rule:
-  - NBA (412 flags): floored until games on or after 11-19 (I-25);
-  - NCAAB totals (447): floored until 11-17 (#816 calibrates them upstream; a residual k needs post-#816 dates);
-  - interval flags (h1 / h2 / q*): the optimizer has no live interval cell, so they stay raw;
-  - NCAAB h2h live, WNCAAB: not validated in the window.
+  - NBA, 298 flags (every segment): floored until games on or after 11-19 (I-25);
+  - NCAAB / WNCAAB full-game totals, 435: floored until 11-17 (#816 calibrates them upstream; a residual k needs
+    post-#816 dates);
+  - college interval flags (h1 / h2), 147: the optimizer has no live interval cell, so they stay raw;
+  - 58 in cells not validated in the window (NCAAB h2h 36, NHL spreads 5, WNCAAB h2h 4 / spreads 4, NCAAF h2h 3,
+    NFL h2h 3, NHL h2h 3). (Recounted from `HR_rail.json` per cell; 182 + 298 + 435 + 147 + 58 = 1,120.)
 - Reported (not pass conditions): flags kept 1,003 of 1,120 (11-15 471/506, 11-16 240/257, 11-17 292/357); kept
   flags hit **−10.1 pp below p′** [−14.1, −6.3] and +1.1 vs fair [−2.8, +4.8]; all flags −9.05 below the raw model
   [−12.6, −5.4] and −8.06 below p′ [−11.5, −4.4]. Within the 182 served-cell flags alone (post hoc):
