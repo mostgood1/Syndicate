@@ -2916,7 +2916,7 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   - The child recycled 4 times by 9:25 PM, and every one exited **rc -6**: the buffered-stdin lifeline aborts at interpreter shutdown (reproduced on the fleet's Python 3.11.16).
   - The longest gap between `BOARD_BUILD_TIMING` lines was 1,580 s.
   - Cause: the guard reads parent + child RSS against the declared 7,168 MB. The second interpreter is p50 777 MB (n 476), and the parent's tick grows +1.1 GB 5-9 PM, which a child recycle cannot return.
-  - Fixes are on main `38c3a6905`, **DEFAULT-OFF and NOT LOADED**: `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_{RAW_LIFELINE,CEILING_CREDIT_MB,PARENT_TRIM_SECONDS,RECYCLE_AFTER_BUILD}`.
+  - Fixes are on main `38c3a6905`, **LOADED 2026-11-19 17:00:09Z** (drained down/up, BC-053; load checks MET, verified 17:07Z; evening reading owed): `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_{RAW_LIFELINE,CEILING_CREDIT_MB,PARENT_TRIM_SECONDS,RECYCLE_AFTER_BUILD}`.
   - Detail: `findings_2026-11-18_board_split_memory_guard.md`.
 - **The host is a second, separate cost:** Windows read 100% busy at 56-64% of nominal clock (1,920-2,188 of 3,417 MHz, Snapdragon X1E80100, on AC) at 7:36 and 8:05 PM CST 11-17, with vmmemwsl 3.9-6.4 cores and MsMpEng 1.0-2.4. Inside WSL that shows as clock, not runqueue wait. A WSL-side process appending to `/mnt/c` every second raised MsMpEng ~2.4 -> ~1.1 cores when stopped: write samplers to WSL-native paths.
 

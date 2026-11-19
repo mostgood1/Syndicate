@@ -62308,3 +62308,65 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - 999 s of the 1,604 s gap was before any NHL game started.
   - The in-game part was **605 s**: 14 s to the first NHL attempt, 250 s refused behind the 337 s soccer + NBA live run, 279 s idle until the next attempt, then a 61 s run.
 - **Corrected grade:** NHL odds age from the actual first drop: **0 gaps over 1,200 s -> MET** (was "MISSED once"). Every other row of the 05:05Z table stands.
+
+## 2026-11-19 17:00:09Z (11:00 AM CST) -- DEPLOY (drained full down/up + ff d78a448c4 -> 38c3a6905 + 4 refresh-worker env keys): board child memory under the split (todo #850, lane `board-split-memory-guard`) -- **LOADED; boot, env, credit, switches and first-build checks MET; the evening reading is OWED (pre-registered, findings §5)**
+
+- betting change: **yes** -- BC-053, registered OUTSIDE the window as "broken money path". BC-042's own rule applies: the portfolio plan's cadence follows the board build, and these switches change how often a build is refused. Loaded at refresh-worker's boot, `2026-11-19T17:00:26Z`.
+- **User decision (verbatim, typed in session 1f9c9a40, 2026-11-19 ~7:40 AM CST):** "11-19 midday", answering "When should the four fix switches load on the fleet?". The options put to the user named the outside-window exception (findings §6, Option A).
+- **Why now:**
+  - The parent 152916 was never restarted after the 11-18 evening; the 04:46:22Z load TERMed only the child.
+  - The memory guard refused 3-8 builds every hour 04Z-13Z.
+  - There were 15 child recycles 04:29-13:24Z, all rc -6.
+- **Keys** (`REFRESH_WORKER__` prefix, `~/syndicate-prod/local_production.env`):
+  - `SYNDICATE_BOARD_PROCESS_RAW_LIFELINE=1`
+  - `SYNDICATE_BOARD_PROCESS_CEILING_CREDIT_MB=768`
+  - `SYNDICATE_BOARD_PROCESS_PARENT_TRIM_SECONDS=300`
+  - `SYNDICATE_BOARD_PROCESS_RECYCLE_AFTER_BUILD=1`
+  - Appended at 16:56:05Z by `C:\tmp\bmg\load\kit_env_850.sh` (self-tested on a dummy file 13:44Z).
+  - Backup: `local_production.env.bak-bmg850-20261119T165605.205258587Z-1010161`, mode 600.
+- **Ride-alongs** (`d78a448c4..38c3a6905`): runtime files are this lane's `pipeline/board_build_process.py` and `worker_recycle.py`, plus two default-off changes:
+  - #847 `8acee817d` (`SYNDICATE_CELL_CALIBRATION_LIVE_PROB`);
+  - #848 `556b416c6`/`5c01275de` (`SYNDICATE_SCORECARD_848_GRADING`).
+  - Neither key is set in `local_production.env` or `fleet_env/*.json` (checked by name at 13:4xZ).
+  - The rest is tests and ledger.
+- **Gates:**
+  - Claims (holder `board-split-memory-guard`) on refresh-worker / web / live-odds-worker, rc 0 each. Taken at 16:55:2xZ with a 45-min TTL, then released by token and re-taken with a 90-min TTL at 16:55:5xZ.
+  - `fleet_role_env_reading.py snapshot` was taken BEFORE the down, at 16:56:16Z: web 160 / refresh-worker 263 / live-odds-worker 235 keys.
+  - Drain under the worker's environ (`kit_drain.sh drain 1800`): **CLEAR at ~16:59:4xZ**, after waiting on one in-flight board build.
+  - Baselines read at 16:59:46Z.
+  - Preflight from worktree `elegant-shamir-356c6f` at origin/main, `--target fleet --target-commit 38c3a6905e22... --betting-change yes --outside-window "broken money path: ..."`:
+    - refresh-worker ran with 5 expect/baseline pairs;
+    - web and live-odds-worker ran with `--no-expectation` (no runtime change beyond the ff);
+    - **JOINT CLEAR at 17:00:01Z**, on round 1.
+- **Load:**
+  - `C:\tmp\t834\window1124\kit_ff_down.sh d78a448c4 38c3a6905e22...`: 0 dirty overlaps; `merge --ff-only` at 17:00:09.127Z, head_now `38c3a6905`; `watchdog_no_autostart` set.
+  - `down` ran 17:00:09-17:00:18Z (rc 0).
+  - `Start-ScheduledTask SyndicateLocalProduction` at 17:00:22Z. `/healthz` returned 200 at 17:00:27Z, and the marker was removed.
+  - Undrained the new refresh-worker 1011283 at 17:01:10Z (`DRAIN_CLEARED`).
+- **expect / measured** (read 17:00:27-17:07:41Z):
+  - `fleet_checkout_head` d78a448c4 -> 38c3a6905: **MET**. `status`: web 1011213 / refresh-worker 1011283 / live-odds-worker 1011284, all `up`, `code=38c3a690`, restarts 0.
+  - `refresh_worker_pid` 152916 -> new: **MET** (1011283, `[refresh_worker] BOOTED` at 17:00:26.475Z).
+  - `switches_in_refresh_worker_environ` 0 -> 4: **MET** (`/proc/1011283/environ`; `SYNDICATE_BOARD_BUILD_PROCESS=1` unchanged).
+  - `refresh_worker_ceiling_mb` 7168 -> 7936: **MET**.
+    - `BOARD_PROCESS_CEILING_CREDIT from_mb=7168 to_mb=7936 credit_mb=768` at 17:00:29.173Z.
+    - `ALL_PROCESS_MEMORY` reads `container_memory_max_mb: 7936.0`.
+    - The supervisor's `status` still prints "cap 7168 MB" (its own env), and `/proc` environ keeps 7168 (the credit is an in-process env write); the heartbeat is the reading.
+  - `child_switches_lines_since_boot` 0 -> >=1: **MET** (`BOARD_PROCESS_CHILD_SWITCHES pid=1011359 raw_lifeline=1 recycle_after_build=1 ceiling_credit=7168+768` at 17:00:31.066Z).
+  - Also seen: `BOARD_PROCESS_PARENT_TRIM_STARTED interval_s=300 pid=1011283`.
+  - Env reading (`compare --expect-added` x4): **COMPARE OK**, exit 0.
+    - refresh-worker gained exactly the 4 keys.
+    - All three roles changed only `SYNDICATE_GIT_COMMIT`, `SYNDICATE_INSTANCE_ID` and `WSL_INTEROP`.
+  - **First build from the new child:**
+    - `LIVE_PLAN_WRITTEN date=2026-11-19 venue=kalshi` at 17:06:46Z;
+    - `BOARD_BUILD_TIMING wall_s=216.9 ok=True` at 17:07:24Z;
+    - 0 `MEMORY_GUARD_ABORT` and 0 `BOARD_PROCESS_EXITED` since the load;
+    - tree 3,442 MB, headroom 4,493 MB of 7,936 (17:07:30Z);
+    - first parent trim released 54 MB of 721 MB in 7.9 ms.
+  - Traceback lines since the down: 0 / 0 / 0 (live-odds-worker / refresh-worker / web).
+- **verify:** the pre-registered evening reading, `findings_2026-11-18_board_split_memory_guard.md` §5, for 5-10 PM CST 11-19. The thresholds:
+  - P1: refusals <= 1 every hour and <= 3 total;
+  - P2: <= 2 recycles, all rc 75;
+  - P3: longest gap between `BOARD_BUILD_TIMING` lines <= 900 s.
+  - The rail monitor reads it. The load checks above are MET, so the reading is not VOID.
+- **Revert:** delete the 4 lines (or restore the backup above), then a drained full down/up; each key is independent. A revert is allowed outside a window.
+- **Claims:** released by token at 17:08:24Z (refresh-worker / web / live-odds-worker rc 0, status free).
