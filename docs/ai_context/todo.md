@@ -106,6 +106,8 @@
   - #849: closed, not built.
 - **Owed:**
   - re-rank when the 11-24 window's readings, M2 (11-24) and #847's H-F (11-26) land;
+  - the suggested-to-placed order match rerun, in the same 11-26 pass;
+  - CONSOLIDATION 11-19 (user "Yes, consolidate" ~9:20 AM CST, relayed by the top session local_1f10ce63): two follow-ups now report to this program. (1) #847 H-F forward grade, Thu 11-26: the #847 session is putting it on a one-off scheduled task that reports to this lane. (2) The suggested-to-placed order match rerun (~11-26; on 11-18 only 16.0% of placed orders, 1,607 of 10,036, sat on a graded suggested line), with context in lane `layer2-suggested-grader`, folds into this program's 11-26 re-rank pass. #844's P1-P4 after the 11-24 batch moved to the rail monitor's daily routine.
   - the 12-08 window candidates go to the user before 12-08: #847 (c)/(d), hold-value exits after a shadow, #816 spread-only, #836.
 
 ### `#845` — **QUEUED for the 12-08 betting-change window (user "queue the splice for the 12-08 window", 2026-11-18 4:57 PM CST): switch the Understat-outage SPLICE on then IF understat.com is still down. `SYNDICATE_SOCCER_UNDERSTAT_SPLICE` is on main default OFF; nothing to do now or at 11-24** `[2026-11-18, lane understat-fallback-backtest; `.syndicate/findings_2026-11-18_understat_fallback_backtest.md`; follows #841]`
