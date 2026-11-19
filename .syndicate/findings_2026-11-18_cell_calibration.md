@@ -52,7 +52,7 @@ and `http://127.0.0.1:10000`. Never the git `data/` mirror.
 | (a) | `SYNDICATE_CELL_CALIBRATION_RAIL` | the Games Rail's ≥ 3 pp MODEL ≠ LINE test reads `p'` instead of the raw live probability | no (display) |
 | (b) | `SYNDICATE_CELL_CALIBRATION_DISPLAY` | the board's shown model numbers: the Sim probability and the model EV at the price, `p'·decimal − 1` | no (display) |
 | (c) | `SYNDICATE_CELL_CALIBRATION_RANK_STAKE` | rank and stake: a served cell's optimizer factor may go below the 0.5 floor, to its served k (never below K_FLOOR) | **yes**; default-off; 12-08 window at the earliest |
-| (d) | `SYNDICATE_CELL_CALIBRATION_LIVE_PROB` | the shared live probability (live game lines), except the college totals #816 already calibrates | **yes**; default-off; 12-08 window at the earliest |
+| (d) | `SYNDICATE_CELL_CALIBRATION_LIVE_PROB` | `cell_calibration.live_probability` + `live_std_err`, called from `live_gameline_join._cell_calibrate` after #816's step in `price_distribution_market` and before the edge in `price_moneyline`; the cell is passed from `attach_live_gamelines` (`live_cell=(sport, market, segment)`). College totals are skipped (#816). The verdict carries `live_cell_calibration` + `model_prob_cell_uncalibrated`, and `_apply_verdict` copies the stamp onto the projection so (a) never applies twice. The analytic WNBA path is not wired (no served WNBA cell) | `test_d_*` (6), incl. both real pricers off != on and the `_apply_verdict` -> rail hand-off; 1,664 tests pass across the 76 files that import the live join | **yes** | **WIRED on main, default-off** (LOAN of `live_gameline_join.py` from `live-player-exit-gate`, user "Yes, take the loan", 11-18 8:32 PM CST); 12-08 window at the earliest; predictions §4.2 |
 
 **What (b) does NOT fix, stated before it is judged:** the board's EV column is MARKET EV (the price against the
 de-vigged consensus fair, `ev_vs_fair_pct`), and the suggested set's +3.41% promise vs −3.02% realised is on that
@@ -244,9 +244,19 @@ floors.
   0.461 (59), WNCAAB spreads 0.956 (34). NBA (floored) and college totals (#816) do not move.
 - **P-d1, reachability:** on the first live slate after the load, live rows in those cells carry the
   `live_cell_calibration` stamp and an edge about k × their raw edge (NCAAB spread: a raw +10 pp reads about +3.5).
-- **P-d2, the precision gate does more of the work:** priceable live rows per build in NCAAB / NCAAF spreads and
+- ~~**P-d2, the precision gate does more of the work:** priceable live rows per build in NCAAB / NCAAF spreads and
   NCAAF totals fall by at least half, but at least one per evening slate stays priceable in each (else it is a gate,
-  and (d) is reverted).
+  and (d) is reverted).~~
+- **P-d2 REVISED 11-18 8:43 PM CST, at wiring and before any load.** The wiring carries the gate's error through
+  the transform, as #816 does: the sim's error times the slope, plus k's own fit error. So the edge and its error
+  shrink together, and the gate's verdict mostly does not move. The original P-d2 assumed an unscaled error.
+  - **New prediction:** priceable live rows per build in the moved cells fall by LESS than a third. The fall comes
+    only from the fit-error term (largest at k 0.10, NCAAF totals). The main effect is the edge itself: the median
+    |edge_pp| of priceable rows in those cells falls by about (1 − k).
+  - **Gate rule kept:** at least one row per evening slate stays priceable in each moved cell. Otherwise (d) is
+    reverted.
+  - **Refuted if:** priceable rows fall by half or more in NCAAB spreads, or the median |edge| ratio is outside
+    k ± 0.15 in any moved cell with >= 30 priceable rows.
 - **P-d3, accuracy:** on graded live rows of those cells, Brier vs the raw live probability improves (H-S's sign,
   forward), and the rail flags in them hit within ±3 pp of the probability shown.
 - **P-d4, money:** live orders in those cells fall in count; no detectable P&L change in two weeks.
