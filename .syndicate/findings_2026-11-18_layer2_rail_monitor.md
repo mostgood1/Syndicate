@@ -500,3 +500,31 @@ alternative-source session working.
 
 **Session started on the user's "Yes, start it":** local_fbe07d8c "Grade the board's suggested picks as their own set".
 When it reports the file, the dashboard adds a "Suggested by the board" set.
+
+## Reading 12 — Wed 11-18 6:14 PM CST (00:14Z 11-19), full page
+
+**Fleet:** `a3104a5b6`, no new ff. **Host load 8.0** (5.7 / 4.4 over 5 / 15 min).
+
+**Slate: 61 live.**
+- Flags: 45 shown, 0 false, 0 missed, 0 dark.
+- P1: 13 college totals flags, 0 contradictions. P6: 0. #824: 0.
+- Live rows: 1,513, 214 priced <= 120 s (college row ages are lower bounds per #844).
+
+**Board (P2): 3 builds, 189 / 248 / 289 s, median 248 s, 0 over 300 s.** CPU per build 162-260 s. One more build was in flight at the read; today's board was 641 s old.
+- **L-d, third point:** at 6:14 PM `build_soccer_artifacts.py --league epl --date 2026-11-23` ran at nice 0, 80% CPU, beside the board child (73%). Three odds refreshes were running at nice 0 too, which is expected for live odds.
+- **Monitor fix:** refresh-worker.log rotated at 6:11:21 PM CST. `d4metrics.py` read only the new file, so it reported 0 builds and 8 ticks.
+  - It now prepends the rotated `.1` tail when the window is not covered.
+  - This reading was re-run with the fix: 3 builds, 65 ticks, coverage true.
+
+**Overlay:** 0 gaps over 360 s (max WNCAAB 161 s); tick gap max 68 s; web merges 24, 0 stale.
+
+**Live odds lane:** 11 launched, 2 refused (15.4%). Live run 70 s. No NHL odds child running; NHL starts 6:30 PM.
+
+**Load (full page):** **`/intelligence` 26.4 s** (r8 22.1 s, r4 9.0 s); query 10.7 s; shortlist 0.7 s.
+
+**Team cards:** 0 defects.
+
+**Since reading 11 (dashboard):**
+- **Cheat sheet section added.** The user: "add the cheat sheet picks performance to the dashboard too". It draws on 35 daily reviews, 10-15..11-18.
+- **Optimization session started.** The user: "we need to then take all this data to optimize the overall Syndicate product" (accepted as a new session).
+  - Session: "Optimize Syndicate from its performance data" (local_09a95c0b).
