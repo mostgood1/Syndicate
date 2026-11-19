@@ -64,10 +64,42 @@ Script `C:\tmp\ncal816\stale_books.py`, output `C:\tmp\ncal816\stale_books_ncaab
   - The flags that do fire are on rows where no venue quotes, or where the venue is the newest.
 - **What has not been measured:** the money effect. That needs the flags and bets the gate refused, priced against their outcomes.
 
-## The fix (not built; `book_grid.py` is claimed by OPEN lane `ncaaf-grid-build-speed`)
+## The fix as first proposed (superseded by the BUILT section below)
 
 - **Read side:** take the newest stamp by parsed time, e.g. `max(stamps, key=_parse_ts)`, falling back to the text when parsing fails. This fixes today's mixed shards too.
 - **Optionally also the write side:** normalise `book_updated_at` to one format in `odds_book_quotes._normalize`.
 - **Tests:** a cell set with a space-format sportsbook stamp newer than a `T`-format venue stamp. The row age must equal the sportsbook's, and the current code fails this.
 - **It is a BETTING CHANGE** (it changes which college live rows the gate prices), so it loads in a betting-change window (`.syndicate/betting_change_windows.md`, next Tue 11-24 2:00-7:00 AM CST) unless the user calls it a broken money path.
 - **The #816 grade** (window 11-17..11-23) is unaffected by a load in the 11-24 window, since that load comes after the window's data ends.
+
+## BUILT, on main `25a5e480d`, DEFAULT OFF `[2026-11-19 00:49Z, 6:49 PM CST 11-18]`
+
+- **User decisions:** "Yes, build it" in this session, then "get 844 landed default off for 11-24", relayed verbatim from session `product-optimization-program`. Window rule 2 (`.syndicate/betting_change_windows.md`) requires the same.
+- **The code:** `book_grid._newest_stamp` picks the stamp that is latest in TIME, using a cached `_stamp_instant` parse. Equal instants keep the text max. Unparseable stamps are skipped when another stamp parses, and the text max stands when none do.
+- **The switch:** `SYNDICATE_BOOK_GRID_NEWEST_BY_TIME=on` (also 1 / true / yes). Absent, or anything else, keeps the text max exactly.
+- **Ownership:** the line was borrowed from lane `ncaaf-grid-build-speed` under a LOAN recorded in both blocks, and is now returned.
+- **Tests:** `tests/test_book_grid_newest_stamp.py`, 22 cases. They cover off != on, absent = the old behaviour, offsets, ties, unparseable stamps, and the live gate pricing the fixed row. 5 fail on the old text max. 402 grid, gate and venue tests pass.
+- **A/B on the fleet's real shards** (worktree code, key absent vs `on`, one fixed `now`; `C:\tmp\ncal816\grid844_ab.py`):
+
+| sport, shard, now | grid rows | rows changed | rows crossing the 120 s gate, stale to fresh |
+|---|---|---|---|
+| NBA 11-17, 03:30Z | 3,885 | 0 (BYTE-IDENTICAL) | 0 |
+| NHL 11-17, 02:30Z | 1,470 | 0 (BYTE-IDENTICAL) | 0 |
+| NCAAB 11-17, 02:00Z | 2,139 | 190 | 58 |
+| NCAAB 11-18, 20:58Z | 1,298 | 140 | 13 |
+| WNCAAB 11-17, 01:30Z | 270 | 21 | 3 |
+
+- **What changed:** only `updated_at` and `age_seconds`, and only on rows with a Kalshi/Polymarket cell. The age always got younger: 0 rows got older and 0 crossed fresh to stale.
+- **Caveat:** the A/B's capture filter compares `captured_at` as text, the same flaw, so a "now" snapshot may include some later space-format rows. Both arms read identical inputs, so the A/B holds.
+- **Roles that must carry the key:**
+  - refresh-worker: the book_grid artifact build in `run_refresh_worker.py`, and `build_layer2_shortlist` in the board child, which inherits refresh-worker's env;
+  - web: the inline builds in `/api/board/book-grid` and `/api/board/cross-book`;
+  - live-odds-worker builds no grid.
+  - A global key in `local_production.env` covers all of them, at a drained `down`/`up`.
+- **Betting change:** yes, conservatively. It changes which college live rows the live gate prices. Live orders are not traced. The window package's money trace may support `no`, and that is the user's call at the window.
+- **PRE-REGISTERED PREDICTION, before any load:**
+  - **P1 reachability:** refresh-worker's first NCAAB grid after load has at least one row with a venue cell and a sportsbook-spelled `updated_at`. Before load there are 0, because a venue cell always wins.
+  - **P2:** NCAAB full-game moneyline rows with `age_seconds` <= 120 rise from about 25% (25.5% of live minutes on 11-17/18) to >= 70% on the first full evening slate. Fresh by time was 81.2%.
+  - **P3:** the NBA and NHL grids are unchanged.
+  - **P4:** NCAAB/WNCAAB `stale_quote` refusals per build fall, and priceable rows per build rise.
+- **Load:** proposed for the Tue 11-24 betting-change window (2:00-7:00 AM CST) through the window package. Loading needs the user's yes.

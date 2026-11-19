@@ -62115,3 +62115,21 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Portfolio plans were generated at 23:44:52Z, 23:51:29Z, 23:56:11Z and 00:03:41Z (CST 17:44:52 ... 18:03:41). None fell inside the refused window, and none carries `key_player_out`. That is correct: no plan was built while the game was refused.
   - **Not a test of the plan refusal.** A plan-side reading needs a refusal that outlasts a plan cycle (~5-7 min), i.e. an UNMODELLED exit (injury, ejection, goalie or keeper change).
 - **Watcher:** b93mxzijs and bx09bg0u6 are done. New: `lpeg_watch_refusal.ps1` task bltzp0icb from 00:11:00Z 11-19 to 06:00:00Z 11-23 (covers Saturday's NCAAF and Sunday's NFL).
+
+## 2026-11-19 00:50Z (6:50 PM CST 11-18) -- READING (no deploy): the I-17 calibrated college total on the live rail, first full evening (owed by the 2026-11-18 08:02:54Z load; lane `ncaab-total-overprojection`, user "check the I-17 rail tonight when college games go live") -- **MET: 0 contradictions on 21 NCAAB flags**
+- betting change: no (reading only).
+- **Instrument:** `C:\tmp\ncal816\i17watch.py`, polling `/api/board/live-rail` every 300 s. College full-game totals rows only. A flag is `|model_edge_pct| >= 3` with the quote no more than 120 s old.
+  - A CONTRADICTION is a flag whose shown `live_total` sits on the other side of the line from its lean. That is the I-17 defect: 12 of 20 NCAAB under flags at the 11-17 peak.
+  - Evening gate: from 00:00Z, with at least 3 live NCAAB games.
+  - The first run fired on the one afternoon game, Rutgers @ Notre Dame (20:23Z: 13 rows, all calibrated, 2 under flags, 0 contradictions; `C:\tmp\ncal816\i17watch_afternoon_1118.txt`), so it was re-armed for the evening.
+- **Readings:**
+
+| read (CST) | live NCAAB games | priced rows / `basis: calibrated` | flags (all under) | contradictions | calibrated minus sim, median |
+|---|---|---|---|---|---|
+| 6:04 PM | 19 | 81 / 81 | 6 | 0 | -0.97 |
+| 6:24 PM | 25 | 247 / 247 | 6 | 0 | -3.65 |
+| 6:44 PM | 29 | 277 / 277 | 9 | 0 | -1.74 |
+
+- **WNCAAB:** 7-12 games, 5 / 12 / 15 flags, all `basis: sim`, 0 contradictions. WNCAAB live has no fitted calibration (it is thin), so it shows the sim's own total by design.
+- **Agrees with:** the rail monitor's own card count over the same evening (readings 10-12): no flagged college total had "ours" on the wrong side.
+- **Not covered:** the late games, and whether the calibrated total is a better number than the sim's. That second question is the #816 grade on 11-24.
