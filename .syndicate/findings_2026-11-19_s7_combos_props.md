@@ -227,3 +227,162 @@ rule makes money, not whether it loses less.
 - MLB: 0 (the season ended).
 - NBA SP-disjoint: 9,383, not a passing shape. They are counted as not read, and are never tested.
 - Joined counts follow with the result.
+
+## RESULT -- Arm A: no reading is due (A5 reads on 11-24); NBA SP-nested's joined combos will sit near A3's 200-combo floor at the window end. Arm B: NO CHALLENGER (FIT stop); the sim's edge against the venue's breakeven never beat breakeven, even in sample (run 2026-11-19 18:07Z = 12:07 PM CST, read-only; pre-registration on main `6c54babb1`, pushed 18:07:07Z)
+
+Nothing in the method changed after the push. Both runs used the code and the dump named in the pre-registration.
+
+### Arm A -- E4 Stage 2 under its own registration: funnel-only counts and a projection (no price, probability or outcome computed)
+
+**Run.**
+- `e4_stage2_combo_prices.py --a5 --window-start 2026-10-31 --window-end 2026-11-18 --funnel-only`, 17:59-18:07Z,
+  rc 0.
+- Fleet data root, nice 19 / ionice idle, fleet venv; peak RSS 0.79 GB under the 2.5 GB guard.
+- 28 public leg-metadata GETs (5,771 cached) against this lane's copy of the cache. Fee multiplier read: 1.0 (upper
+  bound), as on 10-30.
+- **No R1, R2 or R3 was computed.** The registered read stays with task `e4-a5-pregame-print-read-1124` (11-24).
+
+**Funnel, settlements 10-31..11-18 (19 days):**
+
+| | NBA SP-nested | Soccer GL |
+|---|---|---|
+| shaped candidates (0 missing) | 924 | 3,938 |
+| Stage 1 games available | 138 (141 sim files; 3 no outcome) | 189 (210 sim matches) |
+| no two-sided book quote at the combo's line | 400 | 853 |
+| no pregame print (every print in play) | 116 | 1,376 |
+| player has no sim row | 180 | -- |
+| game not matched / not in slot | 7 | 384 + 135 |
+| other (no box score 22, DNP 3, PRA identity 1; clubs 3) | 26 | 3 |
+| **joined and priced** | **195 combos / 86 games** | **1,187 combos / 122 games** |
+
+- MLB: 0 shaped combos (the season ended), so both MLB cells will read INSUFFICIENT at any date.
+- In the A3 window, NBA SP-nested joined 12 combos / 11 games in 26 days. Now it joins 195 / 86 in 19 days, about
+  10.3 combos a day.
+
+**Projection against A3's minimum n (>= 200 combos AND >= 20 games, per R2 TEST, i.e. per side).**
+- The joined count is a CEILING for each side's test. A combo enters YES only with p_b - p_a >= 1 pp and a pregame
+  print taken on YES; it enters NO only with p_a - p_b >= 1 pp and a NO print.
+  - The side split needs probabilities, which funnel-only does not compute, so it is not projected here.
+  - In the A3 run, all 12 NBA SP-nested combos fell on the YES side.
+- **NBA SP-nested at the window end (settlements through 11-22, 4 more days at 10.3/day): about 236 combos / about
+  104 games.**
+  - **The YES test reaches 200 only if at least about 85% of joined combos qualify for YES.** So it may read
+    INSUFFICIENT on 11-24.
+  - The NO test will almost certainly read INSUFFICIENT.
+  - Games are not the constraint (86 already).
+- **The registered extension to 12-20 is unlikely to run.**
+  - A5 §2 extends only if EVERY R2 test is INSUFFICIENT.
+  - Soccer GL already joins 1,187 combos / 122 games. In A3, 46% of soccer combos fell on YES and 36% on NO, so both
+    soccer tests are likely to clear 200.
+  - If NBA YES falls short on 11-24, that reading stands.
+- If the extension did run, NBA SP-nested would reach about 523 joined combos by 12-20 (32 more days). YES would
+  then clear 200 if about 38% qualify.
+- **What this means for S7:** the combos question is answered on 11-24 by its owner's task, not here. No new
+  registration is proposed.
+- If NBA reads INSUFFICIENT on 11-24, a further NBA-only window would need a NEW amendment, written before its data.
+  That would be lane `e4-pregame-prints`' call, or the user's.
+
+### Arm B -- the registered test (props, sim edge vs venue breakeven)
+
+**Coverage actually used.**
+- FIT: 2,396 orders / 246 events (10-02..11-07).
+- TEST: 2,004 orders / 190 events (11-08..11-18), all Kalshi.
+- The pre-registration's coverage section has the full table.
+
+**FIT (all orders: -9.74% [-14.00, -5.49]):**
+
+| T (pp) | kept orders / events | kept ROI [95%] | kept - all [95%] |
+|---|---|---|---|
+| **0** | 1,399 / 233 | **-12.51% [-18.33, -6.70]** | -2.77 [-6.74, +1.20] |
+| 1 | 959 / 183 | -13.42% [-20.59, -6.25] | -3.68 [-9.22, +1.86] |
+| 2 | 789 / 155 | -13.40% [-20.89, -5.91] | -3.66 [-9.79, +2.48] |
+| 3 | 703 / 146 | -14.05% [-22.11, -5.99] | -4.31 [-11.22, +2.60] |
+| 4 | 613 / 142 | -14.90% [-23.87, -5.93] | -5.16 [-13.12, +2.80] |
+| 5 | 529 / 134 | -12.72% [-22.39, -3.05] | -2.98 [-11.74, +5.78] |
+| 6 | 441 / 128 | -12.85% [-23.27, -2.43] | -3.11 [-12.84, +6.62] |
+| 8 | 321 / 114 | -15.22% [-28.04, -2.40] | -5.48 [-17.72, +6.76] |
+| 10 | 218 / 102 | -20.73% [-35.73, -5.73] | -10.99 [-25.61, +3.64] |
+
+- **Every T is eligible, and every kept ROI is negative, with its upper bound below 0.** The best is T = 0, at
+  -12.51%.
+- **Verdict as registered: rule 1, FIT stop. NO CHALLENGER.** The sim's edge against the venue's breakeven does not
+  beat breakeven even in sample. There is no forward test.
+- At every T, the kept orders did worse than all FIT orders (kept - all is negative at all 9 T, none beyond noise).
+
+**TEST, reported descriptively at T = 0 (as registered for a FIT stop).**
+
+| set | orders / events | flat ROI [95%] |
+|---|---|---|
+| all | 2,004 / 190 | -4.57% [-8.84, -0.31] |
+| kept (edge_pp >= 0) | 1,104 / 187 | -3.74% [-9.75, +2.26] |
+| dropped | 900 / 177 | -5.59% [-11.88, +0.69] |
+
+- Kept - all: +0.83 pp [-3.16, +4.82]. Kept - dropped: +1.85 pp [-7.02, +10.72]. Share kept: 55%.
+- The bootstrap check on kept agrees: [-9.77, +2.21].
+- Even had FIT not stopped, TEST would not have killed (upper bound +2.26), and nothing on TEST beats breakeven.
+
+**Monotonicity (the edge-band read, descriptive).** Return does not rise with the sim's edge in either window:
+
+| edge_pp band | FIT orders / events, ROI [95%] | TEST orders / events, ROI [95%] |
+|---|---|---|
+| < 0 | 997 / 191, -5.86% [-12.84, +1.12] | 900 / 177, -5.59% [-11.88, +0.69] |
+| 0-2 | 610 / 166, -11.36% [-19.58, -3.15] | 547 / 156, +0.04% [-7.81, +7.90] |
+| 2-4 | 176 / 83, -8.17% [-22.90, +6.57] | 142 / 75, -12.08% [-27.09, +2.92] |
+| 4-6 | 172 / 83, -20.16% [-37.63, -2.69] | 120 / 64, -1.88% [-18.15, +14.38] |
+| 6-10 | 223 / 94, -5.15% [-18.89, +8.60] | 175 / 79, -8.56% [-21.32, +4.19] |
+| >= 10 | 218 / 102, -20.73% [-35.73, -5.73] | 120 / 60, -5.97% [-25.76, +13.82] |
+
+- **Slope of return on edge_pp:**
+  - FIT: **-0.21 pp per pp** [-0.88, +0.47];
+  - TEST: **-0.09** [-0.87, +0.68].
+- A sim edge that carried information at the venue's price would show a positive slope. Both point estimates are
+  negative, and both intervals exclude a slope of about +1 (an edge that pays in full).
+- **The orders where the sim disagrees most with the venue (>= 10 pp) lost most on FIT.**
+
+**Slices (TEST, kept at T = 0; descriptive, deciding nothing):**
+
+| slice | all | kept |
+|---|---|---|
+| live | 144 / 72, -13.68% [-24.49, -2.87] | 96 / 57, -9.30% [-21.68, +3.09] |
+| ladder | 1,762 / 190, -4.06% [-8.42, +0.29] | 932 / 187, -3.50% [-9.95, +2.94] |
+| paper twin | 98 / 69, -0.38% [-15.01, +14.24] | 76 / 62, +0.31% [-16.11, +16.72] |
+| NBA | 777 / 88, -2.59% [-9.92, +4.74] | 407 / 87, +1.88% [-7.94, +11.69] |
+| NFL | 248 / 27, -1.93% [-12.02, +8.17] | 137 / 27, +0.26% [-17.45, +17.97] |
+| NHL | 979 / 75, -6.82% [-12.80, -0.84] | 560 / 73, -8.81% [-17.09, -0.53] |
+
+- No kept slice's interval excludes 0 from above. NHL kept is below 0.
+- With about 9 slices, roughly 0.45 would exclude 0 by chance under a true null. None is a sport or market switch.
+
+### What it means
+
+- **Props (Arm B): the sim's probability does not select winning prop orders at the venue's price.**
+  - On 2,396 FIT orders, no threshold on the sim's edge vs the venue's breakeven made money (best -12.5%).
+  - The return does not rise with the edge (slopes -0.21 FIT, -0.09 TEST).
+  - This agrees with every earlier read:
+    - `sim-stake-earned-profile`: the sim never beats the market's Brier in a prop cell;
+    - the 10-02 backtests: the model is worse than the book in every sport;
+    - S4: the in-play sim gets weight 0 against Kalshi.
+  - **The board's sim, as it stands, is not the different selection source the program is looking for, on props.**
+- **Combos (Arm A): open until 11-24, and it rests on soccer.**
+  - The registered A5 read answers on 11-24.
+  - Soccer GL will very likely have a verdict.
+  - NBA SP-nested will sit near its floor on the YES side only.
+  - MLB has no combos.
+  - The 10-30 reading found no edge at the (contaminated) last print. R3 (no price) showed the sim's soccer joint
+    beats independence, so soccer is where a combo edge, if any, would show first.
+- **Untested, a lead and not a result:** a SIM-ONLY prop source, which would buy every venue prop quote where the sim
+  clears the venue's breakeven, whether or not the consensus likes it.
+  - It needs a new build: venue prop quotes from `book_quotes` `venue_direct` joined to the population ledger's `mp`,
+    plus a row-level grader. The scorecard keeps per-game sums only.
+  - Given this result, and the sim's record on props against the market's Brier, its prior is poor. It is not
+    recommended ahead of the A5 read.
+- **No challenger from S7 goes to the 12-08 window.** Nothing changes live, and nothing is queued.
+
+### S7_RULE_JSON (recorded for completeness; the FIT stop means NO forward test reads it)
+
+```json
+{"t_pp": 0.0, "fit_end": "2026-11-08T00:00:00Z", "test_end": "2026-11-19T00:00:00Z", "forward_start": "2026-11-20T00:00:00Z", "forward_events": 150, "verdict": "NO CHALLENGER (FIT stop)"}
+```
+
+Scratch (not in git): `C:\tmp\s7cp\` -- `ledger.json` (dump), `report.txt` / `report.json`, `coverage.json`,
+`a5_funnel_2026-11-18.json` + `a5_funnel.log`, the synthetic dry run `synth_report.txt`.
