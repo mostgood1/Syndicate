@@ -175,16 +175,25 @@ full down/up. Each change in it already has the user's own yes.
 | A | NFL profile t0.925 (P6) | branch `refit/nfl-level-t0.925` @ `12034bf24` | "Yes, that window" | the batch task |
 | B | #834 NBA live total anchor env key (P3) | main `88193c0a7`, default off | "Yes, in 11-24" | `nba-live-resim-total-anchor` |
 | C | #842 look-ahead keys (P15), droppable | on main, default off | "Fix day 1, retire day 2" | `lookahead-day2-phase-lock` |
-| **D (proposed)** | **#844 grid newest-stamp-by-time env key (P2)** | **building now; must land on main DEFAULT-OFF with an off != on test** | 11-18 ~6:40 PM CST: "get 844 landed default off for 11-24" (that is the landing; adding it to the batch's load is asked separately) | `ncaab-total-overprojection` |
+| **D (proposed)** | **#844 grid newest stamp by time (P2): `SYNDICATE_BOOK_GRID_NEWEST_BY_TIME=on`, GLOBAL in `local_production.env`** | **ON MAIN `25a5e480d`, DEFAULT OFF** (verified here 11-18 ~7:00 PM CST: enabled only for on/1/true/yes; absent and `off` keep the old text max; `tests/test_book_grid_newest_stamp.py` 23 passed). Roles that read it: refresh-worker (the book-grid artifact build, and the board child that inherits its env) and web (inline `/api/board/book-grid`, `/api/board/cross-book`). live-odds-worker builds no grid | 11-18 ~6:40 PM CST: "get 844 landed default off for 11-24" (that is the landing; adding it to the batch's load is asked separately) | `ncaab-total-overprojection` |
 
-**D's predictions** (the builder may sharpen them; from `findings_2026-11-18_college_quote_age_text_max.md` and pass D):
-- P844-1: NCAAB full-game moneyline, live minutes whose row age is ≤ 120 s: 25.5% → at least 75%. The books are within
-  120 s in 81.2% of minutes.
-- P844-2: WNCAAB: the 62.7% of fresh minutes that read stale falls to under 10%.
-- P844-3: the NBA, NHL, NFL, NCAAF and soccer grids are byte-identical, with the key on and off, on the same shard.
-- P844-4: about 7 more NCAAB games a day carry a priced live moneyline; about +98 NCAAB / +15 WNCAAB paper bets/day.
-- P844-5: live orders do not change: no live order path reads these rows (passes B and D). The betting-change call is
-  the builder's at load.
+**D's predictions,** registered by the builder before any load (its message to this lane, 11-18 ~6:55 PM CST),
+plus the program's P844-5:
+- Builder's A/B on real fleet shards (absent vs on):
+  - NBA 11-17 (3,885 rows) and NHL 11-17 (1,470 rows) are byte-identical.
+  - NCAAB 11-17: 190 of 2,139 rows change, and 58 cross the 120 s gate from stale to fresh.
+  - NCAAB 11-18: 140 of 1,298 change, 13 cross. WNCAAB 11-17: 21 of 270 change, 3 cross.
+  - Only `updated_at` and `age_seconds` change. A changed row is always younger, and 0 cross from fresh to stale.
+- P1, reachability: on refresh-worker's first NCAAB grid after the load, at least 1 row with a venue cell carries a
+  sportsbook-spelled `updated_at`. Before the load the count is 0.
+- P2: NCAAB full-game moneyline rows with `age_seconds` ≤ 120 rise from ~25% (25.5% of live minutes on 11-17/18) to
+  at least 70% on the first full evening slate. Fresh-by-time is 81.2%.
+- P3: the NBA and NHL grids are unchanged.
+- P4: NCAAB and WNCAAB `stale_quote` refusals per build fall, and priceable rows per build rise.
+- P844-5 (program): live orders do not change. Passes B and D found no live order path that reads a grid row's age.
+- **Betting change: the builder says yes, conservatively.** The live gate prices different college rows, and those
+  rows reach the rail flags and the live gameline ledger. Classify it `yes` and load it in the window, as the user
+  asked. A `no` would need an order-path trace that nobody has done.
 
 **Left out, on purpose:**
 - **The optional guard** `LIVE_ODDS_WORKER__SYNDICATE_STAKED_PROBABILITY_UNFITTED=market` (portfolio trace 11-18: 0 of
@@ -221,7 +230,7 @@ batch restarts the scale-up gate's clock anyway, so adding D costs no extra rest
 | L4 | `live-bet-timing-forward` | nothing new | (already registered) |
 | L6 / M5 exit fees | `portfolio-monitor` | lanes.md note | count `exit_applied.exit_fee_dollars` in the readout's fee fields |
 | P1 calibration everywhere | **new session proposed**; todo #847 | proposal card | lane, pre-registration, default-off build |
-| P2 #844 | `ncaab-total-overprojection` (top session) | message 11-18 ~6:45 PM CST with the user's words | land default-off; SHA, roles, prediction |
+| P2 #844 | `ncaab-total-overprojection` (top session) | message 11-18 ~6:45 PM CST with the user's words | **DONE:** landed default-off `25a5e480d` (verified here), roles and predictions in §4 D |
 | P5 | `ncaab-total-overprojection` | lanes.md note | C-3's post-#816 number |
 | P4, P11, P12 | `basketball-scenario-calibration` | lanes.md note | the overshoot since F1, the OT rate, the unfed form inputs |
 | P7, P10 | `syndicate-decision-engine` (umbrella) | lanes.md note | an owner for #836's shadow read and #835 |
