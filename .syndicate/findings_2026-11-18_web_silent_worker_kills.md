@@ -213,5 +213,22 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
   - Since the load: 0 doubles under 30 s in 12 recycles.
 - The day counter for the owed reading is scratchpad `wsk_day.py` / `wsk_day.sh`. Its `silent_kills` counts 5 on 11-17:
   the lane's 4 plus 16:13:23Z, the self-inflicted `/api/portfolio/paper` GET named above.
+- Reading 3, 2026-11-19 01:05Z (7:05 PM CST 11-18), checked against the portfolio monitor's F14 (its findings, reading 51):
+  - F14's 01:03:21Z pair re-derived: 392526 recycled at 1,202 MB (limit 625); 0.1 s later 394203 (1,230 MB, limit 618)
+    was held. The hold ordered the exits; it cannot stop both workers being over the line at once.
+  - Since the load (19:14:22Z, 5.85 h): 41 recycles (37 hard, 0 emergency), 0 doubles under 30 s, 9 holds, 0 WORKER
+    TIMEOUT, 0 dumps, respawn p50 3.6 s / max 15.8 s.
+  - Holds ran 8.8, 13.1, 20.4, 29.6, 31.0, 180.9, 339.6 and 1,000.9 s. Each ended on the held worker's next 1-3 requests.
+    1,000.9 s: 276452 went from request 10 to 11 in 16.7 min, so it served nothing in between.
+  - Peaks climb through the day: max 1,323 MB at 00:14:48Z, 63 MB under that worker's emergency line (limit + 750).
+    Past that line a hard recycle skips the hold by design, so doubles can come back on the evening slate. That is
+    the emergency valve working, not the hole; the growth itself belongs to the endpoints, not to this lane.
+  - Latent instrument flaw, not yet fired (`gunicorn.conf.py` `decide_recycle`):
+    - The below-limit branch clears `_syndicate_hard_pending` but not `_syndicate_hard_deferred_at`.
+    - A worker held, then dipping below its limit, then held again would log no second DEFERRED line, and its
+      `hard_deferred_s` would count from the first hold.
+    - Behaviour is unaffected. 0 of the 8 completed holds were exposed: a dip resets the pending flag, so the next
+      non-5th request would have skipped the check, and every one recycled within 1-3 requests.
+    - Fix: clear it in that branch, at the next web load.
 - Correction: the lane status said the widening happened at "19:30Z". The fleet clock read 19:13:44Z at the baseline, so it
   was ~19:05Z.
