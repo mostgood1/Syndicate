@@ -44,6 +44,8 @@ recorded price; venue fees are NOT netted.
                 whatever the board ranked on, with `sim_roi` on the same rows: does the sim agree
                 with the lines the market flagged? NOT a promise the board made.
   ci95          a 95% percentile interval on roi, `RESAMPLES` bootstrap resamples over GAMES
+  ladder_roi    each alt LADDER once (its rungs' mean pnl), averaged over ladders -- the paper book caps
+                stake per ladder (`portfolio_commit.cap_alt_ladder_stakes`), so per bet over-weights them
 Windows: `1d` is one kickoff date (Central). `28d` is the scorecard's window: for run day D, kickoff dates
 [D-28, D-1], labelled D, so a `28d` row sits beside `model_scorecard_<D>.json`'s three sets.
 Season phases are NEVER pooled (`season_phase`, learnings 2026-10-05). Every row names its phase, and the
@@ -108,6 +110,10 @@ SEED = 20261118
 # An ungraded line is retried while its kickoff is this recent (box scores and settlers can lag); after that its
 # reason is final and it is not fetched again.
 RETRY_DAYS = 7
+# Dated copies kept beside `latest` (~3 MB each on 11-18). `latest` carries every day's rows, so these are an audit
+# trail, not history; older ones are deleted (this folder only).
+DATED_KEEP_DAYS = 14
+DATED_RE = re.compile(r"^suggested_set_(\d{8})\.json$")
 # The first board date whose recorder file can carry `sg` (`[layer2-suggested-opps]`, loaded 10-13 16:49Z).
 SG_FIRST_DATE = "2026-10-13"
 SG_TRUE = '"sg":true'
@@ -354,6 +360,15 @@ def _pct(value: float | None, digits: int = 2) -> float | None:
     return None if value is None else round(100.0 * value, digits)
 
 
+def ladder_of(row: Mapping[str, Any]) -> tuple[Any, ...]:
+    """The paper book's alt-ladder unit (`portfolio_commit.cap_alt_ladder_stakes`): event, market without
+    `_alt` / `_alternate`, segment, player and side -- plus the pregame/live phase, as the 11-02 grade kept it."""
+    market = str(row.get("market") or "")
+    for suffix in ("_alternate", "_alt"):
+        market = market.removesuffix(suffix)
+    return (row.get("game"), row.get("phase"), market, row.get("segment"), row.get("player"), row.get("side"))
+
+
 def summarise(rows: Sequence[Mapping[str, Any]], *, row_id: str, resamples: int) -> dict[str, Any] | None:
     """The set's numbers over `rows` (graded rows), or None when no row is priced."""
     priced = [r for r in rows if r.get("pnl") is not None and r.get("price") not in (None, 0) and r.get("y") is not None]
@@ -381,7 +396,13 @@ def summarise(rows: Sequence[Mapping[str, Any]], *, row_id: str, resamples: int)
     bets = len(priced)
     units = sum(float(r["pnl"]) for r in priced)
     wins = sum(1 for r in priced if float(r["y"]) >= 1.0)
-    ci = roi_interval([(p, b) for p, b in games.values()], resamples=resamples, seed=_seed(row_id))
+    ladders: dict[tuple[Any, ...], list[float]] = collections.defaultdict(list)
+    for r in priced:
+        ladders[ladder_of(r)].append(float(r["pnl"]))
+    ladder_means = [sum(v) / len(v) for v in ladders.values()]
+    # Games in a FIXED order: the seed alone does not make the draw repeatable when the rows arrive in another order
+    # (the state reloads sorted), and a daily number must not move on identical data.
+    ci = roi_interval([tuple(games[g]) for g in sorted(games)], resamples=resamples, seed=_seed(row_id))
     return {
         "bets": bets,
         "games": len(games),
@@ -391,6 +412,8 @@ def summarise(rows: Sequence[Mapping[str, Any]], *, row_id: str, resamples: int)
         "roi_pct": _pct(units / bets),
         "roi_ci95_lo_pct": _pct(ci[0]) if ci else None,
         "roi_ci95_hi_pct": _pct(ci[1]) if ci else None,
+        "ladders": len(ladder_means),
+        "ladder_roi_pct": _pct(sum(ladder_means) / len(ladder_means)),
         "predicted_ev_pct": _pct(sum(model_ev) / len(model_ev)) if model_ev else None,
         "model_bets": len(model_ev),
         "model_roi_pct": _pct(sum(model_pnl) / len(model_pnl)) if model_pnl else None,
@@ -478,6 +501,18 @@ def write_json(path: Path, payload: Any) -> int:
     tmp.write_text(json.dumps(payload, separators=(",", ":"), sort_keys=True, default=str), encoding="utf-8")
     os.replace(tmp, path)
     return path.stat().st_size
+
+
+def prune_dated(out_dir: Path, today: str, keep_days: int = DATED_KEEP_DAYS) -> list[str]:
+    """Delete this grader's own dated copies older than `keep_days`. Touches nothing else in the folder."""
+    floor = _shift(today, -keep_days).replace("-", "")
+    removed = []
+    for path in sorted(out_dir.glob("suggested_set_*.json")):
+        match = DATED_RE.match(path.name)
+        if match and match.group(1) < floor:
+            path.unlink()
+            removed.append(path.name)
+    return removed
 
 
 def resolve_data_root(arg: str | None) -> Path | None:
@@ -589,6 +624,8 @@ def main(argv: list[str] | None = None) -> int:
             "sim_ev": "mean(p_model * decimal(price) - 1) over every row the sim priced, whatever the board ranked "
                       "on; sim_roi on the same rows. Not a promise the board made.",
             "ci95": f"percentile interval of roi, {args.resamples} bootstrap resamples over games",
+            "ladder_roi": "each alt ladder (game, phase, market without _alt/_alternate, segment, player, side) "
+                          "counted once at its rungs' mean pnl",
             "windows": f"1d = one Central kickoff date; {WINDOW_DAYS}d = kickoff dates [day-{WINDOW_DAYS}, day-1], "
                        "the scorecard's window, labelled with the scorecard's run day",
             "season_phase": "season_phase.season_phase per kickoff date; never pooled; the all-sports row is "
@@ -613,6 +650,9 @@ def main(argv: list[str] | None = None) -> int:
             log(f"WROTE {out_dir / name} bytes={write_json(out_dir / name, payload)}")
         if not args.no_state:
             log(f"WROTE {state_file} bytes={write_json(state_file, state)}")
+        removed = prune_dated(out_dir, today)
+        if removed:
+            log(f"PRUNED {len(removed)} dated copies older than {DATED_KEEP_DAYS} days: {removed[0]}..{removed[-1]}")
     except OSError as exc:
         log(f"WRITE_FAILED {type(exc).__name__}: {exc}")
         return 5

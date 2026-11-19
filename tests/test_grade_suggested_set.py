@@ -190,12 +190,34 @@ def test_summarise_uses_the_optimizers_definitions():
     assert out["roi_ci95_lo_pct"] <= out["roi_pct"] <= out["roi_ci95_hi_pct"]
 
 
+def test_ladders_once_counts_each_alt_ladder_at_its_rungs_mean():
+    def rung(market, line, pnl, player="jane doe"):
+        return dict(_row("2026-11-10", pnl=pnl, y=1.0 if pnl > 0 else 0.0, market=market),
+                    segment="full", player=player, side="over", line=line)
+
+    rows = [rung("player_points", 19.5, 1.0), rung("player_points_alternate", 24.5, -1.0),
+            rung("player_points_alternate", 29.5, -1.0), rung("player_points", 19.5, -1.0, player="john roe")]
+    out = G.summarise(rows, row_id="x", resamples=50)
+    assert out["bets"] == 4 and out["roi_pct"] == -50.0
+    # jane doe's three rungs are one ladder at mean -1/3; john roe's one rung is another at -1.
+    assert out["ladders"] == 2
+    assert out["ladder_roi_pct"] == pytest.approx(100 * (-1 / 3 - 1) / 2, abs=0.01)
+
+
 def test_a_market_ranked_set_has_no_predicted_ev_but_keeps_the_sims():
     rows = [_row("2026-11-10", p_model=0.55, eb="market_fair"), _row("2026-11-10", game="g2", pnl=-1.0, y=0.0)]
     out = G.summarise(rows, row_id="x", resamples=50)
     assert out["predicted_ev_pct"] is None and out["model_bets"] == 0
     assert out["sim_bets"] == 1 and out["sim_ev_pct"] == pytest.approx(10.0)
     assert G.summarise([_row("2026-11-10", pnl=None)], row_id="x", resamples=10) is None
+
+
+def test_the_interval_does_not_depend_on_row_order():
+    rows = [_row("2026-11-10", game=f"g{i}", pnl=(1.0 if i % 3 else -1.0), y=(1.0 if i % 3 else 0.0)) for i in range(30)]
+    forward = G.summarise(rows, row_id="x", resamples=300)
+    backward = G.summarise(list(reversed(rows)), row_id="x", resamples=300)
+    assert (forward["roi_ci95_lo_pct"], forward["roi_ci95_hi_pct"]) == (backward["roi_ci95_lo_pct"],
+                                                                         backward["roi_ci95_hi_pct"])
 
 
 def test_the_interval_resamples_games_and_is_seeded():
@@ -278,6 +300,16 @@ def test_make_grade_record_runs_the_record_through_grade_rows():
     assert row is None and reason == "extra_player_not_found"
     row, reason = grade_record(_record(KEY_A, "2026-11-18T12:00:00Z", ct="2026-11-19T00:00:00Z"))
     assert row is None and reason == "not_yet"
+
+
+def test_prune_deletes_only_its_own_old_dated_copies(tmp_path):
+    for name in ("suggested_set_20261101.json", "suggested_set_20261104.json", "suggested_set_20261118.json",
+                 "suggested_set_latest.json", "suggested_set_state.json", "other_20261101.json"):
+        (tmp_path / name).write_text("{}")
+    assert G.prune_dated(tmp_path, "2026-11-18") == ["suggested_set_20261101.json"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "other_20261101.json", "suggested_set_20261104.json", "suggested_set_20261118.json",
+        "suggested_set_latest.json", "suggested_set_state.json"]
 
 
 # --------------------------------------------------------------------------- refusals
