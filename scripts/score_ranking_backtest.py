@@ -139,6 +139,14 @@ def graded_row(record: Mapping[str, Any], graded: Mapping[str, Any]) -> dict[str
         "qsa": _num(record.get("qsa")),
         "fab": record.get("fab"),
         "src": record.get("src") or "recorder",
+        # The grader's own probabilities and price, as `grade_population` returned them [2026-11-18, lane
+        # layer2-suggested-grader]: the daily optimizer's EV columns are p_market * odds - 1 (market) and
+        # p_model * odds - 1 (model), so a set graded through this row reports them by the same formula.
+        # `k` lets a caller key a graded row back to its record.
+        "k": record.get("k"),
+        "p_market": _num(graded.get("p_market")),
+        "p_model": _num(graded.get("p_model")),
+        "price": _num(graded.get("price")),
     }
 
 
