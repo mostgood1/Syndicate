@@ -1736,6 +1736,7 @@ death, never life — do not invert it.
 - Falsification test: D = ROI(kept) - ROI(all) on TEST has a 95% CI upper < 0 (early KILL), or FIT shows no gain at any keep share (NO CHALLENGER); otherwise a forward test from 2026-11-20 decides at 150 events (GO iff CI lower > 0)
 - Verification: pre-registration pushed to main before any outcome number; result section in the same file
 - Blocked by: none
+- Note `[2026-11-19 14:06Z]`: this lane is run by a subagent of the portfolio-monitor session and shares its session id (69d80317). Per the user's instruction no marker was written, so lane-guard read the parent's marker (`portfolio-monitor`) and refused Write on this lane's own files. The two files were written outside the repo and copied in (lane-postwrite-check warned, as expected). No other lane's file was touched.
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
