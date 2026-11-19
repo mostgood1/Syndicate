@@ -1807,6 +1807,12 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### board-read-cold-share — OPEN — opened 2026-11-19 — session eb973f38-791a-4e17-b512-b496ae1f9592
+- STATUS 2026-11-19 ~1:45 PM CST: GOAL: NOT MET. Done:
+  - (1) H-a NOT falsified: 69 of 75 cold reads (92%) on 11-18 5-11 PM CST, and 151 of 198 (76%) on 11-17, were a new worker's first board read. TTL was 3-12% (32% on the quiet 11-19 morning) and overlay 5-12%.
+  - (2) The fix is on main DEFAULT-OFF behind `SYNDICATE_COMBINED_BOARD_SHARED_COPY`: tests 20 + 1 POSIX skip, off != on, plus 217 in 18 existing files.
+  - (3) P1-P6 are pre-registered in `.syndicate/findings_2026-11-19_board_read_cold_share.md`.
+  - Todo #853. Betting change: no (web-only reader).
+  - Left: (4) the user's load decision (`WEB__` env key + a drained full down/up); (5) the first-evening reading.
 - Goal: The Layer 2 page's board query (POST /api/intelligence/query on web) stops paying a cold board_read on most requests: attribute every cold read (worker recycle / TTL / overlay / other) from the fleet web log with denominators, build the fix behind an env switch (absent = old behaviour) with off != on + reachability tests, land on main default-off, pre-register the first-evening prediction (cold share, query p50/p90, recycles/h), and put the load to the user. Asked by the rail monitor session 62433e58 (lane layer2-rail-monitor, I-28).
 - Files: pipeline/intelligence_state.py (the combined-board cache read and write in read_combined_intelligence_response plus a shared-copy helper beside the overlay warmer ONLY), syndicate/features/shared/combined_board_shared_copy.py (NEW), tests/test_combined_board_shared_copy.py (NEW), scripts/rail_monitor/coldread_attrib.py (NEW), .syndicate/findings_2026-11-19_board_read_cold_share.md (NEW), docs/ai_context/todo.md (the new board-read item section ONLY)
 - Hypothesis: Stated after the read-only attribution (run before this lane opened, recorded as such). H-a: on a live evening the cold reads are the first combined-board call in a freshly recycled web worker (each process keeps its own cache). H-b: TTL expiry (180 s on web; the overlay warmer refreshes only on a newer overlay). H-o: a newer in-play overlay refused the entry before the warmer rebuilt it. FIX HYPOTHESIS: a worker that finds another worker's build of the same key, fresh by the SAME TTL and overlay rules, adopts it (a ~0.7 s load) instead of rebuilding (3.9-8.8 s), and serves it while another worker's rebuild is in flight, so most boot-cold reads become loads without raising the recycle rate.

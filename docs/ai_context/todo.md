@@ -1,5 +1,26 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#853` — **THE LAYER 2 BOARD QUERY'S COLD `board_read` IS A NEW WEB WORKER BUILDING A BOARD THE OTHER WORKER ALREADY HOLDS: 69 of 75 cold reads on 11-18 5-11 PM CST (92%; 151 of 198 = 76% on 11-17) were a freshly recycled worker's FIRST board read. The cache is per process, and the memory guard recycles a worker that has built the board (anon p50 980 MB vs a ~634 MB limit). TTL expiry is 3-12% of cold reads on evenings and 32% on the quiet 11-19 morning; overlay expiry is 5-12%. The published board's version is never read. Fix on main DEFAULT-OFF behind `SYNDICATE_COMBINED_BOARD_SHARED_COPY`: a worker adopts another worker's copy (fresh by its own TTL and overlay rules), or serves it while another worker rebuilds. Not a betting change. LOAD = the user's decision (an env change: a drained full down/up)** `[2026-11-19, lane board-read-cold-share, session eb973f38; rail monitor I-28; findings `.syndicate/findings_2026-11-19_board_read_cold_share.md`]`
+
+- **Measured** (`scripts/rail_monitor/coldread_attrib.py`, fleet web log, read-only; per-request rows in `C:\tmp\coldread\rows_*.txt`):
+
+  | window (CST) | queries | cold | boot_cold | TTL | overlay | all p50 / p90 |
+  |---|---|---|---|---|---|---|
+  | 11-17 5-11 PM | 370 | 53.5% | 76% of cold | 12% | 12% | 6.4 / 16.3 s |
+  | 11-18 5-11 PM | 125 | 60.0% | 92% | 3% | 5% | 7.2 / 16.1 s |
+  | 11-19 7 AM-1 PM | 60 | 68.3% | 59% | 32% | 10% | 6.4 / 14.0 s |
+
+- **Rejected:** warming at worker boot. A built board puts a new worker over the recycle limit at once, so the guard would recycle it at its 120 s minimum age and the recycle rate would RISE.
+- **Built:** `syndicate/features/shared/combined_board_shared_copy.py` plus three call sites in `read_combined_intelligence_response`.
+  - Copies are streamed by pickle to `/dev/shm/syndicate-combined-board-<uid>` (0700, owner-checked).
+  - Load measured at 0.51 s for a 4,622-row board, against a 3.9-8.8 s build.
+  - A cross-worker lease means one overlay change is built once, not once per worker.
+  - Tests: `tests/test_combined_board_shared_copy.py` (20 + 1 POSIX skip, off != on parametrized); the 18 existing combined-board files pass (217).
+- **Projection (a model):** evening cold share 60% -> ~14% (11-18) and 53.5% -> ~5% (11-17). Daytime TTL misses are unchanged.
+- **Owed:**
+  1. The user's load decision. Set `WEB__SYNDICATE_COMBINED_BOARD_SHARED_COPY=1` in `local_production.env`, ff to a SHA carrying the code, then a drained full down/up: its own, or a ride-along on the next planned one.
+  2. The first-evening reading against the pre-registered P1-P6 in the findings file: cold share <= 25%, query p50 <= 5.5 s / p90 <= 13 s, recycles/h and anon at recycle within 1.3x / 1.1x.
+
 ### `#852` — **THE NCAAF LIVE RE-SIM'S LATE "SURPLUS" (#835's H-ENDGAME) IS A MARGIN-BLIND END-GAME: blowouts run OVER because the LEADER keeps scoring (ledger finals 2026, 75-95%: +2.12 at 17-24 and +2.86 at 25+; 2024 resumed real states: leader +2.2 of a +2.05 surplus at Q4 15:00), one-score games run UNDER through the trailer's last two minutes and overtime (engine OT 3.6 pts per OT game vs 12.4). The mean cancels; the slope pays. #808's switches are reachable (+1.17 at every margin) but make blowouts worse. #686's existing default-off leader-only `blowout_damping_strength` is the lever: 0.9 lifts the 2024 late slope 0.67 -> 0.77 (log loss -0.026, se 0.0075) and, on top of #835 on the 2026 ledger, slope 0.84 -> 0.89, log loss -0.0076 (se 0.0040). NOTHING BUILT: a live-only default-off switch waits on the user's yes** `[2026-11-19, lane ncaaf-live-endgame-surplus, session 617b553b; from #835's lead; findings `.syndicate/findings_2026-11-19_ncaaf_live_endgame_surplus.md`]`
 
 - **What was believed** (brief, from #835): smartsim2's NCAAF end-game scores too much late (1.29x the close's even pace at 75-95% vs Kalshi's 0.82x; late centre +2.0 to +2.2 over Kalshi), suspected seat #808's end-game mechanisms being off for NCAAF.
