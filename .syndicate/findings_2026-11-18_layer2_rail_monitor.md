@@ -582,3 +582,15 @@ Both cards' total rows carry `live_total_basis: None`. `i17check.py` at 6:42:57 
 **Team cards:** 0 defects.
 
 **Monitor note:** the probe first ran from `C:\tmp\railmon\dash` (wrong cwd, rc 2). It was re-run from the worktree at 6:40:35 PM.
+
+### CORRECTION to reading 13's P1 attribution (~6:55 PM CST, from the I-17 owner local_1f10ce63)
+
+The 2 contradictions are **real**, but my "rows with `live_total_basis: None`" attribution was wrong.
+- `liverail_0.json` (same folder) shows every FULL-game totals row of both games is `calibrated`. The basis-None rows I printed were the h1/h2 half totals (calibration is full-game only, by design), and the probe's `rail.json` card rows do not carry the field.
+- **The cause is the card:** `liveRailSummary` takes `marketRows.find(basis === "calibrated")`, which is the FIRST calibrated row of the market, not the flagged row.
+  - Chattanooga @ Winthrop: the flagged u154.5 row's own calibrated total is 153.4 (consistent). The card showed 156.0 from the 157.5 row, which was 152-249 s old.
+  - Coppin St @ La Salle: the flagged row's own total is 143.9. The card showed 146.0 from the 147.5 row.
+- **The fix belongs to the I-17 owner:** OURS will use the flagged/main row's own calibrated total, with the freshest calibrated row as the fallback.
+- The owner's row-level watcher saw 0 because it checks each row against its own line. Its deploys.md 00:50Z "MET" is being corrected to "measured rows, not cards".
+- **WNCAAB live: 0 of 111 calibrated is by design.** It has no fitted calibration (thin sample) and serves the sim total. BC-048 is the PREGAME market fallback.
+- Lesson: the monitor's P1 counter (card edge vs card "ours") and the owner's watcher (row vs own line) measure different things. The card one is what the user sees.
