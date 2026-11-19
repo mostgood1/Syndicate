@@ -3608,3 +3608,9 @@ as a verdict.
 - **Caught by:** listing the names in the SCORED POPULATION that the map leaves unresolved, before reading any comparison. Rerun at one code state; 3 leagues reproduced byte-identically, 2 changed.
 - **Rule:** in any harness that calls `_fill_promoted` / `_gate_few_match` / `_rating_for` on names from a different source than production's, print the unresolved names that occur in the population and require it to be empty. A fill-on-miss function turns a join miss into a confident wrong prior, not a missing row.
 - *(evidence in `.syndicate/findings_2026-11-18_understat_fallback_backtest.md` section 9)*
+
+## 2026-11-18 — OVERTURNED: "the recorder's `sg=true` rows ARE the board's suggested set" -- `sg` is the flag at a line's FIRST sighting per board date, so it holds about half of what the board suggests `[lane layer2-suggested-grader, session ab77b427]`
+- **What was believed:** four grades (10-19, 10-23, 10-26, 11-02) and the daily grader's first draft graded "Suggested" as every `sg=true` recorder record.
+- **What is true:** the recorder dedups per (board date, phase) at the first sighting (`seen_key`). A line that turns suggested at a later build is already recorded with `sg=false` and is never written again that day. Of 610 lines suggested at a day's last build (decision records, 10-23..11-17), 304 (49.8%) have an `sg=true` record, 304 only `sg=false`, and 2 none. The staked set has no such gap: the paper book stakes from every build.
+- **Rule:** before grading any per-build flag from the opportunity recorder, cross-check it against a second view of the flag, such as the decision records' last build, and state the capture rate. Call the set "suggested at first sight" until a recorder change writes the first suggested sighting (`#sg`, findings §7).
+- *(evidence in `.syndicate/findings_2026-11-18_suggested_set_grade.md` section 2; `C:\tmp\sgset_1118\gap.json`)*

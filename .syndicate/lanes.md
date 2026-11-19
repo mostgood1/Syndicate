@@ -1643,6 +1643,14 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### layer2-suggested-grader — OPEN — opened 2026-11-18 — session ab77b427-6b1c-4647-b576-7308915d860f
+- Verdict 2026-11-18 6:13 PM CST: "A daily grader of the Layer 2 board's SUGGESTED set (earliest sg=true sighting per identity per phase), by sport and market, per day and 28-day rolling, built on the scorecard's own grader + settlers (score_ranking_backtest.grade_rows / bucket_search.grade_population), on main with tests; its results JSON on the fleet data root in the rail monitor's board-results row shape; findings with per-family coverage and the comparison with the scorecard's published and staked sets" -- GOAL: MET.
+  - Grader + 20 tests on main (`f570e43b6`, `2119c68f1`).
+  - The Verification ran: the fleet hand run at 6:07 PM CST wrote `~/syndicate-prod/data/reports/suggested_set/suggested_set_latest.json` (4,945 rows); the 11-02 reproduction is exact; tests 20/20.
+  - Findings `.syndicate/findings_2026-11-18_suggested_set_grade.md`.
+  - HYPOTHESIS FALSIFIED per sport: NBA -3.20 vs published -1.16, NCAAB -8.95 vs -4.66. Pooled it holds narrowly, -3.02 [-5.56, -0.51] vs -5.87.
+  - Stays OPEN only for the user's two calls: the daily refresh (Windows task after a fleet ff) and the recorder `#sg` record (§2: 304 of 610 suggested lines captured).
+  - Todo `#846` is unwritten: `todo.md` is claimed by lane `wnba-native-live-cutover`.
+  - Close when the user answers.
 - Goal: A daily grader of the Layer 2 board's SUGGESTED set (earliest sg=true sighting per identity per phase), by sport and market, per day and 28-day rolling, built on the scorecard's own grader + settlers (score_ranking_backtest.grade_rows / bucket_search.grade_population), on main with tests; its results JSON on the fleet data root in the rail monitor's board-results row shape; findings with per-family coverage and the comparison with the scorecard's published and staked sets
 - Files: scripts/grade_suggested_set.py, tests/test_grade_suggested_set.py, scripts/score_ranking_backtest.py, .syndicate/findings_2026-11-18_suggested_set_grade.md, .syndicate/state_layer2.md
 - Hypothesis: Over the fleet's whole sg history (sg stamped from 2026-10-13), the suggested set's flat-unit ROI per bet is HIGHER than the scorecard's published (recommended) set over the same 28-day windows, in each sport with >= 60 graded games, and pooled across sports the game-clustered 95% interval of suggested ROI lies above the published set's point estimate
