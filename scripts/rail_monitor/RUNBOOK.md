@@ -109,6 +109,22 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
   - P4: NCAAB `stale_quote` refusals per build fall versus 11-19.
 - Write the verdict to `findings_2026-11-18_college_quote_age_text_max.md`, a deploys.md READING entry, and todo #844.
 
+**R-C. Suggested-set coverage check (from the archived session local_fbe07d8c).** The one-off scheduled task `suggested-set-coverage-1120` runs Fri 11-20 at 7:45 AM CST. At the 11-20 DAY START, read its run result (`list_task_runs`) and put the outcome in that day's findings file.
+
+**R-D. #851: the Polymarket slate sweep runs off the live-odds main loop (`8f0d73a2e`, default off; CHANGE E, droppable, of the 11-24 2:15 AM batch task `nfl-level-refit-load-1120`).** Taken over 11-19 from session local_73a5d2dd (lane `polymarket-slate-off-odds-loop`). The user answered "Yes, take it" to "Should the monitor take #851's 11-24 reading so its session can be archived?".
+- First check deploys.md for the 11-24 batch: did CHANGE E load (`LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND=1` in `local_production.env`, then a drained full down/up)? If E did not load, there is no reading; it waits for the 12-08 window.
+- The window is the first live evening after the load: 00-05Z on UTC date 2026-11-25 (11-24, 6-11 PM CST). Read it after 05:00Z (11 PM CST):
+  `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p851_loopstages.py 2026-11-25"`
+  - The reader is the lane's `C:\tmp\w1124_851\loopstages.py` with the window taken from argv, plus P2 and P4 lines; it is rebuilt by `make_p851.py`.
+  - Baseline, reproduced exactly on 11-19 for 11-16..11-19: 482 iterations, p50 100 s, p90 299 s, 138 over 180 s, 117 slow iterations carrying a slate write. Output: `C:\tmp\railmon\p851_baseline_1116_1119.txt`.
+- Predictions, registered by the lane before the build (todo #851):
+  - P1: iteration p90 <= 200 s (was 299 s), and <= 12% of iterations over 180 s (was 29%);
+  - P2: odds-sweep attempt gap p90 <= 200 s (the `#851 P2` lines; NCAAB was p90 299 s);
+  - P3: slate write gap p50 within 173 s +-20% (139-208 s);
+  - P4: 0 `POLYMARKET_ARTIFACT_STALE`;
+  - P5: 0 slow iterations (post > 120 s) where the slate is the larger part (was 117).
+- Each is PREDICTED, FALSIFIED or NEITHER. Name any restart in the window (it CONFOUNDS the reading). Write the verdict to the lane `polymarket-slate-off-odds-loop`, a deploys.md READING entry, and todo #851.
+
 ## NIGHTLY CLOSE
 
 1. The probe shows 0 live games. **Fetch day D's finals by date:**
