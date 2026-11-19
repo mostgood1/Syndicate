@@ -918,3 +918,28 @@ The suggested recorder fix (local_fbe07d8c) was waiting for the in-flight build 
 **Live odds lane:** 11 launched, 1 refused (8.3%); 12 live runs, max 267 s.
 
 **Team cards:** 0 defects.
+
+## Reading 23 — Wed 11-18 11:04 PM CST (05:04Z 11-19): two loads, and 0 card contradictions after the I-17 card fix
+
+**Fleet:** **`d78a448c4`**. Host load 4.4. Two loads since reading 22, from deploys.md:
+
+| time (CST) | load | betting change | how |
+|---|---|---|---|
+| 10:46:22 PM | `a3104a5b6` -> `199d6c529`: the recorder writes a line's FIRST SUGGESTED sighting | no | ff, drain (3 `DEFERRED_BOARD_BUILD` in this window), and a board-child TERM; the refresh-worker parent was NOT restarted |
+| 10:58:14 PM | `199d6c529` -> `d78a448c4`: the I-17 rail-card OURS fix `523357e7f` plus the calibrated-total score floor | no | ff only, no restart; web serves it from 10:59:30 PM |
+
+- **The suggested recorder load (local_fbe07d8c):** the board child exited `rc=0 reason=exit` at 10:46:41 PM (a clean TERM, not the recycle abort). Child 698409 is attempt 8. Its first build wrote 103 suggested-sighting records, and the daily 7:15 AM grade task is registered.
+- **The card fix:** the score floor reaches the board child at its next respawn and the refresh-worker parent (pid 152916, still `d1e14be46`) at its next restart. Overlay rows can still show ours below points until then. #844 and #847 rode along with their keys absent (off).
+
+**P1 split at 10:59:30 PM:** before it, 1-2 card contradictions per reading from 6:40 PM; **after it, 0** (this read, 3 college totals flags).
+
+**Board:** 4 builds, median 306 s, max 340 s; publication gap median 529 s, max 639 s. No memory-guard refusal in this window.
+
+**Slate: 8 live.**
+- Flags: 20 shown, 0 false, 0 missed, 0 dark. #824: 0. P6: 0.
+- Live rows: 453, 231 priced <= 120 s.
+- Web merges 73, **146 stale** (NCAAF 73, WNCAAB 73): those slates are finished.
+
+**Live odds lane:** 15 launched, 1 refused (6.2%); 15 live runs, max 73 s.
+
+**Team cards:** 0 defects.
