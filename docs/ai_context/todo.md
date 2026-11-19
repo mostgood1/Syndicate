@@ -54,7 +54,7 @@
   - grading defects (#848);
   - board build priority (#849).
   - Hand-off notes are in each owner's lanes.md block, dated 11-18 ~7:05 PM CST.
-- **11-24 package:** the existing batch (NFL t0.925, #834, #842) plus #844's global key `SYNDICATE_BOOK_GRID_NEWEST_BY_TIME=on`. Adding #844 is the user's call, put to them 11-18 ~7:10 PM CST. It is worth about $0/day of live money; its value is board and paper accuracy.
+- **11-24 package:** the existing batch (NFL t0.925, #834, #842) plus #844's global key `SYNDICATE_BOOK_GRID_NEWEST_BY_TIME=on`. Adding #844 was put to the user 11-18 ~6:59 PM CST. USER 11-18 ~7:00 PM CST: "Yes, add it" (to "Add #844's key to the 11-24 window batch?"). Added as droppable CHANGE D to batch task `nfl-level-refit-load-1120` (Tue 11-24 2:15 AM CST, one ff + one drained down/up): prompt read back byte-identical 7:07 PM CST; schedule unchanged. Kit `C:/tmp/optprog/window1124/kit_env_844.sh` (self-tested on a dummy env file 7:04 PM CST: append, idempotent, restore, real file untouched). If the batch does not load D, D waits for 12-08. It is worth about $0/day of live money; its value is board and paper accuracy.
 - **Hypothesis:**
   - H1 FALSIFIED: the long-shot tail gap is noise pooled over three days, -1.4 pp [-10.7, +8.0].
   - H2 holds: 7 of 26 statistical levers clear BH + LODO, all on calibration metrics, none on money.
