@@ -31,6 +31,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any
 
 from syndicate.features.shared.odds_book_quotes import (
@@ -282,6 +283,74 @@ def _age_seconds(stamp: str, *, now: datetime) -> float | None:
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
     return round(max(0.0, (now - when).total_seconds()), 1)
+
+
+# THE ROW'S NEWEST OBSERVATION, BY TIME, NOT BY TEXT `[2026-11-18, todo #844, lane
+# ncaab-total-overprojection, user "Yes, build it"]`.
+#
+# The row's `updated_at` / `age_seconds` were `max(stamps)` over the cells' `observed_at`
+# STRINGS. Stamps arrive in more than one spelling: college sportsbooks
+# `2026-11-18 20:58:05+00:00` (a space), Kalshi `2026-11-18T20:55:57Z` and Polymarket
+# `2026-11-18T20:41:51.488325+00:00` (a `T`). `T` (0x54) sorts above a space (0x20), so on a
+# college row any venue stamp won the max whatever its time, and the row read the VENUE's age.
+# The live gate reads that age (`live_gameline_join.quote_age_verdict(row["age_seconds"])`,
+# 120 s for NCAAB/WNCAAB), so a row a sportsbook had just moved was refused as stale.
+#
+# MEASURED on the fleet's quote log, full-game NCAAB moneylines, 57 live games / 6,112 live
+# minutes on 11-17 + 11-18: a book within 120 s in 81.2% of minutes, the row age within 120 s
+# in 25.5% -- 68.6% of the fresh minutes read stale. WNCAAB 11-17: 62.7%. NBA and NHL: 0%,
+# because their sportsbook stamps share the venues' `T` spelling, and there text order IS time
+# order. Grid at 20:58:22Z 11-18, Rutgers @ Notre Dame moneyline: row age 143.6 s (Kalshi)
+# while FanDuel was 14.6 s. Findings `.syndicate/findings_2026-11-18_college_quote_age_text_max.md`.
+#
+# Equal instants keep the text max, so a row whose stamps share one spelling gets the same
+# answer as before. A stamp that does not parse is skipped when any other does; when none
+# does, the old text max stands (its age was unparseable then too).
+# DEFAULT OFF `[2026-11-18, user "get 844 landed default off for 11-24"]`: it changes which
+# college live rows the gate prices, so under `.syndicate/betting_change_windows.md` rule 2 it
+# lands with ABSENT = the old text max and is switched on in a window.
+# `SYNDICATE_BOOK_GRID_NEWEST_BY_TIME=on` (or 1 / true / yes) enables it; anything else, absent
+# included, keeps the text max exactly. Every role that builds a grid must carry the key.
+_NEWEST_BY_TIME_ENV = "SYNDICATE_BOOK_GRID_NEWEST_BY_TIME"
+
+
+def _newest_by_time_enabled() -> bool:
+    import os
+
+    return str(os.environ.get(_NEWEST_BY_TIME_ENV) or "").strip().lower() in {"on", "1", "true", "yes"}
+
+
+@lru_cache(maxsize=1 << 16)
+def _stamp_instant(stamp: str) -> datetime | None:
+    """`stamp` as an aware UTC datetime, read the way `_age_seconds` reads it; None if it does not parse.
+
+    Cached: a pull stamps thousands of quotes with a handful of distinct clocks. A pure function of
+    its string, so the cache is never stale.
+    """
+    try:
+        when = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when
+
+
+def _newest_stamp(stamps: list[str]) -> str | None:
+    """The stamp latest in TIME (ties: the text max). See the block above."""
+    if not stamps:
+        return None
+    if not _newest_by_time_enabled():
+        return max(stamps)
+    best: str | None = None
+    best_when: datetime | None = None
+    for stamp in stamps:
+        when = _stamp_instant(stamp)
+        if when is None:
+            continue
+        if best_when is None or when > best_when or (when == best_when and stamp > best):
+            best, best_when = stamp, when
+    return best if best is not None else max(stamps)
 
 
 def _duration(seconds: float | None) -> str:
@@ -1156,7 +1225,7 @@ def build_book_grid(
                 }
 
             stamps = [c[s]["observed_at"] for c in cells.values() for s in c if c[s]["observed_at"]]
-            newest = max(stamps) if stamps else None
+            newest = _newest_stamp(stamps)  # by TIME, not by text: todo #844
 
             # Row-level gaps: why this row is not the full grid the reference
             # surface shows. Rendered greyed with these strings rather than
