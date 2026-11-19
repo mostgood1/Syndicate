@@ -307,3 +307,37 @@ batch restarts the scale-up gate's clock anyway, so adding D costs no extra rest
   - the ledger archive;
   - `/api/board/game-chips` for 11-15..11-17 (22 flags settled).
 - **Rail grades:** `C:\tmp\railmon\grade*_out.json` (the rail monitor's), re-pooled.
+
+## 10. What the three proposed sessions found (read 11-18 ~8:55 PM CST from main; every switch checked absent = off here)
+
+The user started all three cards ~7:10 PM CST. The rail monitor started duplicates on the user's "start 847, 848, and
+849" and stopped its own.
+
+- **#847, calibration everywhere** (lane `cell-calibration-847`, `.syndicate/findings_2026-11-18_cell_calibration.md`):
+  - **Built and on main, all default OFF:** (a) rail `SYNDICATE_CELL_CALIBRATION_RAIL`, (b) display
+    `..._DISPLAY`, (c) rank/stake `..._RANK_STAKE` (betting), (d) live probability `..._LIVE_PROB` (betting; wired into
+    `live_gameline_join` on a user-approved loan). Commits `75a787964`, `8acee817d`.
+  - **H-S (scorecard rows, time split) PASSES:** dBrier −0.0062/row [−0.0102, −0.0021], 23,564 rows / 367 games / 7
+    dates, 22 of 29 cells better.
+  - **H-R (rail flags) FAILS on coverage, not sign:** +0.0010 nats/flag [−0.0030, +0.0051]. Only 182 of 1,120 flags
+    sit in a cell the validated table serves.
+  - So use (a) is NOT supported on its own evidence yet. Pass C's +0.024 nats/flag came from a rail-fitted k, not the
+    optimizer's validated table.
+  - Forward grade H-F on Thu 11-26. (c) and (d) are 12-08 window candidates and need the user's OK then.
+- **#848, scorecard grading** (lane `scorecard-grading-defects`, CLOSED; `.syndicate/findings_2026-11-18_scorecard_grading_defects.md`):
+  - **M2 soccer props: FALSIFIED for the bulk.** Did-not-play rows are voided. The −55% is the real return of one-way
+    prop ladders at the recorded prices. What is wrong is the cell's MARKET EV: the one-way fair assumes a ~7% margin.
+  - One real defect was found on the way: goal-scorer rows ignored their side.
+  - **M3 NHL live goals: CONFIRMED, refined.** 780 of 782 ev10+ rows were priced on a quote their own book never
+    returned after puck drop.
+  - Fixes `soccer/2` and `nhl/2` are on main behind `SYNDICATE_SCORECARD_848_GRADING` (absent = off; grading only,
+    not a betting change).
+- **#849, background build priority** (lane `board-build-priority`, CLOSED, GOAL MET, NOT BUILT; `.syndicate/findings_2026-11-18_board_build_priority.md`):
+  - Far-dated soccer autorun units cost the evening board ~6 s per build and ~19 s of a 371 s publication gap.
+  - A lower priority cannot buy that back, so no switch was built (`238502852`).
+- **Effect on the ranking:**
+  - P1 holds as built-but-unproven: the scorecard grade passes, the rail grade fails on coverage, and the forward grade
+    lands 11-26.
+  - M2 becomes "the soccer prop cell's market EV is mis-stated", a display and optimizer-input defect, not grading.
+  - M3 is fixed default-off.
+  - M4 is closed as not worth building.

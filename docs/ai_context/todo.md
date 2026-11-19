@@ -51,7 +51,13 @@
 - **Hypothesis:**
   - H1 FALSIFIED: the long-shot tail gap is noise pooled over three days, -1.4 pp [-10.7, +8.0].
   - H2 holds: 7 of 26 statistical levers clear BH + LODO, all on calibration metrics, none on money.
-- **Owed:** the user's answer on the 11-24 addition; sessions for #847-#849 if the user starts them; re-rank when the 11-24 window's readings and M2 (11-24) land.
+- **Outcomes 11-18 ~8:55 PM CST** (findings section 10):
+  - #847: built default-off. H-S passes; H-R fails on coverage; H-F due 11-26.
+  - #848: M2 falsified (the soccer prop cell's market EV is mis-stated); M3 confirmed and fixed default-off.
+  - #849: closed, not built.
+- **Owed:**
+  - re-rank when the 11-24 window's readings, M2 (11-24) and #847's H-F (11-26) land;
+  - the 12-08 window candidates go to the user before 12-08: #847 (c)/(d), hold-value exits after a shadow, #816 spread-only, #836.
 
 ### `#845` — **QUEUED for the 12-08 betting-change window (user "queue the splice for the 12-08 window", 2026-11-18 4:57 PM CST): switch the Understat-outage SPLICE on then IF understat.com is still down. `SYNDICATE_SOCCER_UNDERSTAT_SPLICE` is on main default OFF; nothing to do now or at 11-24** `[2026-11-18, lane understat-fallback-backtest; `.syndicate/findings_2026-11-18_understat_fallback_backtest.md`; follows #841]`
 - **QUEUED 2026-11-18 4:57 PM CST** (user "queue the splice for the 12-08 window", 2026-11-18 4:57 PM CST). Nothing loads it automatically: it goes into the 12-08 window's batch (Tue 12-08 2-7 AM CST, one ff + ONE drained full down/up with that window's other changes). Owner of the entry: this item and the fleet-watcher's window queue (lane `understat-fetch-failures` CLOSED, user "close the lane", 2026-11-18 6:42 PM CST). Before loading, check:
