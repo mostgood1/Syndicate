@@ -1728,6 +1728,14 @@ death, never life — do not invert it.
 - Verification: Findings file with per-family coverage (score_<date>.json puck drops, manifests 11-09.., live-odds-worker logs ~11-14..), a per-game table (drop, last pre-drop refresh, first in-game refresh, wait, parts), totals with denominators, H1/H2 verdicts; deploys/state untouched (read-only).
 - Blocked by: none
 
+### s6-adverse-selection — OPEN — opened 2026-11-19 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: Study S6 of the profit learning program, read-only: a pre-registered, time-split test of whether a regularised entry-time adverse-selection filter (quote ages, book count, dispersion, time to start, price, venue move, claimed EV) raises fee-net flat ROI out of sample vs all orders (D with an event-clustered 95% CI); verdict KILL / FORWARD TEST / NO CHALLENGER written to the findings file
+- Files: scripts/s6_adverse_selection.py, tests/test_s6_adverse_selection.py, .syndicate/findings_2026-11-19_s6_adverse_selection.md
+- Hypothesis: Picks are adversely selected (11-18: win 7.8 pp under the consensus); entry-time line features, fitted on orders before 2026-11-08, identify the losing orders so that dropping the lowest-scored share raises flat ROI on 11-08..11-18 orders
+- Falsification test: D = ROI(kept) - ROI(all) on TEST has a 95% CI upper < 0 (early KILL), or FIT shows no gain at any keep share (NO CHALLENGER); otherwise a forward test from 2026-11-20 decides at 150 events (GO iff CI lower > 0)
+- Verification: pre-registration pushed to main before any outcome number; result section in the same file
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
