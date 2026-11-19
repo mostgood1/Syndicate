@@ -62133,3 +62133,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **WNCAAB:** 7-12 games, 5 / 12 / 15 flags, all `basis: sim`, 0 contradictions. WNCAAB live has no fitted calibration (it is thin), so it shows the sim's own total by design.
 - **Agrees with:** the rail monitor's own card count over the same evening (readings 10-12): no flagged college total had "ours" on the wrong side.
 - **Not covered:** the late games, and whether the calibrated total is a better number than the sim's. That second question is the #816 grade on 11-24.
+
+## 2026-11-19 00:56Z (6:56 PM CST 11-18) -- CORRECTION (no deploy) to the 00:50Z I-17 rail reading: ROWS met, CARDS did not -- 2 cards at 6:40 PM CST showed another line's calibrated total on the other side of the flag; card fix on main `523357e7f`, NOT LOADED (lane `ncaab-total-overprojection`)
+- betting change: no (reading + a display-only web template fix, not loaded).
+- **What the 00:50Z reading missed:** it checked each ROW against its own line, but the CARD's "ours" came from a different row. The rail monitor found 2 cards at 00:40:35Z (6:40 PM CST) with "ours" on the other side of the flagged line:
+  - Chattanooga @ Winthrop: flag UNDER 154.5, ours 156.0;
+  - Coppin St @ La Salle: flag UNDER 145.5, ours 146.0.
+  - **The cause:** the card took the FIRST calibrated row of the market, here the 157.5 and 147.5 rows, 152-249 s old. The flagged rows' own calibrated totals were 153.4 and 143.9, consistent with the flag. A row's calibrated total comes from its own quote and snapshot, so rows of one market disagree.
+  - **The fix:** OURS now uses the shown row's own calibrated total (`main`: the flagged row, else the main line), falling back to the freshest calibrated row. On main as `523357e7f` (web template, display only), NOT LOADED.
+  - **The replay:** the template's real `liveRailSummary` run in node over the 27 saved rail fetches of this evening (`C:\tmp\railmon\readings`, 144 flagged college totals card evaluations): old code 6 contradictions (those 2 cards, in each of the 6:40 PM reading's 3 fetches), new code 0.
