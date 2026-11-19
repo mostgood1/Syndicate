@@ -142,7 +142,7 @@ NCAAF evidence but no placeable Kalshi totals: these midweek games were not list
 
 ## Loading it: the user's yes, in a betting-change window
 
-- **Code:** branch commit in the lane's worktree, NOT on main. The push is the user's call.
+- **Code: ON MAIN `f29c53e91`** (2026-11-19 ~11:42 AM CST, user "Yes, push it"). DEFAULT OFF, NOT LOADED.
   - An ff that carries it changes nothing: absent = off, betting change: no.
 - **Switch-on:** a betting change (it changes NCAAF live totals probabilities, so it changes which bets are placed).
   - Only in a window (`.syndicate/betting_change_windows.md`). The next after 11-24 is **Tue 12-08, 2-7 AM CST**.
