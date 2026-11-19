@@ -299,3 +299,23 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **Live odds:** NCAAB overlay gap max 70 s; priced age p50 119 s, p90 397 s (8 of 20 rows over 300 s); 8 sweeps,
   1 refused.
 - **Load:** query 2.64 s. **I-28:** 7 queries since 2:13 PM, 4 cold (57%), cold total p50 5.63 s vs warm 2.83 s.
+
+## Reading 8 — 3:31 PM CST (21:31Z), full page
+
+- **Live:** 2 games.
+  - NCAAB WVU / Florida, H2 1:08: 6 rail rows, still with no model.
+  - WNCAAB High Point @ Vermont, Q2 7:27: 0 rail rows. Its join considered 0 lines, because no book quotes it live, and its re-sim tick was `refused=1`. Nothing to price, not a join defect.
+- 0 flags; P1 0; P6 0; P8 0 of 0; team cards 94 chips, 0 defects.
+- **I-29:**
+  - `live_games_no_model` is 1 of 1 game with rows.
+  - `lgb.py ncaab` shows projected 0 on every build from 2:52 to 3:31 PM; from 1:47 PM that is the whole rest of the game,
+    about 1 h 45 min. A typical build withheld 19-29 lines as `no_live_gameline_projection`.
+  - Card task_dcdd0d3d is proposed and not started.
+- **P7 (#850), 2:52-3:31 PM:** 0 refusals, 0 child exits. Child 3.94 GB after 4.5 h.
+  - Board: 9 builds, wall median 179 s, max 217 s; publication gap median 256 s, max 285 s.
+- **R-B (#844 sample 4):** NCAAB 14 rows (6 venue), h2h 1, row 0 / cell 0. NBA 0.
+- **R-E:** 2 NHL steps, 0 timed out.
+- **Live odds:** NCAAB overlay gap max 72 s; 6 sweeps, 0 refused; priced age p50 97 s, p90 209 s.
+- **Load:** `/intelligence` 10.44 s; query **9.19 s**; shortlist 1.11 s; chips 0.41 s.
+  - **I-28:** 7 queries since 2:52 PM, 3 cold (43%), cold total p50 6.63 s vs warm 2.70 s.
+  - Its fix #853 waits on the user's load decision (local_a5513c97).
