@@ -120,6 +120,19 @@ def factor_for_row(row: Any, *, now: datetime | None = None, path: Path | None =
         if stake is None:
             stake = stakes.get(opt.props_tier_cell(cell) or "", 1.0)
         factor = float(table["edge_shrink"].get(cell, 1.0)) * float(stake)
+        # (c) BELOW THE 0.5 FLOOR WHERE THE EVIDENCE SAYS SO (todo #847, lane cell-calibration-847; a BETTING change,
+        # default OFF: `SYNDICATE_CELL_CALIBRATION_RANK_STAKE`). When on, a cell whose per-cell calibrated k (pooled
+        # w* CI upper, `cell_calibration`) is below FACTOR_FLOOR uses that k as its edge shrink and is floored at
+        # `cell_calibration.K_FLOOR` (0.10) instead of 0.5. Every other cell, and everything with it off, is the
+        # optimizer's own factor. Still > 0, still rank and stake only: it never withholds a line.
+        try:
+            from syndicate.features.shared import cell_calibration as _cc
+
+            below = _cc.rank_stake_factor(cell)
+        except Exception:
+            below = None
+        if below is not None:
+            return max(_cc.K_FLOOR, min(1.0, below * float(stake)))
         return max(opt.FACTOR_FLOOR, min(1.0, factor))
     except Exception as exc:
         meta = {"reason": f"error:{type(exc).__name__}"}

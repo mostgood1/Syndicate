@@ -33,6 +33,9 @@ ROW_FIELDS = (
     "book_age_seconds", "price_grid_generated_at", "team", "display_name", "home_key", "away_key", "home_team",
     "away_team", "matchup", "sport", "sport_slug", "event_id", "game_id", "gamePk", "player_name",
     "game_date", "commence_time", "source", "source_board_date",
+    # todo #847 (lane cell-calibration-847): the per-cell calibrated live probability the flag test reads when
+    # `SYNDICATE_CELL_CALIBRATION_RAIL` is on; absent on the row otherwise.
+    "live_model_probability_cal", "live_cal_k", "live_cal_cell",
 )
 QUOTE_FIELDS = ("fair_probability", "fair_consensus_prob", "books_quoting", "book_age_seconds", "bookmaker",
                 "quote_seen_age_seconds")

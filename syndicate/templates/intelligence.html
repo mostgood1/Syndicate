@@ -3419,6 +3419,15 @@
     const model = liveRailNum(item.live_model_probability);
     const fair = liveRailNum(quote.fair_probability) ?? liveRailNum(quote.fair_consensus_prob);
     if (model !== null && fair !== null && model > 0 && model < 1 && fair > 0 && fair < 1) {
+      // THE TEST READS THE PER-CELL CALIBRATED NUMBER WHEN THE ROW CARRIES ONE (todo #847, lane
+      // cell-calibration-847): `live_model_probability_cal` is stamped only with SYNDICATE_CELL_CALIBRATION_RAIL on
+      // and the row's cell served, so with it off this is exactly the raw test. `model` stays the raw sim, so the
+      // callout's "sim x% vs book y%" is unchanged; k <= 1 keeps the calibrated gap on the raw gap's side and
+      // never larger, so a flagged line still reads as a >= 3 point disagreement off the numbers it shows.
+      const calibrated = liveRailNum(item.live_model_probability_cal);
+      if (calibrated !== null && calibrated > 0 && calibrated < 1) {
+        return { gap: (calibrated - fair) * 100, model, fair, calibrated, k: liveRailNum(item.live_cal_k) };
+      }
       return { gap: (model - fair) * 100, model, fair };
     }
     if (item.live_aware !== true) return null;
@@ -5029,7 +5038,11 @@
     const ev = evVsFairValue(item);
     if (!Number.isFinite(ev)) return '<span class="board-blotter__muted">&mdash;</span>';
     const tone = ev > 0.01 ? "pos" : (ev < -0.01 ? "neg" : "flat");
-    return `<span class="board-blotter__ev board-blotter__ev--${tone}" title="Expected value against the no-vig fair price">${ev > 0 ? "+" : ""}${ev.toFixed(1)}%</span>`;
+    // (b) todo #847: the model's EV at its calibrated probability, beside the market EV this cell shows (stamped
+    // only with SYNDICATE_CELL_CALIBRATION_DISPLAY on). The cell's own number is unchanged.
+    const calEv = numeric(item && item.model_ev_cal_pct);
+    const calNote = calEv !== null ? ` · our calibrated sim's EV at this price: ${calEv > 0 ? "+" : ""}${calEv.toFixed(1)}%` : "";
+    return `<span class="board-blotter__ev board-blotter__ev--${tone}" title="Expected value against the no-vig fair price${escapeHtml(calNote)}">${ev > 0 ? "+" : ""}${ev.toFixed(1)}%</span>`;
   }
 
   function renderBlotterAge(item) {
@@ -5218,7 +5231,17 @@
                   <td data-label="Fair">${renderBlotterFair(item)}</td>
                   <td data-label="EV" title="Edge ${(edge * 100).toFixed(1)}%">${renderBlotterEv(item)}</td>
                   <td data-label="Sim" class="board-blotter__sim">
-                    <div class="board-blotter__sim-prob${offScaleGap !== null ? " board-blotter__muted" : ""}">${confidence !== null ? Math.round(confidence * 100) + "%" + (offScaleGap !== null ? " (set aside)" : "") : "&mdash;"}</div>
+                    ${(() => {
+                      // (b) THE SHOWN SIM IS THE PER-CELL CALIBRATED NUMBER when the row carries one (todo #847,
+                      // lane cell-calibration-847; stamped only with SYNDICATE_CELL_CALIBRATION_DISPLAY on). The raw
+                      // sim stays in the tooltip, and `confidenceValue` (sorting, the chart-agreement check) is untouched.
+                      const calibrated = numeric(item.model_probability_cal);
+                      const shown = calibrated !== null && calibrated > 0 && calibrated < 1 && confidence !== null ? calibrated : confidence;
+                      const calTitle = shown !== confidence
+                        ? ` title="${escapeHtml(`Calibrated for this market from graded results (k ${numeric(item.cal_k)?.toFixed(2) ?? "?"}: the share of the sim's disagreement with the no-vig fair that has paid off). Raw sim ${Math.round(confidence * 100)}%.`)}"`
+                        : "";
+                      return `<div class="board-blotter__sim-prob${offScaleGap !== null ? " board-blotter__muted" : ""}"${calTitle}>${shown !== null ? Math.round(shown * 100) + "%" + (shown !== confidence ? " cal." : "") + (offScaleGap !== null ? " (set aside)" : "") : "&mdash;"}</div>`;
+                    })()}
                     ${projectedDisplay && !/%$/.test(projectedDisplay) ? `<div class="board-blotter__muted"${projectionIsPregameOnLive(item) ? ` title="${escapeHtml(PREGAME_ON_LIVE_TITLE)}"` : ""}>${projectionIsPregameOnLive(item) ? "pregame proj" : "proj"} ${escapeHtml(projectedDisplay)}</div>` : ""}
                     ${simBadge}${simRailed}${simNoView}
                   </td>

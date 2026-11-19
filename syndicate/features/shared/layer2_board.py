@@ -4087,6 +4087,14 @@ def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
         live_prob = _live_prob_for_side(row, live_prob)
     if live_prob is not None:
         out["live_model_probability"] = live_prob
+        # (a) THE RAIL'S FLAG TEST READS THE CALIBRATED NUMBER (todo #847, lane cell-calibration-847). With
+        # `SYNDICATE_CELL_CALIBRATION_RAIL` on and the row's cell served, `live_model_probability_cal` is the per-cell
+        # calibrated live probability for this side; `liveRowGap` uses it for the >= 3 pp MODEL != LINE test. Game
+        # rows only, and only beside the raw number, which is unchanged. Absent when off.
+        if is_game:
+            from syndicate.features.shared.cell_calibration import rail_columns as _cell_calibration_rail
+
+            out.update(_cell_calibration_rail(row, live_prob))
 
     # `layer2-live-projection-actual`, 2026-08-20: the real box-score/current-
     # game-state value, under the name `displayLiveActual()` reads
@@ -5477,6 +5485,15 @@ def _layer2_board_columns(
     # projection on a betting board is worse than an empty cell").
     if model_prob is not None:
         columns["confidence"] = model_prob
+        # (b) THE CALIBRATED MODEL NUMBER, display only (todo #847, lane cell-calibration-847). With
+        # `SYNDICATE_CELL_CALIBRATION_DISPLAY` on and the row's cell served, the page shows the per-cell
+        # calibrated probability and the model EV at that probability beside the raw ones. Absent otherwise, so an
+        # off board is byte-identical. Nothing ranks, admits or stakes on these fields.
+        from syndicate.features.shared.cell_calibration import display_columns as _cell_calibration_display
+
+        calibrated = _cell_calibration_display(row, quote, model_prob)
+        if calibrated:
+            columns.update(calibrated)
     # The book-breadth factor is still carried, under its own name, so the
     # score breakdown keeps every term it always had. It is already inside
     # `board_score_components` below; naming it at the top level too means a

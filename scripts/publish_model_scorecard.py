@@ -494,6 +494,19 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             log(f"OPTIMIZER_FAILED {type(exc).__name__}: {exc} -- scorecard publishes without it")
             scorecard["optimizer"] = {"error": f"{type(exc).__name__}: {exc}"}
+        # THE PER-CELL CALIBRATION TABLE (todo #847, lane cell-calibration-847), from the same window of the same
+        # state. Written every run; READ only by consumers whose own switch is on (all four are absent = off), so
+        # writing it changes nothing served. Its own try: a failure here never costs the optimizer's outputs.
+        if opt.OPT_STATE_PATH in optimizer_outputs:
+            try:
+                from syndicate.features.shared import cell_calibration as cc
+
+                cell_table = cc.fit_table(opt.window_games(opt_state, today), now=now, today=today,
+                                          resamples=args.resamples or opt.RESAMPLES)
+                optimizer_outputs[cc.TABLE_PATH] = opt.dumps(cell_table)
+                log(f"CELL_CALIBRATION cells={len(cell_table['cells'])} window={json.dumps(cell_table['window'])}")
+            except Exception as exc:
+                log(f"CELL_CALIBRATION_FAILED {type(exc).__name__}: {exc}")
 
     simgap_outputs: dict[str, str] = {}
     if sg_state is not None:
