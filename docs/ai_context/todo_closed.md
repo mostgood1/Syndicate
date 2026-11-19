@@ -17,6 +17,26 @@ work takes the next free number (see the counter at the top of `todo.md`).
 ---
 
 
+### `#837` — **CLOSED 2026-11-19 (GOAL MET): NHL LIVE PROPS LEAVE THE BOARD WHENEVER THEIR ONE CAPTURE CLOCK LAPSES PAST 300 s: they rode only the shared live sweep (median gap 335 s), so 33 of 76 NHL overlay builds on 11-17 carried no props. An NHL in-play props pull (`9f911cb98`) is LOADED since 2026-11-18 14:05:39Z (BC-047); the first NHL night's reading (11-18) MET all 5 registered metrics: 2 drop builds of 315, 0% of in-play time without fresh props (a lapsed line keeps dropping, user 11-18)** `[2026-11-17, lane nhl-inplay-props-drop; `.syndicate/findings_2026-11-17_nhl_inplay_props_drop.md`]`
+- **STATUS 2026-11-19 7:45 AM CST: GOAL MET, closed** (user "Close and archive"; lane `nhl-inplay-props-drop` CLOSED). The scheduled reading `nhl-inplay-props-first-night-reading-1118` (main `a24c7c7b2`) met all 5 registered metrics on the 11-18 night. The 2 whole-overlay empties (props < 60 s old) are an untraced lead in `.syndicate/leads.md`, not part of this item. The switch stays ON; rollback = remove the env line + a drained full down/up (a revert may load outside a betting-change window, `--outside-window "revert: ..."`).
+- **Cause (measured 11-17, read-only):** NHL's live props are written only by `refresh_nhl_oddsapi.py` inside the live sweep. The overlay keeps a live row while `seen_age_seconds <= 300` (`book_grid_artifact.is_inplay_fresh_row`).
+  - 18 captures, median gap 335 s, max 1,869 s.
+  - 76 of 76 builds split at 300 s: 43 with 464-956 rows (capture 3.8-298.3 s old), 33 with 0-99 rows (327.8-1,825 s).
+  - No fresh props for 53% of the in-play window, 22% before the NHL step hangs began.
+- **Built, OFF:** `syndicate/features/nhl/inplay_props_lane.py` + `scripts/refresh_nhl_inplay_props.py`, on the live-odds-worker's capture thread.
+  - Every 120 s, live games only, one call each, the sweep's own prop markets and books, through the sweep's own writer.
+  - Never calls either NHL API (api-web or the stats REST, where the 11-17 sweep stalled; todo #838).
+  - Switch `SYNDICATE_ENABLE_NHL_INPLAY_PROPS_AUTORUN` (absent = OFF); interval `..._INTERVAL_SECONDS` (120), kill `..._TIMEOUT_SECONDS` (90).
+- **Cost:** ~5 credits per live game per pull. That is ~4,300 on an 11-game night (upper estimate), 0.09% of the 5M monthly cap.
+- **LOADED 2026-11-18 14:05:39Z (8:05 AM CST), user "Yes, load it":** `LIVE_ODDS_WORKER__SYNDICATE_ENABLE_NHL_INPLAY_PROPS_AUTORUN=1` in `local_production.env`, then a drained full `down`/`up` at `2ae0c646a` (no ff), BC-047; deploys.md 2026-11-18 14:05:18Z. Rollback: remove the line and run a drained full `down`/`up`.
+  - The code also needs the fleet at `9f911cb98` or later.
+  - Claims + preflight; `betting change: yes`, because live NHL prop prices reach the board and its in-play rows.
+- **Verify:** `NHL_INPLAY_PROPS_LAUNCHED` / `[nhl_inplay_props] PULL` lines in live-odds-worker.log, plus the findings file's join on the next NHL night.
+  - Predicted: <= 1 drop build per hour and <= 5% of in-play time without props, vs 11-17's 9-13 per hour.
+- **READING 11-18 night (read 2026-11-19 12:30 AM CST): MET.** 0 of 157 live pulls with errors; live-pull gap median 125 s, max 154 s (n=156); 1,166 credits over 173 pulls; drop builds per hour <= 1 (2 of 315 builds, both whole-overlay empties with props 55-57 s old, at a game coming live and the last game ending); 0 of 19,605 s without fresh props (11-17: 53%). Safety clean. Closing the lane is the user's call; deploys.md 2026-11-19 06:35Z.
+- **Display, DECIDED 2026-11-18 7:42 AM CST** (the user, this session: "Drop it (today)"): a lapsed line keeps dropping. No carry of the last price is built.
+- **Related:** I-22 (lane odds-lane-sport-deadline) owns the sweep hang. After the first failed full generation, every later live sweep was `--mode full` again, because predictions stayed > 30 min old. That loop was sent to that session 11-17 ~02:50Z.
+
 ### `#849` — **CLOSED 2026-11-18 (MEASURED, NOT BUILT): BACKGROUND BUILDS AT FULL PRIORITY SLOW THE LAYER 2 BOARD -- far-dated soccer builds cost the evening board ~6 s per build and ~19 s of a 371 s publication gap, but the board is not waiting for a CPU (run-delay share 0.005-0.007), so `nice` cannot buy it back** `[2026-11-18, the rail monitor's lever L-d, recorded by lane product-optimization-program (M4); taken and closed by lane board-build-priority, session b2be7822]`
 - **Verdict: do not build the `nice 10` switch.** Findings: `.syndicate/findings_2026-11-18_board_build_priority.md`; scripts and data `C:\tmp\bbp_849\`. Fleet read-only, nice 19, 7:16-7:55 PM CST.
 - **Launcher (confirmed):** refresh-worker's soccer WEEKLY autorun (`run_refresh_worker._launch_autorun_soccer_weekly_refresh`), one league-date unit per launch (`--phase live --soccer-leagues L --soccer-date D`), 30 units, 300 s spacing. The 4:22 / 4:55 / 6:14 PM builds were units eredivisie 11-22 (pid 282290), championship 11-24 (290890) and epl 11-23 (342046). Not #840. 387 of 391 units 11-16..11-18 were dated today+2 or later.
