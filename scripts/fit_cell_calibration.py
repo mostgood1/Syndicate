@@ -6,6 +6,9 @@ job writes). The rule it fits is `syndicate.features.shared.cell_calibration`; t
 
     py -3 scripts/fit_cell_calibration.py fit   --state STATE.json --today 2026-11-18 [--out TABLE.json]
     py -3 scripts/fit_cell_calibration.py grade --state STATE.json --fit-today 2026-11-11 --from 2026-11-11 --to 2026-11-17
+    py -3 scripts/fit_cell_calibration.py grade --state STATE.json --table FROZEN.json --from 2026-11-19 --to 2026-11-25
+        (H-F: grade a FROZEN table's k exactly, no refit -- the state drops games older than 35 days and late-graded
+        games arrive, so a refit on a later state is not the table that was frozen)
     py -3 scripts/fit_cell_calibration.py rail  --state STATE.json --fit-today 2026-11-15 --flags C_rail_rows.jsonl \
         --from 2026-11-15 --to 2026-11-17
 
@@ -64,6 +67,8 @@ def _boot(items: Sequence[Any], stat: Callable[[Sequence[Any]], float | None], *
 
 def _variants(table: Mapping[str, Any]) -> dict[str, dict[str, float]]:
     served = {cell: float(e["k"]) for cell, e in table["cells"].items()}
+    if not table.get("diagnostics"):
+        return {"served": served}  # a frozen table: its own k only
     diag = {d["cell"]: d for d in table["diagnostics"]}
 
     def clip(v: Any) -> float | None:
@@ -219,7 +224,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     p_fit.add_argument("--out")
     p_grade = sub.add_parser("grade")
     p_grade.add_argument("--state", required=True)
-    p_grade.add_argument("--fit-today", required=True)
+    p_grade.add_argument("--fit-today", help="refit on the window before this date")
+    p_grade.add_argument("--table", help="a FROZEN table JSON ({'cells': {cell: {'k': ...}}}); grades its k exactly")
     p_grade.add_argument("--from", dest="date_from", required=True)
     p_grade.add_argument("--to", dest="date_to", required=True)
     p_rail = sub.add_parser("rail")
@@ -240,8 +246,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             Path(args.out).write_text(json.dumps(table, indent=1, sort_keys=True), encoding="utf-8")
         payload: Any = table
     else:
-        table = fit(state, args.fit_today, resamples=args.resamples)
-        print(summarize_table(table))
+        if args.cmd == "grade" and getattr(args, "table", None):
+            frozen = json.loads(Path(args.table).read_text(encoding="utf-8"))
+            table = {"cells": frozen["cells"], "diagnostics": [], "window": frozen.get("window")}
+            print(f"frozen table {args.table}: {len(table['cells'])} cells, window {table['window']}")
+        elif getattr(args, "fit_today", None):
+            table = fit(state, args.fit_today, resamples=args.resamples)
+            print(summarize_table(table))
+        else:
+            parser.error("grade needs --table or --fit-today; rail needs --fit-today")
         if args.cmd == "grade":
             payload = {"table_window": table["window"], "grade": grade(state, table, args.date_from, args.date_to)}
         else:

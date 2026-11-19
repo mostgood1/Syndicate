@@ -1,0 +1,610 @@
+{
+ "cells": {
+  "ncaab|spreads|full|live": {
+   "ci95": [
+    -0.0779,
+    0.34699
+   ],
+   "dates": 16,
+   "games": 602,
+   "k": 0.34526,
+   "optimizer_factor": 0.5,
+   "post_mean": 0.1357,
+   "post_sd": 0.10692,
+   "rows": 6550,
+   "w": 0.13528
+  },
+  "ncaaf|h2h|h1|pregame": {
+   "ci95": [
+    -0.53143,
+    0.93899
+   ],
+   "dates": 20,
+   "games": 202,
+   "k": 0.55966,
+   "optimizer_factor": 0.93899,
+   "post_mean": 0.18904,
+   "post_sd": 0.18909,
+   "rows": 404,
+   "w": 0.21232
+  },
+  "ncaaf|h2h|h2|pregame": {
+   "ci95": [
+    -0.62517,
+    0.67945
+   ],
+   "dates": 18,
+   "games": 201,
+   "k": 0.5181,
+   "optimizer_factor": 0.67945,
+   "post_mean": 0.15753,
+   "post_sd": 0.18396,
+   "rows": 402,
+   "w": 0.03103
+  },
+  "ncaaf|h2h|q2|pregame": {
+   "ci95": [
+    -1.04677,
+    0.61738
+   ],
+   "dates": 20,
+   "games": 208,
+   "k": 0.51499,
+   "optimizer_factor": 0.61738,
+   "post_mean": 0.13564,
+   "post_sd": 0.19355,
+   "rows": 416,
+   "w": -0.23398
+  },
+  "ncaaf|receiving yards|full|pregame": {
+   "ci95": [
+    0.06072,
+    0.51481
+   ],
+   "dates": 20,
+   "games": 171,
+   "k": 0.50997,
+   "optimizer_factor": 0.51481,
+   "post_mean": 0.28292,
+   "post_sd": 0.11584,
+   "rows": 8811,
+   "w": 0.28292
+  },
+  "ncaaf|receptions|full|pregame": {
+   "ci95": [
+    0.12068,
+    0.62836
+   ],
+   "dates": 20,
+   "games": 161,
+   "k": 0.62879,
+   "optimizer_factor": 0.62836,
+   "post_mean": 0.37495,
+   "post_sd": 0.12951,
+   "rows": 2266,
+   "w": 0.37495
+  },
+  "ncaaf|rushing yards|full|pregame": {
+   "ci95": [
+    -0.35579,
+    0.21482
+   ],
+   "dates": 20,
+   "games": 172,
+   "k": 0.20404,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.08127,
+   "post_sd": 0.14556,
+   "rows": 5496,
+   "w": -0.08127
+  },
+  "ncaaf|spreads|full|live": {
+   "ci95": [
+    -0.0258,
+    0.534
+   ],
+   "dates": 19,
+   "games": 216,
+   "k": 0.36466,
+   "optimizer_factor": 0.534,
+   "post_mean": 0.17825,
+   "post_sd": 0.0951,
+   "rows": 4466,
+   "w": 0.25333
+  },
+  "ncaaf|spreads|full|pregame": {
+   "ci95": [
+    -0.40296,
+    0.55042
+   ],
+   "dates": 20,
+   "games": 238,
+   "k": 0.36466,
+   "optimizer_factor": 0.55042,
+   "post_mean": 0.17825,
+   "post_sd": 0.0951,
+   "rows": 3184,
+   "w": 0.08307
+  },
+  "ncaaf|spreads|h1|pregame": {
+   "ci95": [
+    -0.9677,
+    0.42206
+   ],
+   "dates": 20,
+   "games": 240,
+   "k": 0.36466,
+   "optimizer_factor": 0.5,
+   "post_mean": 0.17825,
+   "post_sd": 0.0951,
+   "rows": 1468,
+   "w": -0.28879
+  },
+  "ncaaf|spreads|h2|pregame": {
+   "ci95": [
+    -0.38312,
+    0.75129
+   ],
+   "dates": 20,
+   "games": 239,
+   "k": 0.36466,
+   "optimizer_factor": 0.75129,
+   "post_mean": 0.17825,
+   "post_sd": 0.0951,
+   "rows": 678,
+   "w": 0.17939
+  },
+  "ncaaf|spreads|q1|pregame": {
+   "ci95": [
+    -0.64455,
+    0.97563
+   ],
+   "dates": 20,
+   "games": 240,
+   "k": 0.36466,
+   "optimizer_factor": 0.97563,
+   "post_mean": 0.17825,
+   "post_sd": 0.0951,
+   "rows": 1032,
+   "w": 0.15266
+  },
+  "ncaaf|spreads|q2|pregame": {
+   "ci95": [
+    -1.04716,
+    0.65334
+   ],
+   "dates": 20,
+   "games": 240,
+   "k": 0.36466,
+   "optimizer_factor": 0.65334,
+   "post_mean": 0.17825,
+   "post_sd": 0.0951,
+   "rows": 842,
+   "w": -0.21101
+  },
+  "ncaaf|totals|full|live": {
+   "ci95": [
+    -0.4742,
+    -0.00556
+   ],
+   "dates": 19,
+   "games": 220,
+   "k": 0.1,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.1303,
+   "post_sd": 0.06888,
+   "rows": 6308,
+   "w": -0.24212
+  },
+  "ncaaf|totals|full|pregame": {
+   "ci95": [
+    -0.3459,
+    0.24694
+   ],
+   "dates": 20,
+   "games": 231,
+   "k": 0.1,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.1303,
+   "post_sd": 0.06888,
+   "rows": 4228,
+   "w": -0.04592
+  },
+  "ncaaf|totals|h1|pregame": {
+   "ci95": [
+    -0.43004,
+    0.36737
+   ],
+   "dates": 20,
+   "games": 239,
+   "k": 0.1,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.1303,
+   "post_sd": 0.06888,
+   "rows": 1714,
+   "w": -0.04296
+  },
+  "ncaaf|totals|h2|pregame": {
+   "ci95": [
+    -0.53397,
+    0.39197
+   ],
+   "dates": 20,
+   "games": 236,
+   "k": 0.1,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.1303,
+   "post_sd": 0.06888,
+   "rows": 690,
+   "w": -0.0636
+  },
+  "ncaaf|totals|q1|pregame": {
+   "ci95": [
+    -0.2983,
+    0.81174
+   ],
+   "dates": 20,
+   "games": 240,
+   "k": 0.1,
+   "optimizer_factor": 0.81174,
+   "post_mean": -0.1303,
+   "post_sd": 0.06888,
+   "rows": 896,
+   "w": 0.2747
+  },
+  "ncaaf|totals|q2|pregame": {
+   "ci95": [
+    -0.6796,
+    0.3208
+   ],
+   "dates": 20,
+   "games": 239,
+   "k": 0.1,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.1303,
+   "post_sd": 0.06888,
+   "rows": 678,
+   "w": -0.18583
+  },
+  "ncaaf|totals|q3|pregame": {
+   "ci95": [
+    -0.21581,
+    0.83225
+   ],
+   "dates": 20,
+   "games": 239,
+   "k": 0.1,
+   "optimizer_factor": 0.83225,
+   "post_mean": -0.1303,
+   "post_sd": 0.06888,
+   "rows": 800,
+   "w": 0.33119
+  },
+  "ncaaf|totals|q4|pregame": {
+   "ci95": [
+    -0.39192,
+    0.68766
+   ],
+   "dates": 20,
+   "games": 240,
+   "k": 0.1,
+   "optimizer_factor": 0.68766,
+   "post_mean": -0.1303,
+   "post_sd": 0.06888,
+   "rows": 842,
+   "w": 0.18105
+  },
+  "nhl|assists|full|pregame": {
+   "ci95": [
+    -0.43783,
+    0.05708
+   ],
+   "dates": 28,
+   "games": 192,
+   "k": 0.1,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.18853,
+   "post_sd": 0.12625,
+   "rows": 7470,
+   "w": -0.18853
+  },
+  "nhl|goals|full|pregame": {
+   "ci95": [
+    -0.18957,
+    0.598
+   ],
+   "dates": 28,
+   "games": 192,
+   "k": 0.6005,
+   "optimizer_factor": 0.598,
+   "post_mean": 0.20671,
+   "post_sd": 0.20091,
+   "rows": 9952,
+   "w": 0.20671
+  },
+  "nhl|points|full|pregame": {
+   "ci95": [
+    -0.35493,
+    0.23974
+   ],
+   "dates": 28,
+   "games": 192,
+   "k": 0.25056,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.04678,
+   "post_sd": 0.1517,
+   "rows": 8238,
+   "w": -0.04678
+  },
+  "nhl|saves|full|pregame": {
+   "ci95": [
+    -0.22186,
+    0.63551
+   ],
+   "dates": 28,
+   "games": 175,
+   "k": 0.64159,
+   "optimizer_factor": 0.63551,
+   "post_mean": 0.21291,
+   "post_sd": 0.21872,
+   "rows": 1062,
+   "w": 0.21291
+  },
+  "nhl|sog|full|pregame": {
+   "ci95": [
+    0.0225,
+    0.33738
+   ],
+   "dates": 28,
+   "games": 192,
+   "k": 0.338,
+   "optimizer_factor": 0.5,
+   "post_mean": 0.18056,
+   "post_sd": 0.08033,
+   "rows": 7992,
+   "w": 0.18056
+  },
+  "soccer|btts|full|pregame": {
+   "ci95": [
+    -1.66225,
+    0.33093
+   ],
+   "dates": 15,
+   "games": 311,
+   "k": 0.30981,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.68678,
+   "post_sd": 0.50846,
+   "rows": 622,
+   "w": -0.68678
+  },
+  "soccer|h2h|full|live": {
+   "ci95": [
+    -0.86799,
+    0.186
+   ],
+   "dates": 17,
+   "games": 199,
+   "k": 0.17536,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.22408,
+   "post_sd": 0.2038,
+   "rows": 351,
+   "w": -0.34874
+  },
+  "soccer|h2h|full|pregame": {
+   "ci95": [
+    -0.67561,
+    0.54909
+   ],
+   "dates": 13,
+   "games": 153,
+   "k": 0.17536,
+   "optimizer_factor": 0.54909,
+   "post_mean": -0.22408,
+   "post_sd": 0.2038,
+   "rows": 283,
+   "w": -0.09298
+  },
+  "soccer|player_first_goal_scorer|full|pregame": {
+   "ci95": [
+    0.70381,
+    0.8301
+   ],
+   "dates": 15,
+   "games": 229,
+   "k": 0.83099,
+   "optimizer_factor": 0.8301,
+   "post_mean": 0.76785,
+   "post_sd": 0.03222,
+   "rows": 5167,
+   "w": 0.76785
+  },
+  "soccer|player_goal_scorer_anytime|full|live": {
+   "ci95": [
+    0.40511,
+    0.66255
+   ],
+   "dates": 15,
+   "games": 231,
+   "k": 0.67558,
+   "optimizer_factor": 0.66255,
+   "post_mean": 0.55243,
+   "post_sd": 0.06283,
+   "rows": 3602,
+   "w": 0.53324
+  },
+  "soccer|player_goal_scorer_anytime|full|pregame": {
+   "ci95": [
+    0.72503,
+    0.95173
+   ],
+   "dates": 14,
+   "games": 228,
+   "k": 0.94771,
+   "optimizer_factor": 0.95173,
+   "post_mean": 0.83822,
+   "post_sd": 0.05586,
+   "rows": 4076,
+   "w": 0.84473
+  },
+  "soccer|player_last_goal_scorer|full|pregame": {
+   "ci95": [
+    0.64237,
+    0.78317
+   ],
+   "dates": 15,
+   "games": 211,
+   "k": 0.78432,
+   "optimizer_factor": 0.78317,
+   "post_mean": 0.71392,
+   "post_sd": 0.03592,
+   "rows": 5414,
+   "w": 0.71392
+  },
+  "soccer|player_shots_on_target|full|live": {
+   "ci95": [
+    0.62318,
+    0.89879
+   ],
+   "dates": 15,
+   "games": 237,
+   "k": 0.91008,
+   "optimizer_factor": 0.89879,
+   "post_mean": 0.78287,
+   "post_sd": 0.0649,
+   "rows": 5446,
+   "w": 0.7592
+  },
+  "soccer|player_shots|full|live": {
+   "ci95": [
+    0.63066,
+    0.92287
+   ],
+   "dates": 15,
+   "games": 237,
+   "k": 0.91191,
+   "optimizer_factor": 0.92287,
+   "post_mean": 0.82531,
+   "post_sd": 0.04418,
+   "rows": 7030,
+   "w": 0.77329
+  },
+  "soccer|player_shots|full|pregame": {
+   "ci95": [
+    0.76198,
+    0.97351
+   ],
+   "dates": 15,
+   "games": 239,
+   "k": 0.91316,
+   "optimizer_factor": 0.97351,
+   "post_mean": 0.8283,
+   "post_sd": 0.0433,
+   "rows": 7184,
+   "w": 0.86674
+  },
+  "soccer|spreads|full|live": {
+   "ci95": [
+    0.16967,
+    0.58179
+   ],
+   "dates": 17,
+   "games": 298,
+   "k": 0.57848,
+   "optimizer_factor": 0.58179,
+   "post_mean": 0.37559,
+   "post_sd": 0.10351,
+   "rows": 1700,
+   "w": 0.3805
+  },
+  "soccer|spreads|full|pregame": {
+   "ci95": [
+    -0.95798,
+    0.00904
+   ],
+   "dates": 17,
+   "games": 330,
+   "k": 0.1,
+   "optimizer_factor": 0.5,
+   "post_mean": -0.38028,
+   "post_sd": 0.22773,
+   "rows": 1482,
+   "w": -0.48807
+  },
+  "soccer|totals|full|live": {
+   "ci95": [
+    -0.02587,
+    0.52462
+   ],
+   "dates": 16,
+   "games": 297,
+   "k": 0.46116,
+   "optimizer_factor": 0.52462,
+   "post_mean": 0.21386,
+   "post_sd": 0.12617,
+   "rows": 1656,
+   "w": 0.24897
+  },
+  "soccer|totals|full|pregame": {
+   "ci95": [
+    -0.53664,
+    0.58988
+   ],
+   "dates": 17,
+   "games": 330,
+   "k": 0.46116,
+   "optimizer_factor": 0.58988,
+   "post_mean": 0.21386,
+   "post_sd": 0.12617,
+   "rows": 1578,
+   "w": 0.05348
+  },
+  "wncaab|spreads|full|live": {
+   "ci95": [
+    -0.18621,
+    0.94413
+   ],
+   "dates": 15,
+   "games": 108,
+   "k": 0.95584,
+   "optimizer_factor": 0.94413,
+   "post_mean": 0.39067,
+   "post_sd": 0.28835,
+   "rows": 952,
+   "w": 0.39067
+  }
+ },
+ "fit_command": "py -3 scripts/fit_cell_calibration.py fit --state <copy> --today 2026-11-18 (2,000 resamples)",
+ "fitted_on": "fleet model_scorecard_optimizer_state.json written 2026-11-18 05:36 CST (copy read 7:19 PM CST)",
+ "generated_at": "2026-11-19T01:33:20Z",
+ "rule": {
+  "findings": ".syndicate/findings_2026-11-18_cell_calibration.md",
+  "k": "clip(pooled w* posterior mean + 1.96 sd, K_FLOOR, 1) on an overconfident verdict",
+  "k_ceiling": 1.0,
+  "k_floor": 0.1,
+  "market_fit_floors": [
+   {
+    "from": "2026-11-17",
+    "market_prefix": "totals",
+    "sports": [
+     "ncaab",
+     "wncaab"
+    ]
+   }
+  ],
+  "pool_by": "sport|market",
+  "sport_fit_floors": {
+   "nba": "2026-11-19"
+  },
+  "transform": "logit p' = logit fair + k (logit p_model - logit fair)"
+ },
+ "source": "cell-calibration-847 frozen table for H-F (pre-registered .syndicate/findings_2026-11-18_cell_calibration.md section 1.3)",
+ "window": {
+  "dates": 28,
+  "days": 28,
+  "first_date": "2026-10-21",
+  "games": 1711,
+  "last_date": "2026-11-17"
+ }
+}

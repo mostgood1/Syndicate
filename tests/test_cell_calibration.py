@@ -436,3 +436,28 @@ def test_d_apply_verdict_carries_the_stamp_so_a_never_applies_twice(tmp_path, mo
     cols = _live_projection_columns(row)
     assert cols["live_model_probability"] == pytest.approx(verdict["model_prob"])
     assert "live_model_probability_cal" not in cols
+
+
+def test_hf_grades_a_frozen_tables_k_exactly_without_refitting():
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "fit_cell_calibration", Path(__file__).resolve().parents[1] / "scripts" / "fit_cell_calibration.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    state = {"games": {"g1": {"date": "2026-11-20", "cal": {"x|m|full|live": [10, 2.0, 0.1]}},
+                       "g2": {"date": "2026-11-21", "cal": {"x|m|full|live": [10, 2.0, 0.2]}},
+                       "g3": {"date": "2026-11-12", "cal": {"x|m|full|live": [10, 2.0, 0.2]}}}}
+    frozen = {"cells": {"x|m|full|live": {"k": 0.5}}, "diagnostics": []}
+    out = mod.grade(state, frozen, "2026-11-19", "2026-11-25")
+    assert list(out) == ["held_out", "served"]
+    assert out["held_out"]["games"] == 2
+    expected = sum((0.25 - 1) * 2.0 - 2 * (0.5 - 1) * sdr for sdr in (0.1, 0.2)) / 20
+    assert out["served"]["d_brier_per_row"] == pytest.approx(expected, abs=1e-6)
+    import json as _json
+
+    table = _json.loads((Path(__file__).resolve().parents[1]
+                         / ".syndicate/findings_2026-11-18_cell_calibration_frozen_table.json").read_text(encoding="utf-8"))
+    assert len(table["cells"]) == 41 and cc.validate_table(
+        {**_table({c: e["k"] for c, e in table["cells"].items()})})[1] == "ok"
