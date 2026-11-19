@@ -431,3 +431,67 @@ their falsification were written into the lane (`9326ac378`) before any grading.
   that every line is its own decision.
 - **Scorer smoke run** on the discovery JSONs (in-sample, so expected to pass): C1-C6 and C4r HOLDS, C2x NOT CONFIRMED. It
   proves only that the scorer reads the right cells.
+
+## Interim read, 11-18 only (NOT the registered verdict)
+
+INTERIM, one night. Run at 1:17-1:18 AM CST 11-19 by scheduled task `live-bet-timing-interim-1118`, on the user's request
+of 11-18 (~10 AM CST): "run the #830 forward test early on today's games". **It does NOT replace or change the 12-02
+verdict** (task `live-bet-timing-forward-830`, the 14 nights 11-18..12-01). It changes no cell, rule or the 30-game minimum.
+
+- **Run:** the registered blobs, `live_bet_timing_study.py` `25543aebf51e` and `score_live_bet_timing_forward.py`
+  `d58692e395c2`, from worktree `live-bet-timing-forward` at `1ff9f2554`. On the fleet (`~/syndicate-prod/data`, read
+  only), nice 19, `--from 2026-11-18 --to 2026-11-18`. Outputs and scorer print: `C:\tmp\livetiming_interim_1118\`
+  (`score.txt`; not in git).
+- **Games graded:** NCAAB 52, WNCAAB 16, NBA 12, NHL 2, NCAAF 1, NFL 0 (no NFL slate on a Wednesday).
+  - `no_final`: **0** in every sport. The run started after the last game ended.
+  - Unmatched to ESPN: NCAAB 1,629 of 12,010 records, NCAAF 303 of 621, NHL 18 of 67. The registered run counts these the same way.
+  - Fresh (<= 60 s) records: NCAAB 5,296, NCAAF 215, WNCAAB 1,182, NBA 12,796, NHL 22.
+
+Every cell, hit - fair or y - p in pp on FRESH quotes, 90% game-clustered CI. Discovery = the fresh number in this file's
+"What holds on FRESH quotes" (through 11-16):
+
+| cand | cell | interim mean [90% CI] | games | cell status | discovery |
+|---|---|---|---|---|---|
+| C1 | NCAAB totals flags, 90-100% | +13.7 [+4.7, +22.6] | 50 | MEETS (0-25% cell +4.6) | +13.8 +- 3.7 (251 g) |
+| C1 | NCAAB spreads flags, 75-90% | +5.0 [-1.9, +12.0] | 51 | OPEN | +4.5 |
+| C1 | NCAAF spreads flags, 75-90% | no cell | 0 | INSUFFICIENT | +7.0 |
+| C1 | NCAAF spreads flags, 90-100% | no cell | 0 | INSUFFICIENT | +8.1 |
+| C1 | NCAAF totals flags, 75-90% | no cell | 0 | INSUFFICIENT | +6.1 to +6.4 (75-100) |
+| C2 | NCAAB under flags | +8.6 [+0.6, +16.5] | 52 | MEETS | +8.3 (429 g) |
+| C2 | NCAAF under flags | no cell | 0 | INSUFFICIENT | +10.7 (255 g) |
+| C2 | WNCAAB under flags | +22.6 [+9.2, +36.1] | 16 | INSUFFICIENT | +7.3 (104 g) |
+| C2 | NCAAB over flags (no edge) | no cell | 0 | INSUFFICIENT | +0.9 |
+| C2 | NCAAF over flags (no edge) | no cell | 0 | INSUFFICIENT | +3.0 |
+| C2x | NCAAB totals ahead of pace, market y - p | +8.5 [-20.5, +37.5] | 8 | INSUFFICIENT | +5.2 (93 g, CI incl. 0) |
+| C3 | NCAAB totals flags WITH the heat | +18.2 [+7.3, +29.0] | 31 | MEETS (against +2.4) | +11.3 (289 g) vs -0.5 |
+| C3 | NCAAB spreads flags WITH the run | -5.5 [-14.8, +3.9] | 41 | OPEN | +7.2 (172 g) vs -4.3 |
+| C4 | NHL live ML, home y - p | +0.6 [-31.3, +32.5] | 2 | INSUFFICIENT | -11.2 (42 g) |
+| C4 | NFL live ML, home y - p | no cell | 0 | INSUFFICIENT | -8.7 (57 g) |
+| C4r | WNCAAB live ML, home y - p | +16.5 [+6.9, +26.0] | 10 | INSUFFICIENT | +10.3 (56 g) |
+| C5 | NCAAB model ML flags, 0-25% | +8.6 [+0.3, +16.9] | 30 | FAILS | -11.3 (102 g) |
+| C6 | NBA totals flags (no edge) | -11.9 [-23.5, -0.2] | 12 | INSUFFICIENT | CI contains 0 |
+| C6 | NBA spreads flags (no edge) | +9.3 [-7.2, +25.9] | 12 | INSUFFICIENT | CI contains 0 |
+
+**INTERIM verdicts, as the scorer prints them** (one night; none of them is the registered verdict):
+
+- **C1 INSUFFICIENT.** NCAAF had 1 graded game. The headline cell repeats: NCAAB late totals +13.7 on 50 games vs +13.8 in discovery.
+- **C2 INSUFFICIENT.** NCAAB unders +8.6 MEETS (discovery +8.3). NCAAF has no cells. WNCAAB has 16 games. There were no NCAAB or NCAAF over-flag cells.
+- **C2x INSUFFICIENT** (8 games).
+- **C3 NOT CONFIRMED.** Totals with the heat +18.2 MEETS. Spreads with the run read -5.5, which is OPEN: its CI holds 0. Discovery was +7.2.
+- **C4 INSUFFICIENT.** NHL had 2 games and NFL 0.
+- **C4r INSUFFICIENT** (10 games; +16.5, the discovery sign).
+- **C5 FAILS** on exactly 30 games: +8.6 [+0.3, +16.9], against discovery's -11.3. Early NCAAB model ML flags BEAT their price on 11-18.
+  - That is one night at the 30-game floor, with the CI's low end at +0.3. Treat it as the first thing to watch in the full run, not a result.
+- **C6 INSUFFICIENT** (12 NBA games). NBA totals flags read -11.9 with the CI just below 0. Spreads read +9.3 with the CI around 0.
+
+**Fleet loads on 11-18, before or during the slate** (deploys.md; listed only, NOT split. One night cannot carry a split.)
+
+| UTC 11-18 | CST | load | BC | relevance |
+|---|---|---|---|---|
+| 08:02:54Z | 2:02 AM | refresh-worker TERM: I-17's calibrated college total (`923869cf3`) and the NFL re-sim event-id seeds (`ee47c930a`) | BC-041 / BC-045 | I-17 is display only. The NFL seeds have no NFL games in this read. |
+| 08:30:50Z | 2:30 AM | the board split: the board build runs in its own process (`09eddabf2`, #832) | yes | cadence of the board and the live plan |
+| 13:47:14Z | 7:47 AM | I-22, the live odds lane fix: one sport's hung child no longer takes the lane (`2ae0c646a`, #838) | | changes how fresh live quotes are, and so the FRESH population |
+| 14:42:44Z | 8:42 AM | the #816 gate fallback: a failed college totals calibration serves the market (`36a9f5501`) | BC-048 | pregame only; NCAAB live is unchanged |
+| 15:56:43Z | 9:56 AM | the pregame NHL generation split (`cdab875d5`, #838) | BC-049 | pregame NHL |
+
+Later loads on the 11-18 slate, at 04:46Z and 04:58Z on 11-19, came near or after the last games. They are not listed; the 12-02 run's load list will cover them.
