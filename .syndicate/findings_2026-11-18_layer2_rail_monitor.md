@@ -943,3 +943,27 @@ The suggested recorder fix (local_fbe07d8c) was waiting for the in-flight build 
 **Live odds lane:** 15 launched, 1 refused (6.2%); 15 live runs, max 73 s.
 
 **Team cards:** 0 defects.
+
+## Reading 24 — Wed 11-18 11:32 PM CST (05:32Z 11-19), full page: winding down
+
+**Fleet:** `d78a448c4`, no new ff.
+
+**A-3, a seventh memory-guard recycle:**
+- `RECYCLE_EXIT ... uptime_s 1834` at 11:17:20 PM, 31 min after the 10:46 PM board-child restart (the suggested recorder load). It exited `rc=-6`; child 719980 is attempt 9.
+- **A child restart does not reset the refresh-worker parent's memory, so the refusals return within ~30 min.** This fits the #850 diagnosis (local_d0f83044).
+
+**Slate: 3 live**: NCAAB Cal St Fullerton @ UCLA (H2 1:08), UNLV @ Auburn (H2 4:18), NHL Colorado @ Utah (P3 13:57).
+- Flags: 2 shown, 0 false, 0 missed, 0 dark.
+- P1: 0 contradictions (card fix live). #824: 0.
+- Live rows: 30, 9 priced <= 120 s.
+
+**Board:** 2 builds, median 246 s. **Live odds lane:** 5.9% refused.
+
+**Load (full page):** `/intelligence` 5.9 s; query 2.5 s.
+
+**Team cards:** 0 defects.
+
+**`grade1118.py` written** (`C:\tmp\railmon\grade1118.py`):
+- DAY_START 11-18 06:00Z; population = games commencing >= 18:05Z. The 11:01 AM game goes to an EARLY bucket.
+- New buckets: P3 first-reading flags (within 600 s of the game's first rail reading), P4 fair < 0.40, P5 NCAAB full totals with the flagged lines' over share.
+- A trial run at 11:40 PM graded 590 flags over 86 games, with 14 not yet final. The final grade runs after the last game.
