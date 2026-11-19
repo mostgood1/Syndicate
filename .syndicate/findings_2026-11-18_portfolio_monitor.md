@@ -1022,3 +1022,30 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - orders today 72 (71 filled, 1 unfilled in-play IOC); unreconciled 0;
   - cap use 29.6% / 21.0%.
 - **Unchanged:** gate 8 of 800 on the BC-052 clock; 1 unclassified load (soccer ff 17:58:30Z).
+
+## Reading 59 — Wed 11-18 11:16 PM CST (05:16Z), window 32 min
+
+- **Results first.** All-time 2,079 bets / 1,120 events (+2 bets), -10.89%; 30 d -7.33% [-12.8, -1.9].
+- **12 games started and unsettled** (14 last reading), none past the 8 h line: the late games are settling.
+- **No anomalies.** Every endpoint was inside budget: `live_today` 0.22 s, page 0.27 s.
+- **Flow:**
+  - plan 15.4 min old (newest write 05:01:47Z): 78 suggested, 13 positions;
+  - 12 live ticks, 2 placed, 0 failed;
+  - orders today 74 (73 filled, 1 unfilled in-play IOC); unreconciled 0;
+  - cap use 29.9% / 22.2%.
+- **Unchanged:** gate 8 of 800 on the BC-052 clock; 1 unclassified load (soccer ff 17:58:30Z).
+
+## Reading 60 — Wed 11-18 11:47 PM CST (05:47Z), window 31 min
+
+- **Results first.** All-time 2,086 bets / 1,123 events (+7 bets), -10.92% [-18.1, -3.7]; 30 d -7.33% [-12.8, -1.9]
+  (it includes 11-18 once that date fully settles).
+- **6 games started and unsettled** (12 last reading), none past the 8 h line.
+- **Gate:** 10 of 800 events (16 bets) on the BC-052 clock.
+- **No anomalies.** Every endpoint was inside budget: `live_today` 0.34 s, page 0.30 s.
+- **Flow:**
+  - plan 2.0 min old: 21 suggested, 10 positions;
+  - 9 live ticks, 0 placed;
+  - orders today 75 (74 filled, 1 unfilled in-play IOC); unreconciled 0;
+  - cap use 32.1% / 21.8%;
+  - paper book 15,118 settled, -1.25%.
+- **Next:** the DAILY SUMMARY for 11-18 once the last 6 games settle; readings after midnight go to the 11-19 file.
