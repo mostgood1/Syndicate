@@ -958,3 +958,36 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - cap use 26.5% / 22.4%;
   - paper book 14,893 settled, -1.25%.
 - **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it).
+
+## Reading 55 — Wed 11-18 9:11 PM CST (03:11Z), window 32 min
+
+- **Results first.** All-time 2,050 bets / 1,108 events (+8 bets since reading 54), -10.96% [-18.2, -3.7]. 39 games
+  started and unsettled (late starts joined; 33 last reading), none late.
+- **Gate:** 2 of 800 events (5 bets) on the BC-052 clock.
+- **No anomalies.** Every endpoint was inside budget: `live_today` 0.23 s, page 0.31 s.
+- **Flow: the night is winding down.**
+  - Tonight's plan was last written 02:53:02Z (19 min old). New plan writes (03:03:56Z) are for 11-19.
+  - Tonight's plan: 183 suggested, 7 positions, 94 `in_play_market_fair`.
+  - 11 live ticks, 1 placed, 0 failed.
+  - Orders today 69 (68 filled, 1 unfilled in-play IOC); unreconciled 0.
+  - Cap use 27.0% / 21.5%.
+  - Paper book 14,964 settled, -1.24%.
+- **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it).
+
+## Reading 56 — Wed 11-18 9:42 PM CST (03:42Z), window 31 min
+
+- **Results first.** All-time 2,076 bets / 1,117 events (+26 bets since reading 55), **-10.89%** [-18.1, -3.7].
+  - 30 d: 1,606 bets, -7.33% [-12.8, -1.9].
+  - 7 d: 402 bets, -2.54% [-13.2, +8.1] (one late grade of an earlier date).
+  - 14 games started and unsettled (39 last reading), none late.
+- **Gate:** 8 of 800 events (13 bets) on the BC-052 clock.
+- **No anomalies.** Every endpoint was inside budget: books 1.33 s (budget 2.0, the slowest today outside recycles),
+  plan 1.55 s, page 0.48 s.
+- **Flow:**
+  - tonight's plan 9.8 min old: 154 suggested, 14 positions, 86 `in_play_market_fair`;
+  - the 11-19 plan writes are running (03:41Z);
+  - 10 live ticks, 1 placed, 0 failed;
+  - orders today 70 (69 filled, 1 unfilled in-play IOC); unreconciled 0;
+  - cap use 27.1% / 21.0%;
+  - paper book 14,986 settled, -1.25%.
+- **Unchanged:** 1 unclassified load (soccer ff 17:58:30Z, its lane owes it).
