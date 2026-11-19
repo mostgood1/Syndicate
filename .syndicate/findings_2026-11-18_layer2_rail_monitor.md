@@ -1059,3 +1059,5 @@ The suggested recorder fix (local_fbe07d8c) was waiting for the in-flight build 
 | Cheat sheet picks (dashboard) | season: Consistency +0.3%, Hot streaks +2.3%, Matchups +1.5% (beat matched non-members +3.5 [+0.6, +6.5]); Value −5.4% (trails its fair −4.1 [−7.1, −0.8]); Syndicate picks −7.0% |
 
 **Open for the user:** the board-split rollback vs #850's fix (11-24 window, or an exception), and whether to monitor 11-19 (TNF, the NFL seeds' first game).
+
+**Page:** "Rail Watch, Wed Nov 18", https://claude.ai/artifact/ESGaWMYhR7JH6EWfeqiViY (published 12:2x AM CST 11-19). Live dashboard: https://claude.ai/artifact/HoJ2n52ewHZnVDbN2LpxaJ. The loop is stopped. Monitoring 11-19 is the user's call.
