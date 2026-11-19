@@ -118,6 +118,14 @@ No result guarantees future returns.
      - No challenger.
 5. **S5: a calibration map by side and price band** (live + ladder + closes). The live book's 0.30-0.45 band is -12.6%,
    and longshots lose in every phase. It feeds S1's features.
+   - **Result 11-18** (`findings_2026-11-18_s5_price_band_map.md`; pre-registration `ccd49b2b6` pushed before the
+     run):
+     - The map fitted on live bets <= 10-31 excludes only .55-.70 (-15.9% [-30.1, -1.0]).
+     - On 11-01..11-17 that band was the best (+0.5%). Dropping it would have cost **-3.27 pp [-6.91, +0.46]**.
+     - The losing band moves with the period, so a band filter is unlikely to be the lever.
+     - There is no early kill by the rule, so the registered forward test (bets >= 11-19, at 150 events, about
+       11-25/26) decides.
+     - No challenger for 11-24.
 6. **S6: an adverse-selection model.**
    - Features at entry: quote age, book count, dispersion, time to start, price band, the venue's recent move.
    - Label: won minus fair. Trained on the ladder and live history, time-split.

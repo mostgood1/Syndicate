@@ -64,3 +64,46 @@ later bets than the champion (no band rule)?
 
 **Reported beside, deciding nothing:** the calibration table per band on FIT and on each test set. It shows win
 rate, mean breakeven (fill price plus fee) and their difference.
+
+## RESULT — the map does not carry over; no early kill, so the forward test decides (run 2026-11-19 ~04:07Z = 10:07 PM CST, read-only; pre-registration on main `ccd49b2b6` at 04:05:09Z)
+
+Script: `C:\tmp\pfmon\s5_band_map.py`, exactly as registered. Input: the monitor's `live_all.json` saved 03:42Z.
+Result: `C:\tmp\pfmon\s5_result.json`.
+
+**FIT map (selected 08-06..10-31), flat fee-net ROI with a 95% event-clustered CI:**
+
+| band | bets / events | ROI | 95% CI | win - breakeven |
+|---|---|---|---|---|
+| <.30 | 36 / 36 | -31.1% | [-81.3, +32.6] | -4.1 pp |
+| .30-.45 | 323 / 258 | -10.3% | [-22.5, +1.4] | -3.9 pp |
+| .45-.55 | 421 / 359 | -3.1% | [-12.0, +6.1] | -0.8 pp |
+| **.55-.70** | 129 / 94 | **-15.9%** | **[-30.1, -1.0]** | **-10.2 pp** |
+| .70-.85 | 51 / 36 | -6.3% | [-20.7, +7.8] | -1.5 pp |
+| >=.85 | 15 / 10 | (< 30 bets, not judged) | | |
+
+- **Excluded band (CI upper < 0): .55-.70 only.** The challenger is the champion without .55-.70 bets.
+
+**Historical early read (selected 11-01..11-17; contaminated, see above):**
+
+| band | bets / events | ROI | win - breakeven |
+|---|---|---|---|
+| .30-.45 | 141 / 97 | -13.6% | -1.1 pp |
+| .45-.55 | 375 / 244 | -8.1% | -4.3 pp |
+| **.55-.70** | 384 / 215 | **+0.5%** | **+1.7 pp** |
+| .70-.85 | 151 / 114 | -4.5% | -2.7 pp |
+
+- All bets: -5.21%. Challenger, with 384 bets dropped: -8.48%. **D = -3.27 pp [-6.91, +0.46].**
+- **The band the FIT map excluded was the best band in the historical test.** Dropping it hurt, though not beyond
+  noise. D's CI upper bound is +0.46 > 0, so the registered early KILL does not fire.
+- **Verdict as registered: no early kill; the forward test (bets selected >= 11-19, read at >= 150 events) decides.**
+
+**Reading.**
+- The FIT map's worst band became the test window's best. The price band at which the book loses moves with the
+  period, which matches the close-calibration result (favourite-longshot FALSIFIED).
+- **A price-band filter is unlikely to be the lever.** The forward test is kept because it was registered, and it is
+  cheap: it only re-reads the ledger.
+- The book's losses in the test window sit in **.45-.55 (coin-flip prices, -4.3 pp under breakeven on 375 bets)**.
+  That is where the adversely-selected trigger fires most, not a structural price effect. The lead goes to S6
+  (adverse-selection features), not to a band rule.
+- **Forward read:** the monitor re-runs `C:\tmp\pfmon\s5_band_map.py` once bets selected >= 11-19 cover >= 150 events
+  (about 11-25/26 at 24 graded games a day). The verdict is reported then. Nothing goes to the 11-24 window from S5.
