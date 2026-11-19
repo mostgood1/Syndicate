@@ -1049,3 +1049,68 @@ above 0, **and** gap_c < 0 with its 95% interval below 0 (the consensus overstat
   - cap use 32.1% / 21.8%;
   - paper book 15,118 settled, -1.25%.
 - **Next:** the DAILY SUMMARY for 11-18 once the last 6 games settle; readings after midnight go to the 11-19 file.
+
+## DAILY SUMMARY — Wed 11-18 (Central), written Thu 11-19 1:05 AM CST after the day's last grade
+
+Counts and percentages only (the repo is public). Sources: `/api/portfolio/live?on=all&show=all` at 06:59Z 11-19,
+and the 36 probe readings dated 11-18 CST (readings 25-60).
+
+**Results first.**
+- **11-18: 66 graded bets / 33 games, ROI +3.90% [-23.3, +31.1]**, 43 won / 23 lost (65.2% won against a 59.9%
+  breakeven). One day is noise, not a verdict.
+- **30 d: 1,671 bets / 705 games, -7.15% [-12.6, -1.7]** (-7.35% at the start of the day). Still beyond noise.
+- **7 d: 399 bets, -3.96% [-15.0, +7.1].** All-time: 2,092 bets, -10.85%.
+- **Fee-net CLV (30 d): -0.42 pp (se 0.21).** Gross +1.24 pp; beat the close on 62.2% of 609.
+- **Signals beyond noise (30 d), unchanged:**
+  - the book;
+  - Kalshi;
+  - totals;
+  - the `model_edge` path;
+  - the EV 2-5 band (predicted +4.1%, realised -10.2%);
+  - the .30-.45 price band;
+  - the largest-stake quartile.
+
+**Live book, selected_date 11-18.**
+- **Orders: 75 = 74 filled + 1 rejected.** The rejection is an unfilled in-play IOC (`venue_canceled`), a designed
+  ending. 0 failed, 0 unknown submits.
+- **In-play:** 4 entries, 3 filled.
+- **Maker pilot:** 2 filled. Both FILL lines say `filled_as=maker`, and the daily line copy now keeps them.
+- **8 fills are not graded yet:** NCAAF (6) and soccer (2) on later games, not late. Late (> 8 h) at day end: 0.
+- **By venue:** Kalshi 23-13, Polymarket 20-10.
+- **By sport:** NBA 22-12, NCAAB 13-10, NHL 8-0.
+- **Gate:** its clock moved twice: BC-050 (16:45:40Z), then BC-052 (21:02:51Z, the user's "Load it now", recorded as
+  an override outside a window). 12 of 800 events at day end.
+
+**Endpoint.**
+- 36 readings, 252 endpoint reads, 0 non-200.
+- **Every slow read traced to the same cause, F14 (web memory recycles):**
+  - `live_today` 25.6 s (10:22 AM);
+  - `books` 11.7 s (12:47 PM);
+  - `page` 6.2 s (1:07 PM);
+  - `live_all` 4.45 s (3:01 PM);
+  - `live_today` 5.4 s (7:03 PM).
+- The double-recycle fix went live at 1:14 PM (`web-silent-worker-kills`): 41 restarts, 0 back-to-back, 0 kills, and
+  the hold worked under the slate. Worker peaks still climb to about 1.2 GB against a ~630 MB limit.
+- Plan staleness: none past 45 min; the longest gap was 25.6 min.
+
+**Decisions and program, 11-18.**
+- **Betting changes now load only in windows** (every second Tuesday; first 11-24): rule, register and preflight
+  enforcement on main.
+- **Profit learning program** on main (`plan_2026-11-18_profit_learning_program.md`). Its volume figure was corrected
+  to $49 a day over 7 days, not about $100.
+- **Stake cut:** approved, stood down before any restart (it would have loaded other lanes' changes outside a
+  window), then **dropped by the user**. Sizing is unchanged.
+- **Studies, all pre-registered before computing, none produced a challenger:**
+  - **S1** freshness: FALSIFIED (F16);
+  - **S2** in-play 95-99c favourites: KILL under R3 (F17);
+  - **S3** maker entry: not due (shadow look about 11-26/27; pilot re-judge about 11-24) (F18);
+  - **S4** Kalshi as the in-play prior: KILL, the sim earns weight 0 (F19);
+  - **S5** price bands: the map does not carry over; the forward test decides about 11-25/26 (F20).
+- **Data kept:**
+  - in-play recorder backfill (27 nights, 1.4 GB), with daily copy task `SyndicateInplayPreserve`;
+  - maker-pilot log lines (1,592), with daily task `SyndicateMakerPilotLines`.
+- **Owed by other lanes:** 2 unclassified loads (soccer ff 17:58:30Z; layer2 suggested-sighting 04:46:22Z, declared
+  "betting change: no"). Neither can move the gate's clock.
+
+**Next:** the S3 and S5 decisions land about 11-24..11-27. S6 (an adverse-selection model) is the strongest open lead
+and waits on the user.
