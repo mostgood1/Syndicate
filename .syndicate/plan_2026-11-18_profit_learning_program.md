@@ -130,6 +130,22 @@ No result guarantees future returns.
    - Features at entry: quote age, book count, dispersion, time to start, price band, the venue's recent move.
    - Label: won minus fair. Trained on the ladder and live history, time-split.
    - It is a filter in front of any trigger.
+   - **Result 11-19** (`findings_2026-11-19_s6_adverse_selection.md`; pre-registration `96d2f75a7` 14:06Z, before
+     the run; result `211eb1a21`):
+     - Population: 8,684 FIT / 9,445 TEST orders, about 91% paper ladder.
+     - **No entry feature separates the losing orders.** The regularised logistic shrank every feature to about 0:
+       quote ages, book count, dispersion, time to start, claimed EV, and S1's venue move.
+     - Our orders win less than breakeven by about the same amount everywhere.
+     - The frozen filter is in effect a price cut (keep breakeven >= 0.56). TEST: **D +2.01 pp [-0.85, +4.88]**. The
+       kept half was still negative (-1.34% against -3.35% for all).
+     - No early kill, so the registered **forward test** (orders submitted from 11-20, first 150 games, about 11-22/23)
+       decides. At that size a GO needs about +6.6 pp, so NO-GO is likely.
+     - The portfolio monitor runs `scripts/s6_adverse_selection.py forward` when it is due.
+   - **What S1-S6 add up to:**
+     - The live trigger's shortfall against breakeven is uniform. None of these explains it: freshness, price band,
+       the sim, entry features, or the EV threshold.
+     - The fee-net gap is the edge the consensus trigger does not have. The next lever is the selection source
+       itself (S7 and new signals), not a filter on this trigger.
 7. **S7: correlation products** (Kalshi combos, SGP paper) and **props** (population ledger + forward quote mirror),
    later.
 
