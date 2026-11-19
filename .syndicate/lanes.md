@@ -1654,7 +1654,11 @@ death, never life — do not invert it.
     - The suggested-to-placed match rerun (16.0% of placed orders on a graded suggested line) folds into `product-optimization-program`'s 11-26 re-rank (its `6d2142a26`).
     - The per-line follow-ups are #847's (cell calibration, H-F due 11-26).
   - First scheduled grade run, 11-19 7:15:01 AM CST: rc=0, `today_central=2026-11-19`, 0 missed runs, 770 newly graded, 5,093 rows. All sports -2.57% [-5.12, -0.03] (12,252 bets / 1,389 games).
-  - The coverage reading for board date 11-19 (pre-registered bar: share >= 95% MET) is prepared as a one-off scheduled check, prompt `C:\SyndicateProd\suggested_set\coverage_check_prompt_20261120.md`, NOT registered until the user says yes in this session.
+  - The coverage reading for board date 11-19 (pre-registered bar: share >= 95% MET) is a one-off scheduled check, REGISTERED 11-19 on the user's "Yes, register it" in this session:
+    - task `suggested-set-coverage-1120`, fires once Fri 11-20 7:45 AM CST (13:45Z), enabled;
+    - saved in Bypass permissions mode, and it runs only while the app is open (otherwise at the next launch);
+    - its prompt is the same as `C:\SyndicateProd\suggested_set\coverage_check_prompt_20261120.md`;
+    - it writes findings section 8, one line in this block, and `.syndicate/log/2026-11-20.md`.
 - Goal: A daily grader of the Layer 2 board's SUGGESTED set (earliest sg=true sighting per identity per phase), by sport and market, per day and 28-day rolling, built on the scorecard's own grader + settlers (score_ranking_backtest.grade_rows / bucket_search.grade_population), on main with tests; its results JSON on the fleet data root in the rail monitor's board-results row shape; findings with per-family coverage and the comparison with the scorecard's published and staked sets
 - Files: scripts/grade_suggested_set.py, tests/test_grade_suggested_set.py, scripts/score_ranking_backtest.py, .syndicate/findings_2026-11-18_suggested_set_grade.md, .syndicate/state_layer2.md, syndicate/features/shared/opportunity_population_ledger.py (the #sg first-suggested-sighting dedup and write path ONLY), tests/test_opportunity_population_ledger.py
 - Hypothesis: Over the fleet's whole sg history (sg stamped from 2026-10-13), the suggested set's flat-unit ROI per bet is HIGHER than the scorecard's published (recommended) set over the same 28-day windows, in each sport with >= 60 graded games, and pooled across sports the game-clustered 95% interval of suggested ROI lies above the published set's point estimate
