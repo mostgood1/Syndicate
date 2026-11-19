@@ -870,3 +870,51 @@ The owner's 6-9 PM read passed 4 of 5 checks. The miss was one 27-min NHL odds g
 **Load:** query 7.8 s.
 
 **Team cards:** 0 defects.
+
+## Reading 22 — Wed 11-18 10:36 PM CST (04:36Z 11-19): P2 verdict, and the board-split verdict
+
+**Fleet:** `a3104a5b6`, no new ff. Host load 4.9.
+
+**Sixth memory-guard recycle:**
+- `MEMORY_GUARD_ABORT` six times, 10:15-10:25 PM (headroom 1,611-1,860 MB).
+- `RECYCLE_EXIT ... consecutive_refusals 6 ... uptime_s 1828` at 10:29:32 PM, then `rc=-6`.
+- Child 686712 is attempt 7.
+- Intervals: 8.8 h, 83, 50, 42, 33, 31 min.
+
+The suggested recorder fix (local_fbe07d8c) was waiting for the in-flight build (~10:38-10:40 PM) before its fleet update and board-child restart. No deploy entry yet at the read.
+
+### P2 verdict, 5:30-10:30 PM CST (pre-registered: median < 253 s and nothing over 1,510 s)
+
+`d4metrics.py` and `d4gaps.sh` over `refresh-worker.log{.1,}`:
+
+| measure | evening | verdict |
+|---|---|---|
+| builds | 25 | — |
+| median wall | **301 s** | **FALSIFIED** (target < 253 s) |
+| longest wall | 507 s | holds (< 1,510 s) |
+| publication gap median | **572 s** (9.5 min) | — |
+| gaps over 600 s | **11 of 24** | — |
+| longest gap | **1,580 s** (6:16-6:42 PM) | — |
+
+- The next-longest gaps: 1,513 s (8:30-8:55 PM), 1,187 s (7:45-8:04 PM), 1,111 s (7:02-7:21 PM), 1,019 s (9:18-9:35 PM), 944 s (9:52-10:07 PM).
+- Host load ran 4-10.
+- **Six memory-guard recycles (A-3)** account for the longest gaps.
+
+**The board-split verdict task (deploys.md 2026-11-19 04:20Z, lane `layer2-board-process-split`) reads the same evening as CONFOUNDED: the evening slowdown did NOT go away.**
+- **The isolation worked:** board CPU share 0.44 -> **0.90**.
+- **Three predictions FALSIFIED:** wall p50 335 s; today's shortlist gap p50 363 -> **1,070 s**; live-plan gap p50 351 -> 1,098 s.
+- **Confounded** by 21 refusals and 5 recycles in its window.
+- **Safety:** 5 exits at rc -6; container memory **max 6,194 MB, over the 6,144 MB line** (B was 4,190 / 5,341).
+- **Rollback, the user's decision:** remove `REFRESH_WORKER__SYNDICATE_BOARD_BUILD_PROCESS=1`, then a drained full down/up. The alternative is lane `board-split-memory-guard` (#850, local_d0f83044): fixes on main `38c3a6905`, default-off, counted as a betting change.
+- As a revert, the rollback is the rule's own outside-window exception.
+
+**Slate: 13 live.**
+- Flags: 14 shown, 0 false, 0 missed, 0 dark.
+- P1: 5 college totals flags, 0 contradictions.
+- #824: 1 (likely the same wrong-row card bug). P6: 0.
+- Live rows: 644, **56 priced <= 120 s**, with today's board 1,360 s old at the read (the recycle).
+- Web merges 31, **62 stale** (NCAAF 31, WNCAAB 31): late games ending.
+
+**Live odds lane:** 11 launched, 1 refused (8.3%); 12 live runs, max 267 s.
+
+**Team cards:** 0 defects.
