@@ -528,3 +528,57 @@ When it reports the file, the dashboard adds a "Suggested by the board" set.
 - **Cheat sheet section added.** The user: "add the cheat sheet picks performance to the dashboard too". It draws on 35 daily reviews, 10-15..11-18.
 - **Optimization session started.** The user: "we need to then take all this data to optimize the overall Syndicate product" (accepted as a new session).
   - Session: "Optimize Syndicate from its performance data" (local_09a95c0b).
+
+## Reading 13 — Wed 11-18 6:40 PM CST (00:40Z 11-19): BOARD OUTAGE (A-3) and P1's first contradictions
+
+**Fleet:** `a3104a5b6`, no new ff. **Host load 8.8** (7.8 / 6.7).
+
+**A-3: the board child's scheduled recycle crashed on exit, and the board went 26.3 min without a build.**
+- Timeline from refresh-worker.log `[board_process]`, the WSL crash capture and `BOARD_BUILD_TIMING`:
+
+| time (CST) | event |
+|---|---|
+| 6:16:21 PM | last build of child 152953 finishes (342 s) |
+| 6:29:18 PM | `BOARD_PROCESS_RECYCLE pid=152953`: `maybe_recycle` at 31,853 s (8.8 h) uptime; it returns 75 |
+| ~6:29 PM | `Fatal Python error: _enter_buffered_busy: could not acquire lock for <_io.BufferedReader name='<stdin>'> at interpreter shutdown, possibly due to daemon threads`. The WSL CaptureCrash shows signal 6 for pid 152953. |
+| 6:29:58 PM | `BOARD_PROCESS_EXITED pid=152953 rc=-6 reason=exit uptime_s=31853 respawn_in_s=5`. The intended clean rc 75 ("recycle") became an abort. |
+| 6:30:03-6:30:05 PM | child 363665 STARTED / BOOT / READY |
+| 6:33:56 PM | its first build starts (`pull_hot_artifacts`) |
+| 6:42:41 PM | its first build finishes: **wall 526 s**, cpu 465 s |
+
+- **Cost:** no fresh board from 6:16:21 to 6:42:41 PM, which is 26.3 min against the 300 s cadence, in the evening peak (75 live games, host load 8.8). The build in flight at the recycle was lost. At the 6:40 PM read, today's board was 1,503 s old.
+- **The cause sits in shipped code.** `pipeline/board_build_process.py`:
+  - the lifeline thread `_read_stdin` (`:433-446`, daemon) blocks in `sys.stdin.buffer.read(1)`;
+  - so the interpreter's shutdown cannot take the buffered-reader lock and aborts;
+  - the recycle path is `:519-526`.
+- **Two fixes, neither a betting change:**
+  1. exit without that abort, e.g. read fd 0 with `os.read`, or `os._exit(75)` after cleanup;
+  2. recycle only right after a completed build, or defer it while today's board has live games.
+- The board-split lane (`layer2-board-process-split`, I-20) is OPEN, but its session is archived. Its 10:15 PM verdict task will see `rc=-6`. A session is proposed for the fix.
+
+**P1 (I-17): 2 contradictions, the first today.** Both are NCAAB full totals with model P > 0.5 whose "ours" sits across the line:
+- Chattanooga @ Winthrop: u154.5, model 0.537 / fair 0.489, ours 156.0;
+- Coppin St @ La Salle: u145.5, 0.549 / 0.500, ours 146.0.
+
+Both cards' total rows carry `live_total_basis: None`. `i17check.py` at 6:42:57 PM: NCAAB 277 of 286 rows calibrated (9 not), 9 flags; WNCAAB 0 of 111 calibrated, 15 flags. Sent to the I-17 owner (local_1f10ce63) with the question: expected (no calibration input) or a gap? Possibly tied to the stale board (overlay merges on a 25-min-old board).
+
+**Slate: 75 live.**
+- Flags: 56 shown (34 cards), 0 false, 0 missed, 0 dark.
+- P6: 0. #824: 0.
+- Live rows 1,621, 266 priced <= 120 s.
+- **NBA: 885 rows, only 8 priced <= 120 s** (I-3 / I-4: NBA slow cadence and alt lines).
+- NCAAB 589 (222). WNCAAB 108 (24). NHL 2 (0).
+
+**P7 (NHL window opened 6:30 PM):**
+- longest live run 100 s;
+- refused 1 of 6 sweeps (16.7%);
+- no NHL odds child running;
+- NHL overlay: 1 build, 31 in-play rows, 47 s since the last build.
+
+**Overlay:** 0 gaps over 360 s (max NCAAF 148 s); web merges 44, 0 stale.
+
+**Load:** query **21.9 s / 5.97 MB / 31.2 MB** (bigger evening payload); live-rail 1.3 s; chips 3.0 s.
+
+**Team cards:** 0 defects.
+
+**Monitor note:** the probe first ran from `C:\tmp\railmon\dash` (wrong cwd, rc 2). It was re-run from the worktree at 6:40:35 PM.
