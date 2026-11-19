@@ -69,3 +69,27 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - orders today 8: 6 filled and 2 maker-pilot posts resting (156 / 148 min, exempt until kickoff); unreconciled 0;
   - cap use 7.6% / 4.6%.
 - **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 65 — Thu 11-19 4:00 AM CST (10:00Z), window 60 min
+
+- **Results first.** Unchanged overnight: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **No new anomaly.** Every endpoint was inside budget: page 1.22 s (the slowest overnight), `live_all` 0.84 s. The same
+  2 unclassified loads, owed by their lanes.
+- **Flow (11-19 board):**
+  - plan 1.7 min old: 42 suggested, 15 positions;
+  - 18 live ticks, 1 placed, 0 failed;
+  - orders today 9: 7 filled and 2 maker-pilot posts resting (216 / 208 min, exempt until kickoff); unreconciled 0;
+  - cap use 7.6% / 5.6%.
+- **Gate:** 12 of 800 events on the BC-052 clock.
+
+## Reading 66 — Thu 11-19 5:00 AM CST (11:00Z), window 60 min
+
+- **Results first.** Unchanged overnight: 30 d -7.15% [-12.6, -1.7] on 705 events; nothing open.
+- **No new anomaly.** Every endpoint was inside budget: `live_today` 0.19 s, page 0.53 s, books 0.55 s. The same 2
+  unclassified loads, owed by their lanes.
+- **Flow (11-19 board):**
+  - plan 2.4 min old: 53 suggested, 17 positions (max gap 14.5 min over 6 h);
+  - 20 live ticks, 4 placed, 0 failed;
+  - orders today 13: 11 filled and 2 maker-pilot posts resting (276 / 268 min, exempt until kickoff); unreconciled 0;
+  - cap use 9.0% / 6.7%.
+- **Gate:** 12 of 800 events on the BC-052 clock.
