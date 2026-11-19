@@ -3622,3 +3622,10 @@ as a verdict.
   - What survives is the model over-stating its own probability on every kind of line: −9.1 pp [−12.7, −5.3], 27 of 41 slices clear BH. It grows with the claimed gap, and the tail (−13.7) cannot be separated from the body (−9.1).
 - **Rule:** before a slice becomes a lever, pool every graded day, cluster the CI by game, and correct over the family of slices looked at. A one-day band effect names a hypothesis, not a lever. Same family as 2026-11-04 ("a one-night signed edge median is not a direction").
 - *(evidence in `.syndicate/findings_2026-11-18_product_optimization_program.md` §5, §7; pass C `C:/tmp/optprog/C_rail_analyze_out.txt`)*
+
+## 2026-11-18 — OVERTURNED: "per-cell calibration will make the Games Rail's flags honest out of sample (pass C: +0.024 nats/flag)" — with k taken from the scorecard population, the rail shows NO held-out gain (+0.0010 [−0.0030, +0.0051]), because 84% of its flags sit in cells the rule cannot serve yet `[lane cell-calibration-847, session c124edc4]`
+- **Measured** (pre-registered `941874243`, read once): the same rule gains −0.0062 Brier/row [−0.0102, −0.0021] on the scorecard population (23,564 rows / 367 games). On the rail it touches only 182 of 1,120 flags.
+- **Why the flags are not reached:** NBA (298) is floored for I-25, college full-game totals (435) for #816, and the 147 interval flags have no live optimizer cell.
+- **Pass C's +0.024 answered a different question:** its k was fitted ON rail flags, NBA and NCAAB totals included.
+- **Rule (a repeat of the 2026-09-21 FORBIDDEN: re-check a population correction on the subset you will act on):** before predicting a correction's gain on a surface, count how much of THAT surface's population the correction can reach. Report the coverage beside the gain.
+- *(evidence in `.syndicate/findings_2026-11-18_cell_calibration.md` §2)*

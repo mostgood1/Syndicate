@@ -523,11 +523,11 @@ once this index exists: re-splitting would orphan the parts.
 | [combined-board-state-rows-lost] | THE COMBINED BOARD DROPS EVERY PERSISTED STATE ROW; ITS AGE IS TOMORROW'S SHORTLIST — FIXED, LIVE ON WEB `b6a0 | `state_board.md` |
 | [board-per-date-freshness] | THE COMBINED BOARD DATES EACH WINDOW DATE ON ITS OWN; THE CHIP SHOWS TODAY APART FROM TOMORROW — LIVE ON WEB ` | `state_board.md` |
 | [inplay-overlay-board-cadence] | THE BOARD'S IN-PLAY ROWS COME FROM THE BOOK GRID EVERY TICK, NOT THE SHORTLIST — LIVE ON ALL THREE SERVICES `[ | `state_board.md` |
-| [live-endgame-freshness] | LIVE RE-SIM NUMBERS IN THE LAST 5% OF A GAME: THE STATE IS 1.5-2.5 MIN OLD BY CADENCE, AND AN END-GAME FRESHNE `[ | `state_board.md` |
 | [intelligence-season-evidence] | INTELLIGENCE EXPLANATIONS NAMED METRICS THEY NEVER READ, AND THE READINESS GATE COULD NOT SEE THE DATA ROOT -- | `state_board.md` |
 | [live-winpct-blank] | LIVE NFL/NCAAF ROWS SHOW NO PREGAME SIM PROBABILITY -- the Win%, the "Our sim has..." sentence and the directi | `state_board.md` |
 | [ncaaf-polymarket-spread-no-fair] | 73 NCAAF SPREAD ROWS REACH THE BOARD WITH NO FAIR AND NO REASON, BECAUSE POLYMARKET ALONE QUOTES THEM AND PRIC | `state_board.md` |
 | [live-player-exit-gate] | LIVE PLAYER-EXIT GATE -- a key player out of a live game refuses its live lines, his props and its in-play bet | `state_board.md` |
+| [live-endgame-freshness] | LIVE RE-SIM NUMBERS IN THE LAST 5% OF A GAME: THE STATE IS 1.5-2.5 MIN OLD BY CADENCE, AND AN END-GAME FRESHNE | `state_board.md` |
 | [nfl-model-accuracy-backtest] | NFL GAME LINES AND PROPS LOSE TO THE CLOSE IN EVERY MARKET; THE PROP PROBABILITY CARRIES NO INFORMATION AT THE | `state_football.md` |
 | [ncaaf-sim-view-coverage] | NCAAF GAME LINES CARRY A SIM VIEW ON EVERY MARKET; EDGES ARE BOUNDED BY THE 15-POINT CAP; STAKES STAY ON PRICE | `state_football.md` |
 | [nfl-live-prop-capture] | NFL PER-QUARTER PLAYER PRODUCTION IS CAPTURED AND RETRIEVABLE — the allowlist alone moved ZERO bytes `[verifie | `state_football.md` |
@@ -682,6 +682,7 @@ once this index exists: re-splitting would orphan the parts.
 | [nhl-player-props] | NHL PLAYER PROPS ARE PROJECTED AND PRICED ON THE BOARD, PER-LINE GATED -- and the engine still loses to a play | `state_model.md` |
 | [model-edge-ceiling] | THE 15-POINT MAGNITUDE BOUND IS GONE: REPLACED 2026-10-19 BY THE PROBABILITY-SPACE TEST ITS OWN DOCSTRING DESC | `state_model.md` |
 | [prop-projection-support] | NFL PROP SUPPORT IS NOW PUBLISHED AND SERVED (0 of 1,070 -> 1,067 of 1,067, `5457b428`); NHL AND MLB STILL CAR | `state_model.md` |
+| [cell-calibration] | ONE PER-CELL CALIBRATED MODEL PROBABILITY IS ON MAIN, EVERY USE DEFAULT-OFF, NOT LOADED -- held-out Brier gain | `state_model.md` |
 | [polymarket-live-totals-quote-names-no-game] | 26 OF 28 LIVE POLYMARKET TOTALS QUOTES ON THE BOARD ARE SHARED ACROSS GAMES — one price per LINE, no game iden | `state_polymarket.md` |
 | [polymarket-fill-price-is-reported] | THE VENUE REPORTS `avgPx`. "This path has no fill price" was FALSE and cost a 12h live halt `[verified 2026-08 | `state_polymarket.md` |
 | [polymarket-capital-is-margin-held] | POLYMARKET'S CASH IS NOT ITS BUYING POWER: `marginRequirement` HOLDS IT, and the venue tells us in a field we  | `state_polymarket.md` |
@@ -740,7 +741,7 @@ once this index exists: re-splitting would orphan the parts.
 | [soccer-shots-prop-skill] | SOCCER SHOTS PROPS â€” THE POISSON SHAPE IS RIGHT AND THE MEAN IS INFLATED `[measured 2026-08-31, lane layer1- | `state_soccer.md` |
 | [soccer-moneyline-precision] | SOCCER'S MONEYLINE EDGE IS NOW GATED ON ITS OWN SIM NOISE, AND 61% OF IT WAS INSIDE THAT NOISE `[measured 2026 | `state_soccer.md` |
 | [soccer-shot-woodwork-undercount] | EVERY SHOT OFF THE WOODWORK WAS MISSING FROM SHOT TOTALS — FIXED, LIVE ON live-odds-worker `20d589ed` 2026-09- | `state_soccer.md` |
-| [soccer-understat-outage] | UNDERSTAT IS DOWN SITE-WIDE SINCE 2026-11-03, SO BIG-5 SOCCER TEAM/PLAYER HISTORY IS FROZEN AT 10-31; THE FETCH STEPS FAIL WITH A NAMED REASON (NAMING GUARD LIVE, COOLDOWN OFF) | `state_soccer.md` |
+| [soccer-understat-outage] | UNDERSTAT IS DOWN SITE-WIDE SINCE 2026-11-03, SO BIG-5 SOCCER TEAM/PLAYER HISTORY IS FROZEN AT 10-31; THE FETC | `state_soccer.md` |
 | [live-lens-snapshot] | THE LIVE-LENS SNAPSHOT CANNOT BE DATED — it is a 4 MB KEYVALUE key, not a file, and archiving it would cost ~5 | `state_ui.md` |
 | [live-surface-tier5] | THE LIVE SURFACE — Tier 5 `[measured 08-15 02:3x–03:0xZ]` | `state_ui.md` |
 | [ask-the-syndicate] | ASK THE SYNDICATE | `state_ui.md` |
