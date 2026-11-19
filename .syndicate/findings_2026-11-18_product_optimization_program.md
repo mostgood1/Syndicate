@@ -9,7 +9,7 @@ Substrate: the fleet's disk (`~/syndicate-prod/data`) and `http://127.0.0.1:1000
 
 ## 1. Pre-registration (committed before any lever result was read)
 
-Written 11-18 ~7:00 PM CST, before the four evidence passes (A scorecard funnel, B live book, C rail flags and cheat
+Committed 11-18 6:19 PM CST (`4294294e1`), before the four evidence passes (A scorecard funnel, B live book, C rail flags and cheat
 sheets, D engine and input defects) returned anything.
 
 ### 1.1 Hypothesis (copied from the lane block)
