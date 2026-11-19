@@ -125,3 +125,12 @@ COUNTERFACTUAL iteration length, live window (same iterations, parts subtracted;
   minus main-loop slate:  p50 91s p90 170s max 413s; over 180 s 42 of 482
   minus slate and exec:   p50 79s p90 102s max 199s; over 180 s 1 of 482
 ```
+
+## Addendum 2026-11-19 ~10:05 AM CST -- the fix is on main, default off (todo #851, lane `polymarket-slate-off-odds-loop`)
+
+- **On main `8f0d73a2e`.**
+  - `SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND`, absent = off = the inline call.
+  - `_main_loop_polymarket_slate_step` starts a due sweep on a daemon thread, returns `in_flight` / `not_due` otherwise, and never pages the venue on the main thread.
+- **Tests:** 22 new cases, all failing on the old code; 919 passed across the 42 test files that import the worker.
+- **Not loaded.** It is a betting change: the 11-24 window, the user's decision.
+- **Prediction P1-P5** is in the lane block and todo #851.

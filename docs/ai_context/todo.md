@@ -1,5 +1,35 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#851` — **LIVE-ODDS-WORKER'S MAIN LOOP RAN THE POLYMARKET US SLATE SWEEP SYNCHRONOUSLY, AND EVERY ODDS SWEEP WAITED FOR IT: 25.9% of the live loop's time (92-233 s a sweep), the larger part of 117 of 125 slow iterations, so every sport's odds-sweep attempts were p50 100 s / p90 299 s apart. Fix on main `8f0d73a2e` DEFAULT OFF behind `SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND`; loading is a BETTING CHANGE (window, the user's decision)** `[2026-11-19, lane polymarket-slate-off-odds-loop, session bb342d07; user "Yes, build it"; findings `.syndicate/findings_2026-11-19_live_odds_loop_attempt_spacing.md`]`
+- **Measured** (lane `live-odds-loop-attempt-spacing`, 482 main-loop iterations in the 00-05Z live windows 11-15..11-18):
+
+  | part of the loop | share of time |
+  |---|---|
+  | sleep | 40.3% |
+  | slate sweep on the main thread | 25.9% |
+  | execution tick | 18.4% |
+  | odds tick | 14.0% |
+
+  - The sweep is single-flight with the venue-poll thread, and the main loop won 153 of 387 writes.
+  - Every live odds-sweep launch (482 of 482) comes from this loop.
+- **The change** (absent = OFF = the inline call exactly as before). The main loop's one slate call goes through `_main_loop_polymarket_slate_step`:
+  - on, a due sweep starts on a daemon thread and the loop goes on to the execution tick;
+  - a sweep in flight on either thread is not doubled, and a not-due pass starts nothing;
+  - the lock, interval gate and 180 s cadence are the writer's own, with one interval resolver for both.
+- **Cost:** an order placed on a pass where the loop would have swept is priced off the previous completed slate. That is the same as the 234 of 387 passes where the venue poll held the sweep. `execute_portfolio`'s 3x ceiling (540 s by default) fails closed by name, and there were 0 `POLYMARKET_ARTIFACT_STALE` refusals 11-15..11-19.
+- **Tests:** 22 new cases (all fail on main's old code), the two main-loop placement tests updated, 919 passed across the 42 test files that import the worker.
+- **PREDICTION** (lane block, written before the build) for the first live window after a load:
+  - P1: iteration p90 <= 200 s (was 299 s), and over 180 s in <= 12% (was 29%).
+  - P2: attempt-gap p90 <= 200 s.
+  - P3: slate write gap p50 within 173 s +-20%.
+  - P4: 0 stale refusals.
+  - P5: 0 slow iterations carrying a slate write (was 117).
+- **To load** (11-24 window or later, the user's decision):
+  - a fleet ff carrying `8f0d73a2e`: inert by itself;
+  - `LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND=1` in `local_production.env`;
+  - a drained full `down`/`up`.
+  - Read P1-P5 with the lane's `loopstages.py` method.
+
 ### `#850` — **SINCE THE 11-18 BOARD SPLIT THE MEMORY GUARD REFUSES THE BOARD 5 TIMES AN HOUR IN THE LIVE EVENING (26 refusals 5-10 PM CST vs 0 in-thread on 11-17), THE CHILD RECYCLES 4 TIMES AND EACH ONE ABORTS rc -6, AND THE BOARD GOES UP TO 26.3 MIN UNBUILT: the guard measures parent + child RSS against the declared 7,168 MB; the split added a second interpreter (parent calm p50 777 MB, n 476) and the parent's tick grows +1.1 GB 5-9 PM, which a child recycle cannot return. Four fixes on main DEFAULT-OFF; LOAD = the user's decision (a betting change by BC-042's rule)** `[2026-11-19, lane board-split-memory-guard]`
 - **Cause, measured read-only** (`.syndicate/findings_2026-11-18_board_split_memory_guard.md` §2): RSS = PSS within 85 MB of 5,377, so nothing is miscounted. The 1,900 MB floor is still right for the stage (warm-build child rise at 60 s: p50 4, p90 259, max 1,136 MB, n 101), so it is NOT lowered.
 - **rc -6 is the lifeline:** a daemon thread blocked in `sys.stdin.buffer.read(1)` holds the BufferedReader lock at interpreter shutdown. Reproduced on the fleet's Python 3.11.16: buffered rc 134 (SIGABRT), `os.read(0, 1)` rc 75.
