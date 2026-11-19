@@ -148,6 +148,21 @@ No result guarantees future returns.
        itself (S7 and new signals), not a filter on this trigger.
 7. **S7: correlation products** (Kalshi combos, SGP paper) and **props** (population ledger + forward quote mirror),
    later.
+   - **Result 11-19** (`findings_2026-11-19_s7_combos_props.md`; pre-registration `6c54babb1` 18:07Z before any
+     outcome; result `3c8e65783`).
+   - **Combos: not read early.** E4's own amendment (A5, the pregame-print read) is due 11-24, and the existing task
+     `e4-a5-pregame-print-read-1124` runs it.
+     - Joined-combo counts only (settlements 10-31..11-18): NBA same-player nested 195 combos / 86 games, soccer
+       1,187 / 122, MLB 0 (season over).
+     - NBA projects to about 236 by the 11-22 window end, so its YES test (200) may still read INSUFFICIENT.
+   - **Props: no challenger.**
+     - Rule: keep a pregame Kalshi/Polymarket player prop when the sim's probability beats the price plus fee by T.
+     - Every T lost on FIT (2,396 orders / 246 events); best T=0 -12.5% [-18.3, -6.7].
+     - Kept orders did worse than all orders, and return does not rise with the sim's edge.
+     - TEST (2,004 / 190) is informational only: -3.7% [-9.8, +2.3].
+     - Untested: a sim-only selection over every venue prop quote (needs a new quote join; poor prior).
+   - **Fees are more than half the loss** (30 d: 3.87% of stake, before-fees ROI -3.28%), so a selection must beat
+     about 4 pp of fees before it wins. That points back at fee-light entry (S3 maker) and fewer paid exits.
 
 ## Infrastructure that makes learning compound
 
