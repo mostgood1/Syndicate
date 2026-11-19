@@ -26,6 +26,18 @@ matters. Scripts: `C:\tmp\bmg\` (`bmg_series.py` = the per-minute series, `bmg_s
 - Gaps between consecutive `BOARD_BUILD_TIMING` lines from 5 PM CST on 11-18: n 28 (29 builds), p50 543 s,
   **max 1,580 s (26.3 min)**, 5 of 28 over 900 s. The respawned children's cold first builds ran 359-526 s.
 
+- **Addendum from the rail monitor** (lane `layer2-rail-monitor`, reading 21, read 10:09 PM CST; by message 11-19
+  ~04:25Z; not re-read here):
+  - a **5th recycle at 9:58:38 PM**, child 613542 at 1,960 s uptime, rc -6 again. The intervals are now
+    83 / 50 / 42 / 33 min.
+  - Headroom at the 3 refusals before recycles 2-5: 1,545-1,867 MB. The tree was 5.30-5.62 GB at each refusal.
+  - Each new child is back at 2.40-2.88 GB 9-15 min after its respawn, while the parent held ~2.0-2.3 GB.
+  - Board publication gaps around the 5 recycles: 26.3, 16+, 22, 17 and 15.7 min.
+  - This is finding 3 below, measured from the other side. The 5-10 PM refusal total is therefore >= 26: my count
+    stops at 03:53Z, and the 5th recycle's streak ended after it.
+  - The suggested-picks lane's refresh-worker restart after 10:31 PM resets the parent, so 11-19's evening starts
+    from a fresh baseline without the fix.
+
 ## 2. Where the memory is (the cause)
 
 The guard (`intelligence_state._abort_if_memory_critical`) reads `memory_headroom_snapshot(1,900 MB)`. On the fleet,
