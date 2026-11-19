@@ -61,6 +61,8 @@ cool = 0
 for f in sorted(glob.glob("logs/live-odds-worker.log*")):
     out = subprocess.run(["grep", "-a", "NHL_LIVE_GENERATION_COOLDOWN", f], capture_output=True, text=True, errors="replace").stdout
     for line in out.splitlines():
+        if "ALL_PROCESS_MEMORY" in line:  # quotes process cmdlines, including this watcher's own grep
+            continue
         t = ts(line[:24]) if re.match(r"20\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d+Z", line) else None
         if t and t >= since:
             cool += 1

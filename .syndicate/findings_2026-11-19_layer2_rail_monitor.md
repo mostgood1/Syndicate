@@ -143,3 +143,44 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **Improvement hunt:** the WNCAAB quote-age tail persists (6 of 17 rows over 300 s; p90 540 s), with every overlay gap
   <= 103 s. That points at the books' own quote updates, not the pipeline: `seen_age_at_pricing` p50 5 s. Not a lever yet;
   keep measuring when NCAAB adds volume.
+
+## Reading 3 — 12:02 PM CST (18:02Z)
+
+- **Live:** 6 WNCAAB games; 12 rail rows; **0 flags shown**, 0 false, 0 missed, 0 dark.
+- **P1:** 0. **P6:** 0. **P8 (score floor):** 0 of 9 rows.
+- **Team cards:** 94 chips, 0 defects.
+- **P7 (#850), 11:23 AM-12:02 PM:** 0 `MEMORY_GUARD_ABORT`, 0 child exits.
+  - The board child (pid 1011359) has been up 62 min and is at 3.47 GB RSS (3.00 GB at 23 min). The parent is at 769 MB.
+  - Board: 8 builds, wall median 178 s, max 300 s (1 over 300 s); publication gap median 267 s, max 415 s.
+- **R-E (#838 NHL timeout watcher), first run:** 1 NHL generation step since 11:23 AM, 0 timed out, no marker.
+- **Instrument fix (self-match).** My first watcher run counted 3 `NHL_LIVE_GENERATION_COOLDOWN` lines. All 3 were
+  `ALL_PROCESS_MEMORY` lines quoting my own grep's command line. `d4metrics.py`'s `nhl_generation_markers` /
+  `nhl_generation_cooldowns` had the same hole. Both now skip `ALL_PROCESS_MEMORY` lines, and both read 0 on re-run.
+  Readings before this one may have over-counted these two fields whenever a grep was running.
+- **Live odds:**
+  - WNCAAB overlay gap max 65 s, 0 over 360 s; 49 web merges, 0 stale;
+  - 15 sweeps, 1 refused;
+  - priced age p50 82 s, p90 839 s (4 of 12 rows over 300 s).
+- **Load: `/api/intelligence/query` 10.28 s** (2.24 s at reading 2). Three back-to-back fetches at 12:05 PM: 10.3, 14.2,
+  5.4 s.
+
+**Improvement I-28 (new): the board query's `board_read` is cold on most requests.**
+- **What happens:** the stage costs 3.9-8.8 s on a cold worker, against 1-40 ms warm (`QUERY_STAGE_MS`). It is cold after
+  every web worker memory recycle and every newly published board.
+  - The recycles: `WEB_WORKER_MEMORY_RECYCLE`, hard, at anon 920-1,045 MB against a ~620-650 MB limit. There were 13 in the
+    11 AM hour, and 20-45 an hour on recent evenings.
+  - With 2 workers, each one reads every new board version for itself.
+- **Measured** (`C:\tmp\railmon\qstage.py`, from the web log):
+
+  | window | queries | cold `board_read` | cold total p50 | warm total p50 | all p50 / p90 |
+  |---|---|---|---|---|---|
+  | 11-18 5-11 PM | 125 | **75 (60%)**, p50 5.36 s | 9.63 s | 4.32 s | 7.21 / 16.07 s |
+  | 11-19 7 AM-1 PM | 53 | 37 (70%), p50 3.90 s | 6.88 s | 4.97 s | 6.35 / 13.89 s |
+
+- **The lever:** take the board read off the request path. For example, each worker could pre-read a newly published board
+  in the background (`COMBINED_BOARD_OVERLAY_WARMER` already runs at boot; it is unclear what it warms), or the read could
+  be made cheaper. That would move the page's query from ~7 s at the median toward the ~4.3 s warm path.
+- **Already known and owned elsewhere:**
+  - lane `web-silent-worker-kills` owns the recycle path (the double-recycle fix is loaded);
+  - the I-13 response cache was rejected because read-time merges change every response (todo #828).
+  - Neither covers the cold board read itself. Owner: none yet; proposed as its own session (below).

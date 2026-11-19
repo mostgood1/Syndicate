@@ -140,8 +140,9 @@ out["sweeps_launched"] = launched
 out["sweeps_refused"] = len(refused)
 out["sweeps_refused_pct"] = round(100.0 * len(refused) / (launched + len(refused)), 1) if (launched + len(refused)) else None
 out["refused_reasons"] = dict(collections.Counter(re.findall(r"reason=([a-z_]+)", " ".join(refused))))
-out["nhl_generation_markers"] = sum(1 for l in lo if re.search(r"NHL_(LIVE|PREGAME)_GENERATION", l))
-out["nhl_generation_cooldowns"] = sum(1 for l in lo if "NHL_LIVE_GENERATION_COOLDOWN" in l)
+# ALL_PROCESS_MEMORY lines quote every process's cmdline, including this monitor's own greps: skip them
+out["nhl_generation_markers"] = sum(1 for l in lo if "ALL_PROCESS_MEMORY" not in l and re.search(r"NHL_(LIVE|PREGAME)_GENERATION", l))
+out["nhl_generation_cooldowns"] = sum(1 for l in lo if "ALL_PROCESS_MEMORY" not in l and "NHL_LIVE_GENERATION_COOLDOWN" in l)
 
 # odds children now
 try:
