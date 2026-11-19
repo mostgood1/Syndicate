@@ -62151,3 +62151,19 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Safety:** EXITED 5, all rc -6 after `RECYCLE_EXIT` (stdin-lifeline shutdown abort) -- not rc 75; LEASE_WAIT 0; never 2 children (243 of 244 rows = 1, 1 row = 0 in a respawn gap); container memory p50 5,047 / **max 6,194 MB > 6,144** (n 649; B 4,190/5,341); child listed as own server; Traceback 1 (soccer prop_evidence empty-file read in the parent, unrelated).
 - **verify:** findings `.syndicate/findings_2026-11-17_layer2_board_process_split.md` section READING 1; raw output `C:\tmp\l2split\reading_1118\reading_out.txt`.
 - **Rollback (user's decision, NOT run):** remove `REFRESH_WORKER__SYNDICATE_BOARD_BUILD_PROCESS=1` from `local_production.env`, drained full down/up. Lane `board-split-memory-guard` (#850) owns the refusal/recycle fix and may be preferred.
+
+## 2026-11-19 04:34:30Z (10:34 PM CST 11-18) -- READING (no deploy): FIRST UNMODELLED key exit refused end to end, NCAAF (lane `live-player-exit-gate`, #814)
+- **The exit:** event 401866469, Central Michigan (NCAAF, Wednesday MACtion). Play-by-play shows QB **Jadyn Glasser** replaced at 03:25:45Z (`PLAYER_OUT team=CMU reason=replaced key=True source=pbp since=2026-11-19T03:25:45Z`). The engine does not model a QB change, so the exit is unmodelled.
+- **Detected within one tick:** the next NCAAF exit tick, at 03:28:18Z (the previous tick was 03:26:17Z, before the play was posted), read `players_out=1 key_players_out=1`.
+- **Producer refused:** `NCAAF_LIVE_RESIM` at 03:28:18Z and 03:31:20Z: `live_resimmed 0`, `refusals_by_reason.key_player_out 1`. The game went final by 03:34:27Z (`game_final 2`, `live_games 0`).
+- **Board refused the game lines:**
+  - book_grid NCAAF `LIVE_GAMELINE_BUILD`: 03:27:31Z `projected=5 written=5` (before the refusal) -> 03:30:05Z `projected=0`, `no_live_gameline_projection 24` -> 03:32:36Z `projected=0`.
+  - layer2 `LIVE_GAMELINE_JOIN`: `projected=8` at 03:27:12Z -> `projected=0` at 03:30:02Z.
+  - The only live NCAAF game at the time was this one (`live_games=1`).
+- **Not read:**
+  - live props: NCAAF publishes none, so there are none to refuse.
+  - the portfolio plan: plans are overwritten each cycle, and this reading came an hour later.
+  - an entry hold: there is no `EXIT_HOLD` line 03:20-03:40Z in either log. Either no in-play entry was attempted on the game, or the hold does not log when it holds; not determined.
+- **Watcher miss:** both earlier watchers keyed on `refused_*=N` in `PLAYER_EXIT_TICK`, and NCAAF's tick line carries no refused counter (it is on `NCAAF_LIVE_RESIM`). It surfaced in watcher v2's dry run. v2 (`C:\tmp\lpeg\lpeg_watch_refusal2.ps1`, task bmt6m5hie, from 04:34:00Z to 06:00:00Z 11-23) stops on any key `PLAYER_OUT` whose reason is not foul_out, on `EXIT_HOLD` / `KEY_PLAYER_OUT_REFUSED`, or on a refusal on 2+ consecutive ticks. It logs foul-out flickers and keeps going.
+- **Also tonight (modelled foul-out flickers, one tick each):** NCAAB UConn's Silas Demary Jr. at Arizona (401909742), refused at 04:30:26Z.
+- **#814 measurement status:** NCAAF gamelines MET (one tick, board withdrawn). Every other sport still owes an unmodelled exit; NCAAF's plan and hold reads are still owed.
