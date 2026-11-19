@@ -1404,8 +1404,19 @@ def full_game_prob_scale(market: Any, segment: Any, sport: Any, *, anchored: boo
 _COLLEGE_TOTAL_SPORTS = frozenset({"ncaab", "wncaab"})
 
 
+def points_scored_from_game(game: Any) -> float | None:
+    """Home + away score from a grid row's `game` (the score #824 reads), or None if either is missing."""
+    if not isinstance(game, Mapping):
+        return None
+    try:
+        scored = float(game.get("home_score")) + float(game.get("away_score"))
+    except (TypeError, ValueError):
+        return None
+    return scored if math.isfinite(scored) else None
+
+
 def college_calibrated_total(dist: Any, *, sims: Any, prob_scale: float, calibration: Any, line: Any,
-                             market_prob_over: Any) -> float | None:
+                             market_prob_over: Any, points_scored: Any = None) -> float | None:
     """The TOTAL at which the calibrated P(over) is 50/50 -- the number a college totals card shows as "ours" when the
     #816 calibration is in force (I-17, lane ncaab-total-overprojection; the user chose this over a "sim" label,
     2026-11-17).
@@ -1418,7 +1429,15 @@ def college_calibrated_total(dist: Any, *, sims: Any, prob_scale: float, calibra
     pricer does it. The market is priced only at the row's line, so elsewhere it is modelled as the sim's own spread
     shifted to match that quote (normal, sd = the histogram's): at the quoted line this reproduces the served P
     exactly, so the total is always on the same side of the line as the calibrated lean. Bisection on the monotone
-    calibrated curve; None when anything is missing or the curve does not cross 0.5 inside the histogram's range."""
+    calibrated curve; None when anything is missing or the curve does not cross 0.5 inside the histogram's range.
+
+    THE SCORE IS A FLOOR (`points_scored`, user "Yes, build it" 2026-11-18). A final total cannot end below the points
+    already scored, so P(over t) is 1 for every t below them. Without that, the calibration's level (it pulls the 50/50
+    point a few points under the sim's final) could land the number below the score late in a game: Vermont @ Yale at
+    8:01 PM CST 11-18 showed 124.9-127.5 with 128 scored and the sim's own final at 130.87 (5 of 980 calibrated rows
+    across that evening's 12 rail readings, all that one game). With the floor the number is never below the score; when
+    the sim's whole histogram is behind the score the curve never crosses and the answer is None (#824 refuses that
+    row's flag anyway)."""
     from statistics import NormalDist
 
     from syndicate.features.shared.prop_projections import _dist_prob_over
@@ -1444,8 +1463,16 @@ def college_calibrated_total(dist: Any, *, sims: Any, prob_scale: float, calibra
         return None
     normal = NormalDist()
     market_mean = anchor_line + sd * normal.inv_cdf(p_mkt)      # so P_market(over anchor_line) == p_mkt
+    try:
+        floor = float(points_scored) if points_scored is not None else None
+    except (TypeError, ValueError):
+        floor = None
+    if floor is not None and not math.isfinite(floor):
+        floor = None
 
     def calibrated_over(total: float) -> float | None:
+        if floor is not None and total < floor:
+            return 1.0                                              # the final cannot end below the points scored
         raw = _dist_prob_over(dist, total)
         if raw is None:
             # Outside the histogram's support `_dist_prob_over` answers None; the probability there is known.
@@ -1519,6 +1546,7 @@ def price_distribution_market(
     sport: Any = None,
     prob_scale: float = 1.0,
     total_calibration: Any = None,
+    points_scored: Any = None,
 ) -> dict[str, Any]:
     """Price a live TOTALS or SPREADS row off the re-sim's own histogram.
 
@@ -1650,7 +1678,7 @@ def price_distribution_market(
             # I-17: the total the calibrated probability implies, for the card's "ours" (display only).
             out["calibrated_total"] = college_calibrated_total(
                 dist, sims=sims, prob_scale=float(prob_scale), calibration=total_calibration, line=line_value,
-                market_prob_over=market_p)
+                market_prob_over=market_p, points_scored=points_scored)
     edge = _edge_pp(float(model_prob), market_p)
     out["edge_pp"] = round(edge, 2)
     # THE SAME BAR AS THE MONEYLINE, deliberately. A histogram answers "what is
@@ -1818,7 +1846,8 @@ def live_display_block(
                     hit.get("total_runs_dist"), sims=sims,
                     prob_scale=full_game_prob_scale(market_key, hit.get("segment") or "full", sport,
                                                     anchored=bool(hit.get("margin_anchored"))),
-                    calibration=cal, line=row.get("line"), market_prob_over=fair)
+                    calibration=cal, line=row.get("line"), market_prob_over=fair,
+                    points_scored=points_scored_from_game(row.get("game")))
     total_mean = hit.get("total_mean") if market_key in _TOTALS_MARKETS else None
     if prob is None and total_mean is None:
         return None
@@ -2842,6 +2871,8 @@ def attach_live_gamelines(
                                                     anchored=bool(hit.get("margin_anchored"))),
                     # #816: college full-game totals only; None everywhere else.
                     total_calibration=college_live_total_calibration(market_key, segment, sport, row.get("commence_time")),
+                    # I-17's calibrated total never shows below the points already scored (display only).
+                    points_scored=points_scored_from_game(game),
                 )
             # A DISPLAY-ONLY HISTOGRAM IS NOT A PRICE (`#773`, NHL puck line). The row keeps the pricer's own
             # no-distribution refusal -- no model probability, so `_apply_verdict` publishes no

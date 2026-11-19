@@ -168,6 +168,64 @@ def test_the_total_sits_on_the_calibrated_lean_side_of_the_line(a):
     assert total is not None and (total < LINE) == (served < 0.5)
 
 
+# ------------------------------------------------------------------------- the score is a floor (user "Yes, build it")
+# Vermont @ Yale, 8:01 PM CST 11-18: 128 scored, the sim's final 130.87, every calibrated row 124.9-127.5. A final
+# total cannot end below the points already scored, so the shown number must not either.
+
+def _total(points_scored=None):
+    return college_calibrated_total(DIST, sims=200, prob_scale=1.0, calibration=CAL, line=LINE, market_prob_over=MARKET,
+                                    points_scored=points_scored)
+
+
+def test_the_calibrated_total_never_shows_below_the_points_scored():
+    unfloored = _total()
+    assert unfloored is not None and unfloored < 136.0          # the calibration pulls it under the sim's 137.6 mean
+    assert _total(136) == pytest.approx(136.0, abs=0.05)
+    assert _total(137) == pytest.approx(137.0, abs=0.05)
+
+
+def test_a_score_below_the_number_changes_nothing():
+    assert _total(130) == _total() == _total(None)
+
+
+def test_a_sim_wholly_behind_the_score_gives_no_number():
+    # Every final in the histogram (130-144) is below 150 scored: no honest 50/50 point (#824 refuses the flag too).
+    assert _total(150) is None
+
+
+@pytest.mark.parametrize("game, expected", [
+    ({"home_score": 76, "away_score": 60}, 136.0),
+    ({"home_score": "76", "away_score": "60"}, 136.0),
+    ({"home_score": None, "away_score": 60}, None),
+    ({}, None),
+    (None, None),
+])
+def test_points_scored_from_game(game, expected):
+    from syndicate.features.shared.live_gameline_join import points_scored_from_game
+    assert points_scored_from_game(game) == expected
+
+
+def _scored_row(**kw):
+    row = _row(**kw)
+    row["game"] = {"state": "live", "home_score": 76, "away_score": 60}   # 136 scored; the sim's final 137.2 is above
+    return row
+
+
+def test_the_join_floors_the_priced_rows_calibrated_total():
+    rows = [_scored_row()]
+    _attach(rows)
+    lg = rows[0]["live_gameline"]
+    assert lg["calibrated_total"] == pytest.approx(136.0, abs=0.05)
+    assert lg["calibrated_total"] >= 136.0 - 0.05
+
+
+def test_the_display_path_floors_it_too():
+    rows = [_scored_row(age=20.0, updated_at=LANE_AT - timedelta(seconds=600))]
+    _attach(rows)
+    block = rows[0].get(LIVE_DISPLAY_KEY)
+    assert block is not None and block["calibrated_total"] == pytest.approx(136.0, abs=0.05)
+
+
 @pytest.mark.parametrize("kw", [{"line": None}, {"market_prob_over": None}, {"market_prob_over": 1.0}, {"calibration": None}])
 def test_missing_inputs_give_no_number(kw):
     args = {"sims": 200, "prob_scale": 1.0, "calibration": CAL, "line": LINE, "market_prob_over": MARKET} | kw
