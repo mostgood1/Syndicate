@@ -206,3 +206,32 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **Since 12:02 PM (`qstage.py`):** 12 queries, 6 cold (50%). Cold `board_read` p50 8.77 s, cold total p50 13.56 s, warm
   total p50 4.86 s.
 - Cold reads ranged 4.4-16.5 s this window. Session card task_6b228341 is proposed and not yet started.
+
+## Reading 5 — 1:36 PM CST (19:36Z), NCAAB's first game live
+
+- **Live:** 1 game, Florida @ West Virginia (NCAAB), with 18 rail rows. No WNCAAB game is live.
+- **Flags: 3 shown on 1 card, 0 false, 0 missed, 0 dark.**
+  - full-game total u144.5 (model 0.547 vs fair 0.509, ours 142.7);
+  - first-half total u68.5 (0.588 vs 0.492, ours 65.6);
+  - moneyline WVU (0.297 vs 0.213, a long shot in the P4 slice).
+- **P1:** 0 contradictions; both totals have ours on the flagged side of the line. **#824 (below points):** 0.
+  **P6:** 0. **P8 (score floor):** 0 of 9.
+- **Team cards:** 94 chips, 0 defects.
+- **P7 (#850), 12:45-1:36 PM:** 0 `MEMORY_GUARD_ABORT`, 0 child exits. The child is at 3.75 GB after 2.6 h up (3.00 GB at
+  23 min, 3.47 GB at 62 min, 3.41 GB at 105 min).
+  - Board: 12 builds, wall median 164 s, max 228 s, 0 over 300 s; publication gap median 246 s, max 338 s.
+- **R-B (#844 baseline, sample 1):** NCAAB 14 grid rows (7 venue), h2h 1, `h2h_row_fresh` 0 vs `h2h_cell_fresh` 1,
+  **`mismatch` 3**; NBA 0 rows (not live). This is the predicted shape: mismatch > 0, row-fresh below cell-fresh.
+- **R-E:** 2 NHL steps since 12:45 PM, 0 timed out.
+- **Live odds:**
+  - NCAAB overlay gap max 37 s; 12 sweeps, 0 refused;
+  - priced age p50 116 s, p90 285 s (3 of 18 rows over 300 s);
+  - all 5-6 web merges list `wncaab` as stale: no WNCAAB game was live, so that overlay has nothing new. Not a defect.
+- **Load:** query 3.42 s (a warm read), shortlist 0.98 s, chips 0.20 s.
+- **I-28:**
+  - Since 12:45 PM: 9 queries, 8 cold (89%), cold total p50 7.07 s, warm 2.56 s.
+  - The session (local_a5513c97) attributed it: 69 of the 75 cold reads on the 11-18 evening were a NEW worker's first read
+    after a memory recycle. The other kind is a 180 s cache expiry; nothing in the cache reads the board's version.
+  - Its fix is todo #853 (`9931a787b`, `SYNDICATE_COMBINED_BOARD_SHARED_COPY`, default off): a shared copy in `/dev/shm`.
+    Prediction: cold <= 25%, query p50 <= 5.5 s, p90 <= 13 s.
+  - The load (env key + a drained full down/up) is the user's decision, asked in that session.
