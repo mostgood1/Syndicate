@@ -72,6 +72,7 @@ Then:
   - P1 (`ours_contradictions`) and #824 (`ours_below_points`);
   - the score floor (`floor_violations`, owned reading R-A) and, while NCAAB is live, the #844 sampler (R-B);
   - on NHL days, the NHL timeout watcher `p838_watch.py <prev Z>` (R-E);
+  - `live_games_no_model`: live games whose full-game rail rows carry no live model at all (I-29, added 11-19). A game can lack a model before its first re-sim, so confirm on the next reading. If it persists, `lgb.py <sport> <since>` shows the join's `withheld_by_reason`;
   - P6;
   - overlay gaps over 360 s and stale web merges;
   - board publication gaps and the memory guard;

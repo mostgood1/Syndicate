@@ -103,6 +103,19 @@ def row(args):
                 if len(floor_examples) < 3:
                     floor_examples.append(f"{r.get('matchup')} {r.get('side')} {r.get('line')}: total {lt} < {pts[gk]:.0f} scored, age {r.get('book_age_seconds')}")
 
+    # I-29 (11-19): live games whose full-game (non-player) rail rows carry NO live model at all. The probe's dark/missed
+    # counts need a model on the row, so a game that loses its model join is invisible to them.
+    by_game = {}
+    if os.path.exists(lr_path):
+        for r in (json.load(open(lr_path, encoding="utf-8")).get("rows") or []):
+            if r.get("player_name") or str(r.get("segment") or "full") != "full":
+                continue
+            g = by_game.setdefault(f"{r.get('sport')} {r.get('matchup')}", [0, 0])
+            g[0] += 1
+            if r.get("live_model_probability") is not None:
+                g[1] += 1
+    games_no_model = sorted(k for k, (n, m) in by_game.items() if n and not m)
+
     # BC-048: pregame college totals flags on the shortlist (model edge > 0 on a non-live row)
     sl = json.load(open(os.path.join(rdir, "shortlist.json"), encoding="utf-8"))
     p6 = 0
@@ -129,6 +142,9 @@ def row(args):
         "floor_violations": floor_viol,
         "floor_examples": floor_examples,
         "pregame_college_total_flags": p6,
+        "live_games_with_rows": len(by_game),
+        "live_games_no_model": len(games_no_model),
+        "live_games_no_model_list": games_no_model[:5],
         "live_rows": lr.get("n"),
         "priced_le_120": lr.get("priced_le_120"),
         "priced_age_p50_s": (lr.get("priced_age") or {}).get("p50"),
