@@ -122,8 +122,18 @@ def load_bucket_search() -> Any:
 # ---------------------------------------------------------------------------
 
 
+# The row's bookmaker, kept ONLY with `SYNDICATE_SCORECARD_848_GRADING` on (todo #848): `population_outcomes_nhl`
+# nhl/2 voids a live row whose OWN book quote was unseen at its sighting, and without `bk` every pending row reaches
+# it as "unknown" -- measured 2026-11-18, a read-only scorecard run with the settler on moved no NHL cell at all.
+# Absent, the kept fields (and so the saved state) are exactly what they were.
+KEEP_FIELDS_848 = ("bk",)
+
+
 def strip_record(record: Mapping[str, Any]) -> dict[str, Any]:
-    return {field: record.get(field) for field in KEEP_FIELDS if record.get(field) is not None}
+    from syndicate.features.shared.population_outcomes_soccer import grading_848_on
+
+    fields = KEEP_FIELDS + KEEP_FIELDS_848 if grading_848_on() else KEEP_FIELDS
+    return {field: record.get(field) for field in fields if record.get(field) is not None}
 
 
 def game_key(record: Mapping[str, Any]) -> str | None:

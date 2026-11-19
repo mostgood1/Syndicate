@@ -140,15 +140,36 @@ are sized, so it is a betting change (CLAUDE.md 2026-11-16), and it loads only i
 And it would load early if it landed switched on: the job runs from the fleet checkout (`local_production.py`,
 `cwd=REPO_ROOT`), so the next fast-forward by ANY lane would ship it at the following 11:30Z run. So both fixes
 sit behind ONE key, `SYNDICATE_SCORECARD_848_GRADING` (on / 1 / true / yes). Absent, the code grades exactly as
-`soccer/1` and `nhl/1` did, the versions stay `soccer/1` / `nhl/1` (no reset), and the NHL settler reads no
-sidecar. The `view_from_record` keys are additive and read only by `nhl/2`.
+`soccer/1` and `nhl/1` did, the versions stay `soccer/1` / `nhl/1` (no reset), the NHL settler reads no sidecar,
+and the scorecard keeps exactly its old record fields. The `view_from_record` keys are additive and read only by
+`nhl/2`. The core grader signature is unchanged (`7fed663d478b` in both A/B runs), so no other sport resets.
 
-To load: put `SYNDICATE_SCORECARD_848_GRADING=on` in `~/syndicate-prod/local_production.env` (the job gets
-refresh-worker's env, built only at `up`), in a window, with a drained down/up and `betting_change.py add --kind
-yes`. Verify at the next 11:30Z run: the `GRADER` log line reads `soccer/2` and `nhl/2`; `STATE ... reset` names
-soccer and nhl; the published scorecard carries `extra_live_quote_unseen_at_sighting` under nhl. The overlay's
-soccer / NHL cells come back as the runs refill (a 40-date `--max-board-dates` one-off would refill at once, but
-reads every in-season sport's parts for ~36 dates through web's stream route).
+**The scorecard strips `bk` (found by the first A/B, fixed).** `model_scorecard.merge_board_date` keeps only
+`KEEP_FIELDS`, which did not include the bookmaker, so with the settler on every pending NHL row reached `nhl/2`
+as "unknown" and the first read-only run moved NO NHL cell. With the switch on, `strip_record` now also keeps
+`bk` (`KEEP_FIELDS_848`); a test through `merge_board_date` fails without it. Rows of games still PENDING when the
+switch turns on were stripped before it, so they carry no `bk` and grade as before (counted as unknown): about
+one to two days of NHL games.
+
+**A refill commits games before their later board dates arrive (an existing scorecard defect, not fixed here).**
+`model_scorecard.grade_pending` commits any game whose kickoff has passed and that shows no not-final reason; it
+does not wait for the board dates that still hold the game's records. After a version reset the refill fetches
+today + yesterday + the 8 OLDEST incomplete board dates per run, so a soccer game (recorded up to 7 days ahead)
+commits on its look-ahead sightings, and its game-day pregame and LIVE rows then arrive `late` and are dropped.
+Measured on the first A/B (5 passes of 10 board dates, the daily job's refill): the same 448 soccer games on the
+same 19 dates as production, but 41,516 graded rows against production's 170,978, and `player_shots` live 783 rows
+/ 7 games against 25,549 / 267. NHL has no multi-day look-ahead and was unaffected (192 games, 75,715 rows,
+identical to production). **So switching `soccer/2` on and letting the daily job refill would gut soccer's live
+history for four weeks.** The load must refill in ONE run (`--max-board-dates 40`, every retained board date
+fetched before anything is graded, as the single-pass A/B in §5 does), or `grade_pending` must first learn to wait.
+
+To load (a betting change; the user's call; in a window): put `SYNDICATE_SCORECARD_848_GRADING=on` in
+`~/syndicate-prod/local_production.env` (the job gets refresh-worker's env, built only at `up`), drained down/up,
+`betting_change.py add --kind yes`, then ONE manual scorecard run with `--max-board-dates 40 --publish --verify`
+(it reads every in-season sport's parts for ~36 dates through web's stream route: run it off-peak, inside the
+window). Verify: the `GRADER` log line reads `soccer/2` and `nhl/2`; `STATE ... reset` names soccer and nhl; nhl
+carries `extra_live_quote_unseen_at_sighting`; soccer's 28d coverage stays near 171k graded rows; the overlay's
+14 soccer + 5 NHL cells are present on that run's overlay.
 
 ## 4. off != on
 
@@ -156,10 +177,51 @@ reads every in-season sport's parts for ~36 dates through web's stream route).
 Caufield and Suzuki 10-17 recorder rows and their state entries), each fix shown both ways through the same code:
 switch on (fixed) and absent (exactly the old grading: the Caufield row WIN, the sidecar never read; Olmo's `no`
 LOSS). The versions move only with the switch (`off`, `0`, empty, `no` all keep `/1`). Before the switch was
-added, the same tests against `origin/main`'s three modules failed 16 of 17 (the DNP void passes under both).
+added, the same tests against `origin/main`'s three modules failed 16 of 17 (the DNP void passes under both). The
+stripped-state reachability test fails with HEAD's `model_scorecard.py` (no `bk`) and passes with the fix.
 Neighbours pass: `test_population_outcomes_soccer.py`, `_nhl.py`, `_basketball.py`, `test_bucket_search.py`,
-`test_model_scorecard.py`, `test_publish_model_scorecard.py` (167 with the new file).
+`test_model_scorecard.py`, `test_publish_model_scorecard.py`, `test_daily_optimizer.py`, `test_sim_gap_ev_study.py`,
+`test_grade_suggested_set.py`, `test_score_ranking_backtest.py`, `test_optimizer_overlay.py`, `test_skill_overlay.py`,
+`test_bet_status_nhl.py`, `test_soccer_settlement_props.py`.
 
 ## 5. The scorecard re-run (read-only)
 
-(filled below from the A/B run)
+**How.** The REAL `scripts/publish_model_scorecard.main`, unmodified, wrapped by `C:/tmp/g848/scorecard_ro.py`:
+every `WebReader` read answered from the fleet's disk, every write redirected to a WSL scratch root, `publish`
+refused, and the process run inside a private mount namespace with `~/syndicate-prod/data` bind-mounted
+READ-ONLY (a probe write was refused). Fresh state, ONE pass over every retained board date (`--max-board-dates
+40`), `--weekly off --simgap off --resamples 200`, one sport per run, nice 19, a 3.5 GB address-space cap.
+`old` = this branch's base (`9ff9649db`), switch absent; `new` = the fix with the switch on. The only network
+reads: the fleet's public `/api/board/game-chips` and api-web.nhle.com (cached).
+
+**NHL (old reproduces production EXACTLY: 75,675 pooled bets, every cell identical to the 11-18 11:30Z artifact):**
+
+| pooled, 28 d to 11-17 | prod / old | new (switch on) |
+|---|---|---|
+| `nhl\|goals\|full\|live` ev10+ | 723 bets / 113 g, ROI +152.9%, mkt EV +174.5% | **1 bet** |
+| `nhl\|goals\|full\|live` all | 7,854, -13.6% / +11.1% | 3,174, -11.3% / -6.4% |
+| `nhl\|goals\|full\|live` ev<0 | 6,943, -31.1% / -5.7% | 3,138, -11.3% / -6.5% |
+| NHL ev10+, every cell | 1,084, +111.4% / +145.9% | 322, +36.0% / +95.8% |
+| NHL pooled | 75,675, -11.76% / -3.68% | 63,384, -12.47% / -5.61% |
+| NHL recommended (published) | 63,413, -11.47% / -2.51% | 52,784, -12.39% / -4.75% |
+| `extra_live_quote_unseen_at_sighting` | 0 | 12,295 rows |
+
+The goals cell's realised ROI and market EV now agree in sign and size. Two-sided live cells lose rows but barely
+move (sog -5.0 / -4.9 -> -5.1 / -4.9). Pregame cells are untouched (pregame rows are never checked). The NHL ev10+
+that remains is mostly `nhl|totals|full|live` (124 bets, +34.5% vs +45.0%), partly rows with no sidecar entry;
+a lead, not claimed.
+
+**Soccer (old reproduces production: 170,902 pooled bets vs 170,805, the same 448 games / 19 dates; the small
+excess is records written after the 11:30Z run):**
+
+| pooled, 28 d to 11-17 | prod / old | new (switch on) |
+|---|---|---|
+| `soccer\|player_goal_scorer_anytime\|full\|live` | 6,794 / 271 g, hit 0.0926, ROI -44.9% / mkt EV -8.7% | hit 0.0951, ROI -44.6% |
+| `soccer\|player_goal_scorer_anytime\|full\|pregame` | 6,713 / 269 g, hit 0.0921, ROI -57.0% / -8.0% | hit 0.0947, ROI -56.7% |
+| `soccer\|player_shots\|full\|live` | 25,549 / 267 g, -56.4% / -7.9% | unchanged |
+| soccer pooled | 170,902, -43.25% / -7.21% | -43.23% / -7.21% |
+| soccer recommended (published) | 82,953, -34.80% / -6.72% | -34.75% / -6.72% |
+
+The soccer cells move only where the `no` rows sit, and only a little: the -55% is not a grading defect, so it
+should not move. Raw outputs: `C:/tmp/g848/ab_nhl_single_pass.txt`, `ab_soccer_single_pass.txt`,
+`ab_refill_5x10.txt` (the first, refill-order run that exposed both §3 findings), `ab_*_log.txt`.

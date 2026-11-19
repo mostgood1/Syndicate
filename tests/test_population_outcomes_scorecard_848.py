@@ -248,3 +248,34 @@ def test_absent_the_stale_live_row_grades_exactly_as_before_and_nothing_is_read(
     assert (result, reason) == ("win", "nhl_box") and exports.calls == [] and not settler.counters
     graded, ungraded = bs.grade_population([CAUFIELD], {}, extra_settler=po.build_extra_settler(fetch_export=exports))
     assert len(graded) == 1 and graded[0]["y"] == 1.0 and not ungraded
+
+
+# --- reachability through the scorecard's OWN state: `merge_board_date` strips every record to KEEP_FIELDS ----
+#
+# Measured 2026-11-18: with the settler on but the bookmaker stripped, a read-only run of the real
+# `publish_model_scorecard.main` moved NO NHL cell (every pending row reached nhl/2 as "unknown"). The test above
+# feeds `grade_population` a raw record; this one goes through the path production takes.
+
+from syndicate.features.shared import model_scorecard as msc  # noqa: E402
+
+
+def _pending_after_merge(record):
+    state = msc.empty_state("sig", {})
+    msc.merge_board_date(state, "2026-10-17", [record], today="2026-11-18",
+                         central_date=bs.SCORECARD.central_date, fetched_at="2026-11-18T12:00:00Z")
+    (records,) = state["pending"].values()
+    return records
+
+
+def test_reachability_through_the_scorecards_stripped_state(nhl_graded_win):
+    records = _pending_after_merge(CAUFIELD)
+    assert records[0]["bk"] == "betrivers"
+    composite = po.build_extra_settler(fetch_export=_Exports({STATE_PATH: QUOTE_STATE}))
+    graded, ungraded = bs.grade_population(records, {}, extra_settler=composite)
+    assert graded == [] and ungraded == {"extra_live_quote_unseen_at_sighting": 1}
+
+
+def test_absent_the_scorecard_keeps_exactly_the_old_fields(grading_absent):
+    kept = msc.strip_record({**CAUFIELD, "eb": "market_fair"})
+    assert "bk" not in kept and set(kept) <= set(msc.KEEP_FIELDS)
+    assert _pending_after_merge(CAUFIELD)[0] == msc.strip_record(CAUFIELD)
