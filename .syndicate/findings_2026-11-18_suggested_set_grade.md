@@ -33,8 +33,16 @@ EV on those same bets, so it realised 6.4 points below its promise. Counting eac
   first sighting per board date.
 
 **The grader is on main** (`scripts/grade_suggested_set.py`, 20 tests). **The results are on the fleet** at
-`~/syndicate-prod/data/reports/suggested_set/suggested_set_latest.json`, from a hand run. **The daily refresh is the
-user's call** (§6).
+`~/syndicate-prod/data/reports/suggested_set/suggested_set_latest.json`.
+
+**UPDATE 11-18 ~11:00 PM CST (user "Yes, go ahead"): both loads are done.**
+- The daily refresh runs as Windows task `SyndicateSuggestedSet`, 7:15 AM CT, first run 11-19. Its test run at
+  10:57 PM gave result 0 and `rc=0` in 33 s (§6).
+- The recorder's `#sg` record (§2, §7) has been live since **04:46:47Z (10:46 PM CST)** (`deploys.md`
+  2026-11-19 04:46:22Z).
+  - The first build on it wrote 103 suggested-sighting records.
+  - So from the 11-19 run on, this grade sees every line the board suggests, not only those suggested at first
+    sight. Earlier days keep the blind spot.
 
 ## 1. Where `suggested` is recorded, and since when (fleet, read 11-18 5:49 PM CST)
 
@@ -233,7 +241,20 @@ A row's `games` is the set's own games; the monitor's other sets carry the sport
 - Two consecutive runs give identical intervals. Games are put in a fixed order before the seeded bootstrap; an
   earlier run differed by 0.1 point before that fix.
 
-**Two ways to refresh it daily. Neither is loaded; both are the user's call.**
+**LOADED 11-18 10:57 PM CST (user "Yes, go ahead"): option A.**
+- **The task:** `SyndicateSuggestedSet`, daily at 7:15 AM local, Interactive / Limited, priority 7, 1 h limit, start
+  when available. It runs `conhost.exe --headless wsl.exe -d Ubuntu-24.04 -- bash
+  /mnt/c/SyndicateProd/suggested_set/run_suggested_set.sh`, a copy of `scripts/run_suggested_set_daily.sh`.
+- **The script:** it runs the grader from `~/Syndicate` at nice 19 with `--cache-dir ~/.cache/syndicate_suggested_set`
+  (seeded from the hand runs' cache).
+  - It logs `=== start <UTC> head=<sha>` and `=== end <UTC> rc=<n>` to `~/syndicate-prod/logs/suggested_set.log`.
+  - It exits with the grader's code, so the task's result is the grader's exit.
+- **Why a script file and not the inline command below.** The first test ran the inline form, and its `$(...)` and
+  `$rc` expanded at the wsl.exe hop: `head=` and `rc=` came out empty, so a failed grade would still have read result 0.
+- **Test run 04:57:49Z..04:58:22Z:** `head=199d6c529`, `rc=0`, task result 0, the same 4,945 rows and day-11-18
+  numbers as the 6:07 PM hand run.
+
+The options as they were put to the user:
 - **A. A scheduled read (recommended).** A Windows task `SyndicateSuggestedSet` at ~7:15 AM CT, after the 5:30 AM CT
   scorecard. It has the same shape as `SyndicateCheatSheetPicks`:
   `conhost.exe --headless wsl.exe -d Ubuntu-24.04 -- bash -lc "cd ~/Syndicate && nice -n 19
@@ -248,8 +269,12 @@ A row's `games` is the set's own games; the monitor's other sets carry the sport
 
 - **BUILT 2026-11-18 (user "Yes, go ahead"):** `199d6c529`, on main, default ON, off switch
   `SYNDICATE_OPPORTUNITY_POPULATION_SUGGESTED_SIGHTING=off`. 4 new tests, plus 291 tests of the recorder's readers.
-  It loads with a refresh-worker restart after 10:30 PM CST 11-18; `deploys.md` has the load. The original plan
-  follows.
+  **LOADED 04:46:47Z 11-19 (10:46 PM CST 11-18):** a fleet ff `a3104a5b6 -> 199d6c529` at 04:46:22Z, then a TERM of
+  the board CHILD only, under a drain.
+  - The recorder runs only in `pipeline.board_build_process --serve`; the refresh-worker parent was not restarted.
+  - 13 of 13 POPULATION lines read `suggested_sighting=on`, and `suggested_pending` summed to 95.
+  - 103 `sg=true` records and 103 `#sg` sidecar keys on disk.
+  - `deploys.md` entry 2026-11-19 04:46:22Z. The original plan follows.
 - **The recorder's missing half (§2).** In `opportunity_population_ledger.record_population`, write a second record
   the first time a line is seen suggested on a board date, under a `#sg` sidecar suffix, the way `#live` works.
   - Every earliest-sighting reader keeps its row, because the new record is later. So the scorecard, the optimizer
@@ -264,7 +289,10 @@ A row's `games` is the set's own games; the monitor's other sets carry the sport
 **Todo `#846` is NOT written.** `docs/ai_context/todo.md` is claimed by the OPEN lane `wnba-native-live-cutover`
 (guard source origin/main@9e233a9c), and lane-guard blocks a cross-lane edit. The three owed items above are this
 entry, for whoever can write it: (1) the daily refresh, (2) the recorder `#sg` record, (3) the orders join. The
-entry is `#846`, checked free in both todo files at about 6:11 PM CST.
+entry was to be `#846`, checked free in both todo files at about 6:11 PM CST. **(1) and (2) are DONE as of 11-18
+~11:00 PM CST.** **CORRECTION (11:00 PM CST):** `#846` has since been taken, by lane `product-optimization-program`
+(the ranked lever table, which already lists this suggested set as an input). So (3), the orders join, and the
+per-line follow-ups above are owed here with no todo number of their own.
 
 ## Scripts and outputs
 
