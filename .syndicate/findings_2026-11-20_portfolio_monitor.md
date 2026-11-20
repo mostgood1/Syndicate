@@ -213,3 +213,40 @@ only, because this repo is public.
   - Live ticks: 1 placed on Polymarket.
   - Cap use: 4.8% Kalshi, 5.7% Polymarket.
   - A browser loaded `/portfolio` and logged in during the window (2 browser requests).
+
+## Local Portfolio Watch, no credits (user, 11-20 ~9:55 AM CST: "make this dashboard self contained so it doesnt use up credits")
+
+- **What spent credits:** the claude.ai dashboard's page never calls Claude. The cost was this session re-uploading its 3
+  files and rewriting its datasets after every reading.
+- **What replaces it:** the Windows task **`SyndicatePortfolioWatch`**.
+  - It runs every 30 min at :04 and :34, keeping off the :07/:22/:37/:52 picks minutes. The user, Interactive logon,
+    `conhost --headless`, so no window. IgnoreNew, a 15-min limit.
+  - It runs `C:\tmp\pfmon\local_watch.py`:
+    1. the probe from the main checkout (`--log-minutes 30`, read-only);
+    2. `build_page_data.py`;
+    3. `build_local_dashboard.py`, which writes **`C:\tmp\pfmon\page\dashboard.html`**, one file with its data
+       inside (no network, reloads every 5 min, flags itself stale past 75 min);
+    4. prunes the raw reading folders older than 48 h (40 removed at the first run, 510 MB to 326 MB).
+  - Its log is `C:\tmp\pfmon\local_watch.log`.
+  - Verified:
+    - a manual run and a Task Scheduler run (09:59), every step rc 0;
+    - rendered headless at 1280 px light and 390 px dark: 0 script errors and no horizontal scroll.
+- **The claude.ai page** (https://claude.ai/artifact/BUBiY1Qd5EizqJJUGMmqGN) is no longer updated after each reading.
+  It keeps its 9:27 AM data.
+
+## Reading 104 — Fri 11-20 9:58 AM CST (15:58Z), by hand through the new runner
+
+- **Results:** unchanged (30 d -7.38% on 719 events; gate 13 of 800).
+- **ANOMALY: `live_today` 8.77 s** (server 8,627 ms at 15:58:36Z). This read was timed at Normal priority, so it is
+  not the probe's starvation.
+- **No recycle, boot or overlay line** in 15:56-15:59Z.
+- **Host load 6.2** (15 min 4.5, rising), from the fleet's own morning builds:
+  - `build_soccer_artifacts.py` ×2 (nice 0, ~100% each);
+  - `build_college_pregame_sims.py` (nice 15, 129%);
+  - a `find ~/syndicate-prod/data -maxdepth 4 -name *state*2026-11-2*` (nice 0, 88%);
+  - `board_build_process` (67%).
+- The task's own run at 09:59 read `live_today` inside budget.
+- **Tally since 6 PM 11-19:** 7 of 25 `live_today` reads above 2 s, 3 above 3 s. Causes: 2 memory recycles, 2 host
+  load (now the fleet's own workers, not only research jobs), 3 not logged.
+- Added to the web owners' evidence. `web-silent-worker-kills` has the brief, and keeps the session open by the user's
+  "Keep it open".
