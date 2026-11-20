@@ -790,3 +790,12 @@ over the refresh-worker logs.
   - Outside §5's 23:00-04:00Z window, so the grade stands. The pattern continues: 2 an hour from 8 PM on, never 3 in a
     row.
 - **Load:** `/intelligence` 9.00 s; query 1.58 s; chips 0.84 s; shortlist 0.61 s.
+
+## Reading 25 — 11:27 PM CST (05:27Z)
+
+- **Live:** 7 games (4 NCAAB, 2 NHL in P3, 1 MLS in extra time); 4 with rail rows (58 rows).
+- **0 flags**, 0 false, 0 missed. P8 0 of 13. Team cards 94 chips, 0 defects.
+- **I-29:** Kansas @ Houston (H2 18:00) is still REVERSED, 13 rows, no model. It has been dark since the tip.
+- **#850:** no new refusals or exits since 10:40 PM. Board publication gap max 294 s.
+- **Load:** query 2.47 s, chips 0.84 s, shortlist 0.66 s.
+- The last games should end ~12:15 AM; the nightly close follows.
