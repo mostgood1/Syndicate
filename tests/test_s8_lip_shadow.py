@@ -69,3 +69,19 @@ def test_greedy_book_ranks_by_dollars_per_capital_within_budget():
 def test_usd_per_day_is_centi_cents_over_program_days():
     p = {"period_reward": 1_000_000, "start_date": "2026-11-20T00:00:00Z", "end_date": "2026-11-22T00:00:00Z"}
     assert s8.program_usd_per_day(p) == pytest.approx(50.0)
+
+
+def test_a_restart_reuses_only_this_slots_book(tmp_path):
+    import datetime as dt
+    import json
+
+    def write(name, selected_at):
+        (tmp_path / name).write_text(json.dumps({"selected_at": selected_at, "book": []}), encoding="utf-8")
+
+    write("universe_20261120T141218Z.json", "2026-11-20T14:12:18+00:00")  # 8:12 AM CST 11-20
+    now = dt.datetime(2026, 11, 20, 15, 30, tzinfo=dt.timezone.utc)      # 9:30 AM CST, same slot
+    assert s8.current_slot_universe(tmp_path, now).name == "universe_20261120T141218Z.json"
+    later = dt.datetime(2026, 11, 21, 12, 30, tzinfo=dt.timezone.utc)    # 6:30 AM CST 11-21: a new slot
+    assert s8.current_slot_universe(tmp_path, later) is None
+    early = dt.datetime(2026, 11, 21, 11, 0, tzinfo=dt.timezone.utc)     # 5:00 AM CST 11-21: still 11-20's slot
+    assert s8.current_slot_universe(tmp_path, early).name == "universe_20261120T141218Z.json"

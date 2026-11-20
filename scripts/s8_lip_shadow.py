@@ -345,18 +345,48 @@ class HourlyWriter:
         self.fh = None
 
 
-def collect(out_dir: Path, hours: float, log=print) -> int:
+def current_slot_universe(out_dir: Path, now: dt.datetime | None = None) -> Path | None:
+    """The newest universe file chosen in the current selection slot (since the most recent RESELECT_CST_HOUR CST),
+    so a restarted collector keeps the day's book instead of re-reading every program (about 25 min)."""
+    now_cst = (now or utcnow()).astimezone(CST)
+    slot = now_cst.replace(hour=RESELECT_CST_HOUR, minute=0, second=0, microsecond=0)
+    if now_cst < slot:
+        slot -= dt.timedelta(days=1)
+    for path in sorted(out_dir.glob("universe_*.json"), reverse=True):
+        try:
+            selected = parse_ts(json.loads(path.read_text(encoding="utf-8")).get("selected_at"))
+        except (OSError, ValueError):
+            continue
+        if selected and selected.astimezone(CST) >= slot:
+            return path
+        return None
+    return None
+
+
+def collect(out_dir: Path, hours: float, log=print, until: dt.datetime | None = None) -> int:
     set_idle_priority()
     client = Client(spacing=0.15)
     select_client = Client(spacing=0.35)
-    universe_path = select_universe(client, out_dir, log)
-    state = {"universe": json.loads(universe_path.read_text(encoding="utf-8")), "path": universe_path.name,
-             "selecting": False, "last_select_cst_date": dt.datetime.now(CST).date().isoformat()}
+    stop_at = time.time() + hours * 3600
+    if until is not None:
+        stop_at = min(stop_at, until.timestamp())
+    if time.time() >= stop_at:
+        log("[s8] collect: past the stop time, nothing to do")
+        return 0
+    universe_path = current_slot_universe(out_dir)
+    if universe_path is not None:
+        log(f"[s8] collect: resuming with this slot's book {universe_path.name}")
+    else:
+        universe_path = select_universe(client, out_dir, log)
+    universe = json.loads(universe_path.read_text(encoding="utf-8"))
+    selected_cst = (parse_ts(universe.get("selected_at")) or utcnow()).astimezone(CST)
+    state = {"universe": universe, "path": universe_path.name, "selecting": False,
+             "last_select_cst_date": selected_cst.date().isoformat()}
     books_w, trades_w = HourlyWriter(out_dir, "books"), HourlyWriter(out_dir, "trades")
     last_trade_ts: dict[str, int] = {}
     seen_trades: set[str] = set()
-    stop_at = time.time() + hours * 3600
     cycle = 0
+    log(f"[s8] collect: pid {os.getpid()}, stop at {dt.datetime.fromtimestamp(stop_at, dt.timezone.utc).isoformat()}")
 
     def reselect() -> None:
         try:
@@ -427,6 +457,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     s2 = sub.add_parser("collect")
     s2.add_argument("--out", default=r"C:\tmp\pfmon\s8")
     s2.add_argument("--hours", type=float, default=124.0)
+    s2.add_argument("--until", default=None, help="absolute UTC stop time (ISO); restarts never extend the study")
     args = ap.parse_args(argv)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -441,7 +472,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         set_idle_priority()
         select_universe(Client(spacing=0.15), out, log)
         return 0
-    return collect(out, args.hours, log)
+    return collect(out, args.hours, log, until=parse_ts(args.until) if args.until else None)
 
 
 if __name__ == "__main__":
