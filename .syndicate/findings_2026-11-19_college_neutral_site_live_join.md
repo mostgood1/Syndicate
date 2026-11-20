@@ -237,5 +237,10 @@ Registered 2026-11-19, before any load. The load is a betting change: it adds li
     Wembley against the odds feed's reverse).
   - Extending `ORIENTATION_JOIN_SPORTS` to `ncaaf` would need its hit fields classified first. NCAAF hits can carry
     possession-side state.
-  - Re-measure after 12-05 with the same script.
+  - Re-measure after 12-05. The script is now on main as `scripts/ncaaf_live_orientation_check.py` (`8a818a4f9`).
+  - It reproduces this section's numbers: 420 live, 0 reversed, 35 dark for other causes.
+  - It also names the second NCAAF orientation failure: ESPN's order against CFBD's, which makes the lens refuse
+    `no_live_state`. That was 0 of the 35 here; 34 of them predate the evidence log (11-09), and 1 was
+    `game_not_in_progress`.
+  - Scheduled: task `ncaaf-orientation-recheck-1207`, Mon 12-07 9:00 AM CST, over 11-20..12-06.
 
