@@ -591,3 +591,31 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **R-E:** 0 NHL steps, 0 timed out.
 - **Live odds:** overlay gap max 180 s (soccer); 9 sweeps, 4 refused; priced age p50 217 s, p90 701 s (295 of 1,239 over 300 s).
 - **Load:** query 7.58 s, chips **3.36 s**, shortlist 0.78 s. **I-28:** 28 queries, 14 cold (50%).
+
+## Reading 18 — 8:21 PM CST (02:21Z)
+
+- **Live:** 40 games; 32 with rail rows (1,167 rows).
+- **Flags: 32 shown on 17 cards, 0 false, 0 missed, 0 dark.**
+  - By sport: NCAAB 38 of 312; NBA 5 of 773; NHL 2 of 26; NCAAF 1 of 3; WNCAAB 1 of 26.
+  - 11 are college full totals.
+- **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 149.** Team cards 94 chips, 0 defects.
+- **I-29:**
+  - Wisconsin @ Seton Hall (30 rows) and UNLV @ Rutgers (22 rows): still REVERSED, 0 with a model.
+  - **Oregon St @ Oregon** (neutral, Moda Center, 8 PM): **direct, 26 of 26 with a model.** It was one of the 3 neutral
+    games the slate did not reorient.
+- **TNF:** joined (`LIVE_GAMELINE_BUILD sport=nfl` index 1, attached full 15), but **0 of 22 NFL rail rows carry a live model.**
+  - Withheld: `live_resim_published_no_distribution_for_this_market` 14, `segment_is_not_full_game` 43,
+    `quote_older_than_live_pricing_ceiling` 7.
+  - The rows are 7 full-game totals plus segment totals and spreads. The NFL live re-sim publishes no distribution for
+    these markets, so NFL live totals are never modelled on the rail.
+  - Lead for the NFL live lane, not chased: coverage by design, not a join failure.
+- **NHL (I-30):** `live_resim` 9, 7, 9 of 12, full_games 8, 6, 8 (02:14-02:21Z). Coverage is high this half-hour; EDM @ TBL
+  had no model at the read.
+- Maine @ Quinnipiac (3 rows, direct, no model): the NCAAB re-sim refused 1 game this tick (late game).
+- **P7 (#850), 7:56-8:21 PM:** 0 refusals, 0 exits. Child 4.23 GB after 9.3 h.
+  - Board: 5 builds, wall median 237 s, max 271 s; publication gap median 308 s, max 347 s. Host load 3.0.
+- **R-B (#844 sample 14):** NCAAB 219 rows (119 venue), h2h 14: row-fresh 7 vs cell-fresh 11, mismatch 33. NBA 33 rows,
+  mismatch 0.
+- **R-E:** 0 NHL steps; NHL child odds age max 13 s.
+- **Live odds:** overlay gap max 344 s (soccer); 11 sweeps, 4 refused; priced age p50 204 s, p90 699 s.
+- **Load:** query **11.17 s**, chips **3.75 s**, shortlist 0.97 s. At the read, two `refresh_odds_sources` processes were at 272% and 205% CPU.
