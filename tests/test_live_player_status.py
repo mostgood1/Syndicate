@@ -299,3 +299,103 @@ def test_nhl_api_final_or_pregame_never_refuses():
         box = _nhlapi()
         box["gameState"] = state
         assert lps.gameline_refusal(lps.exits_from_nhl_boxscore(box)) is None
+
+
+# --------------------------------------------------------------- basketball off-floor signal (ESPN has no injury cue)
+#   nba_401910012_final_murray_boyles_exit   WSH @ TOR 11-19: Murray-Boyles subbed out P1 7:06, never back (5 min)
+#   wncaab_401918531_final_card_exit         UTC @ APSU 11-19: Ava Card subbed out P1 5:54, never back (4 min)
+
+
+def _cut(summary: dict, period: int, clock: str) -> dict:
+    """The live payload as of the first play at (period, clock): plays up to it, state 'in'."""
+    s = _set_live(summary)
+    plays = s["plays"]
+    idx = next(i for i, p in enumerate(plays) if p["period"]["number"] == period and p["clock"]["displayValue"] == clock)
+    s["plays"] = plays[: idx + 1]
+    return s
+
+
+@pytest.fixture
+def mb():
+    return _load("nba_401910012_final_murray_boyles_exit.json.gz")
+
+
+@pytest.fixture
+def card():
+    return _load("wncaab_401918531_final_card_exit.json.gz")
+
+
+def _off(status, who):
+    hit = status.player_is_out(who)
+    return hit if hit is not None and hit.reason == "off_floor" else None
+
+
+def test_off_floor_switch_absent_is_off():
+    assert lps.off_floor_enabled({}) is False
+    assert lps.off_floor_enabled({lps.OFF_FLOOR_SWITCH: "on"}) is True
+    assert lps.off_floor_enabled({lps.OFF_FLOOR_SWITCH: "off"}) is False
+
+
+def test_off_ne_on_the_nba_off_floor_exit_changes_the_gameline_verdict(mb, monkeypatch):
+    live = _cut(mb, 2, "3:24")  # ~16 game-min after he left
+    monkeypatch.delenv(lps.OFF_FLOOR_SWITCH, raising=False)
+    off = lps.exits_from_espn_summary("nba", live)
+    monkeypatch.setenv(lps.OFF_FLOOR_SWITCH, "on")
+    on = lps.exits_from_espn_summary("nba", live)
+    assert _off(off, "Collin Murray-Boyles") is None
+    hit = _off(on, "Collin Murray-Boyles")
+    assert hit is not None and hit.key and hit.team == "TOR" and hit.source == "pbp"
+    assert lps.gameline_refusal(off) is None or "Murray-Boyles" not in str(lps.gameline_refusal(off))
+    ref = lps.gameline_refusal(on)
+    assert ref["reason"] == lps.REASON_KEY_PLAYER_OUT and "TOR:Collin Murray-Boyles:off_floor" in ref["players"]
+    assert lps.prop_refusal(on, "Collin Murray-Boyles")["reason"] == lps.REASON_KEY_PLAYER_OUT
+
+
+def test_nba_off_floor_waits_n_minutes(mb, monkeypatch):
+    monkeypatch.setenv(lps.OFF_FLOOR_SWITCH, "on")
+    early = lps.exits_from_espn_summary("nba", _cut(mb, 1, "3:53"))  # ~3 game-min off: a normal rest
+    assert _off(early, "Collin Murray-Boyles") is None
+
+
+def test_college_off_floor_fires_k_minutes_into_the_second_half(card, monkeypatch):
+    monkeypatch.setenv(lps.OFF_FLOOR_SWITCH, "on")
+    # WNCAAB has no N rule: still off at the end of the first half is not a flag
+    assert _off(lps.exits_from_espn_summary("wncaab", _cut(card, 2, "6:21")), "Ava Card") is None
+    hit = _off(lps.exits_from_espn_summary("wncaab", _cut(card, 3, "1:51")), "Ava Card")
+    assert hit is not None and hit.key and hit.team == "UTC"
+
+
+def _synthetic(plays, starters_home=("H1", "H2", "H3", "H4", "H5"), starters_away=("A1", "A2", "A3", "A4", "A5")):
+    def team(ab, names):
+        return {"team": {"abbreviation": ab}, "statistics": [{"labels": ["MIN", "PF"], "athletes": [
+            {"athlete": {"displayName": n, "id": n}, "starter": True, "stats": ["10", "0"]} for n in names]}]}
+    return {"header": {"id": "9", "competitions": [{"status": {"type": {"state": "in"}}, "competitors": []}]},
+            "boxscore": {"players": [team("HOM", starters_home), team("AWY", starters_away)]},
+            "plays": [{"period": {"number": per}, "clock": {"displayValue": clk}, "type": {"text": kind}, "text": text,
+                       "homeScore": hs, "awayScore": as_} for per, clk, kind, text, hs, as_ in plays]}
+
+
+def test_a_play_naming_the_player_lifts_the_flag(monkeypatch):
+    monkeypatch.setenv(lps.OFF_FLOOR_SWITCH, "on")
+    out = [(1, "10:00", "Substitution", "B1 enters the game for H1", 0, 0), (2, "7:00", "Jump Shot", "A2 misses jumper", 0, 0)]
+    assert _off(lps.exits_from_espn_summary("nba", _synthetic(out)), "H1") is not None  # 17 game-min off
+    back = out + [(2, "6:50", "Jump Shot", "H1 makes jumper", 2, 0)]
+    assert _off(lps.exits_from_espn_summary("nba", _synthetic(back)), "H1") is None
+
+
+def test_foul_trouble_blowout_and_end_window_never_flag(monkeypatch):
+    monkeypatch.setenv(lps.OFF_FLOOR_SWITCH, "on")
+    fouls = [(1, "11:00", "Personal Foul", "H1 personal foul", 0, 0), (1, "10:30", "Shooting Foul", "H1 shooting foul", 0, 0),
+             (1, "10:00", "Substitution", "B1 enters the game for H1", 0, 0), (2, "7:00", "Jump Shot", "A2 misses jumper", 0, 0)]
+    assert _off(lps.exits_from_espn_summary("nba", _synthetic(fouls)), "H1") is None  # 2 fouls in Q1 = foul trouble
+    blowout = [(1, "10:00", "Substitution", "B1 enters the game for H1", 30, 5), (2, "7:00", "Jump Shot", "A2 misses", 30, 5)]
+    assert _off(lps.exits_from_espn_summary("nba", _synthetic(blowout)), "H1") is None
+    late = [(4, "11:00", "Substitution", "B1 enters the game for H1", 0, 0), (4, "0:30", "Jump Shot", "A2 misses", 0, 0)]
+    assert _off(lps.exits_from_espn_summary("nba", _synthetic(late)), "H1") is None  # fires inside the last 5 min
+
+
+def test_bench_players_are_never_off_floor_flagged(monkeypatch):
+    monkeypatch.setenv(lps.OFF_FLOOR_SWITCH, "on")
+    plays = [(1, "10:00", "Substitution", "H1 enters the game for B9", 0, 0), (2, "7:00", "Jump Shot", "A2 misses", 0, 0)]
+    st = lps.exits_from_espn_summary("nba", _synthetic(plays))
+    assert not [p for p in st.players_out if p.reason == "off_floor"]

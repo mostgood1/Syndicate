@@ -105,7 +105,7 @@ class PlayerOut:
     team: str  # team abbreviation as the feed spells it
     player: str  # display name
     player_id: str | None
-    reason: str  # injury | injured_in_play | replaced | ejection | foul_out | goalie_change | red_card | keeper_change
+    reason: str  # injury | injured_in_play | replaced | ejection | foul_out | off_floor | goalie_change | red_card | keeper_change
     key: bool
     source: str  # pbp | injuries | boxscore | keyEvents | rosters
     since: str | None = None  # feed wallclock / injury stamp when known
@@ -491,7 +491,151 @@ def _basketball(sport: str, game_id: str, summary: Mapping[str, Any]) -> list[Pl
         k = (team, normalize_name(display))
         if display and k not in results:
             results[k] = PlayerOut(sport, game_id, team, display, _athlete_id(ath), "injury", k in starters, "injuries", stamp)
+    if off_floor_enabled():
+        for p in _off_floor(sport, game_id, summary):
+            k = (p.team, normalize_name(p.player))
+            if k not in results:
+                results[k] = p
     return list(results.values())
+
+
+# --------------------------------------------------------------------------- basketball off-floor signal
+#
+# ESPN carries NO in-game injury cue for basketball (2026-11-20, lane live-player-exit-gate): the NBA `injuries`
+# list is the next-day report (Murray-Boyles played 5 min 11-19, stamped Out ~21 h later) and college summaries
+# have no injuries list; the four known exits read in pbp are plain sub-outs that never come back. So the only
+# signal is substitution history: a STARTER still off the floor
+#   * N game-minutes after his sub-out (NBA/WNBA only: in college this rule added false flags and no catches), or
+#   * K game-minutes into the second half after leaving in the first,
+# not in foul trouble when he left, margin <= 20 when he left, and before the last 5 minutes of regulation.
+# Measured on FINALS (target = "never returned", which includes a coach benching him for good -- the sim's
+# minutes are just as wrong then). Holdout dates the rule was not tuned on:
+#   NBA 10-28..11-09 98 games: 15 flags, precision 0.67, false-refused 0.16% of game-minutes (in-sample 0.64 / 0.36%)
+#   NCAAB 11-08..11-14: 49 flags, 0.76, 0.39% (in-sample 11-15..11-19 251 games: 0.82 / 0.58%)
+#   WNCAAB 11-08..11-14: 35 flags, 0.74, 0.39% (in-sample 264 games: 0.79 / 0.12%)
+#   WNBA: NOT MEASURED (out of season); it takes the NBA rule.
+# It lags by design (median 15 min NBA) and lifts the moment the player is named in a play again.
+
+OFF_FLOOR_SWITCH = "SYNDICATE_LIVE_EXIT_OFF_FLOOR"
+# sport -> (period lengths in seconds, N minutes or None, K minutes into the 2nd half)
+_OFF_FLOOR_RULES: dict[str, tuple[tuple[int, ...], float | None, float]] = {
+    "nba": ((720,) * 4, 15.0, 8.0),
+    "wnba": ((600,) * 4, 15.0, 8.0),
+    "ncaab": ((1200,) * 2, None, 8.0),
+    "wncaab": ((600,) * 4, None, 8.0),
+}
+_OT_SECONDS = 300
+_OFF_FLOOR_END_WINDOW_S = 5 * 60
+_OFF_FLOOR_BLOWOUT = 20
+_SUB_ENTERS = re.compile(r"^(.+?) enters the game for (.+?)\s*$")
+_SUB_COLLEGE = re.compile(r"^(.+?) subbing (in|out) for ")
+_FOUL_ON = re.compile(r"Foul on (.+?)\.")
+
+
+def off_floor_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """ABSENT = OFF, deliberately: it refuses more live lines, a betting change that loads only in a window
+    (rule 11-18). Turn on with SYNDICATE_LIVE_EXIT_OFF_FLOOR=on."""
+    raw = (env if env is not None else os.environ).get(OFF_FLOOR_SWITCH)
+    return raw is not None and str(raw).strip().lower() in {"1", "on", "true", "yes"}
+
+
+def _clock_seconds(value: Any) -> float:
+    v = str(value or "0").strip()
+    try:
+        if ":" in v:
+            m, s = v.split(":", 1)
+            return int(m) * 60 + float(s)
+        return float(v)
+    except ValueError:
+        return 0.0
+
+
+def _elapsed(periods: tuple[int, ...], period: int, clock: Any) -> tuple[float, float]:
+    """(elapsed game seconds at this play, elapsed at the start of its period)."""
+    period = max(int(period or 1), 1)
+    if period <= len(periods):
+        start, length = float(sum(periods[: period - 1])), periods[period - 1]
+    else:
+        start, length = float(sum(periods) + _OT_SECONDS * (period - 1 - len(periods))), _OT_SECONDS
+    return start + length - _clock_seconds(clock), start
+
+
+def _foul_trouble(sport: str, fouls: int, t: float, periods: tuple[int, ...]) -> bool:
+    if sport in ("nba", "wnba"):
+        q = min(int(t // periods[0]), 3)
+        return fouls >= (2, 3, 4, 5)[q]
+    return fouls >= (2 if t < sum(periods) / 2 else 4)
+
+
+def _off_floor(sport: str, game_id: str, summary: Mapping[str, Any]) -> list[PlayerOut]:
+    rule = _OFF_FLOOR_RULES.get(sport)
+    plays = list(summary.get("plays") or [])
+    if rule is None or not plays:
+        return []
+    periods, n_min, k_min = rule
+    half, regulation = sum(periods) / 2, float(sum(periods))
+    starters: dict[str, tuple[str, Mapping[str, Any]]] = {}
+    names: list[str] = []
+    for team, _n, _c, entry in _box_athletes(summary):
+        ath = entry.get("athlete") or {}
+        display = str(ath.get("displayName") or "")
+        if display:
+            names.append(display)
+            if entry.get("starter"):
+                starters.setdefault(display, (team, ath))
+    if len(starters) < 8:
+        return []
+    names.sort(key=len, reverse=True)
+    off: dict[str, tuple[float, int, int, Any]] = {}  # name -> (t_out, fouls at out, margin at out, wallclock)
+    fouls: dict[str, int] = {}
+    now = 0.0
+    for play in plays:
+        t, period_start = _elapsed(periods, (play.get("period") or {}).get("number") or 1,
+                                   (play.get("clock") or {}).get("displayValue"))
+        now = max(now, t)
+        kind = str(((play.get("type") or {}).get("text")) or "")
+        text = str(play.get("text") or "").strip()
+        try:
+            margin = abs(int(play.get("homeScore") or 0) - int(play.get("awayScore") or 0))
+        except (TypeError, ValueError):
+            margin = 0
+        if "oul" in kind and "Technical" not in kind and "Flagrant" not in kind:
+            m = _FOUL_ON.match(text)
+            who = m.group(1) if m else next((n for n in names if text.startswith(n)), None)
+            if who:
+                fouls[who] = fouls.get(who, 0) + 1
+        if kind != "Substitution":
+            # a play naming an OFF starter puts him back: NBA pbp logs no sub for a between-period lineup change
+            for who in [w for w in off if w in text]:
+                del off[who]
+            continue
+        moves: list[tuple[str, str]] = []
+        m = _SUB_ENTERS.match(text)
+        if m:
+            moves = [(m.group(2).strip(), "out"), (m.group(1).strip(), "in")]
+        else:
+            m = _SUB_COLLEGE.match(text)
+            if m:
+                moves = [(m.group(1).strip(), m.group(2))]
+        for who, direction in moves:
+            if who not in starters:
+                continue
+            if direction == "out" and who not in off:
+                off[who] = (t, fouls.get(who, 0), margin, play.get("wallclock"))
+            elif direction == "in":
+                off.pop(who, None)
+    out: list[PlayerOut] = []
+    for who, (t_out, f, margin, wall) in off.items():
+        fire = t_out + n_min * 60 if n_min is not None else float("inf")
+        if t_out < half:
+            fire = min(fire, half + k_min * 60)
+        if now < fire or fire >= regulation - _OFF_FLOOR_END_WINDOW_S or margin > _OFF_FLOOR_BLOWOUT:
+            continue
+        if _foul_trouble(sport, f, t_out, periods):
+            continue
+        team, ath = starters[who]
+        out.append(PlayerOut(sport, game_id, team, who, _athlete_id(ath), "off_floor", True, "pbp", wall))
+    return out
 
 
 def _toi_seconds(value: str | None) -> int:
