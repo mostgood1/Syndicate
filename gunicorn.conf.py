@@ -338,8 +338,23 @@ def install_loop_stall_log(worker, *, now=time.monotonic, cpu=time.process_time)
     return "armed"
 
 
-def install_gc_pause_log(*, now=time.perf_counter, thread_cpu=time.thread_time, callbacks=None) -> str:
-    """Add a `gc.callbacks` hook that logs `WEB_GC_PAUSE` for long collections. Returns armed / disabled."""
+# NEVER WRITE FROM INSIDE A GC CALLBACK (the 2026-11-20 20:01:56Z kill, pid 1860718). A collection runs on
+# whichever allocation crosses the threshold -- including one inside `StampedStream.write`
+# (`scripts/local_logstamp/sitecustomize.py`), which holds a NON-reentrant lock around its timestamp. The first
+# version of this hook printed from the callback: the board warmer's own print fired a full collection inside
+# that lock, the hook's print re-entered `write` on the same thread and waited on itself forever, every thread
+# that printed after it queued on the same lock, and the main loop joined them at its first fast-healthz line;
+# the master killed the worker 60 s later (dump: every thread at sitecustomize.py:47). A worker whose main loop
+# never printed again would have kept heartbeating, accepting connections it could never answer. So the
+# callback only appends to a bounded deque (no I/O, no lock) and the main loop's heartbeat writes the lines.
+GC_PAUSE_QUEUE_CAP = 256
+
+
+def install_gc_pause_log(worker=None, *, now=time.perf_counter, thread_cpu=time.thread_time, callbacks=None,
+                         clock=time.monotonic) -> str:
+    """Add a `gc.callbacks` hook that QUEUES `WEB_GC_PAUSE` for long collections, and wrap `worker.notify` so each
+    heartbeat writes what is queued. Returns armed / disabled."""
+    import collections
     import gc
     import threading
 
@@ -347,6 +362,8 @@ def install_gc_pause_log(*, now=time.perf_counter, thread_cpu=time.thread_time, 
     if threshold <= 0:
         return "disabled"
     started: dict[str, float] = {}
+    pending: collections.deque = collections.deque()
+    dropped = [0]
 
     def on_gc(phase, info) -> None:
         try:
@@ -359,14 +376,37 @@ def install_gc_pause_log(*, now=time.perf_counter, thread_cpu=time.thread_time, 
             pause = now() - t0
             if pause < threshold:
                 return
-            _log("WEB_GC_PAUSE", {"pid": os.getpid(), "generation": info.get("generation"),
-                                  "pause_s": round(pause, 3),
-                                  "thread_cpu_s": round(thread_cpu() - started.pop("cpu", 0.0), 3),
-                                  "collected": info.get("collected"), "uncollectable": info.get("uncollectable"),
-                                  "thread": threading.current_thread().name})
+            if len(pending) >= GC_PAUSE_QUEUE_CAP:
+                dropped[0] += 1
+                return
+            pending.append({"pid": os.getpid(), "generation": info.get("generation"),
+                            "pause_s": round(pause, 3),
+                            "thread_cpu_s": round(thread_cpu() - started.pop("cpu", 0.0), 3),
+                            "collected": info.get("collected"), "uncollectable": info.get("uncollectable"),
+                            "thread": threading.current_thread().name, "_queued_at": clock()})
         except Exception:  # a GC callback must never raise
             pass
 
+    def drain() -> None:
+        while pending:
+            try:
+                payload = pending.popleft()
+            except IndexError:
+                return
+            payload["written_after_s"] = round(clock() - payload.pop("_queued_at", clock()), 2)
+            if dropped[0]:
+                payload["dropped_before"], dropped[0] = dropped[0], 0
+            _log("WEB_GC_PAUSE", payload)
+
+    if worker is not None:
+        original = worker.notify
+
+        def notify() -> None:
+            original()
+            if pending:
+                drain()
+
+        worker.notify = notify
     (gc.callbacks if callbacks is None else callbacks).append(on_gc)
     return "armed"
 
@@ -380,7 +420,7 @@ def post_worker_init(worker) -> None:
         _log("WEB_STALL_INSTRUMENTS_ARMED", {"pid": os.getpid(),
                                              "loop_stall_log": install_loop_stall_log(worker),
                                              "loop_stall_log_s": loop_stall_log_seconds(),
-                                             "gc_pause_log": install_gc_pause_log(),
+                                             "gc_pause_log": install_gc_pause_log(worker),
                                              "gc_pause_log_s": gc_pause_log_seconds()})
     except Exception as exc:  # never take the worker down
         _log("WEB_LOOP_STALL_DUMP_ERROR", {"hook": "stall_instruments", "error": f"{type(exc).__name__}: {exc}"})

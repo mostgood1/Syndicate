@@ -395,10 +395,11 @@ def test_off_is_not_on_for_the_stall_log(monkeypatch, capsys):
     assert worker.notify is original
 
 
-def test_a_long_collection_logs_its_generation_pause_and_cpu(monkeypatch, capsys):
+def test_a_long_collection_is_queued_and_written_by_the_next_heartbeat(monkeypatch, capsys):
     monkeypatch.delenv("SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS", raising=False)
-    hooks, clock, cpu = [], _Clock(), _Cpu()
-    assert conf.install_gc_pause_log(now=clock, thread_cpu=cpu, callbacks=hooks) == "armed"
+    worker, beats = _beating_worker()
+    hooks, clock, cpu, wall = [], _Clock(), _Cpu(), _Clock()
+    assert conf.install_gc_pause_log(worker, now=clock, thread_cpu=cpu, callbacks=hooks, clock=wall) == "armed"
     [hook] = hooks
     hook("start", {"generation": 0})
     clock.t += 0.01
@@ -408,9 +409,31 @@ def test_a_long_collection_logs_its_generation_pause_and_cpu(monkeypatch, capsys
     cpu.t += 3.4
     hook("stop", {"generation": 2, "collected": 12, "uncollectable": 0})
     hook("stop", None)  # a malformed call never raises
+    assert _lines(capsys, "WEB_GC_PAUSE") == [], "the callback itself never writes"
+    wall.t += 0.8
+    worker.notify()
+    assert beats == [1], "the original heartbeat still runs"
     [line] = _lines(capsys, "WEB_GC_PAUSE")
     assert line["generation"] == 2 and line["pause_s"] == 3.5 and line["thread_cpu_s"] == 3.4
-    assert line["collected"] == 12 and line["thread"]
+    assert line["collected"] == 12 and line["thread"] and line["written_after_s"] == 0.8
+    assert "_queued_at" not in line and "dropped_before" not in line
+    worker.notify()
+    assert _lines(capsys, "WEB_GC_PAUSE") == [], "written once"
+
+
+def test_a_full_queue_drops_and_says_how_many(monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS", raising=False)
+    worker, _ = _beating_worker()
+    hooks, clock = [], _Clock()
+    conf.install_gc_pause_log(worker, now=clock, callbacks=hooks)
+    [hook] = hooks
+    for _ in range(conf.GC_PAUSE_QUEUE_CAP + 3):
+        hook("start", {"generation": 2})
+        clock.t += 1.0
+        hook("stop", {"generation": 2, "collected": 0, "uncollectable": 0})
+    worker.notify()
+    lines = _lines(capsys, "WEB_GC_PAUSE")
+    assert len(lines) == conf.GC_PAUSE_QUEUE_CAP and lines[0]["dropped_before"] == 3
 
 
 def test_off_is_not_on_for_the_gc_pause_log(monkeypatch):
@@ -425,14 +448,72 @@ def test_a_real_collection_reaches_the_gc_pause_log(monkeypatch, capsys):
     import gc
 
     monkeypatch.setenv("SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS", "0.000000001")
+    worker, _ = _beating_worker()
     before = list(gc.callbacks)
     try:
-        assert conf.install_gc_pause_log() == "armed"
+        assert conf.install_gc_pause_log(worker) == "armed"
         gc.collect()
     finally:
         gc.callbacks[:] = before
+    worker.notify()
     lines = _lines(capsys, "WEB_GC_PAUSE")
     assert any(line["generation"] == 2 for line in lines)
+
+
+def _stamped_stream_class(monkeypatch):
+    """The fleet's real `StampedStream`, loaded by path with its import-time install switched off."""
+    monkeypatch.setenv("SYNDICATE_LOCAL_LOG_TIMESTAMPS", "0")
+    path = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "local_logstamp" / "sitecustomize.py"
+    spec = importlib.util.spec_from_file_location("_logstamp_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.StampedStream
+
+
+def test_a_collection_inside_the_fleets_stamped_write_cannot_deadlock_the_writer(monkeypatch):
+    """The 2026-11-20 20:01:56Z kill, reproduced with the real pieces: the fleet's `StampedStream` as stdout,
+    the hook in the REAL gc.callbacks, and a real full collection fired from inside the stream's locked
+    timestamp -- where the board warmer's print met a collection on the fleet. The first version of the hook
+    printed from the callback, re-entered the non-reentrant lock on the same thread and never returned."""
+    import gc
+    import io
+    import sys
+    import threading
+
+    stamped = _stamped_stream_class(monkeypatch)
+    monkeypatch.setenv("SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS", "0.000000001")
+    sink = io.StringIO()
+    fired = []
+
+    def clock():
+        import datetime as dt
+
+        if not fired:
+            fired.append(1)
+            gc.collect()  # a full collection INSIDE `write`, under its lock
+        return dt.datetime(2026, 11, 20, 20, 0, 54, tzinfo=dt.timezone.utc)
+
+    stream = stamped(sink, clock=clock)
+    monkeypatch.setattr(sys, "stdout", stream)
+    worker, _ = _beating_worker()
+    before = list(gc.callbacks)
+    try:
+        assert conf.install_gc_pause_log(worker) == "armed"
+        writer = threading.Thread(
+            target=lambda: print("[intelligence_state] STATE_DECODE_SKIPPED key=layer2_shortlist", flush=True),
+            daemon=True)
+        writer.start()
+        writer.join(5.0)
+        deadlocked = writer.is_alive()
+    finally:
+        gc.callbacks[:] = before
+    assert fired == [1], "the collection really ran inside the locked write"
+    assert not deadlocked, "the writer is stuck on the stream's own lock: the GC hook wrote from inside the callback"
+    worker.notify()  # the main loop's heartbeat writes what the collection queued
+    text = sink.getvalue()
+    assert "STATE_DECODE_SKIPPED" in text
+    gc_lines = [line for line in text.splitlines() if " WEB_GC_PAUSE " in line]
+    assert gc_lines and all(line.startswith("2026-11-20T20:00:54.000Z ") for line in gc_lines), text
 
 
 def test_post_worker_init_arms_both_instruments_on_a_real_heartbeat(monkeypatch, capsys):
