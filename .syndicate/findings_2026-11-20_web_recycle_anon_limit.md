@@ -238,6 +238,25 @@ All figures are MB. `accounted_rss_mb` counts shared pages more than once.
 5. **Rollback** = remove the line at the next drained full down/up. A role restart reuses the old env, so there is no
    fast rollback. Until that down/up, the guard's hard and emergency margins still cap each worker.
 
+## LOAD DECISION (2026-11-20 ~11:00 AM CST)
+
+- **The user, in session f182fa28**, answered "Load the 1,500 MB web recycle limit after #853's 11-24 evening reading?"
+  with **"Yes, after #853"**.
+- **When:** QUEUED for the FIRST drained full down/up after 2026-11-25T05:00Z (#853's first evening), at the latest
+  the 12-08 window's down/up.
+  - Never in the same down/up as #853's CHANGE F.
+  - If #853 did not load on 11-24, it waits until #853 has loaded and had its first evening read.
+  - Nothing is scheduled for it. No drained full down/up is scheduled between 11-25 and 12-08. The 11-21
+    `board-memory-parent-reset-1121` task is a refresh-worker TERM, which does not rebuild env.
+- **Kit** `/mnt/c/tmp/w857/`:
+  - `kit_env_857.sh check|apply|restore`: one `WEB__` line, backup first, idempotent;
+  - `kit_after_up_857.sh <up_utc>`: the LOAD CHECK;
+  - `kit_selftest_857.sh`: a dummy file; the real file was byte-identical, 17:00Z;
+  - `web_anon_curve.py`;
+  - `README.md` with the steps.
+  - Dry run on the live fleet (17:01Z, read-only): the key is ABSENT on all three roles; ARMED limits read 636.7-646.8.
+- **Not a betting change:** `--betting-change no` at preflight, and no `betting_change.py` row.
+
 ## PRE-REGISTERED PREDICTION — first live evening (5-11 PM CST) after the load (L = 1,500)
 
 **Reader:**

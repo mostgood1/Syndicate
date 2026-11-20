@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#857` — **WEB'S 650 MB RECYCLE LIMIT (sized for Render's 2 GB container) RECYCLES EVERY WORKER THAT HOLDS THE LAYER 2 BOARD: a board-holding worker PLATEAUS at anon p50 ~1,010-1,070 MB (p90 1,090-1,265 per evening; ~+75 MB per +1,000 board rows), so 14-29 recycles an hour on evenings. RECOMMENDED: `WEB__SYNDICATE_WEB_WORKER_ANON_LIMIT_MB=1500` (env only, absent = today) -> predicted <= 2 recycles/h, for +1.0-1.2 GB fleet RSS at p50, at EVERY hour (both workers keep the board; nothing evicts it by time). Fleet-role p99/max barely move; web worst case ~3.4 GB. Not a betting change. LOAD = the user's decision; NOT with #853 on 11-24** `[2026-11-20, lane web-recycle-anon-limit, session f182fa28; from #853's lead; findings `.syndicate/findings_2026-11-20_web_recycle_anon_limit.md`]`
+### `#857` — **WEB'S 650 MB RECYCLE LIMIT (sized for Render's 2 GB container) RECYCLES EVERY WORKER THAT HOLDS THE LAYER 2 BOARD: a board-holding worker PLATEAUS at anon p50 ~1,010-1,070 MB (p90 1,090-1,265 per evening; ~+75 MB per +1,000 board rows), so 14-29 recycles an hour on evenings. RECOMMENDED: `WEB__SYNDICATE_WEB_WORKER_ANON_LIMIT_MB=1500` (env only, absent = today) -> predicted <= 2 recycles/h, for +1.0-1.2 GB fleet RSS at p50, at EVERY hour (both workers keep the board; nothing evicts it by time). Fleet-role p99/max barely move; web worst case ~3.4 GB. Not a betting change. QUEUED (user "Yes, after #853"): the first drained full down/up after #853's 11-24 evening, at the latest 12-08; NOT with #853** `[2026-11-20, lane web-recycle-anon-limit, session f182fa28; from #853's lead; findings `.syndicate/findings_2026-11-20_web_recycle_anon_limit.md`]`
 
 - **Measured.** Instrument `scripts/rail_monitor/web_anon_curve.py` (stdlib; `extract` then `report`), read-only at nice 19. It reads per-worker RSS from live-odds-worker's `ALL_PROCESS_MEMORY` (11-16..11-20, one snapshot per ~9 s) and the guard lines in web.log.
   - **Growth after a worker first holds the full board.**
@@ -13,9 +13,14 @@
   - **Cost.** Fleet roles p50 evening 7.4 -> 8.4 GB, night 6.9 -> 8.1 GB; p99 9.6 -> 10.0; max unchanged at 10.1.
   - **The VM's real risk is co-tenant jobs.** A global OOM kill at 11-20 ~2:48 AM CST took an 8.8 GB pytest; refresh-worker and redis were swapped out. No other role's guard sees web memory: each gates on its own tree.
 - **Owed:**
-  1. **The load decision (the user).** Recommended: at the FIRST drained full down/up AFTER #853's first-evening reading (11-24 5-11 PM CST).
-     - Loading in the same down/up as #853 voids #853's P1/P2/P6, which assume today's recycle rate.
-     - Kit when decided: one `WEB__` line in `local_production.env`, a drained full down/up, `--betting-change no`.
+  1. **The load: QUEUED.** USER DECISION 2026-11-20 ~11:00 AM CST, in session f182fa28, to "Load the 1,500 MB web recycle limit after #853's 11-24 evening reading?": **"Yes, after #853"**.
+     - It rides the FIRST drained full down/up after 2026-11-25T05:00Z, at the latest the 12-08 window's. Never in the same down/up as #853's CHANGE F, which would void #853's P1/P2/P6.
+     - No down/up is scheduled for it, and none is scheduled 11-25..12-08. Whoever runs the next drained full down/up carries it and says so here.
+     - Kit `/mnt/c/tmp/w857/` (README has the steps):
+       - `kit_env_857.sh` (check | apply | restore, backup first);
+       - `kit_after_up_857.sh <up_utc>` (LOAD CHECK: every ARMED line 1,425-1,500 and the master's env carries the key);
+       - self-tested 17:00Z on a dummy file; the real file was byte-identical.
+     - Not a betting change: `--betting-change no`.
   2. **The first-evening reading** against the pre-registered P1-P9 (findings): recycles/h <= 2; H-plateau median <= +150 MB; web RSS max <= 3.5 GB; fleet roles max <= 11.5 GB; 0 OOM kills of a fleet process (roll back if any).
      - P7 (kills/dumps) was RESTATED 11-20 before any load, relative to the pre-load daily rate: 1 stall dump on 11-20, in the cold-read path.
      - P9 = 0 double recycles < 30 s. `--max-requests` bypasses the guard's stagger stamp.
