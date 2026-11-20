@@ -16,7 +16,9 @@
   1. **The load decision (the user).** Recommended: at the FIRST drained full down/up AFTER #853's first-evening reading (11-24 5-11 PM CST).
      - Loading in the same down/up as #853 voids #853's P1/P2/P6, which assume today's recycle rate.
      - Kit when decided: one `WEB__` line in `local_production.env`, a drained full down/up, `--betting-change no`.
-  2. **The first-evening reading** against the pre-registered P1-P8 (findings): recycles/h <= 2; H-plateau median <= +150 MB; web RSS max <= 3.5 GB; fleet roles max <= 11.5 GB; 0 OOM kills of a fleet process (roll back if any).
+  2. **The first-evening reading** against the pre-registered P1-P9 (findings): recycles/h <= 2; H-plateau median <= +150 MB; web RSS max <= 3.5 GB; fleet roles max <= 11.5 GB; 0 OOM kills of a fleet process (roll back if any).
+     - P7 (kills/dumps) was RESTATED 11-20 before any load, relative to the pre-load daily rate: 1 stall dump on 11-20, in the cold-read path.
+     - P9 = 0 double recycles < 30 s. `--max-requests` bypasses the guard's stagger stamp.
 - **Leads:**
   - An idle eviction of the board cache would remove the night cost (`pipeline/intelligence_state.py`).
   - Co-tenant research/test jobs in WSL have no memory cap (11-20 OOM).

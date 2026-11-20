@@ -260,7 +260,8 @@ All figures are MB. `accounted_rss_mb` counts shared pages more than once.
 | P4 | fleet roles RSS (web + board + refresh + live-odds + redis) | p50 7.4 GB, max 10.1 GB | p50 <= baseline + 1.3 GB; max <= 11.5 GB | max > 12.5 GB |
 | P5 | SAFETY: global OOM kills (`oom_kill` delta, `dmesg`) | 0 in evenings; 1 at 11-20 2:48 AM (co-tenant) | 0 | ANY OOM victim that is a fleet process -> ROLL BACK at the next drained down/up |
 | P6 | board query new-worker first reads (share of queries) | 49% (11-19, pre-#853); #853's own post-load reading | <= 3% | > 8% |
-| P7 | `WORKER TIMEOUT` kills and loop-stall dumps | 0 a day 11-18..11-20 | 0 | any -> hand the dump to lane `web-silent-worker-kills` |
+| P7 (RESTATED 11-20 ~11 AM CST, before any load) | `WORKER TIMEOUT` kills and loop-stall dumps (`Timeout (0:00:40)!`) per day | kills: 5 on 11-17, 0 a day 11-18..11-20; dumps: 1 on 11-20 (just after 16:05Z: a request thread held the GIL in one `json.loads` of a 40 MB `layer2_shortlist` during a cold board read; lane `web-silent-worker-kills`, main `c000d1ecf`). Re-count per day from the stall dump's arming to the load | kills 0; dumps <= the pre-load daily rate | a kill whose worker was > 20 min old (a failure only long-lived workers reach). Any dump goes to lane `web-silent-worker-kills`. A dump in the cold-read path is NOT this change's failure: fewer recycles mean fewer cold reads |
+| P9 (added 11-20, before any load) | double recycles: two worker exits of ANY kind (memory or `--max-requests`) < 30 s apart | 0 in 302 since `db6a395ed` (lane `web-silent-worker-kills`) | 0 | any. `--max-requests` does not touch the guard's stagger stamp, so it can coincide with a memory recycle; hand it to lane `web-silent-worker-kills` |
 | P8 | (secondary, not gating) `/api/board/game-chips` p50 | the baseline evening | <= 0.9x | — |
 
 - **CONFOUNDED if** the window has < 30 board queries, a restart / `reload-web` / deploy, or a non-fleet process
