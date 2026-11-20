@@ -251,3 +251,22 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
     - `wsk_day.py`: every WORKER TIMEOUT on 11-17 was silent; 0 of any kind 11-18 / 11-19 so far.
 - Correction: the lane status said the widening happened at "19:30Z". The fleet clock read 19:13:44Z at the baseline, so it
   was ~19:05Z.
+
+- Reading 5: the full UTC day 11-19 (counted 2026-11-20 00:05:51Z / 6:05 PM CST, `wsk_day.py`). **Fix 1 MET.**
+  - Doubles < 30 s: **0 of 184 recycles** (149 hard, 0 emergency). Before: 24 of 219 on 11-18 up to the load, 28 of 277
+    on 11-17, 305 of 4,070 on 11-01..11-16 (19 a day). 14-20 were expected at the old 7.5-11.0% share.
+  - 25 holds; 24 ended in that worker's own recycle (held 8.2 / 41 / 405.6 s min / median / max). The 25th left through
+    lane `board-split-memory-guard`'s drained full `down`/`up` at 17:00:15Z, drained with 0 abandoned.
+  - 0 emergency recycles, 0 `WORKER TIMEOUT`, 0 stall dumps. Respawn max 15.8 s.
+  - Silent kills per day (the goal metric) and every `WORKER TIMEOUT` behind them:
+
+    | window | silent kills | all WORKER TIMEOUT |
+    |---|---|---|
+    | 11-01..11-16 (16 days) | 0 | 5 (each after a recycle: the drain-path mode) |
+    | 11-17 | 5 (4 counted; the 5th was the self-inflicted paper GET) | 5 |
+    | 11-18 | 0 | 0 |
+    | 11-19 | 0 | 0 |
+
+  - Two zero days look like the 16 before 11-17. They are not evidence about the 11-17 mode, whose stall is still unnamed:
+    it needs a dump. The drain-path kills (5 in 16 days before) are also at 0 since the load. Not yet a rate: at 5 in 16
+    days, about 0.4 would have been expected in the 1.2 days since the load.

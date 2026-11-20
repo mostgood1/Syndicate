@@ -61980,6 +61980,19 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Harm: none seen. Its anon grew 2.7 MB over the hold (955.8 -> 958.5 MB; the emergency line was 1,396.5). It drained in 5.1 s with 0 abandoned, its replacement booted 22:06:57.7Z, and there was no `WORKER TIMEOUT`. The heartbeat sampler's max age in the window was 4.0 s.
   - Not changed: memory grows on requests, and every request while held re-checks. A timer release is the lever if a held worker is ever seen growing toward the emergency line between requests.
   - Since the load (19:14:22-22:11:41Z): 12 recycles, 0 doubles < 30 s, 2 holds (held 31.0 s and 339.6 s), 0 `WORKER TIMEOUT`, respawn max 8.3 s.
+- **reading 3, 2026-11-20 00:05:51Z (6:05 PM CST 11-19): the full UTC day 11-19. `double_hard_recycles_lt30s_non_emergency_per_day` 24 -> 0: MET** (scratchpad `wsk_day.py` via `wsk_eod_wait.sh`; web.log runs from 10-30, so the day is whole):
+  - 11-19: **0 doubles < 30 s in 184 recycles** (149 hard, 0 emergency).
+    - Before: 24 of 219 recycles on 11-18 up to the load (11.0%); 28 of 277 on 11-17 (10.1%); 305 of 4,070 on 11-01..11-16 (7.5%, 19 a day).
+    - At 7.5-11.0% of 184 recycles, 14-20 doubles were expected. Under a Poisson model P(0 | 14) is about 1 in a million.
+  - Holds: 25 started on 11-19 and 24 ended in that worker's own recycle (`hard_deferred_s` min 8.2, median 41, max 405.6).
+    - The 25th, pid 1004508 (held 17:00:01Z at 945.8 MB), left through lane `board-split-memory-guard`'s drained full `down`/`up` at 17:00:15Z (its 17:00:09Z entry): drained, 0 abandoned.
+    - The new master (17:00:23Z) armed `hard_spacing_s` 30 on every worker.
+  - Since the load (19:14:22Z 11-18 - 00:00Z 11-20, 28.8 h): 206 recycles, 0 doubles, 29 holds, 0 emergency recycles.
+  - Harm on 11-19: 0 `WORKER TIMEOUT`, 0 stall dumps. Respawn p50 1.7 s, max 15.8 s; 2 over 10 s, both ~01:0xZ (the master-respawn lead, findings Reading 4).
+  - The lane's goal metric, not this fix's: silent kills per day were 0 on 11-18 and 0 on 11-19.
+    - Before: 0 on 11-01..11-16 (5 `WORKER TIMEOUT` there, every one after a recycle), then 5 on 11-17.
+    - Two zero days match the 16 before 11-17, so they say nothing about the 11-17 mode. Its stall is still unnamed.
+  - The `hard_deferred_s` < ~35 prediction stays WRONG for most holds (median 41 s): a hold ends on the worker's next request (reading 2).
 ## 2026-11-18 20:22Z (2:22 PM CST) -- READING (no deploy by this lane): the soccer Understat outage guard's NAMING half `5a7cc60d2` (todo #841, lane `understat-fetch-failures`; user "Load it now" to "Load the naming half on the fleet now (ff to 5a7cc60d2, betting change no)?") reached the fleet as a ride-along of lane `web-silent-worker-kills`'s ff `640c6d4fd` -> `db6a395ed` at 19:14:22Z (BC-051) -- **P1 MET 52 of 52, P2 MET, P3 MET, P5 MET; P4 (recovery) owed**
 - betting change: **no**. This entry loads nothing; the load is BC-051 (`no`), which lists this guard as a ride-along.
   - Naming sends the same requests and writes the same bytes as OFF under 7 responses x 2 kinds (`tests/test_understat_fetch.py`, 46 of 46).
