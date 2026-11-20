@@ -1581,6 +1581,13 @@ call back in passes `False`. Depth **247 -> 1**, and the failure is now NAMED
     - The narrower vendored clip (0.75-1.25, after the team prior stacks) had capped blowouts. Women's sims fell -3.2 total / -4.1 margin short of their own target.
     - Now the published pregame sims sit on their target: wncaab 11-04 total -1.06, margin -0.40; ncaab 11-03 -0.28 / -0.32 (22:56Z read).
 
+- **NEUTRAL-SITE LIVE JOIN ORIENTATION** `[verified 2026-11-19 on the fleet, read-only, lane college-neutral-site-live-join, todo #854]`:
+  - The live re-sim lanes are in ESPN's home/away: 459/459 NCAAB lanes 11-09..11-19 match ESPN's scoreboard.
+  - The board's rows are in the odds feed's. The feed reorients some neutral-site games and flips mid-game, both ways.
+  - The join keys the ordered pair, so a reversed game is dark: 24 NCAAB games 11-02..11-19, 24/24 dark while reversed, all neutral (of 61 neutral live games).
+  - The lanes' numbers are right: the neutral prior has no home edge, and the anchor maps by team id.
+  - Fix on main `e5a267c1d`: `SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION`, absent = shadow (counts only); `on` = a betting change, NOT LOADED.
+
 - **Rail interval projections: LIVE 2026-11-07 22:44Z** (`b13a1202a`, deploys.md 22:44:30Z). Every basketball chip with a sim carries an `intervals` block: per half (ncaab) or quarter, plus the projected final.
   - Source: the pregame sim, or the live re-sim lane for live chips (re-read at serve time).
   - No block when there is no sim. A projection, never a price.
