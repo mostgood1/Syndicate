@@ -370,3 +370,32 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
 - **Lead for the fix, whichever multiplier it is:** every cold board read decodes the 40 MB `layer2_shortlist`, and the board
   query may not use it. That code is in `pipeline/intelligence_state.py` (lane `board-read-cold-share` holds that file's
   combined-board read).
+
+## Instruments live, then the decode fix live (2026-11-20 11:41 AM CST (17:41Z))
+
+- **Deploys** (user "Yes, both"): instruments `3c8ba5b14` at 17:03:49Z (BC-054 no); the decode skip `eeeb62a63` at 17:38:47Z
+  (BC-055 no). deploys.md has both entries.
+- **The second dump of the day, 17:04Z, was the reload's own drain.** Old worker 1803108 had a 73.3 s board query in flight
+  (`board_read` 58.4 s). It waited un-heartbeated in `futures.wait`, then in the interpreter-exit join, while a request thread
+  serialized the response (`json_safety.json_safe_value`). The request finished (200); 0 `WORKER TIMEOUT`.
+- **The instruments' first 35 min (17:03:49-17:38:47Z, before the fix):**
+  - **302 `WEB_GC_PAUSE`, every one a full (gen 2) collection that collected nothing:**
+    - in the overlay warmer's thread: 242, 236.7 s in all, max 4.19 s;
+    - in request threads: 56, 36.5 s in all, max 1.66 s;
+    - MainThread: 4.
+  - About 273 s of whole-worker pauses in 35 min of wall time, roughly 13% (the two workers overlap, so this is the
+    order of magnitude, not a precise share).
+  - `thread_cpu_s` equals `pause_s` each time: real CPU work, not a starved host. The sampler's 3-4.2 s heartbeat gaps line
+    up one for one (17:27:45Z: a 4.19 s GC and a 4.2 s gap).
+  - 0 `WEB_LOOP_STALL` (no gap >= 5 s). Cold `board_read` 13.7 s p50 (n=6, max 58.4 s, which was the in-flight one).
+- **What this says about the 40 s holds.** A full collection runs whenever enough new objects have piled up since the last
+  one (more than a quarter of the long-lived count). The warmer rebuilds the board every few seconds, so a full collection
+  over the whole heap follows almost every rebuild. It finds nothing, because the old board was already freed by reference
+  counting.
+  - Decoding 40 MB inside one `json.loads` creates ~10^6 containers, so several of these 1-4 s collections can run inside
+    that ONE C call. That is the leading explanation for the 40x slowdown. It is not yet proven: no big decode has run
+    under the instruments.
+  - The decode skip removes the biggest single trigger. The rest is a GC-tuning question: `gc.freeze()` after boot, a
+    higher gen-2 threshold, or both. That is a separate change for the user to decide, after the fix's reading.
+- **Owed:** the decode skip's first-hour reading (`wsk_fix_reading.py`, waiter until 18:41Z): `STATE_DECODE_SKIPPED` on cold
+  reads, cold `board_read` vs 13.7 s p50, GC pauses vs the 302 above, dumps and kills.
