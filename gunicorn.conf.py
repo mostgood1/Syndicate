@@ -284,11 +284,106 @@ def install_loop_stall_dump(worker, *, now=time.monotonic, dump_later=None, stre
     return "armed"
 
 
+# WHICH CALL HOLDS THE GIL, AND IS IT REALLY WORKING (lane `web-silent-worker-kills`, 2026-11-20).
+# The 16:08:10Z 11-20 dump named the stalled call: a request thread inside ONE `json.loads` at
+# `pipeline/intelligence_state.py:4613` (`_decompress_oversized_values`, the board query's cold
+# board read) held the GIL for 40+ s, and live /proc sampling showed that thread at a full core
+# with the main loop locked out. The same decode takes 0.3-1.1 s in a side process. Three things
+# fit and need separating before a fix: a cyclic-GC pause fired inside the decode, the decode
+# itself, or the host starving that vCPU. Two log lines separate them, both instruments only:
+#   * `WEB_LOOP_STALL` -- logged by the main thread when its heartbeat resumes after a gap of
+#     `loop_stall_log_seconds()` (5 s) or more: the gap, and the PROCESS CPU used during it. A
+#     ratio near 1.0 is one thread burning a full core; far below it is a starved process.
+#   * `WEB_GC_PAUSE` -- every collection of `gc_pause_log_seconds()` (0.25 s) or more: its
+#     generation, wall pause, the CPU the collecting thread spent in it, and which thread.
+# Switches: `SYNDICATE_WEB_LOOP_STALL_LOG_SECONDS`, `SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS` (0 disables).
+def _float_env(name: str, default: float) -> float:
+    raw = str(os.environ.get(name) or "").strip()
+    try:
+        return max(0.0, float(raw)) if raw else default
+    except ValueError:
+        return default
+
+
+def loop_stall_log_seconds() -> float:
+    return _float_env("SYNDICATE_WEB_LOOP_STALL_LOG_SECONDS", 5.0)
+
+
+def gc_pause_log_seconds() -> float:
+    return _float_env("SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS", 0.25)
+
+
+def install_loop_stall_log(worker, *, now=time.monotonic, cpu=time.process_time) -> str:
+    """Wrap `worker.notify` so a heartbeat that ends a long gap logs `WEB_LOOP_STALL`. Returns armed / disabled."""
+    threshold = loop_stall_log_seconds()
+    if threshold <= 0:
+        return "disabled"
+    import threading
+
+    original = worker.notify
+    state = {"t": now(), "cpu": cpu()}
+
+    def notify() -> None:
+        original()
+        t, c = now(), cpu()
+        gap = t - state["t"]
+        if gap >= threshold:
+            _log("WEB_LOOP_STALL", {"pid": os.getpid(), "gap_s": round(gap, 2),
+                                    "process_cpu_s": round(c - state["cpu"], 2),
+                                    "cpu_per_wall": round((c - state["cpu"]) / gap, 2) if gap > 0 else None,
+                                    "threads": threading.active_count()})
+        state["t"], state["cpu"] = t, c
+
+    worker.notify = notify
+    return "armed"
+
+
+def install_gc_pause_log(*, now=time.perf_counter, thread_cpu=time.thread_time, callbacks=None) -> str:
+    """Add a `gc.callbacks` hook that logs `WEB_GC_PAUSE` for long collections. Returns armed / disabled."""
+    import gc
+    import threading
+
+    threshold = gc_pause_log_seconds()
+    if threshold <= 0:
+        return "disabled"
+    started: dict[str, float] = {}
+
+    def on_gc(phase, info) -> None:
+        try:
+            if phase == "start":
+                started["t"], started["cpu"] = now(), thread_cpu()
+                return
+            t0 = started.pop("t", None)
+            if t0 is None:
+                return
+            pause = now() - t0
+            if pause < threshold:
+                return
+            _log("WEB_GC_PAUSE", {"pid": os.getpid(), "generation": info.get("generation"),
+                                  "pause_s": round(pause, 3),
+                                  "thread_cpu_s": round(thread_cpu() - started.pop("cpu", 0.0), 3),
+                                  "collected": info.get("collected"), "uncollectable": info.get("uncollectable"),
+                                  "thread": threading.current_thread().name})
+        except Exception:  # a GC callback must never raise
+            pass
+
+    (gc.callbacks if callbacks is None else callbacks).append(on_gc)
+    return "armed"
+
+
 def post_worker_init(worker) -> None:
     try:
         install_loop_stall_dump(worker)
     except Exception as exc:  # never take the worker down
         _log("WEB_LOOP_STALL_DUMP_ERROR", {"hook": "post_worker_init", "error": f"{type(exc).__name__}: {exc}"})
+    try:
+        _log("WEB_STALL_INSTRUMENTS_ARMED", {"pid": os.getpid(),
+                                             "loop_stall_log": install_loop_stall_log(worker),
+                                             "loop_stall_log_s": loop_stall_log_seconds(),
+                                             "gc_pause_log": install_gc_pause_log(),
+                                             "gc_pause_log_s": gc_pause_log_seconds()})
+    except Exception as exc:  # never take the worker down
+        _log("WEB_LOOP_STALL_DUMP_ERROR", {"hook": "stall_instruments", "error": f"{type(exc).__name__}: {exc}"})
 
 
 def decide_recycle(worker, *, now: float, anon_mb_reader, stamp_path: str) -> str:

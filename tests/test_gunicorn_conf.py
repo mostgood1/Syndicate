@@ -353,3 +353,104 @@ def test_a_loop_that_stops_turning_gets_every_threads_stack_dumped(monkeypatch, 
             faulthandler.cancel_dump_traceback_later()
     text = path.read_text(encoding="utf-8", errors="replace")
     assert "Timeout (0:00:01)!" in text and "test_a_loop_that_stops_turning" in text
+
+
+# --------------------------------------------------------------------------------------------
+# `WEB_LOOP_STALL` / `WEB_GC_PAUSE` (2026-11-20): the 16:08:10Z dump named a request thread inside
+# one `json.loads` holding the GIL 40+ s; these two lines separate a GC pause, the decode itself and
+# a starved vCPU. They pin: the stall line carries the gap and the process CPU, the GC line carries
+# the generation and the collecting thread's CPU, both are switchable, and a real gc.collect() and a
+# real heartbeat reach them (off != on).
+# --------------------------------------------------------------------------------------------
+
+
+class _Cpu:
+    def __init__(self):
+        self.t = 10.0
+
+    def __call__(self):
+        return self.t
+
+
+def test_a_heartbeat_after_a_long_gap_logs_the_gap_and_the_cpu_spent_in_it(monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_WEB_LOOP_STALL_LOG_SECONDS", raising=False)
+    worker, beats = _beating_worker()
+    clock, cpu = _Clock(), _Cpu()
+    assert conf.install_loop_stall_log(worker, now=clock, cpu=cpu) == "armed"
+    clock.t += 1.0
+    worker.notify()  # a normal turn: no line
+    clock.t += 41.0
+    cpu.t += 40.2  # one thread burned a full core through the gap
+    worker.notify()
+    assert len(beats) == 2, "the original heartbeat runs on every turn"
+    [line] = _lines(capsys, "WEB_LOOP_STALL")
+    assert line["gap_s"] == 41.0 and line["process_cpu_s"] == 40.2 and line["cpu_per_wall"] == 0.98
+
+
+def test_off_is_not_on_for_the_stall_log(monkeypatch, capsys):
+    monkeypatch.setenv("SYNDICATE_WEB_LOOP_STALL_LOG_SECONDS", "0")
+    worker, _ = _beating_worker()
+    original = worker.notify
+    assert conf.install_loop_stall_log(worker) == "disabled"
+    assert worker.notify is original
+
+
+def test_a_long_collection_logs_its_generation_pause_and_cpu(monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS", raising=False)
+    hooks, clock, cpu = [], _Clock(), _Cpu()
+    assert conf.install_gc_pause_log(now=clock, thread_cpu=cpu, callbacks=hooks) == "armed"
+    [hook] = hooks
+    hook("start", {"generation": 0})
+    clock.t += 0.01
+    hook("stop", {"generation": 0, "collected": 5, "uncollectable": 0})  # short: no line
+    hook("start", {"generation": 2})
+    clock.t += 3.5
+    cpu.t += 3.4
+    hook("stop", {"generation": 2, "collected": 12, "uncollectable": 0})
+    hook("stop", None)  # a malformed call never raises
+    [line] = _lines(capsys, "WEB_GC_PAUSE")
+    assert line["generation"] == 2 and line["pause_s"] == 3.5 and line["thread_cpu_s"] == 3.4
+    assert line["collected"] == 12 and line["thread"]
+
+
+def test_off_is_not_on_for_the_gc_pause_log(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS", "0")
+    hooks = []
+    assert conf.install_gc_pause_log(callbacks=hooks) == "disabled"
+    assert hooks == []
+
+
+def test_a_real_collection_reaches_the_gc_pause_log(monkeypatch, capsys):
+    """Reachability: the hook in the REAL gc.callbacks, fired by a real full collection."""
+    import gc
+
+    monkeypatch.setenv("SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS", "0.000000001")
+    before = list(gc.callbacks)
+    try:
+        assert conf.install_gc_pause_log() == "armed"
+        gc.collect()
+    finally:
+        gc.callbacks[:] = before
+    lines = _lines(capsys, "WEB_GC_PAUSE")
+    assert any(line["generation"] == 2 for line in lines)
+
+
+def test_post_worker_init_arms_both_instruments_on_a_real_heartbeat(monkeypatch, capsys):
+    import faulthandler
+    import gc
+
+    for name in ("SYNDICATE_WEB_LOOP_STALL_DUMP_SECONDS", "SYNDICATE_WEB_LOOP_STALL_LOG_SECONDS",
+                 "SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS"):
+        monkeypatch.delenv(name, raising=False)
+    worker, beats = _beating_worker()
+    before = list(gc.callbacks)
+    try:
+        conf.post_worker_init(worker)
+        worker.notify()
+    finally:
+        gc.callbacks[:] = before
+        faulthandler.cancel_dump_traceback_later()
+    assert beats == [1]
+    [armed] = _lines(capsys, "WEB_STALL_INSTRUMENTS_ARMED")
+    assert armed["loop_stall_log"] == "armed" and armed["gc_pause_log"] == "armed"
+    assert armed["loop_stall_log_s"] == 5.0 and armed["gc_pause_log_s"] == 0.25
