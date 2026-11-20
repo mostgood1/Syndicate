@@ -677,3 +677,23 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **Live odds:** overlay gap max 152 s (NCAAF); 13 web merges, 12 list soccer stale; 12 sweeps, 6 refused (`lane_busy`,
   33%); priced age p50 199 s, p90 571 s.
 - **Load:** `/intelligence` 6.00 s; query 6.36 s; chips 2.33 s; shortlist 0.77 s.
+
+## Reading 21 — 9:33 PM CST (03:33Z)
+
+- **Live:** 23 games (NBA final); 19 with rail rows (298 rows).
+- **Flags: 16 shown on 9 cards, 0 false, 0 missed, 0 dark.**
+- **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 77.** Team cards 94 chips, 0 defects.
+- **`live_games_no_model` 5 of 19:**
+  - UNLV @ Rutgers (24 rows) and Wisconsin @ Seton Hall (23 rows): REVERSED (I-29), dark for their whole games so far;
+  - NCAAF Rice @ Temple and TNF: segment / totals rows with no distribution;
+  - NHL Dallas @ Vegas (I-30). NHL `live_resim` was 5 of 12 at 03:33Z.
+- **P7 (#850), since the load:** still 4 `MEMORY_GUARD_ABORT` (2 in 02Z, 2 in 03Z), 0 exits, 0 fatal.
+  - 127 builds; longest gaps 807, 662, 585 s; 0 over 900 s.
+  - Parent 1.52 GB, child 4.53 GB.
+- **Board (9:09-9:33 PM):** 4 builds, wall median 228 s, max 247 s; publication gap median 304 s, max 331 s. Host load 3.88.
+- **R-B (#844 sample 17):** NCAAB 193 rows (133 venue), h2h 10: **row-fresh 0 vs cell-fresh 8, mismatch 34**. NBA 0 rows
+  (final).
+- **R-E:** 0 NHL steps, 0 timed out.
+- **Live odds:** overlay gap max 153 s (soccer); 71 web merges, 9 list soccer stale; 12 sweeps, 5 refused; priced age
+  p50 169 s, p90 383 s.
+- **Load:** query 2.72 s, chips 1.89 s, shortlist 0.89 s.
