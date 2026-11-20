@@ -191,6 +191,21 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
   - State so far (11-20 9:30 AM): since the 17:00Z 11-19 load there have been 12 refusals, 1 exit (rc 75, 11:58 PM CST, after a refusal streak) and 0 real fatal errors (the 04:33Z "Fatal Python error" hits were grep command lines quoted in `ALL_PROCESS_MEMORY`). `held=transient_jobs` 11 of 11. Parent 1.65 GB.
 - Write it in the day's findings, send the numbers to local_d0f83044 (or its lane if the session is gone), then drop this item.
 
+**R-G. #853 shared board copy for web: the first-evening reading (CHANGE F of the 11-24 batch; not a betting change).** Taken over 11-20 from session local_a5513c97 (since archived). The user's words: "Rail monitor takes it". Predictions are in `.syndicate/findings_2026-11-19_board_read_cold_share.md`, main `cd5c28556`.
+- **Run after 11 PM CST 11-24**, only if deploys.md shows CHANGE F loaded. A one-shot cron does it at 11:20 PM:
+  `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p853/p853_readout.py 2026-11-23T23:00:00 2026-11-24T05:00:00 2026-11-24T23:00:00 2026-11-25T05:00:00"`
+  (copies in `C:\tmp\railmon\p853\`, repo `scripts/rail_monitor/p853_readout.py` + `coldread_attrib.py`). It prints the load check, the confound check and P1-P6 verdicts.
+- **The predictions:**
+  - P1: cold share <= 25% (falsified > 30%);
+  - P2: new-worker first reads <= 20% (> 25%);
+  - P3: fresh-worker penalty in AFTER <= 1,500 ms (> 2,500 ms);
+  - P4: adopted copy load p50 <= 1.5 s (> 2.5 s);
+  - P5: builds per hour <= 0.75x baseline (> 0.9x);
+  - P6 SAFETY: recycles per hour <= 1.3x AND anon p50 at recycle <= 1.1x. Both above = ROLL BACK (switch off at the next down/up); one above = WATCH.
+- Dry run 11-20 on two pre-load evenings: VOID as expected. Baseline cold share 58.8% / 58.5%; recycles 15.2 / 16.7 per hour.
+- **Where it goes:** the findings file above (a READING section), a deploys.md READING entry, and todo #853.
+- **Related decision, not the monitor's:** #857 (raise web's worker recycle limit to 1,500 MB, measured on main `e47f83987`), recommended to load after #853's first evening. It is the user's call.
+
 ## NIGHTLY CLOSE
 
 1. The probe shows 0 live games. **Fetch day D's finals by date:**
