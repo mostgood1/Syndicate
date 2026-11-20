@@ -449,6 +449,176 @@ def collect(out_dir: Path, hours: float, log=print, until: dt.datetime | None = 
     return 0
 
 
+# ------------------------------------------------------------------------------------------------- score (pre-registered)
+
+MAX_FILLS_PER_SIDE_DAY = 3
+PASS_POINT, KILL_POINT = 25.0, 10.0
+
+
+def _read_jsonl(paths: Iterable[Path]) -> list[dict[str, Any]]:
+    out = []
+    for p in paths:
+        opener = gzip.open if p.suffix == ".gz" else open
+        with opener(p, "rt", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if line:
+                    try:
+                        out.append(json.loads(line))
+                    except ValueError:
+                        continue
+    return out
+
+
+def best_mid(yes: Sequence[Level], no: Sequence[Level]) -> float | None:
+    """Mid of the YES market from the two bid ladders: (best yes bid + (1 - best no bid)) / 2."""
+    if not yes or not no:
+        return None
+    return (yes[0][0] + (1.0 - no[0][0])) / 2.0
+
+
+def score_stream(snapshots: Sequence[Mapping[str, Any]], trades: Sequence[Mapping[str, Any]], market: Mapping[str, Any],
+                 s: float = S_CONTRACTS) -> dict[str, Any]:
+    """One market's reward and M1 fills over its snapshots (sorted by `t`) and public trades.
+
+    The quote rests at each side's reference price from the latest snapshot. Over the interval to the next snapshot a
+    side earns only if it was resting at the start and was not filled during it (conservative). A fill takes the side
+    off until the next snapshot; at most MAX_FILLS_PER_SIDE_DAY fills per side per CST day."""
+    target, df = float(market["target"]), float(market.get("df") or 0.5)
+    usd = float(market.get("usd_day_pool") or 0.0)
+    trade_times = sorted(((parse_ts(t.get("created_time")) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)).timestamp(), t)
+                         for t in trades)
+    reward, fills, j = 0.0, [], 0
+    fills_today: dict[tuple[str, str], int] = {}
+    prev = None
+    for snap in snapshots:
+        yes, no = [tuple(lv) for lv in snap.get("y") or []], [tuple(lv) for lv in snap.get("n") or []]
+        t = float(snap["t"])
+        if prev is not None:
+            p_t, p_refs, p_on = prev
+            filled = {"yes": False, "no": False}
+            while j < len(trade_times) and trade_times[j][0] <= t:
+                tt, tr = trade_times[j]
+                j += 1
+                if tt <= p_t:
+                    continue
+                day = dt.datetime.fromtimestamp(tt, CST).date().isoformat()
+                for side in ("yes", "no"):
+                    if not p_on[side] or filled[side] or p_refs[side] is None:
+                        continue
+                    if fills_today.get((side, day), 0) >= MAX_FILLS_PER_SIDE_DAY:
+                        continue
+                    if m1_fills_side(tr, side, p_refs[side]):
+                        filled[side] = True
+                        fills_today[(side, day)] = fills_today.get((side, day), 0) + 1
+                        fills.append({"t": tt, "side": side, "price": p_refs[side]})
+            sh = snapshot_shares(prev_books[0], prev_books[1], target, df, s,
+                                 yes_on=p_on["yes"] and not filled["yes"], no_on=p_on["no"] and not filled["no"])
+            reward += snapshot_reward(usd, t - p_t, sh)
+        day_now = dt.datetime.fromtimestamp(t, CST).date().isoformat()
+        on = {side: fills_today.get((side, day_now), 0) < MAX_FILLS_PER_SIDE_DAY for side in ("yes", "no")}
+        prev = (t, {"yes": reference_price(yes, target), "no": reference_price(no, target)}, on)
+        prev_books = (yes, no)
+    last_mid = best_mid(*prev_books) if prev is not None else None
+    return {"reward": reward, "fills": fills, "last_mid": last_mid}
+
+
+def fill_pnl(fill: Mapping[str, Any], result: str | None, mid: float | None, fee_type: str | None,
+             s: float = S_CONTRACTS) -> tuple[float | None, bool]:
+    """(P&L of one fill of s contracts, settled?). Settled: payout 1 or 0 minus price; else the last mid. Minus the
+    maker fee on maker-fee series."""
+    price, side = float(fill["price"]), fill["side"]
+    if result in ("yes", "no"):
+        value, settled = (1.0 if result == side else 0.0), True
+    elif mid is not None:
+        value, settled = (mid if side == "yes" else 1.0 - mid), False
+    else:
+        return None, False
+    return s * (value - price - maker_fee(fee_type, price)), settled
+
+
+def bootstrap_ci(per_event: Mapping[str, float], days: float, n: int = 2000, seed: int = 20261120) -> tuple[float, float]:
+    import random
+
+    rng = random.Random(seed)
+    keys = list(per_event)
+    if not keys or days <= 0:
+        return (float("nan"), float("nan"))
+    vals = [per_event[k] for k in keys]
+    sims = sorted(sum(rng.choice(vals) for _ in vals) / days for _ in range(n))
+    return sims[int(0.025 * n)], sims[int(0.975 * n) - 1]
+
+
+def verdict(point: float, lo: float, hi: float, final: bool) -> str:
+    if point >= PASS_POINT and lo > 0:
+        return "PASS"
+    if hi < 0 or point < KILL_POINT:
+        return "KILL"
+    return "KILL (INSUFFICIENT at look 2)" if final else "INSUFFICIENT (continue)"
+
+
+def score(out_dir: Path, final: bool, client: Client | None = None, log=print) -> dict[str, Any]:
+    """Read once, by the pre-registered rule (findings_2026-11-20_s8_lip_shadow.md). M2 and the 1 h / 24 h markouts
+    are diagnostics the registration names; they are not computed here."""
+    universes = []
+    for p in sorted(out_dir.glob("universe_*.json")):
+        u = json.loads(p.read_text(encoding="utf-8"))
+        universes.append((parse_ts(u["selected_at"]).timestamp(), {m["ticker"]: m for m in u.get("book") or []}))
+    snaps = _read_jsonl(sorted(out_dir.glob("books_*.jsonl*")))
+    trades = _read_jsonl(sorted(out_dir.glob("trades_*.jsonl*")))
+    by_tk: dict[tuple[int, str], list[dict[str, Any]]] = {}
+    for sn in snaps:
+        slot = max((i for i, (sel, _) in enumerate(universes) if sel <= sn["t"]), default=None)
+        if slot is not None and sn["tk"] in universes[slot][1]:
+            by_tk.setdefault((slot, sn["tk"]), []).append(sn)
+    tr_by_tk: dict[str, list[dict[str, Any]]] = {}
+    for tr in trades:
+        tr_by_tk.setdefault(tr.get("tk") or tr.get("ticker"), []).append(tr)
+    client = client or Client(spacing=0.2)
+    results: dict[str, str | None] = {}
+    per_event: dict[str, float] = {}
+    tot_reward = tot_fill = 0.0
+    n_fills = n_settled = n_unpriced = 0
+    t_min, t_max = float("inf"), 0.0
+    for (slot, tk), ss in by_tk.items():
+        ss.sort(key=lambda x: x["t"])
+        t_min, t_max = min(t_min, ss[0]["t"]), max(t_max, ss[-1]["t"])
+        m = universes[slot][1][tk]
+        lo_t, hi_t = ss[0]["t"], ss[-1]["t"]
+        trs = [t for t in tr_by_tk.get(tk, []) if lo_t < ((parse_ts(t.get("created_time")) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)).timestamp()) <= hi_t]
+        r = score_stream(ss, trs, m)
+        if r["fills"] and tk not in results:
+            try:
+                mk = client.get(f"/markets/{tk}").get("market") or {}
+                results[tk] = mk.get("result") if mk.get("status") in ("settled", "finalized") else None
+            except Exception:  # noqa: BLE001
+                results[tk] = None
+        pnl = 0.0
+        for f in r["fills"]:
+            v, settled = fill_pnl(f, results.get(tk), r["last_mid"], m.get("fee_type"))
+            n_fills += 1
+            if v is None:
+                n_unpriced += 1
+                continue
+            n_settled += settled
+            pnl += v
+        ev = m.get("event_ticker") or tk
+        per_event[ev] = per_event.get(ev, 0.0) + r["reward"] + pnl
+        tot_reward += r["reward"]
+        tot_fill += pnl
+    days = max((t_max - t_min) / 86400.0, 1e-9) if t_max > 0 else 0.0
+    point = (tot_reward + tot_fill) / days if days else float("nan")
+    lo, hi = bootstrap_ci(per_event, days)
+    out = {"read_at": utcnow().isoformat(), "final": final, "days_collected": round(days, 3), "markets": len(by_tk),
+           "events": len(per_event), "snapshots": len(snaps), "trades": len(trades), "fills": n_fills,
+           "fills_settled": n_settled, "fills_unpriced": n_unpriced, "reward_per_day": tot_reward / days if days else None,
+           "fill_pnl_per_day": tot_fill / days if days else None, "net_per_day": point, "ci95": [lo, hi],
+           "verdict": verdict(point, lo, hi, final), "not_computed": ["M2 FIFO fills", "1 h / 24 h markouts"]}
+    (out_dir / f"score_{utcnow().strftime('%Y%m%dT%H%M%SZ')}.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    log(f"[s8] score: {json.dumps(out)}")
+    return out
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -458,6 +628,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     s2.add_argument("--out", default=r"C:\tmp\pfmon\s8")
     s2.add_argument("--hours", type=float, default=124.0)
     s2.add_argument("--until", default=None, help="absolute UTC stop time (ISO); restarts never extend the study")
+    s3 = sub.add_parser("score", help="read once by the pre-registered rule (look 1 at >= 72 h, final at 120 h)")
+    s3.add_argument("--out", default=r"C:\tmp\pfmon\s8")
+    s3.add_argument("--final", action="store_true", help="look 2: INSUFFICIENT counts as KILL")
     args = ap.parse_args(argv)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -471,6 +644,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.cmd == "select":
         set_idle_priority()
         select_universe(Client(spacing=0.15), out, log)
+        return 0
+    if args.cmd == "score":
+        score(out, args.final, log=log)
         return 0
     return collect(out, args.hours, log, until=parse_ts(args.until) if args.until else None)
 
