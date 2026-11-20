@@ -180,3 +180,38 @@ The backtest window is unusually light: most of its target dates fell in the int
   commands instead.
 - **Owed:** P3-P5 over 48 h. The first Saturday-target run (launched 11-20, target 11-21, at least 27 fixtures listed)
   is the real test of P2's bound.
+
+## 8. 48-hour reading (P1-P5) `[2026-11-20 12:47 PM CST, scheduled task soccer-lookahead-anchor-reading-1120]`
+
+Read-only, nice 19: `scripts/read_soccer_lookahead_anchor.py --out C:\tmp\soccerlane\p3p5_result.json`, window
+11-18 17:58:30Z .. 11-20 17:58:30Z (11:58 AM CST 11-18 .. 11:58 AM CST 11-20). 35 refresh-worker look-ahead runs
+(pregame, run date > CST launch day).
+
+- **P1 NOT MET: 34 of 35 anchored.** The miss is `odds_refresh_20261120_055209`: launched 05:52:09Z (11:52 PM CST
+  11-19) by `MLB_SIM_TICK lookAhead warm_next_day_slate`, run date 2026-11-20, every soccer step `--week N --season 2026
+  --horizon-days 7` (the old scope). Its stderr has 0 `SOCCER_LOOKAHEAD_DATE_ANCHOR` lines. Its soccer `_artifacts` steps
+  started 06:03:41Z..06:21:13Z, i.e. after CST midnight, when `central_today()` = the run's own date, so
+  `_soccer_lookahead_anchor_date` would see "not future". That fits a midnight-crossing gap (the check is evaluated when
+  the soccer steps are built, not at launch). NOT MEASURED: when the step list was actually built. Second clause: 623
+  other soccer runs carried their own `--date` scopes (sample 11-19..11-27); the reader did not flag a change, but it did
+  not diff them against pre-fix commands either.
+- **P2: 30 of 35 within bound.** Misses:
+  - `055209` (the unanchored run): 1,072 s for 4 matches, bound 235 s.
+  - Saturday target (11-21, 49 matches, night bound 814 s): `080116` 871 s (+7%), `100149` 843 s (+4%), `110209` 815 s
+    (+0.1%). The other five Saturday-target runs were within bound (753-1,000 s; two daytime, bound 2,035 s).
+  - Sunday target (11-22, 28 matches): `120329` 520 s vs 478 s (+9%).
+  - Read as: the 16 s/match + 30 s slope holds within 10% on the first heavy dates; the slope is slightly low at 49 matches.
+- **P3: p50 MET, max NOT MET.** n=35, p50 385 s (bound 600; baseline 1,201), p90 1,264 s, max 1,853 s, 1 over 1,800 s
+  (bound 0; baseline 10 of 86). The one is the unanchored `055209`. Anchored max 1,449 s (Saturday target, 49 matches).
+  The miss is 3% over 1,800 s, inside the 25% falsification margin.
+- **P4 MET:** weekly autorun `SOCCER_UNIT_LAUNCHED last_success_age_s` n=369, p50 14,589 s, p90 18,173 s (bound 18,900),
+  max 25,703 s. Note: p90 is 1,027 s above the pre-fix 17,146 s baseline; within the bound, cause not investigated.
+- **P5 MET on n=1 full day:** look-ahead soccer sim-hours 11-19 = 0.68 h (bound 1.0; baseline 4.65 / 5.59 h). Partial days:
+  11-18 (from 11:58 AM) 0.13 h; **11-20 (to 11:58 AM) already 2.26 h** -- eight runs targeting the 49-match Saturday at
+  ~750-1,000 s each. 11-20 will finish well over 1.0 h. The bound was set on a light-slate assumption; on a heavy-slate
+  day an hourly date-anchored look-ahead still costs ~13-15 min of soccer per run.
+- **Against the pre-registered falsification rule:** P1 failed (1 of 35), so the prediction set is FALSIFIED as written.
+  The effect is still large: p50 run hold 1,201 -> 385 s, runs over 1,800 s 10 of 86 -> 1 of 35 (the unanchored one).
+- **Leads (not followed, read-only run):** (a) evaluate the anchor at launch, or compare with the run's launch day, so a
+  look-ahead launched before CST midnight stays anchored; (b) heavy-slate cost: hourly re-sims of the same 49-match date
+  are 8+ runs x ~14 min; a per-date "already simulated this hour/odds unchanged" skip would bound P5 on weekends.

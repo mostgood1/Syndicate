@@ -2993,4 +2993,6 @@ is a bounded steady state: 923 of 973 MB is soccer `layer2_shortlist` shards (8.
   LOADED by a fleet ff 17:58:30Z (11:58 AM CST), no restart. First look-ahead on it (`180720`, 12:07 PM CST): every soccer step
   `--horizon-days 0 --date 2026-11-19`, soccer sims 45 s (2 matches), run hold 386 s (baseline today 1,326-2,444 s). The
   `SOCCER_LOOKAHEAD_DATE_ANCHOR` stderr line is not readable (`odds_refresh.stderr.txt` keeps 32 KB + tail); read the step commands.
-  P3-P5 (48 h) owed.
+  48-h reading `[2026-11-20 12:47 PM CST]`: P1 NOT MET (34 of 35 look-ahead runs anchored), P2 30 of 35 within bound, P3 p50 MET (385 s) but 1 run over 1,800 s (1,853 s), P4 MET (p90 18,173 s, n=369), P5 MET on the one full CST day (11-19: 0.68 h; 11-20 already 2.26 h by noon). Falsified as written by P1: `odds_refresh_20261120_055209`
+  (launched 11:52 PM CST, soccer steps after CST midnight) ran the old `--horizon-days 7` scope, 1,853 s hold. Anchored
+  runs: p50 hold ~385 s, max 1,449 s; a 49-match target date costs ~750-1,000 s of soccer per hourly run.

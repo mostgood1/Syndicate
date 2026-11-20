@@ -62536,3 +62536,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - `WEB_LOOP_STALL` (gap >= 5 s): 0, as before. New stall dumps: 0 (2 on 11-20, both before the fix). `WORKER TIMEOUT`: 0. Recycles: 6. healthz 200.
   - Caveat: two different hours of the same late morning, not a same-instant A/B. Traffic differs, and n is small (10 and 6 cold reads). The direction is the same on every measure, and the 40 s single-call hold is gone by construction.
   - **Owed:** silent kills per day vs 11-17's 4, over the following days (0 a day on 11-18, 11-19 and 11-20 so far).
+
+## 2026-11-20 18:47:33Z (12:47 PM CST) -- READING (no deploy): soccer look-ahead anchor P1-P5 (lane soccer-pregame-odds-lane, fix 640c6d4fd)
+- Scheduled task `soccer-lookahead-anchor-reading-1120`, read-only (`scripts/read_soccer_lookahead_anchor.py`, nice 19), window 11-18 17:58:30Z .. 11-20 17:58:30Z, 35 look-ahead runs.
+- **P1 NOT MET:** 34 of 35 anchored. `odds_refresh_20261120_055209` (launched 11:52 PM CST 11-19, soccer steps started after CST midnight) ran the old `--horizon-days 7` scope; 0 anchor lines in its stderr. Likely midnight-crossing gap, not measured.
+- **P2 NOT MET (per run):** 30 of 35 within bound; the unanchored run (1,072 s vs 235) and four heavy-date runs at +0.1% to +9% (11-21: 871/843/815 vs 814; 11-22: 520 vs 478).
+- **P3 NOT MET (max clause):** p50 385 s (bound 600; MET), max 1,853 s, 1 over 1,800 s (bound 0) -- the unanchored run; anchored max 1,449 s. Miss 3%, inside the 25% margin.
+- **P4 MET:** p90 18,173 s (bound 18,900), n=369; p50 14,589 s.
+- **P5 MET (n=1 full day):** 11-19 0.68 h (bound 1.0). Partial 11-20 already 2.26 h by 11:58 AM (49-match Saturday target): will exceed when the day completes.
+- **Verdict:** falsified as written by P1's 1-of-35 miss; effect large (p50 hold 1,201 -> 385 s; runs over 1,800 s 10/86 -> 1/35).
+- betting change: no (reading only; nothing loaded)
