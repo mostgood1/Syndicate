@@ -1899,6 +1899,14 @@ death, never life — do not invert it.
 - Verification: Unit tests: off != on, absent = today (decision dicts and the persisted exits document byte-identical), shadow = today's decisions, reachability through run_exit_tick and the fast loop's evaluate_exit; landed on origin/main; the grader reproduces a hand-computed exit-minus-hold on a synthetic shadow + ledger; findings file holds the pre-registration, load plan and 12-08 predictions; the verdict is the 12-07 reading after the user loads the shadow
 - Blocked by: none
 
+### rail-watch-fleet-page — OPEN — opened 2026-11-20 — session d58574cb-c55a-4f1f-aa9a-ab530a5f63e0
+- Goal: Serve the Claude-free Rail Watch page from the fleet web app at /rail-watch (read-only: web reads ~/syndicate-prod/data/reports/rail_watch/index.html, rendered every 20 min by the Windows task SyndicateRailWatch), so it opens on the LAN; user 11-20 'Page on the fleet app'. Code waits on branch rail-watch-route and lands + deploys (ff + reload-web, betting change: no) only AFTER the 11-24 2:15 AM window batch, whose ride-along gate stops on any (c) commit.
+- Files: syndicate/blueprints/rail_watch.py, syndicate/app.py (the rail_watch_bp import and register_blueprint lines ONLY), tests/test_rail_watch_route.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: after the deploy: GET http://127.0.0.1:10000/rail-watch returns 200 text/html whose 'updated' stamp matches the newest tick in C:\tmp\railmon\railwatch\tick.log; a missing file returns 404
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
