@@ -401,8 +401,73 @@ def render_multi(today):
             + "</div>" + js + "</body></html>")
 
 
+PRIMARY = r"C:\Users\tempadmin\Coding\Syndicate"
+
+
+def stale(path, hours):
+    try:
+        return time.time() - os.path.getmtime(path) > hours * 3600
+    except OSError:
+        return True
+
+
+def refresh_findings(days):
+    """Each day's monitor write-up, for display: `git show origin/main:<findings file>` from the primary tree (read-only:
+    a fetch plus object reads; the working tree is never touched). At most hourly; the last copy is kept on failure."""
+    marker = os.path.join(OUT, "findings_fetched.txt")
+    if not stale(marker, 1):
+        return
+    run(["git", "-C", PRIMARY, "fetch", "-q", "origin"], 120)
+    got = 0
+    for d in days:
+        try:  # bytes, decoded as UTF-8 (text mode would use the Windows code page and garble dashes)
+            p = subprocess.run(["git", "-C", PRIMARY, "show", f"origin/main:.syndicate/findings_{d}_layer2_rail_monitor.md"],
+                               capture_output=True, timeout=60, creationflags=NOWIN)
+            rc, out = p.returncode, p.stdout.decode("utf-8", errors="replace")
+        except subprocess.TimeoutExpired:
+            rc, out = -9, ""
+        if rc == 0 and out.strip():
+            tmp = os.path.join(OUT, f"findings_{d}.md.tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(out)
+            os.replace(tmp, os.path.join(OUT, f"findings_{d}.md"))
+            got += 1
+    with open(marker, "w", encoding="utf-8") as f:
+        f.write(dt.datetime.now(UTC).isoformat())
+    log(f"findings refreshed for {got} of {len(days)} days")
+
+
+def refresh_product(now_ct):
+    """The live dashboard's product datasets, once a day after 10 AM CST: the fleet scorecard / suggested-set / cheat-sheet
+    series (read-only WSL scripts), then the local builders. Same steps the Claude morning upkeep used to run."""
+    if now_ct.hour < 10 or not stale(os.path.join(DASH, "board_results.json"), 18):
+        return
+    ok = True
+    for script, out_name in (("perf_series.py", "perf_series_raw.json"), ("sug_series.py", "sug_raw.json"), ("cs_series.py", "cs_raw.json")):
+        rc, _, err, _ = run(["wsl", "--", "nice", "-n", "19", "python3", f"/mnt/c/tmp/railmon/dash/{script}"], 600,
+                            stdout_path=os.path.join(DASH, out_name + ".tmp"))
+        if rc == 0 and os.path.getsize(os.path.join(DASH, out_name + ".tmp")) > 2:
+            os.replace(os.path.join(DASH, out_name + ".tmp"), os.path.join(DASH, out_name))
+        else:
+            ok = False
+            log(f"product {script} rc={rc} {err.strip()[:160]}")
+    run([PY, os.path.join(DASH, "cs_split.py")], 120, cwd=DASH)
+    rc, _, err, _ = run([PY, os.path.join(DASH, "perf_build.py")], 300, cwd=DASH)
+    log(f"product refreshed ok={ok} perf_build rc={rc}")
+
+
 def publish(day):
-    page = render_multi(day)
+    sys.path.insert(0, OUT)
+    import page as page_mod  # noqa: E402  (C:\tmp\railmon\railwatch\page.py)
+    try:
+        refresh_findings(page_mod.all_days(day))
+    except Exception:
+        log("findings refresh ERROR " + traceback.format_exc().replace("\n", " | ")[-300:])
+    try:
+        refresh_product(dt.datetime.now(CT))
+    except Exception:
+        log("product refresh ERROR " + traceback.format_exc().replace("\n", " | ")[-300:])
+    page = page_mod.render_all(day)
     path = os.path.join(OUT, "index.html")
     with open(path + ".tmp", "w", encoding="utf-8") as f:
         f.write(page)
