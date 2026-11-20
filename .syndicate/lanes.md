@@ -1836,6 +1836,14 @@ death, never life — do not invert it.
 - Verification: Tests: off != on, side mapping, reachability via board_enrichment; replay on the fleet's 11-19 artifacts (read-only, nice 19); after a user-approved load, LIVE_GAMELINE_BUILD shows a nonzero orientation-reversed count and the reversed games' rows carry a model.
 - Blocked by: none
 
+### s8-lip-shadow — OPEN — opened 2026-11-20 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: Measure, read-only and pre-registered, whether resting maker orders on Kalshi liquidity-incentive markets would earn more in rewards than they lose to fills (reward minus markout per dollar of capital, event-clustered), as the S8 study of the profit learning program
+- Files: scripts/s8_lip_shadow.py, tests/test_s8_lip_shadow.py, .syndicate/findings_2026-11-20_s8_lip_shadow.md
+- Hypothesis: Quiet incentive markets pay more in liquidity rewards than a resting order at the reference price loses to adverse fills (static ceiling 207 USD/day on 2,092 USD, findings_2026-11-19_income_routes.md)
+- Falsification test: Pre-registered in findings_2026-11-20_s8_lip_shadow.md: KILL if the 95% upper bound of net (reward minus markout) per day on the 2,500 USD book is below 0 or the point estimate is below 10 USD/day; PASS needs lower bound above 0 and point at least 25 USD/day
+- Verification: The pre-registration is pushed before any collected data is read; the collector runs 3-5 days read-only on public Kalshi data; the result is read once by the pre-registered rule and recorded in the findings file and the plan's S8 entry
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
