@@ -4583,9 +4583,28 @@ def _compress_oversized_values(payload: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _decompress_oversized_values(payload: dict[str, Any]) -> dict[str, Any] | None:
+_DECODE_SKIPPED_KEY = "decode_skipped_by_reader"
+
+
+def _skipped_decode_marker(key: str, envelope: Mapping[str, Any]) -> dict[str, Any]:
+    """What a skipped value reads as: the shortlist's documented "not here" marker
+    (`_query_state_persist_response`), deliberately WITHOUT `rows` / `cards`, so a
+    consumer that wrongly reaches for them gets None rather than an empty list."""
+    return {
+        _QUERY_STATE_LAYER2_OMITTED_KEY: True,
+        _DECODE_SKIPPED_KEY: True,
+        "read_from": "read_layer2_shortlist" if key == "layer2_shortlist" else None,
+        "raw_bytes": envelope.get(_COMPRESSED_VALUE_BYTES),
+    }
+
+
+def _decompress_oversized_values(payload: dict[str, Any], skip_keys: tuple[str, ...] = ()) -> dict[str, Any] | None:
     """Inverse of `_compress_oversized_values`. Returns None if it cannot honour
     the payload, which is the whole point of the codec tag.
+
+    `skip_keys` are left ENCODED and replaced by `_skipped_decode_marker`: for a
+    reader that never uses them (see `_combined_read_skip_keys`). The codec is
+    still checked first, so an unknown codec refuses the payload as before.
 
     An UNKNOWN codec must produce NOTHING, not a best effort. A reader that
     hands back the envelope dict where a list of candidates belongs gives every
@@ -4609,6 +4628,14 @@ def _decompress_oversized_values(payload: dict[str, Any]) -> dict[str, Any] | No
                 flush=True,
             )
             return None
+        if key in skip_keys:
+            out[key] = _skipped_decode_marker(key, value)
+            print(
+                f"[intelligence_state] STATE_DECODE_SKIPPED key={key} "
+                f"raw_bytes={value.get(_COMPRESSED_VALUE_BYTES)} encoded_chars={len(value.get(_COMPRESSED_VALUE_DATA) or '')}",
+                flush=True,
+            )
+            continue
         try:
             raw = zlib.decompress(base64.b64decode(value.get(_COMPRESSED_VALUE_DATA) or ""))
             out[key] = json.loads(raw.decode("utf-8"))
@@ -4659,7 +4686,7 @@ def _board_snapshot_persist_payload(
     return _compact_state_for_persist(payload)
 
 
-def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | None:
+def _expand_persisted_state(state: dict[str, Any] | None, *, skip_keys: tuple[str, ...] = ()) -> dict[str, Any] | None:
     """Restore response.analysis from its alias marker. Inverse of
     _compact_state_for_persist, so every existing consumer is unaffected.
     Tolerates un-aliased payloads written before this change.
@@ -4669,7 +4696,7 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     # #317. Decompress FIRST: the alias markers this function resolves live
     # inside the values `_compress_oversized_values` packed, so every rule below
     # would find nothing to do on a compressed payload and return it untouched.
-    state = _decompress_oversized_values(state)
+    state = _decompress_oversized_values(state, skip_keys)
     if not isinstance(state, dict):
         return None
     expanded = dict(state)
@@ -4936,7 +4963,7 @@ def _timed_candidate_pool(build, *args) -> Any:
             pass
 
 
-def _read_state_payload(path: Path) -> dict[str, Any] | None:
+def _read_state_payload(path: Path, *, skip_keys: tuple[str, ...] = ()) -> dict[str, Any] | None:
     """Read the board state from the keyvalue store or the published artifact.
 
     #43. The write side diverts oversized payloads to the artifact transport
@@ -4986,7 +5013,7 @@ def _read_state_payload(path: Path) -> dict[str, Any] | None:
                 flush=True,
             )
             chosen = disk_payload
-    return _expand_persisted_state(chosen) if isinstance(chosen, dict) else chosen
+    return _expand_persisted_state(chosen, skip_keys=skip_keys) if isinstance(chosen, dict) else chosen
 
 
 def read_intelligence_state() -> dict[str, Any] | None:
@@ -10424,6 +10451,23 @@ def _by_sport_shape(value: Any) -> str:
     return "mixed"
 
 
+# THE COMBINED READ LEAVES THE LAYER 2 SHORTLIST ENCODED (lane `web-silent-worker-kills`, 2026-11-20).
+# The day state carries the full Layer 2 shortlist, compressed: 11-21's was 5.2 MB of base64 and 39.9 MB
+# of JSON. Every cold combined-board read decoded it with ONE `json.loads`, and nothing on that path reads
+# it -- `read_combined_intelligence_response` uses each date's `by_sport`, `candidate_count` and stamps,
+# and its Layer 2 fallback reads the standalone artifact through `read_layer2_shortlist(date)`. The
+# fleet's stall dumps (16:08:10Z and 17:04Z 11-20) named exactly that `json.loads` holding the GIL 40+ s
+# in a web request thread, so the worker's main loop could not heartbeat (the 11-17 silent kills were
+# the same request past 60 s). Switch `SYNDICATE_COMBINED_READ_SKIP_LAYER2_SHORTLIST`: absent = skip;
+# 0 / false / no / off = decode it as before.
+_COMBINED_READ_SKIP_ENV = "SYNDICATE_COMBINED_READ_SKIP_LAYER2_SHORTLIST"
+
+
+def _combined_read_skip_keys() -> tuple[str, ...]:
+    raw = str(os.environ.get(_COMBINED_READ_SKIP_ENV) or "").strip().lower()
+    return () if raw in {"0", "false", "no", "off"} else ("layer2_shortlist",)
+
+
 def _read_single_date_response_for_combining(selected_date: str) -> dict[str, Any] | None:
     """One date's already-computed response, read-only. Consults both the
     in-memory snapshot the background loop already holds (cheapest -- exactly
@@ -10477,7 +10521,7 @@ def _read_single_date_response_for_combining(selected_date: str) -> dict[str, An
     # already expanded; this was the one reader of this file that did not.
     # The expansion now lives INSIDE `_read_state_payload` (lane
     # `state-read-expand-choke-point`), so no caller of it can forget again.
-    on_disk = _read_state_payload(_intelligence_state_daily_paths(selected_date)["state"])
+    on_disk = _read_state_payload(_intelligence_state_daily_paths(selected_date)["state"], skip_keys=_combined_read_skip_keys())
     on_disk = on_disk if isinstance(on_disk, dict) and _intelligence_state_candidate_count(on_disk) > 0 else None
 
     if in_memory is None:

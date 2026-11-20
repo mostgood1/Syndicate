@@ -94,7 +94,7 @@ def test_the_historical_defect_fires_the_tripwire(written, capsys):
         "the writer stored by_sport as plain lists, so this no longer reproduces the defect"
     )
 
-    with patch.object(S, "_read_state_payload", side_effect=lambda path: raw_read(path)):
+    with patch.object(S, "_read_state_payload", side_effect=lambda path, **_: raw_read(path)):
         out = S.read_combined_intelligence_response(dates=[DATE], sport="all")
 
     entry = out["by_date"][DATE]
