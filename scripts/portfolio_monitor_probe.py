@@ -850,7 +850,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not re.match(r"^http://(127\.0\.0\.1|localhost)(:\d+)?$", args.base_url.rstrip("/")):
         print(f"refused: {args.base_url} is not the fleet (loopback only)", file=sys.stderr)
         return 2
-    set_idle_priority()
     sys.path.insert(0, str(HERE))
     from _base_url import admin_token
 
@@ -874,6 +873,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             except ValueError:
                 meta["error"] = "not JSON"
             (rdir / f"{name}.json").write_bytes(body)
+    # Idle only AFTER the timed fetches. The endpoint times are client-measured; at Idle a busy host starves the probe
+    # and inflates them (11-20 9:27 AM: `settings` 3.45 s client vs 285 ms in the web log). Every reading before the
+    # 11-20 ctypes fix was taken at Normal, so timing at Normal also keeps the series comparable.
+    set_idle_priority()
 
     today = now.astimezone(CT).date().isoformat()
     live_today = bodies.get("live_today") or {}
