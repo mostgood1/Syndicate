@@ -1845,6 +1845,11 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### college-neutral-site-live-join — OPEN — opened 2026-11-19 — session 86eb6e0f-55ca-4ba0-9d8b-e4ffe69ead77
+- SESSION ARCHIVED 2026-11-20 (user "archive this session"; session 86eb6e0f). Nothing uncommitted. The lane stays OPEN, and its follow-ups are owned by scheduled tasks:
+  - `nfl-level-refit-load-1120` CHANGE G, the 11-24 load;
+  - `college-orientation-join-reading-1127`, P1-P4, which closes the lane if MET;
+  - `ncaaf-orientation-recheck-1207`, NCAAF after championship weekend.
+  If a task shows 0 runs after its time, run its SKILL.md brief by hand.
 - GOAL VERDICT 2026-11-19 ~7:15 PM CST: Goal, verbatim: "On main, default-off (switch SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION, absent = old behaviour): an NCAAB/WNCAAB board row whose (away, home) is the REVERSE of its live re-sim lane's (ESPN) orientation joins that lane through an explicit side-mapped view (home win prob, margin histograms, home margin, state scores and segment blocks restated in the row's orientation), exact pair first; tests prove off != on, the side mapping (spread sign, h2h side, segment side, state scores) and reachability through board_enrichment's real index build; the cause is named file:line, the reoriented/dark frequency since 11-02 is measured with denominators, a prediction for the first live evening after a load is pre-registered, and the load is put to the user (betting change, window 11-24)." -- **GOAL: MET** (load put to the user in this session's closing ask). Readings:
   - On main `e5a267c1d` + `6c1a3ecee` + `8c8bba9c4`. `on` is off by default; absent = SHADOW, which serves rows byte-identical to off (tested), so a code ff is not a betting change.
   - Tests: 14 new pass (off != on; side mapping; producer-written lanes through board_enrichment == a hand-flipped twin, NCAAB + WNCAAB). 605 neighbouring tests pass.
