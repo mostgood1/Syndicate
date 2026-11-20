@@ -152,6 +152,13 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
   - P2: <= 2 exits, all rc 75; falsified on any rc -6 or `Fatal Python error`.
   - P3: longest `BOARD_BUILD_TIMING` gap <= 900 s; falsified if > 1,200 s.
   Also record the exploratory numbers: parent and child RSS, and `held=transient_jobs` post-build checks.
+- **Exploratory, added 11-20 by the owner (findings §8, main `553c4bd3a`; it decides the next lever):**
+  - parent (`run_refresh_worker.py`) RSS p50 at ~9 PM CST (take `ps` at the 8:45 / 9:10 / 9:35 PM readings);
+  - parent RSS at ~9 AM CST the next morning (the floor). A one-shot cron takes it on 11-21.
+  - `p7count.py` now prints `POST_BUILD_CHECK by held reason` and `BOARD_PROCESS_RECYCLE by reason`; report both, including any `reason=post_build_headroom`.
+  - The owner's expectation, written before the evening: the pair crosses the line on its own, the post-build recycle fires (rc 75), and P2's "<= 2 recycles" is at risk.
+  - If the 11-21 floor is >= 0.5 GB above 1,610 MB (the 11-20 9:28 AM floor), the parent ratchet is multi-day, and the owner puts a parent reset to the user.
+  - State so far (11-20 9:30 AM): since the 17:00Z 11-19 load there have been 12 refusals, 1 exit (rc 75, 11:58 PM CST, after a refusal streak) and 0 real fatal errors (the 04:33Z "Fatal Python error" hits were grep command lines quoted in `ALL_PROCESS_MEMORY`). `held=transient_jobs` 11 of 11. Parent 1.65 GB.
 - Write it in the day's findings, send the numbers to local_d0f83044 (or its lane if the session is gone), then drop this item.
 
 ## NIGHTLY CLOSE

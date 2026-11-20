@@ -6,7 +6,7 @@ import collections, glob, re, subprocess, sys, datetime as dt
 
 a = sys.argv[1][:19]
 b = sys.argv[2][:19] if len(sys.argv) > 2 else "9999"
-pat = "MEMORY_GUARD_ABORT|BOARD_PROCESS_EXITED|RECYCLE_EXIT|BOARD_PROCESS_RECYCLE|BOARD_BUILD_TIMING|Fatal Python error"
+pat = "MEMORY_GUARD_ABORT|BOARD_PROCESS_EXITED|RECYCLE_EXIT|BOARD_PROCESS_RECYCLE|BOARD_BUILD_TIMING|Fatal Python error|BOARD_PROCESS_POST_BUILD_CHECK"
 lines = []
 for f in sorted(glob.glob("logs/refresh-worker.log*")):
     out = subprocess.run(["grep", "-aE", pat, f], capture_output=True, text=True, errors="replace").stdout
@@ -25,4 +25,9 @@ gaps = sorted(((y - x).total_seconds(), x.strftime("%H:%M:%SZ")) for x, y in zip
 print("window", a, "->", b)
 print("MEMORY_GUARD_ABORT per UTC hour", dict(sorted(per_hour.items())), "total", sum(per_hour.values()))
 print("BOARD_PROCESS_EXITED rc", exits, "| RECYCLE_EXIT", recycles, "| Fatal Python error", fatal)
+held = collections.Counter((re.search(r"held=(\S+)", l).group(1) if re.search(r"held=(\S+)", l) else "fired")
+                           for l in lines if "BOARD_PROCESS_POST_BUILD_CHECK" in l)
+recyc_reason = collections.Counter((re.search(r"reason=(\S+)", l).group(1) if re.search(r"reason=(\S+)", l) else "?")
+                                   for l in lines if "BOARD_PROCESS_RECYCLE" in l)
+print("POST_BUILD_CHECK by held reason", dict(held), "| BOARD_PROCESS_RECYCLE by reason", dict(recyc_reason))
 print("BOARD_BUILD_TIMING builds", len(ts), "| longest gaps", [(int(g), t) for g, t in gaps[-3:]], "| gaps > 900 s", sum(1 for g, _ in gaps if g > 900))
