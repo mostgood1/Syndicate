@@ -394,3 +394,20 @@ of the blowout gap. The rest of it, and the one-score half, are the follow-ups b
   `ladder_margin.py`, `pat_pending.py`.
 - Every table above is saved as a `*.txt` beside its script.
 - Windows workers ran at Idle priority (4 at a time) and the WSL reads at nice 19.
+
+## NOTE 2026-11-20 12:50 PM CST — the hold-out runner was replaced (for the scheduled checks)
+
+The scheduled hold-out checks (`engine-ncaaf-checks-1124` / `-1130`, lane engine-learner) run
+`C:\tmp\t852\check_slate_852.sh`. They expected sha256 prefix `4d0e07ba90c0918d`. **The runner now in place has sha256
+prefix `997e220ff44eb273`** (full `997e220ff44eb273f959c281dbf0b34758194b00c361e966ec3269189c8a5bdb`).
+
+- **Pinned commit `44184da1e`:** an export of main `44184da1eb1b3597bd5c8649eaa50ee335d97f4f` (#852's switch) in
+  `C:\tmp\t852\code`, recorded in `code/COMMIT`. All three code-importing steps read it, and the runner exits 5 without
+  it.
+- **Interpreter:** pinned to `py -3.11`. On 11-20 `py -3` began resolving to a bare Python 3.12 with no psutil.
+- **Re-run on 11-14 at 12:29 PM CST:**
+  - The summary's first line names the commit and Python 3.11.9.
+  - Rc 0; E0 reproduction 345 match, 0 differ; **CHECK VALID**.
+  - Numbers unchanged from the unpinned clean run: the pick + #835 against production + #835, -0.0176 (se 0.0095);
+    slope 0.76 -> 0.88.
+- **Unchanged:** usage `<date> <week> [every]`, the summary file `check852_<date>.txt` and the last-line wording.
