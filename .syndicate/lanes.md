@@ -1912,6 +1912,7 @@ death, never life — do not invert it.
 - Falsification test: n/a
 - Verification: after the deploy: GET http://127.0.0.1:10000/rail-watch returns 200 text/html whose 'updated' stamp matches the newest tick in C:\tmp\railmon\railwatch\tick.log; a missing file returns 404
 - Blocked by: none
+- STATUS 2026-11-20 10:55 AM CST (16:55Z): **Rail Watch is Claude-free and multi-day.** The Windows task SyndicateRailWatch (every 20 min, 10:03 AM-2:03 AM CST) renders ONE self-contained page at the stable path C:\tmp\railmon\railwatch\index.html (fleet copy ~/syndicate-prod/data/reports/rail_watch/index.html), with a day picker (Today + every slate day since 11-15) and an All-days view (graded hit vs fair by day, peaks, false/missed, board gaps, query p50, day-page links). 11-15..11-17 rows rebuilt from the saved readings (probe summary() on reading.json; no fleet-log columns). Asked by the fleet-watcher local_379fd729 for its central hub (C:\SyndicateProd\dashboards\index.html), user verbatim: "yes, ask all three sessions to make those changes - and pull in the history we already should have. I want all 3 of these available in one central dashboard hub". The /rail-watch route still lands after the 11-24 batch (branch rail-watch-route, one-shot 9:37 AM 11-24).
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

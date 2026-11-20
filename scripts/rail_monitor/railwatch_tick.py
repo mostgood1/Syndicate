@@ -268,8 +268,141 @@ th:first-child,td:first-child {{ text-align:left; }} th {{ color:var(--mute); fo
 </div></body></html>"""
 
 
+DAY_PAGES = {  # the Claude-written day pages (private claude.ai links)
+    "2026-11-15": "https://claude.ai/artifact/BJwFByJoeonxBCHPeRTnP7",
+    "2026-11-16": "https://claude.ai/artifact/NatuXkAdpFRR3RN5EmBjRq",
+    "2026-11-17": "https://claude.ai/artifact/HBPdAGfJxCjGcAF76iNx2f",
+    "2026-11-18": "https://claude.ai/artifact/ESGaWMYhR7JH6EWfeqiViY",
+    "2026-11-19": "https://claude.ai/artifact/XxP9SEsLj9NFebk8G1YEs3",
+}
+
+
+def all_days(today):
+    days = {today}
+    for p in glob.glob(os.path.join(DASH, "rows_20*.jsonl")):
+        days.add(os.path.basename(p)[5:15])
+    if os.path.exists(os.path.join(DASH, "rows.jsonl")):
+        days.add("2026-11-18")
+    return sorted(d for d in days if d <= today)
+
+
+def day_label(day):
+    d = dt.date.fromisoformat(day)
+    return d.strftime("%a %b ") + str(d.day)
+
+
+def readings_table(rows, limit=60):
+    trs = []
+    for r in reversed(rows[-limit:]):
+        trs.append("<tr>" + "".join(f"<td>{c}</td>" for c in [
+            html.escape(fmt_ct(r["at"])), num(r.get("live_games")), num(r.get("flags_shown")),
+            f"{num(r.get('flags_false'))} / {num(r.get('flags_missed'))}", num(r.get("dark_rows")), num(r.get("live_games_no_model")),
+            num(r.get("floor_violations")), f"{num(r.get('board_pub_gap_median_s'))} / {num(r.get('board_pub_gap_max_s'))}",
+            num(r.get("query_s"), 1), num(r.get("live_rows")), num(r.get("host_load"), 1)]) + "</tr>")
+    return ('<table><thead><tr><th>Time (CST)</th><th>Live</th><th>Flags</th><th>False / missed</th><th>Dark rows</th>'
+            '<th>No-model games</th><th>Floor viol.</th><th>Board gap med / max s</th><th>Query s</th><th>Rail rows</th>'
+            f'<th>Host load</th></tr></thead><tbody>{"".join(trs)}</tbody></table>')
+
+
+def day_stats(day, rows, results):
+    g = lambda k: [r.get(k) for r in rows if r.get(k) is not None]
+    eve = [r.get("board_pub_gap_max_s") for r in rows if r.get("board_pub_gap_max_s") is not None
+           and ("23:30" <= r["at"][11:16] or r["at"][11:16] <= "04:30")]
+    q = sorted(g("query_s"))
+    res = next((x for x in results if x.get("day") == day and x.get("kind") == "all"), None)
+    return {"day": day, "n": len(rows), "live": max(g("live_games") or [0]), "flags": max(g("flags_shown") or [0]),
+            "false": sum(g("flags_false")), "missed": sum(g("flags_missed")),
+            "nomodel": max(g("live_games_no_model")) if g("live_games_no_model") else None,
+            "floor": sum(g("floor_violations")) if g("floor_violations") else None,
+            "gap": max(eve) if eve else None, "q50": q[len(q) // 2] if q else None, "res": res}
+
+
+def trend_chart(stats):
+    pts = [s for s in stats if s["res"] and s["res"].get("hit_pct") is not None]
+    if len(pts) < 2:
+        return ""
+    W, H, L, B, T = 900, 220, 44, 30, 14
+    xs = [L + i * (W - L - 20) / (len(pts) - 1) for i in range(len(pts))]
+    lo = int(min(min(s["res"]["hit_pct"], s["res"]["fair_pct"]) for s in pts) // 5 * 5) - 5
+    hi = int(max(max(s["res"]["hit_pct"], s["res"]["fair_pct"]) for s in pts) // 5 * 5) + 10
+    y = lambda v: H - B - (v - lo) * (H - B - T) / (hi - lo)
+    parts = [f'<svg viewBox="0 0 {W} {H}" role="img" aria-label="Graded flag hit rate against book fair, by day">']
+    for gv in range(lo, hi + 1, 5):
+        parts.append(f'<line x1="{L}" x2="{W - 20}" y1="{y(gv):.1f}" y2="{y(gv):.1f}" class="grid"/><text x="{L - 6}" y="{y(gv) + 4:.1f}" class="ax" text-anchor="end">{gv}%</text>')
+    for key, color in (("hit_pct", "var(--s1)"), ("fair_pct", "var(--mute)")):
+        parts.append('<polyline points="' + " ".join(f"{x:.1f},{y(s['res'][key]):.1f}" for x, s in zip(xs, pts))
+                     + f'" fill="none" stroke="{color}" stroke-width="2.5"/>')
+        parts.extend(f'<circle cx="{x:.1f}" cy="{y(s["res"][key]):.1f}" r="3.5" fill="{color}"/>' for x, s in zip(xs, pts))
+    parts.extend(f'<text x="{x:.1f}" y="{H - 8}" class="ax" text-anchor="middle">{html.escape(s["day"][5:])}</text>' for x, s in zip(xs, pts))
+    parts.append("</svg>")
+    return ('<div class="legend"><span><i style="background:var(--s1)"></i>flags won, %</span>'
+            '<span><i style="background:var(--mute)"></i>book fair (break-even), %</span></div>' + "".join(parts))
+
+
+def render_multi(today):
+    try:
+        results = json.load(open(os.path.join(DASH, "rail_results.json"), encoding="utf-8"))
+    except (OSError, ValueError):
+        results = []
+    days = all_days(today)
+    rows_by = {d: sorted(read_jsonl(rows_path(d)), key=lambda r: r["at"]) for d in days}
+    # Today keeps the full single-day page (tiles, chart, games with no model, memory guard, readings, results).
+    today_html = render(today)
+    body = today_html[today_html.index('<div class="wrap">') + len('<div class="wrap">'):today_html.rindex("</div></body>")]
+    head = today_html[:today_html.index("<body>")]
+    stats = [day_stats(d, rows_by[d], results) for d in days]
+    trs = []
+    for s in reversed(stats):
+        r = s["res"] or {}
+        page = DAY_PAGES.get(s["day"])
+        trs.append("<tr>" + "".join(f"<td>{c}</td>" for c in [
+            f'<a href="#day-{s["day"]}" data-day="{s["day"]}">{html.escape(day_label(s["day"]))}</a>', num(s["n"]), num(s["live"]), num(s["flags"]),
+            f"{s['false']} / {s['missed']}", num(s["nomodel"]), num(s["floor"]), num(s["gap"], 0, " s"), num(s["q50"], 1, " s"),
+            (f"{num(r.get('won'))}-{num(r.get('lost'))}" if r else "–"),
+            (f"{num(r.get('hit_pct'), 1, '%')} vs {num(r.get('fair_pct'), 1, '%')}" if r else "–"),
+            ("[" + num(r.get("ci90_lo_pp"), 1) + ", " + num(r.get("ci90_hi_pp"), 1) + "]" if r and r.get("ci90_lo_pp") is not None else "–"),
+            (f'<a href="{page}" target="_blank" rel="noopener">page</a>' if page else "–")]) + "</tr>")
+    alldays = (f'<section class="day" id="day-all" data-day="all"><h2>All days, {html.escape(days[0])} to {html.escape(days[-1])}</h2>'
+               f'<div class="card">{trend_chart(stats)}</div>'
+               '<div class="card" style="margin-top:12px"><table><thead><tr><th>Day</th><th>Readings</th><th>Peak live</th>'
+               '<th>Peak flags</th><th>False / missed</th><th>Peak no-model</th><th>Floor viol.</th><th>Board gap, evening max</th>'
+               '<th>Query p50</th><th>Graded W-L</th><th>Hit vs fair</th><th>90% CI pp</th><th>Day page</th></tr></thead>'
+               f'<tbody>{"".join(trs)}</tbody></table>'
+               '<p class="note">Graded columns come from the nightly close (finals by date, first sighting of each flag). 11-15..11-17 rows were '
+               'rebuilt from the saved readings, without the fleet-log columns (board gaps, sweeps), which had rotated. Day pages are the private '
+               'claude.ai write-ups.</p></div></section>')
+    past = []
+    for d in reversed(days):
+        if d == today:
+            continue
+        rows = rows_by[d]
+        st = next(s for s in stats if s["day"] == d)
+        r = st["res"] or {}
+        summary = (f"{st['n']} readings · peak {st['live']} live games and {st['flags']} flags · false / missed {st['false']} / {st['missed']}"
+                   + (f" · graded {num(r.get('won'))}-{num(r.get('lost'))}, hit {num(r.get('hit_pct'), 1, '%')} vs fair {num(r.get('fair_pct'), 1, '%')}" if r else ""))
+        page = DAY_PAGES.get(d)
+        past.append(f'<section class="day" id="day-{d}" data-day="{d}" hidden><h2>{html.escape(day_label(d))}</h2>'
+                    f'<p class="sub">{html.escape(summary)}' + (f' · <a href="{page}" target="_blank" rel="noopener">day page</a>' if page else "")
+                    + f'</p><div class="card">{chart(rows)}</div><h2>Readings</h2><div class="card">{readings_table(rows)}</div></section>')
+    nav = ('<nav class="days"><a href="#day-today" data-day="today" class="on">Today</a>'
+           + "".join(f'<a href="#day-{d}" data-day="{d}">{html.escape(d[5:])}</a>' for d in reversed(days) if d != today)
+           + '<a href="#day-all" data-day="all">All days</a></nav>')
+    css = ('<style>.days{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px}.days a{padding:5px 11px;border:1px solid var(--line);'
+           'border-radius:999px;color:var(--ink);text-decoration:none;font-size:13px;background:var(--card)}.days a.on{background:var(--ink);color:var(--bg)}'
+           'a{color:var(--s1)}</style>')
+    js = ("<script>(function(){function show(k){document.querySelectorAll('section.day').forEach(function(s){s.hidden=(s.dataset.day!==k)});"
+          "document.querySelectorAll('nav.days a').forEach(function(a){a.classList.toggle('on',a.dataset.day===k)})}"
+          "function fromHash(){var h=(location.hash||'').replace('#day-','');show(h&&document.querySelector('section.day[data-day=\"'+h+'\"]')?h:'today')}"
+          "document.addEventListener('click',function(e){var a=e.target.closest('a[data-day]');if(!a)return;e.preventDefault();"
+          "history.replaceState(null,'','#day-'+a.dataset.day);show(a.dataset.day);window.scrollTo(0,0)});"
+          "window.addEventListener('hashchange',fromHash);fromHash()})();</script>")
+    return (head.replace("</head>", css + "</head>") + '<body><div class="wrap">' + nav
+            + f'<section class="day" id="day-today" data-day="today">{body}</section>' + "".join(past) + alldays
+            + "</div>" + js + "</body></html>")
+
+
 def publish(day):
-    page = render(day)
+    page = render_multi(day)
     path = os.path.join(OUT, "index.html")
     with open(path + ".tmp", "w", encoding="utf-8") as f:
         f.write(page)
