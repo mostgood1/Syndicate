@@ -69,3 +69,54 @@ timeouts):
 **Scope.** Harness only. On a pass, the build is two default-off `CalibrationProfile` fields in `situation_model` /
 `drive_simulator` on a loan from `football-scenario-calibration`, plus the live timeouts feed (the NFL pattern). Both
 need the user's yes. On a fail, the stated reason not to.
+
+## RESULTS (written after the runs; nothing above was changed)
+
+### Verdict: H-REACH TRUE. Both arms pass G1-G3. The simpler `v4a` (concede only) scores at least as well as `v4ab`.
+
+`C:\tmp\t859\c859_read.py`, `c859_read_saved.txt`. 150 paired games, against `base` (damping + college OT, no clock):
+
+| | `clk_to` (#858) | **`v4a`** | `v4ab` |
+|---|---|---|---|
+| G1: one-score last-2:00 points (real 3.58 [2.55, 4.71]) | 3.23 | **3.19** in | 3.21 in |
+| G1: one-score log loss, Q4 3:00 | -0.0132 (0.0462) | -0.0132 (0.0462) | -0.0132 (0.0462) |
+| G2: 17+ log loss, Q4 15:00-6:00 | +0.0307 (0.0123) FAIL | **-0.0279 (0.0189)** PASS | -0.0153 (0.0268) PASS |
+| G3: overall log loss, Q4 15:00-6:00 | +0.0141 (0.0098) FAIL | **-0.0099 (0.0114)** PASS | -0.0037 (0.0136) PASS |
+| H-REACH: 17+ rest vs `clk_to`, Q4 15:00 (needs <= -0.35) | | -1.66 (0.13) | -2.74 (0.15) |
+| overall slope / rest engine-over-actual | 0.66 / 1.065 | **0.70 / 0.994** | 0.66 / 0.969 |
+
+**`v4a` minus `base` rest, Q4 15:00 / 10:00 / 6:00 / 3:00 by margin, and [`v4a` engine minus actual]:**
+- 0-8: +0.83 [-0.22] / +0.97 [+0.06] / +1.22 [-0.91] / +1.02 [-0.47].
+- 9-16: +0.55 [-0.77] / +0.68 [-1.19] / +0.73 [+0.78] / +0.16 [-1.44].
+- 17-24: -0.56 [-1.34] / -0.23 [-0.49] / -0.72 [+0.53] / -0.35 [+0.54].
+- 25+: -1.23 [+0.42] / -1.45 [+0.98] / -1.31 [+0.96] / -0.36 [+0.33].
+- For comparison, `base` 25+ was +1.64 / +2.43 / +2.27 / +0.69.
+
+**Reading.**
+- The clock still delivers the one-score last two minutes, and the concede rule takes back the blowout cost. A
+  trailer down 25+ no longer hurries, so both sides of a rout score less.
+- `v4ab`'s run-out over-corrects 17-24: engine minus actual -2.53 at Q4 15:00, against -0.78 for `base`.
+- **Prediction misses, reported:**
+  - the 17+ move -0.3 to -0.8 was far too small (-1.66 / -2.74);
+  - "G2 borderline" was wrong (clear passes);
+  - H-RATE is weaker than feared.
+- **Prediction held:** one-score unchanged within 0.05 (`v4ab` vs `clk_to` -0.05 at Q4 15:00).
+- **Not shown:** that `v4a` beats `base` beyond noise anywhere. Every passing reading is "not worse" with a
+  better-signed point estimate.
+
+### What a build would be (the user's call; it needs two loans)
+
+1. **Engine (loan from `football-scenario-calibration`).** A `CalibrationProfile` field, `trailing_concede_deficit`
+   (default None = off, byte-identical). In regulation Q4, a trailer down that much leaves `trailing_urgency` / the
+   two-minute drill for `neutral_offense` (`situation_model.classify_urgency`, with its call sites taking the profile
+   value). Plus its `to_dict` entry and tests: off byte-identical to pinned digests, on reachable.
+2. **Live (loan from `live-player-exit-gate`).**
+   - ESPN `situation.homeTimeouts` / `awayTimeouts` into `NcaafLiveGameState` and the re-sim's
+     `initial_timeouts_*` (the NFL pattern). It is needed because the timeouts matter: +0.46, se 0.19.
+   - One live switch that arms the end-game set for the NCAAF live re-sim: #808's seven switches + the concede rule +
+     #855's college overtime, on top of #852's damping.
+3. **Re-fit and hold-out.**
+   - #852's damping (1.0 / 17) was fitted without the clock and v4. A joint re-read of its shape is owed.
+   - The 2026 ledger cannot carry timeouts. So the out-of-sample test is live shadow readings after the wiring, or an
+     ESPN-timeouts backfill of 11-21 / 11-28.
+4. **Loading:** a betting change, a window only, after #852 / #835's own 12-08 decision.

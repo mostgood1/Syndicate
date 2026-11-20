@@ -1,5 +1,23 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#859` — **A MARGIN-AWARE END-GAME LETS #808'S CLOCK HELP NCAAF LIVE TOTALS. The concede rule (a trailer down 25+ in Q4 stops hurrying) on top of the clock with real timeouts, damping 1.0/17 and college OT passes #858's gates against the live candidate. Harness-only so far; the build needs two loans and the user's yes**
+
+`[2026-11-20, lane ncaaf-margin-aware-endgame, session 617b553b; user "Start v4 here"; pre-registered 7b28b5f82; findings .syndicate/findings_2026-11-20_ncaaf_margin_aware_endgame.md]`
+
+- **Measured first (CFBD 2023-24):** real trailers beyond reach still hurry (pass 0.67, 13.9 s a snap). They ease only at **25+** (pass 0.47, 19.0 s). Leaders run the clock from 9+ (pass 0.11-0.15). Q4 possession T = 159 s.
+- **Result (`v4a`, 150 paired 2024 games, vs `base`):**
+  - G1: one-score last-2:00 3.19 (real 3.58 [2.55, 4.71]);
+  - G2: 17+ log loss -0.0279 (se 0.0189);
+  - G3: overall -0.0099 (se 0.0114), slope 0.71 -> 0.70, rest ratio 0.994;
+  - 25+ engine minus actual: +1.64 -> +0.42 at Q4 15:00.
+  - The run-out rule (`v4ab`) also passes but over-corrects 17-24.
+  - All "not worse"; no reading beats `base` beyond noise.
+- **Build (owed, the user's call):**
+  1. Engine: `CalibrationProfile.trailing_concede_deficit` (default off) in `situation_model.classify_urgency`. Loan from `football-scenario-calibration`.
+  2. Live: ESPN timeouts left into `ncaaf/live_resim.py` (the NFL pattern) + one live switch for the end-game set (#808 clock + concede + #855 OT on top of #852). Loan from `live-player-exit-gate`.
+  3. A joint re-read of the damping shape, and a hold-out with real timeouts (live shadow, or an ESPN backfill of 11-21 / 11-28).
+  4. Load only in a window.
+
 ### `#858` — **#808'S END-OF-HALF CLOCK FOR NCAAF LIVE ONE-SCORE GAMES: NOT BUILT, the registered "reason not to".**
 
 On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL timeouts:
