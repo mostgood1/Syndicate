@@ -62383,3 +62383,20 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - The rail monitor reads it. The load checks above are MET, so the reading is not VOID.
 - **Revert:** delete the 4 lines (or restore the backup above), then a drained full down/up; each key is independent. A revert is allowed outside a window.
 - **Claims:** released by token at 17:08:24Z (refresh-worker / web / live-odds-worker rc 0, status free).
+
+## 2026-11-20 03:54:32Z (9:54 PM CST 11-19) -- READING (no deploy): UNMODELLED key exit read LIVE through every NCAAF layer, refusal held and LIFTED on return -- Rice QB Gael Ochoa (lane `live-player-exit-gate`, #814)
+- **The exit:** event 401862830, Rice @ Temple (NCAAF). Rice's starter Gael Ochoa was `replaced` at 03:26:09Z (pbp, key=True). A QB change is unmodelled.
+- **Detected within one tick:** the 03:27:48Z tick (the previous one was 03:26:31Z).
+- **Producer refused:** `NCAAF_LIVE_RESIM` `live_resimmed 0`, `key_player_out 1` at 03:27:48Z and 03:31:03Z.
+- **Lifted when he returned:** at 03:34:05Z, `live_resimmed 1` and no `key_player_out`. A `replaced` exit clears on the starter's next snap (`live_player_status`), so Ochoa was back. Refused for ~6 min, from 03:27:48Z to 03:34:05Z. This meets the goal's "while that player is out", both ways.
+- **Board:** book_grid NCAAF `LIVE_GAMELINE_BUILD`:
+  - before the refusal: `projected=9 written=7` (03:27:41Z);
+  - while refused: `projected=0`, `no_live_gameline_projection` 22 -> 18, on every build from 03:29:21Z to 03:33:53Z (6 builds), and layer2 `LIVE_GAMELINE_JOIN projected=0` at 03:31:45Z;
+  - after the lift: back to `projected=6 written=6` at 03:35:19Z.
+  - Rice @ Temple was the only live NCAAF game (`live_games=1`).
+- **Entry hold:** probed on the fleet at 03:29:24Z, inside the window: `ExitHold().check("ncaaf", "Temple", "Rice")` with refresh-worker's env -> `{'verdict': 'fail', 'reason': 'key_player_out', 'players': ['RICE:Gael Ochoa:replaced'], 'snapshot_at': '2026-11-19T21:27:48-06:00'}`. The in-play paper loop covers NCAAF. No `EXIT_HOLD` line was logged, so no entry signal fired on this game in the window.
+- **Portfolio plan:**
+  - Two plans were built INSIDE the window: 03:28:47Z (`below_min_ev_pct_after_fair_noise 3, below_min_stake 11, beyond_max_positions 20, in_play_market_fair 30`) and 03:33:32Z.
+  - Neither carries `key_player_out`. Consistent with the board having already withdrawn the game's live projection upstream: the plan's `_refuses_key_player_out` is a backstop for a row that still carries one, and no such row reached it.
+  - Not proven per game, because the plan's refusal counts are not keyed by game.
+- **#814 NCAAF:** detection, producer refusal, board withdrawal, hold verdict and lift-on-return are all measured on the fleet. The plan backstop was not exercised, because upstream removed the rows first.
