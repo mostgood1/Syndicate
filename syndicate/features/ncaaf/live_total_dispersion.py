@@ -308,6 +308,19 @@ def apply(totals: list[int], *, score_so_far: int, period: Any, clock_seconds: A
 MAX_KICKOFF_SIMS_PER_TICK = 8
 
 
+def _live_profile_key() -> tuple:
+    """What the live re-sim's default profile depends on besides the ratings: #852's leader damping
+    (`ncaaf/live_blowout_damping.py`), which `resim_live_game` applies when its switch is on. E0 is that same function
+    at kickoff, so it is damped exactly when the snapshot's draws are; the cache key carries the setting so a cached E0
+    can never come from a different engine."""
+    try:
+        from syndicate.features.ncaaf.live_blowout_damping import enabled as damping_on
+        from syndicate.features.ncaaf.live_blowout_damping import settings as damping_settings
+    except Exception:  # noqa: BLE001 -- no damping module: nothing beyond the ratings
+        return ()
+    return ("blowout_damping", tuple(sorted(damping_settings().items()))) if damping_on() else ()
+
+
 def _draws(dist: Mapping[Any, Any]) -> list[int]:
     out: list[int] = []
     for key, count in dist.items():
@@ -358,7 +371,7 @@ def calibrate_snapshot_totals(snapshot: dict[str, Any], *, ratings: Mapping[str,
                 refusal = "no_pregame_ratings"
             else:
                 (ho, hd), (ao, ad) = pair
-                cache_key = (str(date_str)[:10], home, away, sims, shrink, ho, hd, ao, ad)
+                cache_key = (str(date_str)[:10], home, away, sims, shrink, ho, hd, ao, ad, _live_profile_key())
 
                 def _kickoff(ho=ho, hd=hd, ao=ao, ad=ad, shrink=shrink, home=home, away=away) -> Optional[float]:
                     ran.append(1)

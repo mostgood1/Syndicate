@@ -174,6 +174,29 @@ def test_the_kickoff_total_is_the_resim_itself_at_kickoff_and_is_computed_once()
     assert summary["kickoff_sims"] == 0 and summary["anchored"] == 2
 
 
+def test_with_852s_damping_on_the_kickoff_total_is_the_DAMPED_kickoff_resim(monkeypatch):
+    """#852 (`live_blowout_damping`) changes `resim_live_game`'s default profile. The snapshot's draws and E0 must come
+    from the same engine: both damped when its switch is on, and a cached undamped E0 must not be reused."""
+    from syndicate.features.ncaaf import live_blowout_damping as lbd
+
+    kickoff = lr.NcaafLiveGameState(away_team="Boise State", home_team="Oregon", period=1, clock_seconds=900,
+                                    home_score=0, away_score=0)
+
+    def oregon_e0():
+        snap = _snapshot()
+        ltd.calibrate_snapshot_totals(snap, ratings=RATINGS, date_str="2026-11-14", env={ltd.SWITCH_ENV: "on"})
+        (oregon,) = [g for g in snap["games"] if g["home_name"] == "Oregon"]
+        return oregon["gameLens"][0]["projection"]["totalCalibration"]["kickoffTotal"]
+
+    plain = oregon_e0()
+    monkeypatch.setenv(lbd.SWITCH_ENV, "on")
+    damped = oregon_e0()  # same process, same cache: the key must tell the two engines apart
+    kick = lr.resim_live_game(kickoff, home_offense=1.2, home_defense=0.6, away_offense=0.1, away_defense=0.1, sims=40)
+    assert "blowout_damping" in kick
+    assert damped == pytest.approx(kick["total_mean"], abs=1e-3)
+    assert damped != pytest.approx(plain, abs=1e-3)
+
+
 def test_kickoff_sims_are_capped_per_tick_and_the_rest_are_widened_by_name():
     snap = _snapshot()
     summary = ltd.calibrate_snapshot_totals(snap, ratings=RATINGS, date_str="2026-11-14", env={ltd.SWITCH_ENV: "on"},
