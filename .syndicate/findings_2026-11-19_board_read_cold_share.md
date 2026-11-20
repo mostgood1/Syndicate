@@ -232,6 +232,35 @@ board crosses it within ~3.5 min of age (p50 211 s), so recycles run 14-29 an ho
 - The memory guard's code is lane `web-silent-worker-kills`' file, although an env key does not edit it.
 - It is the user's decision.
 
+## READING OWNERSHIP + P3 RESTATED AGAIN (2026-11-20 ~10:00 AM CST, before any load)
+
+- **The user, in session eb973f38**, answered "Who should take #853's first-evening reading on 11-24?" with **"Rail
+  monitor takes it"**. Lane `layer2-rail-monitor` owns the reading, as it owns #851's.
+- **Reader:** `scripts/rail_monitor/p853_readout.py`; a copy is in `/mnt/c/tmp/w1124_853/`. It runs
+  `coldread_attrib.py` on both windows and prints the load check, the CONFOUNDED test and P1-P6 graded as registered.
+- **Command, after 11 PM CST on the first evening F is live:**
+
+      cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/w1124_853/p853_readout.py \
+          2026-11-23T23:00:00 2026-11-24T05:00:00 2026-11-24T23:00:00 2026-11-25T05:00:00
+
+  - That is for a load at the 11-24 2:15 AM CST batch: baseline 11-23 5-11 PM CST, after 11-24 5-11 PM CST.
+  - If F loads at another down/up, shift both windows to the evening before and the evening after that load.
+- **Dry run (pre-load 11-18 as baseline, pre-load 11-19 as "after"):** every row reads `VOID (would read ...)`
+  because no shared-copy line exists. The baseline fresh-worker penalty reads 5,307 ms.
+
+**P3 restated a second time, and why.** The dry run graded the 11-20-morning P3 (whole-evening p50 and p90 <= 0.85x
+the baseline) PREDICTED between two evenings WITHOUT the fix (x0.72 / x0.67). Whole-evening latency moves that much
+with board size and host load, so no threshold on it can separate the fix from the evening.
+
+P3 is now the **fresh-worker penalty inside the AFTER evening**: the query total p50 of queries that ADOPTED a shared
+copy, minus the total p50 of warm queries that touched no shared-copy marker, both from the same evening.
+- Predicted <= 1,500 ms; falsified > 2,500 ms.
+- Without the fix the same-evening penalty (new-worker cold minus warm) was 5.3 s on 11-18, 3.8 s on 11-17 and
+  3.0 s on 11-19. All three sit above the falsification line, so the test can fail.
+- Whole-evening p50 / p90 stays in the readout as EXPLORATORY, not graded.
+- P1, P2 and P4-P6 are unchanged.
+- The batch prompt's abbreviated P1-P6 list is superseded by this file and the reader.
+
 ## Leads (not followed)
 
 - A daytime TTL miss (32% of 11-19 morning's cold reads) could be served stale-while-revalidate: serve the
