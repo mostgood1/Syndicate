@@ -697,3 +697,55 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **Live odds:** overlay gap max 153 s (soccer); 71 web merges, 9 list soccer stale; 12 sweeps, 5 refused; priced age
   p50 169 s, p90 383 s.
 - **Load:** query 2.72 s, chips 1.89 s, shortlist 0.89 s.
+
+## Reading 22 — 10:03 PM CST (04:03Z), and the #850 evening grade
+
+**The reading:**
+- **Live:** 17 games; 14 with rail rows (165 rows).
+- **Flags: 6 shown, 0 false, 0 missed, 0 dark.** P1 0; #824 0; P6 0; **P8 0 of 78.** Team cards 94 chips, 0 defects.
+- **`live_games_no_model` 4 of 14:**
+  - Wisconsin @ Seton Hall: REVERSED (I-29), 1 row left;
+  - Utah Tech @ Washington: direct, a re-sim refusal;
+  - TNF;
+  - Dallas @ Vegas (I-30).
+  - Houston @ Kansas (10 PM, neutral) has no rail rows yet.
+- **Load:** query 4.08 s, chips 1.28 s, shortlist 0.63 s.
+
+### #850 (BC-053) evening reading: the owner's §5 pre-registration, graded
+
+Window 5-10 PM CST (23:00-04:00Z), the first evening after the 17:00:09Z load. Counts from `C:\tmp\railmon\p7count.py`
+over the refresh-worker logs.
+
+| # | metric | 11-18 baseline | predicted | falsified if | 11-19 | verdict |
+|---|---|---|---|---|---|---|
+| P1 | `MEMORY_GUARD_ABORT` per UTC hour | 7/5/5/3/6 = 26 | <= 1 every hour, <= 3 total | > 2 in an hour, or > 6 total | **0/0/0/2/2 = 4** (02:42, 02:43, 03:05, 03:07Z) | **NEITHER** |
+| P2 | child exits and their rc | 4, all rc -6 | <= 2, all rc 75 | any rc -6 or `Fatal Python error` | **0 exits, 0 fatal** | **PREDICTED** |
+| P3 | longest `BOARD_BUILD_TIMING` gap | 1,580 s; 5 of 28 > 900 s | <= 900 s; <= 1 gap > 900 s | > 1,200 s | **807 s** (00:34Z, the 7 PM peak at host load ~8); 0 > 900 s; 54 builds | **PREDICTED** |
+
+- **Load checks: MET** at reading 2 (11:23 AM):
+  - `BOARD_PROCESS_CHILD_SWITCHES raw_lifeline=1 recycle_after_build=1 ceiling_credit=7168+768`;
+  - `BOARD_PROCESS_CEILING_CREDIT 7168 -> 7936`;
+  - `container_memory_max_mb 7936.0`.
+- **Confounds:** no refresh-worker restart, drain or deploy in the window. Parent pid 1011283 has been up since 17:00:29Z; fleet head `38c3a6905` all day.
+- **Comparability: CONFOUNDED by the slate, by §5's own rule.**
+  - Live NCAAB+NBA+NHL+NFL at 7 PM: **21** at 7:06 PM (28 at 7:31 PM) against 46 at 7:06 PM on 11-18. That is 46% (61%), under §5's 70% bar.
+  - The lighter slate makes P1-P3 easier, so even the PREDICTED verdicts are weaker than they read.
+  - Against that, the refusals came anyway, late (8:42-9:07 PM), as the slate thinned.
+- **Safety:**
+  - guard `current_mb` max 6,295 MB (<= 6,936);
+  - 0 OOM lines in `dmesg` / kern.log;
+  - WSL `MemAvailable` 6.47 GB at 10:03 PM. The evening minimum was not sampled.
+- **Exploratory:**
+  - parent RSS 1.55-1.60 GB at 9 PM (11-18: 2,167 MB); 785 MB at 11:23 AM, 1.04 GB at 6:15 PM, 1.52 GB at 10:03 PM;
+  - child 4.35-4.57 GB;
+  - **post-build recycles: 0 of 4 post-build checks in the window recycled; all 4 were `held=transient_jobs`**
+    (headroom 1,641-1,793 MB);
+  - streak recycles: 0.
+  - Reading of the shape: **the refusals came from the pair's growth while the post-build recycle kept being held by transient jobs.** No refusal reached a streak of 3, so the guard never recycled the child either. That points at `held=transient_jobs` and at the parent growth (§5's "not built: the parent cannot recycle under the split") as the next lever. It is the owner's call.
+
+### The monitor's P2 (board cadence, 5:30-10:30 PM): ON TRACK, final at the next reading
+
+- 5:30-10:03 PM: **31 publications, gap median 313 s (<= 600), max 585 s** (`d4metrics.py`; <= 1,800). The
+  `BOARD_BUILD_TIMING` gap measure is stricter, with longest 807 s.
+- Against 11-18's same window: median 572 s, 11 of 24 gaps over 10 min, max 26.3 min.
+- Final after 10:30 PM.
