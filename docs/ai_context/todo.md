@@ -181,6 +181,7 @@
 - **Owed:**
   - re-rank when the 11-24 window's readings, M2 (11-24) and #847's H-F (11-26) land;
   - the suggested-to-placed order match rerun, in the same 11-26 pass;
+  - 11-20 (findings section 11): the re-rank is scheduled as task `product-optimization-rerank-1126` (Thu 11-26 9:30 AM CST, read-only). L6 is resolved by portfolio-monitor and M1 by the #sg fix. L1 hold-value exits has NO live owner (the kalshi-exit-path session is gone): building it default-off plus a shadow is the user's call.
   - CONSOLIDATION 11-19 (user "Yes, consolidate" ~9:20 AM CST, relayed by the top session local_1f10ce63): two follow-ups now report to this program. (1) #847 H-F forward grade, Thu 11-26: the #847 session is putting it on a one-off scheduled task that reports to this lane. (2) The suggested-to-placed order match rerun (~11-26; on 11-18 only 16.0% of placed orders, 1,607 of 10,036, sat on a graded suggested line), with context in lane `layer2-suggested-grader`, folds into this program's 11-26 re-rank pass. #844's P1-P4 after the 11-24 batch moved to the rail monitor's daily routine.
   - the 12-08 window candidates go to the user before 12-08: #847 (c)/(d), hold-value exits after a shadow, #816 spread-only, #836.
 

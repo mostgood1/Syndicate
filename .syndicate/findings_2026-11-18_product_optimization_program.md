@@ -341,3 +341,67 @@ The user started all three cards ~7:10 PM CST. The rail monitor started duplicat
   - M2 becomes "the soccer prop cell's market EV is mis-stated", a display and optimizer-input defect, not grading.
   - M3 is fixed default-off.
   - M4 is closed as not worth building.
+
+## 11. Status and next steps (11-20 ~9:45 AM CST)
+
+### 11.1 What moved since 11-18 (read on main and the fleet)
+
+- **Live book:** 30 d −7.38% [−12.8, −2.0] on 719 events. 11-19 alone: +4.21% [−10.8, +19.3] (51 bets / 23 games, won
+  60.8% vs a 64.3% breakeven). Fees 3.89% of stake. Gate 13 of 800 on BC-053 (the portfolio monitor, readings 99-102).
+  No change to §3.1.
+- **Scorecard funnel:** unchanged across 11-18 / 11-19 / 11-20. The windows overlap, so that is expected.
+  - NBA staked +4.1 / +3.7 / +4.2%; NCAAB +6.8 / +5.0 / +6.2.
+  - Soccer board −43.3 / −43.4 / −44.1. #848 explains the soccer board number as one-way ladders priced against a
+    mis-stated market EV.
+- **Rail flags 11-19:** 167 flags / 37 games, hit 0.503 vs fair 0.506 (the rail monitor's daily summary). Flags at the
+  fair again, consistent with §2.
+- **Suggested set:** `#sg` coverage is 100% from 11-18 (`ee0ceee34`), so M1 is RESOLVED.
+
+### 11.2 Hand-offs: who answered
+
+| lever | owner | state 11-20 |
+|---|---|---|
+| L6 exit fees | `portfolio-monitor` | **RESOLVED** (its STATUS 11-19 ~12:05 PM CST) |
+| P2 #844 | `ncaab-total-overprojection` | change D of the 11-24 batch; kit present; P1-P4 move to the rail monitor |
+| P1 #847 | `cell-calibration-847` | built default-off; H-F scheduled 11-26 7:00 AM CST |
+| M2/M3 #848 | `scorecard-grading-defects` | CLOSED; fixes default-off; loading is a BETTING change (overlay); 12-08 candidate |
+| M4 #849 | `board-build-priority` | CLOSED, not built |
+| L1 hold-value exits | `kalshi-exit-path` | **NO ANSWER: the owner session is gone.** Nobody is building it |
+| L2 / T1 evidence | `decision-policy-paper` | note unread; its weekly read is 11-23 |
+| P4 / P11 / P12 NBA engine | `basketball-scenario-calibration` | note unread |
+| P7 / P10 (#836, #835) | `syndicate-decision-engine` | note unread; #836 still has no named owner |
+| P8 / P9 cheat sheets | `cheat-sheet-section-optimization` | note unread |
+| L3 overs | `prop-fair-side-lean` | note unread; its holdout is 11-27 |
+
+### 11.3 The 11-24 window
+
+- The batch task `nfl-level-refit-load-1120` now holds seven changes:
+  - A: NFL t0.925
+  - B: #834
+  - C: #842
+  - **D: #844**
+  - E: #851
+  - F: #853
+  - G: #854
+- D's kit and prompt are intact (read 11-20).
+- The gate count restarts at the window load whatever is in it.
+
+### 11.4 Calendar of the readings the re-rank waits for
+
+- 11-23: decision-policy-paper weekly read (P1 `ev_lb`).
+- 11-24: the window load (2:15 AM CST); M2's read (~10:30 AM); #816's grade (10 AM); the maker pilot re-judge.
+- 11-26: #847's H-F (7:00 AM CST); then **this program's re-rank, scheduled task
+  `product-optimization-rerank-1126` (9:30 AM CST, read-only)**. It also reruns the suggested-to-placed match handed
+  over on 11-19 and drafts the 12-08 candidates.
+- 11-27: prop-fair-side-lean's holdout.
+
+### 11.5 Next steps
+
+1. **Gap, the user's call:** L1 hold-value exits has no live owner. To be a 12-08 candidate it needs a default-off
+   build plus a shadow log running by about 11-24, so two weeks of shadow exits can be graded.
+   - A shadow is not a betting change and can load any time with the user's OK.
+   - Expected value is small: about $0.5/day, ceiling $1.58/day, not clearing BH. It is still the top-ranked live
+     lever, and the shadow is how to find out cheaply.
+2. **No action:** the unread hand-off notes sit at the top of each owner's lane block, and owners see them when they
+   next work. #836's owner question goes into the 11-26 re-rank.
+3. **12-08 package:** the 11-26 re-rank drafts it, and the user decides each change before 12-08.
