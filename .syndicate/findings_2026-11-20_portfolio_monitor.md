@@ -168,3 +168,48 @@ only, because this repo is public.
   - Orders today: 10 filled.
   - Cap use: 4.8% Kalshi, 4.9% Polymarket.
   - Plan max gap 10.7 min.
+
+## Reading 103 — Fri 11-20 9:27 AM CST (15:27Z), window 88 min
+
+- **Results first.** Unchanged:
+  - 30 d: -7.38% [-12.8, -2.0] on 719 events;
+  - 7 d: -6.20% [-16.8, +4.4] on 181;
+  - gate: 13 of 800 (BC-053);
+  - nothing open.
+  - Orders today: 11, all filled.
+- **ANOMALY: 3 endpoints over budget.**
+
+  | endpoint | probe | server (web log) | budget |
+  |---|---|---|---|
+  | `live_today` | 5.39 s | 5,294 ms | 3.0 s |
+  | `page` | 3.20 s | 3,104 ms | 3.0 s |
+  | `settings` | 3.45 s | 285 ms | 2.0 s |
+
+  - **Hypothesis, written first:** another web memory recycle, as at 00:33Z and 05:27Z.
+    - **Falsified:** the web log has no recycle, no worker boot and no overlay rebuild in 15:26-15:28Z.
+  - **What it was: host CPU load.** The load average rose from 3.4 (15 min) to 5.7-6.1 (1 min). The top CPU users at
+    the read:
+    - another lane's research replay, `/mnt/c/tmp/odds_lane_838/livewin.py`, at 86%. It finished before its nice
+      value could be read; it belongs to `layer2-rail-monitor`'s #838 reading R-E.
+    - `fetch_ncaaf_oddsapi_game_lines.py` at 80%;
+    - `pipeline.board_build_process` at 66%;
+    - `refresh_odds_sources.py` at 47%.
+  - **Re-reads:** six, 10 s apart, gave 0.45-0.53 s, plus one at 2.88 s (load 5.6). So it is intermittent and follows
+    host load.
+  - **`settings` was the probe, not the server:**
+    - 3.45 s on the client against 285 ms on the server, so the probe was starved.
+    - The cause was this session's Idle fix (497a34c7d), which made the probe really run at Idle.
+    - **Fixed (8506b7202):** the probe drops to Idle only after its timed fetches. Every earlier reading was timed at
+      Normal, so the series stays comparable.
+  - **Handoff:** `live_today` crossed the 5 s line set at Reading 86, so the reads go to the web owners in this
+    ledger. This is not a fix for this lane.
+    - Tally since 6 PM 11-19: **6 of 23 `live_today` reads above 2 s, 2 above 3 s.**
+    - Causes: 2 on web memory recycles, 1 on host CPU load (this one), 3 not logged.
+    - Owners: `web-silent-worker-kills` (memory growth) and `board-read-cold-share` (#853).
+    - Host contention from research jobs is the runbook's "Research/test jobs at Idle / nice 19" rule.
+  - The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan: 31 suggested, 14 positions. The plan was 11.5 min old; max gap 13.1 min.
+  - Live ticks: 1 placed on Polymarket.
+  - Cap use: 4.8% Kalshi, 5.7% Polymarket.
+  - A browser loaded `/portfolio` and logged in during the window (2 browser requests).

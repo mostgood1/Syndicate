@@ -122,3 +122,20 @@ The help page's terms:
   a7967dd833c3579b, the same as the commit), Idle priority, `collect --hours 124`.
   - The first select found **8,148 active liquidity programs with at least 6 h left** (7,260 on 11-19).
   - It reads every order book before choosing the book, about 35 min at its request spacing.
+- 2026-11-20 8:35 AM CST: select done: 7,323 payable markets.
+  - **Book: 43 markets, $2,499 of capital, static ceiling $277/day** (`universe_20261120T141218Z.json`).
+  - Collection began 8:37 AM.
+- **2026-11-20 8:37-9:24 AM CST: the first run (pid 11068) died silently after cycle 3.**
+  - There was no reboot (last boot 11-17), and stderr and the log were empty.
+  - It was most likely killed with this session's app process tree when the session restarted.
+  - **14:37-15:26Z, 49 min, is UNOBSERVED.** Under the pre-registered rule, a gap over 120 s earns 0, which is
+    conservative.
+- **2026-11-20 9:26 AM CST: moved to the Windows scheduled task `SyndicateS8Collector`.**
+  - It runs as the user with an Interactive logon, using `pyw.exe`, so no window. It restarts every 10 min with
+    IgnoreNew, and the trigger ends 2026-11-25 13:30 local.
+  - Collector commit c8844c70a adds:
+    - `--until 2026-11-25T18:12:00Z`, so restarts cannot extend the study;
+    - a restart reuses the current slot's book.
+  - It resumed at 15:26:47Z with the same book, pid 19300 at **Idle** (verified). Cycle 4 at 15:32Z: 43 of 43 books,
+    0 errors.
+  - **Delete the task after 11-25.**
