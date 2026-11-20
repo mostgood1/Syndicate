@@ -416,6 +416,14 @@ class CalibrationProfile:
     # Q4 and H1 > H2.
     kneel_out_q4_only: bool = False
 
+    # COLLEGE OVERTIME. todo #855 (lane `ncaaf-college-overtime`, findings_2026-11-20_ncaaf_college_overtime.md).
+    # OFF: a tied regulation gives ONE drive from the team's OWN 25, sudden death, two rounds at most (3.6 points per
+    # NCAAF OT game against a real 12.40). ON: the college rules -- periods 1-2 one possession each from the
+    # OPPONENT's 25 (a touchdown in period 2 tries for two), alternating two-point attempts from period 3
+    # (`game_simulator._college_overtime`). Default OFF, byte-identical: it adds OT points, so pregame use needs a
+    # level re-fit (`model_engine_standard.md` 4.4).
+    college_overtime: bool = False
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -458,6 +466,7 @@ class CalibrationProfile:
             "end_of_half_clock_by_need": self.end_of_half_clock_by_need,
             "q4_kick_waits": self.q4_kick_waits,
             "kneel_out_q4_only": self.kneel_out_q4_only,
+            "college_overtime": self.college_overtime,
         }
 
 

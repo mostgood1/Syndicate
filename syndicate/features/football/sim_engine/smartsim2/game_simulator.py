@@ -77,6 +77,67 @@ def _second_half_kickoff(state, *, opening_receiver: str | None, rng: Random):
     return replace(state, possession_owner=receiver, field_position=25, down=1, distance=10)
 
 
+# COLLEGE OVERTIME (todo #855), reached only with `CalibrationProfile.college_overtime` ON. Measured on CFBD 2023-24
+# (`.syndicate/findings_2026-11-20_ncaaf_college_overtime.md`): 801 two-point tries, 0.451 good.
+COLLEGE_TWO_POINT_RATE = 0.451
+COLLEGE_OVERTIME_PERIOD_CAP = 12
+
+
+def _with_points(state, owner: str, points: int):
+    if owner == "home":
+        return replace(state, score_home=state.score_home + points)
+    return replace(state, score_away=state.score_away + points)
+
+
+def _college_overtime(state, simulation_input, *, rng: Random, profile: CalibrationProfile,
+                      drive_log: list[dict[str, Any]], possession_log: list[dict[str, Any]]):
+    """College overtime after a tied regulation (todo #855).
+
+    Periods 1 and 2: each team gets one possession from the OPPONENT's 25 (`field_position` 75, 1st and 10, a full
+    `quarter_seconds` so no clock ends the drive). The first possessor is a coin flip from the sim's own rng, and the
+    order alternates each period. From period 2 a touchdown scores 6 plus a two-point try (`COLLEGE_TWO_POINT_RATE`)
+    in place of the engine's 7. From period 3: one two-point attempt each, alternating. It ends when the scores differ
+    after both teams' turns, or at `COLLEGE_OVERTIME_PERIOD_CAP` periods (then it stays tied).
+
+    The drives are the engine's own (`simulate_drive`), so its fourth-down and kick decisions are unchanged: a second
+    team trailing by 4+ may still kick. That is a measured approximation (findings, H-DRIVE).
+    """
+    first = "home" if rng.random() < 0.5 else "away"
+    period = 0
+    while state.score_home == state.score_away and period < COLLEGE_OVERTIME_PERIOD_CAP:
+        period += 1
+        second = "away" if first == "home" else "home"
+        order = (first, second) if period % 2 == 1 else (second, first)
+        quarter = int(simulation_input.quarters) + period
+        if period <= 2:
+            for owner in order:
+                start = replace(state, possession_owner=owner, field_position=75, down=1, distance=10,
+                                quarter=quarter, clock_remaining=int(simulation_input.quarter_seconds))
+                drive_result = simulate_drive(start, simulation_input, rng=rng, profile=profile)
+                drive = drive_result.to_dict()
+                steps = [step.to_dict() for step in drive_result.steps]
+                end = drive_result.end_state
+                if period >= 2:
+                    gained = (end.score_home - start.score_home) if owner == "home" else (end.score_away - start.score_away)
+                    if gained == 7:  # a touchdown: 6 + the two-point try, not the kick
+                        delta = (2 if rng.random() < COLLEGE_TWO_POINT_RATE else 0) - 1
+                        end = _with_points(end, owner, delta)
+                        # the logs carry the try too, so a reader summing them gets the score the game has
+                        key = "score_home" if owner == "home" else "score_away"
+                        for entry in [drive] + steps[-1:]:
+                            entry["end_state"][key] += delta
+                            entry["points_scored"] = int(entry.get("points_scored") or 0) + delta
+                drive_log.append(drive)
+                possession_log.extend(steps)
+                state = end
+        else:
+            for owner in order:
+                if rng.random() < COLLEGE_TWO_POINT_RATE:
+                    state = _with_points(state, owner, 2)
+            state = replace(state, quarter=quarter)
+    return state
+
+
 def _initial_timeouts(value: int | None) -> int:
     """A resume's timeouts left (todo #808); None -> 3, a fresh half."""
     return 3 if value is None else max(0, min(3, int(value)))
@@ -185,7 +246,11 @@ def simulate_game(
     # -- a silent 1.0/0.0/0.5 on a game that is still being played. The producer
     # refuses overtime for its own reasons (`ncaaf/live_resim.py`), but the
     # engine must not answer confidently when it has simulated nothing.
-    if state.score_home == state.score_away:
+    if state.score_home == state.score_away and profile.college_overtime:
+        # todo #855: college rules, behind `CalibrationProfile.college_overtime` (default OFF: the block below runs).
+        state = _college_overtime(state, simulation_input, rng=rng, profile=profile,
+                                  drive_log=drive_log, possession_log=possession_log)
+    elif state.score_home == state.score_away:
         ot_owner = "away" if state.possession_owner == "home" else "home"
         state = replace(state, possession_owner=ot_owner, field_position=25, down=1, distance=10)
         overtime_cap = 2
