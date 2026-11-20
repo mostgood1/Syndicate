@@ -463,3 +463,37 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
   - 8 sweeps, 3 refused (`lane_busy`);
   - priced age p50 171 s, p90 382 s, max 771 s (45 of 203 over 300 s).
 - **Load:** query **11.56 s**, chips 1.41 s, shortlist 0.72 s. **I-28:** 26 queries since 5:50 PM, 17 cold (65%), all p50 5.29 s.
+
+## Reading 14 — 6:40 PM CST (00:40Z), the 7 PM peak
+
+- **Live:** 45 games: 9 NCAAB, 1 NCAAF, 7 NHL, 28 WNCAAB. 25 have rail rows (249 rows).
+- **Flags: 7 shown, 0 false, 0 missed, 3 dark.** Dark means a qualifying flag whose price is now over 300 s old.
+  - **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 123.** Team cards 94 chips, 0 defects.
+- **Host load 7.91** (5-min 8.11), against 1.6-3.6 all afternoon. At the read, the busiest processes were:
+  - an MLS soccer artifact build (98% CPU);
+  - live odds refreshes for WNCAAB (96%), NCAAF (58%) and soccer;
+  - an NCAAF game-lines fetch (94%);
+  - the board child (68%); the live-odds worker (47%); a web worker (55%);
+  - two live re-sim workers (22% each, nice 5).
+- **Board under that load (6:15-6:40 PM):**
+  - **3 builds**, wall median 262 s, max **548 s** (1 over 300 s);
+  - publication gap median 502 s, **max 662 s**; today's board 633 s old at the read;
+  - 1 deferred slow tick; pregame run max 741 s.
+- **P7 (#850): 0 refusals, 0 exits.** The memory guard is not what slowed the board; CPU contention is.
+- **Load:** shortlist **10.19 s** (normally ~1 s); query **15.48 s**; chips 0.59 s.
+  - **I-28:** 19 queries since 6:15 PM, 9 cold, all p50 10.5 s; warm p50 10.4 s, so CPU contention slows even warm queries.
+- **Live odds:**
+  - overlay gap max 142 s (WNCAAB); 7 sweeps, 4 refused (`lane_busy`, 36%);
+  - NHL child odds age max 371 s; NHL rows' `book_age_seconds` up to 836 s;
+  - priced age p50 169 s, p90 580 s (101 of 249 rows over 300 s).
+- **`live_games_no_model` 5 of 25:**
+  - **I-29 / other college:**
+    - **Charleston @ Drake (NCAAB):** `not_in_resim`, 4 rows. Probably tipped after the 6:37 PM re-sim tick; re-check.
+    - Stetson @ UCF (WNCAAB): no-anchor refusal, as before.
+    - Auburn / ND went final. All 9 other NCAAB games are direct with a model, including Murray St / NC State (7 of 19 rows; half rows unpriced).
+  - **NHL: 3 of 7 live games with no model** (STL @ PIT 0/5, BUF @ WSH 0/3, EDM @ TBL 0/7, just dropped).
+    - `LIVE_GAMELINE_BUILD sport=nhl index_why`: 12 games in the snapshot, **6 indexed with a `live_resim` lane, 6 `pregame_only`**; full_games 5.
+    - NHL live projections come from `nhl_live_generation` runs (the last at 00:20:11Z). A game that dropped after that run has only a pregame lane until the next one.
+    - STL @ PIT dropped ~6:05 PM and still has no model 35 min later. Watch: does the next generation cover it?
+- **R-B (#844 sample 10):** NCAAB 138 rows (53 venue), `p1_sportsbook_newest` 5, **h2h 9: row-fresh 0 vs cell-fresh 9, mismatch 26**.
+- **R-E:** 1 NHL step, 0 timed out.
