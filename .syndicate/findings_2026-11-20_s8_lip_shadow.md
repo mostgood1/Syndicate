@@ -146,3 +146,6 @@ The help page's terms:
     which implies the value can be withdrawn.
   - The exact rule (withdraw directly, or only after trading?) is not public in what was found. **The user's account
     Rewards page or Kalshi support settles it.**
+- 2026-11-20 ~10:20 AM CST: **the scorer was pushed (c7dbc576e) BEFORE any collected data was read**
+  (`s8_lip_shadow.py score [--final]`, 16 tests). It implements the table above. M2 and the 1 h / 24 h markouts are
+  named in its output as not computed. Look 1 and look 2 are run by the daily task `portfolio-learning-review`.

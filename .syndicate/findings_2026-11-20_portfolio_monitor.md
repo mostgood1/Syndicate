@@ -250,3 +250,29 @@ only, because this repo is public.
   load (now the fleet's own workers, not only research jobs), 3 not logged.
 - Added to the web owners' evidence. `web-silent-worker-kills` has the brief, and keeps the session open by the user's
   "Keep it open".
+
+## Hourly loop stopped; a daily learning review replaces it (user, 11-20 ~10:15 AM CST: "stop the loop but you should be checking the dashboard to learn")
+
+- **Loop:** the self-paced reading loop (`/loop` + ScheduleWakeup) is stopped. Numeric monitoring continues for free
+  through the `SyndicatePortfolioWatch` task.
+- **Daily review:** the scheduled task **`portfolio-learning-review`** runs at about 1:57 AM local (Bypass mode,
+  inherited from this session). Each run:
+  - reads the local dashboard's data;
+  - writes the previous day's DAILY SUMMARY, performance first;
+  - writes a "What the data teaches" block with exactly one pre-registrable optimization lead;
+  - runs the dated study reads once each when due: S8 look 1 (after 11-23 9 AM) and look 2 (after 11-25 12:12 PM,
+    then it disables `SyndicateS8Collector`), the S6 forward test at 150 events, the 11-24 check of the
+    fill-quote-logging fields, and the S5 forward test at 150 events.
+  - It never changes anything live and never edits lanes.md.
+- **First learning pass, from the dashboard (11-20, 30 d):**
+  - Nothing wins beyond noise. Seven slices lose beyond noise:
+    - WNBA -35.6% (21 bets);
+    - price 0.30-0.45 -12.7% [-23.9, -1.4] (315 / 206);
+    - totals -12.5% [-24.0, -1.1] (400 / 309);
+    - EV band 2-5 -10.4% [-18.0, -2.9] (1,016 / 536; predicted +4.1%);
+    - the largest-stake quartile -9.2% [-16.7, -1.7] (64% of dollars);
+    - the `model_edge` path -7.5%;
+    - Kalshi -6.2%.
+  - The dollars sit where the book does worst: the middle stake quartiles are -3% to -4%.
+  - Under the per-line rule, the lead is what overstates edge in sizing and in the totals fair, not a totals
+    exclusion.
