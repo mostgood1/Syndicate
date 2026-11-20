@@ -76,7 +76,7 @@ every-2nd task list, 60 sims a state, paired seeds.
 
 ## RESULTS (written after the runs; nothing above was changed)
 
-### Verdict: H-RULES TRUE. M1's gate passes, and M2's predictions all hold. BUILT, default off, not on main.
+### Verdict: H-RULES TRUE. M1's gate passes, and M2's predictions all hold. ON MAIN `42af6a923` (user "Push it"), default off, not used by any profile.
 
 **The code** (worktree `frosty-edison-10dcd8`, under the loan; the commit is below):
 - `calibration_profile.py`, +9 lines: the `college_overtime` field and its `to_dict` entry.
@@ -135,7 +135,7 @@ Common-line log loss against the real final, ON vs production:
   -2.1.
 
 ### What it would take to use it (the user's calls)
-1. **The push to main.** Default off and byte-identical, so the push changes nothing.
+1. **The push to main: DONE, `42af6a923`.** Default off and byte-identical, so it changes nothing on the fleet.
 2. **Live use**, the natural use, where it closes the OT half of #852's one-score gap.
    - An NCAAF live switch (as #852's damping: profile resolution in `resim_live_game`, which needs
      `live-player-exit-gate`'s loan widened, or a resolver added to `ncaaf/live_blowout_damping.py`).

@@ -36,10 +36,10 @@
 - **Owed, the user's decision:** after the 12-07 verdict, `on` in the 12-08 window or not (predictions P1-P6, findings §5).
 - **Owed, a session:** the 12-07 grade (`nice -n 19 ~/.venvs/syndicate/bin/python scripts/exit_hold_value_shadow_grade.py` on the fleet, registered defaults); schedule it once the shadow has loaded.
 
-### `#855` — **SMARTSIM2'S OVERTIME IS NOT COLLEGE OVERTIME: after a tied regulation the engine gives ONE drive from the team's OWN 25, sudden death, two rounds at most; it scores 3.6 points per OT game against a real 12.4 (CFBD 2023-24, 65 OT games of 1,501). It pulls late one-score live totals low (#852). BUILT, DEFAULT OFF, NOT ON MAIN: `CalibrationProfile.college_overtime`; the real OT games go 3.73 -> 13.87 points per OT game (real 12.40 [10.62, 14.23]); 2024 one-score late log loss at Q4 3:00 -0.0718 (se 0.0449); the push and live use are the user's calls** `[2026-11-20, lane ncaaf-college-overtime, session 617b553b; user "Lend it, start OT" + "Extend the loan"; from #852's follow-ups; findings `.syndicate/findings_2026-11-20_ncaaf_college_overtime.md`]`
+### `#855` — **SMARTSIM2'S OVERTIME IS NOT COLLEGE OVERTIME: after a tied regulation the engine gives ONE drive from the team's OWN 25, sudden death, two rounds at most; it scores 3.6 points per OT game against a real 12.4 (CFBD 2023-24, 65 OT games of 1,501). It pulls late one-score live totals low (#852). ON MAIN `42af6a923`, DEFAULT OFF (user "Push it"): `CalibrationProfile.college_overtime`; the real OT games go 3.73 -> 13.87 points per OT game (real 12.40 [10.62, 14.23]); 2024 one-score late log loss at Q4 3:00 -0.0718 (se 0.0449); live use is the user's call** `[2026-11-20, lane ncaaf-college-overtime, session 617b553b; user "Lend it, start OT" + "Extend the loan"; from #852's follow-ups; findings `.syndicate/findings_2026-11-20_ncaaf_college_overtime.md`]`
 
 - **Rules modelled.** OT1-OT2: each team gets a possession from the opponent's 25. From OT2 a TD tries for two (0.451, measured on 801 tries). From OT3, alternating two-point attempts. Cap 12.
-- **Code:** local commit `339d9806c` on `claude/compassionate-lederberg-b0c116`, pinned `refs/keep/ncaaf-college-overtime`. NOT on main.
+- **Code: ON MAIN `42af6a923`** (pushed 2026-11-20 on the user's "Push it" after 54 tests re-ran green on that exact commit). It is default off and byte-identical: no profile turns it on, so the fleet ff that carries it is betting change: no. The loan is RETURNED to `football-scenario-calibration`, and lane `ncaaf-college-overtime` is CLOSED, GOAL MET.
   - `calibration_profile.py` (+9) and `game_simulator.py` (+67 / -1), under the user-approved loan from `football-scenario-calibration`.
   - `tests/test_smartsim2_college_overtime.py`: 12 passed (reachability first, 3 pinned pre-change digests). Neighbouring suites: 189 passed.
 - **Pre-registered (`9a9fb7b44`).**
@@ -47,7 +47,7 @@
   - **M2, every prediction held:** one-score rest +0.50 at Q4 15:00 to +0.99 at Q4 3:00; 17+ unchanged; one-score log loss at Q4 3:00 -0.0718 (se 0.0449), slope 0.26 -> 0.41.
   - Two M1 point predictions missed high, reported: 13.87 vs 11.0-13.5, and 0.112 vs 0.04-0.10.
 - **Owed (the user's calls):**
-  1. The push. Default off, so it changes nothing.
+  1. DONE: the push (`42af6a923`).
   2. Live use: an NCAAF live switch like #852's. It needs `live-player-exit-gate`'s loan widened, or a resolver added to `ncaaf/live_blowout_damping.py`. A betting change, window only.
   3. Pregame use needs a level re-fit (+~0.4 pts a game). Not proposed.
 - **What is left of #852's one-score gap:** the last two minutes, 2.31 vs 3.58 points. That is #808's end-game clock.
