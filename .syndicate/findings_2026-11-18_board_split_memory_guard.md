@@ -190,3 +190,51 @@ Window: 5-10 PM CST of the first evening after the load (23:00-04:00Z). The base
   - **Option B:** queue for the 11-24 window, where the four keys join that night's batch down/up. The cost is five
     more evenings of 16-26-min gaps (11-19..11-23).
 - **Rollback:** delete the four keys and do a drained down/up. Each key is independent.
+
+## 7. READING 1 -- the first evening after the load, 11-19 5-10 PM CST (23:00-04:00Z), against §5
+
+Taken by the rail monitor (lane `layer2-rail-monitor`, `findings_2026-11-19_layer2_rail_monitor.md` reading 22, main
+`6b9e9e9f0`). The P1-P3 counts and the post-build checks were re-derived here from `refresh-worker.log{,.1}` at
+04:06Z 11-20, read-only (`C:\tmp\bmg\load\read1.sh`); they match.
+
+| # | 11-18 | 11-19 evening | predicted | verdict |
+|---|---|---|---|---|
+| P1 refusals per UTC hour 23/00/01/02/03Z | 7/5/5/3/6 = 26 | 0/0/0/2/2 = **4** | <= 1 every hour, <= 3 total | **NEITHER** (over the prediction, short of > 2 in an hour or > 6 total) |
+| P2 child exits | 4, all rc -6 | **0** exits, 0 `RECYCLE_EXIT`, 0 `Fatal Python error` | <= 2, all rc 75 | **PREDICTED** |
+| P3 longest gap between `BOARD_BUILD_TIMING` lines | 1,580 s; 5 of 28 > 900 s | **807 s**, then 662 and 585 s; 0 of 53 > 900 s (54 builds) | <= 900 s | **PREDICTED** |
+
+- **P1 detail.** The 4 refusals were at 02:42:11, 02:43:19, 03:05:53 and 03:07:01Z, with headroom 1,898 / 1,885 /
+  1,785 / 1,886 MB against the 1,900 floor. Each pair of refusals was 68 s apart, and the next attempt built; no
+  refusal streak reached 3.
+- **Load checks: MET.** `CHILD_SWITCHES raw_lifeline=1 recycle_after_build=1 ceiling_credit=7168+768`; the ceiling
+  reads 7,936.
+- **No confound from the fleet:** no restart, drain or deploy in the window. Parent 1011283 has been up since
+  17:00:29Z, and the fleet ran `38c3a6905` all day.
+- **CONFOUNDED by the slate, under §5's own 70% rule.** Live NCAAB + NBA + NHL + NFL was 21 at 7:06 PM (28 at
+  7:31 PM), against 46 at 7:06 PM on 11-18: 46% (61%). So P1-P3 are recorded, but they cannot pass the prediction.
+- **Safety: MET.** Tree max 6,295 MB <= 6,936; 0 OOM lines; `MemAvailable` 6.47 GB at 10:03 PM (the evening's
+  minimum was not sampled).
+- **Exploratory:**
+  - **Parent RSS:** 785 MB (11:23 AM), 1.04 GB (6:15 PM), 1.55-1.60 GB (9 PM; 11-18: 2,167 MB), 1.52 GB (10:03 PM).
+  - **Parent trims:** 60 in the window, released p50 142 MB, max 258 MB. That is freed heap the parent never
+    returned before the switch. The parent's 9 PM figure is ~0.6 GB under 11-18, but the slate was lighter, so
+    the trim's share of that is not separable.
+  - **Child:** 4.35-4.57 GB. It was never recycled (up ~10.6 h at 03:45Z); on 11-18 the child was recycled from
+    6:29 PM on.
+  - **Post-build recycles: 0.** All 4 `BOARD_PROCESS_POST_BUILD_CHECK` lines were `held=transient_jobs`, with
+    `pair_rss_mb` 5,857-6,009, i.e. 27-180 MB under the 6,036 MB line. The rest of the tree (odds and other
+    jobs, ~260-290 MB) took headroom to 1,641-1,793 MB.
+  - **Streak recycles: 0.**
+  - **Board cadence (rail monitor), 5:30-10:03 PM:** 31 publications, gap median 313 s, max 585 s. On 11-18 the
+    median was 572 s and the max 26.3 min.
+- **What the shape says.**
+  - The design did what it says: no crash exits, no 3-refusal streaks, no gap over 15 min. The 4 refusals each
+    cost one 68-s retry.
+  - **Lead (not built):** the `transient_jobs` hold uses a 0 MB margin. But the "transient" jobs recur through
+    every evening cycle, so the board pair sat a few tens of MB under the line while the tree kept tipping over
+    it. A margin equal to the evening's typical other-process RSS (~300 MB) would let the post-build recycle
+    reset the child before those near-misses. The child's own 12-hour ratchet (4.4-4.6 GB) is the larger half
+    of the pair now.
+  - Either change is a betting change, by the same rule as BC-053.
+- **Owed:** the same §5 thresholds on the next evening that passes the 70% slate rule (>= 33 live NCAAB + NBA +
+  NHL + NFL at 7 PM CST), with no restart in the window. Until then the lane's goal is NOT MET.

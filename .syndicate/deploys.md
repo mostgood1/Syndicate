@@ -62400,3 +62400,24 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Neither carries `key_player_out`. Consistent with the board having already withdrawn the game's live projection upstream: the plan's `_refuses_key_player_out` is a backstop for a row that still carries one, and no such row reached it.
   - Not proven per game, because the plan's refusal counts are not keyed by game.
 - **#814 NCAAF:** detection, producer refusal, board withdrawal, hold verdict and lift-on-return are all measured on the fleet. The plan backstop was not exercised, because upstream removed the rows first.
+
+## 2026-11-20 04:10Z (10:10 PM CST 11-19) -- READING (no deploy): #850 board child memory, first evening after the 2026-11-19 17:00:09Z load -- **P1 NEITHER (4 refusals, predicted <= 3), P2 PREDICTED (0 child exits, 0 rc -6), P3 PREDICTED (longest build gap 807 s); CONFOUNDED by a light slate (46-61% of 11-18's live games)**
+
+- betting change: no (a reading of BC-053's load)
+- Lane `board-split-memory-guard` (todo #850). The reading was taken by the rail monitor (reading 22, `findings_2026-11-19_layer2_rail_monitor.md`, main `6b9e9e9f0`). P1-P3 were re-derived read-only from `refresh-worker.log{,.1}` at 04:06Z; they match. Window 23:00-04:00Z.
+- **P1:** `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` per UTC hour 23/00/01/02/03Z = 0/0/0/2/2, total 4 (11-18: 26).
+  - Headroom at the refusals: 1,785-1,898 MB against 1,900.
+  - Each was retried 68 s later and built; no streak reached 3.
+- **P2:** 0 `BOARD_PROCESS_EXITED`, 0 `RECYCLE_EXIT`, 0 `Fatal Python error` (11-18: 4 exits, all rc -6).
+- **P3:** 54 `BOARD_BUILD_TIMING` lines; the longest gaps are 807 / 662 / 585 s, and 0 of 53 exceed 900 s (11-18: max 1,580 s, 5 of 28 over 900 s).
+- **Load checks:** MET (ceiling 7,936; child switches on).
+- **Confounds:**
+  - no restart, drain or deploy in the window (parent 1011283 up since 17:00:29Z);
+  - **slate:** NCAAB + NBA + NHL + NFL live 21 at 7:06 PM vs 46 on 11-18 = 46%, under §5's 70% rule, so the reading is **CONFOUNDED**.
+- **Safety:** tree max 6,295 <= 6,936 MB; 0 OOM.
+- **Exploratory:**
+  - parent RSS 1.55-1.60 GB at 9 PM (11-18: 2,167);
+  - 60 parent trims, released p50 142 MB;
+  - child 4.35-4.57 GB, never recycled;
+  - 4 post-build checks, all `held=transient_jobs` (pair 5,857-6,009 MB vs the 6,036 line), so 0 post-build recycles.
+- **verify:** `findings_2026-11-18_board_split_memory_guard.md` §7. The comparable-slate reading is owed: the same thresholds on the next evening with >= 33 live NCAAB + NBA + NHL + NFL at 7 PM CST.
