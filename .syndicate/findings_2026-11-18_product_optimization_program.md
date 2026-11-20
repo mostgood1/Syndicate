@@ -407,3 +407,32 @@ The user started all three cards ~7:10 PM CST. The rail monitor started duplicat
 2. **No action:** the unread hand-off notes sit at the top of each owner's lane block, and owners see them when they
    next work. #836's owner question goes into the 11-26 re-rank.
 3. **12-08 package:** the 11-26 re-rank drafts it, and the user decides each change before 12-08.
+
+### 11.6 Checks, 11-20 ~11:20 AM CST
+
+- **Change H is in the batch, verified here.** The prompt names `LIVE_ODDS_WORKER__SYNDICATE_EXIT_HOLD_VALUE=shadow`
+  and never `on`. H is wired through every stage, the same way D was:
+  - decision quotes;
+  - the restore chain, now B -> C -> D -> E -> F -> G -> H;
+  - the kit `C:/tmp/hv856/kit_env_856.sh` and its self-test;
+  - `tests/test_exit_hold_value.py` (failure drops H only);
+  - apply checks (live-odds-worker `shadow`; refresh-worker and web ABSENT);
+  - baseline, preflight and verification;
+  - a "not a betting change" registration (F and H are never registered as betting changes).
+  The user also approved it in the exits session directly ("Yes, ride 11-24", ~10:55 AM CST), and both approvals agree.
+- **Batch integrity:** all 18 kit files named in the prompt exist on disk.
+  - Risk 1: every kit lives in `C:\tmp`, which has been cleaned before (10-27). A missing kit drops only its own
+    change, except the core `t834` kit, whose loss stops the batch.
+  - Risk 2: only #834 has a fallback task. If the batch task misses its dispatch, every other change waits for 12-08.
+- **Schedules (read 11-20 ~11:15 AM CST):** all enabled:
+  - `nfl-level-refit-load-1120`, 11-24 08:15Z (2:15 AM CST);
+  - `nba-total-anchor-load-1124`, 09:45Z;
+  - `cell-calibration-847-hf-grade-1126`, 11-26 13:00Z (7:00 AM CST);
+  - `product-optimization-rerank-1126`, 11-26 15:30Z (9:30 AM CST).
+- **#836's shadow is LIVE on the fleet,** contrary to section 3.2 P7's "no line has printed". The fleet checkout
+  carries `52e68382a` (fleet head `3c8ba5b14`). refresh-worker logged NHL `LIVE_ENDGAME_FRESHNESS mode=shadow` on
+  11-19 10:33-11:50 PM CST: 191 end-game line-instants judged, 86 (45.0%) would be refused
+  (`live_state_stale_in_endgame`).
+  - No NBA or NCAAF shadow lines appear in refresh-worker.log yet.
+  - Nobody grades the shadow against outcomes: its finder lane is closed, and the follow-ups sit on todo #836.
+  - The 11-26 re-rank decides whether #836 is a 12-08 candidate. Without a graded shadow it is not.
