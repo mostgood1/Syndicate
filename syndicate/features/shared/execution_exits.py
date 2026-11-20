@@ -883,9 +883,27 @@ def evaluate_exit(
     fair = position.model_probability
     if fair is not None and net >= fair + fair_buffer - 1e-9:
         rules.append(RULE_MODEL_FAIR)
-    return {
+    # HOLD-VALUE GATE [todo #856, lane hold-value-exits; LOAN from kalshi-exit-path, user
+    # 2026-11-20 "Yes, start it"]: take profit only when the net bid beats what HOLDING is
+    # worth by more than the exit fee (`exit_hold_value`). `SYNDICATE_EXIT_HOLD_VALUE`
+    # absent = off = this dict exactly as before (no key added); `shadow` adds the
+    # assessment and changes nothing; `on` drops `take_profit` where it would hold.
+    from syndicate.features.shared import exit_hold_value as hv
+
+    hv_mode = hv.hold_value_mode()
+    hold_value = held_by_gate = None
+    if hv_mode != hv.HV_OFF:
+        try:
+            hold_value = hv.assess(
+                position, market, bid=bid, exit_fee=exit_fee, net=net, in_play=base["in_play"], now=now, today_rules=rules
+            )
+        except Exception as exc:  # noqa: BLE001 -- shadow: today's rules stand; on: an unknown holds
+            hold_value = hv.failed_assessment(rules, exc)
+        if hv_mode == hv.HV_ON:
+            rules, held_by_gate = hv.apply_gate(rules, hold_value)
+    decision = {
         **base,
-        "reason": "triggered" if rules else "below_threshold",
+        "reason": "triggered" if rules else (hv.REASON_HOLD if held_by_gate else "below_threshold"),
         "rule": "+".join(rules) or None,
         "bid": bid,
         # Size at the touch we would hit. A NO bid IS the YES ask, so its depth
@@ -899,6 +917,9 @@ def evaluate_exit(
         "fair_source": "entry_model_raw" if fair is not None else None,
         "margin": margin,
     }
+    if hold_value is not None:
+        decision["hold_value"] = hold_value
+    return decision
 
 
 def round_trip_pnl(position: Mapping[str, Any] | OpenPosition, bid: float, exit_fee: float) -> float:
@@ -1437,6 +1458,10 @@ def _run_exit_tick_unlocked(
         return {"status": "off"}
     stamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     now_text = stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Hold-value shadow (todo #856, lane hold-value-exits): inert unless the switch is set.
+    from syndicate.features.shared.exit_hold_value import ShadowTick
+
+    hv_tick = ShadowTick(at=now_text, tick="slow" if orders is None else "dispatch")
 
     if orders is None:
         from syndicate.features.shared.execution_ledger import _load
@@ -1487,6 +1512,7 @@ def _run_exit_tick_unlocked(
         )
         reasons[decision["reason"]] = reasons.get(decision["reason"], 0) + 1
         _update_watch(watch, position, decision, now_text)
+        hv_tick.observe(position, decision)
         if not decision.get("rule"):
             continue
         key = exit_idempotency_key(position.entry_key)
@@ -1590,6 +1616,9 @@ def _run_exit_tick_unlocked(
         "pruned": pruned,
         "pruned_exits": pruned_exits,
     }
+    hv_summary = hv_tick.flush()  # None when the switch is off: the summary is exactly as before
+    if hv_summary is not None:
+        summary["hold_value"] = hv_summary
     state["last_tick"] = summary
     state["updated_at"] = now_text
     if persist:
@@ -1599,7 +1628,7 @@ def _run_exit_tick_unlocked(
 
 def exit_tick_line(summary: Mapping[str, Any]) -> str:
     vr = summary.get("venue_reconcile") or {}
-    return (
+    line = (
         f"[live_odds_worker] EXIT_TICK status={summary.get('status')} mode={summary.get('mode')}"
         f" positions={summary.get('positions')} live={summary.get('live_positions')}"
         f" by_venue={summary.get('by_venue')} pm_quoted={summary.get('polymarket_quoted')}"
@@ -1609,6 +1638,10 @@ def exit_tick_line(summary: Mapping[str, Any]) -> str:
         f" mismatches={len(vr.get('mismatches') or [])} margin={summary.get('margin')}"
         f" watching={summary.get('watching')} skipped={summary.get('skipped')}"
     )
+    # Present only when SYNDICATE_EXIT_HOLD_VALUE is set (todo #856): the line is unchanged when off.
+    if summary.get("hold_value") is not None:
+        line += f" hold_value={summary.get('hold_value')}"
+    return line
 
 
 # --------------------------------------------------------------------------
