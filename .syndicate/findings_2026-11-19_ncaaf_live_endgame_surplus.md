@@ -31,8 +31,10 @@ mainly through #808's missing mechanisms.
    untuned) it lifts the 2024 late calibration slope 0.67 -> 0.77 and log loss -0.026 (se 0.0075) on common lines.
    On the 2026 ledger finals at 75-95%, on top of #835's fix: log loss -0.0076 (se 0.0040), slope 0.84 -> 0.89, pace
    1.105 -> 1.082 against an actual 1.065. All of it comes from leads of 17+.
-5. **Not built.** A live-only default-off switch for the damping needs no smartsim2 edit. It is designed below and
-   waits on the user's yes. The one-score / overtime half is separate engine work.
+5. **BUILT, DEFAULT OFF, on a branch (user "Build it here"; see "## FIX — RESULTS").**
+   `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING` arms the damping for the live re-sim at the re-fitted strength 1.0 and
+   threshold 17. 2024 FIT: -0.0186 vs production (se 0.0070). 2026 ledger on top of #835: -0.0086 (se 0.0038), slope
+   0.84 -> 0.91. The one-score / overtime half is separate engine work.
 
 ## The brief's own instrument: 75-95% pace ratio and calibration slope against the ledger's finals (2026)
 
@@ -213,9 +215,9 @@ not hard enough: strength and threshold are the re-fit levers.
 - **The brief's suspect (#808 missing) is half right.** Its clock fixes the one-score last two minutes. Its kneel-out
   does not reach blowout leaders before the last 2:00, so on its own it makes the late centre worse.
 
-## What a fix is, and why none is built here yet
+## What a fix is (the design as first proposed; BUILT afterwards, see "## FIX — RESULTS")
 
-**Not built: it needs the user's decision** (the brief: "if the user agrees"). The measured mechanism is #686's existing
+**Built on the user's "Build it here"** (the brief: "if the user agrees"). The measured mechanism is #686's existing
 leader-only damping. It is a profile field, so a live-only fix needs no smartsim2 edit and no loan from
 `football-scenario-calibration`.
 
@@ -301,6 +303,82 @@ answered **"Build it here"**.
 - the 17+ bucket's mean F - c closer to 0.
 
 **Load:** a betting change, window only (earliest 12-08), on the user's own yes, TOGETHER with #835's switch.
+
+## FIX — RESULTS (written 2026-11-19 after the runs; nothing above the pre-registration was changed)
+
+### Verdict: BUILT, DEFAULT OFF; G1, G2 and G3 PASS. The pick is strength 1.0, threshold 17, span 14.
+
+**The re-fit** (`fit_select.py`; `fit_stage1.txt`, `fit_stage2.txt`): 2024 FIT, 150 games x 4 checkpoints, 60 sims,
+1,563 line-records. Log loss vs each comparator, paired SE:
+
+| arm (strength / threshold) | log loss | vs incumbent (se) | vs production (se) | \|m\| <= 8 | \|m\| >= 17 |
+|---|---|---|---|---|---|
+| production | 0.6289 | | | | |
+| 0.9 / 10 | 0.6191 | +0.0052 (0.0025) | -0.0099 (0.0083) | +0.0045 | -0.0367 |
+| 0.9 / 14 (stage 1 incumbent) | 0.6139 | - | -0.0151 (0.0071) | +0.0019 | -0.0449 |
+| 0.9 / 17 | 0.6119 | **-0.0019 (0.0018)** | -0.0170 (0.0063) | +0.0005 | -0.0463 |
+| 0.9 / 21 | 0.6120 | -0.0019 (0.0031) | -0.0170 (0.0054) | +0.0003 | -0.0447 |
+| 0.6 / 17 | 0.6156 | +0.0037 (0.0024) vs 0.9/17 | -0.0133 (0.0045) | +0.0001 | -0.0350 |
+| 0.75 / 17 | 0.6140 | +0.0021 (0.0014) | -0.0149 (0.0055) | +0.0001 | -0.0394 |
+| **1.0 / 17 (PICK)** | **0.6103** | **-0.0017 (0.0012) vs 0.9/17** | **-0.0186 (0.0070)** | +0.0000 (0.0012) | **-0.0503 (0.0161)** |
+
+- **Stage 1:** 17 cleared the 1-SE floor narrowly: -0.00191 against se 0.00176, i.e. 1.09 SE. 21 tied it inside the
+  floor and stayed out.
+- **Stage 2:** 1.0 cleared it at 1.4 SE.
+- **G1 PASS:** -0.0186 against production, se 0.0070 (2.7 SE).
+- **G2 PASS:** one-score states +0.0000 (se 0.0012).
+- **Predictions:** stage 1 at 14 or 17 held (17); stage 2 at 0.9 or 1.0 held (1.0). The gain, -0.019, landed just
+  under the predicted -0.02 to -0.03.
+- **Caveat:** strength 1.0 is the field's upper bound. At a lead of 31+ in the game's last seconds the leader's scoring
+  weights reach their 0.01 floor.
+
+**G3 PASS: the 2026 ledger finals at 75-95%, on top of #835** (`ledger_score2_pick.txt`, the same 478 states and 141
+games as above, E0 re-taken under the pick):
+
+| 75-95% | log loss | vs prod+#835 (se) | slope | pace (actual 1.065) | mean F - c |
+|---|---|---|---|---|---|
+| production as loaded | 0.6961 | +0.0461 (0.0155) | 0.47 | 1.128 | -0.54 |
+| production + #835 | 0.6501 | - | 0.84 | 1.105 | -0.34 |
+| **pick + #835** | **0.6414** | **-0.0086 (0.0038)** | **0.91** | **1.086** | -0.18 |
+| leads 17+ only (53 games) | 0.6302 | -0.0260 (0.0121) | 1.18 | 0.997 (actual 0.763) | -1.97 |
+| margin <= 16 only (103 games) | 0.6462 | -0.0012 (0.0009) | 0.83 | 1.123 (actual 1.193) | +0.59 |
+| pick WITHOUT #835 | 0.680 | (vs production -0.016) | 0.51 | 1.097 | -0.27 |
+
+The 17+ bucket is still about 2 points over the finals and one-score games are still under. The damping closes part
+of the blowout gap. The rest of it, and the one-score half, are the follow-ups below.
+
+### The code (branch, NOT on main; the push is the user's yes)
+
+- **`syndicate/features/ncaaf/live_blowout_damping.py` (NEW).** The switch, the three knobs, and `resolve(base)`,
+  which returns `base` itself when off. One `NCAAF_LIVE_BLOWOUT_DAMPING` print per process when on.
+- **`syndicate/features/ncaaf/live_resim.py`**, under the user-approved loan from `live-player-exit-gate`, +13 / -1.
+  `resim_live_game`'s `profile` default is now `None`. That resolves to production's profile, or the damped one
+  when on. The result carries a `blowout_damping` block only when on.
+- **`tests/test_ncaaf_live_blowout_damping.py` (NEW), 44 passed.**
+  - Reachability first: absent equals the pre-change explicit-profile call, byte for byte. Off and 5 unrecognised
+    values equal absent. On changes a blowout's histogram. Through `run_refresh_worker._run_ncaaf_live_resim_tick`, off
+    is byte-identical to absent and on changes the published lane.
+  - Then: the leader's margin and total fall more than 1 point at 200 sims. An explicit profile is honoured.
+    #835's E0 path carries the block. Off resolves to the same object. Only the damping fields change. The factor
+    damps only a leader above the threshold in the second half.
+  - Switch and knob parsing, including typo, nan, inf and out-of-range fallbacks to the fitted default.
+- **Neighbouring suites:** 165 passed (`test_ncaaf_live_resim`, `_wiring`, `_total_dispersion`, `_segments`,
+  `_level_shrink`, `test_ncaaf_live_gameline_registration`, `_player_exit`).
+
+### Loading (the user's yes, in a betting-change window)
+
+- **Keys,** in `~/syndicate-prod/local_production.env` (global, so refresh-worker's tick and #835's E0 both see it):
+  `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING=on`.
+- **Load it WITH #835's two keys:** `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION=on` and
+  `SYNDICATE_LIVE_TOTALS_PROB_SCALE_NCAAF=1`. G3 was read only in that combination.
+- **Re-check before the load:** #835's late k (1.6) was fitted without the damping. The damped late centre is better,
+  so the late widening may now be a little wide (pick + #835 slope 0.91 overall, 1.18 in 17+). Read it on 11-21 /
+  11-28.
+- **Betting change: yes.** Earliest window Tue 12-08 2-7 AM CST. Drained full `down` / `up`, preflight
+  `--betting-change yes`, `betting_change.py add`.
+- **Verify after the load:**
+  - the refresh-worker log carries `NCAAF_LIVE_BLOWOUT_DAMPING on strength=1.0 lead_threshold=17.0 lead_span=14.0`;
+  - on the first Saturday, `ledger_score2.py`'s 17+ bucket pace falls toward the actual.
 
 ## Reproduction (`C:\tmp\t852`, scratch)
 
