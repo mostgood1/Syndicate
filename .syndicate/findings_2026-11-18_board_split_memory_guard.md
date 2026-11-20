@@ -285,3 +285,18 @@ Read-only, from `refresh-worker.log{,.1}` (scripts `C:\tmp\bmg\load\since_load.s
   2. **A parent self-recycle under the split:** in quiet hours, when the parent's own RSS is over a threshold and
      no job other than the board child runs, the whole worker exits and the supervisor restarts it. Behind a
      switch; a betting change by BC-053's rule, so the 11-24 window.
+
+## 3a. Addendum 2026-11-20 16:00Z -- every rc -6 wrote a ~3 GB core dump to C: (lead from session local_313ab61c, confirmed here)
+
+- `C:\Users\tempadmin\AppData\Local\Temp\wsl-crashes\` holds 10 files, 27.1 GB. WSL's crash capture keeps the latest 10.
+- Nine of them are `wsl-crash-<epoch>-<pid>-_usr_bin_python3.11-6.dmp` (signal 6), **3.06-3.54 GB each**, written on
+  11-19 at 12:11:39, 12:47:20, 13:24:03, 14:03:04, 14:33:42, 15:09:26, 15:42:13, 16:21:07 and 16:52:00Z.
+  - Their pids match the board child's `BOARD_PROCESS_EXITED ... rc=-6` lines: 844647 at 12:11:39Z, 853119 at
+    12:47:20Z and 860765 at 13:24:03Z. 869307 was the board child that `check_deploy_safety` listed at ~13:48Z.
+  - So each crash exit also wrote the child's whole memory (~3 GB) to C:, every 31-39 min, on the shared host.
+- The series stops at 16:52Z, 8 min before the #850 load (17:00:09Z). Since then the only child exit is the clean
+  rc 75 at 05:58Z 11-20, with no dump.
+- **One small dump is unexplained:** 25 MB, pid 1406840, at 08:19:56Z 11-20. It is NOT the board child, which had no
+  exit then. Its pid appears in no role log line except other sessions' greps quoted in `ALL_PROCESS_MEMORY`.
+- The 9 board-child dumps carry nothing the reproduction (§3) did not already show. Deleting them is the user's
+  call; it would free ~27 GB.
