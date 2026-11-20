@@ -775,3 +775,18 @@ over the refresh-worker logs.
   - 166 stale web merges are NBA / NCAAF / NFL after their finals, not a defect;
   - priced age p50 178 s, p90 418 s.
 - **Load:** query 4.61 s, chips 1.13 s, shortlist 0.78 s.
+
+## Reading 24 — 11:00 PM CST (05:00Z), full page
+
+- **Live:** 8 games (5 NCAAB, 2 NHL, 1 MLS); 7 with rail rows (94 rows).
+- **Flags: 6 shown on 4 cards, 0 false, 0 missed, 0 dark.** P1 0; P6 0; **P8 0 of 33.** Team cards 94 chips, 0 defects.
+- **`live_games_no_model` 2 of 7:**
+  - **Kansas @ Houston** (REVERSED, I-29), H1 1:21, 16 rows. Session local_a94d8ca3 replayed it with the fix on: 61 of 61
+    rows matched their lane, right sides (`0f2467a2a`).
+  - DAL @ VGK (I-30).
+- **#850 after the graded window:**
+  - 2 more `MEMORY_GUARD_ABORT` at 04:39:10Z and 04:40:16Z (headroom 1,743 / 1,739 MB);
+  - **6 since the load** (2 each in 02Z, 03Z, 04Z); still 0 exits, 0 fatal; child 4.32 GB, parent 1.52 GB.
+  - Outside §5's 23:00-04:00Z window, so the grade stands. The pattern continues: 2 an hour from 8 PM on, never 3 in a
+    row.
+- **Load:** `/intelligence` 9.00 s; query 1.58 s; chips 0.84 s; shortlist 0.61 s.
