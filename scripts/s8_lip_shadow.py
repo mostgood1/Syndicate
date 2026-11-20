@@ -206,10 +206,17 @@ def utcnow() -> dt.datetime:
 def set_idle_priority() -> None:
     if sys.platform != "win32":
         return
+    # The handle types matter on 64-bit Python: with ctypes' default int restype the GetCurrentProcess
+    # pseudo-handle (-1) is truncated to 0xFFFFFFFF and SetPriorityClass fails silently (measured 11-20: the
+    # collector ran at Normal until set by hand).
     try:
         import ctypes
 
-        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x40)  # IDLE
+        k32 = ctypes.windll.kernel32
+        k32.GetCurrentProcess.restype = ctypes.c_void_p
+        k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        k32.SetPriorityClass.restype = ctypes.c_int
+        k32.SetPriorityClass(k32.GetCurrentProcess(), 0x40)  # IDLE_PRIORITY_CLASS
     except Exception:  # noqa: BLE001
         pass
 
@@ -277,6 +284,8 @@ def select_universe(client: Client, out_dir: Path, log=print) -> Path:
     log(f"[s8] select: {len(programs)} active liquidity programs with >= {MIN_HOURS_LEFT:g} h left")
     entries = []
     for i, p in enumerate(programs):
+        if i % 1000 == 0:
+            log(f"[s8] select: {i} of {len(programs)} books read, {len(entries)} payable so far")
         try:
             yes, no = parse_book(client.get(f"/markets/{p['market_ticker']}/orderbook"))
         except Exception as e:  # noqa: BLE001
@@ -289,8 +298,6 @@ def select_universe(client: Client, out_dir: Path, log=print) -> Path:
                   "series_ticker": p.get("series_ticker"), "period_reward": p.get("period_reward"),
                   "program_start": p.get("start_date"), "program_end": p.get("end_date"), "program_id": p.get("id")})
         entries.append(e)
-        if i % 1000 == 0:
-            log(f"[s8] select: {i} of {len(programs)} books read")
     book = greedy_book(entries)
     fee_types: dict[str, Any] = {}
     for e in book:

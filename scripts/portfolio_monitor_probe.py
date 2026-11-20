@@ -604,10 +604,17 @@ def fleet_logs(cutoff: str, work_dir: Path, plan_cutoff: str | None = None
 def set_idle_priority() -> None:
     if sys.platform != "win32":
         return
+    # Handle types matter on 64-bit Python: with ctypes' default int restype the GetCurrentProcess pseudo-handle is
+    # truncated and SetPriorityClass fails silently, so this ran at Normal until 2026-11-20 (found via the S8 collector;
+    # scripts/inplay_nightly.py and the others already set the types).
     try:
         import ctypes
 
-        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x40)  # IDLE
+        k32 = ctypes.windll.kernel32
+        k32.GetCurrentProcess.restype = ctypes.c_void_p
+        k32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        k32.SetPriorityClass.restype = ctypes.c_int
+        k32.SetPriorityClass(k32.GetCurrentProcess(), 0x40)  # IDLE_PRIORITY_CLASS
     except Exception:  # noqa: BLE001
         pass
 
