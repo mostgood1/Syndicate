@@ -16,7 +16,11 @@
   - Tests: `tests/test_live_gameline_orientation.py` (14). Producer-written NCAAB/WNCAAB lanes through the board's own attach equal a hand-flipped twin row for row; off != on; shadow == off. Neighbouring suites: 605 passed.
   - Instruments: `COLLEGE_ORIENTATION_JOIN` on refresh-worker (only when a reversed row exists) and `orientation_reversed` in coverage / `index_why`.
 - **Owed:**
-  1. **The load of `on`: the user's decision.** It is an env key (global, or `REFRESH_WORKER__`) in `local_production.env`, then a drained full down/up. The natural slot is the 11-24 window's batch down/up. Outside a window it needs an `--outside-window` reason, and none of the three exceptions fits cleanly: the games fail closed, so waiting costs missed opportunities, not losses. Feast Week (11-25..11-29), the densest neutral-site week, falls after 11-24.
+  1. **The load of `on`: QUEUED for the 11-24 window.** USER DECISION 2026-11-20 ~8:05 AM CST, in session 86eb6e0f, to "Turn the college orientation join on in the 11-24 betting-change window?": **"Queue for 11-24"**.
+     - Added as droppable CHANGE G of batch task `nfl-level-refit-load-1120` (Tue 11-24 2:15 AM CST, one claimed ff + one drained full down/up): ONE GLOBAL line `SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION=on`.
+     - The prompt was updated through the scheduled-tasks tool at ~8:20 AM CST and read back identical (44,574 chars).
+     - Kit `/mnt/c/tmp/w1124_854/`: `kit_env_854.sh` (check | apply | restore, backup first), `kit_after_up_854.sh`, `kit_selftest_854.sh` (self-tested 11-19 6:55 PM CST on a dummy file; the real env file is untouched).
+     - If the batch does not load G, G waits for the 12-08 window (no fallback task).
   2. Shadow counts from the first fleet ff that carries the code. That ff is NOT a betting change.
   3. The first-evening reading against the pre-registered P1-P4 (findings section 5).
 - **Lead, not chased:** NCAAF's live lens keys `(away, home)` too. #791 aliases names but not order, and NCAAF has neutral sites. Measure NCAAF the same way before extending `ORIENTATION_JOIN_SPORTS`. Its hit fields would need classifying first.
