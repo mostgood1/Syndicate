@@ -300,3 +300,7 @@ Read-only, from `refresh-worker.log{,.1}` (scripts `C:\tmp\bmg\load\since_load.s
   exit then. Its pid appears in no role log line except other sessions' greps quoted in `ALL_PROCESS_MEMORY`.
 - The 9 board-child dumps carry nothing the reproduction (§3) did not already show. Deleting them is the user's
   call; it would free ~27 GB.
+- **DELETED 2026-11-20 ~16:05Z on the user's "Yes, delete them"** (answering "Delete the nine board-child crash dumps (27 GB)?").
+  - Each of the 9 pids was first matched to a `BOARD_PROCESS_STARTED` / `BOARD_PROCESS_EXITED ... rc=-6` pair in the role log.
+  - 9 files, 27.0 GB; C: free went from 147.3 to 178.9 GB.
+  - The 25 MB pid-1406840 dump was kept.
