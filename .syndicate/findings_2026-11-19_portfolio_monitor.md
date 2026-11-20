@@ -405,3 +405,62 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - Cap use: 26.3% Kalshi, 14.4% Polymarket.
   - Placeable: Polymarket 17 of 576 rows, Kalshi 32 of 1,077.
   - Plan max gap 10.8 min.
+
+## Reading 82 — Thu 11-19 6:33 PM CST (00:33Z), window 31 min
+
+- **Results first.**
+  - Nothing graded yet tonight.
+  - 30 d: -7.15% [-12.6, -1.7] on 705 events.
+  - 7 d: -3.96% [-15.0, +7.1] on 177 events.
+  - Gate: 0 of 800 (BC-053 clock).
+  - 17 games have started and are unsettled; none is late.
+- **Slower but inside budget (watch item, not an anomaly):**
+  - `live_today` 2.05 s of a 3.0 s budget (0.23 s at Reading 81).
+  - `page` 1.56 s of 3.0 s; `live_all` 1.66 s of 5.0 s.
+  - The web log agrees: `/api/portfolio/live` took 2,022 ms server-side.
+  - The read landed on a plan write (00:33:07Z) at tip-off for 17 games. Hypothesis: transient load at slate start.
+    Re-checked at Reading 83. If it is still above 1.5 s off a plan write, it gets diagnosed.
+- **Flow:**
+  - Plan 1.1 min old: 41 suggested, 17 positions.
+  - 5 rows refused `in_play_market_fair` (games started); 2 rows `no_model_edge_pct`.
+  - Live ticks: 3 placed (1 Kalshi, 2 Polymarket) in 10. Kalshi also refused 5 as `game_started`.
+  - Orders today: 56. 55 filled, 1 maker post resting.
+  - Cap use: 26.8% Kalshi, 16.1% Polymarket.
+
+## Reading 83 — Thu 11-19 7:03 PM CST (01:03Z), window 30 min
+
+- **Results first.**
+  - Nothing graded yet tonight.
+  - 30 d: -7.15% [-12.6, -1.7] on 705 events.
+  - 7 d: -3.96% [-15.0, +7.1] on 177 events.
+  - Gate: 0 of 800 (BC-053 clock).
+  - 17 games have started and are unsettled; none is late.
+- **Reading 82's watch item is closed as transient.**
+  - `live_today` is 0.31 s (2.05 s at Reading 82), `page` 0.27 s, `live_all` 0.41 s.
+  - The tip-off hypothesis holds: one slow read at slate start, not repeated 30 min later off a plan write.
+- **No new anomaly.** The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 3.3 min old: 119 suggested, 9 positions. 86 refused as `beyond_max_positions`; 5 rows `in_play_market_fair`.
+  - Live ticks: 0 placed in 10. The 16 refusals are all `outside_price_band`.
+  - Orders today: 56, unchanged.
+  - Cap use: 26.8% Kalshi, 16.2% Polymarket.
+  - Plan max gap 14.4 min.
+
+## Reading 84 — Thu 11-19 7:32 PM CST (01:32Z), window 30 min
+
+- **Results first.**
+  - The first of tonight's games have graded: all-time is now 2,094 bets / 1,128 events, -10.82% (2,092 / 1,126,
+    -10.85% at Reading 83).
+  - The 7 d and 30 d windows end at yesterday, so they are unchanged: 30 d -7.15% [-12.6, -1.7] on 705 events.
+  - Gate: 0 of 800 (BC-053 clock).
+  - 43 games have started and are unsettled; none is late.
+- **No new anomaly.**
+  - Today's maker post (resting about 1,120 min) ended `rejected` at kickoff. This is the known kickoff-expiry
+    pattern from 11-17 (`venue_canceled`), not a failure. Resting is now 0.
+  - Every endpoint returned in 0.41 s or less. The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 2.0 min old: 209 suggested. 132 rows refused `in_play_market_fair` (games in play), and the sim edge share
+    fell to 0.24 for the same reason. 12 positions.
+  - Live ticks: 0 placed in 6 (11 `outside_price_band`, 3 `game_started`).
+  - Orders today: 56. 55 filled, 1 maker expiry.
+  - Cap use: 23.0% Kalshi dollars (the expiry released its room), 16.2% Polymarket.
