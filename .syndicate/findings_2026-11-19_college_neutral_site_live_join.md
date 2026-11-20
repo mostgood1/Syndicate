@@ -19,7 +19,10 @@ games, and the join keys the **ordered** pair.
   only RESPELLS each name to the odds feed's spelling. It never reorders them. So `nameSource: odds` means the
   names are the board's, and the orientation is still ESPN's.
   - Cross-check: over 11-09..11-19, the lanes the re-sim actually wrote (`live_evidence/ncaab/*.jsonl`) match ESPN's
-    scoreboard orientation for **459 of 459** NCAAB games (WNCAAB 467 of 468).
+    scoreboard orientation for **459 of 459** NCAAB games and 467 of 468 WNCAAB games.
+    - The WNCAAB exception: 11-18 Oregon State @ UC Riverside (401928312), not neutral.
+    - Its lane was a refusal (`no_margin_anchor`, no number), and ESPN's scoreboard now reads the reverse.
+    - Not chased: it published nothing a row could join.
 - **The join keys the ordered pair.**
   - `syndicate/features/shared/live_gameline_join.py:2472` indexes each lane under `(away, home)`.
   - `:2757` looks each row up under its own `(away, home)`.
