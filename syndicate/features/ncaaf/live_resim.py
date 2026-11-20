@@ -894,7 +894,7 @@ def resim_live_game(
     away_offense: float,
     away_defense: float,
     sims: int | None = None,
-    profile: Any = NCAAF_CALIBRATION_PROFILE,
+    profile: Any = None,
     level_shrink: float | None = None,
 ) -> dict[str, Any] | NcaafResimRefusal:
     """Rest-of-game Monte Carlo from `state`. Returns the lens lane's payload.
@@ -931,6 +931,17 @@ def resim_live_game(
     home_offense, home_defense, away_offense, away_defense = shrink_rating_level(
         float(home_offense), float(home_defense), float(away_offense), float(away_defense), shrink
     )
+
+    # THE LIVE PROFILE (todo #852). No profile passed -- every production caller -- means production's NCAAF profile,
+    # plus #686's leader-only blowout damping when `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING` is on
+    # (`ncaaf/live_blowout_damping.py`). Off, `profile` IS `NCAAF_CALIBRATION_PROFILE` and the result has no new key.
+    damping_keys: dict[str, Any] = {}
+    if profile is None:
+        from syndicate.features.ncaaf.live_blowout_damping import resolve as resolve_live_profile
+
+        profile, damping_block = resolve_live_profile(NCAAF_CALIBRATION_PROFILE)
+        if damping_block is not None:
+            damping_keys["blowout_damping"] = damping_block
 
     base = dict(
         home_team=state.home_team or "HOME",
@@ -1026,6 +1037,7 @@ def resim_live_game(
 
     return {
         **segment_keys,
+        **damping_keys,
         "home_win_prob": round(home_win_prob, 6),
         "sims_run": ran,
         "home_margin_mean": round(calibrated_margin_mean, 3),
