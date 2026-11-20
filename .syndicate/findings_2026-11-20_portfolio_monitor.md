@@ -153,3 +153,18 @@ only, because this repo is public.
   - Live ticks: 1 placed on Polymarket.
   - Orders today: 9 filled.
   - Cap use: 4.8% Kalshi, 4.2% Polymarket.
+
+## Reading 102 — Fri 11-20 8:00 AM CST (14:00Z), window 60 min
+
+- **Results first.** Unchanged:
+  - 30 d: -7.38% [-12.8, -2.0] on 719 events;
+  - 7 d: -6.20% [-16.8, +4.4] on 181;
+  - gate: 13 of 800 (BC-053);
+  - nothing open.
+- **No new anomaly.** Every endpoint returned in 0.31 s or less. The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 2.6 min old: 112 suggested, 14 positions; 84 refused `beyond_max_positions`.
+  - Live ticks: 1 placed on Polymarket in 18.
+  - Orders today: 10 filled.
+  - Cap use: 4.8% Kalshi, 4.9% Polymarket.
+  - Plan max gap 10.7 min.
