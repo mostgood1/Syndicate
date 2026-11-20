@@ -100,3 +100,56 @@ only, because this repo is public.
   - Live ticks: 1 placed on Kalshi in 20.
   - Orders today: 6 filled.
   - Cap use: 4.8% Kalshi, 1.7% Polymarket.
+
+## Reading 99 — Fri 11-20 5:00 AM CST (11:00Z), window 60 min
+
+- **Results first.** Unchanged:
+  - 30 d: -7.38% [-12.8, -2.0] on 719 events;
+  - 7 d: -6.20% [-16.8, +4.4] on 181;
+  - gate: 13 of 800 (BC-053);
+  - nothing open.
+- **No new anomaly.**
+  - `plan` is back to 0.01 s (2.88 s at Reading 98).
+  - `live_today` 2.23 s (2,162 ms server-side), inside its 3.0 s budget. It landed 3 s after a plan write (11:00:07Z),
+    and the web log has no recycle, no worker boot and no overlay rebuild in 10:57-11:01Z, so no cause is logged.
+  - **Running tally since 6 PM 11-19:** 5 of 20 `live_today` reads were above 2 s and 1 was above 3 s. 2 sit on a web
+    memory recycle; 3 have no logged cause.
+  - Owners as before: `web-silent-worker-kills` and `board-read-cold-share` (#853).
+  - The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 0.2 min old: 20 suggested, 13 positions.
+  - Live ticks: 1 placed on Polymarket in 20.
+  - Orders today: 7 filled.
+  - Cap use: 4.8% Kalshi, 2.4% Polymarket.
+
+## Reading 100 — Fri 11-20 6:00 AM CST (12:00Z), window 60 min
+
+- **Results first.** Unchanged:
+  - 30 d: -7.38% [-12.8, -2.0] on 719 events;
+  - 7 d: -6.20% [-16.8, +4.4] on 181;
+  - gate: 13 of 800 (BC-053);
+  - nothing open.
+- **No new anomaly.** Every endpoint was inside budget (`live_today` 0.20 s, `live_all` 0.39 s). The GATE line is the
+  same 2 unclassified loads.
+- **Flow:**
+  - Plan 3.0 min old: 14 suggested, 8 positions.
+  - Live ticks: 1 placed on Polymarket in 20.
+  - Orders today: 8 filled.
+  - Cap use: 4.8% Kalshi, 3.3% Polymarket.
+  - Polymarket placeable: 8 of 384 rows, so its feed is healthy, unlike the F21 window at this hour on 11-19.
+
+## Reading 101 — Fri 11-20 7:00 AM CST (13:00Z), window 60 min
+
+- **Results first.** Unchanged:
+  - 30 d: -7.38% [-12.8, -2.0] on 719 events;
+  - 7 d: -6.20% [-16.8, +4.4] on 181;
+  - gate: 13 of 800 (BC-053);
+  - nothing open.
+- **No new anomaly.** Every endpoint was inside budget (`live_all` 1.02 s of 5.0 s; the rest 0.27 s or less). The GATE
+  line is the same 2 unclassified loads.
+- **Flow:** the morning board has widened the plan.
+  - 106 suggested (14 at Reading 100), 18 positions; 80 refused `beyond_max_positions`.
+  - Placeable: Kalshi 28 of 761 rows, Polymarket 34 of 651.
+  - Live ticks: 1 placed on Polymarket.
+  - Orders today: 9 filled.
+  - Cap use: 4.8% Kalshi, 4.2% Polymarket.
