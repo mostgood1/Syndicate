@@ -324,3 +324,49 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
     ~10 s, so the next board use names it. Both are instruments, betting change no; they need a web load.
 - For lane `board-read-cold-share`: the cold read costs 17-28 s even in an idle side process, and 35% of its GIL time is `json`
   decoding of layer-2 shards and the state.
+
+## THE DUMP LANDED: 2026-11-20 16:08:10Z (10:08 AM CST), recorded 2026-11-20 10:22 AM CST (16:22Z)
+
+- **`Timeout (0:00:40)!` in pid 1796235** (546.9 MB anon); scratchpad watcher `wsk_dump_watch.sh`.
+  - The thread holding the loop was a gthread request thread in `json.loads` (`raw_decode`). Its stack, innermost first:
+    - `_decompress_oversized_values` (`pipeline/intelligence_state.py:4613`)
+    - `_expand_persisted_state` (4671)
+    - `_read_state_payload` (4988)
+    - `_read_single_date_response_for_combining` (10393)
+    - `read_combined_intelligence_response` (10498)
+    - `intelligence_query_api` (`syndicate/blueprints/intelligence.py:2927`)
+  - MAIN was in `selectors.select` (`web_worker.py:88`), waiting to retake the GIL. The overlay warmer was asleep (10239).
+- **The request: the cheat-sheet picks run's board query** (`Python-urllib`, the 10:07 AM CST slot).
+  - 82,118 ms in all; `board_read` 64,308 ms; 6,237 rows; 4.8 MB on the wire.
+  - No `WORKER TIMEOUT` followed, so the stall ended between 40 and 60 s.
+  - This is H5's request shape: two 11-17 kills were this run's board read.
+- **The sampler in the same window**, GAP 16:07:35.3-16:08:16.5Z (peak 43.4 s):
+  - thread 1796264 `R` at 99-109 ticks/s with 0 voluntary switches, every second;
+  - MAIN `S` on futex, ~200 wakeups/s;
+  - anon exactly 546,936 KB for 15+ s.
+- **What that decode is.** The state's compressed values. The only large one is 11-21's `layer2_shortlist`: 5.2 MB base64,
+  39.9 MB of JSON. The others are 0.5-0.8 MB and take ~0.01 s.
+  - Side process (`wsk_decode_probe.py`, the keyvalue copy, read-only): `json.loads` takes 0.31 s with gc off and 1.10 s with gc
+    on (3 gen2 = 0.24 s). On a padded heap: 2.0 s.
+  - Production took 40x or more as long, at a full core.
+- **Excluded so far:**
+  - tracemalloc: no `TRACEMALLOC_INIT`, and `SYNDICATE_TRACEMALLOC_DIAG` is not in web's env;
+  - PYTHON* debug env: only PYTHONPATH / UNBUFFERED / IOENCODING are set;
+  - GC tuning: no `gc.set_threshold` / `gc.freeze` in the code;
+  - a CPU quota: the cgroup has no `cpu.max`, and `cpu.pressure` some is ~1%;
+  - paging: 0 major faults.
+  - An ordinary full collection takes 0.52 s at 5.25M tracked objects on this host (`wsk_gc_scale.py`). A 40 s pause would need
+    roughly 400M objects, which a 547 MB worker cannot hold, unless the collector itself is pathological.
+- **Not yet separated:**
+  - (a) a pathological GC pause inside the decode;
+  - (b) the decode itself;
+  - (c) the host starving that vCPU. The Windows host was 79-88% busy at 16:14Z, and Hyper-V reports no steal to the guest.
+- **Instruments that separate them** are on this lane's worktree branch, commit `edaa3417d`. They are NOT on main; that waits for
+  the user's go. Both are instruments only: nothing changes which request is served or when a worker recycles.
+  - `WEB_LOOP_STALL`: the gap, plus the process CPU spent in it.
+  - `WEB_GC_PAUSE`: every collection of 0.25 s or more, with its generation, wall pause, thread CPU and thread.
+  - Tests: 39 passed / 2 skipped on Windows, 41 on the fleet's Linux Python.
+  - The picks run reproduces the cold read every 15 min, so one web load answers within the hour.
+- **Lead for the fix, whichever multiplier it is:** every cold board read decodes the 40 MB `layer2_shortlist`, and the board
+  query may not use it. That code is in `pipeline/intelligence_state.py` (lane `board-read-cold-share` holds that file's
+  combined-board read).
