@@ -1,5 +1,26 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#857` — **WEB'S 650 MB RECYCLE LIMIT (sized for Render's 2 GB container) RECYCLES EVERY WORKER THAT HOLDS THE LAYER 2 BOARD: a board-holding worker PLATEAUS at anon p50 ~1,010-1,070 MB (p90 1,090-1,265 per evening; ~+75 MB per +1,000 board rows), so 14-29 recycles an hour on evenings. RECOMMENDED: `WEB__SYNDICATE_WEB_WORKER_ANON_LIMIT_MB=1500` (env only, absent = today) -> predicted <= 2 recycles/h, for +1.0-1.2 GB fleet RSS at p50, at EVERY hour (both workers keep the board; nothing evicts it by time). Fleet-role p99/max barely move; web worst case ~3.4 GB. Not a betting change. LOAD = the user's decision; NOT with #853 on 11-24** `[2026-11-20, lane web-recycle-anon-limit, session f182fa28; from #853's lead; findings `.syndicate/findings_2026-11-20_web_recycle_anon_limit.md`]`
+
+- **Measured.** Instrument `scripts/rail_monitor/web_anon_curve.py` (stdlib; `extract` then `report`), read-only at nice 19. It reads per-worker RSS from live-odds-worker's `ALL_PROCESS_MEMORY` (11-16..11-20, one snapshot per ~9 s) and the guard lines in web.log.
+  - **Growth after a worker first holds the full board.**
+    - Not evening: flat to 60 min, median +4 to +29 MB.
+    - Evening: drifts +17 / +39 / +52 MB over 3-15 min. Past ~20 min the 650 limit censors it (n 2-5).
+    - Lane `web-silent-worker-kills`' held workers aged >= 900 s: median 0.0 MB over 1.8 h.
+    - The board cache is bounded (<= 4,000 rows, at least one entry kept).
+  - **Limit model** (evening first crossings per worker-hour x 2 workers): 1,300 -> ~1.3/h [0.5, 2.7]; 1,400 -> ~0.6 [0.1, 1.6]; 1,500 -> ~0.2 [0.0, 1.0].
+    - `--max-requests 1000` (live in the fleet's `GUNICORN_CMD_ARGS`, never fired: 0 in 20 days) adds ~0.2-0.45/h once workers live.
+  - **Cost.** Fleet roles p50 evening 7.4 -> 8.4 GB, night 6.9 -> 8.1 GB; p99 9.6 -> 10.0; max unchanged at 10.1.
+  - **The VM's real risk is co-tenant jobs.** A global OOM kill at 11-20 ~2:48 AM CST took an 8.8 GB pytest; refresh-worker and redis were swapped out. No other role's guard sees web memory: each gates on its own tree.
+- **Owed:**
+  1. **The load decision (the user).** Recommended: at the FIRST drained full down/up AFTER #853's first-evening reading (11-24 5-11 PM CST).
+     - Loading in the same down/up as #853 voids #853's P1/P2/P6, which assume today's recycle rate.
+     - Kit when decided: one `WEB__` line in `local_production.env`, a drained full down/up, `--betting-change no`.
+  2. **The first-evening reading** against the pre-registered P1-P8 (findings): recycles/h <= 2; H-plateau median <= +150 MB; web RSS max <= 3.5 GB; fleet roles max <= 11.5 GB; 0 OOM kills of a fleet process (roll back if any).
+- **Leads:**
+  - An idle eviction of the board cache would remove the night cost (`pipeline/intelligence_state.py`).
+  - Co-tenant research/test jobs in WSL have no memory cap (11-20 OOM).
+
 ### `#855` — **SMARTSIM2'S OVERTIME IS NOT COLLEGE OVERTIME: after a tied regulation the engine gives ONE drive from the team's OWN 25, sudden death, two rounds at most; it scores 3.6 points per OT game against a real 12.4 (CFBD 2023-24, 65 OT games of 1,501). It pulls late one-score live totals low (#852). IN PROGRESS: a college-rules OT behind a new default-off `CalibrationProfile.college_overtime`** `[2026-11-20, lane ncaaf-college-overtime, session 617b553b; user "Lend it, start OT" + "Extend the loan"; from #852's follow-ups]`
 
 - **Rules to model.** OT1-OT2: each team gets a possession from the opponent's 25. From OT2 a TD must try for two. From OT3, alternating two-point attempts.
