@@ -1851,6 +1851,14 @@ death, never life — do not invert it.
 - Verification: The pre-registration is pushed before any collected data is read; the collector runs 3-5 days read-only on public Kalshi data; the result is read once by the pre-registered rule and recorded in the findings file and the plan's S8 entry
 - Blocked by: none
 
+### web-recycle-anon-limit — OPEN — opened 2026-11-20 — session f182fa28-1b2d-421b-944d-aabe7c8f93fe
+- Goal: A measured decision on the fleet web workers' anon recycle limit (today 650 MB, sized for Render's 2 GiB container): the per-worker anon growth curve past the first board build (plateau vs ratchet), predicted recycles/h and fleet memory cost at candidate limits with denominators, and, if a limit is justified, an env-only change WEB__SYNDICATE_WEB_WORKER_ANON_LIMIT_MB (absent = today) with a pre-registered first-evening prediction put to the user. READ-ONLY on the fleet; no load without the user's yes behind the claim + preflight locks.
+- Files: .syndicate/findings_2026-11-20_web_recycle_anon_limit.md (NEW), scripts/rail_monitor/web_anon_curve.py (NEW). NOT gunicorn.conf.py (lane web-silent-worker-kills owns it; an env key needs no edit there)
+- Hypothesis: Stated 2026-11-20 before any fleet read. H-plateau: a web worker's anon growth is bounded: it rises to ~1.0-1.2 GB with the first combined-board build (the per-process board cache plus build transients) and then holds within ~+150 MB per hour of age, so a limit of ~1,300 MB would turn the evening's 14-29 recycles/h into a handful. H-ratchet (the alternative): anon keeps climbing with requests/age past the first build (per-request heap retention, arena fragmentation), so a higher limit only delays each recycle and buys little while costing memory.
+- Falsification test: H-plateau is falsified if workers that live past their first board build (daytime long-lived workers, DEFERRED/hard holds, and the per-pid RSS series in live-odds-worker ALL_PROCESS_MEMORY lines) show anon still rising by > 150 MB per hour of age after the first build, or if the anon at recycle keeps rising with age at recycle across the evening sample (age-binned p50 at recycle increasing monotonically beyond the first-build level).
+- Verification: Findings file holds the growth curve (anon vs age since first board build, per worker, with n), the recycle-rate model at 900/1,100/1,300 MB with denominators and its back-test against the 650 MB evenings, the fleet memory cost vs the 11-19 evening max, and the readers of the limit (hard/emergency margins, stagger); todo entry; the decision put to the user and recorded verbatim, or the lane closed with 'no change' and why.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
