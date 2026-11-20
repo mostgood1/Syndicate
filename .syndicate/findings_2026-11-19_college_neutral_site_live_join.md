@@ -202,3 +202,20 @@ Registered 2026-11-19, before any load. The load is a betting change: it adds li
     - priceable, edge +8.75 pp: a flag the board could not show.
   - Shadow rows == off rows in both captures. The 10 games in ESPN's order are identical in all three modes.
   - Seton Hall / Wisconsin, also reversed on the slate, had no live rows in either capture.
+- **Second replay, Kansas / Houston, 10:34 PM CST** (`/mnt/c/tmp/cnsl/replay_ncaab_20261120T043448Z`; reported by
+  the rail monitor at 10:33 PM, readings 17 and 23):
+  - The lane is home Kansas (ESPN Houston @ Kansas); the rows read Kansas @ Houston.
+  - The slate read Houston @ Kansas, unswapped, at 6:55 PM. Its `reoriented_neutral_site` went 4 -> 5 by 04:33:55Z:
+    the odds feed's orientation changed later in the day.
+  - Fleet: 0 of 61 rows with a model.
+  - Switch `on`:
+    - 61 of 61 joined, 53 Live-column numbers;
+    - full-game 9 of 31 modelled; `no_live_gameline_projection` 31 -> 0;
+    - none priceable: stale quotes, and no two-sided market at the moment.
+  - Sides: row home Houston 0.9425 = 1 - lane 0.0575 (lane home Kansas); state 26-10 restated.
+  - Shadow == off.
+- **Tonight's tally (rail monitor, re-read here for the two games captured):**
+  - 5 of 7 NCAAB neutral-site games were reoriented, and all 5 were dark: WVU / Florida, Auburn / Notre Dame,
+    Rutgers / UNLV, Seton Hall / Wisconsin, Kansas / Houston.
+  - The other 2 joined directly.
+  - The history count in section 3 (24, to about 6:50 PM) does not include the 3 evening games.
