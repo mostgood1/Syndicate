@@ -1,0 +1,122 @@
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Layer 2 Games Rail · monitor log · Thu Nov 19, 2026 · 10:39 AM – 12:19 AM CST · the first always-on day</div>
+    <h1>Rail Watch, Thu Nov 19</h1>
+    <p class="lede">26 readings of the served Games Rail on the fleet: a college afternoon, a 50-game evening with NHL, NBA and Thursday Night Football, and the late West games. The board memory fix (#850) loaded at 11 AM and had its first evening. Every reading is on the live dashboard: <a href="https://claude.ai/artifact/HoJ2n52ewHZnVDbN2LpxaJ">Rail Watch (live)</a>.</p>
+  </header>
+
+  <div class="strip" aria-label="Day totals">
+    <div class="stat good"><span class="v">0 / 0</span><span class="k">false / missed flags, all 26 readings</span></div>
+    <div class="stat"><span class="v">84-83</span><span class="k">169 flags graded on finals (37 games): hit 50.3% vs 50.6% fair</span></div>
+    <div class="stat good"><span class="v">0</span><span class="k">board-process crashes (Wed: 7)</span></div>
+    <div class="stat warn"><span class="v">5 / 5</span><span class="k">reoriented neutral-site games with no live model</span></div>
+    <div class="stat good"><span class="v">0</span><span class="k">college live totals below the score already scored</span></div>
+  </div>
+
+  <section class="owed">
+    <h2>Decisions waiting on you</h2>
+    <ol>
+      <li><b>Load the neutral-site fix (I-29), and when?</b><span class="why">At tournament games on a neutral court, the slate takes the odds feed's home/away while the live re-sim keeps ESPN's. The board then looks up the model under the reversed pair and finds nothing. Tonight that left 5 of 5 such games with no live model for their whole game, and since 11-02 it has hit 24 of 24. The fix is on main and running in shadow. Replays with it switched on matched 29 of 29 and 61 of 61 rows on the right sides. It changes which live lines get priced, so it is a betting change: the 11-24 window, unless you give an outside-window reason. The games fail closed (no model, no bet), so waiting costs missed chances, not losses.</span></li>
+      <li><b>Start the NHL coverage session (I-30)?</b><span class="why">From one board build to the next, only 1 to 9 of 12 NHL games carry a live re-sim. 11-18 had the same shape. The hypothesis is two writers of one NHL file. The session card is waiting.</span></li>
+      <li><b>The memory fix's next lever.</b><span class="why">Every post-build restart of the board process was held tonight while other jobs ran, and the main worker grew to 1.6 GB. The memory-guard session has put a margin for those jobs to you. It is a betting change.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Flags and fresh quotes through the day</h2>
+    <div class="chart">
+      <div class="legend"><span style="--c: var(--bar)">flags shown (markets)</span><span style="--c: var(--bad)">hidden as stale (dark)</span><span style="--c: var(--accent)">live rows priced on a quote ≤ 120 s, %</span></div>
+      <svg id="trend" viewBox="0 0 900 300" role="img" aria-label="Flags shown, dark rows and fresh-quote share per reading"></svg>
+    </div>
+    <p class="note">The evening peaked at 50 live games at 7:06 PM, and at 32 flags at 8:21 PM. None was wrong or missed. With NBA live from 7:10 PM the rail carried up to 1,277 rows, mostly NBA alternate lines priced from one sweep about 2.5 minutes old, so the fresh-quote share fell. At the 7 PM peak, host load 7.9 slowed the shortlist to 10 s and the board query to 15–25 s.</p>
+  </section>
+
+  <section>
+    <h2>Did the flags carry anything?</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Population</th><th>Flags</th><th>Games</th><th>Record</th><th>Hit rate vs book fair</th></tr></thead>
+      <tbody>
+        <tr><td>All day (games from 10:40 AM)</td><td class="n">167</td><td class="n">37</td><td class="n">84-83</td><td class="n">50.3% vs 50.6% [−5.8, +5.9]</td></tr>
+        <tr><td>Men's college</td><td class="n">140</td><td class="n">25</td><td class="n">73-67</td><td class="n">52.1% vs 50.9% [−5.3, +8.0]</td></tr>
+        <tr><td>NBA</td><td class="n">13</td><td class="n">4</td><td class="n">5-8</td><td class="n">38.5% vs 50.3% [−22.0, −0.3]</td></tr>
+        <tr><td>NHL</td><td class="n">5</td><td class="n">4</td><td class="n">2-3</td><td class="n">40.0% vs 38.9%</td></tr>
+        <tr><td>Full-game totals</td><td class="n">76</td><td class="n">30</td><td class="n">40-36</td><td class="n">52.6% vs 50.3% [−7.9, +13.3]</td></tr>
+        <tr><td>Full-game spreads</td><td class="n">49</td><td class="n">26</td><td class="n">23-26</td><td class="n">46.9% vs 49.4% [−13.8, +9.3]</td></tr>
+        <tr><td><b>Registered in advance (10:40 AM)</b></td><td></td><td></td><td></td><td></td></tr>
+        <tr class="split"><td>P3 · flags on a game's first reading</td><td class="n">45</td><td class="n">24</td><td class="n">23-22</td><td class="n">51.1% vs 48.8% [−10.1, +14.5]</td></tr>
+        <tr class="split"><td>P4 · book fair under 40%</td><td class="n">4</td><td class="n">4</td><td class="n">1-3</td><td class="n">25.0% vs 27.9%</td></tr>
+        <tr class="split"><td>P5 · men's college full-game totals, calibrated</td><td class="n">61</td><td class="n">23</td><td class="n">32-29</td><td class="n">52.5% vs 50.2% [−8.9, +15.7]</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note"><b>The flags hit their price, no better and no worse.</b> The model's own average probability on them was 59.5% against a 50.3% hit rate: about 9 points over-confident. That is the case for calibrating each line (#847, graded 11-26). <b>NBA ran under its price for a second day</b>, by 12 points on 13 flags (Wed: 8 points on 182). It is evidence for calibration, never a cut-off. P5's calibrated college totals were 57 unders and 4 overs, and 31 of their 61 lines went over. Brackets are 90% intervals on hit rate minus book fair, resampled by game.</p>
+  </section>
+
+  <section>
+    <h2>The board memory fix's first evening</h2>
+    <div class="mnf">
+      <div><span class="tm">11:00 AM</span><span>The #850 fix loads with one drained restart. The board process gets a clean exit, a post-build restart and credit for its own memory. The restart also gives the main worker the college score floor.</span></div>
+      <div><span class="tm">5–8 PM</span><span>No refusals, no restarts. The longest gap between builds is 807 s, at the 7 PM peak under host load 8.</span></div>
+      <div><span class="tm">8:42 PM</span><span>The first refusals since the load: 2 at 8:42, 2 at 9:05, 2 at 10:39 PM. Each time the headroom was a few MB to 160 MB under the 1,900 MB floor. Never 3 in a row, so the process never restarted.</span></div>
+      <div><span class="tm">10 PM</span><span>Graded against the owner's prediction: refusals 4 against a predicted 3 or fewer (neither met nor failed); 0 crashes (met); longest gap 807 s against 900 (met). <b>Confounded:</b> 21 major live games at 7 PM against 46 on Wednesday. A busier night is still owed.</span></div>
+    </div>
+    <p class="note"><b>Shape:</b> all 4 post-build restarts in the window were held because other jobs were running. Meanwhile the main worker grew from 785 MB to 1.6 GB, and it cannot shed that while the board builds in its own process. <b>The board published every 310 s at the median 5:30–10:30 PM, 585 s at the longest</b> (Wed: 572 s median and a 26-minute worst), so the cadence prediction is met.</p>
+  </section>
+
+  <div class="two">
+    <section>
+      <h2>Refresh</h2>
+      <div class="tbl"><table><tbody>
+        <tr><td>Live-price gaps over 360 s</td><td class="n">0 in the evening</td></tr>
+        <tr><td>Board rebuild</td><td class="n">160–240 s typical · 548 s at the 7 PM peak</td></tr>
+        <tr><td>Longest publication gap, 5:30–10:30 PM</td><td class="n">585 s (Wed: 26.3 min)</td></tr>
+        <tr><td>Live odds refreshes turned away</td><td class="n">0–36% per reading</td></tr>
+        <tr><td>NHL odds rebuild timeouts</td><td class="n">0</td></tr>
+      </tbody></table></div>
+    </section>
+    <section>
+      <h2>Load</h2>
+      <div class="tbl"><table><tbody>
+        <tr><td>Page's board query</td><td class="n">1.6–24.5 s</td></tr>
+        <tr><td>Board page</td><td class="n">2.2–11.6 s</td></tr>
+        <tr><td>Shortlist · chips</td><td class="n">≤ 10.2 s · ≤ 9.2 s (both at peaks)</td></tr>
+      </tbody></table></div>
+      <p class="note"><b>Why the query is slow:</b> 60–70% of board queries read a cold board, 4–16 s, because a freshly restarted web worker rebuilds a board the other worker already has. The fix (#853) is queued for Tuesday's batch.</p>
+    </section>
+  </div>
+
+  <section>
+    <h2>Games with no live model</h2>
+    <p>A new check counts live games whose lines carry no live model at all, which the flag counts cannot see. Tonight's causes:</p>
+    <ul>
+      <li><b>Reoriented neutral-site college games (I-29):</b> WVU–Florida, Auburn–Notre Dame, Wisconsin–Seton Hall, UNLV–Rutgers, Kansas–Houston. All dark, and the 2 that were not reoriented joined normally.</li>
+      <li><b>NHL (I-30):</b> 2 to 5 live games at any reading, as the live lanes flicker between builds.</li>
+      <li><b>NFL:</b> Thursday Night Football had no model for its first 40 minutes, refused as "uninformative" by design. After that the NFL re-sim publishes no distribution for totals, so its 22 rows stayed unpriced. Leads for the NFL live work.</li>
+      <li><b>Women's college:</b> games with a live market but no pregame anchor are refused (Stetson–UCF, FDU–LSU). A lead.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Teams on the rail</h2>
+    <p>No flipped, chip-less, duplicate or truncated cards in 26 readings, and every live game had a live card. No card showed "ours" on the wrong side of its flagged line.</p>
+  </section>
+
+  <section>
+    <h2>What changed and where it stands</h2>
+    <div class="tbl"><table>
+      <thead><tr><th>Item</th><th>What</th><th>Owner</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="n">#850</td><td>Board process memory: clean exits, post-build restart, memory credit</td><td>Memory-guard session</td><td><span class="pill ok">live 11:00 AM · first evening confounded</span></td></tr>
+        <tr><td class="n">I-17</td><td>College live totals never below the score already scored (now in the main worker too)</td><td>This monitor (owned reading)</td><td><span class="pill ok">0 violations all day</span></td></tr>
+        <tr><td class="n">I-28 / #853</td><td>Share the built board between web workers</td><td>Cold-board-read session</td><td><span class="pill wait">queued: Tue 11-24 batch</span></td></tr>
+        <tr><td class="n">I-29</td><td>Live join that works whichever team is listed home</td><td>Neutral-site session</td><td><span class="pill wait">on main in shadow · your call</span></td></tr>
+        <tr><td class="n">I-30</td><td>NHL live coverage flickers between builds</td><td>Proposed session</td><td><span class="pill mute">card waiting</span></td></tr>
+        <tr><td class="n">#844</td><td>College rows read stale when fresh</td><td>This monitor (owned reading)</td><td><span class="pill wait">baseline taken · 11-24 window</span></td></tr>
+        <tr><td class="n">#851</td><td>Polymarket slate sweep off the live odds loop</td><td>This monitor (owned reading)</td><td><span class="pill wait">11-24 window · read that evening</span></td></tr>
+        <tr><td class="n">#847</td><td>Calibrate each line</td><td>Optimization program</td><td><span class="pill wait">grade 11-26</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <p class="note">Source: <code>.syndicate/findings_2026-11-19_layer2_rail_monitor.md</code> on main (readings 1–26 and the daily summary). Probe: <code>scripts/layer2_rail_monitor_probe.py</code>. Grader: <code>grade_day.py</code> with the day's pre-registered splits. Monitor scripts and runbook: <code>scripts/rail_monitor/</code>.</p>
+</div>
