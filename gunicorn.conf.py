@@ -303,7 +303,9 @@ def decide_recycle(worker, *, now: float, anon_mb_reader, stamp_path: str) -> st
         return "skipped"
     anon = anon_mb_reader()
     if anon is None or anon < limit:
+        # A dip ends any hold: a later hard crossing is a NEW hold, logged and timed from its own start.
         worker._syndicate_hard_pending = False
+        worker._syndicate_hard_deferred_at = None
         return "below_limit"
     age = now - float(getattr(worker, "_syndicate_born", now))
     if age < min_age_seconds():

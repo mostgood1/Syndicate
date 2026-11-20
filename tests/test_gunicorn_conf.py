@@ -135,6 +135,27 @@ def test_a_held_worker_that_shrinks_stops_checking_every_request(tmp_path):
     assert conf.decide_recycle(held, now=1003.0, anon_mb_reader=lambda: 9999.0, stamp_path=stamp) == "skipped"
 
 
+def test_a_worker_held_again_after_a_dip_logs_the_new_hold_and_times_it_from_there(tmp_path, capsys):
+    """Findings Reading 3 (2026-11-19): the below-limit branch cleared the pending flag but not the hold's start, so a
+    worker that was held, dipped under its limit and was held again logged no second DEFERRED line, and its
+    `hard_deferred_s` counted from the FIRST hold (here 1031.0 instead of 31.0)."""
+    stamp = tmp_path / "stamp"
+    stamp.write_text("")
+    os.utime(stamp, (995.0, 995.0))
+    held = _worker()
+    assert conf.decide_recycle(held, now=1000.0, anon_mb_reader=_hard_mb, stamp_path=str(stamp)) == "deferred_hard"
+    assert conf.decide_recycle(held, now=1001.0, anon_mb_reader=lambda: 100.0, stamp_path=str(stamp)) == "below_limit"
+    os.utime(stamp, (1995.0, 1995.0))  # the other worker recycles much later
+    held._syndicate_requests = 9  # the next request is a 5th one, so it is checked
+    assert conf.decide_recycle(held, now=2000.0, anon_mb_reader=_hard_mb, stamp_path=str(stamp)) == "deferred_hard"
+    assert conf.decide_recycle(held, now=2031.0, anon_mb_reader=_hard_mb, stamp_path=str(stamp)) == "recycled"
+    out = capsys.readouterr().out.splitlines()
+    deferred = [json.loads(x.split(" ", 1)[1]) for x in out if x.startswith("WEB_WORKER_MEMORY_RECYCLE_DEFERRED ")]
+    [recycle] = [json.loads(x.split(" ", 1)[1]) for x in out if x.startswith("WEB_WORKER_MEMORY_RECYCLE ")]
+    assert [d["last_recycle_age_s"] for d in deferred] == [5.0, 5.0], "each hold logs its own DEFERRED line"
+    assert recycle["hard_deferred_s"] == 31.0, "the hold is timed from the second hold, not the first"
+
+
 def test_a_hook_that_fails_never_raises_into_gunicorn(capsys, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("proc unreadable")
