@@ -47,3 +47,56 @@ only, because this repo is public.
   - Orders today: 2 filled.
   - Cap use: 4.0% Kalshi, 1.0% Polymarket.
 - **Pace:** no games until the afternoon, so readings go hourly or slower overnight.
+
+## Reading 96 — Fri 11-20 2:00 AM CST (08:00Z), window 61 min
+
+- **Results first.** Unchanged overnight:
+  - 30 d: -7.38% [-12.8, -2.0] on 719 events;
+  - 7 d: -6.20% [-16.8, +4.4] on 181;
+  - gate: 13 of 800 (BC-053);
+  - nothing open.
+- **No new anomaly.**
+  - Every endpoint was inside budget. `plan` took 1.81 s of its 6.0 s budget (1,778 ms server-side), the slowest
+    tonight.
+  - The GATE line is the same 2 unclassified loads.
+- **Flow (11-20 pregame):**
+  - Plan 1.7 min old: 45 suggested, 13 positions; ceiling used 42.8%.
+  - Live ticks: 3 placed (1 Kalshi, 2 Polymarket) in 18; 1 refused `maker_pilot_held`.
+  - Orders today: 5 filled.
+  - Cap use: 4.4% Kalshi, 1.7% Polymarket.
+
+## Reading 97 — Fri 11-20 3:00 AM CST (09:00Z), window 60 min
+
+- **Results first.** Unchanged:
+  - 30 d: -7.38% [-12.8, -2.0] on 719 events;
+  - 7 d: -6.20% [-16.8, +4.4] on 181;
+  - gate: 13 of 800 (BC-053);
+  - nothing open.
+- **No new anomaly. Watch item:** `plan` 2.91 s against a 6.0 s budget (server 2,820 ms), up from 1.81 s at
+  Reading 96; `page` 1.22 s.
+  - Both are inside budget. It becomes an anomaly at more than 6 s, or if it keeps rising into the morning reads.
+  - The other endpoints returned in 0.25 s or less.
+  - The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 2.8 min old: 27 suggested, 13 positions.
+  - Live ticks: 0 placed in 18 (18 `already_held_other_slate`).
+  - Orders today: 5 filled.
+  - Cap use: 4.4% Kalshi, 1.7% Polymarket.
+
+## Reading 98 — Fri 11-20 4:00 AM CST (10:00Z), window 60 min
+
+- **Results first.** Unchanged:
+  - 30 d: -7.38% [-12.8, -2.0] on 719 events;
+  - 7 d: -6.20% [-16.8, +4.4] on 181;
+  - gate: 13 of 800 (BC-053);
+  - nothing open.
+- **No new anomaly.**
+  - `plan` 2.88 s against a 6.0 s budget, flat against Reading 97's 2.91 s, so it is not rising. Its payload grew
+    with the day's plan (209 to 230 KB); the server time was 2,777 ms. The watch stays at "more than 6 s".
+  - The plan's own max gap is down to 12.0 min, because the 148-min boundary artifact rolled out of the 6-h window.
+  - The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 1.8 min old: 23 suggested, 13 positions.
+  - Live ticks: 1 placed on Kalshi in 20.
+  - Orders today: 6 filled.
+  - Cap use: 4.8% Kalshi, 1.7% Polymarket.
