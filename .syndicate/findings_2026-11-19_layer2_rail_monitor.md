@@ -749,3 +749,29 @@ over the refresh-worker logs.
   `BOARD_BUILD_TIMING` gap measure is stricter, with longest 807 s.
 - Against 11-18's same window: median 572 s, 11 of 24 gaps over 10 min, max 26.3 min.
 - Final after 10:30 PM.
+
+## Reading 23 — 10:33 PM CST (04:33Z)
+
+- **Live:** 15 games (West Coast NCAAB, NHL West, MLS, 3 WNCAAB); 12 with rail rows (158 rows).
+- **Flags: 11 shown on 6 cards, 0 false, 0 missed, 0 dark.** P1 0; P6 0; **P8 0 of 69.** Team cards 94 chips, 0 defects.
+- **I-29: a 5th reoriented game, Kansas / Houston (401920518, Michelob ULTRA Arena, 10 PM tip): rail "Kansas Jayhawks @
+  Houston Cougars", re-sim REVERSED, 23 rows, 0 with a model.**
+  - The slate file now reads `reoriented_neutral_site: 5` (fetched 04:33:55Z), against 4 at 22:10Z. It swapped this game once the odds feed held only the reversed pair.
+  - So the reading-9 claim "4 of 7 reoriented" was a snapshot. The count moves through the day.
+  - **Tonight: 5 of 7 neutral-site NCAAB games reoriented, 5 of 5 dark; the 2 not reoriented joined directly.**
+- **`live_games_no_model` 4 of 12:**
+  - Kansas @ Houston (I-29);
+  - UTEP @ New Mexico St (END H2, refused);
+  - DAL @ VGK and VAN @ SEA (I-30).
+- **The monitor's P2 (board cadence, 5:30-10:30 PM CST = 23:30-04:30Z): PREDICTED.**
+  - `d4metrics.py`: **35 publications, gap median 310 s (<= 600), max 585 s (<= 1,800)**; wall median 225 s, max 407 s.
+  - `p7count.py`: 53 `BOARD_BUILD_TIMING` lines; longest 807, 662, 585 s; 0 over 900 s.
+  - 11-18's same window: median 572 s, 11 of 24 gaps over 10 min, max 26.3 min.
+  - Same caveat as #850: the slate was lighter (21 vs 46 core live games at 7 PM).
+- **#850 since the grade:** no new refusals; 2 more post-build checks `held=transient_jobs` (04:17, 04:27Z); child
+  4.54 GB.
+- **Live odds:**
+  - 17 sweeps, 8 refused (`lane_busy`, 32%); overlay gap max 155 s;
+  - 166 stale web merges are NBA / NCAAF / NFL after their finals, not a defect;
+  - priced age p50 178 s, p90 418 s.
+- **Load:** query 4.61 s, chips 1.13 s, shortlist 0.78 s.
