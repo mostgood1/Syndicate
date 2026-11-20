@@ -3718,3 +3718,23 @@ ratios, when the remaining-time denominator can approach zero.
 **Measured:** `/proc/<pid>/environ` of the master and both workers carries `GUNICORN_CMD_ARGS=--max-requests 1000 --max-requests-jitter 100 --access-logfile -`. It comes from the Render-era `fleet_env/web.json` snapshot, and gunicorn merges it with the command line. It has never fired (0 `Autorestarting worker` lines in 20 days), only because the 650 MB guard recycles every worker long before 1,000 requests. At a higher limit it becomes the second recycle path (~0.2-0.45/h on an evening).
 
 **Rule.** Before modelling a fleet process's lifetime or limits, read its live environ (`tr '\0' '\n' < /proc/<pid>/environ`) for env-carried arguments (`GUNICORN_CMD_ARGS`, and the like), not only the launcher's argv. A path that has never fired is not absent: say what keeps it from firing, and whether the change under study removes that.
+
+## 2026-11-20 -- FORBIDDEN: printing from a gc callback, `__del__`, weakref finalizer or signal handler in a fleet role `[lane web-silent-worker-kills, session 313ab61c]`
+
+**Believed (by me, when I wrote `3c8ba5b14`):** a `gc.callbacks` hook that `print`s one line per long collection is a
+harmless instrument. The callback ran "between" pieces of Python code, and `print` with `flush=True` is what every
+fleet log line uses.
+
+**Measured (2026-11-20 20:01:56Z):** it killed a web worker. Every role's `sys.stdout` / `sys.stderr` is
+`scripts/local_logstamp/sitecustomize.py`'s `StampedStream`, which holds a `threading.Lock` (NOT reentrant) around its
+timestamp. A collection fires on whatever allocation crosses the threshold, including the ones inside that lock. The
+board warmer's own print triggered a full collection under the lock. The hook's print then waited on the warmer's own
+lock forever, every printing thread queued behind it, and the master killed the worker when the main loop printed. The
+dump showed every thread at `sitecustomize.py:47`. A worker whose main loop never printed again would have been a
+permanent, silent black hole.
+
+**Rule.** Code that runs at an arbitrary allocation or signal point must not take a lock or do I/O. That covers
+`gc.callbacks`, `__del__`, `weakref.finalize` callbacks and signal handlers. It records into a preallocated structure
+(a `deque.append` is enough), and ordinary code writes it out later: here the worker's heartbeat (`0d20a6919`). The
+same holds for any lock-holding wrapper around stdout. Test such an instrument with the REAL `StampedStream` and a REAL
+`gc.collect()` fired inside its locked section, not with a capture fixture.

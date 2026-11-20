@@ -62489,6 +62489,7 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - A `WEB_GC_PAUSE` with `pause_s` near that gap names GC.
   - No such pause, with `cpu_per_wall` ~1.0, names the decode itself; `cpu_per_wall` well under 1 names a starved process.
   - Reading owed, and the decode fix comes next, in its own reload.
+- **DEFECT FOUND 2026-11-20 20:01:56Z (2:01 PM CST): this entry's `WEB_GC_PAUSE` hook caused a WORKER TIMEOUT.** It printed from inside the GC callback. A full collection fired inside `StampedStream.write` (`scripts/local_logstamp/sitecustomize.py`), whose lock is NOT reentrant, so the hook's print waited on its own thread's lock forever. Worker 1860718 was killed. Fixed by `0d20a6919`: see the 2026-11-20 20:13:38Z entry.
 
 ## 2026-11-20 17:38:47Z (11:38 AM CST) -- web: the combined board read leaves the day state's Layer 2 shortlist encoded `eeeb62a63` (lane `web-silent-worker-kills`, user "Yes, both" to "Deploy the instruments now, then fix the unused 40 MB decode in this lane?") -- **LOADED on web; the effect reading is owed**
 - betting change: **no**. The served board is byte-identical with the skip on and off: the test compares the whole combined response, and only the wall-clock age fields differ, as between any two reads.
@@ -62546,3 +62547,44 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **P5 MET (n=1 full day):** 11-19 0.68 h (bound 1.0). Partial 11-20 already 2.26 h by 11:58 AM (49-match Saturday target): will exceed when the day completes.
 - **Verdict:** falsified as written by P1's 1-of-35 miss; effect large (p50 hold 1,201 -> 385 s; runs over 1,800 s 10/86 -> 1/35).
 - betting change: no (reading only; nothing loaded)
+
+## 2026-11-20 20:13:38Z (2:13 PM CST) -- web: `WEB_GC_PAUSE` is queued by the GC callback and written by the heartbeat `0d20a6919` (lane `web-silent-worker-kills`, standing user instruction "keep watching and fix it when the dump lands") -- **LOADED on web; MET at +2.5 min, the 24-h reading is owed**
+- betting change: **no** (BC-056). Instrument only: the hook's lines are written by the main loop's heartbeat instead of the GC callback.
+  - Ride-along `c37bdeab3` (#814, the basketball off-floor exit signal) loaded INERT on web:
+    - the code runs only under `if off_floor_enabled()`, and `SYNDICATE_LIVE_EXIT_OFF_FLOOR` absent = off (`live_player_status.py:535`);
+    - the key is in no env layer (`local_production.env`, `fleet_env/*.json`, `fleet_role_spec.json`: none);
+    - only web reloaded. The workers load it at their next restart, still off.
+  - Everything else in `eeeb62a63..0d20a6919` is ledger. The fleet checkout's 14 dirty paths (data / reports / engines) are not touched by the ff.
+- **Why:** the 20:01:56Z `WORKER TIMEOUT` (pid 1860718) was caused by `3c8ba5b14`'s hook. It was 11-20's only kill.
+  - The stall dump (20:01:3xZ) put EVERY thread at `scripts/local_logstamp/sitecustomize.py:47`, the `with self._lock` in `StampedStream.write`.
+  - The board warmer's `STATE_DECODE_SKIPPED` print held that lock when a full collection fired inside `_stamp`.
+  - The hook printed `WEB_GC_PAUSE` from the callback and waited on its own non-reentrant lock forever. Every thread that printed after it queued behind it.
+  - The main loop joined them at its first `WEB_FAST_HEALTHZ_ACTIVE` print (~20:00:55Z). The master killed the worker 62 s later.
+  - 1860718's last line carrying its pid was 19:46:33.9Z, so its threads were probably stuck from about then: ~15 min of a worker accepting connections it could not answer.
+    - web.log had 0 lines from ANY web process 19:57:23-20:01:34Z, and 1 request 20:01:59-20:03:01Z. The other roles logged normally (no host freeze).
+  - A worker whose main loop had ALREADY printed its fast-healthz line would never have been killed. It would have kept heartbeating, a permanent black hole for its share of web's connections.
+- **The change** (`gunicorn.conf.py`):
+  - The callback only appends to a bounded deque (cap 256; drops are counted in `dropped_before`).
+  - `install_gc_pause_log(worker)` wraps `worker.notify`, so each heartbeat writes the queued lines, each with `written_after_s`.
+  - No other `gc.callbacks` / `__del__` / `weakref.finalize` writer exists outside tests / vendor / data.
+  - Tests reproduce the kill with the real pieces: the fleet's `StampedStream` as stdout, the hook in the real `gc.callbacks`, a real `gc.collect()` inside the locked stamp.
+    - HEAD's hook: `writer_stuck_after_5s=True`, 0 bytes written. The fix: completes.
+    - 43 passed under the fleet venv (gunicorn importable).
+- **Gates:**
+  - claim web 20:13:13Z (holder `web-silent-worker-kills`, ACQUIRED, rc 0);
+  - baseline 20:13:19Z: fleet head `eeeb62a63`, healthz 200, 0 lines with `written_after_s`, 1 `WORKER TIMEOUT` today;
+  - preflight `--service web --target-commit 0d20a6919 --betting-change no`, from a worktree at origin/main, 3 expect/baseline pairs: **CLEAR 20:13:28Z**.
+- **ff + reload:**
+  - `git merge --ff-only` at **20:13:38Z** (`eeeb62a6344a` -> `0d20a69191b7`).
+  - `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "max_latency_s": 0.0}`.
+  - Workers 1872317 / 1874732 -> **1874834 / 1874835**, both `WEB_STALL_INSTRUMENTS_ARMED`; master 1011213 unchanged.
+- **expect / measured (20:16:11Z, +2.5 min):**
+  - `fleet_head` eeeb62a63 -> 0d20a6919: **MET**.
+  - `healthz` 200 -> 200: **MET**.
+  - `gc_pause_written_after_lines` 0 -> >= 1: **MET**. 24 `WEB_GC_PAUSE` lines, all 24 with `written_after_s` (mean 0.45 s, max 1.03 s), 0 without. Pauses 8.5 s in all, max 0.65 s.
+  - 0 dumps, 0 `WORKER TIMEOUT`, 0 Traceback. Both workers logging (last lines 20:16:08Z / 20:15:44Z).
+- **verify:**
+  - Over the next 24 h: 0 stall dumps at `sitecustomize.py:47`, and no worker silent while the other logs (the deadlock signature).
+  - `WEB_GC_PAUSE` keeps arriving at ~5 a minute with `written_after_s` <= ~1 s.
+  - Watch: scratchpad `wsk_dump_watch.sh` (task `bngl82idh`, to 2026-11-21 ~25:13Z); reading: `wsk_gcfix_reading.sh`.
+  - Kills per day: 11-20's one kill is this defect, not the decode mechanism. It does not count against `eeeb62a63`.

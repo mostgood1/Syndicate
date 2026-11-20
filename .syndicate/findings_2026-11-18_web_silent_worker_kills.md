@@ -406,3 +406,32 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
   - 0 loop stalls >= 5 s, 0 new dumps, 0 `WORKER TIMEOUT`.
   - So the warmer's every-few-seconds rebuild had been decoding the 40 MB shortlist too. The remaining full GCs (308 an hour,
     max 2.65 s, all collecting nothing) are the GC-tuning question, a separate decision.
+
+## 2026-11-20 2:20 PM CST (20:20Z) -- THE 20:01:56Z KILL WAS MY INSTRUMENT: the `WEB_GC_PAUSE` hook self-deadlocked a worker's stdout
+
+- **The dump (20:01:3xZ, pid 1860718)** put every thread at `scripts/local_logstamp/sitecustomize.py:47`, the `with self._lock` of
+  `StampedStream.write`:
+  - the overlay warmer was INSIDE that lock, in its `STATE_DECODE_SKIPPED` print -> `_stamp` -> `datetime.now()`. A full
+    collection fired there. `on_gc` -> `_log` -> `print` -> `write` -> the same lock, same thread: `threading.Lock` is not
+    reentrant, so it waits on itself forever;
+  - a request thread at the same print, the access logger, the live-rail request and a board query all queued on the lock;
+  - the MAIN thread in `_answer_healthz` -> `print("WEB_FAST_HEALTHZ_ACTIVE")`, its first fast healthz (~20:00:55Z). That
+    stopped the heartbeat, and the master killed it at 20:01:56Z (62 s).
+- **Timeline:**
+  - 1860718's last pid-tagged line was 19:46:33.9Z (booted 19:44:32Z). Its threads were probably stuck from about then.
+  - web.log had 0 lines from any web process 19:57:23-20:01:34Z, and 1 request 20:01:59-20:03:01Z.
+  - The other roles logged normally (refresh-worker 198-689 lines a minute), so this was not a host freeze.
+  - The other worker (1861480) served its 5th and last request at 20:03:02Z and recycled normally. It was not deadlocked
+    (its stdout still wrote), so I read its silence as clients stuck on 1860718's connections. That is inferred, not measured.
+- **Why a kill at all was luck:** the main loop prints only once per worker (its first fast healthz) or after a >= 5 s
+  gap. A deadlocked worker that had already printed that line would heartbeat forever, accepting connections it never
+  answers, with no kill, no recycle (`post_request` sits behind the access-log print) and no dump.
+- **Fix `0d20a6919`, LOADED 20:13:38Z (BC-056 no):**
+  - the callback only appends to a bounded deque; the heartbeat writes the lines (`written_after_s`);
+  - reproduced in a test with the real `StampedStream` + real `gc.callbacks` + a real `gc.collect()` inside the locked stamp:
+    HEAD's hook is stuck after 5 s with 0 bytes written, the fix completes;
+  - at +2.5 min: 24 lines, all written by the heartbeat (max 1.03 s late), 0 dumps, 0 kills.
+- **Kills per day:** 11-20 has 1 `WORKER TIMEOUT`, and it is this instrument defect, not the decode mechanism that
+  `eeeb62a63` fixed. 0 on 11-18 and 11-19.
+- **Lesson** (learnings.md 11-20): a gc callback, `__del__`, weakref finalizer or signal handler in a fleet role must never
+  print. Every role's stdout/stderr is a `StampedStream` with a non-reentrant lock, and a collection can fire inside it.
