@@ -118,6 +118,10 @@
   2. 11-21 / 11-28 after M2's verdict:
      - Run `bash /c/tmp/t852/check_slate_852.sh 2026-11-21 12` (then `2026-11-28 13`). It refuses before `m2_verdict.txt` exists.
      - Smoke-tested end to end on 11-14 (every 4th state, 41 games). There E0 reproduced 87 of 87, and the pick + #835 read -0.0167 (se 0.0085) vs production + #835.
+     - **SCHEDULED by the decision-engine session** (session e32fef1a; user "Yes, schedule them", 11-20 ~9:50 AM CST): one-time tasks `engine-ncaaf-checks-1124` (Tue 11-24 2:00 PM CST, 11-21 slate, week 12) and `engine-ncaaf-checks-1130` (Mon 11-30 10:30 AM CST, 11-28 slate, week 13). Do not schedule a second copy.
+     - **Runner fixed 11-20, before the tasks pin it.** The exported `T852_SIMS=60` (meant for the paired replays) leaked into E0, so the first full 11-14 run reproduced 0 of 345 E0s. E0 is now pinned to production's 120 sims.
+     - The clean full 11-14 re-run: rc 0, E0 345 of 345, pick + #835 -0.0176 (se 0.0095) vs production + #835, slope 0.76 -> 0.88.
+     - The runner ends with `CHECK VALID` / `CHECK INVALID`: read the numbers only on VALID. sha256 `4d0e07ba90c0918d2ec7c6e5e8914e52f70b2c32c9ce572a6d1ef58695f281d3`, sent to the scheduling session.
      - Expected (pre-registered): 75-95% log loss below production + #835, slope at least as high, the 17+ bucket's mean F - c closer to 0.
      - Re-check #835's late k (1.6) on top of the damping.
   3. **QUEUED for the Tue 12-08 window.** The user picked "Queue for 12-08 (Recommended)" on 2026-11-20 ~9:40 AM CST, a CONDITIONAL entry:
