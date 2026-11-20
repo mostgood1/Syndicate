@@ -125,6 +125,12 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
   - P3: slate write gap p50 within 173 s +-20% (139-208 s);
   - P4: 0 `POLYMARKET_ARTIFACT_STALE`;
   - P5: 0 slow iterations (post > 120 s) where the slate is the larger part (was 117).
+  - **P6 (OddsAPI credits), added 11-20 by local_73a5d2dd:** credits per hour over 00-05Z rise by no more than 30% against the baseline nights.
+    - The user typed "Keep it in" to "Keep #851 in the 11-24 batch with that OddsAPI cost?" (~9:45 AM CST 11-20, recorded on main `e08a97034`).
+    - The cost estimate is ~+24% evening sweeps, an upper bound of +0.24-0.4M credits a month. The month stays <= ~4.3M of the 5M cap; at 15:29Z 11-20 the projection was 3.94M for 30 days.
+    - Method: `py -3 C:\tmp\railmon\p851_quota.py <label>` (run from the worktree) reads `quota.latest.used` from `/api/ops/oddsapi/quota` and appends to `C:\tmp\railmon\p851_quota.jsonl`. Read at 00:00Z and 05:00Z; credits per hour = delta / hours between reads.
+    - Also report credits per lane sweep (ODDS_SWEEP_LAUNCHED in the window, from `p851_loopstages.py`), because slate size moves the raw rate.
+    - Baseline: the 11-20 and 11-21 evenings. One-shot crons read at 6 PM and 11 PM CST both nights, and at 6 PM and 11 PM on 11-24.
 - Each is PREDICTED, FALSIFIED or NEITHER. Name any restart in the window (it CONFOUNDS the reading). Write the verdict to the lane `polymarket-slate-off-odds-loop`, a deploys.md READING entry, and todo #851.
 
 **R-E. #838 slow-NHL-API case (lane `odds-lane-sport-deadline`, OPEN, goal not met until this is read).** Taken over 11-19 from session local_73a5d2dd (handover on main `ab4877f6e`; the user's "keep it open" from 11-19 still stands).
