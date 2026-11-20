@@ -238,3 +238,50 @@ Taken by the rail monitor (lane `layer2-rail-monitor`, `findings_2026-11-19_laye
   - Either change is a betting change, by the same rule as BC-053.
 - **Owed:** the same §5 thresholds on the next evening that passes the 70% slate rule (>= 33 live NCAAB + NBA +
   NHL + NFL at 7 PM CST), with no restart in the window. Until then the lane's goal is NOT MET.
+
+## 8. Since the load, to 2026-11-20 9:28 AM CST -- the parent's ratchet (written 15:35Z 11-20, before the 11-20 evening)
+
+Read-only, from `refresh-worker.log{,.1}` (scripts `C:\tmp\bmg\load\since_load.sh`, `fatal_after*.sh`).
+
+- **Exits since the load: 1**, at 05:58:33Z 11-20 (11:58 PM CST 11-19): `RECYCLE_EXIT reason=heavy_build_refused`
+  after 3 refusals, then `BOARD_PROCESS_EXITED rc=75 reason=recycle`. That is the RAW_LIFELINE fix working: a
+  clean exit where 11-18 had 4 of 4 SIGABRTs.
+  - "Fatal Python error" does appear twice in the log after the load, at 04:33:47Z. Both are inside an
+    `ALL_PROCESS_MEMORY` line: the cmdline of another session's `grep "Fatal Python error" ...` that was running
+    at the time (memory note: the heartbeat quotes greps).
+  - **0 real fatal errors since the load.**
+- **Refusals** after the 11-19 window:
+  - 04Z 2, 05Z 5 (10-11:59 PM CST): the streak that recycled the child at 05:58Z;
+  - 13Z 1 (7 AM CST).
+- **Post-build checks: 11 of 11 `held=transient_jobs`** (02:50Z-05:52Z), with pair 5,825-6,009 MB against the
+  6,036 MB line. **The post-build recycle has never fired.** The only recycle was the 3-refusal streak's.
+- **The parent does not come back.**
+
+  | when (CST) | parent RSS |
+  |---|---|
+  | 11-19 11:23 AM | 785 MB |
+  | 11-19 6:15 PM | 1.04 GB |
+  | 11-19 9 PM | 1.55-1.60 GB |
+  | 11-20 9:28 AM | **1,610 MB** |
+
+  - The 60 trims in the 11-19 evening released p50 142 MB each, but the floor after the evening stayed
+    ~1.5-1.6 GB overnight: about +0.8 GB from one evening that is not returned.
+  - Under the split the parent cannot recycle itself: its own refusal count is always 0, and the board child
+    always counts as a running child (§4, owed item 3).
+- **This morning:** tree 5,851 MB = parent 1,610 + child 3,890 (respawned 05:58Z) + jobs.
+  - Headroom 2,085 MB, 185 MB over the floor, in QUIET hours.
+- **Projection for the 11-20 evening, written before it** (not a new pass/fail, an expectation to check):
+  - The parent adds +0.8-1.1 GB to reach 2.4-2.7 GB by 9 PM, and the child is at 4.0-4.5 GB. So the pair alone is
+    over 6,036.
+  - The post-build check should then read `recycle`, not `transient_jobs`, and the child should recycle after
+    builds, at most every 30 min (the min uptime).
+  - Expect P2's "<= 2 recycles" to be at risk (still rc 75), and refusals fewer than in 11-18's streaks.
+- **If the parent's next-morning floor (11-21 ~9 AM CST) is >= 0.5 GB above today's 1,610 MB,** the parent ratchet
+  is a multi-day trend. By the second or third evening, the pair with a FRESH child (~2.9 GB after one build) would
+  sit over the line on its own, and the 11-18/19 overnight refuse-and-recycle loop returns. Two answers, neither
+  built:
+  1. **A refresh-worker restart:** a claimed TERM with no code or env change. It resets the parent, and it is not
+     a betting change, because nothing that decides bets changes.
+  2. **A parent self-recycle under the split:** in quiet hours, when the parent's own RSS is over a threshold and
+     no job other than the board child runs, the whole worker exits and the supervisor restarts it. Behind a
+     switch; a betting change by BC-053's rule, so the 11-24 window.
