@@ -125,3 +125,15 @@ def test_the_board_index_drops_the_refused_game_and_the_entry_hold_fails(tick):
 
 def test_nhl_publishes_to_the_hold():
     assert H.PUBLISHING_SPORTS["nhl"] == LR.live_lens_snapshot_path().name
+
+
+def test_a_live_box_without_starter_flags_still_refuses_the_lane(tick):
+    """2026-11-20 BUF @ WSH: a live goalie change read players_out=0; a box with no `starter` flags must refuse."""
+    box = _box()
+    for side in ("homeTeam", "awayTeam"):
+        for g in box["playerByGameStats"][side]["goalies"]:
+            g.pop("starter", None)
+    snap, _ = tick(box)
+    lane = snap["games"][0]["gameLens"][0]
+    assert lane["liveResimRefusal"] == "key_player_out" and snap["playerExits"]["refused_games"] == 1
+    assert {p["player"] for p in snap["games"][0]["playersOut"]} == {"K. Vejmelka", "V. Vanecek"}

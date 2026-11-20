@@ -734,15 +734,27 @@ def exits_from_nhl_boxscore(boxscore: Mapping[str, Any] | None, *, require_in_pr
     for side in ("homeTeam", "awayTeam"):
         abbr = str(((box.get(side) or {}).get("abbrev")) or "")
         goalies = list(((stats.get(side) or {}).get("goalies")) or [])
-        relief_played = any(not g.get("starter") and _toi_seconds(g.get("toi")) > 0 for g in goalies)
-        if not relief_played:
-            continue
-        for g in goalies:
-            if g.get("starter"):
-                name = str(((g.get("name") or {}).get("default")) or "")
-                pid = g.get("playerId")
-                out.append(PlayerOut("nhl", gid, abbr, name, str(pid) if pid is not None else None,
-                                     "goalie_change", True, "boxscore"))
+        played = [g for g in goalies if _toi_seconds(g.get("toi")) > 0]
+        flagged = [g for g in goalies if g.get("starter")]
+        if flagged:
+            # A non-starter with ice time = the starter has left.
+            if not any(not g.get("starter") and _toi_seconds(g.get("toi")) > 0 for g in goalies):
+                continue
+            leaving = flagged
+        else:
+            # NO goalie carries a `starter` flag -- suspected to be the LIVE box (2026-11-20: BUF @ WSH
+            # 2026020351, Thompson pulled at 10:11 of P1, every live tick read players_out=0, while the
+            # FINAL box of the same game is caught). Two goalies with ice time = the goaltender changed.
+            # The box alone cannot say which one is in net now, so every goalie with ice time is out,
+            # as on ESPN (`_hockey`); the refusal is game-level either way.
+            if len(played) < 2:
+                continue
+            leaving = played
+        for g in leaving:
+            name = str(((g.get("name") or {}).get("default")) or "")
+            pid = g.get("playerId")
+            out.append(PlayerOut("nhl", gid, abbr, name, str(pid) if pid is not None else None,
+                                 "goalie_change", True, "boxscore"))
     return GameExitStatus("nhl", gid, True, tuple(sorted(out, key=lambda p: (p.team, p.player))), home, away)
 
 
