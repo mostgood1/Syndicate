@@ -820,6 +820,7 @@
       - Over 13 games: q2 12.90 -> 14.11 and q3 10.71 -> 9.23 points a game (league 14.02 / 9.50).
       - Lane `nfl-profile-load` CLOSED, GOAL MET. Findings: `findings_2026-11-16_nfl_profile_load.md`.
       - Still owed under this item: the TNF 11-19 live readings, and the #752 re-grade on 12-08.
+    - **TNF READING 11-19 (IND @ HOU 3-26, deploys.md 2026-11-20 04:10Z): all four expectations MET.** Of 85 in-progress reads, 66 were ok. timeouts_fed 66/66. Fed = ESPN on 58/66; the other 8 were all tick lag in the Q2 two-minute window (median lens age 159 s). possession carried on 48/66 (73%, MNF 75-81%; baseline 0/313). Refusals were only pre-existing reasons: `uninformative_probability` 18 (Q1 to 0:48) and `game_not_in_progress` 1. Scoreboard vs play-by-play: 77/85 match + 8 halftime. Nothing broken.
 - **Read-only.** Production's own NFL `build_projection`, 136 games of 2024-25 x 100 seeds, same seeds per arm (patched in the research process only), against nflverse pbp 2024-25 (544 games). Findings: `.syndicate/findings_2026-11-15_football_end_of_half_scoring.md`.
 - **The whole Q2 gap is in its last 120 s:** sim 3.14 points a game against the league's 4.78 [4.46, 5.10]. The regulation total looks right (45.84 vs 45.62) only because the errors cancel.
 - **Cause 1, halftime carry-over (`halftime_kickoff` OFF):** a drive crosses the half in 0.84 of games and scores 2.33 points a game in Q3. Switching it on: q3 -0.95 [-1.07, -0.83] (to 9.57, the league's 9.50), q2 0, total -1.07. That total drop is why the switch failed alone upstream.
