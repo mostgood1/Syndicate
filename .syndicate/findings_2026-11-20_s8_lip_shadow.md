@@ -139,3 +139,10 @@ The help page's terms:
   - It resumed at 15:26:47Z with the same book, pid 19300 at **Idle** (verified). Cycle 4 at 15:32Z: 43 of 43 books,
     0 errors.
   - **Delete the task after 11-25.**
+- **2026-11-20 9:45 AM CST: credit-to-cash check, a gate for any pilot. Leaning yes, not confirmed.**
+  - Kalshi's help pages: rewards post as credits (Rewards; Account → Activity → Credits). The minimum is $1.00, and a
+    verified SSN is required above the IRS reporting threshold, so they are taxable like income.
+  - A CFTC filing names them "Promotional Bonus Credits" and forbids manipulation aimed at withdrawing their value,
+    which implies the value can be withdrawn.
+  - The exact rule (withdraw directly, or only after trading?) is not public in what was found. **The user's account
+    Rewards page or Kalshi support settles it.**
