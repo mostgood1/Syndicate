@@ -1914,6 +1914,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS 2026-11-20 10:55 AM CST (16:55Z): **Rail Watch is Claude-free and multi-day.** The Windows task SyndicateRailWatch (every 20 min, 10:03 AM-2:03 AM CST) renders ONE self-contained page at the stable path C:\tmp\railmon\railwatch\index.html (fleet copy ~/syndicate-prod/data/reports/rail_watch/index.html), with a day picker (Today + every slate day since 11-15) and an All-days view (graded hit vs fair by day, peaks, false/missed, board gaps, query p50, day-page links). 11-15..11-17 rows rebuilt from the saved readings (probe summary() on reading.json; no fleet-log columns). Asked by the fleet-watcher local_379fd729 for its central hub (C:\SyndicateProd\dashboards\index.html), user verbatim: "yes, ask all three sessions to make those changes - and pull in the history we already should have. I want all 3 of these available in one central dashboard hub". The /rail-watch route still lands after the 11-24 batch (branch rail-watch-route, one-shot 9:37 AM 11-24).
 
+### ops-dashboards-hub — OPEN — opened 2026-11-20 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
+- Goal: Serve the three Claude-free dashboards (Engine Watch, Portfolio Watch, Rail Watch) from the fleet web app as one hub at /ops/dashboards behind the portfolio login (user 11-20: 'yes, open the lane and send the asks'): web only reads prebuilt files ~/syndicate-prod/data/reports/{engine_watch,portfolio_watch,rail_watch}/index.html written by each builder's own Windows task (no computation in web, a missing file shows a 'not built yet' tab, not an error); betting change: no.
+- Files: syndicate/blueprints/ops_dashboards.py (NEW), syndicate/app.py (the ops_dashboards_bp import and register_blueprint lines ONLY), tests/test_ops_dashboards_route.py (NEW)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: After a reload-web deploy: GET http://127.0.0.1:10000/ops/dashboards returns 200 with three tabs only when signed in (401/redirect otherwise); each tab's content matches the newest file in data/reports/<name>/ (mtime within its builder's cadence); deleting one file shows that tab's 'not built yet' panel and the other two still render; web RSS unchanged within noise (no computation). Recorded in deploys.md, betting change: no.
+- Blocked by: rail-watch-fleet-page (its /rail-watch route proves the serve-a-prebuilt-file pattern after the 11-24 batch; this lands after it), and the portfolio + decision-engine builders adding the data-root copy step
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
