@@ -62448,3 +62448,44 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Criteria:** MET-1 gaps > 300 s <= 10%: 0% YES. MET-2 wall time without <= 10%: 17% NO (2% to the final). MET-3 rail <= 1 zero poll: 0 YES. NOT-MET-a wall time >= 25%: no. NOT-MET-b gap p50 > 300 s: no (117). **NOT-MET-c capture stopped before 04:05Z: YES (04:00:14Z)**. NOT-MET-d >= 2 zero rail polls: no.
 - **Verdict: NOT MET, as pre-registered, on criterion c alone.** Everything that measures the change (gap cadence, in-game freshness, the rail) cleared MET by a wide margin. Both misses come from the game ending early: the 04:05Z cut-off and the fixed 04:40Z window both assumed a game over 3 hours, and this one ran 2 h 53 min. Whether criterion c was mis-set is for the lane owner to decide. This run does not re-grade it. Lane stays OPEN.
 - reading only: loads nothing (no betting change).
+
+## 2026-11-20 17:03:49Z (11:03 AM CST) -- web: the WEB_LOOP_STALL + WEB_GC_PAUSE instruments `3c8ba5b14` (lane `web-silent-worker-kills`, user "Yes, both" to "Deploy the instruments now, then fix the unused 40 MB decode in this lane?") -- **LOADED on web; the reading is owed**
+- betting change: **no**. Instruments only: two log lines; nothing changes which request is served or when a worker recycles.
+  - Ride-alongs `38c3a6905..3c8ba5b14` (227 commits) are default-off, shadow or ledger-only. No key for them is set in any fleet env layer (read 17:0xZ, by key name):
+    - NCAAF blowout damping (`SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING` absent = off);
+    - NCAAF live total dispersion (`SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION` absent = off);
+    - hold-value exits (`SYNDICATE_EXIT_HOLD_VALUE` absent = off);
+    - the combined-board shared copy (`SYNDICATE_COMBINED_BOARD_SHARED_COPY` absent = off);
+    - live gameline orientation (`SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION` absent = shadow);
+    - the Polymarket slate main-loop background (absent = off);
+    - fill-quote logging (`3d636d88e`: ledger fields only, "NOT a betting change").
+  - The workers load all of it at their next restart, at those defaults.
+- **The change** (`gunicorn.conf.py` `post_worker_init`):
+  - `WEB_LOOP_STALL`: when the main loop's heartbeat resumes after >= 5 s, the gap and the process CPU spent in it (`cpu_per_wall`).
+  - `WEB_GC_PAUSE`: every collection >= 0.25 s, with its generation, pause, the collecting thread's CPU and the thread.
+  - Every worker logs `WEB_STALL_INSTRUMENTS_ARMED`. Switches `SYNDICATE_WEB_LOOP_STALL_LOG_SECONDS` / `SYNDICATE_WEB_GC_PAUSE_LOG_SECONDS` (0 disables).
+  - Tests: 39 passed / 2 skipped on Windows, 41 on the fleet's Linux Python, including off != on and a real `gc.collect()` / real heartbeat.
+- **Why:** the 16:08:10Z dump (findings, "THE DUMP LANDED").
+  - A request thread held the GIL 40+ s inside one `json.loads` at `pipeline/intelligence_state.py:4613`: 11-21's 40 MB `layer2_shortlist`, decoded on every cold board read and unused by it.
+  - The same decode takes 0.3-1.1 s in a side process. These lines separate a GC pause, the decode itself and a starved vCPU.
+- **Gates:**
+  - claim web 17:02:21Z (holder `web-silent-worker-kills`, ACQUIRED, rc 0);
+  - baseline 17:02:40Z: fleet head `38c3a6905`, 0 `WEB_STALL_INSTRUMENTS_ARMED` lines, healthz 200;
+  - preflight `--service web --target-commit 3c8ba5b14 --betting-change no`, from a worktree at origin/main `12136a4d0`, 3 expect/baseline pairs: **CLEAR 17:02:59Z**.
+- **ff + reload** (scratchpad `wsk_ff_reload2.sh`):
+  - `git merge --ff-only` at **17:03:49Z** (`38c3a6905e22` -> `3c8ba5b1484f`).
+  - `RELOAD_WEB {"elapsed_s": 52.2, "failures": 0, "healthz_ok_last": true, "max_latency_s": 4.0, "probes": 26}`.
+  - Workers -> **1816342 / 1816343**; master 1011213 unchanged.
+- **Why the reload took 52 s.** Old worker 1803108 had a 73.3 s board query in flight: `POST /api/intelligence/query`, `Python-urllib`, `board_read` 58.4 s, 6,131 rows.
+  - It drained with in_flight 1 / still_in_flight 1 (17:04:01Z), waited, and logged `Worker exiting` at 17:04:31Z.
+  - Then the day's second stall dump fired, with its main thread in interpreter exit (`_python_exit` -> `join`, un-heartbeated: the drain-path mode) while a request thread serialized the response (`json_safety.json_safe_value`).
+  - The request finished 17:04:40.7Z (200), and the worker went at 17:04:41Z ("was sent SIGTERM"). 0 `WORKER TIMEOUT`.
+- **expect / measured:**
+  - `fleet_head` 38c3a6905 -> 3c8ba5b14: **MET**.
+  - `stall_instruments_armed_workers` 0 -> 2: **MET** (17:03:56.975Z pid 1816342, 17:03:57.557Z pid 1816343; 0.25 s / 5 s).
+  - `healthz` 200 -> 200: **MET** (17:05Z, 1.1 ms). 0 Traceback 17:03-17:07Z.
+  - First line: `WEB_GC_PAUSE` 17:07:37Z, gen 2, 0.452 s pause / 0.451 s thread CPU, in a request thread (the 11:07 AM CST picks run).
+- **verify:** the next cold board read with a heartbeat stall (picks run :07 / :22 / :37 / :52, or the board page) logs `WEB_LOOP_STALL` with `gap_s` >= 5.
+  - A `WEB_GC_PAUSE` with `pause_s` near that gap names GC.
+  - No such pause, with `cpu_per_wall` ~1.0, names the decode itself; `cpu_per_wall` well under 1 names a starved process.
+  - Reading owed, and the decode fix comes next, in its own reload.
