@@ -540,3 +540,58 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - Live ticks: 0 placed in 10.
   - Orders today: 58. 57 filled, 1 maker expiry.
   - Cap use: 27.2% Kalshi, 16.0% Polymarket.
+
+## Reading 88 — Thu 11-19 9:27 PM CST (03:27Z), window 31 min
+
+- **Results first.**
+  - Gate: **5 of 800 events** (7 bets) on BC-053.
+  - All-time: 2,109 / 1,137, -10.79% (2,101 / 1,133, -10.82% at Reading 87). Tonight's grades are coming in
+    slightly better than the book's average.
+  - 30 d: -7.13% [-12.6, -1.7] on 706 events.
+  - 7 d: -3.81% [-14.8, +7.2] on 178.
+  - 36 games are in play; none is late.
+- **No new anomaly.** Every endpoint returned in 0.41 s or less (`live_today` 0.38 s). The GATE line is the same 2
+  unclassified loads.
+- **Flow:**
+  - Plan 4.0 min old: 88 suggested, 15 positions; 25 rows refused `in_play_market_fair`.
+  - Live ticks: 0 placed in 9.
+  - Orders today: 58. 57 filled, 1 maker expiry.
+  - Cap use: 27.1% Kalshi, 16.0% Polymarket.
+
+## Reading 89 — Thu 11-19 9:57 PM CST (03:57Z), window 30 min
+
+- **Results first.** Tonight's slate is mostly graded.
+  - Gate: **8 of 800 events** (12 bets) on BC-053.
+  - All-time: 2,134 / 1,142, -10.74% (2,109 / 1,137, -10.79% at Reading 88).
+  - Yesterday (late 11-18 grades): 69 bets / 35 events, +3.64% [-22.9, +30.1].
+  - 7 d: -3.96% [-15.0, +7.1] on 179.
+  - 30 d: -7.15% [-12.6, -1.7] on 707.
+  - 11 games are still in play; none is late.
+- **No new anomaly.** Every endpoint returned in 0.27 s or less. The GATE line is the same 2 unclassified loads.
+- **Noted, not an anomaly:**
+  - `/api/portfolio/plan` took 50 requests in the window (2 a reading before), at a steady 2 a minute from 03:27Z.
+  - UA `Python-urllib/3.11`, so another session's poller, not this probe.
+  - Cheap: median 19 ms, max 193 ms. No action.
+- **Flow:**
+  - Plan 0.8 min old: 41 suggested, 14 positions.
+  - Live ticks: 0 placed in 9.
+  - Orders today: 58. 57 filled, 1 maker expiry.
+  - Cap use: 27.1% Kalshi, 15.1% Polymarket.
+
+## Reading 90 — Thu 11-19 10:27 PM CST (04:27Z), window 30 min
+
+- **Results first.**
+  - Gate: **9 of 800 events** (13 bets) on BC-053.
+  - All-time: 2,137 / 1,144, -10.72%.
+  - 30 d: -7.15% [-12.6, -1.7] on 707 events.
+  - 7 d: -3.96% [-15.0, +7.1] on 179.
+  - 9 games are still in play; none is late.
+- **No new anomaly.**
+  - Every endpoint returned in 0.27 s or less.
+  - The plan poller from Reading 89 has stopped (n=2 in this window).
+  - The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 5.1 min old: 33 suggested, 13 positions.
+  - Live ticks: 0 placed in 10.
+  - Orders today: 58. 57 filled, 1 maker expiry.
+  - Cap use: 27.1% Kalshi, 15.1% Polymarket.
