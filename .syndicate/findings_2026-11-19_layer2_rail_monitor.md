@@ -561,3 +561,33 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **Live odds:** overlay gap max 272 s (soccer); 8 sweeps, 3 refused; priced age p50 172 s, p90 455 s.
 - **Load:** `/intelligence` **2.17 s** (35 MB raw, the largest today); query 6.69 s; shortlist 2.41 s.
   **I-28:** 15 queries, 8 cold (53%).
+
+## Reading 17 — 7:56 PM CST (01:56Z)
+
+- **Live:** 48 games; 33 with rail rows (1,239 rows).
+- **Flags: 19 shown on 14 cards, 0 false, 0 missed, 2 dark** (prices over 300 s old).
+- **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 143.** Team cards 94 chips, 0 defects.
+- **I-29: 4 of 4 reoriented neutral-site games went dark, as predicted at reading 9.**
+  - **Wisconsin @ Seton Hall** (401920888): 14 rows, 0 with a model, re-sim REVERSED.
+  - **UNLV @ Rutgers** (401920520): 20 rows, 0 with a model, re-sim REVERSED.
+  - With WVU / Florida and Auburn / Notre Dame earlier, that is 4 of 4. The other 3 neutral-site games joined directly:
+    Murray St / NC State, plus Oregon St @ Oregon (8 PM) and Houston @ Kansas (10 PM), still to tip.
+  - Session local_a94d8ca3 replayed UNLV / Rutgers with the fix switched on: 29 of 29 rows matched their lane, right sides
+    (`dbd42a9fb`). Not loaded.
+- **TNF IND @ HOU had no live model for its first ~40 min. That was a gate, not a join miss.**
+  - `NFL_LIVE_RESIM` every ~5 min showed `live_resimmed 0`, `refusals_by_reason {"game_not_in_progress": 12,
+    "uninformative_probability": 1}`: the one live game was refused as uninformative from kickoff (7:15 PM).
+  - The first `live_resimmed 1` came at 01:55:10Z. `LIVE_GAMELINE_BUILD sport=nfl date=2026-11-19` went from index 0 /
+    full_games 0 to **index 1, projected 21, full_games 1 at 01:56:55Z**, 51 s after this reading's probe.
+  - Lead, not chased: is NFL's `uninformative_probability` gate holding the first quarter dark by design? Its threshold
+    belongs to the NFL live lane.
+- **NHL (I-30):** `live_games_no_model` lists CBJ @ CHI and LAK @ TOR. `lgbidx.py nhl`: `live_resim` 6, 5, then **2** of 12
+  by 01:53Z. Still flickering.
+- **P7 (#850), 7:31-7:56 PM:** 0 refusals, 0 exits. Child 4.28 GB after 8.9 h.
+  - Board: 4 builds, wall median 231 s, max 255 s; publication gap median 312 s, max 325 s. Host load 5.2.
+- **R-B (#844 sample 13):**
+  - NCAAB 255 rows (171 venue), **h2h 14: row-fresh 0 vs cell-fresh 11, mismatch 44**;
+  - NBA 70 rows, h2h 4 = 4, mismatch 0.
+- **R-E:** 0 NHL steps, 0 timed out.
+- **Live odds:** overlay gap max 180 s (soccer); 9 sweeps, 4 refused; priced age p50 217 s, p90 701 s (295 of 1,239 over 300 s).
+- **Load:** query 7.58 s, chips **3.36 s**, shortlist 0.78 s. **I-28:** 28 queries, 14 cold (50%).
