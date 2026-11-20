@@ -62,3 +62,50 @@ the state's own seed block, paired across arms. Production's NCAAF profile, seas
   - a live switch for these profile fields;
   - loans from `live-player-exit-gate`, the user's yes, and a betting-change window.
 - No code here without the user's yes.
+
+## RESULTS, STAGE 1: the gates before any re-fit (written after the runs; nothing above was changed)
+
+`C:\tmp\t858\c858_read.py`, `c858_read_stage1.txt`. 150 paired games; one-score = |margin| <= 8 at the state.
+
+| gate | reading | |
+|---|---|---|
+| G1 points: one-score last-2:00 points in the real CI | `clk_to` **3.23**; real 3.58 [2.55, 4.71] (n 66); `base` 2.31 | PASS |
+| G1 snaps: one-score last-2:00 snaps within 10% | `clk_to` 7.69 against a real 9.09 (**-15%**); `base` 4.91 (-46%) | **FAIL** |
+| G1 log loss: one-score at Q4 3:00 below `base` | -0.0132 (se 0.0462) | PASS (point) |
+| G2: 17+ log loss (Q4 15:00-6:00) vs `base` | **+0.0307 (se 0.0123)**, 2.5 SE worse | **FAIL** (predicted) |
+| G3: overall log loss (Q4 15:00-6:00) vs `base` | +0.0141 (se 0.0098) | **FAIL** |
+| H-TIMEOUTS: `clk_3` - `clk_to` rest, Q4 3:00 one-score | **+0.46 (se 0.19)** | matters |
+
+**Rest-of-game, `clk_to` minus `base`, by margin (Q4 15:00 / 10:00 / 6:00 / 3:00):**
+- 0-8: +0.87 / +0.97 / +1.22 / +1.02.
+- 9-16: +0.89 / +0.87 / +0.76 / +0.15.
+- 17-24: +0.66 / +0.54 / +0.01 / -0.22.
+- 25+: +0.77 / +0.68 / +0.79 / +0.62.
+
+The leader takes +0.46 at Q4 15:00 at every margin.
+
+**One-score engine minus actual:** `base` -1.04 / -0.91 / -2.13 / -1.49; `clk_to` **-0.17 / +0.06 / -0.91 / -0.47**. The
+clock closes most of the one-score gap.
+
+**25+ engine minus actual:** `base` +1.64 / +2.43 / +2.27 / +0.69; `clk_to` +2.41 / +3.11 / +3.06 / +1.30. It reopens
+the blowout surplus that #852's damping had cut.
+
+**`clk_3` (default 3 timeouts):**
+- every margin +1.1 to +1.5 over `base`;
+- 17+ log loss +0.0550 (se 0.0161);
+- overall +0.0229 (se 0.0118).
+
+Feeding the real timeouts is necessary but not sufficient.
+
+**Predictions:**
+- `clk_to` one-score rest +0.87 at Q4 15:00: MISS, under the predicted +1.0 to +1.6.
+- Last-2:00 points 3.23: MISS, just under 3.3-3.9.
+- Snaps 7.69: inside the predicted 6.6-8.0. But the one-score REAL is 9.09, not the all-margin 7.3 the prediction
+  assumed.
+- 17+ worse by +0.5 to +1.2: HELD (+0.54 to +0.79 before 3:00).
+- G2 FAIL: HELD.
+- H-TIMEOUTS +0.2 to +0.6: HELD (+0.46).
+
+**Next, as registered:** G2 failed, so the damping is re-fit with the clock on. Grid: threshold {14, 17, 21} x span
+{7, 14} at strength 1.0. Arms `ckt14s7`, `ckt14s14`, `ckt17s7`, `ckt21s7`, `ckt21s14`; the incumbent `ckt17s14` =
+`clk_to`. Then G2 / G3 are re-read (`c858_refit.py`).
