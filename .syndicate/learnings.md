@@ -3710,3 +3710,11 @@ kneel-out / clock mechanisms being off for NCAAF.
 trailer). Opposite-signed errors cancel in the mean and show only in the calibration slope. Grade a "the market expects
 less" gap against the FINALS before treating the market as truth. Quote pace as a ratio of means, never a mean of
 ratios, when the remaining-time denominator can approach zero.
+
+## 2026-11-20 -- A COMMAND LINE IS NOT A PROCESS'S CONFIG: the fleet's gunicorn runs `--max-requests 1000` that `local_production.py` never passes `[lane web-recycle-anon-limit, session f182fa28, todo #857]`
+
+**Believed (by me, for one draft of the findings):** the fleet web has no `--max-requests`. `local_production.py:574-583` builds the gunicorn command line without it, so with a higher memory limit a worker would live until the guard, a timeout or a down/up.
+
+**Measured:** `/proc/<pid>/environ` of the master and both workers carries `GUNICORN_CMD_ARGS=--max-requests 1000 --max-requests-jitter 100 --access-logfile -`. It comes from the Render-era `fleet_env/web.json` snapshot, and gunicorn merges it with the command line. It has never fired (0 `Autorestarting worker` lines in 20 days), only because the 650 MB guard recycles every worker long before 1,000 requests. At a higher limit it becomes the second recycle path (~0.2-0.45/h on an evening).
+
+**Rule.** Before modelling a fleet process's lifetime or limits, read its live environ (`tr '\0' '\n' < /proc/<pid>/environ`) for env-carried arguments (`GUNICORN_CMD_ARGS`, and the like), not only the launcher's argv. A path that has never fired is not absent: say what keeps it from firing, and whether the change under study removes that.
