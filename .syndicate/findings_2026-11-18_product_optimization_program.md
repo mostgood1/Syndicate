@@ -449,5 +449,5 @@ Both are read-only, so both were acted on.
   NOT READY on 11-26 (its verdict is due 12-07), and to cover batch changes A-H. The prompt was read back
   byte-identical, and the schedule was untouched.
 - **12-07 exits grade:** the `hold-value-exits` session was asked to schedule its pre-registered grade as a one-off
-  read-only task before the 12-08 window. Its confirmation is owed.
+  read-only task before the 12-08 window. **Confirmed:** the 12-07 exits grade IS SCHEDULED (hold-value-exits, ledger `a3bc22764`, on the user's own "Yes, schedule it" ~11:20 AM CST in that session): read-only tasks `hold-value-shadow-grade-1207` (Mon 12-07 12:30 PM CST) and `-backup` (4:30 PM CST, stands down if graded), both enabled. The pre-registered window is shadow ticks and games through 12-06, verdict on or after 12-07 12:00 PM CST. That leaves the evening for the user's 12-08 decision.
 
