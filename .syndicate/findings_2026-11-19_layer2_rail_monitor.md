@@ -497,3 +497,38 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
     - STL @ PIT dropped ~6:05 PM and still has no model 35 min later. Watch: does the next generation cover it?
 - **R-B (#844 sample 10):** NCAAB 138 rows (53 venue), `p1_sportsbook_newest` 5, **h2h 9: row-fresh 0 vs cell-fresh 9, mismatch 26**.
 - **R-E:** 1 NHL step, 0 timed out.
+
+## Reading 15 — 7:06 PM CST (01:06Z)
+
+- **Live:** 50 games: 14 NCAAB, 1 NCAAF, 7 NHL, 1 soccer, 27 WNCAAB. 29 have rail rows (317 rows).
+- **Flags: 20 shown on 10 cards, 0 false, 0 missed, 0 dark.**
+  - By sport: NCAAB 38 flagged rows of 261; NHL 0 of 18; WNCAAB 0 of 30.
+  - 6 are college full totals.
+- **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 123.** Team cards 94 chips, 0 defects.
+- **I-29:** every live NCAAB game joins **direct**, all 14 in the re-sim with 0 refused. The remaining college no-model game
+  is Stetson @ UCF (WNCAAB, no-anchor refusal).
+  - Session local_a94d8ca3 put the orientation-free join on main (`e5a267c…`). It runs in shadow when its switch is absent
+    and is not loaded. Measured: 24 of 24 reversed NCAAB games since 11-02 were dark.
+- **I-30 (new): NHL live lanes flicker build to build.**
+  - `live_games_no_model` lists 5 of 7 live NHL games at the read (BUF @ WSH, EDM @ TBL, LAK @ TOR, NYI @ WPG, PHI @ OTT).
+    NHL flagged rows: 0 of 18.
+  - `C:\tmp\railmon\lgbidx.py nhl` reads `index_why` per build. Of 12 snapshot games, the count with a `live_resim` lane
+    tonight went 3, 6, 4, 6, 4, 3, 6, 4, 2, **1**, 4 (00:07-01:03Z, 7 games live); full_games moved with it.
+  - **11-18 had the same shape:** 3 live games, `live_resim` cycling 0, 1, 2 every few builds. So it is not new tonight.
+  - The 6:55 PM `nhl_live_generation` run (189 s, exit 0) did not hold coverage: 4 of 12 at 01:03Z.
+  - **Hypothesis, not tested:** two producers write the NHL lens. The ~30-min live generation writes `live_resim` lanes;
+    the faster odds sweeps rewrite games as `pregame_only` in between. That is the one-key-two-writers shape that
+    `board_enrichment.py`'s path map documents for NFL (R8).
+  - Owner: none in the ledger (no `pregame_only` hit in todo.md, lanes or state_board). Proposed as a session.
+- **P7 (#850), 6:40-7:06 PM:** 0 refusals, 0 exits. Child 4.19 GB after 8.1 h.
+  - Board: 3 builds, wall median 309 s, max 325 s (2 over 300 s); publication gap median 384 s, max 414 s.
+  - `today_cadence_step_max_s` 326. Host load 4.18 (8.1 at 6:40 PM).
+- **R-B (#844 sample 11):** NCAAB 168 rows (70 venue), `p1_sportsbook_newest` 7, h2h 12: row-fresh 7 = cell-fresh 7,
+  mismatch 8. NBA 0 rows: the 7:10 PM tip had not produced live rows.
+- **R-E:** 1 NHL step, 0 timed out; NHL child odds age max 44 s.
+- **Live odds:**
+  - overlay gap max 185 s (soccer); 79 web merges, 0 stale;
+  - 10 sweeps, 5 refused (`lane_busy`, 33%);
+  - priced age p50 160 s, p90 631 s (104 of 317 over 300 s).
+- **Load:** query 3.56 s, shortlist 1.56 s, chips 1.97 s. **I-28:** 26 queries since 6:40 PM, 14 cold, all p50 7.6 s.
+  #853 is queued as change F of the 11-24 batch (local_a5513c97).
