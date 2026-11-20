@@ -109,3 +109,58 @@ Feeding the real timeouts is necessary but not sufficient.
 **Next, as registered:** G2 failed, so the damping is re-fit with the clock on. Grid: threshold {14, 17, 21} x span
 {7, 14} at strength 1.0. Arms `ckt14s7`, `ckt14s14`, `ckt17s7`, `ckt21s7`, `ckt21s14`; the incumbent `ckt17s14` =
 `clk_to`. Then G2 / G3 are re-read (`c858_refit.py`).
+
+## RESULTS, STAGE 2: the damping re-fit with the clock on, and the VERDICT
+
+`C:\tmp\t858\c858_refit.py`, `c858_refit.txt`. The same 150 games, paired.
+
+**Grid, overall log loss (Q4 15:00-6:00) against the incumbent `ckt17s14`, se:**
+
+| threshold / span | vs incumbent | 17+ vs incumbent |
+|---|---|---|
+| 14 / 7 | +0.0018 (0.0041) | +0.0004 |
+| 14 / 14 | +0.0016 (0.0024) | +0.0016 |
+| 17 / 7 | -0.0013 (0.0025) | -0.0022 |
+| **21 / 7 (PICK, 1.8 SE)** | **-0.0022 (0.0012)** | -0.0037 |
+| 21 / 14 | +0.0014 (0.0024) | +0.0034 |
+
+The whole grid spans about +-0.004. The damping's shape is not the lever.
+
+**The pick against `base`:**
+- G2: 17+ **+0.0276 (se 0.0127)**. FAIL.
+- G3: overall **+0.0121 (se 0.0099)**. FAIL.
+- G1: one-score at Q4 3:00 -0.0132 (se 0.0462), unchanged, since the damping does not act there.
+
+### VERDICT: NOT BUILT, the registered "stated reason not to". G2 and G3 fail, and the registered re-fit cannot absorb it.
+
+**Why.**
+1. **The clock adds late points at EVERY margin, not just one-score.** Rest-of-game, pick minus `base`, at Q4
+   15:00: +0.90 at 0-8, +0.93 at 9-16, +0.74 at 17-24, +0.73 at 25+.
+   - In blowouts the extra comes from both sides: leader +0.43, trailer +0.31.
+   - The trailer's share is hurry-up and clock stops at a deficit no real team chases. Leader-only damping cannot touch
+     it.
+2. **The one-score gain is real in the MEAN but not shown in log loss.**
+   - One-score engine minus actual: -1.04 -> -0.15 (Q4 15:00) and -1.49 -> -0.47 (Q4 3:00).
+   - Last-2:00 points 3.23, inside the real CI.
+   - But one-score log loss is +0.0054 (se 0.0168) at Q4 15:00-6:00 and -0.0132 (se 0.0462) at Q4 3:00, with the
+     slope 0.64 -> 0.53.
+   - Closing the mean gap with a clock that also adds spread did not price one-score games better on these 51-73
+     games.
+3. **Snaps still miss:** 7.69 against a real 9.09 in one-score games (G1 snaps FAIL).
+4. **Timeouts matter** (+0.46, se 0.19). So any live use must feed ESPN's timeouts first: the NFL pattern,
+   `findings_2026-11-16_nfl_live_timeouts.md`.
+
+**What a v4 would be (not pre-registered; the user's call).** A MARGIN-AWARE end-game, NCAAF-specific, two new
+mechanisms in `situation_model` / `drive_simulator` (a loan):
+- (a) the trailing hurry-up and the two-minute drill fire only when the deficit is within reach of the possessions
+  left: today `classify_urgency` fires at ANY deficit;
+- (b) a leader up beyond reach runs the clock earlier than the 150 s end-game preservation.
+
+Measured target: real Q4 points and seconds per snap by role and margin (`C:\tmp\t852\real_blowout.py`: trailer
+pass share 0.66 at 9-24 and 0.52 at 25+; Q4 trailer points 4.80 at 25+). Then the clock is re-read on top.
+
+**The live candidate stays as it is:** #852's damping (1.0 / 17) + #855's college overtime (on main, default off),
+#835's anchor. The one-score last-2:00 gap stays open (2.31 vs 3.58 points), and is this lane's documented residual.
+
+**Predictions after the re-fit:** none were registered for the grid beyond the rule. The stage-1 prediction "G2
+FAILS before the re-fit" held, and the re-fit did not rescue it.

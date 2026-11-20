@@ -1,5 +1,29 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#858` — **#808'S END-OF-HALF CLOCK FOR NCAAF LIVE ONE-SCORE GAMES: NOT BUILT, the registered "reason not to".**
+
+On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL timeouts:
+- **What it fixes:** one-score last-2:00 points go 2.31 -> 3.23 (real 3.58 [2.55, 4.71]).
+- **What it costs:** it adds +0.7 to +0.9 rest points at EVERY margin. Blowouts get worse: 17+ log loss +0.028 (se
+  0.013); overall +0.012 (se 0.010). The pre-registered damping re-fit can't absorb it (the grid spans +-0.004).
+- **One-score log loss** is not shown better (-0.013, se 0.046 at Q4 3:00).
+- **Timeouts left matter** (+0.46, se 0.19).
+- **Next would be a margin-aware end-game (v4), the user's call.**
+
+`[2026-11-20, lane ncaaf-endgame-clock, session 617b553b; user "start the end-game clock follow-up"; pre-registered 2682664f4; findings .syndicate/findings_2026-11-20_ncaaf_endgame_clock.md]`
+
+- **Population:** the #852 2024 harness (`C:\tmp\t852\resume.py`): the first 150 games of the every-2nd list, Q4 15:00 / 10:00 / 6:00 / 3:00 real CFBD states, 60 sims, paired.
+- **Arms:** `base` (damping 1.0/17/14 + college OT); `clk_to` (+ #808's seven switches, real CFBD timeouts); `clk_3` (the same with the default 3); re-fit grid `ckt<threshold>s<span>`.
+- **Gates (stage 1):**
+  - G1: points PASS, snaps FAIL (7.69 vs 9.09), one-score log loss -0.013 (se 0.046);
+  - G2: FAIL (+0.0307, se 0.0123);
+  - G3: FAIL (+0.0141, se 0.0098);
+  - H-TIMEOUTS: `clk_3` - `clk_to` +0.46 (se 0.19).
+- **Re-fit (stage 2):** pick 21/7, -0.0022 vs the incumbent (se 0.0012). Against `base`, G2 +0.0276 (se 0.0127) and G3 +0.0121 (se 0.0099): still FAIL.
+- **Why:** `classify_urgency` puts a trailer of ANY deficit in hurry-up / the two-minute drill. With the clock's stops, blowout trailers score where real ones do not (trailer +0.31 at 25+). The leader's preservation starts only at 150 s.
+- **Owed (the user's calls):** a v4 margin-aware end-game in `situation_model` / `drive_simulator` (a loan from `football-scenario-calibration`): (a) the hurry-up only within reach; (b) the leader runs the clock earlier. Then the clock is re-read on top. Any live use feeds ESPN's timeouts first (the NFL pattern).
+- **The live candidate is unchanged:** #852 + #855 (+ #835's anchor). The residual one-score last-2:00 gap stays documented.
+
 ### `#857` — **WEB'S 650 MB RECYCLE LIMIT (sized for Render's 2 GB container) RECYCLES EVERY WORKER THAT HOLDS THE LAYER 2 BOARD: a board-holding worker PLATEAUS at anon p50 ~1,010-1,070 MB (p90 1,090-1,265 per evening; ~+75 MB per +1,000 board rows), so 14-29 recycles an hour on evenings. RECOMMENDED: `WEB__SYNDICATE_WEB_WORKER_ANON_LIMIT_MB=1500` (env only, absent = today) -> predicted <= 2 recycles/h, for +1.0-1.2 GB fleet RSS at p50, at EVERY hour (both workers keep the board; nothing evicts it by time). Fleet-role p99/max barely move; web worst case ~3.4 GB. Not a betting change. QUEUED (user "Yes, after #853"): the first drained full down/up after #853's 11-24 evening, at the latest 12-08; NOT with #853** `[2026-11-20, lane web-recycle-anon-limit, session f182fa28; from #853's lead; findings `.syndicate/findings_2026-11-20_web_recycle_anon_limit.md`]`
 
 - **Measured.** Instrument `scripts/rail_monitor/web_anon_curve.py` (stdlib; `extract` then `report`), read-only at nice 19. It reads per-worker RSS from live-odds-worker's `ALL_PROCESS_MEMORY` (11-16..11-20, one snapshot per ~9 s) and the guard lines in web.log.
