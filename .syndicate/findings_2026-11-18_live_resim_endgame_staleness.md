@@ -145,3 +145,43 @@ The 95-100% row matches the engine read exactly. By true state age, 95-100% read
 - The props join (`live_projection_join`) checks no snapshot age.
 - Paper mode places in-play bets with no after-kickoff check.
 - NCAAB / WNCAAB / WNBA / NFL re-sims are not covered by this read (no Kalshi prior in the engine read). Gate them only after a read.
+
+
+## Shadow reading and M3's reproduction check (2026-11-20 10:11 AM CST, lane `engine-learner`, user "fix gap")
+
+The two follow-ups this lane left unowned at its close are now owned by lane `engine-learner` (session e32fef1a).
+
+**Shadow reading.** The fleet has carried `52e68382a` since the 11-18 evening (fleet HEAD `38c3a6905`), so the shadow
+tally has run on two live evenings. Source: `refresh-worker.log.1` + `refresh-worker.log` on the fleet, every
+`LIVE_ENDGAME_FRESHNESS` line, 2026-11-19 02:19Z to 2026-11-20 05:50Z (8:19 PM CST 11-18 to 11:50 PM CST 11-19), mode
+`shadow` on every line, `refused` empty on every line. Counts are row-builds (a row is judged again on every build).
+
+| sport | builds with an end-game row | judged | would refuse | share | of those, priced now |
+|---|---|---|---|---|---|
+| NBA | 23 | 3,665 | 542 | 15% | 346 |
+| NCAAF | 25 | 529 | 138 | 26% | 88 |
+| NHL | 99 | 589 | 301 | 51% | 30 |
+
+- "Priced now" is the board's late-game edges the gate would withhold when `on`: 346 NBA and 88 NCAAF row-builds over
+  two evenings; NHL's would-refuse rows are mostly unpriced already.
+- The share is far below the dev re-measure's 92.5% (section 5). That figure was over evidence-log line-instants; this
+  one is over board rows per build, judged at build time. They are different populations, so this is not a
+  contradiction, but the board's own share is the one `on` acts on.
+- NHL alternates build to build between 0 and all 5 judged rows refused: its serial live-lens loop refreshes about every
+  60 s while the board builds about every 30 s.
+
+**M3's reproduction with the gate `on`.** M3's pinned experts (`981ef14f6`) check JOIN and PRIOR only on the ledger's
+PRICED records (`live_state_as_of` present); a refusal record is `ledger_refusal_row` and opines nothing.
+- Run on main's code (exported to `C:\tmp\elp\t836read\main_src`), with the join test's own fixture (NBA, Q4 1:00):
+  - shadow, state 45 s: priceable, 1 ledger record in the priced half;
+  - `on`, state 45 s: withheld `live_state_stale_in_endgame`, **0 ledger records** (neither half);
+  - `on`, state 10 s: priceable, 1 priced record, as before.
+- So a gated row never reaches the pinned checks, and switching `on` cannot add a JOIN or PRIOR mismatch: reproduction
+  stays at 0 by construction. Its effect on M3 is fewer end-game opinions, hence fewer end-game bets. M3's morning
+  capture records the switch as a new version (`SYNDICATE_LIVE_ENDGAME*` is on the 5b allowlist).
+- Lead, not fixed: a withheld end-game row leaves no ledger record at all, as every staleness reason above the attach
+  site does, so the ledger cannot show the gate's population afterwards; the `LIVE_ENDGAME_FRESHNESS` lines are the
+  only record of it. Script: `C:\tmp\elp\t836read\repro_on.py`; reading: `summ.py`.
+
+**What is left:** switching `on` (`SYNDICATE_LIVE_ENDGAME_FRESHNESS=on`; betting change yes; drained full down/up) in the
+12-08 window at the earliest, on the user's own yes. It is on the 12-08 candidate list under `#846`.
