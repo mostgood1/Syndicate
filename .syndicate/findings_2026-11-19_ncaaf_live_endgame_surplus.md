@@ -248,6 +248,60 @@ leader-only damping. It is a profile field, so a live-only fix needs no smartsim
    - Real: both teams from the opponent's 25, two-point tries from the third OT.
    - Pregame cost about -0.4 points a game (4.3% x 8.8); late in close games -1 to -3.
 
+## FIX — PRE-REGISTERED 2026-11-19 12:50 PM CST, BEFORE any fix code or re-fit run
+
+**Decision.** The session asked "Build the live-only leader-damping switch (default off, with a re-fit)?". The user
+answered **"Build it here"**.
+
+**The change: one switch, no new mechanism code.** #686's `blowout_damping_*` fields already exist in
+`CalibrationProfile` and `play_simulator`.
+- **Switch:** `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING`. Absent or unrecognised = OFF; `on` / `1` / `true` / `yes` = ON.
+- **ON:** `ncaaf/live_resim.resim_live_game`, when the caller passes no profile, runs production's NCAAF profile with
+  `blowout_damping_strength` / `_lead_threshold` / `_lead_span` set from the fit below.
+- **Where it reaches:**
+  - every production caller passes no profile (the tick's `build_live_lens_snapshot`, #835's E0, the cutoff-replay
+    harness), so #835's anchor sees the same engine;
+  - an explicit `profile=` is honoured unchanged;
+  - pregame is untouched.
+- **Knobs:** `..._STRENGTH`, `..._THRESHOLD`, `..._SPAN`. A typo, a non-finite value or one out of range falls back
+  to the fitted default, never to "no damping".
+- **OFF:** the resolved profile IS `NCAAF_CALIBRATION_PROFILE`, the same object. Test-pinned byte-identical through
+  `resim_live_game` and through the snapshot builder.
+- **Observability:** one `NCAAF_LIVE_BLOWOUT_DAMPING` print per process on first use (on, strength, threshold, span).
+  The re-sim result carries a `blowout_damping` key ONLY when on, so off output is unchanged.
+
+**The re-fit (`model_engine_standard.md` 4.4: the damping's own levers; the level stays with #835's anchor).**
+- **FIT:** 2024 resumed real CFBD states (`C:\tmp\t852\resume.py`, `T852_CPS=fit`). The first 150 games of the
+  every-2nd task list (the same games as the `eoh` / `bd9` arms). Checkpoints Q3 7:30, Q4 15:00, Q4 7:30, Q4 3:00
+  (where the damping acts). 60 sims a state on the state's own seed block, the same in every arm.
+- **Criterion:** common-line log loss against the real final, over every fit state. Lines = the production arm's own
+  25 / 50 / 75% rest quantiles + 0.5. Paired against the incumbent, game-clustered SE.
+- **Grid (span 14 fixed):**
+  - Stage 1: threshold {10, 14, 17, 21} at strength 0.9.
+  - Stage 2: strength {0.6, 0.75, 0.9, 1.0} at stage 1's pick.
+- **Selection with a noise floor** (learnings 2026-11-15). The incumbent is the field's own example (0.9, 14). A grid
+  point replaces it only if its paired log-loss improvement over the incumbent exceeds 1 paired SE. Among those, the
+  best wins. Otherwise the incumbent stays.
+
+**Gates.**
+- **G1:** on FIT, the pick beats production on log loss by more than 2 paired SE. Else nothing ships.
+- **G2:** on FIT, one-score states (|margin| <= 8) are not worse than production by more than 1 paired SE.
+- **G3:** on the 2026 ledger finals at 75-95%, on top of #835 (this dev window, already read once for 0.9 / 14):
+  - log loss <= production + #835;
+  - the rest pace ratio closer to the actual than production + #835's.
+
+**Predictions** (from the `bd9` arm, before any fit run).
+- 0.9 / 14 over-damps 17-24 (-1.24) and under-damps 25+ (+1.65), so stage 1 lands at 14 or 17, and stage 2 at 0.9 or
+  1.0.
+- The pick beats production on FIT by about -0.02 to -0.03.
+
+**Clean hold-out after M2's verdict** (11-21, then 11-28): `ledger_score2.py` on those dates. Expected:
+- 75-95% log loss below production + #835;
+- slope at least production + #835's;
+- the 17+ bucket's mean F - c closer to 0.
+
+**Load:** a betting change, window only (earliest 12-08), on the user's own yes, TOGETHER with #835's switch.
+
 ## Reproduction (`C:\tmp\t852`, scratch)
 
 - **Inputs:**
