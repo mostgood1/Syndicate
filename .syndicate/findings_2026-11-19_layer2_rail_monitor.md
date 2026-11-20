@@ -799,3 +799,105 @@ over the refresh-worker logs.
 - **#850:** no new refusals or exits since 10:40 PM. Board publication gap max 294 s.
 - **Load:** query 2.47 s, chips 0.84 s, shortlist 0.66 s.
 - The last games should end ~12:15 AM; the nightly close follows.
+
+## Reading 26 — 12:19 AM CST 11-20 (06:19Z): 0 live games; the slate rolled to 11-20. Nightly close below.
+
+## DAILY SUMMARY — Thu 11-19 (day 5, the first always-on day), closed 12:20 AM CST 11-20
+
+26 readings, 10:39 AM to 12:19 AM CST. POP_START 16:40Z; flags are graded on their first sighting against the finals by
+date (`C:\tmp\railmon\grade_2026-11-19_out.json`, `grade_day.py`).
+
+### The grade
+
+| bucket | flags | games | W-L | hit | fair | hit − fair, 90% CI (game-clustered) |
+|---|---|---|---|---|---|---|
+| **ALL** | 167 | 37 | 84-83 | **0.503** | 0.506 | [−0.058, +0.059] |
+| P3 first reading: yes | 45 | 24 | 23-22 | 0.511 | 0.488 | [−0.101, +0.145] |
+| P3 first reading: no | 122 | 34 | 61-61 | 0.500 | 0.512 | [−0.072, +0.057] |
+| P4 fair < 0.40 | 4 | 4 | 1-3 | 0.250 | 0.279 | [−0.285, +0.228] |
+| P5 NCAAB full totals | 61 | 23 | 32-29 | 0.525 | 0.502 | [−0.089, +0.157] |
+| sport: NCAAB | 140 | 25 | 73-67 | 0.521 | 0.509 | [−0.053, +0.080] |
+| **sport: NBA** | 13 | 4 | 5-8 | **0.385** | 0.503 | **[−0.220, −0.003]** |
+| sport: NHL | 5 | 4 | 2-3 | 0.400 | 0.389 | [−0.428, +0.304] |
+| market: totals full | 76 | 30 | 40-36 | 0.526 | 0.503 | [−0.079, +0.133] |
+| market: spreads full | 49 | 26 | 23-26 | 0.469 | 0.494 | [−0.138, +0.093] |
+| market: h2h full | 15 | 15 | 7-8 | 0.467 | 0.565 | [−0.276, +0.091] |
+
+- **The flags hit their fair, no better, no worse.** The model's own mean probability on them was 0.595 against a 0.503 hit
+  rate, so it is about 9 pp over-confident on the flagged side. That is the per-line calibration case (#847, 11-26 grade).
+- **NBA was under fair for a second day:** 11-18 0.313 vs 0.392; 11-19 0.385 vs 0.503, CI just below 0, n 13 in 4 games.
+  NBA calibrated totals went 4-7. Evidence for #847, not a gate.
+
+### Pre-registered verdicts
+
+| # | prediction | result | verdict |
+|---|---|---|---|
+| P1 | 0 rail-card contradictions | 0 at all 26 readings | **MET** |
+| P2 | board publication gap median <= 600 s, none > 1,800 s, 5:30-10:30 PM | 35 publications, median 310 s, max 585 s (reading 23); `BOARD_BUILD_TIMING` longest 807 s | **PREDICTED** (lighter slate) |
+| P3 | first-reading flags at or below fair | 0.511 vs 0.488, CI [−0.101, +0.145] | **within noise** (above, not significant; 11-18: 0.471 vs 0.484) |
+| P4 | long shots (fair < 0.40) at most fair + 2 pp | 0.250 vs 0.279, n 4 | **PREDICTED** (tiny n) |
+| P5 | report NCAAB calibrated live full totals | 61 flags / 23 games, 0.525 vs 0.502; sides under 57 / over 4; flagged lines went over 31 of 61 | report (11-18: 0.573 vs 0.503; 56 of 124 over) |
+| P6 | 0 pregame NCAAB / WNCAAB totals flags | 0 at all 26 readings | **MET** |
+| P7 | #850, the owner's §5 (5-10 PM) | P1 refusals 4 (2/h at 8 and 9 PM): NEITHER; P2 0 exits: PREDICTED; P3 807 s: PREDICTED | **CONFOUNDED** (21 vs 46 core live games at 7 PM). Re-derived and recorded by the owner (`c09c4e835`); repeat owed (R-F) |
+| P8 | score floor: 0 college calibrated full totals below the score after the parent restart | 0 violations at every reading (up to 169 rows a reading) | **MET** |
+| P9 | #844 baseline: NCAAB mismatch > 0, row-fresh below cell-fresh; NBA mismatch 0 | 17 NCAAB samples, mismatch 1-44, evening row-fresh 0 vs cell-fresh up to 11; NBA mismatch 0 in all samples | **baseline as predicted** (`C:\tmp\railmon\p844_2026-11-19.jsonl`) |
+
+### What the day found (improvements, each with an owner)
+
+- **I-28: the board query reads a cold board on most requests.**
+  - 11-18 evening: 60% of 125 queries cold, cold p50 9.6 s vs warm 4.3 s.
+  - Cause, measured by session local_a5513c97: 69 of the 75 cold reads were a new web worker after a memory recycle.
+  - Fix #853 (`9931a787b`, `SYNDICATE_COMBINED_BOARD_SHARED_COPY`, a shared copy in `/dev/shm`), default off, **queued as change F of
+    the 11-24 2:15 AM batch** (not a betting change).
+- **I-29: neutral-site college games the slate reorients lose their live model. 5 of 5 dark tonight:**
+  - WVU / Florida (1:47 PM to final), Auburn / Notre Dame, Wisconsin / Seton Hall, UNLV / Rutgers, Kansas / Houston;
+  - the 2 neutral-site games that were not reoriented joined directly;
+  - since 11-02: 24 of 24 reversed NCAAB games were dark.
+  - Fix on main in shadow (`e5a267c…`, session local_a94d8ca3). Replays with the switch on: UNLV / Rutgers 29 of 29,
+    Kansas / Houston 61 of 61 rows matched, right sides (`dbd42a9fb`, `0f2467a2a`). Loading it is a betting change
+    (a window, or the user's `--outside-window`).
+- **I-30: NHL live lanes flicker build to build.**
+  - Tonight 1-9 of 12 snapshot games carried a `live_resim` lane per build; 11-18 had the same shape.
+  - Hypothesis: two writers of the NHL lens. Card task_59fd9474 proposed, not started.
+- **Leads, not chased:**
+  - TNF dark for its first ~40 min on the NFL re-sim's `uninformative_probability` gate;
+  - NFL live publishes no distribution for totals or segment markets, so 0 of 22 NFL rail rows were modelled;
+  - WNCAAB `no_margin_anchor` refusals (up to 22 of 28 live games) include games with a live market (Stetson / UCF,
+    FDU / LSU);
+  - NBA live rows priced from one sweep ~2.5 min old at tip-off (13 of 963 rows within 120 s).
+- **Instrument fixes:**
+  - `d4metrics.py` and `p838_watch.py` counted `ALL_PROCESS_MEMORY` lines quoting the monitor's own greps; both now skip
+    them;
+  - new `live_games_no_model` (dash_update.py), `p29_orient.py`, `lgb.py`, `lgbidx.py`, `p7count.py`, `qstage.py`,
+    `rd.sh` (one-command reading). All are backed up in `scripts/rail_monitor/`.
+
+### Loads (11-19)
+
+- **11:00 AM (17:00:09Z):** #850 board memory fix (BC-053), drained full down/up, ff `d78a448c4` -> `38c3a6905` + 4 keys.
+  User "11-19 midday". Load checks MET. It also restarted the refresh-worker parent, which picked up the I-17 score floor.
+- The live-odds-worker self-recycled at ~5:11 PM (`exited code=0 after 22277s`, routine). No other loads.
+
+### Owned readings (runbook R-A..R-F)
+
+- **R-A** score floor: 0 all day.
+- **R-B** #844: baseline done; verdict 11-24 if CHANGE D loads.
+- **R-C** suggested-set coverage check: at the 11-20 day start.
+- **R-D** #851: 11-24 evening, if CHANGE E loads.
+- **R-E** #838 NHL timeout: 0 timed out all day (watching).
+- **R-F** #850 repeat evening: >= 33 core live games at 7 PM and no restart.
+
+### Sessions (linked)
+
+- Memory guard local_d0f83044: graded, recorded.
+- Cold board read local_a5513c97: #853 queued.
+- Neutral-site I-29 local_a94d8ca3: fix in shadow, replays.
+- Odds lane local_73a5d2dd: done; its readings now belong to the monitor.
+- Optimization program local_09a95c0b: 11-26 grades.
+- Proposed, not started: I-30 (task_59fd9474).
+
+### Open user decisions
+
+- **I-29 fix load:** a betting change; the 11-24 window, or an `--outside-window` reason. 5 games went dark tonight.
+- **I-30 session:** card task_59fd9474.
+- **#850's next lever:** a margin for the recurring jobs that hold the post-build recycle (4 of 4 held tonight). It is a betting change, put to the user in local_d0f83044.
+- #853 is queued for 11-24 (no decision owed).
