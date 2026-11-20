@@ -10,7 +10,29 @@ Rules carried from the lane (never relax them):
 - Report in Central time. Quote the user's words exactly. Never relay my own button labels as decisions.
 - Loads belong to the lane that built the change. I relay the user's words; I don't load.
 
-## Daily schedule (CST)
+## LEAN MODE (from 11-20; supersedes the schedule below)
+
+The user asked on 11-20 to "make this dashboard self contained so it doesnt use up ccredits". The answers: "Nightly close only" and "Page on the fleet app".
+
+- **Readings, without Claude:** the Windows task `SyndicateRailWatch` runs `pythonw C:\tmp\railmon\railwatch\tick.py` every 20 min, 10:03 AM to 2:03 AM CST (Interactive, priority 7, IgnoreNew, 15-min limit).
+  - Each tick is read-only: the probe (`--no-page`), `d4metrics.py`, `p7count.py`, `p29_orient.py` and `ps` of the refresh-worker processes.
+  - Each tick writes: a row to `dash\rows_<D>.jsonl` (via `dash_update.py`); `railwatch\extra_<D>.jsonl` (memory guard, process RSS, college games' orientation); a log line to `railwatch\tick.log`.
+  - It then renders `railwatch\index.html` and copies it to `~/syndicate-prod/data/reports/rail_watch/index.html`.
+  - It drops `query.json` (~23 MB) from reading dirs after 6 h, and whole reading dirs after 10 days.
+  - The slate day D rolls at 5 AM CST. Run it by hand with `py -3 C:\tmp\railmon\railwatch\tick.py --force` (or `--render-only`).
+- **The page:** open `C:\tmp\railmon\railwatch\index.html` on this PC.
+  - The fleet route (a small web route serving the data-root copy, LAN-reachable) lands and deploys AFTER the 11-24 2:15 AM window batch. Its ride-along gate STOPS the batch on any "(c) changes what a role does" commit, so the route must not be on main before the batch runs.
+  - The claude.ai dashboard (HoJ2n52ewHZnVDbN2LpxaJ) is frozen at 11-19.
+- **Claude, once a night:** the session cron `NIGHTLY CLOSE (lean)` at ~12:47 AM CST. Its steps:
+  - check the tick log;
+  - finals by date; `grade_day.py --pop-start <D>T16:00`; `perf_build.py` and a `tick.py --render-only`;
+  - P1-P6/P8 from the day's rows, P2 from `d4metrics` 23:30-04:30Z;
+  - the owned readings due that night (R-A..R-F);
+  - a short summary in the findings file and a log line, then commit and push.
+  - No day page, no claude.ai uploads, no wakeups. Renew the cron before its 7-day expiry.
+- **Still Claude-driven one-shots:** R-D P6 quota reads (6 PM and 11 PM CST, 11-20, 11-21 and 11-24) and R-F's parent-floor read (9:04 AM 11-21).
+
+## Daily schedule (CST) — the full mode, used 11-15..11-19
 
 | when | step |
 |---|---|
