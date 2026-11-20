@@ -170,7 +170,9 @@ On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL 
      - **SCHEDULED by the decision-engine session** (session e32fef1a; user "Yes, schedule them", 11-20 ~9:50 AM CST): one-time tasks `engine-ncaaf-checks-1124` (Tue 11-24 2:00 PM CST, 11-21 slate, week 12) and `engine-ncaaf-checks-1130` (Mon 11-30 10:30 AM CST, 11-28 slate, week 13). Do not schedule a second copy.
      - **Runner fixed 11-20, before the tasks pin it.** The exported `T852_SIMS=60` (meant for the paired replays) leaked into E0, so the first full 11-14 run reproduced 0 of 345 E0s. E0 is now pinned to production's 120 sims.
      - The clean full 11-14 re-run: rc 0, E0 345 of 345, pick + #835 -0.0176 (se 0.0095) vs production + #835, slope 0.76 -> 0.88.
-     - The runner ends with `CHECK VALID` / `CHECK INVALID`: read the numbers only on VALID. sha256 `4d0e07ba90c0918d2ec7c6e5e8914e52f70b2c32c9ce572a6d1ef58695f281d3`, sent to the scheduling session.
+     - The runner ends with `CHECK VALID` / `CHECK INVALID`: read the numbers only on VALID. (Superseded sha `4d0e07ba…`, see below.)
+     - **Runner PINNED, 11-20 12:29 PM CST** (asked by the scheduling session, lane engine-learner). The code under test is an export of **main `44184da1e`** (#852's switch) in `C:\tmp\t852\code`, recorded in `code/COMMIT`. All three code-importing steps read it, and the runner refuses (exit 5) without it. The interpreter is pinned to `py -3.11`: on 11-20 `py -3` began resolving to a bare 3.12 with no psutil.
+     - Clean full 11-14 run on the pin: rc 0, E0 345 / 345, VALID, numbers identical to before. sha256 **`997e220ff44eb273f959c281dbf0b34758194b00c361e966ec3269189c8a5bdb`**, sent to the scheduling session. Do NOT edit the runner or the export.
      - Expected (pre-registered): 75-95% log loss below production + #835, slope at least as high, the 17+ bucket's mean F - c closer to 0.
      - Re-check #835's late k (1.6) on top of the damping.
   3. **QUEUED for the Tue 12-08 window.** The user picked "Queue for 12-08 (Recommended)" on 2026-11-20 ~9:40 AM CST, a CONDITIONAL entry:
