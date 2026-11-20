@@ -434,5 +434,20 @@ The user started all three cards ~7:10 PM CST. The rail monitor started duplicat
   11-19 10:33-11:50 PM CST: 191 end-game line-instants judged, 86 (45.0%) would be refused
   (`live_state_stale_in_endgame`).
   - No NBA or NCAAF shadow lines appear in refresh-worker.log yet.
-  - Nobody grades the shadow against outcomes: its finder lane is closed, and the follow-ups sit on todo #836.
-  - The 11-26 re-rank decides whether #836 is a 12-08 candidate. Without a graded shadow it is not.
+  - ~~Nobody grades the shadow against outcomes.~~ **CORRECTED ~11:40 AM CST:** lane `engine-learner` has owned #836
+    since 11-20 10:11 AM CST (user "fix gap"). It read the shadow over 11-18 and 11-19: NBA 542 of 3,665 end-game
+    row-builds would refuse (15%), NCAAF 138 of 529 (26%), NHL 301 of 589 (51%). Todo #836 holds it; `on` is a
+    12-08 ask on the user's yes. My refresh-worker.log grep saw only NHL because the log had rotated.
+  - The 11-26 re-rank reads the owner's result. It does not re-grade it.
+
+### 11.7 The user's "Yes, add it" (11-20 ~11:35 AM CST)
+
+It followed two open asks: grade #836's shadow in the 11-26 re-rank, and schedule the exits shadow's 12-07 grade.
+Both are read-only, so both were acted on.
+- **#836:** already owned and shadow-read by `engine-learner` (section 11.6 corrected). Task
+  `product-optimization-rerank-1126` was edited to read the owner's result rather than re-grade it, to treat L1 as
+  NOT READY on 11-26 (its verdict is due 12-07), and to cover batch changes A-H. The prompt was read back
+  byte-identical, and the schedule was untouched.
+- **12-07 exits grade:** the `hold-value-exits` session was asked to schedule its pre-registered grade as a one-off
+  read-only task before the 12-08 window. Its confirmation is owed.
+
