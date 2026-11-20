@@ -185,4 +185,20 @@ Registered 2026-11-19, before any load. The load is a betting change: it adds li
 
 - **Shadow loads with the next fleet ff that carries the code.** It is not a betting change: rows are byte-identical,
   tested. From then on, every reversed game is counted live before the switch goes on.
-- **The reversed-game replay:** see the lane STATUS line for the 11-19 7:30 PM games (captured if one was reversed).
+- **The reversed-game replay, 11-19 7:35 and 7:38 PM CST** (`C:\tmp\cnsl\replay_ncaab_20261120T013517Z` and
+  `..._013818Z`):
+  - The game: UNLV / Rutgers (401920520), neutral. ESPN lists Rutgers @ UNLV, so the lane is home UNLV; the rows read
+    UNLV @ Rutgers.
+  - This worktree's code was run over the fleet's own snapshot and grid, captured at the same instant.
+
+  | capture | fleet (rows with a model) | off = shadow | on |
+  |---|---|---|---|
+  | 7:35 PM | 0 / 19 | full-game 0 / 13 modelled; 13 `no_live_gameline_projection` | all 19 rows joined; 13 full-game rows reach the quote gates and are refused there (stale quote / quote behind the score, as on any game); 19 Live-column numbers |
+  | 7:38 PM | 0 / 29 | full-game 0 / 18; 18 `no_live_gameline_projection` | 29 of 29 joined; full-game 7 / 18 modelled, **5 priceable**; `no_live_gameline_projection` 0 |
+
+  - Side mapping on the 7:38 PM h2h row:
+    - row home Rutgers 0.7600 = 1 - lane `modelHomeWinProb` 0.24 (lane home UNLV);
+    - row state home 10 / away 2 = lane away 10 / home 2 (Rutgers led 10-2);
+    - priceable, edge +8.75 pp: a flag the board could not show.
+  - Shadow rows == off rows in both captures. The 10 games in ESPN's order are identical in all three modes.
+  - Seton Hall / Wisconsin, also reversed on the slate, had no live rows in either capture.
