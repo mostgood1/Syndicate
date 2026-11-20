@@ -276,3 +276,32 @@ only, because this repo is public.
   - The dollars sit where the book does worst: the middle stake quartiles are -3% to -4%.
   - Under the per-line rule, the lead is what overstates edge in sizing and in the totals fair, not a totals
     exclusion.
+
+## Portfolio Watch keeps full history (fleet-watcher's request, relaying the user ~10:50 AM CST: "pull in the history we already should have. I want all 3 of these available in one central dashboard hub")
+
+- **The 48 h prune never touched the history.** It removes only the raw per-reading folders (each about 4.5 MB of
+  response bodies). The reading log `C:\tmp\pfmon\readings\readings.jsonl` is never pruned and has every probe
+  reading since 11-17 10:21 AM.
+- **New: `C:\tmp\pfmon\build_history.py`, a durable daily rollup.**
+  - Output: `C:\tmp\pfmon\history\daily_rollup.json`, a folder nothing prunes.
+  - It is rebuilt every run from the fleet ledger, the newest saved `/api/portfolio/live?on=all&show=all`, which
+    holds every live order since trading began. So it backfills to the **first graded live bet, 2026-08-06**: 106
+    days, 64 with bets, 2,146 graded bets.
+  - Each day carries:
+    - that day's ROI with its event-clustered 95% range;
+    - won vs breakeven, fees, and fee-net same-book CLV;
+    - rolling 7-day and 30-day ROI ending that day, with ranges;
+    - orders, filled and not filled;
+    - from 11-17 on, the day's reading count, non-GATE anomalies and `live_today` reads above 2 s and 3 s.
+  - It uses the same instrument as the probe (`live_book_edge_readout`). Its 11-19 30-day row is -7.38%
+    [-12.79, -1.97], identical to the probe's. Percentages and counts only.
+  - If the ledger cannot be read, the previous rollup is kept.
+- **Dashboard:** a new "History since 2026-08-06" section.
+  - It charts rolling 30-day ROI with its range and 7-day ROI. A point is plotted only when its window holds at least
+    20 events (30-day) or 10 (7-day), because a one-bet 7-day ROI of +370% on 08-23 flattened the chart.
+  - A table lists every trading day.
+  - Rendered headless at 1280 px light and 390 px dark: 0 errors, no horizontal scroll, 64 rows.
+- **Runner:** `local_watch.py` now runs the probe, page data, **history** and the dashboard, then the prune.
+  Verified under Task Scheduler at 10:45 AM: every step rc 0.
+- **The output path stays `C:\tmp\pfmon\page\dashboard.html`**, for the central hub
+  (`C:\SyndicateProd\dashboards\index.html`, built by the fleet-watcher session).
