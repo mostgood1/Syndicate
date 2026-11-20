@@ -44,10 +44,14 @@ def run(cmd, timeout, cwd=None, stdout_path=None):
     t0 = time.time()
     try:
         if stdout_path:
-            with open(stdout_path, "w", encoding="utf-8") as so:
-                p = subprocess.run(cmd, cwd=cwd, stdout=so, stderr=subprocess.PIPE, timeout=timeout,
-                                   creationflags=NOWIN, text=True, errors="replace")
-            return p.returncode, "", p.stderr[-400:], time.time() - t0
+            with open(stdout_path, "w", encoding="utf-8") as so, open(stdout_path + ".err", "w", encoding="utf-8") as se:
+                p = subprocess.run(cmd, cwd=cwd, stdout=so, stderr=se, stdin=subprocess.DEVNULL, timeout=timeout,
+                                   creationflags=NOWIN)
+            try:
+                err = open(stdout_path + ".err", encoding="utf-8", errors="replace").read()
+            except OSError:
+                err = ""
+            return p.returncode, "", err[-400:], time.time() - t0
         p = subprocess.run(cmd, cwd=cwd, capture_output=True, timeout=timeout, creationflags=NOWIN, text=True,
                            errors="replace")
         return p.returncode, p.stdout, p.stderr[-400:], time.time() - t0
