@@ -532,3 +532,32 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
   - priced age p50 160 s, p90 631 s (104 of 317 over 300 s).
 - **Load:** query 3.56 s, shortlist 1.56 s, chips 1.97 s. **I-28:** 26 queries since 6:40 PM, 14 cold, all p50 7.6 s.
   #853 is queued as change F of the 11-24 batch (local_a5513c97).
+
+## Reading 16 — 7:31 PM CST (01:31Z), full page
+
+- **Live:** 50 games; 33 with rail rows (**1,277 rows**; NBA's 4 games add 963).
+- **Flags: 18 shown on 10 cards, 0 false, 0 missed, 0 dark.**
+  - By sport: NCAAB 17 of 222; NBA 4 of 963; NCAAF 3 of 13; NFL 0 of 25; NHL 0 of 21; WNCAAB 0 of 27.
+  - 7 are college full totals.
+- **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 169.** Team cards 94 chips, 0 defects.
+- **`live_games_no_model` 4 of 33:**
+  - **NFL IND @ HOU (TNF, 7:15 PM kick):** 0 model rows. Re-check next reading (the first NFL live re-sim may lag the kick).
+  - **NHL EDM @ TBL, PHI @ OTT (I-30).** Coverage has risen: `lgbidx.py nhl` shows `live_resim` 7-8 of 12 and full_games 6-7
+    on 01:26-01:31Z builds. Still flickering; card task_59fd9474 proposed.
+  - **Fairleigh Dickinson @ LSU (WNCAAB):** a direct refusal (WNCAAB re-sim: 15 of 20 refused).
+- **I-29:** all 14 live NCAAB games direct, 0 refused. The 7:30 PM neutral-site tips (Wisconsin @ Seton Hall, UNLV @ Rutgers)
+  have no rail rows yet.
+- **NBA quote age:**
+  - rows are 572 alt totals, 301 alt spreads, 56 totals, 9 spreads, 8 h2h;
+  - `book_age` p50 171 s, and `seen_age_at_pricing` is p50 = p90 = 136 s: one sweep's rows, priced together;
+  - only 13 of 963 were priced within 120 s. That is NBA's live sweep cadence at tip-off; watch it as the games settle.
+- **P7 (#850), 7:06-7:31 PM:** 0 refusals, 0 exits. Child 4.35 GB after 8.5 h.
+  - Board: 5 builds, wall median 238 s, max **407 s** (1 over 300 s); publication gap median 330 s, **max 513 s**.
+  - Host load 5.5; an NHL OddsAPI refresh at 86% CPU at the read.
+- **R-B (#844 sample 12):**
+  - NCAAB 206 rows (122 venue), h2h 13: row-fresh 11 vs cell-fresh 12, mismatch 8;
+  - **NBA 61 rows, h2h 4: row-fresh 4 = cell-fresh 4, mismatch 0.** This is P3's baseline: the NBA grid is unaffected.
+- **R-E:** 0 NHL steps, 0 timed out; NHL child odds age max 183 s.
+- **Live odds:** overlay gap max 272 s (soccer); 8 sweeps, 3 refused; priced age p50 172 s, p90 455 s.
+- **Load:** `/intelligence` **2.17 s** (35 MB raw, the largest today); query 6.69 s; shortlist 2.41 s.
+  **I-28:** 15 queries, 8 cold (53%).
