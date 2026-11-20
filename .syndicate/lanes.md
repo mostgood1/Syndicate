@@ -1939,6 +1939,14 @@ death, never life — do not invert it.
 - Verification: Findings file with the pre-registered arms on the first 150 games of the 2024 every-2nd task list (Q4 checkpoints, 60 sims, paired), last-2:00 points and snaps by margin vs real, common-line log loss vs the base by margin; any damping re-fit by the 1-SE rule; a stated build plan or reason not to; no code without the user's yes
 - Blocked by: none
 
+### ncaaf-margin-aware-endgame — OPEN — opened 2026-11-20 — session 617b553b-0e2f-4987-9bfc-2b4c6a617a73
+- Goal: Todo #859 (#858's v4, user 'Start v4 here'): test on 2024 resumed real states, with a harness-only patched urgency rule (nothing in the repo changes), whether a MARGIN-AWARE end-game -- (a) the trailing hurry-up and two-minute drill only while the deficit is within reach of the possessions left, (b) a leader beyond reach runs the clock (four-minute mode) before the 150 s preservation -- lets #808's clock with real timeouts pass #858's gates G1-G3 against the live candidate (damping 1.0/17 + college OT); rule parameters measured from CFBD before the arms; findings with sized evidence and either a request for an engine loan to build it default-off (only if the gates pass) or a stated reason not to.
+- Files: .syndicate/findings_2026-11-20_ncaaf_margin_aware_endgame.md (NEW), docs/ai_context/todo.md (#859 section only)
+- Hypothesis: Written before any run. H-REACH: the clock's blowout cost (#858: 17+ log loss +0.028, trailer +0.31 and leader +0.43 rest at 25+) comes from urgency modes that ignore whether the game is still winnable; rules (a)+(b) remove most of it while keeping the one-score last-2:00 gain. Rival H-RATE: blowout over-scoring is the per-play scoring rate (backups, conservative play), not the mode, so the rules change little.
+- Falsification test: On the same 150 paired games: H-REACH false if clock + (a)+(b) still fails G2 (17+ log loss vs base worse by > 1 paired SE) or G3; also false if (a)+(b) moves the 17+ rest by less than half of the clock's +0.7 there.
+- Verification: Findings with the measured real targets, the pre-registered arms, G1-G3 against base, the 17+ rest shift; a loan request only on a pass
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
