@@ -31,7 +31,7 @@ mainly through #808's missing mechanisms.
    untuned) it lifts the 2024 late calibration slope 0.67 -> 0.77 and log loss -0.026 (se 0.0075) on common lines.
    On the 2026 ledger finals at 75-95%, on top of #835's fix: log loss -0.0076 (se 0.0040), slope 0.84 -> 0.89, pace
    1.105 -> 1.082 against an actual 1.065. All of it comes from leads of 17+.
-5. **BUILT, DEFAULT OFF, on a branch (user "Build it here"; see "## FIX — RESULTS").**
+5. **BUILT, DEFAULT OFF, ON MAIN `44184da1e` (user "Build it here", then "Push it"; see "## FIX — RESULTS").**
    `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING` arms the damping for the live re-sim at the re-fitted strength 1.0 and
    threshold 17. 2024 FIT: -0.0186 vs production (se 0.0070). 2026 ledger on top of #835: -0.0086 (se 0.0038), slope
    0.84 -> 0.91. The one-score / overtime half is separate engine work.
@@ -347,7 +347,7 @@ games as above, E0 re-taken under the pick):
 The 17+ bucket is still about 2 points over the finals and one-score games are still under. The damping closes part
 of the blowout gap. The rest of it, and the one-score half, are the follow-ups below.
 
-### The code (branch, NOT on main; the push is the user's yes)
+### The code (ON MAIN `44184da1e`, pushed on the user's "Push it"; default off, not loaded)
 
 - **`syndicate/features/ncaaf/live_blowout_damping.py` (NEW).** The switch, the three knobs, and `resolve(base)`,
   which returns `base` itself when off. One `NCAAF_LIVE_BLOWOUT_DAMPING` print per process when on.
