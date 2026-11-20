@@ -399,3 +399,10 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
     higher gen-2 threshold, or both. That is a separate change for the user to decide, after the fix's reading.
 - **Owed:** the decode skip's first-hour reading (`wsk_fix_reading.py`, waiter until 18:41Z): `STATE_DECODE_SKIPPED` on cold
   reads, cold `board_read` vs 13.7 s p50, GC pauses vs the 302 above, dumps and kills.
+- **The decode skip's first hour (2026-11-20 12:42 PM CST (18:42Z); 17:38:47-18:41:34Z vs the 35 min before on the instruments):**
+  - 156 `STATE_DECODE_SKIPPED`.
+  - Cold `board_read` p50 3.0 s (n=10, max 7.0 s) vs 13.7 s (n=6, max 58.4 s).
+  - GC pause time 2.9 s a minute vs 7.9 (-64%); the warmer thread's longest pause 1.66 s vs 4.19 s.
+  - 0 loop stalls >= 5 s, 0 new dumps, 0 `WORKER TIMEOUT`.
+  - So the warmer's every-few-seconds rebuild had been decoding the 40 MB shortlist too. The remaining full GCs (308 an hour,
+    max 2.65 s, all collecting nothing) are the GC-tuning question, a separate decision.

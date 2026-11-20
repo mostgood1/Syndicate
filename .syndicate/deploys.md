@@ -62526,3 +62526,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - 0 stall dumps from `_decompress_oversized_values`. That is structural for the shortlist: it no longer reaches `json.loads` on this path.
   - Cold `board_read` vs the baseline above, with n and denominators: the picks run (:07 / :22 / :37 / :52) and the board page are the cold reads.
   - Silent kills per day vs 11-17's 4.
+- **reading 1, 2026-11-20 18:41:34Z (12:41 PM CST): the first 62.8 min on `eeeb62a63`** (scratchpad `wsk_fix_reading.py`; baseline = the 35 min on `3c8ba5b14` with the instruments):
+  - `state_decode_skipped_lines` 0 -> >= 1: **MET.** 156 `STATE_DECODE_SKIPPED key=layer2_shortlist` lines, the first at 17:43:02Z.
+  - Cold `board_read`: **p50 3.0 s, max 7.0 s, n=10**; before, p50 13.7 s, max 58.4 s, n=6.
+    - After: 2.2 / 2.1 / 2.5 / 2.1 / 7.0 / 5.0 / 5.5 / 5.5 / 3.1 / 2.8 s, picks runs and the board page alike.
+  - `WEB_GC_PAUSE`: 308 in 62.8 min (4.9 a minute, 179.2 s in all = 2.9 s a minute); before, 302 in 35 min (8.6 a minute, 277.8 s = 7.9 s a minute).
+    - Pause time per minute fell 64%. The warmer thread's longest fell from 4.19 to 1.66 s. The request threads' longest is 2.65 s (before 1.66 s).
+    - Read as: the warmer's rebuilds had been decoding the 40 MB shortlist each time, so each rebuild set off full collections.
+  - `WEB_LOOP_STALL` (gap >= 5 s): 0, as before. New stall dumps: 0 (2 on 11-20, both before the fix). `WORKER TIMEOUT`: 0. Recycles: 6. healthz 200.
+  - Caveat: two different hours of the same late morning, not a same-instant A/B. Traffic differs, and n is small (10 and 6 cold reads). The direction is the same on every measure, and the 40 s single-call hold is gone by construction.
+  - **Owed:** silent kills per day vs 11-17's 4, over the following days (0 a day on 11-18, 11-19 and 11-20 so far).
