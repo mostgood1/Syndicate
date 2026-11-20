@@ -399,3 +399,31 @@ def test_bench_players_are_never_off_floor_flagged(monkeypatch):
     plays = [(1, "10:00", "Substitution", "H1 enters the game for B9", 0, 0), (2, "7:00", "Jump Shot", "A2 misses", 0, 0)]
     st = lps.exits_from_espn_summary("nba", _synthetic(plays))
     assert not [p for p in st.players_out if p.reason == "off_floor"]
+
+
+def _without_starter_flags(box):
+    for side in ("homeTeam", "awayTeam"):
+        for g in box["playerByGameStats"][side]["goalies"]:
+            g.pop("starter", None)
+    return box
+
+
+def test_nhl_api_goalie_change_is_caught_without_starter_flags():
+    """2026-11-20: BUF @ WSH's goalie change was missed live (players_out=0 every tick) though its FINAL box is
+    caught; the suspected cause is a live box with no `starter` flag. Two goalies with ice time is a change."""
+    box = _without_starter_flags(_nhlapi())
+    box["gameState"] = "LIVE"
+    st = lps.exits_from_nhl_boxscore(box)
+    assert sorted((p.team, p.player, p.reason, p.key) for p in st.players_out) == [
+        ("UTA", "K. Vejmelka", "goalie_change", True), ("UTA", "V. Vanecek", "goalie_change", True)]
+    assert lps.gameline_refusal(st)["reason"] == lps.REASON_KEY_PLAYER_OUT
+
+
+def test_nhl_api_without_starter_flags_one_goalie_with_ice_time_is_no_exit():
+    box = _without_starter_flags(_nhlapi())
+    box["gameState"] = "LIVE"
+    for side in ("homeTeam", "awayTeam"):
+        goalies = box["playerByGameStats"][side]["goalies"]
+        for g in goalies[1:]:
+            g["toi"] = "00:00"
+    assert lps.exits_from_nhl_boxscore(box).players_out == ()
