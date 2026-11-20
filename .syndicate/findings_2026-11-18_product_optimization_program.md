@@ -397,6 +397,8 @@ The user started all three cards ~7:10 PM CST. The rail monitor started duplicat
 
 ### 11.5 Next steps
 
+- **L1 DECIDED 11-20 ~9:50 AM CST: the user answered "Yes, start it" to "Start a session to build hold-value exits default-off with a shadow log?". Session local_552e5194 (hold-value-exits) STARTED with a brief: default-off rule plus a SHADOW log and grader, a LOAN of its sections from kalshi-exit-path (owner session gone), a pre-registered shadow grade, and a load plan for the user. No fleet load and no switch-on are approved; switch-on is a 12-08 window decision.**
+
 1. **Gap, the user's call:** L1 hold-value exits has no live owner. To be a 12-08 candidate it needs a default-off
    build plus a shadow log running by about 11-24, so two weeks of shadow exits can be graded.
    - A shadow is not a betting change and can load any time with the user's OK.
