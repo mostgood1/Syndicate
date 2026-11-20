@@ -650,3 +650,30 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **R-E:** 0 NHL steps, 0 timed out.
 - **Live odds:** overlay gap max 285 s (soccer); 7 sweeps, 3 refused; priced age p50 210 s, p90 584 s.
 - **Load:** query 3.98 s, chips 2.94 s, shortlist 2.69 s.
+
+## Reading 20 — 9:09 PM CST (03:09Z), full page
+
+- **Live:** 30 games; 26 with rail rows (800 rows).
+- **Flags: 14 shown on 10 cards, 0 false, 0 missed, 6 dark** (5 markets whose price passed 300 s).
+- **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 123.** Team cards 94 chips, 0 defects.
+- **`live_games_no_model` 5 of 26:**
+  - Wisconsin @ Seton Hall and UNLV @ Rutgers: REVERSED (I-29);
+  - **Southern Utah @ Texas:** direct but refused. The NCAAB re-sim refused 1 of 13 this tick (`no_margin_anchor` 3,
+    `pbp_score_mismatch` 1 across the two college sports);
+  - TNF (no totals distribution);
+  - CBJ @ CHI (I-30). NHL `live_resim` fell to **3 of 12** at 03:01-03:06Z.
+- **P7 (#850), since the 17:00:09Z load (`p7count.py`):**
+  - **`MEMORY_GUARD_ABORT` 4: 02Z hour 2, 03Z hour 2** (03:05:53Z headroom 1,785 MB; 03:07:01Z 1,886 MB);
+  - `BOARD_PROCESS_EXITED` 0; `RECYCLE_EXIT` 0; `Fatal Python error` 0;
+  - 123 builds; longest gaps 807, 662, 584 s; 0 over 900 s.
+  - Two `BOARD_PROCESS_POST_BUILD_CHECK held=transient_jobs` lines (02:50:29Z, 03:05:44Z): the post-build recycle was
+    held while transient jobs ran (headroom 1,641 / 1,793 MB, pair RSS 6,009 / 5,857 MB). So the child keeps growing:
+    **4.57 GB**; the parent is at 1.60 GB.
+  - Against the owner's §5 P1, so far: over the predicted (<= 1 every hour, <= 3 total), not yet falsified (> 2 in an
+    hour, or > 6 total). Final grade at 10 PM.
+- **Board (8:45-9:09 PM):** 4 builds, wall median 202 s, max 244 s; publication gap median 276 s, max 292 s. Host load 1.99.
+- **R-B (#844 sample 16):** NCAAB 186 rows (96 venue), h2h 12: **row-fresh 0 vs cell-fresh 9, mismatch 38**. NBA 69 rows,
+  mismatch 0.
+- **Live odds:** overlay gap max 152 s (NCAAF); 13 web merges, 12 list soccer stale; 12 sweeps, 6 refused (`lane_busy`,
+  33%); priced age p50 199 s, p90 571 s.
+- **Load:** `/intelligence` 6.00 s; query 6.36 s; chips 2.33 s; shortlist 0.77 s.
