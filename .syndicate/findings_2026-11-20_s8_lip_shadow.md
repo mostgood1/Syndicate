@@ -118,3 +118,7 @@ The help page's terms:
 ## Log
 
 - 2026-11-20 ~8:10 AM CST: lane opened; pre-registration written; collector not started.
+- 2026-11-20 8:12 AM CST: collector `6e8c94369` started (run copy `C:\tmp\pfmon\s8\s8_lip_shadow.py`, sha256 prefix
+  a7967dd833c3579b, the same as the commit), Idle priority, `collect --hours 124`.
+  - The first select found **8,148 active liquidity programs with at least 6 h left** (7,260 on 11-19).
+  - It reads every order book before choosing the book, about 35 min at its request spacing.

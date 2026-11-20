@@ -163,6 +163,20 @@ No result guarantees future returns.
      - Untested: a sim-only selection over every venue prop quote (needs a new quote join; poor prior).
    - **Fees are more than half the loss** (30 d: 3.87% of stake, before-fees ROI -3.28%), so a selection must beat
      about 4 pp of fees before it wins. That points back at fee-light entry (S3 maker) and fewer paid exits.
+8. **S8: liquidity-reward capture** (lane `s8-lip-shadow`; user "go ahead with S8", 11-20). Income that does not
+   depend on selection.
+   - **Basis** (`findings_2026-11-19_income_routes.md`):
+     - Kalshi pays about $138k a day for resting orders on non-sports markets, retail eligible. Most of those series
+       charge makers nothing.
+     - The static ceiling is about $346 a day on $2,500.
+   - **Pre-registration:** `findings_2026-11-20_s8_lip_shadow.md` (33ba9c394, pushed before any collection).
+     - A read-only shadow of S=100 per side at the reference price on a $2,500 book, chosen daily.
+     - The pessimistic fill model M1, with fills marked to settlement.
+     - **PASS:** net ≥ $25/day and 95% lower bound > 0. **KILL:** upper bound < 0, or a point below $10/day.
+     - Looks at 72 h (about 11-23) and 120 h (about 11-25).
+   - **Collector** (6e8c94369): started 11-20 8:12 AM CST at Idle priority on the host; data in `C:\tmp\pfmon\s8\`.
+   - **A PASS is not a live order.** Before any pilot: confirm the credits can be withdrawn as cash and the program
+     runs past 2027-01-01. Then a capped $500 pilot, only in a betting-change window and only with the user's yes.
 
 ## Infrastructure that makes learning compound
 
