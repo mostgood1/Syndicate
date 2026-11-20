@@ -93,7 +93,7 @@ Then:
   - flags: false, missed, dark;
   - P1 (`ours_contradictions`) and #824 (`ours_below_points`);
   - the score floor (`floor_violations`, owned reading R-A) and, while NCAAB is live, the #844 sampler (R-B);
-  - on NHL days, the NHL timeout watcher `p838_watch.py <prev Z>` (R-E);
+  - (R-E's NHL timeout watcher is retired as of 11-20);
   - `live_games_no_model`: live games whose full-game rail rows carry no live model at all (I-29, added 11-19). A game can lack a model before its first re-sim, so confirm on the next reading. If it persists, `lgb.py <sport> <since>` shows the join's `withheld_by_reason`;
   - P6;
   - overlay gaps over 360 s and stale web merges;
@@ -155,7 +155,9 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
     - Baseline: the 11-20 and 11-21 evenings. One-shot crons read at 6 PM and 11 PM CST both nights, and at 6 PM and 11 PM on 11-24.
 - Each is PREDICTED, FALSIFIED or NEITHER. Name any restart in the window (it CONFOUNDS the reading). Write the verdict to the lane `polymarket-slate-off-odds-loop`, a deploys.md READING entry, and todo #851.
 
-**R-E. #838 slow-NHL-API case (lane `odds-lane-sport-deadline`, OPEN, goal not met until this is read).** Taken over 11-19 from session local_73a5d2dd (handover on main `ab4877f6e`; the user's "keep it open" from 11-19 still stands).
+**R-E: RETIRED 11-20.** Lane `odds-lane-sport-deadline` closed with its goal NOT MET, because the slow-API case was never seen (main `c6d5d5d9c`, todo #838). The user said "yes to items 2 and 5", relayed by the fleet-watcher local_379fd729; item 2 was the close. Across 5,244 odds runs (11-18 13:47Z to 11-20 16:04Z), 0 steps hit a time limit, and the longest of 121 NHL rebuilds took 413 s against 900 s. No further watching. The original text follows for reference.
+
+**R-E (historical). #838 slow-NHL-API case (lane `odds-lane-sport-deadline`).** Taken over 11-19 from session local_73a5d2dd (handover on main `ab4877f6e`; the user's "keep it open" from 11-19 still stands).
 - **Trigger:** the first NHL odds rebuild that hits its time limit (900 s). That is a manifest step `nhl_live_generation` / `nhl_pregame_generation` with `timed_out: true`, or `data/nhl_source/data/processed/.nhl_live_generation_timeout_<date>.json` on the fleet. Before 11-19 none had happened: 11-18 6-11 PM had 8 of 8 rebuilds OK, at 169-299 s. The stats cache (`59fbefc71`) may make a timeout rare.
 - **Watch at every reading on a day with NHL:**
   `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p838_watch.py <prev Z>"`
