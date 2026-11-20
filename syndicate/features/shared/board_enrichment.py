@@ -3079,27 +3079,35 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                         for seg in _NCAAF_LIVE_SEGMENTS
                     }
             college_pricing = sport in ("ncaab", "wncaab") and college_segment_pricing_enabled()
+            full_index = build_live_gameline_index(
+                snapshot,
+                diagnostics=index_diag,
+                # Same reason as the first5 index above: without the date a
+                # lens game's "1:10 PM" cannot be compared to a row's
+                # `commence_time`, and the pair stays ambiguous.
+                slate_date=selected_date,
+                sources=lens_sources_for_sport(sport),
+                # None for MLB, so its sims-derived interval stays in charge and
+                # its behaviour is unchanged. Set only for a sport whose live
+                # probability is ANALYTIC and whose error bar has been measured.
+                analytic_std_err=analytic_std_err_for_sport(sport),
+                # Carried so the per-MARKET interval lookup cannot fall back
+                # to a default sport (`#499`). Without this the index stamps
+                # no sport, `hit.get("sport")` is None, and wnba totals
+                # refuse as UNCALIBRATED -- the pricing would be INERT while
+                # every unit test passed.
+                sport=sport,
+            )
+            # A NEUTRAL-SITE COLLEGE GAME THE TWO VENDORS ORIENT DIFFERENTLY (lane college-neutral-site-live-join): the
+            # re-sim lane is in ESPN's home/away, the rows in the odds feed's. With SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION
+            # on, every index also answers the reversed pair with the lane restated in the row's frame (exact pair
+            # first); absent = shadow, which files nothing and only counts. NCAAB / WNCAAB only.
+            from syndicate.features.shared import live_gameline_orientation as orientation
+
+            orientation_state = orientation.prepare(full_index, segment_indexes, sport=sport)
             coverage = attach_live_gamelines(
                 grid,
-                build_live_gameline_index(
-                    snapshot,
-                    diagnostics=index_diag,
-                    # Same reason as the first5 index above: without the date a
-                    # lens game's "1:10 PM" cannot be compared to a row's
-                    # `commence_time`, and the pair stays ambiguous.
-                    slate_date=selected_date,
-                    sources=lens_sources_for_sport(sport),
-                    # None for MLB, so its sims-derived interval stays in charge and
-                    # its behaviour is unchanged. Set only for a sport whose live
-                    # probability is ANALYTIC and whose error bar has been measured.
-                    analytic_std_err=analytic_std_err_for_sport(sport),
-                    # Carried so the per-MARKET interval lookup cannot fall back
-                    # to a default sport (`#499`). Without this the index stamps
-                    # no sport, `hit.get("sport")` is None, and wnba totals
-                    # refuse as UNCALIBRATED -- the pricing would be INERT while
-                    # every unit test passed.
-                    sport=sport,
-                ),
+                full_index,
                 segment_index=segment_index,
                 # SPORT-SCOPED PUBLISH SWITCH, same value the index already
                 # carries. Threaded so disabling one sport cannot silence another.
@@ -3111,6 +3119,7 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 # segment rows are priced instead and never reach the display branch.
                 segment_display_only=sport in LIVE_DISPLAY_SPORTS,
             )
+            orientation.finish(orientation_state, grid, coverage, index_diag)
             if segment_index is not None:
                 coverage["segment_index_size"] = len(segment_index)
             if segment_indexes is not None:
