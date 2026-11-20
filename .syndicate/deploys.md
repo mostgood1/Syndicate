@@ -62489,3 +62489,40 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - A `WEB_GC_PAUSE` with `pause_s` near that gap names GC.
   - No such pause, with `cpu_per_wall` ~1.0, names the decode itself; `cpu_per_wall` well under 1 names a starved process.
   - Reading owed, and the decode fix comes next, in its own reload.
+
+## 2026-11-20 17:38:47Z (11:38 AM CST) -- web: the combined board read leaves the day state's Layer 2 shortlist encoded `eeeb62a63` (lane `web-silent-worker-kills`, user "Yes, both" to "Deploy the instruments now, then fix the unused 40 MB decode in this lane?") -- **LOADED on web; the effect reading is owed**
+- betting change: **no**. The served board is byte-identical with the skip on and off: the test compares the whole combined response, and only the wall-clock age fields differ, as between any two reads.
+  - Ride-alongs `3c8ba5b14..eeeb62a63` (25 commits):
+    - smartsim2 college overtime (`42af6a923`, todo #855), behind `CalibrationProfile.college_overtime` = False (call site `game_simulator.py:249`, gated);
+    - monitoring scripts only (portfolio_watch, rail_monitor).
+  - No new env key except this one.
+- **The change** (`pipeline/intelligence_state.py`):
+  - `_read_single_date_response_for_combining` passes `skip_keys=("layer2_shortlist",)` through `_read_state_payload` -> `_expand_persisted_state` -> `_decompress_oversized_values`.
+  - That value stays encoded, and the shortlist's documented "not here" marker takes its place (no `rows` / `cards`; `read_from: read_layer2_shortlist`). The codec is still checked first.
+  - Every other reader decodes it as before. Each skip logs `STATE_DECODE_SKIPPED`.
+  - Switch `SYNDICATE_COMBINED_READ_SKIP_LAYER2_SHORTLIST`: absent = skip; 0 / off = the old decode.
+  - Tests: `tests/test_combined_read_skip_shortlist.py`, real writer and reader, nothing stubbed, off != on in the work done (zlib never sees the shortlist). 67 passed on the fleet's Linux Python.
+- **Why:** both of 11-20's stall dumps (16:08:10Z, 17:04Z) named this `json.loads` holding the GIL 40+ s in a request thread. 11-21's shortlist is 5.2 MB base64 / 39.9 MB JSON, and nothing on the combined-read path reads it (findings, "THE DUMP LANDED").
+- **Instrument baseline, 17:03:49-17:38:47Z (35 min on `3c8ba5b14`):**
+  - cold `board_read` 58.4 s (the in-flight one on the old worker), then 13.8 / 15.3 / 13.6 / 4.1 / 7.5 s;
+  - 0 `WEB_LOOP_STALL` (no gap >= 5 s); 0 new stall dumps.
+  - `WEB_GC_PAUSE`: full (gen 2) collections that collected nothing, every one: 13 of 1.1-4.2 s in the overlay warmer's thread (pid 1817547, 17:27-17:29Z), and many of 0.25-1.0 s in request threads.
+    - `thread_cpu_s` equals `pause_s` each time: real CPU work, not a starved host.
+    - The sampler's 3-4.2 s heartbeat gaps line up one for one: GC pauses stall the main loop.
+- **Gates:**
+  - claim web 17:38:1xZ (holder `web-silent-worker-kills`, ACQUIRED, rc 0);
+  - baseline 17:38:28Z: fleet head `3c8ba5b14`, 0 `STATE_DECODE_SKIPPED` lines, healthz 200;
+  - preflight `--service web --target-commit eeeb62a63 --betting-change no`, from a worktree at origin/main, 3 expect/baseline pairs: **CLEAR 17:38:35Z**.
+- **ff + reload:**
+  - `git merge --ff-only` at **17:38:47Z** (`3c8ba5b1484f` -> `eeeb62a6344a`).
+  - `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "max_latency_s": 0.01}`.
+  - Workers 1821356 / 1823110 -> **1825619 / 1825620**, both armed (17:38:48.69Z / .70Z); master 1011213 unchanged.
+- **expect / measured:**
+  - `fleet_head` 3c8ba5b14 -> eeeb62a63: **MET**.
+  - `healthz` 200 -> 200: **MET**. 0 new dumps, 0 Traceback at 17:39:05Z.
+  - `state_decode_skipped_lines` 0 -> >= 1 after the first cold read: **OWED**.
+- **verify:**
+  - Every cold combined read logs `STATE_DECODE_SKIPPED key=layer2_shortlist`.
+  - 0 stall dumps from `_decompress_oversized_values`. That is structural for the shortlist: it no longer reaches `json.loads` on this path.
+  - Cold `board_read` vs the baseline above, with n and denominators: the picks run (:07 / :22 / :37 / :52) and the board page are the cold reads.
+  - Silent kills per day vs 11-17's 4.
