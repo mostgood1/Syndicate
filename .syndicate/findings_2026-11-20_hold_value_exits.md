@@ -124,6 +124,102 @@ appended by the slow tick (and by the fast loop's dispatches into it, marked `ti
   L1's −2.10 / −3.74 pp.
 - **Falsified** if, with the minimum sample met, mean EmH >= 0 (AGAINST) or the CI lies wholly above 0.
 
-## 3. Build
+## 3. Build — on main `ace2020d3` (2026-11-20 ~10:35 AM CST), DEFAULT OFF, NOT LOADED
 
-(written after the build; see §3 below the line once filled in)
+Written after §2 was pushed (`923596e4d`). Nothing below changes §2.
+
+- `syndicate/features/shared/exit_hold_value.py` (NEW): the switch (`hold_value_mode`, exact words only),
+  `max_fair_age_seconds`, `consensus_sighting` (reads `kalshi_maker_pilot._seen`, never raises), `leg_ask`,
+  `assess` (pure given the sighting reader), `failed_assessment`, `apply_gate`, `ShadowTick` (collects and
+  writes one tick's rows; inert when off), `grade_shadow` (§2.3, pure), `read_shadow_rows`.
+- `execution_exits.py` (the three loaned sections only): the gate at the end of `evaluate_exit`; the
+  `ShadowTick` hook + the `hold_value` summary key in `_run_exit_tick_unlocked`; the `hold_value=` field in
+  `exit_tick_line`. Off: the decision dict, the tick summary, the EXIT_TICK line and the exits document are
+  exactly as before. An assessment that raises reads as an UNKNOWN hold value (shadow: today's rules
+  stand; on: it holds). A shadow write or observe failure is counted and never breaks the tick.
+- The gate lives in `evaluate_exit`, which the fast loop already calls (`execution_exits_fast.mark_pass`),
+  so the fast loop obeys it with no edit to that file (lane `in-game-trading`'s).
+- `scripts/exit_hold_value_shadow_grade.py` (NEW): the §2.3 grade, read-only, registered defaults; any
+  other parameters print `registered_parameters: false` and an EXPLORATORY note.
+- `tests/test_exit_hold_value.py` (NEW, 40 tests): switch parsing; absent = today (the decision's key set
+  pinned, `off`/garbage equal absent); shadow = today's decision + only the assessment; off != on on the
+  decision and on the tick (OFF books the paper exit, ON books none and reads `hold_value_hold`); the
+  mid-never-clears-the-bid invariant over a grid; consensus pregame-fresh only (in play / stale fall to
+  the mid; the age switch reaches); `model_fair` untouched; unknown hold holds; the pilot's own
+  `note_plan_sighting` feeds `consensus_sighting`; the shadow document identical to absent except
+  `last_tick.hold_value`; paper first-trigger logging; error paths; REACHABILITY through the worker's
+  `_exit_tick` (orders from the ledger: rows are `tick=slow`) and the fast loop's `mark_pass`; the grader
+  on hand-computed numbers (A −30, B −7, C +60; clustered SE by hand), SUPPORT/AGAINST/INSUFFICIENT/
+  INVALID (I1 and I2), exclusions, and the script on files.
+- Test runs (Windows, `python -m pytest`): the new file + `test_execution_exits.py` +
+  `test_execution_exits_fast.py` + `test_exit_sliver_retry.py` + the maker-pilot tests 176 passed; ten more
+  exit/settlement files (`test_exit_hold_near_settlement.py`, `test_paper_settlement_exits.py`,
+  `test_venue_settlement_*`, `test_kalshi_fractional_counts.py`, ...) 215 passed; after the rebase onto
+  `origin/main` the three core files 127 passed.
+- Fleet facts read for the design (no outcome read): `LIVE_ODDS_WORKER__SYNDICATE_KALSHI_MAKER_PILOT=on`
+  in `local_production.env`, so the sightings the consensus reads are being written; fleet HEAD
+  `38c3a6905` (11-20 ~10:10 AM CST) does not carry this build.
+- **Betting-change classification: `no` while absent or `shadow`** (decisions and documents equal OFF,
+  by test, per the 11-18 rule). **`on` is `yes`.**
+- Not built: pruning of the shadow files (~3 MB/day of live rows; the grade needs the whole window), and
+  `HOT_ARTIFACT_PATTERNS` (an output read on the fleet by a script, not a web input).
+
+## 4. Load plan for the SHADOW — the user's decision (NOT approved yet)
+
+Loading is an env change: `LIVE_ODDS_WORKER__SYNDICATE_EXIT_HOLD_VALUE=shadow` in
+`~/syndicate-prod/local_production.env`, which only a drained full `down`/`up` picks up, on a checkout
+that carries `ace2020d3`. It is NOT a betting change, so it may load at any time — but only with the
+user's explicit OK, claims and a preflight (`--betting-change no`).
+
+- **Recommended: ride the 11-24 window batch** (task `nfl-level-refit-load-1120`, Tue 11-24 2:15 AM CST,
+  ONE ff to a TARGET cut from `origin/main` then, plus ONE drained full down/up). Its ff carries
+  `ace2020d3` anyway (inert while absent; its ride-along gate will list it). Adding the shadow costs one
+  env line in the same down/up, as a droppable CHANGE H:
+  - kit `C:/tmp/hv856/kit_env_856.sh` (`check | apply | restore <backup>`; prints only this key; backup
+    first; idempotent; refuses nothing but never writes `on`). Self-tested 2026-11-20 10:15 AM CST on a
+    dummy file: append, idempotent re-apply, restore, mode 600 kept, real env file untouched (0 lines).
+  - order: run `apply` AFTER the batch's other env kits, so a batch STOP's earliest-backup restore undoes
+    it too.
+  - verify after `up`: `kit_role_env.py SYNDICATE_EXIT_HOLD_VALUE` (or the kit's `check`) shows
+    live-odds-worker `shadow`, refresh-worker and web ABSENT; `fleet_role_env_reading.py compare` with
+    `--expect-added SYNDICATE_EXIT_HOLD_VALUE`; the first EXIT_TICK after boot carries
+    `hold_value={'mode': 'shadow', 'rows': N` with N = that tick's `live=`; its `reasons` has no
+    `hold_value_hold`; `shadow_<UTC date>.jsonl` exists under
+    `~/syndicate-prod/data/reports/intelligence/execution_exits_hold_value/` (or the role's reports root)
+    and grows by N rows a tick; 0 Traceback in the live-odds-worker log; live take-profit sales continue
+    as before (EXIT_LIVE lines).
+  - deploys.md: `- betting change: no` for this line (the batch's other changes are `yes`).
+  - Window it buys: 11-24 ~2:30 AM .. 12-06 = ~12.9 days. At ~11 live pregame take-profit events a day
+    (pass B: 179 exited events / 16 days since 11-03) that is ~140 events, over the 60-event minimum if
+    the gate holds most fires.
+  - Adding CHANGE H to that task's prompt changes another lane's batch: it needs the user's OK, and the
+    prompt read back after the edit. If the batch STOPs, the shadow waits for the next drained down/up.
+- **Alternative: a standalone drained down/up before 11-24** (e.g. Sat 11-21 morning). ~3 more days of
+  shadow, including a full NCAAF/NFL weekend. Costs: a full fleet restart outside the batch (claims on all
+  three services, a joint CLEAR preflight from a worktree at `origin/main`, a drain, the ride-along check
+  over everything on main since `38c3a6905`), and every restart comes back LIVE. Not recommended unless
+  the user wants the weekend in the sample.
+
+## 5. Predictions for a 12-08 switch-on (`SYNDICATE_EXIT_HOLD_VALUE=on`) — written before the shadow loads
+
+Conditional on a SUPPORT verdict on 12-07 and the user's yes. Read over the 14 days after the load
+(12-08..12-21) against the 14 days before it (the shadow keeps logging under `on`).
+
+- **P1 (the gate fires as designed):** live take-profit sales per day fall by the shadow's measured S1
+  held share, ± 15 pp (H: S1 >= 80%, so a fall of >= ~65%).
+- **P2:** every remaining live take-profit sale's row has `hold_source=consensus`; 0 with `venue_mid`.
+- **P3:** live exit fees per day fall in proportion to P1 (± 15 pp). At the 11-03..11-18 rate that is up
+  to ~$0.51/day (pass B exit fees −0.83 pp of $61.75/day).
+- **P4:** in-play take-profit dispatches from the fast loop (`FAST_EXIT_LIVE_DISPATCH` carrying
+  `take_profit`) go to 0: in play the hold value is always the venue mid.
+- **P5 (guard: nothing else moved):** live entry orders per day within ±25% of the prior 14 days;
+  `EXIT_TICK` lines every tick with no `EXIT_TICK_FAILED`; `model_fair` paper exits still book; no
+  Traceback.
+- **P6 (economic, noisy, NOT a revert trigger):** on the live pregame-entry positions the switch holds,
+  the §2.3 exit-minus-hold continued forward is < 0.
+- **Side effect stated in advance:** `on` also stops the slow tick's PAPER take-profit exits wherever the
+  gate holds, so `exit_counterfactual_report.py`'s paper `take_profit` rows thin out from the load. The
+  shadow rows keep today's would-be decision (`today_rule`), so nothing is lost for grading.
+- **Bookkeeping at the load:** a betting change: `betting_change.py add --kind yes` (restarts the
+  scale-up gate's 800-event count), `--betting-change yes` on the preflight, inside a window. Back-out:
+  set the line back to `shadow` (a risk-reduction revert may use `--outside-window "revert: ..."`).
