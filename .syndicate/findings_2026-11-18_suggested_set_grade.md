@@ -302,3 +302,36 @@ per-line follow-ups above are owed here with no todo number of their own.
   `gap.py` / `gap.json`, `compare.py` / `compare.json`, `ebcheck.py`.
 - Logs: `repro.log` (5:57 PM), `full.log` (6:03 PM), `incr.log` (the last run, 6:07 PM; its outputs are the ones
   on the fleet).
+
+## 8. Coverage after the #sg fix (reading 2026-11-20)
+
+Scheduled task `suggested-set-coverage-1120`, read-only, run 11-20 ~7:45 AM CST. Command (nice 19, on the fleet):
+`gap_coverage.py /home/amyn/Syndicate /mnt/c/SyndicateProd/suggested_set/gap_after_fix_20261120.json`. The recorder
+held 723 keys, 424 of them `sg=true`.
+
+**Pre-registered bar (board date 2026-11-19 only).** Share = recorder_sg_true / suggested at the day's last build:
+MET: share >= 95%, and not_recorded <= 1. PARTIAL: share 80-95%. NOT MET: share < 80%.
+
+**Verdict: MET.** 2026-11-19: 28 of 28 suggested lines have an `sg=true` record (100%); 0 sg_false_only, 0
+not_recorded (phases: 25 pregame, 3 live).
+
+| board date | suggested | sg_true | sg_false_only | not_recorded | share |
+|---|---|---|---|---|---|
+| 2026-11-19 (first full day on the fix) | 28 | 28 | 0 | 0 | 100% |
+| 2026-11-18 (partial day; builds before 04:46:47Z 11-19 ran old code) | 22 | 22 | 0 | 0 | 100% |
+| 10-23..11-17, pre-fix (section 2, `gap_before_fix_20261118.json`) | 610 | 304 | | | 49.8% |
+| 10-23..11-17, same window re-read today | 610 | 305 | 303 | 2 | 50.0% |
+
+The pre-fix window does not move (305 of 610 today vs 304 of 610 on 11-18), as expected: the fix writes no
+history. 11-20 (111 of 111) and 11-21 (28 of 28) are open board dates, not judged.
+
+**Closed-day check.** The 11-19 decision record's mtime is 2026-11-20 05:52:20Z (11:52 PM CST 11-19), which is
+8 minutes BEFORE the 06:00Z bound the check named. It had not changed by 13:46Z, so no build wrote to that date
+after midnight CST; I read the day as closed, but say so here because the stated check did not pass literally.
+
+**Step 2 diagnosis:** not run (MET).
+
+**11-20 7:15 AM grade run** (`~/syndicate-prod/logs/suggested_set.log`): `=== start 2026-11-20T13:15:01Z
+head=38c3a6905` / `=== end 2026-11-20T13:15:48Z rc=0`; `START today_central=2026-11-20`, 556 files
+2026-10-13..2026-11-21. `LATEST 2026-11-20|all|Suggested by the board`: 14,661 bets / 1,418 games, ROI -1.68%
+[-3.96, +0.53], market EV 3.42%.
