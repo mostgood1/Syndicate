@@ -219,3 +219,23 @@ Registered 2026-11-19, before any load. The load is a betting change: it adds li
     Rutgers / UNLV, Seton Hall / Wisconsin, Kansas / Houston.
   - The other 2 joined directly.
   - The history count in section 3 (24, to about 6:50 PM) does not include the 3 evening games.
+
+## 7. NCAAF: measured, not exposed so far (2026-11-20)
+
+- **The shape is the same.** The NCAAF live lens takes its home/away from the CFBD projection artifact
+  (`run_refresh_worker.py` `_run_ncaaf_live_resim_tick` builds `games` from `smartsim2_projections_<season>_wk<w>.csv`),
+  while the rows carry the odds feed's.
+- **The data:** `/mnt/c/tmp/cnsl/ncaaf_rev.py`, read-only on the fleet. It compares the NCAAF live gameline ledger
+  10-01..11-19 (37 dates) with the 2026 artifacts wk4..wk12.
+- **Result: 0 of 420 live NCAAF games had rows reversed against the lens.**
+  - Direct games with no modelled full-game row: 35 of 420, other causes.
+  - 7 live FCS games were in no artifact.
+  - So CFBD and the odds feed agreed on every regular-season game, including the neutral-site rivalries.
+- **Not measurable yet:** conference championships (12-05), Army-Navy (12-12) and the bowls, where "home" is assigned
+  per game.
+  - The pregame NCAAF join already met one flipped neutral site (state_football: CFBD Arizona State @ Kansas at
+    Wembley against the odds feed's reverse).
+  - Extending `ORIENTATION_JOIN_SPORTS` to `ncaaf` would need its hit fields classified first. NCAAF hits can carry
+    possession-side state.
+  - Re-measure after 12-05 with the same script.
+
