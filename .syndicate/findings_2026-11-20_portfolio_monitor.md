@@ -305,3 +305,30 @@ only, because this repo is public.
   Verified under Task Scheduler at 10:45 AM: every step rc 0.
 - **The output path stays `C:\tmp\pfmon\page\dashboard.html`**, for the central hub
   (`C:\SyndicateProd\dashboards\index.html`, built by the fleet-watcher session).
+
+## Portfolio Watch moves to durable paths and publishes to the fleet data root (fleet-watcher's request, relaying the user ~11:05 AM CST: "yes, open the lane and send the asks"; lane ops-dashboards-hub fd2c27f7b)
+
+- **Code is versioned** in `scripts/portfolio_watch/` (3cb203107, fix 12136a4d0, 6 tests):
+  - `paths.py`, `build_page_data.py`, `build_history.py`, `build_dashboard.py`, `run.py`.
+- **Installed and run from `C:\SyndicateProd\portfolio_watch`** (out of C:\tmp, which a cleanup once wiped).
+  - The reading log, the 8 newest reading folders, the durable `history\daily_rollup.json` and the findings register
+    were copied there.
+  - The old `C:\tmp\pfmon` copies are left in place.
+  - The probe now writes its readings there (`--out-dir`).
+- **Every run publishes the page atomically** (write `.tmp`, then rename) to three places:
+  1. `C:\SyndicateProd\portfolio_watch\page\dashboard.html`;
+  2. **`C:\tmp\pfmon\page\dashboard.html`**, unchanged, for the local hub;
+  3. **the fleet data root `~/syndicate-prod/data/reports/portfolio_watch/index.html`**, for `/ops/dashboards`. This is
+     the Rail Watch pattern; no service reads it until that route lands.
+- **The task `SyndicatePortfolioWatch` now runs `C:\SyndicateProd\portfolio_watch\run.py`.**
+  - Verified by a Task Scheduler run at 10:59 AM: every step rc 0, and the fleet copy was updated at 11:00 with the
+    same md5 as the local copy.
+- **A slip, caught and fixed:**
+  - `paths.py` was first written through a shell heredoc that ate one of the two leading backslashes. The "fleet copy"
+    went to `C:\wsl.localhost\...\index.html`, a stray 249 KB file on C:.
+  - The runner logged only each step's last line, so it showed no failure.
+  - Fixed: a forward-slash UNC path, a test that the target's drive is the WSL share, and the runner now logs every
+    `FAILED` publish line.
+  - **Removing the stray `C:\wsl.localhost` folder was refused by the safety check (a top-level folder on C:); it is
+    left for the user.** It holds only that one file.
+- **The daily learning review's prompt** now points at the durable paths and reads `daily_rollup.json` first.
