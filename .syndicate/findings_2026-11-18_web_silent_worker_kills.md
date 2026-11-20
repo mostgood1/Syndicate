@@ -289,3 +289,38 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
     It tells H3 (main thread waiting on futex while one other thread burns ~100 ticks/s) from H2 (main thread in D) and
     from CPU starvation, on stalls far shorter than the 40 s dump. py-spy is in the venv but ptrace_scope is 1, so it
     cannot attach to the workers without root.
+
+## H3 CONFIRMED as the mechanism class (2026-11-20 10:06 AM CST (16:06Z); read-only)
+
+- **The sampler caught two serving-worker stalls in 25 min** (`wsk_thread_sampler.py`, scratchpad, from 15:32Z 11-20: while a
+  worker's heartbeat is >= 2.5 s old it reads every thread's /proc state, CPU ticks, major faults, context switches, wchan):
+  - 15:39:44Z pid 1792398 (913 MB anon): 12.9 s. 15:41:40Z pid 1794045 (522 MB): 9.1 s.
+  - Each second of both: ONE thread `R`, ~100 ticks/s (a full core), **0 voluntary context switches**. MAIN `S` in
+    `futex_do_wait` with ~185-200 voluntary switches/s: it wakes every ~5 ms (the GIL switch interval) to ask for the GIL and
+    never gets it. 0 major faults, no `D` state anywhere.
+  - So one thread held the GIL inside ONE C-level call (Python honours the 5 ms drop request only between bytecodes). That is
+    H3. H2 (the heartbeat blocked on I/O), CPU starvation and paging are excluded for these two stalls.
+- **The holder was a request thread, not the overlay warmer.** In 1794045 the busy tid 1795998 started 15:40:22Z. The warmer is
+  tid 1795245 (started 15:37:00Z = `COMBINED_BOARD_OVERLAY_WARMER_STARTED` 15:37:01.7Z), and it slept in `hrtimer_nanosleep`.
+- **Both stalls sit inside `board_read` of a browser `POST /api/intelligence/query`** (the board page):
+  - 15:39:34-15:40:13Z: 38,969 ms, `board_read` 28,001 ms.
+  - 15:41:38-15:42:04Z: 27,080 ms, `board_read` 20,316 ms.
+  - Both on the cold path (the same queries 23-25 s later read 8.3 and 1.3 ms).
+  - This joins H5: two 11-17 kills fell on the picks run's board query, when its response was ~62 MB. Same request, a 3x bigger
+    board, and the same kind of stall past 60 s is a silent kill.
+- **Repro of the cold read, in a separate process** (`wsk_repro_board_read.py` under `py-spy record --gil`, nice 19):
+  - Setup: web's env minus the service markers, so no warmer arms. It reads Redis and files only. 3 cold reads; the last ran
+    with gc disabled.
+  - `read_s` 28.0 / 19.0 / 17.2. Longest single GIL hold 0.77 / 2.07 / 0.84 s.
+  - Run 1's 2.07 s was a gen2 collection: 6 gen2 = 6.64 s of a 19 s read, max 2.067 s. Run 0: 18 gen2 = 3.68 s, max 0.59 s,
+    at 613 MB. So a full collection's cost grew with the heap (613 -> 794 MB).
+  - GIL samples: `json` `raw_decode` 1,176 of 3,314 (35%). By call site: `_merge_layer2_shards` 396, `_hydrate_layer2_cards` 391,
+    the state's `_decompress_oversized_values` 202, `game_chip_detail` 109. CSV play-by-play reads (`player_stats.py:93`) 150.
+- **Not named yet: which single call ran 9-13 s in production.** The repro's decodes each stay under ~1 s. Its longest hold is a
+  full GC, and that grows with the heap.
+  - Lead, not proven: in a production worker, whose heap also holds the whole app and other cached boards, a gen2 collection
+    inside the cold read runs 9-13 s.
+  - Test: log every collection >= 0.5 s in web (`gc.callbacks`: generation, pause, triggering thread) and lower the stall dump to
+    ~10 s, so the next board use names it. Both are instruments, betting change no; they need a web load.
+- For lane `board-read-cold-share`: the cold read costs 17-28 s even in an idle side process, and 35% of its GIL time is `json`
+  decoding of layer-2 shards and the state.
