@@ -164,7 +164,11 @@ Written after §2 was pushed (`923596e4d`). Nothing below changes §2.
 - Not built: pruning of the shadow files (~3 MB/day of live rows; the grade needs the whole window), and
   `HOT_ARTIFACT_PATTERNS` (an output read on the fleet by a script, not a web input).
 
-## 4. Load plan for the SHADOW — the user's decision (NOT approved yet)
+## 4. Load plan for the SHADOW — DECIDED: rides the 11-24 batch as CHANGE H
+
+**DECIDED `[2026-11-20 ~10:55 AM CST]`: the user, to "Load the shadow log in the 11-24 batch's restart?" (asked in session ffd41dea), replied "Yes, ride 11-24".** Added as droppable CHANGE H (not a betting change) to task `nfl-level-refit-load-1120` (Tue 11-24 2:15 AM CST, one ff + ONE drained full down/up): prompt and description updated with the scheduled-tasks tool 11:10 AM CST; the stored prompt read back IDENTICAL to the generated file (50,395 chars; 24 asserted single-match edits, generator `C:/tmp/hv856/batch/amend_prompt.py`); schedule unchanged (fireAt 2026-11-24T08:15Z, enabled). Kit `C:/tmp/hv856/kit_env_856.sh`: its read-only `check` on the REAL env file 11:00 AM CST read the key ABSENT on all three roles. If the batch does not load H, H rides the next drained full down/up.
+
+The plan as it was put to the user:
 
 Loading is an env change: `LIVE_ODDS_WORKER__SYNDICATE_EXIT_HOLD_VALUE=shadow` in
 `~/syndicate-prod/local_production.env`, which only a drained full `down`/`up` picks up, on a checkout
