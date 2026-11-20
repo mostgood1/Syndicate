@@ -464,3 +464,79 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - Live ticks: 0 placed in 6 (11 `outside_price_band`, 3 `game_started`).
   - Orders today: 56. 55 filled, 1 maker expiry.
   - Cap use: 23.0% Kalshi dollars (the expiry released its room), 16.2% Polymarket.
+
+## Reading 85 — Thu 11-19 8:02 PM CST (02:02Z), window 30 min
+
+- **Results first.** One more 11-18 bet graded (a late finish), which moved yesterday and the windows slightly:
+  - Yesterday: 67 bets / 34 events, +4.32% [-22.5, +31.1]. Won 65.7% against a 60.5% breakeven.
+  - 7 d: -3.88% [-14.9, +7.2] on 178 events.
+  - 30 d: -7.14% [-12.6, -1.7] on 706 events.
+  - All-time: 2,095 / 1,129, -10.81%.
+  - CLV over 30 d, net of fees: -0.41 pp (se 0.21) on 610.
+  - Gate: 0 of 800 (BC-053 clock).
+  - 45 games are in play; none is late.
+- **No new anomaly.**
+  - Every endpoint is inside budget, a little slower at the evening peak: `live_today` 0.56 s, `page` 0.75 s, `live_all` 0.72 s.
+  - The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 4.8 min old: 187 suggested, 10 positions; 92 rows refused `in_play_market_fair`.
+  - Live ticks: 0 placed in 10 (19 `outside_price_band`, 17 `game_started`).
+  - Orders today: 58. 57 filled, 1 maker expiry.
+  - Cap use: 27.3% Kalshi, 16.0% Polymarket.
+  - Placeable: Kalshi 50 of 755 rows, Polymarket 41 of 460.
+
+## Reading 86 — Thu 11-19 8:31 PM CST (02:31Z), window 30 min
+
+- **Results first.**
+  - Unchanged since Reading 85: 30 d -7.14% [-12.6, -1.7] on 706 events; 7 d -3.88% [-14.9, +7.2] on 178.
+  - Gate: 0 of 800 (BC-053 clock).
+  - 47 games are in play; none is late.
+- **ANOMALY (new tonight): `live_today` 3.20 s against a 3.0 s budget.** The server logged 2,872 ms for
+  `GET /api/portfolio/live` at 02:31:11Z.
+  - Hypothesis, written before testing:
+    - (a) the endpoint's cost scales with open in-play positions (47 games); or
+    - (b) contention in the web worker that served it.
+    - Falsifier: if (a), repeat reads stay slow; if (b), they are intermittent.
+  - **Result: intermittent, so (a) is falsified.**
+    - Six re-reads 10 s apart (02:31:39-02:32:30Z, same 47 games, host load 2.3-3.2): 0.14-0.22 s.
+    - The server logged 126-198 ms for them.
+  - **The earlier slow read is explained.** Reading 82 (00:33:12Z, 2,022 ms) landed on worker 1147878:
+    - it booted at 00:31:37Z after a `WEB_WORKER_MEMORY_RECYCLE` (anon 1,146 MB against a 633 MB limit), so it was
+      about 95 s old;
+    - an in-process `COMBINED_BOARD_OVERLAY_WARMED` rebuild ran over the request (`build_s=56.79`, finished
+      00:33:34Z);
+    - that worker was itself recycled at 00:34:08Z (150 s old, 862 MB).
+  - **This read is not explained.** Between 02:25 and 02:39Z the web log has no recycle, no worker boot and no
+    overlay line. It stays a single unexplained 2.9 s read.
+  - **Owner:** lane `board-read-cold-share` (todo #853, `findings_2026-11-19_board_read_cold_share.md`).
+    - It measured the same mechanism: per-process combined-board rebuilds and cold reads after memory recycles.
+    - Its fix is on main, default-off, queued as CHANGE F of the 11-24 batch.
+    - Nothing to fix from this lane. Over the last 3 h the web log shows 319 overlay rebuilds, median 10.0 s,
+      max 68.7 s.
+  - **Watch:** 2 of 11 portfolio reads tonight were above 2 s. If one goes over 5 s, or 3 or more of 6 reads in a
+    window exceed the budget, it goes to that lane with the reads.
+- **Flow:**
+  - Plan 2.0 min old: 135 suggested, 12 positions; 46 rows refused `in_play_market_fair`.
+  - Live ticks: 0 placed in 10.
+  - Orders today: 58. 57 filled, 1 maker expiry.
+  - Cap use: 27.3% Kalshi, 16.0% Polymarket.
+
+## Reading 87 — Thu 11-19 8:56 PM CST (02:56Z), window 25 min
+
+- **Results first.**
+  - The gate clock has started: **2 of 800 events** on BC-053 (the first bets placed after 11:00 AM have graded).
+  - Yesterday: 68 bets / 34 events, +4.65% [-21.9, +31.2]. Won 66.2% against a 60.4% breakeven.
+  - 7 d: -3.81% [-14.8, +7.2] on 178 events.
+  - 30 d: -7.13% [-12.6, -1.7] on 706 events.
+  - All-time: 2,101 / 1,133, -10.82%.
+  - CLV over 30 d, net of fees: -0.41 pp (se 0.21) on 611.
+  - 42 games are in play; none is late.
+- **No new anomaly.**
+  - `live_today` 0.47 s. The web log's 8 live reads in the window include Reading 86's 2,872 ms and its six
+    re-reads; the median is 172 ms.
+  - The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 1.8 min old: 130 suggested, 12 positions; 36 rows refused `in_play_market_fair`.
+  - Live ticks: 0 placed in 10.
+  - Orders today: 58. 57 filled, 1 maker expiry.
+  - Cap use: 27.2% Kalshi, 16.0% Polymarket.
