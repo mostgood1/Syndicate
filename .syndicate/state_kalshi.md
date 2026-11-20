@@ -878,6 +878,7 @@ board. The loop therefore checks `budget_remaining()` BEFORE spending.
   defer Kalshi; paper exits never read. No live exit -> identical grade. Loads at the next fleet ff + live-odds-worker AND
   refresh-worker restart. `GET /markets` `result` VERIFIED 2026-10-19T21:01Z: yes/no matched the ledger on 2 venue-graded
   live markets (won->yes, lost->no), status `finalized`, `settlement_ts` == `settled_at_venue` to the microsecond.
+- **HOLD-VALUE GATE ON MAIN, DEFAULT OFF, NOT LOADED** `[verified 2026-11-20 ~10:50 AM CST, lane hold-value-exits, todo #856]`: `ace2020d3` adds `SYNDICATE_EXIT_HOLD_VALUE` (absent = off = today byte-identical, by test; `shadow` = today's decisions + `reports/intelligence/execution_exits_hold_value/shadow_<date>.jsonl`; `on` = take_profit only where net - hold > exit fee, a BETTING CHANGE). The fleet (HEAD `38c3a6905`, ~10:10 AM CST) does not carry it and `local_production.env` names no such key. Pre-registered grade + load plan: `findings_2026-11-20_hold_value_exits.md`.
 
 ## [kalshi-maker-shadow] KALSHI MAKER (RESTING-BID) SHADOW: PAPER ONLY, PRE-REGISTERED, RUNNING HOURLY ON THE FLEET VIA A USER-APPROVED BRIDGE `[verified on the fleet 2026-10-20 14:25Z, lane kalshi-maker-shadow-paper]`
 
