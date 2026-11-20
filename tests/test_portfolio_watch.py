@@ -1,0 +1,72 @@
+"""Portfolio Watch builders (scripts/portfolio_watch, lane portfolio-monitor)."""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+PW = Path(__file__).resolve().parents[1] / "scripts" / "portfolio_watch"
+sys.path.insert(0, str(PW))
+
+import build_dashboard  # noqa: E402
+import build_history  # noqa: E402
+import paths  # noqa: E402
+
+
+def test_publish_is_atomic_and_leaves_no_tmp(tmp_path):
+    target = tmp_path / "a" / "b" / "index.html"
+    assert build_dashboard.publish("<html>one</html>", target).startswith("wrote")
+    assert build_dashboard.publish("<html>two</html>", target).startswith("wrote")
+    assert target.read_text(encoding="utf-8") == "<html>two</html>"
+    assert not any(p.name.endswith(".tmp") for p in target.parent.iterdir())
+
+
+def test_an_unwritable_target_is_reported_not_raised(tmp_path):
+    blocker = tmp_path / "file"
+    blocker.write_text("x", encoding="utf-8")
+    assert build_dashboard.publish("<html/>", blocker / "index.html").startswith("FAILED")
+
+
+def test_the_page_publishes_to_all_three_targets_and_data_cannot_close_its_script_tag(tmp_path, monkeypatch):
+    page, hist = tmp_path / "page", tmp_path / "history"
+    page.mkdir()
+    hist.mkdir()
+    (page / "readings.json").write_text(json.dumps({"rows": [{"at": "2026-11-20T15:00:00Z",
+                                                             "label": "x</script><b>"}], "meta": []}), encoding="utf-8")
+    (hist / "daily_rollup.json").write_text(json.dumps({"rows": [{"date": "2026-11-19", "bets": 1}]}), encoding="utf-8")
+    local, fleet = tmp_path / "local" / "dashboard.html", tmp_path / "fleet" / "index.html"
+    monkeypatch.setattr(build_dashboard, "PAGE", page)
+    monkeypatch.setattr(build_dashboard, "OUT", page / "dashboard.html")
+    monkeypatch.setattr(paths, "HISTORY", hist)
+    monkeypatch.setattr(paths, "LOCAL_PAGE_COPY", local)
+    monkeypatch.setattr(paths, "FLEET_PAGE", fleet)
+    monkeypatch.setattr(paths, "S8_HEARTBEAT", tmp_path / "none.json")
+    assert build_dashboard.main() == 0
+    texts = [p.read_text(encoding="utf-8") for p in (page / "dashboard.html", local, fleet)]
+    assert texts[0] == texts[1] == texts[2]
+    assert "x<\\/script>" in texts[0] and "x</script><b>" not in texts[0]
+
+
+def test_ops_by_day_counts_non_gate_anomalies_and_slow_live_reads(tmp_path, monkeypatch):
+    lines = [
+        {"at": "2026-11-20T05:00:00Z", "anomalies": ["GATE 2 loads", "ENDPOINT live_today slow"],
+         "endpoints": {"live_today": {"seconds": 3.4}}},
+        {"at": "2026-11-20T07:00:00Z", "anomalies": [], "endpoints": {"live_today": {"seconds": 2.2}}},
+    ]
+    (tmp_path / "readings.jsonl").write_text("\n".join(json.dumps(x) for x in lines), encoding="utf-8")
+    monkeypatch.setattr(build_history, "READINGS", tmp_path)
+    ops = build_history.ops_by_day()
+    # 05:00Z is 11:00 PM CST 11-19; 07:00Z is 1:00 AM CST 11-20
+    assert ops["2026-11-19"] == {"readings": 1, "anomalies": 1, "live_over_2s": 1, "live_over_3s": 1}
+    assert ops["2026-11-20"] == {"readings": 1, "anomalies": 0, "live_over_2s": 1, "live_over_3s": 0}
+
+
+def test_history_keeps_the_previous_rollup_when_there_is_no_ledger(tmp_path, monkeypatch):
+    monkeypatch.setattr(build_history, "READINGS", tmp_path / "empty")
+    out = tmp_path / "daily_rollup.json"
+    out.write_text('{"rows": [{"date": "kept"}]}', encoding="utf-8")
+    monkeypatch.setattr(build_history, "OUT", out)
+    assert build_history.main() == 0
+    assert json.loads(out.read_text(encoding="utf-8"))["rows"][0]["date"] == "kept"
