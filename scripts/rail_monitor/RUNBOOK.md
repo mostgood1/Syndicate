@@ -142,6 +142,18 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
   - NHL odds age <= ~1,200 s, **measured from the actual first puck drop** (the ESPN state flip in `C:\tmp\inplay_<date>\espn.jsonl`), not the scheduled start. The owner's 11-18 reading got this wrong; see the deploys.md correction at 2026-11-19 14:15Z.
 - **Write the verdict** to the lane `odds-lane-sport-deadline`, a deploys.md READING entry, and todo #838. A MET verdict closes the lane's goal; closing the lane is the user's call.
 
+**R-F. #850 repeat evening (lane `board-split-memory-guard`, session local_d0f83044; 11-19 reading recorded on main `c09c4e835`, verdict P1 NEITHER / P2 PREDICTED / P3 PREDICTED, CONFOUNDED by the slate).**
+- Owed: the same §5 thresholds (`.syndicate/findings_2026-11-18_board_split_memory_guard.md` §5) on the next evening that has:
+  - at least **33 live NCAAB+NBA+NHL+NFL games at 7 PM CST** (count the live chips by sport at the ~7 PM reading);
+  - **no refresh-worker restart, drain or deploy in 5-10 PM**.
+  Fri 11-20 and Sat 11-21 look likely.
+- How: after 10 PM, run `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p7count.py <D>T23:00:00 <D+1>T04:00:00"`, with the window in UTC. Grade each part:
+  - P1: `MEMORY_GUARD_ABORT` <= 1 every hour and <= 3 total; falsified if > 2 in an hour or > 6 total.
+  - P2: <= 2 exits, all rc 75; falsified on any rc -6 or `Fatal Python error`.
+  - P3: longest `BOARD_BUILD_TIMING` gap <= 900 s; falsified if > 1,200 s.
+  Also record the exploratory numbers: parent and child RSS, and `held=transient_jobs` post-build checks.
+- Write it in the day's findings, send the numbers to local_d0f83044 (or its lane if the session is gone), then drop this item.
+
 ## NIGHTLY CLOSE
 
 1. The probe shows 0 live games. **Fetch day D's finals by date:**
