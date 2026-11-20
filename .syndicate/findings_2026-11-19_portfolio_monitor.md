@@ -595,3 +595,61 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - Live ticks: 0 placed in 10.
   - Orders today: 58. 57 filled, 1 maker expiry.
   - Cap use: 27.1% Kalshi, 15.1% Polymarket.
+
+## Reading 91 — Thu 11-19 10:57 PM CST (04:57Z), window 30 min
+
+- **Results first.**
+  - Gate: **11 of 800 events** (15 bets) on BC-053.
+  - All-time: 2,140 / 1,146, -10.71%.
+  - 30 d: -7.15% [-12.6, -1.7] on 707 events.
+  - 6 games are still in play; none is late.
+- **No new anomaly.** Every endpoint returned in 0.25 s or less. The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 4.9 min old: 33 suggested, 11 positions.
+  - Live ticks: 0 placed in 10.
+  - Orders today: 58. 57 filled, 1 maker expiry.
+  - Cap use: 27.1% Kalshi, 15.1% Polymarket.
+
+## Reading 92 — Thu 11-19 11:27 PM CST (05:27Z), window 30 min
+
+- **Results first.**
+  - No new grades since Reading 91. Gate: 11 of 800 events (15 bets) on BC-053.
+  - All-time: 2,140 / 1,146, -10.71%.
+  - 30 d: -7.15% [-12.6, -1.7] on 707 events.
+  - 6 games are still in play; none is late.
+- **Not a failure: a second `rejected` order today.**
+  - A Kalshi spreads order went in at 05:21:36Z for a game that began at 02:48Z, and the venue canceled it 0.85 s
+    later (`venue_canceled`).
+  - This is the known in-play order that did not fill (`is_unfilled_inplay_ioc`), not a failure. The probe already
+    excludes it.
+  - Today: 59 orders, 57 filled, 1 maker expiry, 1 unfilled in-play order.
+- **Watch item, 3rd slow `live_today` tonight: 2.58 s** (inside the 3.0 s budget; the server logged 2,559 ms).
+  - The web log puts it right on a memory recycle:
+    - `WEB_WORKER_MEMORY_RECYCLE` at 05:27:09.6Z (pid 1323361, anon 966 MB against a 628 MB limit, age 2,058 s);
+    - the request finished at 05:27:11.0Z;
+    - the other worker was also over its limit (818 MB) and its recycle was deferred for the 30 s spacing;
+    - a new worker booted at 05:27:13Z.
+  - Overlay rebuilds meanwhile ran every ~31 s at 5.8-7.7 s each.
+  - **Tally: 2 of the 3 slow reads tonight (00:33Z, 05:27Z) coincide with a web memory recycle. The third
+    (02:31Z) has no logged cause.** Both web workers are running 30-55% over their memory limit.
+  - That is the same memory growth that lane `web-silent-worker-kills` named as its follow-up, and the cold read
+    that `board-read-cold-share` (#853) measured. Neither is in this lane's scope.
+  - The probe's budget was not breached (2 reads above 2 s, 1 above 3 s, in 14 evening reads).
+- **Flow:**
+  - Plan 1.2 min old: 27 suggested, 13 positions.
+  - Live ticks: 0 placed in 12.
+  - Cap use: 27.1% Kalshi, 15.1% Polymarket.
+
+## Reading 93 — Thu 11-19 11:58 PM CST (05:58Z), window 31 min
+
+- **Results first.**
+  - Gate: **12 of 800 events** (16 bets) on BC-053.
+  - All-time: 2,143 / 1,148, -10.70%.
+  - 30 d: -7.15% [-12.6, -1.7] on 707 events.
+  - 3 games are still in play; none is late.
+- **No new anomaly.** `live_today` 0.25 s; every endpoint returned in 0.41 s or less. The GATE line is the same 2
+  unclassified loads.
+- **Flow:**
+  - Plan 6.8 min old: 28 suggested, 13 positions.
+  - 1 in-play Kalshi order placed (orders today 60: 58 filled, 1 maker expiry, 1 unfilled in-play order).
+  - Cap use: 27.5% Kalshi, 15.0% Polymarket.
