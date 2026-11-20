@@ -348,3 +348,60 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - Cap use: 22.7% Kalshi, 12.7% Polymarket.
   - Polymarket placeable: 14 of 519 rows.
   - 61 plan writes in 6 h, max gap 15.4 min.
+
+## Reading 79 — Thu 11-19 4:31 PM CST (22:31Z), window 60 min
+
+- **Results first.**
+  - Unchanged, because nothing has settled.
+  - 30 d: -7.15% [-12.6, -1.7] on 705 events.
+  - 7 d: -3.96% [-15.0, +7.1] on 177 events.
+  - Gate: 0 of 800 (BC-053 clock).
+- **No new anomaly.** Every endpoint returned in 0.3 s or less. The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 2.7 min old: 103 suggested, 10 positions. 76 refused as `beyond_max_positions`.
+  - Live ticks: 3 placed (2 Kalshi, 1 Polymarket) in 18.
+  - Orders today: 50 (47 at Reading 78). 49 filled, 1 maker post resting (967 min).
+  - Cap use: 25.0% Kalshi, 13.6% Polymarket.
+  - Placeable: Polymarket 14 of 510 rows, Kalshi 34 of 1,010.
+  - 65 plan writes in 6 h, max gap 15.4 min.
+
+## Reading 80 — Thu 11-19 5:31 PM CST (23:31Z), window 60 min
+
+- **Results first.**
+  - Nothing graded yet tonight.
+  - 30 d: -7.15% [-12.6, -1.7] on 705 events.
+  - 7 d: -3.96% [-15.0, +7.1] on 177 events.
+  - Gate: 0 of 800 (BC-053 clock).
+  - 2 games have started and are unsettled; none is late.
+- **No new anomaly.**
+  - Every endpoint returned in 0.31 s or less.
+  - The plan was 8.8 min old at the read, because the planner was writing 11-20 at 23:27Z. Max gap tonight 10.7 min.
+  - The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan: 105 suggested, 12 positions.
+  - Live ticks: 2 placed (1 Kalshi, 1 Polymarket) in 20.
+  - Orders today: 52. 51 filled, 1 maker post resting (1,027 min).
+  - Cap use: 25.2% Kalshi, 14.4% Polymarket.
+  - Kalshi plan rows fell to 483 (1,010 at Reading 79) as games start.
+
+## Reading 81 — Thu 11-19 6:02 PM CST (00:02Z), window 31 min
+
+- **Results first.**
+  - Nothing graded yet tonight.
+  - 30 d: -7.15% [-12.6, -1.7] on 705 events.
+  - 7 d: -3.96% [-15.0, +7.1] on 177 events.
+  - Gate: 0 of 800 (BC-053 clock).
+  - 5 games have started and are unsettled; none is late.
+- **No new anomaly.**
+  - Every endpoint returned in 0.28 s or less.
+  - First sighting in these readings of the `no_model_edge_pct` refusal: 1 of 100 plan rows (1 Kalshi, 1 Polymarket).
+    It is an existing planner refusal (`portfolio_commit` / `layer2_board.py:3413`, in the code since 09-10), not a new
+    code path.
+  - The GATE line is the same 2 unclassified loads.
+- **Flow:**
+  - Plan 3.6 min old: 100 suggested, 10 positions.
+  - Live ticks: 1 placed on Kalshi in 10.
+  - Orders today: 53. 52 filled, 1 maker post resting (1,058 min).
+  - Cap use: 26.3% Kalshi, 14.4% Polymarket.
+  - Placeable: Polymarket 17 of 576 rows, Kalshi 32 of 1,077.
+  - Plan max gap 10.8 min.
