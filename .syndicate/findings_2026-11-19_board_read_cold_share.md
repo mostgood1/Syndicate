@@ -170,6 +170,16 @@ served a board; >= 1 `COMBINED_BOARD_SHARED_PUBLISHED`; 0 `COMBINED_BOARD_SHARED
   (< 30 queries).
 - The TTL class on quiet daytime hours is NOT predicted to change: no build exists for a copy to come from.
 
+## LOAD DECISION (2026-11-19 ~6:20 PM CST)
+
+- **The user, in session eb973f38**, to "How should the shared-copy switch be loaded on the fleet?": **"Ride along next restart"**.
+- **Queued** as droppable CHANGE F of batch task `nfl-level-refit-load-1120`: Tue 11-24 2:15 AM CST, one claimed ff +
+  one drained full down/up. It adds `WEB__SYNDICATE_COMBINED_BOARD_SHARED_COPY=1`. It is not a betting change: the
+  batch registers no betting-change row for F, and if the batch does not load F, F rides the next drained down/up.
+- **Kit** `/mnt/c/tmp/w1124_853/`, self-tested 6:24 PM CST.
+- **The first live evening after the load** is read against P1-P6 above. If the batch loads at ~2:30 AM CST 11-24,
+  that is 11-24 5-11 PM CST; the baseline is the same window on 11-23.
+
 ## Leads (not followed)
 
 - A daytime TTL miss (32% of 11-19 morning's cold reads) could be served stale-while-revalidate: serve the

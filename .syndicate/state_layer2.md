@@ -1134,7 +1134,7 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   - Flags go dark when refresh-worker's book-grid tick saturates. With NBA live, the NBA in-play overlay takes 94-234 s per build, so the college overlays refresh every ~5 min and their quotes pass 300 s before they are shown (todo #790).
   - A DOM reader must wait for the page's own query, which lands ~80 s after the cached embed paints.
 
-## [board-query-cold-read] THE LAYER 2 BOARD QUERY'S COLD `board_read` IS A NEW WEB WORKER BUILDING A BOARD THE OTHER WORKER ALREADY HOLDS -- fix on main `9931a787b` DEFAULT-OFF, NOT LOADED `[verified 2026-11-19 ~1:50 PM CST from the fleet web log, read-only; lane board-read-cold-share, todo #853]`
+## [board-query-cold-read] THE LAYER 2 BOARD QUERY'S COLD `board_read` IS A NEW WEB WORKER BUILDING A BOARD THE OTHER WORKER ALREADY HOLDS -- fix on main `9931a787b` DEFAULT-OFF, NOT LOADED `[verified 2026-11-19 ~12:50 PM CST from the fleet web log, read-only; lane board-read-cold-share, todo #853]`
 
 - **The cache:** `read_combined_intelligence_response`'s cache is PER gunicorn worker, keyed on `(dates, sport, limit)`.
   - It expires on TTL (fleet web: 180 s) or on a newer in-play overlay past a 22 s floor (fleet web values, read
@@ -1156,6 +1156,8 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   evening, n 82, 75 hard, 13.7/h). So warming a board at worker boot would raise the recycle rate.
 - **Switch:** `SYNDICATE_COMBINED_BOARD_SHARED_COPY` (absent = off) shares one worker's build through
   `/dev/shm/syndicate-combined-board-<uid>`.
-  - Not on the fleet: no `WEB__` key is set.
+  - Not on the fleet: no `WEB__` key is set (read 6:24 PM CST 11-19).
+  - QUEUED as droppable CHANGE F of batch task `nfl-level-refit-load-1120` (Tue 11-24 2:15 AM CST) on the user's
+    "Ride along next restart" (~6:20 PM CST 11-19); kit `/mnt/c/tmp/w1124_853/`.
   - Loading it is an env change (a drained full down/up). It is not a betting change: every reader is a web route.
   - First-evening P1-P6: `.syndicate/findings_2026-11-19_board_read_cold_share.md`.
