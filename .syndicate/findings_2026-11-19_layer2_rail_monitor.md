@@ -434,3 +434,32 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **R-E:** 1 NHL step, 0 timed out (NHL starts 6 PM).
 - **Live odds:** overlay gap max 69 s; 23 web merges, 0 stale; priced age p50 214 s, p90 327 s.
 - **Load:** `/intelligence` 9.27 s; query 2.89 s; shortlist 1.02 s; chips 0.31 s. **I-28:** 6 queries, 3 cold.
+
+## Reading 13 — 6:15 PM CST (00:15Z)
+
+- **Live:** 40 games: 9 NCAAB, 6 NHL (P1), 25 WNCAAB. 22 have rail rows (203 rows).
+- **Flags: 8 shown on 6 cards, 0 false, 0 missed, 0 dark.**
+  - By sport: NCAAB 11 flagged rows of 123; NHL 1 of 26; WNCAAB 0 of 54.
+  - 2 are college full totals.
+- **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 121.** Team cards 94 chips, 0 defects.
+- **`live_games_no_model` 3 of 22:**
+  - **Auburn @ Notre Dame:** REVERSED (I-29), H2 1:31. Dark from tip to final.
+  - **St Louis @ Pittsburgh (NHL, P1 15:40):** 4 rows, 0 with a model.
+    - NHL's join: full_games 5 of 6, with `no_live_gameline_projection` 6 (this game's lines).
+    - The other 5 NHL games have a model on 1-2 of their full-game rows; the rest are `display_only` or have no
+      distribution for that market.
+    - Early first period; re-check next reading before calling it.
+  - **Stetson @ UCF (WNCAAB):** re-sim refused, no margin anchor (WNCAAB re-sim: 19 of 25 live games refused).
+  - All 8 other live NCAAB games join **direct**, with a model on every row. That includes Murray St @ NC State (neutral).
+- **P7 (#850), 5:50-6:15 PM:** 0 refusals, 0 exits. Child 3.99 GB after 7.2 h.
+  - Board: 6 builds, wall median 172 s, max 246 s; publication gap median 248 s, max 326 s.
+- **R-B (#844 sample 9), the full evening shape:**
+  - NCAAB grid 129 rows (68 venue), `p1_sportsbook_newest` 4;
+  - **h2h 9: row-fresh 0 vs cell-fresh 7; mismatch 29.**
+  - NBA 0 (7:10 PM tip).
+- **R-E:** 0 NHL generation steps in the window, 0 timed out. NHL child odds age max 42 s.
+- **Live odds:**
+  - overlay gap max 68 s (NHL); 61 web merges, 0 stale;
+  - 8 sweeps, 3 refused (`lane_busy`);
+  - priced age p50 171 s, p90 382 s, max 771 s (45 of 203 over 300 s).
+- **Load:** query **11.56 s**, chips 1.41 s, shortlist 0.72 s. **I-28:** 26 queries since 5:50 PM, 17 cold (65%), all p50 5.29 s.
