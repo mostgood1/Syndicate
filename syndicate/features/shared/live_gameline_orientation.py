@@ -319,9 +319,12 @@ def finish(state: OrientationState, grid: Any, coverage: dict[str, Any] | None,
         summary = {"mode": state.mode, "error": f"count_failed:{type(exc).__name__}"}
     if isinstance(coverage, dict):
         coverage["orientation_reversed"] = summary
-    if isinstance(index_diag, dict):
+    worth_saying = bool(summary.get("rows") or summary.get("refused") or summary.get("error"))
+    if worth_saying and isinstance(index_diag, dict):
+        # Only then: `index_diagnostics` rides the LIVE_GAMELINE_BUILD line, which drops its widest dict past 1,000
+        # chars, and an always-present zero would crowd out `withheld_by_reason` on every college build.
         index_diag["orientation_reversed"] = summary
-    if summary.get("rows") or summary.get("refused") or summary.get("error"):
+    if worth_saying:
         pairs = _token(";".join(f"{a}@{h}" for a, h in sorted(reversed_pairs)))[:300]
         print(f"{LOG_TAG} sport={state.sport} mode={state.mode} "
               f"games={summary.get('games', 0)} rows={summary.get('rows', 0)} joined={summary.get('joined', 0)} "

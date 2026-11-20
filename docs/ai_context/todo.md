@@ -1,5 +1,26 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#854` — **NEUTRAL-SITE COLLEGE GAMES GO DARK ON THE LIVE RAIL WHEN THE ODDS FEED ORIENTS THEM OPPOSITE TO ESPN: the rows carry the odds feed's away/home, the NCAAB/WNCAAB live re-sim keys on ESPN's `homeAway` (`ncaab/live_resim.py:1447` `_espn_names`; `board_name` only respells), and `live_gameline_join` keys the ORDERED pair (`:2472` index, `:2757` row). 11-02..11-19: 24 NCAAB games (of 61 neutral-site games with live rows, 0 of 721 others) had rows reversed against their lane, and 24 of 24 were dark while reversed (17 the whole game; ~1.3 a day). The re-sim's numbers were right (neutral prior, no home edge; anchor maps by team id). Fix on main behind `SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION`, ABSENT = SHADOW (rows byte-identical, counts what would join); `on` is a BETTING CHANGE: window, the user's decision** `[2026-11-19, lane college-neutral-site-live-join, session 86eb6e0f; rail monitor I-29; findings `.syndicate/findings_2026-11-19_college_neutral_site_live_join.md`]`
+
+- **Cause and evidence:** findings sections 1-3.
+  - The odds feed's orientation also FLIPS mid-game, both ways. 11-19 examples:
+    - Murray St / NC State was reversed 5:06-5:19 PM CST, then joined;
+    - WVU / Florida joined 1:33-1:43 PM, then was dark to the final.
+  - So the fix maps sides at JOIN time, on every build, not in the producer.
+  - WNCAAB is on the same path: 27 neutral, 0 reversed live so far.
+- **Built:**
+  - `syndicate/features/shared/live_gameline_orientation.py`, called from `board_enrichment.attach_live_gamelines_for_sport`. That function serves the book-grid tick and the Layer 2 shortlist, both on refresh-worker.
+  - Each lane is also filed under the reversed pair as a view restated in the row's frame. The restated fields are the win probability (a segment keeps its tie mass out), the margin histograms and the mean, the state scores and the pregame probability.
+  - Exact pair first. Every hit field is classified; an unclassified one refuses the view by name.
+  - `live_gameline_join.py` is untouched.
+  - Tests: `tests/test_live_gameline_orientation.py` (14). Producer-written NCAAB/WNCAAB lanes through the board's own attach equal a hand-flipped twin row for row; off != on; shadow == off. Neighbouring suites: 605 passed.
+  - Instruments: `COLLEGE_ORIENTATION_JOIN` on refresh-worker (only when a reversed row exists) and `orientation_reversed` in coverage / `index_why`.
+- **Owed:**
+  1. **The load of `on`: the user's decision.** It is an env key (global, or `REFRESH_WORKER__`) in `local_production.env`, then a drained full down/up. The natural slot is the 11-24 window's batch down/up. Outside a window it needs an `--outside-window` reason, and none of the three exceptions fits cleanly: the games fail closed, so waiting costs missed opportunities, not losses. Feast Week (11-25..11-29), the densest neutral-site week, falls after 11-24.
+  2. Shadow counts from the first fleet ff that carries the code. That ff is NOT a betting change.
+  3. The first-evening reading against the pre-registered P1-P4 (findings section 5).
+- **Lead, not chased:** NCAAF's live lens keys `(away, home)` too. #791 aliases names but not order, and NCAAF has neutral sites. Measure NCAAF the same way before extending `ORIENTATION_JOIN_SPORTS`. Its hit fields would need classifying first.
+
 ### `#853` — **THE LAYER 2 BOARD QUERY'S COLD `board_read` IS A NEW WEB WORKER BUILDING A BOARD THE OTHER WORKER ALREADY HOLDS: 69 of 75 cold reads on 11-18 5-11 PM CST (92%; 151 of 198 = 76% on 11-17) were a freshly recycled worker's FIRST board read. The cache is per process, and the memory guard recycles a worker that has built the board (anon p50 980 MB vs a ~634 MB limit). TTL expiry is 3-12% of cold reads on evenings and 32% on the quiet 11-19 morning; overlay expiry is 5-12%. The published board's version is never read. Fix on main `9931a787b` DEFAULT-OFF behind `SYNDICATE_COMBINED_BOARD_SHARED_COPY`: a worker adopts another worker's copy (fresh by its own TTL and overlay rules), or serves it while another worker rebuilds. Not a betting change. LOAD = the user's decision (an env change: a drained full down/up)** `[2026-11-19, lane board-read-cold-share, session eb973f38; rail monitor I-28; findings `.syndicate/findings_2026-11-19_board_read_cold_share.md`]`
 
 - **Measured** (`scripts/rail_monitor/coldread_attrib.py`, fleet web log, read-only; per-request rows in `C:\tmp\coldread\rows_*.txt`):

@@ -299,6 +299,9 @@ def test_an_exact_join_is_identical_in_every_mode(monkeypatch):
             assert coverage["orientation_reversed"]["rows"] == 0
     assert grids["off"] == grids[None] == grids["on"]
     assert grids["on"][1]["rows_live_gameline_projected"] == 4
+    # Nothing to report, so nothing added to the capped LIVE_GAMELINE_BUILD line's `index_why`.
+    grid = _league_grid("ncaab", "Notre Dame Fighting Irish", "Auburn Tigers")
+    assert "orientation_reversed" not in _attach(monkeypatch, {"games": [lane]}, grid)["index_diagnostics"]
 
 
 def test_a_pair_some_lane_answers_exactly_is_never_shadowed_by_a_view():
