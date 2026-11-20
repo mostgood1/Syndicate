@@ -162,6 +162,18 @@ NCAAF evidence but no placeable Kalshi totals: these midweek games were not list
   - On the evidence log, rows carry the calibrated `totalRunsDist`, the ladder sd ratio sits at 0.95-1.05, and
     `scripts/betting_change.py` registers it.
 
+## Addendum 2026-11-20 9:51 AM CST: hardening, and the kit pinned
+
+- **On main `56e132d40`** (user "Yes, push it"). E0's cache key carries #852's damping setting; a joint test pins E0 = the
+  damped kickoff re-sim when `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING` is on. Without the key a cached undamped E0 (58.53)
+  would anchor damped draws (57.65); the mutation fails the test.
+- **The kit no longer depends on this lane's worktree.** `closing_ncaaf.py`, `e0_kickoff.py`, `ledger_inputs.py` and
+  `replay_module.py` import a pinned snapshot of main `56e132d40` at `C:\tmp\t835\code` (`WORKTREE` overrides).
+  `check_slate.sh` is unchanged (sha256 `a7ad67ceaa0aadeb`). A full 11-14 re-run from the snapshot is line-for-line
+  identical to the worktree run (`check_2026-11-14.txt` vs `check_2026-11-14_worktree_run.txt`, timing lines aside).
+- **The checks are scheduled** by lane engine-learner: `engine-ncaaf-checks-1124` (Tue 11-24 2:00 PM CST, 11-21) and
+  `engine-ncaaf-checks-1130` (Mon 11-30 10:30 AM CST, 11-28). Both were verified registered and enabled on 11-20.
+
 ## PRE-REGISTERED: what 11-21 should show (written 2026-11-19, before any 11-21 data was read)
 
 Run: `bash /c/tmp/t835/check_slate.sh 2026-11-21 12`, only after `C:\tmp\elp\m2gate_kit\out\m2_verdict.txt` exists (it
