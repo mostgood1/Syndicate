@@ -22,7 +22,9 @@ LOG = ROOT / "run.log"
 LOCAL_PAGE_COPY = Path(os.environ.get("PORTFOLIO_WATCH_LOCAL_COPY", r"C:\tmp\pfmon\page\dashboard.html"))
 FLEET_PAGE = Path(os.environ.get(
     "PORTFOLIO_WATCH_FLEET_PAGE",
-    r"\wsl.localhost\Ubuntu-24.04\home\amyn\syndicate-prod\data\reports\portfolio_watch\index.html"))
+    # Forward slashes on purpose: a shell heredoc ate one of the two leading backslashes on 11-20 and the "fleet copy"
+    # went to C:\wsl.localhost\... instead. //server/share is the same UNC path to pathlib and survives any quoting.
+    "//wsl.localhost/Ubuntu-24.04/home/amyn/syndicate-prod/data/reports/portfolio_watch/index.html"))
 
 REPO_SCRIPTS = Path(os.environ.get("PORTFOLIO_WATCH_REPO_SCRIPTS", r"C:\Users\tempadmin\Coding\Syndicate\scripts"))
 PROBE = REPO_SCRIPTS / "portfolio_monitor_probe.py"

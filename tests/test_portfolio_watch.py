@@ -70,3 +70,11 @@ def test_history_keeps_the_previous_rollup_when_there_is_no_ledger(tmp_path, mon
     monkeypatch.setattr(build_history, "OUT", out)
     assert build_history.main() == 0
     assert json.loads(out.read_text(encoding="utf-8"))["rows"][0]["date"] == "kept"
+
+
+def test_the_fleet_target_is_the_wsl_share_not_a_folder_on_c():
+    # 11-20: a lost leading backslash turned the UNC path into C:\wsl.localhost\... and the "fleet copy" landed on C:.
+    if sys.platform == "win32":
+        # No backslash literals here (a heredoc mangled them once): compare the UNC drive in forward-slash form.
+        assert paths.FLEET_PAGE.drive.replace(chr(92), "/").lower().startswith("//wsl.localhost/"), paths.FLEET_PAGE
+    assert paths.FLEET_PAGE.as_posix().endswith("syndicate-prod/data/reports/portfolio_watch/index.html")

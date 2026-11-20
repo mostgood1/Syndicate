@@ -38,6 +38,10 @@ def run(name: str, args: list[str], timeout: int) -> bool:
     tail = (p.stdout or "").strip().splitlines()[-1:] or [""]
     log(f"{name}: rc {p.returncode} in {time.time() - t0:.1f} s {tail[0][:160]}"
         + (f" | stderr {(p.stderr or '').strip()[-200:]}" if p.returncode else ""))
+    # A failed publish target is not fatal to the step, so it must not hide behind the last line (11-20: it did).
+    for line in (p.stdout or "").splitlines():
+        if line.startswith("FAILED"):
+            log(f"{name}: {line[:300]}")
     return p.returncode == 0
 
 
