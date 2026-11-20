@@ -619,3 +619,34 @@ POP_START: **2026-11-19T16:40Z** (written before the push; games commencing at o
 - **R-E:** 0 NHL steps; NHL child odds age max 13 s.
 - **Live odds:** overlay gap max 344 s (soccer); 11 sweeps, 4 refused; priced age p50 204 s, p90 699 s.
 - **Load:** query **11.17 s**, chips **3.75 s**, shortlist 0.97 s. At the read, two `refresh_odds_sources` processes were at 272% and 205% CPU.
+
+## Reading 19 — 8:45 PM CST (02:45Z)
+
+- **Live:** 33 games; 29 with rail rows (884 rows).
+- **Flags: 18 shown on 14 cards, 0 false, 0 missed, 1 dark.**
+- **P1:** 0. **#824:** 0. **P6:** 0. **P8 (score floor): 0 of 120.** Team cards 94 chips, 0 defects.
+- **`live_games_no_model` 5 of 29:**
+  - Wisconsin @ Seton Hall and UNLV @ Rutgers: REVERSED (I-29);
+  - TNF: no totals distribution, by design;
+  - CBJ @ CHI and EDM @ TBL (I-30). NHL `live_resim` was 9, 8 of 12 at 02:41-02:44Z.
+- **P7 (#850): the first memory-guard refusals since the load.**
+  - 02:42:11Z and 02:43:19Z (8:42-8:43 PM): `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint`. The guard read
+    current 6,038 / 6,051 MB against max 7,936, so headroom was **1,898 / 1,885 MB against the 1,900 MB floor**: just under.
+  - No third refusal followed, so no streak recycle.
+  - `C:\tmp\railmon\p7count.py` over 17:00:09Z-02:45Z:
+    - `MEMORY_GUARD_ABORT` 2 (both in the 02Z hour);
+    - `BOARD_PROCESS_EXITED` 0; `RECYCLE_EXIT` 0; `Fatal Python error` 0;
+    - 119 `BOARD_BUILD_TIMING` lines, longest gaps 807 s (00:34Z), 662 s (00:23Z), 544 s; 0 gaps over 900 s.
+  - **Memory:** the refresh-worker parent (pid 1011283) is at **1.55 GB** (785 MB at 11:23 AM, 1.04 GB at 6:15 PM); the board
+    child is at 4.50 GB.
+    - The parent's evening growth is what the owner's §2 named; §5 lists "the parent cannot recycle under the split" as
+      not built.
+    - Graded at 10 PM against §5: P1 refusals <= 1 every hour and <= 3 in total; P2 <= 2 exits, all rc 75; P3 longest gap
+      <= 900 s.
+- **Board (8:21-8:45 PM):** 4 builds, wall median 243 s, max 264 s; publication gap median 317 s, max 346 s; today's
+  board 440 s old at the read. Host load 2.52.
+- **R-B (#844 sample 15):** NCAAB 143 rows (81 venue), **h2h 12: row-fresh 0 vs cell-fresh 9, mismatch 38**. NBA 73 rows,
+  mismatch 0.
+- **R-E:** 0 NHL steps, 0 timed out.
+- **Live odds:** overlay gap max 285 s (soccer); 7 sweeps, 3 refused; priced age p50 210 s, p90 584 s.
+- **Load:** query 3.98 s, chips 2.94 s, shortlist 2.69 s.
