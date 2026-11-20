@@ -1150,6 +1150,7 @@ After web `cc5bdfb1` (20:11:20Z): placeholder starts **43 -> 0**, "TBD" tokens *
   | 11-18 5-11 PM | 75 of 125 | 69 | 2 | 4 |
   | 11-17 5-11 PM | 198 of 370 | 151 | 24 | 23 |
   | 11-19 7 AM-1 PM | 41 of 60 | 24 | 13 | 4 |
+  | 11-19 5-11 PM | 114 of 195 | 96 | 4 | 14 |
 
   Instrument: `scripts/rail_monitor/coldread_attrib.py`.
 - **Memory:** a worker that has built the board is recycled at anon p50 980 MB, against a limit p50 634 MB (11-18

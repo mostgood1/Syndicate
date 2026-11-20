@@ -42,6 +42,7 @@
   - A cross-worker lease means one overlay change is built once, not once per worker.
   - Tests: `tests/test_combined_board_shared_copy.py` (20 + 1 POSIX skip, off != on parametrized); the 18 existing combined-board files pass (217).
 - **Projection (a model):** evening cold share 60% -> ~14% (11-18) and 53.5% -> ~5% (11-17). Daytime TTL misses are unchanged.
+- **11-19 evening (pre-load, read 11-20 ~9:40 AM CST):** 114 of 195 cold (58.5%), 84% of them a new worker's first read; p50 / p90 5.17 / 10.80 s; 16.7 recycles an hour, anon at recycle 990 MB; model 58.5% -> 8.7%. P3 is RESTATED before any load, relative to the baseline evening: p50 and p90 <= 0.85x, falsified if p50 > 0.95x. The absolute 5.5 s was already met on 11-19, so it was non-diagnostic. Lead (the recycle RATE, which #853 does not change): web's 650 MB anon limit dates from Render's 2 GB container. Fleet evening RSS is p50 8.8 GB, max 12.0 GB of 15.7 GB. Findings, READING 2026-11-20.
 - **Owed:**
   1. The load. USER DECISION ~6:20 PM CST 11-19, in session eb973f38, to "How should the shared-copy switch be loaded on the fleet?": **"Ride along next restart"**.
      - QUEUED as droppable CHANGE F of batch task `nfl-level-refit-load-1120` (Tue 11-24 2:15 AM CST, one claimed ff + one drained full down/up). Its prompt was updated through the scheduled-tasks tool and read back identical (38,210 chars).

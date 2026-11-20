@@ -180,6 +180,58 @@ served a board; >= 1 `COMBINED_BOARD_SHARED_PUBLISHED`; 0 `COMBINED_BOARD_SHARED
 - **The first live evening after the load** is read against P1-P6 above. If the batch loads at ~2:30 AM CST 11-24,
   that is 11-24 5-11 PM CST; the baseline is the same window on 11-23.
 
+## READING 2026-11-20 ~9:40 AM CST: the 11-19 evening, a third pre-load evening; P3 restated BEFORE any load
+
+Read with `/mnt/c/tmp/w1124_853/coldread_attrib.py 2026-11-19T23:00:00 2026-11-20T05:00:00`, read-only at nice 19. The
+switch is not loaded, and the shared-copy markers read 0.
+
+| 11-19 5-11 PM CST | value |
+|---|---|
+| queries | 195 |
+| cold (board_read > 2 s) | 114 (58.5%) |
+| new worker's first read / overlay / TTL | 96 (84% of cold) / 14 (12%) / 4 (4%) |
+| cold board_read p50 | 3.3 s (new worker) |
+| query total p50 / p90 | **5.17 / 10.80 s** (warm p50 3.09 s, cold new-worker p50 6.06 s) |
+| warmer rebuilds | 465 (p50 9 s, p90 17 s) |
+| recycles | 100 = 16.7/h; anon p50 at recycle 990 MB (p10 820, p90 1,117) vs limit p50 633; 97 hard; age p50 211 s |
+| PROJECTION (model) | cold 58.5% -> 8.7% |
+
+- **H-a holds on a third evening.** New-worker first reads are 76-92% of cold reads on all three evenings.
+- **P3 as written is NON-DIAGNOSTIC.** Its absolute threshold (p50 <= 5.5 s) came from 11-18's 7.2 s, and 11-19
+  already met it without the fix (5.17 s). The evening-to-evening spread is wide:
+  - p50 7.2 / 6.4 / 5.2 s;
+  - recycles 13.7 / 28.5 / 16.7 an hour.
+- **P3 RESTATED NOW, before any load or any post-load data.** It is now relative to the baseline evening (the same
+  5-11 PM CST window on the last evening before the load, read with the same reader):
+  - predicted: query total p50 <= 0.85x the baseline AND p90 <= 0.85x;
+  - falsified: p50 > 0.95x the baseline.
+  - Basis: the warm p50 (3.1 s) plus a ~0.5-0.7 s adopt on the reads that would have been cold puts the p50 near
+    0.70-0.75x.
+  - The batch prompt's abbreviated P3 line is superseded by this one.
+- P1, P2 and P4-P6 are unchanged. 11-19's numbers sit inside the variance already allowed.
+
+**Fleet memory on the 11-19 evening.** From live-odds-worker's `ALL_PROCESS_MEMORY` lines (accounted RSS across all
+fleet processes; RSS double-counts shared pages):
+
+| | p50 | p90 | max |
+|---|---|---|---|
+| fleet | 8.8 GB | 9.8 GB | 12.0 GB |
+| web (gunicorn master + 2 workers) | 1.16 GB | 2.0 GB | 2.87 GB |
+| board child | 4.2 GB | | |
+
+The WSL VM has 15.7 GB, and the web role has no cgroup cap (`gunicorn.conf.py`'s own note, read 2026-11-18).
+
+**LEAD (not followed; the recycle RATE, which #853 does not change).** `SYNDICATE_WEB_WORKER_ANON_LIMIT_MB` defaults
+to 650, sized for Render's 2,048 MB container (`gunicorn.conf.py` `anon_limit_mb`). Every worker that serves the
+board crosses it within ~3.5 min of age (p50 211 s), so recycles run 14-29 an hour.
+- #853 makes each recycle cheap for the board query.
+- A higher limit would make recycles RARE for every route. The portfolio monitor tied 2 of 3 slow `live_today` reads
+  on 11-19 to a recycle.
+- Cost: roughly +0.5-0.7 GB per worker against the measured ~2.5-3.7 GB headroom at the evening max.
+- It needs its own measurement (worker anon growth vs age past the first build) and pre-registration.
+- The memory guard's code is lane `web-silent-worker-kills`' file, although an env key does not edit it.
+- It is the user's decision.
+
 ## Leads (not followed)
 
 - A daytime TTL miss (32% of 11-19 morning's cold reads) could be served stale-while-revalidate: serve the
