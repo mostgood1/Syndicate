@@ -332,3 +332,33 @@ only, because this repo is public.
   - **Removing the stray `C:\wsl.localhost` folder was refused by the safety check (a top-level folder on C:); it is
     left for the user.** It holds only that one file.
 - **The daily learning review's prompt** now points at the durable paths and reads `daily_rollup.json` first.
+
+## Portfolio Watch matches the original's detail (fleet-watcher's request, relaying the user ~11:30 AM CST: "make sure all 3 dashboards deliever the same level of detail as the original ones")
+
+- **Compared against:** the original claude.ai page's code, read from its store (`files/index.html`, version 4,
+  byte-identical to the last local copy).
+- **Gaps found:**
+  1. The two summary sentences: endpoints answered, live banner, open anomalies; 30-day ROI with its range, games and
+     the count of signals beyond noise.
+  2. The **Web worker kills** tile (`worker_timeouts` in the web-log window).
+  3. Plan detail: board rows and sized.
+  4. Paper detail: won and lost of settled, plus the "simulated" note.
+  5. The banner's "stale after 900 s" note.
+  6. The response-time chart on a **real time axis** with points, and every series against its budget in the tooltip.
+  7. The money table's **window rows**, **Predicted EV %** and excess wins, plus its explanatory note.
+  8. The findings table's **First seen** column, register order and note.
+  9. The readings table: **every** reading (the local page showed the last 24) with **live ticks, placed, failed,
+     refusals by reason** (price band / held on another slate / game started / other) and **both venue caps**.
+  10. Per-section notes.
+  11. **Sources** (each dataset's notes).
+- **A bug found while comparing:** the local banner tile tested `banner_ok` as truthy, but the field is the string
+  `"ok"`, so a non-ok banner would have shown OK. It now tests `=== "ok"`.
+- **All of these are added** (8688f5ae7, `scripts/portfolio_watch/build_dashboard.py`, installed). The local page keeps
+  what it already had beyond the original: yesterday and all-time tiles, the full history since 08-06, cap use and
+  the S8 collector.
+- **Verified:** rendered headless at 1280 px light and 390 px dark, 0 errors, no horizontal scroll.
+  - Rows and columns: money table 42 × 11, findings 33 × 6, readings 111 × 18, sources 10 × 3, history 64 × 11.
+  - The 9 status tiles are present.
+  - All three outputs were rewritten (local `C:\tmp\pfmon\page\dashboard.html`, `C:\SyndicateProd\portfolio_watch\page`,
+    fleet `reports/portfolio_watch/index.html`).
+- Every 30-minute run of `SyndicatePortfolioWatch` uses the new builder.
