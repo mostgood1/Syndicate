@@ -28,15 +28,21 @@
 - **Owed, the user's decisions:** (1) load the SHADOW — recommended as a droppable CHANGE H in the 11-24 window batch's single drained down/up (`nfl-level-refit-load-1120`; kit `C:/tmp/hv856/kit_env_856.sh`, self-tested), or a standalone down/up earlier (findings §4); (2) after the 12-07 verdict, `on` in the 12-08 window or not (predictions P1-P6, findings §5).
 - **Owed, a session:** the 12-07 grade (`nice -n 19 ~/.venvs/syndicate/bin/python scripts/exit_hold_value_shadow_grade.py` on the fleet, registered defaults); schedule it once the shadow has loaded.
 
-### `#855` — **SMARTSIM2'S OVERTIME IS NOT COLLEGE OVERTIME: after a tied regulation the engine gives ONE drive from the team's OWN 25, sudden death, two rounds at most; it scores 3.6 points per OT game against a real 12.4 (CFBD 2023-24, 65 OT games of 1,501). It pulls late one-score live totals low (#852). IN PROGRESS: a college-rules OT behind a new default-off `CalibrationProfile.college_overtime`** `[2026-11-20, lane ncaaf-college-overtime, session 617b553b; user "Lend it, start OT" + "Extend the loan"; from #852's follow-ups]`
+### `#855` — **SMARTSIM2'S OVERTIME IS NOT COLLEGE OVERTIME: after a tied regulation the engine gives ONE drive from the team's OWN 25, sudden death, two rounds at most; it scores 3.6 points per OT game against a real 12.4 (CFBD 2023-24, 65 OT games of 1,501). It pulls late one-score live totals low (#852). BUILT, DEFAULT OFF, NOT ON MAIN: `CalibrationProfile.college_overtime`; the real OT games go 3.73 -> 13.87 points per OT game (real 12.40 [10.62, 14.23]); 2024 one-score late log loss at Q4 3:00 -0.0718 (se 0.0449); the push and live use are the user's calls** `[2026-11-20, lane ncaaf-college-overtime, session 617b553b; user "Lend it, start OT" + "Extend the loan"; from #852's follow-ups; findings `.syndicate/findings_2026-11-20_ncaaf_college_overtime.md`]`
 
-- **Rules to model.** OT1-OT2: each team gets a possession from the opponent's 25. From OT2 a TD must try for two. From OT3, alternating two-point attempts.
-- **Loans from `football-scenario-calibration`:** `game_simulator.py`'s overtime block, and `calibration_profile.py`'s one new field plus its `to_dict` entry.
-- **Done =**
-  - byte-identical off and reachable on;
-  - engine OT points and periods against CFBD from real tied-at-regulation states;
-  - the paired effect on 2024 late one-score states;
-  - the push and any live use are the user's calls.
+- **Rules modelled.** OT1-OT2: each team gets a possession from the opponent's 25. From OT2 a TD tries for two (0.451, measured on 801 tries). From OT3, alternating two-point attempts. Cap 12.
+- **Code:** local commit `339d9806c` on `claude/compassionate-lederberg-b0c116`, pinned `refs/keep/ncaaf-college-overtime`. NOT on main.
+  - `calibration_profile.py` (+9) and `game_simulator.py` (+67 / -1), under the user-approved loan from `football-scenario-calibration`.
+  - `tests/test_smartsim2_college_overtime.py`: 12 passed (reachability first, 3 pinned pre-change digests). Neighbouring suites: 189 passed.
+- **Pre-registered (`9a9fb7b44`).**
+  - **M1 gate PASS:** 13.87 inside the real CI; the 3rd-period share 0.112 inside 0.031-0.124; TD / FG from the 25 0.593 / 0.194 against 0.556 / 0.207.
+  - **M2, every prediction held:** one-score rest +0.50 at Q4 15:00 to +0.99 at Q4 3:00; 17+ unchanged; one-score log loss at Q4 3:00 -0.0718 (se 0.0449), slope 0.26 -> 0.41.
+  - Two M1 point predictions missed high, reported: 13.87 vs 11.0-13.5, and 0.112 vs 0.04-0.10.
+- **Owed (the user's calls):**
+  1. The push. Default off, so it changes nothing.
+  2. Live use: an NCAAF live switch like #852's. It needs `live-player-exit-gate`'s loan widened, or a resolver added to `ncaaf/live_blowout_damping.py`. A betting change, window only.
+  3. Pregame use needs a level re-fit (+~0.4 pts a game). Not proposed.
+- **What is left of #852's one-score gap:** the last two minutes, 2.31 vs 3.58 points. That is #808's end-game clock.
 
 ### `#854` — **NEUTRAL-SITE COLLEGE GAMES GO DARK ON THE LIVE RAIL WHEN THE ODDS FEED ORIENTS THEM OPPOSITE TO ESPN: the rows carry the odds feed's away/home, the NCAAB/WNCAAB live re-sim keys on ESPN's `homeAway` (`ncaab/live_resim.py:1447` `_espn_names`; `board_name` only respells), and `live_gameline_join` keys the ORDERED pair (`:2472` index, `:2757` row). 11-02..11-19: 24 NCAAB games (of 61 neutral-site games with live rows, 0 of 721 others) had rows reversed against their lane, and 24 of 24 were dark while reversed (17 the whole game; ~1.3 a day). The re-sim's numbers were right (neutral prior, no home edge; anchor maps by team id). Fix on main behind `SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION`, ABSENT = SHADOW (rows byte-identical, counts what would join); `on` is a BETTING CHANGE: window, the user's decision** `[2026-11-19, lane college-neutral-site-live-join, session 86eb6e0f; rail monitor I-29; findings `.syndicate/findings_2026-11-19_college_neutral_site_live_join.md`]`
 

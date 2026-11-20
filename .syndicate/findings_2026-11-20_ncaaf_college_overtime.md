@@ -73,3 +73,73 @@ every-2nd task list, 60 sims a state, paired seeds.
 - Live use (a switch in the NCAAF live re-sim, as #852) is a separate decision.
 - Pregame use would add about +0.4 points a game (4.3% x ~8.8), so it would need a level re-fit first
   (`model_engine_standard.md` 4.4). It is not proposed here.
+
+## RESULTS (written after the runs; nothing above was changed)
+
+### Verdict: H-RULES TRUE. M1's gate passes, and M2's predictions all hold. BUILT, default off, not on main.
+
+**The code** (worktree `frosty-edison-10dcd8`, under the loan; the commit is below):
+- `calibration_profile.py`, +9 lines: the `college_overtime` field and its `to_dict` entry.
+- `game_simulator.py`, +67 / -1: `_college_overtime`, the switch's branch in front of the unchanged old block, and
+  two measured constants. A period-2 touchdown's try is written into the drive and step logs too, so the logs sum to
+  the score. The first test run caught that the logs did not.
+- `tests/test_smartsim2_college_overtime.py`, 12 passed:
+  - reachability: OFF equals the three pre-change digests; ON changes a tied game;
+  - a game not tied at the end of regulation is identical on and off;
+  - the rules: both teams possess in period 1 from the opponent's 25; the order alternates; a period-2 TD is 6 or 8,
+    never 7; overtime always ends decided; from period 3 only twos score; the cap holds.
+- **Neighbouring suites:** 189 passed. They include #808's own pinned digests, the profile key-set tests, NFL live
+  timeouts and the NCAAF live re-sim suites.
+
+**M1, the 65 real OT games of 2023-24, 600 sims each, production profile** (`C:\tmp\t855\m1_ot.py`, `m1_ot.txt`):
+
+| | OT points per OT game | 3rd period needed | possessions from the 25: TD / FG / none |
+|---|---|---|---|
+| real (CFBD) | **12.40 [10.62, 14.23]** | 0.062 | 0.556 / 0.207 / 0.237 |
+| engine OFF (today) | 3.73 | 0.000 | 0.288 / 0.081 / 0.632 (from its OWN 25) |
+| **engine ON** | **13.87** | **0.112** | **0.593 / 0.194 / 0.213** |
+
+- **The gate passes:** 13.87 is inside the real CI, and 0.112 is inside the registered band 0.031-0.124.
+- **H-RULES is TRUE.** H-DRIVE is small: the engine's touchdown rate from the 25 is 3.7 points (of share) above the
+  real one.
+- **Prediction misses, reported:** points 13.87 against the predicted 11.0-13.5, and the 3+ share 0.112 against
+  0.04-0.10. Both lean high, consistent with the slightly high touchdown rate. The second team's kick when trailing by
+  4+ is not the cause: it would push the other way.
+- **Prediction held:** P(TD) 0.593, inside 0.45-0.65.
+
+**M2, the 2024 harness, the first 150 games of the every-2nd list, Q4 checkpoints, 60 sims, paired**
+(`m2_read.py`, `m2_read.txt`). Rest-of-game, ON minus OFF:
+
+| \|margin\| | Q4 15:00 | 10:00 | 6:00 | 3:00 |
+|---|---|---|---|---|
+| 0-8 | **+0.50** (se 0.08) | +0.73 | +0.90 | **+0.99** (0.21) |
+| 9-16 | +0.19 | +0.17 | +0.03 | 0.00 |
+| 17+ | **+0.00** | 0.00 | 0.00 | 0.00 |
+
+Common-line log loss against the real final, ON vs production:
+
+| | log loss | vs production (se) | slope | rest engine / actual |
+|---|---|---|---|---|
+| Q4 15:00-6:00, all | 0.6101 | -0.0062 (0.0041) | 0.69 -> 0.73 | 1.020 -> 1.049 |
+| Q4 15:00-6:00, \|m\| <= 8 | 0.6836 | -0.0135 (0.0104) | 0.57 -> 0.60 | 0.843 -> 0.897 |
+| **Q4 3:00, \|m\| <= 8** | **0.7410** | **-0.0718 (0.0449)** | **0.26 -> 0.41** | 0.630 -> 0.778 |
+| Q4 3:00, all | 0.5930 | -0.0244 (0.0154) | 0.43 -> 0.50 | 0.864 -> 0.942 |
+| \|m\| >= 17 | unchanged | 0.0000 | | |
+
+- **All three M2 predictions held:**
+  - +0.50 and +0.99 sit at the edges of the predicted +0.2-0.5 and +0.4-1.0;
+  - 17+ is unchanged;
+  - one-score log loss at Q4 3:00 is lower by 1.6 paired SE.
+- **What is left in one-score games** is the last two minutes: the engine gives 2.31 points against a real 3.58,
+  unchanged by OT. That is #808's end-game clock (#852's follow-up); one-score engine-minus-actual is still -1.0 to
+  -2.1.
+
+### What it would take to use it (the user's calls)
+1. **The push to main.** Default off and byte-identical, so the push changes nothing.
+2. **Live use**, the natural use, where it closes the OT half of #852's one-score gap.
+   - An NCAAF live switch (as #852's damping: profile resolution in `resim_live_game`, which needs
+     `live-player-exit-gate`'s loan widened, or a resolver added to `ncaaf/live_blowout_damping.py`).
+   - A betting change, window only.
+   - The level stays with #835's anchor. It adds about +0.4 points to E0 in the anchor's input, and the anchor
+     takes that back.
+3. **Pregame use** needs a level re-fit first. Not proposed.
