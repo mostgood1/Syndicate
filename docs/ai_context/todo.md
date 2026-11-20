@@ -1,5 +1,15 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#855` — **SMARTSIM2'S OVERTIME IS NOT COLLEGE OVERTIME: after a tied regulation the engine gives ONE drive from the team's OWN 25, sudden death, two rounds at most; it scores 3.6 points per OT game against a real 12.4 (CFBD 2023-24, 65 OT games of 1,501). It pulls late one-score live totals low (#852). IN PROGRESS: a college-rules OT behind a new default-off `CalibrationProfile.college_overtime`** `[2026-11-20, lane ncaaf-college-overtime, session 617b553b; user "Lend it, start OT" + "Extend the loan"; from #852's follow-ups]`
+
+- **Rules to model.** OT1-OT2: each team gets a possession from the opponent's 25. From OT2 a TD must try for two. From OT3, alternating two-point attempts.
+- **Loans from `football-scenario-calibration`:** `game_simulator.py`'s overtime block, and `calibration_profile.py`'s one new field plus its `to_dict` entry.
+- **Done =**
+  - byte-identical off and reachable on;
+  - engine OT points and periods against CFBD from real tied-at-regulation states;
+  - the paired effect on 2024 late one-score states;
+  - the push and any live use are the user's calls.
+
 ### `#854` — **NEUTRAL-SITE COLLEGE GAMES GO DARK ON THE LIVE RAIL WHEN THE ODDS FEED ORIENTS THEM OPPOSITE TO ESPN: the rows carry the odds feed's away/home, the NCAAB/WNCAAB live re-sim keys on ESPN's `homeAway` (`ncaab/live_resim.py:1447` `_espn_names`; `board_name` only respells), and `live_gameline_join` keys the ORDERED pair (`:2472` index, `:2757` row). 11-02..11-19: 24 NCAAB games (of 61 neutral-site games with live rows, 0 of 721 others) had rows reversed against their lane, and 24 of 24 were dark while reversed (17 the whole game; ~1.3 a day). The re-sim's numbers were right (neutral prior, no home edge; anchor maps by team id). Fix on main behind `SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION`, ABSENT = SHADOW (rows byte-identical, counts what would join); `on` is a BETTING CHANGE: window, the user's decision** `[2026-11-19, lane college-neutral-site-live-join, session 86eb6e0f; rail monitor I-29; findings `.syndicate/findings_2026-11-19_college_neutral_site_live_join.md`]`
 
 - **Cause and evidence:** findings sections 1-3.
@@ -66,9 +76,17 @@
 - **Re-fit:** pre-registered `57fcb392e` (G1 / G2 / G3 all PASS). Stage 1 picked threshold 17 at 1.09 SE (narrow); stage 2 picked strength 1.0 at 1.4 SE.
 - **Owed, in order (the user's calls):**
   1. DONE: the push (`44184da1e`). Not on the fleet until its next ff; whoever ffs it carries this default-off code (betting change: no).
-  2. 11-21 / 11-28 after M2's verdict: `C:\tmp\t852\ledger_score2.py` on those dates. Expected (pre-registered): 75-95% log loss below production + #835, slope at least as high, the 17+ bucket's mean F - c closer to 0. Re-check #835's late k (1.6) on top of the damping.
-  3. Load only in a betting-change window (earliest 12-08), TOGETHER with #835's two keys. Verify the refresh-worker log line `NCAAF_LIVE_BLOWOUT_DAMPING on strength=1.0 lead_threshold=17.0 lead_span=14.0`.
-  4. Follow-ups, each an engine mechanism plus a re-fit (`football-scenario-calibration`'s files, so a loan): college overtime (opponent's 25, both teams), then #808's end-game clock for one-score games once real timeouts are fed live.
+  2. 11-21 / 11-28 after M2's verdict:
+     - Run `bash /c/tmp/t852/check_slate_852.sh 2026-11-21 12` (then `2026-11-28 13`). It refuses before `m2_verdict.txt` exists.
+     - Smoke-tested end to end on 11-14 (every 4th state, 41 games). There E0 reproduced 87 of 87, and the pick + #835 read -0.0167 (se 0.0085) vs production + #835.
+     - Expected (pre-registered): 75-95% log loss below production + #835, slope at least as high, the 17+ bucket's mean F - c closer to 0.
+     - Re-check #835's late k (1.6) on top of the damping.
+  3. **QUEUED for the Tue 12-08 window.** The user picked "Queue for 12-08 (Recommended)" on 2026-11-20 ~9:40 AM CST, a CONDITIONAL entry:
+     - it loads all three keys together (`SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING=on`, #835's `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION=on` and `SYNDICATE_LIVE_TOTALS_PROB_SCALE_NCAAF=1`) in that window's drained down/up;
+     - ONLY if 11-21 meets the pre-registered expectations;
+     - with the user's final yes in that session.
+     - Verify the refresh-worker log line `NCAAF_LIVE_BLOWOUT_DAMPING on strength=1.0 lead_threshold=17.0 lead_span=14.0`.
+  4. **Follow-ups.** College overtime moved to **#855** (lane `ncaaf-college-overtime`, user "Lend it, start OT"). Then #808's end-game clock for one-score games, once real timeouts are fed live.
 - **Kit:** `C:\tmp\t852` (`resume.py` harness, `ledger_score2.py`, all tables as `*.txt`).
 
 ### `#851` — **LIVE-ODDS-WORKER'S MAIN LOOP RAN THE POLYMARKET US SLATE SWEEP SYNCHRONOUSLY, AND EVERY ODDS SWEEP WAITED FOR IT: 25.9% of the live loop's time (92-233 s a sweep), the larger part of 117 of 125 slow iterations, so every sport's odds-sweep attempts were p50 100 s / p90 299 s apart. Fix on main `8f0d73a2e` DEFAULT OFF behind `SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND`; loading is a BETTING CHANGE (window, the user's decision)** `[2026-11-19, lane polymarket-slate-off-odds-loop, session bb342d07; user "Yes, build it"; findings `.syndicate/findings_2026-11-19_live_odds_loop_attempt_spacing.md`]`
