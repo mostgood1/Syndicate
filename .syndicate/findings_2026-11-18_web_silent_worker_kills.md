@@ -270,3 +270,22 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
   - Two zero days look like the 16 before 11-17. They are not evidence about the 11-17 mode, whose stall is still unnamed:
     it needs a dump. The drain-path kills (5 in 16 days before) are also at 0 since the load. Not yet a rate: at 5 in 16
     days, about 0.4 would have been expected in the 1.2 days since the load.
+
+- Reading 6, 2026-11-20 9:36 AM CST (15:36Z), read-only (`wsk_day.py`, web.log):
+  - Since the load (19:14:22Z 11-18 - 15:28Z 11-20, 44 h): 302 recycles, 0 doubles < 30 s, 0 emergency, 0 `WORKER TIMEOUT`,
+    0 stall dumps. The dump watch reached its 31 h cap at 05:55:55Z 11-20 with nothing; restarted 05:56Z and again 15:32Z
+    (the session had ended in between: 05:56-15:32Z checked from the log instead, 12 recycles, 0 timeouts, 0 dumps).
+  - One overnight hold lasted 3,676.8 s (pid 1348221, held 06:59:08Z at 838.6 MB, recycled 08:00:25Z at 843.8 MB): +5.2 MB in
+    61 min. Harmless; at night a worker sees a request every several minutes (11 an hour 07-10Z), and a hold ends on one.
+  - The hold-timer flaw from Reading 3 is fixed on main, `ed5ed7581` (instrument only: the recycle decision never reads that
+    field). New test fails without it (1031.0 vs 31.0); 33 passed / 2 skipped on Windows, 35 on the fleet's Linux Python.
+    It loads at the next web reload by anyone; betting change no.
+  - The picks board query is now ~4.2-4.8 MB on the wire in 5-10 s (6,158 cards), against ~11 MB / ~62 MB decoded on 11-17.
+    A browser board query at 15:30:56Z took 26.2 s with EVERY stage ~3x its usual time (board_read 15.9 s vs ~6 s,
+    drop_row_diagnostics 2.3 vs 0.4 s): the whole worker was slowed, not one step, which is what CPU or GIL contention
+    looks like.
+  - Started `wsk_thread_sampler.py` (scratchpad, 2 h from 15:32Z, read-only /proc): while a worker's heartbeat is >= 2.5 s
+    old it records every thread's state, CPU ticks, major faults, context switches and kernel wait channel each second.
+    It tells H3 (main thread waiting on futex while one other thread burns ~100 ticks/s) from H2 (main thread in D) and
+    from CPU starvation, on stalls far shorter than the 40 s dump. py-spy is in the venv but ptrace_scope is 1, so it
+    cannot attach to the workers without root.
