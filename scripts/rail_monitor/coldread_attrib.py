@@ -167,6 +167,7 @@ def main(argv: list[str]) -> int:
 
     cls = collections.Counter()
     shared_by_query = collections.Counter()
+    penalty_totals: dict[str, list] = collections.defaultdict(list)
     proj = collections.defaultdict(collections.Counter)
     by_hour: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     cold_br = collections.defaultdict(list)
@@ -179,10 +180,18 @@ def main(argv: list[str]) -> int:
         e = s + br / 1000.0
         hour = cst_hour(t)
         by_hour[hour]["queries"] += 1
+        shared_here = False
         for marker in ("shared_adopted", "shared_served_stale", "shared_build"):
             if any_in(marker, s - 1.0, e + 1.0):
+                shared_here = True
                 shared_by_query[marker] += 1
                 by_hour[hour]["q_" + marker] += 1
+        # The fresh-worker penalty, measured INSIDE one evening so evening-level load cancels: a query that
+        # adopted a shared copy vs a warm query that touched no shared marker.
+        if any_in("shared_adopted", s - 1.0, e + 1.0):
+            penalty_totals["adopted"].append(tot)
+        elif br <= COLD_MS and not shared_here:
+            penalty_totals["warm_unshared"].append(tot)
         if br <= COLD_MS:
             c = "warm"
         elif any_in("first_board_call", s - 1.0, e + 1.0):
@@ -224,6 +233,16 @@ def main(argv: list[str]) -> int:
         "cold_board_read_p50_ms": {k: q(v, .5) for k, v in cold_br.items()},
         "total_p50_ms": {k: q(v, .5) for k, v in totals.items()},
         "all_total_p50_p90_ms": [q(all_tot, .5), q(all_tot, .9)],
+        # Fresh-worker penalty: the query total p50 a request pays for landing on a fresh worker, minus the warm
+        # p50 of the SAME evening. Without the shared copy that is boot_cold - warm; with it, adopted - warm_unshared.
+        "fresh_worker_penalty_ms": {
+            "cold": (q(totals["boot_cold"], .5) - q(totals["warm"], .5))
+            if totals.get("boot_cold") and totals.get("warm") else None,
+            "adopted": (q(penalty_totals["adopted"], .5) - q(penalty_totals["warm_unshared"], .5))
+            if penalty_totals.get("adopted") and penalty_totals.get("warm_unshared") else None,
+            "n_adopted": len(penalty_totals.get("adopted", [])),
+            "n_warm_unshared": len(penalty_totals.get("warm_unshared", [])),
+        },
         "warmer_rebuilds": len(ev["warmed"]),
         "warmer_build_s_p50_p90": [q([x[1] for x in ev["warmed"]], .5), q([x[1] for x in ev["warmed"]], .9)],
         "recycles": len(ev["recycle"]), "recycles_per_h": round(len(ev["recycle"]) / span_h, 1),
