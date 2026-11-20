@@ -653,3 +653,82 @@ fleet (`http://127.0.0.1:10000`), read-only. Percentages and counts only: this r
   - Plan 6.8 min old: 28 suggested, 13 positions.
   - 1 in-play Kalshi order placed (orders today 60: 58 filled, 1 maker expiry, 1 unfilled in-play order).
   - Cap use: 27.5% Kalshi, 15.0% Polymarket.
+
+## DAILY SUMMARY — Thu 11-19 (Central), written Fri 11-20 1:05 AM CST after the day's last grade
+
+Counts and percentages only (the repo is public). Sources:
+- `/api/portfolio/live?on=all&show=all` at 06:59Z 11-20;
+- the 33 probe readings dated 11-19 CST (readings 61-93).
+
+**Results first.**
+- **11-19: 51 graded bets / 23 games, ROI +4.21% [-10.8, +19.3]**, 31 won / 20 lost.
+  - We won 60.8% against a 64.3% breakeven (excess -1.8 wins, z -0.53). The positive return comes from where the
+    stakes sat, not from winning more than the prices implied. One day is noise.
+- **30 d: 1,684 bets / 719 games, -7.38% [-12.8, -2.0]**, against -7.15% at the start of the day; the window rolled to
+  drop 10-20. Still beyond noise.
+- **7 d: 404 bets / 181 games, -6.20% [-16.8, +4.4].** All-time: 2,146 bets / 1,150 games, -10.73%.
+- **Fee-net CLV:**
+  - 30 d: -0.35 pp (se 0.22). Gross +1.32 pp; beat the close on 62.1% of 612.
+  - 7 d: -0.39 pp (se 0.43).
+  - Close calibration (30 d): -5.41 pp (z -2.59). Our sides win less often than even the close implies.
+- **Fees: 3.89% of stake over 30 d.** That is more than half the loss.
+- **Signals beyond noise (30 d), unchanged in kind:**
+  - the book;
+  - Kalshi -6.15%;
+  - totals -12.54%;
+  - the `model_edge` path -7.55%;
+  - the EV 2-5 band (predicted +4.07%, realised -10.45%, 1,016 bets);
+  - price 0.30-0.45 -12.67%;
+  - the largest-stake quartile (64.2% of dollars) -9.20%.
+
+**Live book, selected_date 11-19.**
+- **Orders: 60 = 58 filled + 2 rejected.** Both rejections are designed endings, not failures:
+  - 1 maker-pilot post expired at kickoff (`venue_canceled`);
+  - 1 in-play order did not fill (`venue_canceled` 0.85 s after submit).
+  - 0 failed, 0 unknown submits, 0 unreconciled, 0 grade conflicts.
+- **Maker pilot:** 2 posts, 1 filled, 1 expired at kickoff.
+- **7 fills are not graded yet:** NFL (4), NCAAF (2) and soccer (1), all on later games. 0 late (> 8 h) at day end.
+- **By venue:** Kalshi 21-10, Polymarket 10-10.
+- **By sport:** NBA 16-9, NHL 10-5, NCAAB 2-5, NFL 2-0, WNCAAB 1-0, soccer 0-1.
+- **Gate:** BC-053 (board child memory, todo #850) loaded at 11:00 AM, outside a window on the broken-money-path
+  exception (user, 11-19 midday). It reset the clock from 12 to 0, and the count was **13 of 800 by 1 AM**. It did
+  what it was for: the plan's largest write gap fell to 10.8-15.4 min, against up to 26 min on the 11-18 evening.
+
+**Incidents and endpoint.**
+- **F21, Polymarket zero prices, about 5:15-7:10 AM:**
+  - 17,067 of 17,069 Polymarket markets went unpriced upstream of our join, so every Polymarket plan row was refused
+    `aggregator_priced`.
+  - It recovered on its own between 13:07 and 13:10Z, with no deploy.
+  - The probe now raises `VENUE FEED <venue>` for this case, because it raised nothing the first time.
+  - Kalshi was unaffected throughout.
+- **Endpoint:** 33 readings, 231 endpoint reads, 0 non-200. 2 reads were over budget, both `live_today` with no
+  cause found: 3.05 s at 7:04 AM and 3.20 s at 8:31 PM.
+  - Two more reads above 2 s sat on web memory recycles (2.05 s at 6:33 PM, 2.58 s at 11:27 PM). Both web workers
+    run 30-55% over their ~630 MB limit.
+  - Owners: `web-silent-worker-kills` (memory growth follow-up) and `board-read-cold-share` (#853, fix queued as
+    CHANGE F of the 11-24 batch).
+- **The double-recycle fix holds** (`web-silent-worker-kills`, commit 593141f05): 0 back-to-back recycles in 184 on
+  11-19, against 24 in 219 on 11-18, and 0 silent kills. The 11-17 stall is still unnamed.
+
+**Program and research, 11-19.**
+- **S6** (adverse-selection model) and **S7** (combos and props) were run and pre-registered. Neither produced a
+  challenger:
+  - S7 props: every threshold lost on FIT; best -12.5% [-18.3, -6.7];
+  - S7 combos: E4's A5 read stays on 11-24.
+  - So S1-S7 hold no challenger for the 12-08 window.
+- **Fill-time and venue-quote logging** built (lane `fill-quote-logging`). It loads with the 11-24 batch.
+- **Exit fees** are now counted in the readout: the 30 d fees rose from 2.93% to 3.87% of stake, and ROI was unchanged.
+- **Income beyond selection** (`findings_2026-11-19_income_routes.md`, user ask):
+  - Kalshi pays about **$138k a day** for resting orders on 7,260 non-sports markets. Retail is eligible, and most
+    of those series charge fees to takers only.
+  - Static capture ceiling: about $346 a day on $2,500 at 100 contracts a side.
+  - The 36 quiet markets: about $207 a day on $2,092, with fewer than 100 contracts a day trading through our price.
+  - Polymarket US pools are about $54k, mostly on live sports.
+  - **S8, a read-only shadow of reward capture, is proposed and waits for the user's go.**
+
+**One optimization lead.** The selection studies are exhausted for now (S1-S7). The largest lever with a positive
+sign is **not paying fees** (3.89% of stake, more than half the 30 d loss):
+- S8 earns rewards as a maker on fee-free markets;
+- S3's maker-entry re-judge (about 11-24) tests resting instead of taking on the existing book.
+
+Both are measured before any live change.
