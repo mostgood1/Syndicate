@@ -54,6 +54,7 @@ def row(args):
         except Exception:
             pass
     i17 = below = college_flags = 0
+    i17_list = []
     for card in rail.get("cards") or []:
         if card.get("sport") not in COLLEGE or not card.get("live"):
             continue
@@ -72,6 +73,11 @@ def row(args):
                 line = float(mline.group(2))
                 if (mline.group(1) == "o" and ours < line) or (mline.group(1) == "u" and ours > line):
                     i17 += 1
+                    # Name it (11-20 8:50 PM: the fleet-watcher could not tell which game). Two known non-defects
+                    # trip this: the chip's re-sim lagging the flagged row by one build (OURS is the chip's final),
+                    # and a late tie, where an extra-period branch pulls the mean above an under the model favours.
+                    if len(i17_list) < 5:
+                        i17_list.append(f"{card.get('sport')} {card.get('matchup')} {side} p={e.get('model')} ours {ours}")
             gk = str((card.get("chip") or {}).get("game_key"))
             if ours is not None and gk in pts and ours < pts[gk]:
                 below += 1
@@ -105,10 +111,18 @@ def row(args):
 
     # I-29 (11-19): live games whose full-game (non-player) rail rows carry NO live model at all. The probe's dark/missed
     # counts need a model on the row, so a game that loses its model join is invisible to them.
+    # Only the markets the live join prices (live_gameline_join._DIST_MARKETS: totals/spreads and their alts). 11-20
+    # 3:50 PM: soccer games flickered onto this list whenever only their corners / BTTS / h2h rows made the rail's
+    # ~100-row cut -- markets that never carry a live model (0 of 97 soccer rows that day), so "no model" there was the
+    # row mix, not a refusal. h2h is out for every sport: layer2_board leaves some h2h rows blank by design.
+    _PRICED = {"totals", "total", "totals_alt", "alternate_totals", "spreads", "run_line", "ats", "spreads_alt",
+               "alternate_spreads"}
     by_game = {}
     if os.path.exists(lr_path):
         for r in (json.load(open(lr_path, encoding="utf-8")).get("rows") or []):
             if r.get("player_name") or str(r.get("segment") or "full") != "full":
+                continue
+            if str(r.get("market") or "").strip().lower() not in _PRICED:
                 continue
             g = by_game.setdefault(f"{r.get('sport')} {r.get('matchup')}", [0, 0])
             g[0] += 1
@@ -137,6 +151,7 @@ def row(args):
         "dark_rows": flags.get("dark_rows"),
         "college_total_flags": college_flags,
         "ours_contradictions": i17,
+        "ours_contradictions_list": i17_list,
         "ours_below_points": below,
         "floor_calibrated_rows": floor_rows,
         "floor_violations": floor_viol,
