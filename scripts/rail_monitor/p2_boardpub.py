@@ -22,6 +22,3 @@ if g:
     print("median", round(st.median(g)), "max", round(max(g)), "over 1800", sum(1 for x in g if x > 1800), "over 600", sum(1 for x in g if x > 600))
     for x in sorted(gaps, reverse=True)[:5]:
         print("  gap", round(x[0]), x[1], "->", x[2])
-for l in lines:
-    if "2026-11-21T01:1" <= l[:19] <= "2026-11-21T02:00":
-        print(" ", l[:300])
