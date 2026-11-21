@@ -62707,3 +62707,50 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
     - A drain on a busy Saturday cannot reach CLEAR because live-odds-worker's jobs never stop. For a refresh-worker-only TERM, the preflight is the gate.
 - **Claim released** 16:48:57Z.
 - **verify:** tonight is again the parent's first evening, like 11-19 (§7). Same §5 thresholds. The rail monitor reads it.
+
+## 2026-11-21 18:07:33Z (12:07:33 PM CST) -- web: a worker whose loop returned leaves through `os._exit(0)` instead of CPython's shutdown `b07e80882` (lane `web-silent-worker-kills`, user "Load both now" to "Load the web exit fix now, with the Kalshi grading fix riding along?") -- **LOADED on web; MET at +16 min (4 of 4 exits fast, replacements 0.29-0.84 s)**
+- betting change: **no** (BC-057). Exit path only: the hook runs after `Worker exiting`, once the drain is done and no request future is running.
+- **Ride-alongs** (`0d20a6919..b07e80882`, 28 commits; listed before the merge, `wsk_ridealong3.sh`):
+  - `64cd634f4` (lane `kalshi-no-grade-check`): Kalshi in-game NO moneylines graded from the ticker. It writes `grade_check` only, never outcome or pnl, so it is not a betting change.
+    - Loaded on the user's "Load both now"; that lane had held its load for the user's yes.
+    - Its code runs in `settle_orders` -> `_check_venue_grade`, inside `_build_candidate_pool`, in the refresh-worker's board-build child (`pipeline.board_build_process --serve`, pid 2313125, 1.5 h old at 18:0xZ).
+    - So it loads when that child is next replaced, with no role restart. The lane's own verification (the next day's ledger: 0 `side_not_a_team_in_this_game` on new Kalshi in-game NO h2h rows) stays with that lane.
+  - `b2ff241ae` (#859, NCAAF trailer concede + live end game): inert.
+    - `live_endgame.enabled()` is on only for an explicit on value; `trailing_concede_deficit` defaults to None.
+    - No env layer names `SYNDICATE_NCAAF_LIVE_ENDGAME`.
+  - Everything else is ledger, docs, tests, or the portfolio-watch / rail-monitor scripts, which no role imports.
+  - 0 dirty fleet paths touched by the ff.
+- **Why:** the 17:04:54Z stall dump was ONE thread with `<no Python frame>`.
+  - Worker 2300114 had logged `Worker exiting` at 17:04:19.987Z after a normal memory recycle (1,289 MB anon).
+  - It then spent ~55 s in CPython's interpreter shutdown, past atexit (the other thread states were already deleted). Its replacement booted at 17:05:15.7Z, ~5 s before the master's 60 s kill.
+  - Meanwhile web ran on one worker, and had none accepting from ~17:04:19.9Z to 17:04:24.6Z.
+  - Since 10-31: exit to replacement boot was median 1.5 s, p90 3.2 s, p99 9.2 s over 5,296 exits. 5 exits were KILLED in this shutdown (10-31, 11-06 x2, 11-08, 11-11), each 30-60 s after `Worker exiting`.
+- **The change:**
+  - `gunicorn.conf.py` `worker_exit`: when `DrainingThreadWorker.run` has returned (`_syndicate_run_returned_at`, set in `syndicate/web_worker.py`) and no request future is running, it logs `WEB_WORKER_FAST_EXIT`, flushes stdio, and calls `os._exit(0)`.
+  - Anything else takes the stock exit, logged as `WEB_WORKER_STOCK_EXIT` with its reason, so exit codes 3 / 4 still halt the arbiter.
+  - web's only atexit work releases flock()s, which the kernel drops with the fds.
+  - Switch: `SYNDICATE_WEB_WORKER_FAST_EXIT` (0 / false / off / no); in no env layer.
+  - Tests: 60 passed under the fleet venv.
+    - The end-to-end test runs a real gunicorn with the real conf, recycling every 5 requests.
+    - With the switch on, an app atexit handler never runs (0 marks, one `WEB_WORKER_FAST_EXIT` per `Worker exiting`). With it off, it runs in every exiting worker.
+- **Gates:**
+  - claim web 18:06:36Z (holder `web-silent-worker-kills`, ACQUIRED, rc 0);
+  - baseline 18:06:49Z: fleet head `0d20a6919`, healthz 200, `WEB_WORKER_FAST_EXIT` lines 0, `WORKER TIMEOUT` 0 today;
+  - preflight `--service web --target-commit b07e80882 --betting-change no`, from a worktree at origin/main, 3 expect / baseline pairs: **CLEAR 18:07:21Z**.
+- **ff + reload:**
+  - `git merge --ff-only b07e808823d2` at **18:07:33Z** (`0d20a69191b7` -> `b07e808823d2`).
+  - `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "max_latency_s": 0.0}`.
+  - Workers 2387549 / 2388589 -> **2389309 / 2389310**; master 1011213 unchanged. The two retired workers ran the old config and exited the stock way.
+- **expect / measured (18:23:31Z, +16 min, scratchpad `wsk_fastexit_reading.sh`):**
+  - `fleet_head` 0d20a6919 -> b07e80882: **MET**.
+  - `healthz` 200 -> 200: **MET**.
+  - `fast_exit_lines_at_least_one` no -> yes: **MET**. 4 `WEB_WORKER_FAST_EXIT` lines, one for every new-config worker that exited (2389309, 2389310, 2391791, 2395968), 0 `WEB_WORKER_STOCK_EXIT`.
+    - Each logged in the same millisecond as its `Worker exiting` (`after_loop_s` 0.0).
+    - Replacement booted 0.29 / 0.84 / 0.78 / 0.45 s later, against the 1.5 s median before.
+  - 0 dumps, 0 `WORKER TIMEOUT`, 0 Traceback, 0 `Exception during worker exit`.
+- **verify:**
+  - Every new-config `Worker exiting` is followed by `WEB_WORKER_FAST_EXIT` or `WEB_WORKER_STOCK_EXIT` with a reason.
+  - Exit to replacement boot stays under ~2 s at p99 (before: 9.2 s).
+  - 0 exit-time dumps (one thread, `<no Python frame>`) and 0 kills of an exiting worker.
+  - Kills per day are still the lane's measure.
+- **Claim released** 18:24:36Z.
