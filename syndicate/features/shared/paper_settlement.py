@@ -569,7 +569,16 @@ def _check_venue_grade(
     if order.get("grade_check"):
         return None
 
-    verdict, _resolved, refusal = _our_verdict(order, resolver)
+    contract_side, refusal = _kalshi_contract_side_order(order)
+    if refusal:
+        order["grade_check"] = {
+            "agrees": None,
+            "reason": refusal,
+            "venue_outcome": str(order.get("outcome") or ""),
+            "checked_at": _utc_now(),
+        }
+        return refusal
+    verdict, _resolved, refusal = _our_verdict(contract_side or order, resolver)
     if verdict is None:
         # NOT a conflict. "The venue said won and the game says lost" and "the
         # venue said won and we cannot read the game" are opposite findings and
@@ -595,7 +604,60 @@ def _check_venue_grade(
         "settled_value": verdict.get("settled_value"),
         "checked_at": _utc_now(),
     }
+    if contract_side is not None:
+        # Which club the contract side was read as, so a conflict on a YES/NO row
+        # can be checked against the ticker without re-deriving it.
+        order["grade_check"]["side_from_ticker"] = contract_side["side"]
     return "agrees" if agrees else "conflict"
+
+
+def _kalshi_contract_side_order(order: Mapping[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    """For a Kalshi YES/NO game moneyline: `(a COPY of the order with side = the backed club, "")`.
+
+    `(None, "")` when the order is not one (every other row is untouched), and `(None, reason)`
+    when it is one and the club cannot be read (lane kalshi-no-grade-check, 2026-11-21).
+
+    WHY. The in-game entries record the CONTRACT side, `side "no"`, and `_our_verdict` handed it
+    to the sport resolver as if it were a club. `canonical_team(.., "no")` is New Orleans, so a
+    held NO was graded as "New Orleans to win" -- inverted on NO@OKC 11-20 -- and on every
+    other game it refused `side_not_a_team_in_this_game` (36 of 39 on the 11-21 ledger).
+
+    USED BY `_check_venue_grade` ONLY. The copy feeds our own reading of the game; the order
+    keeps what was actually bet, and nothing here reaches `outcome` or `pnl_dollars`.
+    """
+    from syndicate.features.shared.game_line_bet import (
+        REASON_UNKNOWN_GAME_MARKET,
+        is_game_line_market,
+        kalshi_contract_backed_side,
+    )
+
+    contract = str(order.get("side") or "").strip().lower()
+    if contract not in {"yes", "no"} or not _is_kalshi_venue(order):
+        return None, ""
+    sport, market = order.get("sport"), order.get("market")
+    if not is_game_line_market(sport, market):
+        return None, ""
+    ticker = order.get("venue_ticker")
+    if not ticker:
+        key = str(order.get("position_key") or "")
+        # `ingame:<ticker>:<leg>` (inplay_entries_live.POSITION_PREFIX).
+        ticker = key.split(":")[1] if key.count(":") >= 2 else None
+    backed, reason = kalshi_contract_backed_side(
+        sport=sport,
+        market=market,
+        contract_side=contract,
+        venue_ticker=ticker,
+        home_team=order.get("home_team"),
+        away_team=order.get("away_team"),
+        draw_possible=str(sport or "").strip().lower() == "soccer",
+    )
+    if backed is None:
+        if reason == REASON_UNKNOWN_GAME_MARKET:
+            # A spread: a YES/NO spread is a different translation (the line flips with the club),
+            # not built here. Left exactly as it was.
+            return None, ""
+        return None, str(reason)
+    return {**order, "side": backed}, ""
 
 
 def _stamp_grade(order: dict[str, Any], verdict: Mapping[str, Any], resolved: Mapping[str, Any]) -> None:

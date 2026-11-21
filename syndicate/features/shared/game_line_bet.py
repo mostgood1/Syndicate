@@ -85,6 +85,10 @@ __all__ = [
     "REASON_NO_SCORES",
     "REASON_NO_SPREAD_LINE",
     "REASON_HOME_AWAY_DISAGREE",
+    "REASON_KALSHI_TICKER_UNREADABLE",
+    "REASON_KALSHI_TICKER_DISAGREES",
+    "REASON_KALSHI_NO_THREE_WAY",
+    "kalshi_contract_backed_side",
 ]
 
 # Named refusals. Each one sends the next person somewhere different, which is
@@ -97,6 +101,15 @@ REASON_NO_SPREAD_LINE = "no_spread_line"
 # that is. Refused rather than resolved by trusting either: a positional side
 # graded against the wrong club is a confident inverted verdict.
 REASON_HOME_AWAY_DISAGREE = "home_away_disagree_between_sources"
+# KALSHI CONTRACT SIDES (lane kalshi-no-grade-check, 2026-11-21). A Kalshi game
+# moneyline is one market per club, `KXNBAGAME-26NOV20NOPOKC-NOP` = "New Orleans
+# wins", and the ledger records the CONTRACT side (`side "no"` / `"yes"`), not
+# a club. See `kalshi_contract_backed_side`.
+REASON_KALSHI_TICKER_UNREADABLE = "kalshi_ticker_team_unreadable"
+REASON_KALSHI_TICKER_DISAGREES = "kalshi_ticker_disagrees_with_matchup"
+# NO on one club of a THREE-way market is "the other club OR the draw": no single
+# side in this module's vocabulary. Refused, never folded onto the other club.
+REASON_KALSHI_NO_THREE_WAY = "kalshi_no_on_three_way_market"
 
 # Markets decided by the SCOREBOARD rather than by a player's line, and by the
 # score of ONE side rather than the combined total (`totals` is already handled
@@ -211,6 +224,74 @@ def _margin_for_side(
     # than defaulted to either team: picking one produces a confident verdict
     # on the wrong bet, which is worse than no verdict at all.
     return None, REASON_SIDE_NOT_A_TEAM
+
+
+def kalshi_contract_backed_side(
+    *,
+    sport: Any,
+    market: Any,
+    contract_side: Any,
+    venue_ticker: Any,
+    home_team: Any = None,
+    away_team: Any = None,
+    draw_possible: bool = False,
+) -> tuple[str | None, str | None]:
+    """`("home" | "away", None)` -- the club a Kalshi YES/NO moneyline backs -- or `(None, reason)`.
+
+    MEASURED 2026-11-21 (fleet ledger, 2:00 AM CST): 39 in-game Kalshi NO moneylines record
+    `side "no"`. 36 refused `side_not_a_team_in_this_game`; the other 2 with a matchup were
+    graded only because `canonical_team("nba"/"nfl", "no")` is NEW ORLEANS -- so "no" was read as
+    "New Orleans to win". On `KXNFLGAME-26NOV08CLENO-CLE:no` that happens to be right; on
+    `KXNBAGAME-26NOV20NOPOKC-NOP:no` (held NO on New Orleans = backing Oklahoma City) it is
+    inverted, and it raised a false `grade_conflicts: 1`.
+
+    THE TICKER NAMES THE CLUB. `<SERIES>-<date><AWAY><HOME>-<CLUB>`: the suffix is the club the
+    contract is about, and the event segment lists away then home. So the suffix ENDING the
+    segment is home and one found earlier is away (`NOPOKC`: OKC home, NOP away; `CLENO`: NO
+    home, CLE away). YES backs that club; NO backs the other one, which in a two-way market is
+    exactly one side.
+
+    CROSS-CHECKED, NEVER TRUSTED ALONE. Where the suffix resolves through `canonical_team` to one
+    of the order's own two clubs, that must agree with the positional reading, or the row refuses
+    (`REASON_KALSHI_TICKER_DISAGREES`): an inverted moneyline is a confident wrong verdict. A
+    suffix that resolves to neither club (a code no alias knows, or one that aliases elsewhere)
+    leaves the venue's own ticker structure as the only reading.
+    """
+    token = str(contract_side or "").strip().lower()
+    if token not in {"yes", "no"}:
+        return None, REASON_SIDE_NOT_A_TEAM
+    if _canonical_market(sport, market) not in _MONEYLINE_MARKETS:
+        return None, REASON_UNKNOWN_GAME_MARKET
+    three_way = draw_possible or _canonical_market(sport, market) in _ALWAYS_THREE_WAY
+    if token == "no" and three_way:
+        return None, REASON_KALSHI_NO_THREE_WAY
+
+    parts = str(venue_ticker or "").strip().upper().split("-")
+    if len(parts) < 3 or not parts[-1] or not parts[-2]:
+        return None, REASON_KALSHI_TICKER_UNREADABLE
+    suffix, segment = parts[-1], parts[-2]
+    if _is_draw_side(suffix):
+        # `-TIE`: a draw contract, never a club.
+        return None, REASON_KALSHI_TICKER_UNREADABLE
+    if segment.endswith(suffix) and len(segment) > len(suffix):
+        named = "home"
+    elif suffix in segment:
+        named = "away"
+    else:
+        return None, REASON_KALSHI_TICKER_UNREADABLE
+
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    by_code = canonical_team(sport, suffix)
+    home = canonical_team(sport, home_team)
+    away = canonical_team(sport, away_team)
+    if by_code is not None and by_code in {home, away} and home != away:
+        if ("home" if by_code == home else "away") != named:
+            return None, REASON_KALSHI_TICKER_DISAGREES
+
+    if token == "yes":
+        return named, None
+    return ("away" if named == "home" else "home"), None
 
 
 def game_line_view(
