@@ -295,7 +295,7 @@ td.num { text-align:right; white-space:nowrap; }
     { h: "Fees", num: 1, f: r => num(r.fee_pct) + "%" }, { h: "CLV net", num: 1, f: r => r.clv_net_pp == null ? "—" : num(r.clv_net_pp, 2) + " pp" },
     { h: "30 d ROI", num: 1, f: r => pct(r.r30_roi_pct), cls: r => cls(r.r30_roi_lo95, r.r30_roi_hi95) },
     { h: "30 d range", num: 1, f: r => "[" + num(r.r30_roi_lo95) + ", " + num(r.r30_roi_hi95) + "]" },
-    { h: "Orders", num: 1, k: "orders" }, { h: "Anomalies", num: 1, f: r => r.readings ? r.anomalies : "—" },
+    { h: "Orders", num: 1, k: "orders" }, { h: "Distinct anomalies", num: 1, f: r => r.readings ? r.anomalies : "—" },
     { h: "Live > 3 s", num: 1, f: r => r.readings ? r.live_over_3s : "—" },
   ], H.filter(r => r.bets).slice().reverse());
   table("slices", [

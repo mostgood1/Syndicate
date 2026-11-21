@@ -73,3 +73,44 @@ origin/main `lanes.md` at 2:05 AM. kalshi-exit-path claims only `venue_settlemen
 gets its own lane. It writes only `grade_check` and never `outcome` / `pnl_dollars`, so it is not a betting change. Clearing the
 open conflict (`acknowledge_grade_conflict`) writes the live ledger and waits for the user's yes; it changes no money.
 Until then the portfolio page shows "1 settled bet disagrees with the actual game result".
+
+## 10:00 AM — "23 anomalies on 11-21": a counting artefact, plus two real items
+
+**Asked** (fleet-watcher, via the NCAAF backtesting session): the rollup shows 23 anomalies on 11-21 with 2 bets graded,
+while page data shows 5 and then 4. Is something wrong, or is the rollup miscounting?
+
+**Breakdown.** The rollup summed every non-GATE anomaly line over every reading of the day:
+- 16 readings, 1:47 - 8:34 AM: each one re-flagged the same `LEDGER grade_conflicts: 1` (F26, a false alarm).
+- 9:04 AM: 4 lines. 9:34 AM: 3 lines.
+- 16 + 4 + 3 = 23.
+
+Page data counts the latest reading only, including its GATE line: 4 + 1 = 5, then 3 + 1 = 4. The two counts measure
+different things and do not conflict. **Fixed:** `build_history.ops_by_day` now counts DISTINCT anomalies per day (the
+text with numbers blanked). The old sum survives as `anomaly_lines`, and the dashboard column is renamed "Distinct
+anomalies". After the 10:02 AM run: 11-21 = 4 distinct from 25 lines over 19 readings; 11-20 = 4 from 5; 11-19 = 1 from
+3. 7 tests pass.
+
+**The 4 distinct on 11-21:**
+1. **The grade conflict (F26).** A false alarm; it waits on the user (fix the check, clear the conflict).
+2. and 3. **Slow live and page reads:**
+   - 9:04 AM: live_today 4.22 s, page 4.58 s.
+   - 9:34 AM: live_today 3.27 s.
+   - The SERVER log agrees, so this is not probe starvation: `/api/portfolio/live` max 4,134 ms, and p50 3,149 ms in the
+     9:34 window.
+   - This is after web's decode fix (11:38 AM 11-20), so it was passed to lane web-silent-worker-kills as a reading for
+     its measurement.
+4. **Resting Polymarket order `ac07e83e`:**
+   - The order: NBA alternate spread, Spurs -15.5 against the Pelicans (tip-off 7:10 PM). Submitted 6:50 AM as a taker
+     at 0.57 against a 0.56 slate quote 51 s old.
+   - Its state: unfilled since (`ORDER_STATE_NEW`, cum 0). The reconciler reads it about every 5 min.
+   - **It cannot rest into the game:** the worker log shows `TIME_IN_FORCE_GOOD_TILL_DATE`,
+     `goodTillTime='2026-11-22T01:10:00Z'`, so the venue expires it at tip-off.
+   - What it costs: `cancel_stale_resting_orders` is Kalshi-only. The worker's comment calls widening it to Polymarket "a
+     different decision", and `polymarket_us_orders.cancel_order` exists but nothing calls it. So the order holds its
+     idempotency key until kickoff, and the bet cannot be re-placed at a price that exists. That costs a possible fill,
+     not money at risk.
+   - **Lead, not a lane:** a Polymarket stale cancel (the same age + price-band rule as Kalshi). It changes which bets
+     are held, so it is a betting change: window only, the user's call. First filed 09-11 in lanes_history (when there
+     was no kickoff expiry either; that half was fixed).
+
+**No action needed now** beyond what F26 already waits on.

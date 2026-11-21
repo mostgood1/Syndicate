@@ -14,6 +14,7 @@ import collections
 import datetime as dt
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -42,9 +43,21 @@ def keep(s: dict | None, prefix: str) -> dict:
             f"{prefix}roi_lo95": s.get("roi_lo95_pct"), f"{prefix}roi_hi95": s.get("roi_hi95_pct")}
 
 
+def anomaly_signature(text: str) -> str:
+    """One anomaly's identity across readings: its text with every number blanked.
+
+    A persistent issue is re-flagged at every reading with fresh numbers ("resting 134 min", then "resting 164 min";
+    "live_today slow: 4.22s", then "3.27s"). Summing those lines per day counted one open grade conflict 18 times on
+    11-21 and read as "23 anomalies" (fleet-watcher, 11-21 10 AM). The day's count is the number of distinct issues.
+    """
+    return re.sub(r"\d+(?:\.\d+)?", "#", str(text)).strip()
+
+
 def ops_by_day() -> dict[str, dict]:
-    out: dict[str, dict] = collections.defaultdict(lambda: {"readings": 0, "anomalies": 0, "live_over_2s": 0,
-                                                             "live_over_3s": 0})
+    """Per CST day: readings, distinct non-GATE anomalies, every anomaly line (per reading), slow live reads."""
+    out: dict[str, dict] = collections.defaultdict(lambda: {"readings": 0, "anomalies": 0, "anomaly_lines": 0,
+                                                             "live_over_2s": 0, "live_over_3s": 0})
+    distinct: dict[str, set[str]] = collections.defaultdict(set)
     try:
         lines = (READINGS / "readings.jsonl").read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -60,7 +73,10 @@ def ops_by_day() -> dict[str, dict]:
         day = dt.datetime.fromisoformat(at.replace("Z", "+00:00")).astimezone(CT).date().isoformat()
         o = out[day]
         o["readings"] += 1
-        o["anomalies"] += sum(1 for a in (r.get("anomalies") or []) if not str(a).startswith("GATE"))
+        lines_ = [str(a) for a in (r.get("anomalies") or []) if not str(a).startswith("GATE")]
+        o["anomaly_lines"] += len(lines_)
+        distinct[day].update(anomaly_signature(a) for a in lines_)
+        o["anomalies"] = len(distinct[day])
         s = ((r.get("endpoints") or {}).get("live_today") or {}).get("seconds")
         if s is not None:
             o["live_over_2s"] += s > 2
@@ -114,7 +130,8 @@ def main() -> int:
                "r30_fee_pct": (w30 or {}).get("fee_pct_of_stake"), "r30_clv_net_pp": clv30.get("clv_net_pp"),
                "orders": sum(oc.values()), "filled": oc.get("filled", 0),
                "not_filled": sum(n for s, n in oc.items() if s in ("rejected", "failed", "canceled", "cancelled", "expired")),
-               **ops.get(ds, {"readings": 0, "anomalies": None, "live_over_2s": None, "live_over_3s": None})}
+               **ops.get(ds, {"readings": 0, "anomalies": None, "anomaly_lines": None, "live_over_2s": None,
+                              "live_over_3s": None})}
         rows.append(row)
         d += dt.timedelta(days=1)
     allb = rb.summarize(bets) or {}

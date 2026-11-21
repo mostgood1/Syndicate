@@ -59,8 +59,30 @@ def test_ops_by_day_counts_non_gate_anomalies_and_slow_live_reads(tmp_path, monk
     monkeypatch.setattr(build_history, "READINGS", tmp_path)
     ops = build_history.ops_by_day()
     # 05:00Z is 11:00 PM CST 11-19; 07:00Z is 1:00 AM CST 11-20
-    assert ops["2026-11-19"] == {"readings": 1, "anomalies": 1, "live_over_2s": 1, "live_over_3s": 1}
-    assert ops["2026-11-20"] == {"readings": 1, "anomalies": 0, "live_over_2s": 1, "live_over_3s": 0}
+    assert ops["2026-11-19"] == {"readings": 1, "anomalies": 1, "anomaly_lines": 1, "live_over_2s": 1,
+                                 "live_over_3s": 1}
+    assert ops["2026-11-20"] == {"readings": 1, "anomalies": 0, "anomaly_lines": 0, "live_over_2s": 1,
+                                 "live_over_3s": 0}
+
+
+def test_a_persistent_anomaly_counts_once_per_day_not_once_per_reading(tmp_path, monkeypatch):
+    # 11-21: one open grade conflict re-flagged at 18 readings read as "23 anomalies" on the rollup.
+    lines = [{"at": f"2026-11-21T{h:02d}:04:00Z", "anomalies": ["LEDGER grade_conflicts: 1"]} for h in range(8, 14)]
+    lines += [
+        {"at": "2026-11-21T15:04:00Z", "anomalies": ["ENDPOINT live_today slow: 4.22s > budget 3.0s",
+                                                     "LEDGER grade_conflicts: 1",
+                                                     "ORDERS resting order ac07e83e (taker): resting 134 min (> 120)"]},
+        {"at": "2026-11-21T15:34:00Z", "anomalies": ["ENDPOINT live_today slow: 3.27s > budget 3.0s",
+                                                     "LEDGER grade_conflicts: 1",
+                                                     "ORDERS resting order ac07e83e (taker): resting 164 min (> 120)",
+                                                     "GATE 2 deploys.md load(s) unclassified"]},
+    ]
+    (tmp_path / "readings.jsonl").write_text("\n".join(json.dumps(x) for x in lines), encoding="utf-8")
+    monkeypatch.setattr(build_history, "READINGS", tmp_path)
+    day = build_history.ops_by_day()["2026-11-21"]
+    assert day["readings"] == 8
+    assert day["anomaly_lines"] == 12          # every non-GATE line at every reading
+    assert day["anomalies"] == 3               # the conflict, the slow live read, the resting order
 
 
 def test_history_keeps_the_previous_rollup_when_there_is_no_ledger(tmp_path, monkeypatch):
