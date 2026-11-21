@@ -114,3 +114,41 @@ anomalies". After the 10:02 AM run: 11-21 = 4 distinct from 25 lines over 19 rea
      was no kickoff expiry either; that half was fixed).
 
 **No action needed now** beyond what F26 already waits on.
+
+## 3:08 PM — resting order `373a43d7` is a men's bet placed on Kalshi's WOMEN'S market (F27)
+
+Flagged by the fleet-watcher from the 2:34 PM reading (`resting order 373a43d7 (taker): resting 174 min`). It is
+**not** the `ac07e83e` class (Polymarket, good-till-date). It is a Kalshi order on the wrong game.
+
+- **The row** (`/api/portfolio/live?on=all&show=all`, read 21:02Z): sport `ncaab`, OddsAPI event `089763b5`
+  (`ncaab_source` odds), UC Irvine @ San Diego, tip **21:30Z (3:30 PM)**, h2h side away (UC Irvine), taker at 0.61,
+  submitted 17:40:32Z, `venue_status=resting`.
+- **The ticker:** `KXNCAAWBGAME-26NOV21UCIUSD-UCI`. `kalshi_catalogue` maps `KXNCAAWBGAME` to `wncaab`. The women's
+  UC Irvine @ San Diego game tips **2026-11-22T03:00Z (9:00 PM)** (`wncaab_source` scoreboard). Today's live-odds-worker
+  log carries no `KXNCAAMB*` ticker for `UCIUSD`, so Kalshi lists no men's market for this game.
+- **How often:**
+  - **Live endpoint:** 1 of 5 `KXNCAAWBGAME` rows is labelled `ncaab`; this is the one.
+  - **Ledger archive:** 32,005 Kalshi rows. The only other family/sport mismatches are 2 PAPER rows (key `c0a80a61`)
+    on the same game today. No live fill, ever.
+- **Cause, reproduced locally against `kalshi_board_join._resolve_event`:**
+  - It resolves a market's event by team codes against `_distinct_games(board_rows)`. That list carries **no sport**,
+    and `portfolio_commit._resolvers_from_markets` passes the whole cross-sport board.
+  - `sport_for_series` picks the club map only.
+  - Results for `KXNCAAWBGAME-26NOV21UCIUSD-UCI`:
+    - board with only the men's game: `ok` → men's event `089763b5`;
+    - board with both games: `ambiguous` (refused);
+    - the mirror case (a `KXNCAAMBGAME` market with only the women's game on the board) also resolves `ok`.
+  - So a market whose own game is missing from the board lands on a same-named game in the sibling sport. The women's
+    game had no OddsAPI women's odds row (`wncaab_source` odds 11-21: no UC Irvine row), so it was not on the board.
+- **Exposure now:**
+  - Unfilled. Kalshi orders are good-till-canceled.
+  - `cancel_pregame_resting_at_kickoff` reads the row's own (men's) `commence_time`, so it should pull the order at
+    21:30Z. Until then it can fill at 0.61 on the women's game.
+  - The boot stale pass at 18:26:35Z skipped it (`CANCEL_SKIPPED_NO_PRICE`).
+  - If it filled, the venue would settle it on the women's result, and our grade would read the men's.
+- **Owner:** no OPEN lane claims `kalshi_board_join.py` or `kalshi_catalogue.py` (origin/main 21:05Z).
+- **The fix:** `_distinct_games` carries each game's `sport`. `_resolve_event` matches only games whose sport equals
+  the market's `sport_for_series`, and a game with no sport stays eligible. It changes which bets are placed, so it is
+  a **betting change**: the 11-24 window, or a `broken money path` exception on the user's yes.
+- **Taken:** no venue action. A watcher is on the log for this order's `CANCEL_AT_KICKOFF`, fill or terminal
+  reconcile, until 22:15Z.
