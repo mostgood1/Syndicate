@@ -62628,6 +62628,17 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Full collections: 3,273 of the 3,275 pauses are generation 2, and 3,260 of those collected nothing. 1,912 s of pause in 19.9 h across the two workers.
     - Not tuned. User "Watch kills first" (11-21), answering "Tune web's garbage collection next, or watch kills per day first?".
   - Memory recycles: 75 in 19.9 h. Inside the per-UTC-day range for 11-12..11-20: 110 / 374 / 487 / 410 / 155 / 277 / 241 / 184 / 155.
+- **reading 3, 2026-11-21 20:14:02Z (2:14 PM CST): the full 24 h.** The hook is unchanged in `b07e80882` (web from 18:07:33Z). Read-only, nice 19. Scratchpad scripts: `wsk_24h_reading.sh`, `wsk_loopstalls24.sh`, `wsk_stall_context.sh`.
+  - Stall dumps at `sitecustomize.py:47`: 0. `WORKER TIMEOUT` 0, Traceback 0: **MET**. Fleet head `b07e80882`, healthz 200.
+    - The window's one dump (17:04:54Z) is a different cause: a worker stuck in CPython's shutdown after `Worker exiting`. `b07e80882` fixes it (entry below).
+  - No silent worker: **MET**. 105 booted; 100 left by their own recycle line; 3 were retired by the two reloads, each with a `Worker exiting` line (1874732 at 20:13:39Z 11-20; 2387549 / 2388589 at 18:07:34Z 11-21); 2 live; 0 killed; 0 unaccounted.
+    - Live 2492542 had logged nothing for 8 min at the read (booted 20:03:07Z, last line 20:05:55Z). That is idle, not stuck: only its heartbeat re-arms the stall dump, and the dump did not fire.
+  - `WEB_GC_PAUSE` lines: 4,251, all with `written_after_s`, 0 `dropped_before`. `written_after_s`: median 0.09 s, p99 1.61 s, max 3.16 s; 367 over 1 s.
+  - `WEB_LOOP_STALL`: 5 in 24 h (3 at reading 2), max still 10.85 s. The two new ones:
+    - 16:08:41Z: gap 5.32 s. A 4.80 s full collection on the board warmer thread, 0 collected.
+    - 18:10:14Z: gap 5.42 s at 1.01 CPU per wall second, with no GC pause line inside the gap. Three full collections of 0.98-1.40 s on one request thread came in the 6 s before it. So something held the GIL for 5.4 s; it is not named. The worker recycled 14 s later (fast exit).
+  - Full collections: 4,240 of 4,246 pauses are generation 2, and 4,223 of those collected nothing. 2,797 s of pause in 24 h across the two workers; 10 AM-1 PM CST ran 222-239 s an hour. Still not tuned (user "Watch kills first").
+  - Memory recycles: 100 in 24 h (104 boots).
 
 ## 2026-11-21 02:37:06Z (8:37 PM CST 11-20) -- READING (no deploy): first UNMODELLED basketball key exit read LIVE through every layer, plan backstop exercised for the first time -- BKN Nolan Traore (lane `live-player-exit-gate`, #814)
 - **The exit:** event 401909306, Orlando @ Brooklyn (NBA). BKN starter Nolan Traore subbed out at Q3 8:00 (pbp wallclock 02:10:44Z) and did not return. ESPN's `injuries` list stamped him `Out`, hamstring, at 02:25Z, DURING the game.
@@ -62754,6 +62765,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - 0 exit-time dumps (one thread, `<no Python frame>`) and 0 kills of an exiting worker.
   - Kills per day are still the lane's measure.
 - **Claim released** 18:24:36Z.
+- **Correction, the Kalshi ride-along:** it loaded on refresh-worker at that role's 18:14:49Z TERM (the next entry, lane `kalshi-no-grade-check`), not at a board-child replacement as written above.
+- **reading 2, 2026-11-21 20:14:57Z (2:14 PM CST, +2.1 h), scratchpad `wsk_fastexit_reading.sh`:**
+  - 13 `Worker exiting` since the load. 11 came from new-config workers, and each of the 11 logged `WEB_WORKER_FAST_EXIT` within 5 ms (`after_loop_s` 0.0-0.005). The other 2 are the reload's old-config workers. 0 `WEB_WORKER_STOCK_EXIT`.
+  - Exit to replacement boot: 0.18-0.84 s, median 0.29 s, 11 of 11 under 1 s (before: median 1.5 s, p99 9.2 s). **MET** so far on the ~2 s p99 bar.
+  - 0 dumps, 0 `WORKER TIMEOUT`, 0 Traceback, 0 `Exception during worker exit`. healthz 200.
+  - Kills per CST day (`wsk_kills_cst.py`, web.log): 11-12..11-16: 0 / 0 / 0 / 0 / 0; 11-17: 5 (4 silent, plus the 10:13 AM one this lane caused); 11-18: 0; 11-19: 0; 11-20: 1 (the GC hook, fixed by `0d20a6919`); 11-21: 0 to 2:14 PM.
 
 ## 2026-11-21 18:14:49Z (12:14 PM CST) -- DEPLOY (claimed refresh-worker TERM, no env change, no ff by me): loads the fleet checkout's b07e80882 -- the Kalshi YES/NO venue grade check, FIRST version 64cd634f4 (lane kalshi-no-grade-check; user "Yes, load it")
 

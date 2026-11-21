@@ -506,3 +506,38 @@ The Portfolio Watch lane passed this on: 4,134 ms at 9:04 and 3,149 ms at 9:34 A
   - The ff from 0d20a6919 carries 28 commits.
   - One of them is `64cd634f4` (lane `kalshi-no-grade-check`: grade_check only, not a betting change), whose lane waits for the user's yes to load it.
   - #859 (`b2ff241ae`) is inert: `SYNDICATE_NCAAF_LIVE_ENDGAME` absent = off, and no env layer names it.
+
+## 2026-11-21 2:20 PM CST (20:20Z) -- the 24-hour reading: 0 kills on 11-21, the instrument fix holds 24 h, and the fast exit holds 11 of 11
+
+Read-only, nice 19, from the fleet's `~/syndicate-prod/logs/web.log`. Scratchpad scripts: `wsk_kills_cst.py`, `wsk_24h_reading.sh`, `wsk_loopstalls24.sh`, `wsk_stall_context.sh`, `wsk_fastexit_reading.sh`. The deploy-side readings are in `deploys.md` (the 20:13:38Z 11-20 and 18:07:33Z 11-21 entries).
+
+- **Kills per CST day** (read 20:14:02Z; kill = `WORKER TIMEOUT`; silent = no memory recycle first):
+
+  | CST day | kills | silent | stall dumps | recycles | boots |
+  |---|---|---|---|---|---|
+  | 11-12 | 0 | 0 | 0 | 209 | 211 |
+  | 11-13 | 0 | 0 | 0 | 421 | 429 |
+  | 11-14 | 0 | 0 | 0 | 450 | 460 |
+  | 11-15 | 0 | 0 | 0 | 326 | 326 |
+  | 11-16 | 0 | 0 | 0 | 248 | 248 |
+  | 11-17 | 5 | 5 | 0 | 284 | 301 |
+  | 11-18 | 0 | 0 | 0 | 174 | 182 |
+  | 11-19 | 0 | 0 | 0 | 160 | 162 |
+  | 11-20 | 1 | 1 | 3 | 100 | 107 |
+  | 11-21 (to 2:14 PM) | 0 | 0 | 1 | 44 | 46 |
+
+  - 11-17's 5 = the goal's 4 (9:23, 10:38, 10:49 AM, 3:36 PM CST) plus 10:13 AM, which this lane caused.
+  - 11-20's 1 (2:01:56 PM CST) is the `WEB_GC_PAUSE` hook deadlock, fixed by `0d20a6919`.
+  - 11-21's one dump is the exiting worker (section above), fixed by `b07e80882`. It was not a kill.
+  - Recycles per day fell from 209-450 (11-12..16) to 100-174 (11-18..20). The fall began before `eeeb62a63` loaded (17:38Z 11-20), and this reading does not attribute it.
+- **`0d20a6919` at 24 h: MET.**
+  - 0 dumps at `sitecustomize.py:47`, 0 `WORKER TIMEOUT`, 0 Traceback.
+  - 105 workers booted: 100 left by their own recycle line, 3 were retired by the two reloads (each with `Worker exiting`), 2 live, 0 killed, 0 unaccounted.
+  - 4,251 `WEB_GC_PAUSE` lines, all with `written_after_s` (median 0.09 s, max 3.16 s), 0 dropped.
+- **Main-loop stalls >= 5 s: 5 in 24 h, max 10.85 s** (the dump fires at 40 s, the kill at 60 s). Four of them sit on a full collection that collected nothing: 7.14 s, 10.60 s, 6.60 s on request threads, and 4.80 s on the board warmer.
+  - The fifth (18:10:14Z, pid 2389309) is a 5.42 s gap at 1.01 CPU per wall second with no GC pause line inside it. It came right after three full collections of 0.98-1.40 s on one request thread. Something held the GIL for 5.4 s; it is not named.
+- **Full collections:** 4,223 of the 4,240 generation-2 pauses collected nothing; 2,797 s of pause in 24 h across two workers. 10 AM-1 PM CST ran 222-239 s an hour, about 3% of the two workers' wall time.
+  - This is the lever for the slow reads and the loop stalls. It is not a kill cause on this reading, and it stays held on the user's "Watch kills first".
+- **`b07e80882` at +2.1 h:** 11 of 11 new-config exits took `WEB_WORKER_FAST_EXIT` within 5 ms of `Worker exiting`. Replacements booted 0.18-0.84 s later (median 0.29 s; before, median 1.5 s and p99 9.2 s). 0 stock exits, dumps or kills.
+- **Not established:** whether 11-17's four silent kills were all the 40 MB decode. The 11-20 dumps named that mechanism for the cold read, and kills have stayed at 0 since (bar the instrument). The 11-17 kills left no dump: the dump instrument went in later.
+- **Next:** kills per CST day for the coming days, with the dump watch (`bgeqza0oy`, to ~18:26Z 11-22) catching any stall at 40 s. Then the goal verdict.
