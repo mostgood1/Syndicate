@@ -121,9 +121,11 @@ need the user's yes. On a fail, the stated reason not to.
      ESPN-timeouts backfill of 11-21 / 11-28.
 4. **Loading:** a betting change, a window only, after #852 / #835's own 12-08 decision.
 
-## BUILD — 2026-11-21, on the user's "Build both" (committed locally, NOT on main: the push is the user's call)
+## BUILD — 2026-11-21, on the user's "Build both"; PUSHED on the user's "Push it"
 
-Code: `refs/keep/ncaaf-margin-aware-endgame-c8cc6c1dd` (one commit on main `f8b19aaff`). Default OFF everywhere.
+Code: main `b2ff241ae` (pushed 2026-11-21 11:04 AM CST; the same tree as the tested `c8cc6c1dd`, rebased over two ledger-only
+commits). Default OFF everywhere. It reaches the fleet at its next fast-forward, still off: that load is not a
+betting change. Setting the switch is.
 
 1. **Engine** (loan from `football-scenario-calibration`; `play_state.py` is this lane's own claim).
    - `CalibrationProfile.trailing_concede_deficit: int | None = None`, and its `to_dict` entry.

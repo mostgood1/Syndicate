@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#859` — **A MARGIN-AWARE END-GAME LETS #808'S CLOCK HELP NCAAF LIVE TOTALS. The concede rule (a trailer down 25+ in Q4 stops hurrying) on top of the clock with real timeouts, damping 1.0/17 and college OT passes #858's gates against the live candidate. BUILT default-off on the user's "Build both" (`refs/keep/ncaaf-margin-aware-endgame-c8cc6c1dd`, not on main); the push and any load are the user's call**
+### `#859` — **A MARGIN-AWARE END-GAME LETS #808'S CLOCK HELP NCAAF LIVE TOTALS. The concede rule (a trailer down 25+ in Q4 stops hurrying) on top of the clock with real timeouts, damping 1.0/17 and college OT passes #858's gates against the live candidate. BUILT default-off and ON MAIN `b2ff241ae` (user "Build both", "Push it"); turning it on is a betting change, the user's call in a window**
 
 `[2026-11-20, lane ncaaf-margin-aware-endgame, session 617b553b; user "Start v4 here"; pre-registered 7b28b5f82; findings .syndicate/findings_2026-11-20_ncaaf_margin_aware_endgame.md]`
 
@@ -12,10 +12,10 @@
   - 25+ engine minus actual: +1.64 -> +0.42 at Q4 15:00.
   - The run-out rule (`v4ab`) also passes but over-corrects 17-24.
   - All "not worse"; no reading beats `base` beyond noise.
-- **Built 2026-11-21 (user "Build both"), default OFF, committed locally only** (`refs/keep/ncaaf-margin-aware-endgame-c8cc6c1dd`; findings "## BUILD"):
+- **Built 2026-11-21 (user "Build both"), default OFF, on main `b2ff241ae` (user "Push it")** (findings "## BUILD"). A fleet ff loads it off:
   1. Engine: `CalibrationProfile.trailing_concede_deficit` (None = off) in `situation_model.classify_urgency`. OFF byte-identical to 5 pinned digests; the built rule equals the harness `v4a` on 12 of 12 real states.
   2. Live: ESPN `situation.homeTimeouts` / `awayTimeouts` into `NcaafLiveGameState` and `initial_timeouts_*`; `SYNDICATE_NCAAF_LIVE_ENDGAME` (`ncaaf/live_endgame.py`) arms #808's clock + the concession at 25 + #855's OT after #852's damping. Both switches on = `v4a`. Absent / off byte-identical through the tick.
-- **Owed:** the user's yes to push. Then, before any load: a joint re-read of the damping shape; a hold-out with real timeouts (live shadow or an ESPN backfill of 11-21 / 11-28), after verifying that the poller's scoreboard row carries college timeouts on a live game. Load only in a window.
+- **Owed before any load:** a joint re-read of the damping shape; a hold-out with real timeouts (live shadow or an ESPN backfill of 11-21 / 11-28), after verifying that the poller's scoreboard row carries college timeouts on a live game. Load only in a window.
 
 ### `#858` — **#808'S END-OF-HALF CLOCK FOR NCAAF LIVE ONE-SCORE GAMES: NOT BUILT, the registered "reason not to".**
 
