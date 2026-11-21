@@ -304,3 +304,111 @@ Read-only, from `refresh-worker.log{,.1}` (scripts `C:\tmp\bmg\load\since_load.s
   - Each of the 9 pids was first matched to a `BOARD_PROCESS_STARTED` / `BOARD_PROCESS_EXITED ... rc=-6` pair in the role log.
   - 9 files, 27.0 GB; C: free went from 147.3 to 178.9 GB.
   - The 25 MB pid-1406840 dump was kept.
+
+## 9. READING 2 -- the second evening after the load, 11-20 5-10 PM CST (23:00-04:00Z), against §5 (written 2026-11-21 07:15Z = 1:15 AM CST)
+
+The rail monitor took it (R-F in its nightly close, main `f9f59594e`, `findings_2026-11-20_layer2_rail_monitor.md` DAILY
+SUMMARY). It was re-derived here read-only from `refresh-worker.log{,.1}` at 07:03Z 11-21 (`C:\tmp\bmg\load\read2.sh`,
+`read2b.sh`, `read2c.sh`, nice 19).
+
+**Load checks: MET.**
+- All 300 refresh_worker heartbeats in the window read `container_memory_max_mb: 7936.0`.
+- The 3 children started in the window (23:08, 01:36 and 03:29Z) each logged
+  `BOARD_PROCESS_CHILD_SWITCHES raw_lifeline=1 recycle_after_build=1 ceiling_credit=7168+768`.
+
+| # | 11-18 (before) | 11-19 (READING 1) | 11-20 (READING 2) | verdict |
+|---|---|---|---|---|
+| P1 refusals per UTC hour 23/00/01/02/03Z | 7/5/5/3/6 = 26 | 0/0/0/2/2 = 4 | **3/3/3/1/3 = 13** | **FALSIFIED** (> 6 total, and 3 in four of the hours) |
+| P2 child exits and rc | 4, all rc -6 | 0 | **3, all rc 75** `reason=recycle`, 0 `Fatal Python error` | NEITHER (more than 2, none rc -6) |
+| P3 longest `BOARD_BUILD_TIMING` gap | 1,580 s; 5 of 28 > 900 s | 807 s; 0 of 53 | **1,062 s**; 1 of 47 > 900 s (p50 330 s, 48 builds) | NEITHER (over 900, under 1,200) |
+
+- **P1's count.** The rail monitor reported 15 because it counts every `MEMORY_GUARD_ABORT` stage. §5 counts
+  `stage=pre_source_state_fingerprint` only, which is 13. The other 2 are one `build_candidate_pool_start` and one
+  `post_pull_hot_artifacts`. The verdict is the same on either count.
+  - Headroom at the 13 refusals was 1,575.8-1,890.9 MB against the 1,900 floor. 7 of the 13 were within 100 MB of it.
+- **P2's exits.** All 3 are `RECYCLE_EXIT reason=heavy_build_refused` after 3 refusals, at 23:07:53Z, 01:36:01Z and
+  03:29:38Z. Each was followed by `BOARD_PROCESS_EXITED rc=75 reason=recycle` and a 5 s respawn.
+  - There are 0 real fatal errors since the load. All 26 untimestamped `Fatal Python error` lines in the log sit
+    before 16:52Z 11-19, one per pre-load crash.
+- **P3's 1,062 s gap is one of those recycles.**
+  - The last build before it was at 01:26:22Z.
+  - Refusals followed at 01:30:43, 01:33:59 and 01:35:17Z, then the recycle at 01:36:01Z and the respawn at 01:36:13Z.
+  - The fresh child's first build landed at 01:44:04Z, a cold build of ~8 min.
+
+**Comparability.**
+- **The slate, by the letter, is CONFOUNDED.** Core live games (NCAAB + NBA + NHL + NFL, the rail monitor's p7count)
+  were 26 at 7:03 PM CST (NCAAB 22, NBA 4). That is 57% of 11-18's 46, under the 70% rule (33).
+  - After that they read 37 (80%) at 7:23 PM, 36 at 7:43 PM and 29 at 8:03 PM.
+  - **The confound runs against the failure.** A lighter slate makes refusals rarer, so it cannot explain 13 of them.
+    P1's falsification stands. A light slate would only have discounted a pass.
+- **No refresh-worker restart, drain or deploy in the window.** Parent 1011283 has been up since 17:00:29Z 11-19, with
+  0 `BOOTED` lines since 13Z 11-20. The day's 3 loads were web-only reload-webs before 5 PM (betting change no).
+- **Not a confound, but the difference from READING 1:** this was the parent's second evening. It entered the window at
+  1,697 MB; READING 1's parent was ~1.04 GB at 6:15 PM.
+
+**Safety.**
+- **Tree max: 6,939 MB at 01:24:33Z,** 3 MB over §5's 6,936 line. That is 1 of 300 samples; the next highest is
+  6,569 MB. A marginal breach, with no OOM.
+- **OOM:** 0 in the role log in the window.
+  - `dmesg` holds one OOM kill on this boot, at ~08:46Z 11-20 (2:46 AM CST): a host-wide (`global_oom`) kill of an
+    8.8 GB anon-RSS python.
+  - It happened while the nightly ci-suite pytest was running; the watchdog logged `ci-suite ... exited rc=1` at
+    08:50:55Z. Every fleet role pid was unchanged across it.
+  - It is not a fleet role and falls outside both evening windows. Listed as a lead, not chased.
+- **WSL `MemAvailable` at the evening's minimum: NOT MEASURED.** No heartbeat field carries it. It read 6.1 GB at
+  07:05Z 11-21.
+
+**Exploratory.**
+- **Parent RSS, half-hour p50:**
+
+  | 11-20 CST | 5:00 PM | 6:30 PM | 7:00 PM | 8:00 PM | **9:00 PM** | 11:00 PM | 1:00 AM (11-21) |
+  |---|---|---|---|---|---|---|---|
+  | parent | 1,697 | 1,998 | 2,090 | 2,188 | **2,224** | 2,293 (peak) | 2,094 |
+
+  - At 9 PM that is +0.62-0.67 GB over READING 1's 1.55-1.60 GB, one day later. The rail monitor's 9 PM p50 was 2,255 MB
+    and its peak sample 2,396 MB at 10:03 PM.
+- **Parent trims:** 60, releasing p50 234 MB (max 260). READING 1: 60 trims, p50 142 MB. They release more, and the
+  floor still rises.
+- **Child RSS:** p50 3.1-4.1 GB.
+- **Post-build checks in the window: 3 of 3 `held=transient_jobs`.** Pair 5,859-5,955 MB against the 6,036 line;
+  headroom 1,668-1,856 MB.
+  - **Each hold was followed by refusals and a streak recycle:** 23:01 hold -> recycle 23:07; 00:51 -> 01:36;
+    02:26 -> 03:29.
+  - So the hold turned what could have been a clean post-build recycle into 3 refused builds and the same recycle.
+- **Over the slate day (13Z 11-20 to 07Z 11-21):**
+  - 1 post-build recycle fired: `reason=post_build_headroom` at 04:14:05Z, pair 6,064 MB, headroom 1,872 MB. It was
+    the first ever.
+  - There were 6 streak recycles (18:32, 23:07, 01:36, 03:29, 05:47 and 06:46Z), all rc 75.
+- **The overnight refuse-and-recycle loop is back, at a lower rate.**
+  - Refusals after the window: 04Z 1, 05Z 4, 06Z 5, with streak recycles at 05:47 and 06:46Z. 11-19's overnight ran
+    3-8 every hour.
+
+**Against §8's projection (written 15:35Z 11-20, before this evening).**
+- **"The parent reaches 2.4-2.7 GB by 9 PM": LOW.** It read 2,224 MB at 9 PM and peaked at 2,293 MB (half-hour p50).
+  The rise within the window was +0.53 GB.
+- **"The post-build check reads `recycle`": WRONG.** 3 of 3 checks in the window held. The streak recycles keep
+  resetting the child (3.1-3.6 GB after a respawn), so the pair stays 80-180 MB under the line and the hold repeats.
+  It fired once, at 04:14Z.
+- **"P2's <= 2 recycles at risk, still rc 75": RIGHT.** 3 exits, all rc 75.
+- **"Fewer refusals than 11-18": RIGHT, but well over §5:** 13 vs 26.
+
+**What it says.**
+- **Each of the four switches does what it was built to do.**
+  - 3 of 3 exits in the window and 7 of 7 over the slate day were rc 75, not rc -6, and wrote no core dump.
+  - The ceiling credit is counted.
+  - The evening published 48 builds vs 11-18's 28, and its longest gap was 1,062 s vs 1,580 s.
+- **They do not hold the line past the first evening.**
+  - The parent keeps ~+0.6 GB a day that trims do not return. The parent cannot recycle itself under the split (§8).
+  - So by the second evening the tree runs 1,575-1,890 MB of headroom against the 1,900 floor, and the refusals come
+    back.
+- **The `held=transient_jobs` rule now costs refused builds.** The jobs it treats as transient recur every cycle.
+  That is the recurring-jobs margin lead (the user, 11-20: "Wait for a busy night"). From 7:23 PM this evening was busy
+  by the slate rule.
+
+**Owed.**
+- **The 11-21 9 AM CST floor reading** (task `board-memory-parent-reset-1121`, rule: restart if the parent p50 is
+  >= 2,110 MB).
+  - The parent read 2,094 MB at 07:00Z, falling ~40-70 MB per half hour since its 05Z peak. The 9 AM reading may land
+    under 2,110, though this evening shows the multi-day rise the rule was set to detect.
+- **The lasting fix** (§8 answer 2: a parent self-recycle in quiet hours, plus the recurring-jobs margin). Both are
+  betting changes, so the 11-24 window. That is the user's decision after the floor reading.

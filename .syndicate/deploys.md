@@ -62601,3 +62601,26 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **The off-floor signal (main c37bdeab3, default OFF) would NOT have caught this:** he left at 28 game-min, and N=15 fires at 43:00, inside the last-5-min exclusion. The existing `injuries` path did.
 - verify: the readings above, all within 02:32:26Z..02:36:09Z, from live-odds-worker.log, refresh-worker.log, the fleet's /api/portfolio/plan?date=2026-11-20, and the ExitHold probe.
 - **ADDENDUM 02:38:32Z, entry hold FIRED on the real exit:** `[inplay_entries_paper] EXIT_HOLD sport=nba ticker=KXNBASPREAD-26NOV20ORLBKN-ORL5 leg=no players=['BKN:Nolan Traore:injury'] snapshot_at=2026-11-20T20:36:58-06:00` at 02:37:20Z (live-odds-worker.log). The first `EXIT_HOLD` line logged on a real exit: the goal's 'holds paper/live entries' clause, observed rather than probed.
+
+## 2026-11-21 07:15Z (1:15 AM CST 11-21) -- READING (no deploy): #850 board child memory, second evening after the 2026-11-19 17:00:09Z load (11-20 5-10 PM CST) -- **P1 FALSIFIED (13 refusals, limit 6), P2 NEITHER (3 child exits, all rc 75, 0 rc -6), P3 NEITHER (longest build gap 1,062 s); slate CONFOUNDED by the letter (26 core live at 7:03 PM, 37 at 7:23 PM), against the failure**
+
+- betting change: no (a reading of BC-053's load)
+- Lane `board-split-memory-guard` (todo #850). The rail monitor took the reading (R-F, `findings_2026-11-20_layer2_rail_monitor.md`, main `f9f59594e`). P1-P3 were re-derived read-only from `refresh-worker.log{,.1}` at 07:03Z 11-21. Window 23:00-04:00Z.
+- **P1:** `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` per UTC hour 23/00/01/02/03Z = 3/3/3/1/3, total 13 (11-19: 4; 11-18: 26).
+  - Counting every stage gives 15: +1 `build_candidate_pool_start`, +1 `post_pull_hot_artifacts`. That is the rail monitor's number.
+  - Headroom at the refusals: 1,575.8-1,890.9 MB against 1,900; 7 of the 13 were within 100 MB.
+- **P2:** 3 `RECYCLE_EXIT reason=heavy_build_refused` (23:07:53Z, 01:36:01Z, 03:29:38Z), each followed by `BOARD_PROCESS_EXITED rc=75 reason=recycle`. 0 `Fatal Python error` since the load.
+- **P3:** 48 builds, gap p50 330 s. The longest gaps are 1,062 s (01:26:22Z -> 01:44:04Z, across the 01:36Z recycle and a ~8 min cold first build), 839 s and 828 s. 1 of 47 is over 900 s.
+- **Load checks:** MET (300 of 300 heartbeats at ceiling 7,936; 3 of 3 child starts log the switches on).
+- **Confounds:**
+  - No refresh-worker restart, drain or deploy in the window (parent 1011283 up since 17:00:29Z 11-19).
+  - **Slate:** 26 at 7:03 PM is 57% of 46, under the 70% rule. It read 37 / 36 / 29 at 7:23 / 7:43 / 8:03 PM. A lighter slate makes refusals rarer, so it cannot explain P1's failure.
+- **Safety:**
+  - Tree max 6,939 MB at 01:24:33Z, 3 MB over the 6,936 line, 1 of 300 samples (next 6,569).
+  - 0 OOM in the role log. The one `dmesg` OOM on this boot is ~08:46Z 11-20: a host-wide kill of an 8.8 GB python during the nightly ci-suite run. It is not a fleet role and falls outside the window.
+- **Exploratory:**
+  - parent RSS p50 2,224 MB at 9 PM (11-19: 1.55-1.60 GB; 11-18: 2,167), peak half-hour 2,293 MB at 11 PM, and 2,094 MB at 1 AM;
+  - 60 trims, released p50 234 MB;
+  - post-build checks 3 of 3 `held=transient_jobs` (pair 5,859-5,955 MB vs the 6,036 line), each followed by refusals and a streak recycle;
+  - over the slate day (13Z-07Z), 1 `post_build_headroom` recycle (04:14:05Z, the first ever) and 6 streak recycles, all rc 75.
+- **verify:** `findings_2026-11-18_board_split_memory_guard.md` §9. The switches work (rc 75, no dumps, 48 builds vs 28), but the parent's ~+0.6 GB/day keeps the second evening under the floor. The 11-21 9 AM floor reading and the lasting-fix decision are owed.
