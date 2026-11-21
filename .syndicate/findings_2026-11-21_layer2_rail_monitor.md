@@ -53,5 +53,12 @@ local_379fd729 flagged three games. Wisconsin @ Purdue was dark at R7, R8 and R9
 - **Ticker change (the fleet-watcher's ask; Claude-free dashboard files only, no fleet change).** From R13 (2:03 PM) each row carries `live_games_no_model_reasons` {game: reason} and `live_games_no_model_detail`.
   - `p29_orient.py` now reads every per-game snapshot: ncaab, wncaab, nba, ncaaf and nhl lens, nfl, soccer lens. It adds `reason`/`detail` and `priced`/`priced_with_model`. The page's dark list now uses the row's rule, priced full-game rows only.
   - The first row: 13 no-model games. 5 NCAAF `key_player_out`, 1 `orientation_reversed`, 7 soccer.
-  - **The soccer live lens was 21 min old at 2:06 PM** (generated 1:45 PM; MLS and Eredivisie only), while 7 European games were live. The 2:23 reading tells whether it refreshes.
+  - **The soccer live lens was 21 min old at 2:06 PM** (generated 1:45 PM; MLS and Eredivisie only), while 7 European games were live.
+    - **LEAD:** `live_lens_loop TICK_COMPLETE` had soccer True every 1-3 min until 19:45:32Z, then **False on every tick to 20:07:47Z (22 min)**. The window spans the Serie A, Ligue 1, Belgian and Eredivisie kickoffs.
+    - The lens it then wrote, generated 2:07:45 PM, holds all 11 live games, and their rows carry a model again.
+    - So **7 games had no live model for about their first 20 minutes.** Earlier False runs today: 18:08-18:27Z (19 min), 15:56-16:31Z (35 min), 15:25-15:40Z (15 min).
+    - Meanwhile `SOCCER_LIVE_AUTORUN_FAILED RefreshLaneBusy` fired 47 times since 15Z.
+    - Not diagnosed. Count kickoff-window False runs at the close (`lens_loop_soccer.py <since>`).
+  - The helper now also matches soccer-lens spellings ("AJ Auxerre" / "Auxerre") on a word subset. It still misses "PEC Zwolle" / "FC Zwolle", which is labelled `not_in_resim` with the snapshot time.
+  - A new refusal reason seen, NCAAB `pbp_score_mismatch` (St. Thomas (MN) @ Milwaukee, "pbp 5-4 official 3-4"): fail-closed, and expected to be transient.
 - How to read this next time: NCAAF prints no `_LIVE_RESIM_TICK`. Use `ncaaf_events.py` (event names per role log) and `ncaaf_resim_peek.py <team> ...` (the per-game lens), both in `scripts/rail_monitor/`. The runbook says so.

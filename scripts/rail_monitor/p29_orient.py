@@ -66,6 +66,13 @@ def find(index, away, home):
         return hit[0]
     # short-name snapshots ("Wisconsin" for "Wisconsin Badgers"): accept a unique prefix match only
     hit = [g for pairs, g in index if any(pa and ph and a.startswith(pa + " ") and h.startswith(ph + " ") for pa, ph in pairs)]
+    if len(hit) == 1:
+        return hit[0]
+    # soccer lens spellings ("AJ Auxerre" / "Auxerre", "Lens" / "RC Lens"): one name's words a subset of the other's,
+    # both sides, unique match only
+    ta, th = set(a.split()), set(h.split())
+    sub = lambda x, y: bool(x) and bool(y) and (x <= y or y <= x)
+    hit = [g for pairs, g in index if any(sub(ta, set(pa.split())) and sub(th, set(ph.split())) for pa, ph in pairs)]
     return hit[0] if len(hit) == 1 else None
 
 
