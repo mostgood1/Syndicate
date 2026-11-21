@@ -182,7 +182,7 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
   - **no refresh-worker restart, drain or deploy in 5-10 PM**.
   Fri 11-20 and Sat 11-21 look likely.
 - How: after 10 PM, run `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p7count.py <D>T23:00:00 <D+1>T04:00:00"`, with the window in UTC. Grade each part:
-  - P1: `MEMORY_GUARD_ABORT` <= 1 every hour and <= 3 total; falsified if > 2 in an hour or > 6 total.
+  - P1: `MEMORY_GUARD_ABORT` <= 1 every hour and <= 3 total; falsified if > 2 in an hour or > 6 total. Count `stage=pre_source_state_fingerprint` only, the `#850 P1` line of `p7count.py`. Its first total counts every stage (11-20: 15 vs 13).
   - P2: <= 2 exits, all rc 75; falsified on any rc -6 or `Fatal Python error`.
   - P3: longest `BOARD_BUILD_TIMING` gap <= 900 s; falsified if > 1,200 s.
   Also record the exploratory numbers: parent and child RSS, and `held=transient_jobs` post-build checks.

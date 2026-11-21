@@ -31,3 +31,9 @@ recyc_reason = collections.Counter((re.search(r"reason=(\S+)", l).group(1) if re
                                    for l in lines if "BOARD_PROCESS_RECYCLE" in l)
 print("POST_BUILD_CHECK by held reason", dict(held), "| BOARD_PROCESS_RECYCLE by reason", dict(recyc_reason))
 print("BOARD_BUILD_TIMING builds", len(ts), "| longest gaps", [(int(g), t) for g, t in gaps[-3:]], "| gaps > 900 s", sum(1 for g, _ in gaps if g > 900))
+# 11-21: #850 §5's P1 counts only stage=pre_source_state_fingerprint. The total above counts every stage, so on 11-20 the
+# monitor reported 15 where the owner's P1 was 13. Grade P1 on this line.
+_stg = lambda l: (re.search(r"stage=(\S+)", l) or [None, "?"])[1]
+by_stage = collections.Counter(_stg(l) for l in lines if "MEMORY_GUARD_ABORT" in l)
+p1 = collections.Counter(l[:13] for l in lines if "MEMORY_GUARD_ABORT" in l and _stg(l) == "pre_source_state_fingerprint")
+print("MEMORY_GUARD_ABORT by stage", dict(by_stage), "| #850 P1 (pre_source_state_fingerprint) per UTC hour", dict(sorted(p1.items())), "total", sum(p1.values()))

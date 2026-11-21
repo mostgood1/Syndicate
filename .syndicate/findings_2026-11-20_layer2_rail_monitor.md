@@ -79,7 +79,7 @@ Read-only, by the runbook's method. P6 was registered 11-20 by local_73a5d2dd; t
 - **R-D #851 P6 baseline, night 1:** 12,849 credits/h 6-11 PM; at most 120 credits per sport sweep (block above).
 - **R-F #850 repeat evening** (sent to local_d0f83044):
   - Qualifier, borderline: 26 core live games at the 7:03 PM reading (threshold 33), 37 at 7:23 PM; no refresh-worker restart (parent pid 1011283 all day).
-  - P1 `MEMORY_GUARD_ABORT` 15 (3/3/3/2/4 an hour): **FALSIFIED** (11-19: 4).
+  - P1: **13 refusals, FALSIFIED** (3/3/3/1/3 an hour; 11-19: 4). CORRECTION 1:25 AM: this file first said 15. The monitor's `p7count.py` counted every `MEMORY_GUARD_ABORT` stage, while §5's P1 counts `stage=pre_source_state_fingerprint` only. The other two were one `build_candidate_pool_start` and one `post_pull_hot_artifacts`. The owner's reading on main, `9d3644bfd`, is the record; `p7count.py` now prints the split.
   - P2: 3 child exits, all rc 75, 0 fatal (NEITHER).
   - P3: longest build gap 1,062 s (NEITHER).
   - Parent RSS ~9 PM p50 2,255 MB. It was ~1.7 GB all afternoon, rose from 6 PM, peaked at 2,396 MB at 10:03 PM and did not fall back.
@@ -106,5 +106,5 @@ All three were web-only, all `betting change: no`. The workers did not restart (
 ### Open user decisions
 
 - None new tonight.
-- #850's next lever comes to you through local_d0f83044, if its owner proposes one after tonight's 15 aborts. Any lever is a betting change.
+- #850's next lever comes to you through local_d0f83044, if its owner proposes one after tonight's 13 refusals. Any lever is a betting change.
 - #851's cost: night 1 reads above the lane's estimate (~+0.46M vs +0.24-0.4M a month). It is not a decision until night 2 confirms it.
