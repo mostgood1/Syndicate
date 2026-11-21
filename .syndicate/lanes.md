@@ -1964,6 +1964,14 @@ death, never life — do not invert it.
 - Verification: Findings with the measured real targets, the pre-registered arms, G1-G3 against base, the 17+ rest shift; a loan request only on a pass
 - Blocked by: none
 
+### kalshi-no-grade-check — OPEN — opened 2026-11-21 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
+- Goal: Fix the venue-vs-game grade check so Kalshi in-game NO moneylines (order side 'no', not a team) are graded: today 2 of 39 graded, 1 inverted (NOP@OKC 11-20). Writes grade_check only, never outcome/pnl -- not a betting change. User 11-21: 'open a lane for the Kalshi NO grading fix'. Evidence: .syndicate/findings_2026-11-21_portfolio_monitor.md.
+- Files: syndicate/features/shared/paper_settlement.py (_our_verdict, _check_venue_grade only), syndicate/features/shared/game_line_bet.py (side resolution for no-side orders only), tests/test_paper_settlement_kalshi_no_grade.py (new)
+- Hypothesis: _our_verdict treats a held NO as if we held the named team to win; resolving the NO side to the OPPOSING team (from the market ticker suffix + matchup) makes all 39 in-game NO rows gradeable and the NOP@OKC row agree.
+- Falsification test: Re-grade the 11-21 2:00 AM ledger offline: if fewer than 37 of 39 in-game NO h2h rows get a verdict, or any agrees=False row remains where Kalshi's settlement matches the ledger, the hypothesis is wrong.
+- Verification: After a web/worker load: portfolio LEDGER grade_conflicts 0 for NOP@OKC (after acknowledge with user yes) and grade_check reason side_not_a_team_in_this_game count for kalshi in-game NO rows = 0 on the next day's ledger.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
