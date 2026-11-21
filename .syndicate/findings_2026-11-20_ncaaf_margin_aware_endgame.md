@@ -120,3 +120,68 @@ need the user's yes. On a fail, the stated reason not to.
    - The 2026 ledger cannot carry timeouts. So the out-of-sample test is live shadow readings after the wiring, or an
      ESPN-timeouts backfill of 11-21 / 11-28.
 4. **Loading:** a betting change, a window only, after #852 / #835's own 12-08 decision.
+
+## BUILD — 2026-11-21, on the user's "Build both" (committed locally, NOT on main: the push is the user's call)
+
+Code: `refs/keep/ncaaf-margin-aware-endgame-c8cc6c1dd` (one commit on main `f8b19aaff`). Default OFF everywhere.
+
+1. **Engine** (loan from `football-scenario-calibration`; `play_state.py` is this lane's own claim).
+   - `CalibrationProfile.trailing_concede_deficit: int | None = None`, and its `to_dict` entry.
+   - `situation_model.classify_urgency(..., concede_deficit=None)`. In regulation Q4, a trailer down that much or
+     more returns `neutral_offense` before every other rule. That means no `trailing_urgency` and no two-minute drill.
+     The first half, overtime and the leader are untouched. `classify_situation` reads the value off the play state.
+   - `PlayState.trailing_concede_deficit` is a rule switch, not game state, so it is not in `to_dict`. It is passed
+     through `build_play_state_from_possession_state(..., trailing_concede_deficit=)`.
+   - `drive_simulator` takes the profile value at three places:
+     - the five play-state builds;
+     - the drive's urgency call;
+     - the end-of-half clock's mode call.
+2. **Live** (loan from `live-player-exit-gate` for `ncaaf/live_resim.py`).
+   - `NcaafLiveGameState.home_timeouts` / `away_timeouts` come from ESPN `situation.homeTimeouts` / `awayTimeouts`.
+     The rule is NFL's: 0..3, otherwise None, never clamped. They feed `initial_timeouts_*` only when the feed said.
+   - `syndicate/features/ncaaf/live_endgame.py` adds `SYNDICATE_NCAAF_LIVE_ENDGAME`, which only an explicit on value
+     arms. It sets:
+     - #808's seven clock switches;
+     - `trailing_concede_deficit`, from `..._CONCEDE_DEFICIT`. The default is 25, and a bad value falls back to 25,
+       never to "no concession";
+     - `college_overtime`.
+
+     `resim_live_game` applies it after #852's damping, on the no-profile path. The tick, #835's E0 and the
+     cutoff-replay harness all take that path.
+   - The result carries `endgame`: {on, concede_deficit, end_of_half_clock, college_overtime, timeouts_fed}.
+     `NCAAF_LIVE_ENDGAME on ...` is printed once per process.
+   - **With both switches on and the timeouts fed, the live re-sim runs exactly `v4a`.**
+
+### Checks (all `py -3.11`)
+- **OFF is byte-identical.** sha256 over 20 seeds of `simulate_game(...).to_dict()` was pinned on the pre-change
+  code. It is identical afterwards for 5 inputs:
+  - NCAAF pregame;
+  - NCAAF tied at Q4 0:20;
+  - NCAAF 7-35 at Q4 5:00, with and without the seven clock switches;
+  - NFL 7-35 at Q4 5:00 with them.
+- **ON is reachable.** The 7-35 state changes, with and without the clock. A 21-24 state at Q4 1:00 does not.
+- **The built rule equals the harness patch `v4a`.** On 12 of 12 real 2024 Q4 states with a 17+ margin the draws are
+  identical (`C:\tmp\t859\verify_engine.py`). So the RESULTS above are readings of this code.
+- **Live, switch absent, off or unrecognised:** byte-identical through `resim_live_game` and the worker's tick,
+  whether or not ESPN's timeouts are fed.
+- **Live, switch on:**
+  - it changes the published lane;
+  - the tick carries ESPN's (1, 3) to the engine input;
+  - with #852 also on, the profile is `v4a`'s;
+  - the kickoff path (#835 E0) sees the same engine;
+  - an explicit `profile=` is honoured as given;
+  - on the same seeds and clock (200 sims), conceding at 25 gives a lower total than conceding at 60.
+- **Tests:** `test_smartsim2_trailing_concede.py` 17 pass, `test_ncaaf_live_endgame.py` 48 pass. Neighbouring
+  suites: 721 pass in 50 files (smartsim2, football engine, NCAAF live, NFL live re-sim).
+- **`football_sim_input_checklist.py`:** 4 alarms. All are payload population read from this worktree, which has no
+  `data/`. They are unchanged by this build, and the checklist does not enumerate profile fields.
+
+### Still owed before any load
+- **A joint re-read of #852's damping shape with the end game on.** 1.0 / 17 was fitted without it.
+- **A hold-out with real timeouts.** What is verified so far:
+  - ESPN's core API carries `situation.homeTimeouts` for a completed 11-14 game (401856859 -> 1 / 0).
+  - **Not yet verified:** that the scoreboard row the poller keeps carries them on a LIVE college game. The fleet's
+    `live_state_<date>.json` keeps only the day's last snapshot, so it cannot answer this.
+  - If the keys are absent, the engine falls back to 3 each. The block shows `timeouts_fed: false`, which is the
+    `clk_3` arm, not `v4a`.
+- **It is a betting change.** Load it in a window only, on the user's yes, after #852 / #835's 12-08 decision.
