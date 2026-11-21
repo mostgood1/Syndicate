@@ -157,11 +157,46 @@ def row(args):
         elif o.get("resim") in ("not_in_resim", "no_snapshot"):
             reasons[k] = o["resim"]
         elif o.get("reason") == "resimmed":
-            reasons[k] = "resimmed_no_row_model"
+            # 1-2 priced rows: the join's per-line withholds (stale quote, no distribution for that line, stoppage
+            # time) explain it -- 11-21: Wake Forest @ GT, Lyon @ Lille, Philadelphia @ NE at 90'+6'. 3+: a join defect.
+            n_priced = by_game.get(k, [0, 0])[0]
+            reasons[k] = "resimmed_few_priced_rows" if n_priced <= 2 else "resimmed_no_row_model"
+            details[k] = f"{n_priced} priced full-game rows, none with a model"
         else:
             reasons[k] = o.get("reason") or "unknown"
-        if o and o.get("detail"):
+        if o and o.get("detail") and k not in details:
             details[k] = o["detail"]
+
+    # 11-21 (the fleet-watcher's ask): WHY each dark row is dark. The probe calls a row dark when it would flag (gap
+    # >= 3 pp, quote <= 120 s old at pricing) but its age now -- quote age at pricing + the price grid's age -- is over
+    # 300 s, so the flag is (rightly) withheld. Split that age: grid_age_s >= 300 is "grid_stale" (the overlay has not
+    # re-priced the row for 5+ min: a cadence fault worth a look); under 300 it is "cadence_edge" (a quote that was
+    # already 1-2 min old when priced, plus a normal overlay interval, crossed the line). The probe keeps a sample of 6.
+    # Measured 11-21 R14/R15: every dark row had NO price_grid_generated_at, so the probe aged it from the board build
+    # (grid_age_s == query.board_built_age_s). Those rows -- h2h, quarter-ball soccer lines, some alt / half lines --
+    # are not re-priced by the ~26 s book grid, so their freshness rides on the board cycle: "board_cadence".
+    sport_of = {str(c.get("matchup")): c.get("sport") for c in rail.get("cards") or []}
+    dark_detail = []
+    rpath = os.path.join(rdir, "reading.json")
+    board_age = None
+    if os.path.exists(rpath):
+        try:
+            _rd = json.load(open(rpath, encoding="utf-8"))
+            sample = (_rd.get("live") or {}).get("dark_sample") or []
+            board_age = (_rd.get("query") or {}).get("board_built_age_s")
+        except ValueError:
+            sample = []
+        for t in sample:
+            pr, an = t.get("priced"), t.get("age_now")
+            grid = round(float(an) - float(pr), 1) if isinstance(pr, (int, float)) and isinstance(an, (int, float)) else None
+            dark_detail.append({
+                "game": f"{sport_of.get(str(t.get('matchup')), '?')} {t.get('matchup')}",
+                "row": f"{t.get('market')} {t.get('segment')} {t.get('side')} {t.get('line')}",
+                "gap_pp": t.get("gap"), "quote_age_at_pricing_s": None if pr is None else round(float(pr), 1),
+                "grid_age_s": grid, "age_now_s": an,
+                "reason": "unknown" if grid is None else (
+                    "board_cadence" if isinstance(board_age, (int, float)) and abs(grid - float(board_age)) <= 1.0
+                    else ("grid_stale" if grid >= 300 else "cadence_edge"))})
 
     # BC-048: pregame college totals flags on the shortlist (model edge > 0 on a non-live row)
     sl = json.load(open(os.path.join(rdir, "shortlist.json"), encoding="utf-8"))
@@ -182,6 +217,7 @@ def row(args):
         "flags_false": flags.get("false"),
         "flags_missed": flags.get("missed"),
         "dark_rows": flags.get("dark_rows"),
+        "dark_rows_detail": dark_detail,
         "college_total_flags": college_flags,
         "ours_contradictions": i17,
         "ours_contradictions_list": i17_list,

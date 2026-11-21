@@ -61,4 +61,11 @@ local_379fd729 flagged three games. Wisconsin @ Purdue was dark at R7, R8 and R9
     - Not diagnosed. Count kickoff-window False runs at the close (`lens_loop_soccer.py <since>`).
   - The helper now also matches soccer-lens spellings ("AJ Auxerre" / "Auxerre") on a word subset. It still misses "PEC Zwolle" / "FC Zwolle", which is labelled `not_in_resim` with the snapshot time.
   - A new refusal reason seen, NCAAB `pbp_score_mismatch` (St. Thomas (MN) @ Milwaukee, "pbp 5-4 official 3-4"): fail-closed, and expected to be transient.
+- **Third flag, 2:43 PM: dark rows** went 0 (R11-R13), then 7 (R14), then 5 (R15), with ~70 games live. **Verdict: board cadence, not the soccer lens stall.**
+  - All 12 sampled rows carry a model (gap 4.4-44.5 pp) and span NCAAB, NCAAF and soccer.
+  - **Every one has no `price_grid_generated_at`.** The probe therefore ages it from the board build: `grid_age_s` 238.7 at R14 and 303.9 at R15, both exactly `board_built_age_s`. Quote ages at pricing were 15-110 s.
+  - Those rows are h2h, quarter-ball soccer lines (0.25), and some alt / half lines. The book grid does not re-price them; it ticks every 26 s median (p90 61 s, max 134 s, 230 ticks 19-21Z; `gridcad.py`).
+  - So they go dark whenever the board is about 4 min old. This afternoon the board published every 457-890 s (R10-R12) with build walls of 265-548 s. That puts them dark for roughly the back half of each board cycle.
+  - R11-R13's 0 were readings that landed early in a cycle. The flag is withheld by design (fail-closed). Its cost is the share of time these rows cannot flag, which is the board cadence lane's number.
+  - `dark_rows_detail` (from the 3:03 PM tick) names each row, its grid age and a reason: `board_cadence`, `grid_stale` or `cadence_edge`.
 - How to read this next time: NCAAF prints no `_LIVE_RESIM_TICK`. Use `ncaaf_events.py` (event names per role log) and `ncaaf_resim_peek.py <team> ...` (the per-game lens), both in `scripts/rail_monitor/`. The runbook says so.
