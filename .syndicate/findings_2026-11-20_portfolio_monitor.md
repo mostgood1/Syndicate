@@ -362,3 +362,74 @@ only, because this repo is public.
   - All three outputs were rewritten (local `C:\tmp\pfmon\page\dashboard.html`, `C:\SyndicateProd\portfolio_watch\page`,
     fleet `reports/portfolio_watch/index.html`).
 - Every 30-minute run of `SyndicatePortfolioWatch` uses the new builder.
+
+## DAILY SUMMARY — Fri 11-20 (Central), written Sat 11-21 1:50 AM CST by the daily learning review
+
+Counts and percentages only (the repo is public). Sources: `daily_rollup.json` rebuilt 07:47Z 11-21 from the ledger
+saved by a hand reading at 1:47 AM CST (see "Broken" below), `performance.json` of the same reading, and the 18 watch
+readings dated 11-20 CST (12:28 AM - 11:04 AM only). Every 11-20 game is graded: the 1:47 AM reading shows 0 started
+and unsettled, 0 late.
+
+**Performance.**
+- **11-20: 23 graded bets / 17 games, ROI +13.47% [-8.3, +35.3].** Won 52.2% against a 59.2% breakeven (excess -1.6
+  wins): the gain came from where the stakes sat, not from winning more than the prices implied. One day is noise.
+- **7 d: 361 bets / 173 games, -2.57% [-12.9, +7.7]** (11-19: -6.30%).
+- **30 d: 1,645 bets / 719 games, -7.00% [-12.5, -1.5]** (11-19: -7.39%). Still beyond noise. All-time: 2,171 bets /
+  1,168 games, -10.63% [-17.7, -3.5].
+- **Fee-net CLV:** 30 d -0.37 pp; 7 d -0.29 pp (clv_n-weighted over the rollup's last 7 days, 160 priced closes);
+  11-20 alone -1.26 pp on 9.
+- **Fees: 3.74% of stake on 11-20, 3.99% over 30 d** — about 57% of the 30 d loss.
+- **Gate: 30 of 800 events**, clock BC-053 since 11-19 17:00Z (11:00 AM CST); 2 deploys.md loads still unclassified.
+
+**30-day slices beyond noise (95% range excludes 0):**
+- totals -12.75% [-24.2, -1.3] (393 bets / 308 games);
+- price 0.30-0.45 -12.36% [-23.7, -1.1] (307 / 201);
+- EV band 2-5 -10.45% [-18.1, -2.8] against a predicted +4.09% (989 / 535);
+- largest-stake quartile (63.6% of dollars) -8.64% [-16.4, -0.9]; Q2/Q3 -4.82% / -3.08%, both noise;
+- the `model_edge` path -7.33% [-14.3, -0.3] (1,181 / 603).
+- **Moved:** Kalshi is now -5.78% [-11.7, +0.17], inside noise for the first time in these summaries (11-19: -6.15%,
+  beyond noise). Polymarket -11.42% [-24.3, +1.5], noise.
+
+**Operations (the 18 readings 12:28-11:04 AM CST).** Non-GATE anomalies: 5, all `ENDPOINT` (live_today 2, settings 1,
+page 1, live_all 1). Endpoint reads over 2 s: 9, of which 5 over 3 s (live_today 2, settings 1, page 1, live_all 1);
+the 9:27-10:04 AM readings also show plan ages of 7-13 min. Plan writes 11-20 UTC: 30 commits, largest gap 13.9 min;
+early 11-21 UTC shows gaps of 44.9 and 92.5 min (about 9:42 PM - midnight CST, cause not checked — likely a quiet
+slate). Orders 11-20: 37, all filled, 0 failed. The 1:47 AM reading also raised `LEDGER grade_conflicts: 1` (new;
+not investigated here).
+
+**Broken: Portfolio Watch stopped producing readings at 11:04 AM CST 11-20.** Every 30-min run since fails in `probe`
+and `history` with `ZoneInfoNotFoundError: America/Chicago`. The task runs `py.exe -3`, which since the 11-20 11:24 AM
+hand reinstall resolves to a bare Python 3.12 with no tzdata (memory `project-windows-py3-went-bare`). The task still
+reports LastTaskResult 0 because `conhost --headless` hides the exit code, so nothing flagged it. 14.7 h without a
+reading; the dashboard and rollup were frozen at 11-19. I took one reading by hand with
+`Python311-x64\python.exe run.py` (all steps rc 0). **Not fixed:** the task action is unchanged (persistent config,
+left for an interactive session). Fix: point the action at `Python311-x64\pythonw.exe` (as Rail Watch does) or set
+`PY_PYTHON3=3.11`, or give `run.py`/probe a built-in US Central fallback like the Engine Watch builder.
+
+**Studies.** S8 collector heartbeat 07:45:49Z (cycle 961, 0 errors), fresh; LOOK 1 is due after 11-23 9:00 AM CST.
+S6 forward check starts 11-22. S5 forward set is far below 150 events (the gate shows 30 events since 11-19 17:00Z).
+Nothing ran today.
+
+### What the data teaches (11-20)
+- The 30 d loss is narrowing slowly but stays beyond noise: -8.96% on 11-05 → -7.51% on 11-11 → -7.32% on 11-17 →
+  -7.00% on 11-20 (719 games). The upper bound crept from -2.1 to -1.5; at this pace it does not cross 0 before the
+  window rolls in most of December.
+- Kalshi dropped out of beyond-noise (-5.78% [-11.7, +0.17] on 617 games) while Polymarket's point estimate is
+  twice as bad (-11.42%, 301 games). The venue split is not a signal either way now; venue is not a lead.
+- The four persistent signals hold with almost unchanged point estimates across 11-17..11-20: totals ~-12.5%,
+  price 0.30-0.45 ~-12.5%, EV 2-5 realised ~-10.4% vs +4.1% predicted, largest-stake quartile ~-9%.
+- Fees rose to 3.99% of stake (from 3.87% on 11-17) and are ~57% of the 30 d loss; fee-net CLV has sat in
+  -0.29..-0.42 pp for a week, so the gross close-beat (~+1.3 pp) never survives fees.
+- The largest-stake quartile carries 63.6% of dollars at -8.64% while Q2+Q3 (31% of dollars) run -3 to -5%: the
+  sizing concentrates money exactly where returns are worst, which is consistent with the EV 2-5 overstatement
+  feeding Kelly size.
+
+**One optimization lead (pre-registrable, offline, changes nothing live).**
+- *Hypothesis:* the sizer over-weights bets whose model EV is overstated, so capping each stake at the 30 d Q3 upper
+  edge (re-weighting the SAME graded bets, no selection change) raises fee-net ROI.
+- *Data:* the 30 d graded book from `live_all.json` (1,645 bets / 719 games), stakes re-weighted to
+  `min(stake, Q3 upper bound)` with fees recomputed per venue fee schedule; then a forward copy on bets with
+  selected_date >= 11-21 once that set reaches 150 games.
+- *Decision rule:* GO (name a sizing challenger for the 12-08 window) iff the per-game paired difference
+  capped-minus-actual ROI has an event-clustered 95% lower bound > 0 on BOTH the 30 d fit set and the forward set;
+  otherwise KILL. Report how many dollars the cap removes, so a win from simply betting less is visible as such.
