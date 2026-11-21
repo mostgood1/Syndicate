@@ -37,3 +37,16 @@ Asked by §3 of `findings_2026-11-18_board_split_memory_guard.md`: if the 11-21 
   - The owner's 4 AM CST resets for Sunday and Monday are re-pinned to that SHA (`cd849619d`).
   - So the 11-21 evening starts from a fresh parent, as 11-19's did, not a third-day one. Compare its 9 PM RSS with 11-19's 1.55-1.60 GB, not with the ratchet.
 - Instrument: `p2_boardpub.py` lost a leftover debug print, a hard-coded 11-21 01:1x Z line dump. It printed after the numbers and did not change them. The backup in `scripts/rail_monitor/` is updated.
+
+## Fleet-watcher flag: NCAAF games with no live model, R7-R9 (12:03-12:43 PM CST)
+
+local_379fd729 flagged three games. Wisconsin @ Purdue was dark at R7, R8 and R9, Wofford @ Ole Miss at R8 and R9, East Carolina @ Army at R8 only. **Verdict: all three were NCAAF re-sim refusals for `key_player_out`** (#814's deliberate gate, the same kind as 11-20's BKN Nolan Traore). It was not a join gap, and not the 12:14 PM refresh-worker TERM.
+
+- **Per game, from the `ncaaf_live_lens.json` keyvalue** (`generatedAt` 12:58:22 PM):
+  - **Wisconsin @ Purdue:** `liveResimRefusal key_player_out`, detail `PUR:Evans Chuba:replaced`, source pbp, since 17:40:55Z (11:40 AM). That is before R7 and before the TERM.
+  - **Wofford @ Ole Miss:** `playersOut` holds WOF Ethan Drumm, `replaced`, key, since 18:08:34Z (12:08 PM).
+  - **East Carolina @ Army:** `playersOut` is now empty.
+- **Refresh-worker's `NCAAF_LIVE_RESIM` summary:** `key_player_out` was 1 from 17:43Z and 2 from 18:12Z. It was 3 at 18:21Z and back to 2 at 18:27Z: Army's 6-minute flap, which is why only R8 caught it.
+  - At 18:58Z: 16 games live, 14 re-simmed, refusals `key_player_out` 2, `no_live_state` 12 (12 all day, games with no ESPN live state), `game_not_in_progress` 42.
+- **LEAD (not a defect):** the pbp `replaced` detection can be transient. Army's cleared in about 6 minutes, and while it held the game had no model. Count the flaps at the nightly close before calling it noise or cost.
+- How to read this next time: NCAAF prints no `_LIVE_RESIM_TICK`. Use `ncaaf_events.py` (event names per role log) and `ncaaf_resim_peek.py <team> ...` (the per-game lens), both in `scripts/rail_monitor/`. The runbook says so.

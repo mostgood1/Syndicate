@@ -98,7 +98,7 @@ Then:
   - P1 (`ours_contradictions`) and #824 (`ours_below_points`);
   - the score floor (`floor_violations`, owned reading R-A) and, while NCAAB is live, the #844 sampler (R-B);
   - (R-E's NHL timeout watcher is retired as of 11-20);
-  - `live_games_no_model`: live games whose full-game rail rows carry no live model at all (I-29, added 11-19). A game can lack a model before its first re-sim, so confirm on the next reading. If it persists, `lgb.py <sport> <since>` shows the join's `withheld_by_reason`;
+  - `live_games_no_model`: live games whose full-game rail rows carry no live model at all (I-29, added 11-19). A game can lack a model before its first re-sim, so confirm on the next reading. If it persists, `lgb.py <sport> <since>` shows the join's `withheld_by_reason`. NCAAF has no `_LIVE_RESIM_TICK` line: its refusal counts are in refresh-worker's `NCAAF_LIVE_RESIM` summary, and per game in the `ncaaf_live_lens.json` keyvalue (`ncaaf_resim_peek.py <team> ...` prints `liveResimRefusal` and `playersOut`; 11-21: 3 of 3 dark NCAAF games were `key_player_out`);
   - P6;
   - overlay gaps over 360 s and stale web merges;
   - board publication gaps and the memory guard;
