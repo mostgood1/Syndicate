@@ -446,3 +446,46 @@ No claim, no drain, no preflight, no TERM. Nothing on the fleet was changed.
 and a betting-change window or an `--outside-window` reason if any is a betting change); (b) leave it and accept
 a third evening of refusals; (c) the lasting fix, a quiet-hours parent self-recycle -- a betting change for the
 11-24 window, not built. The college slate starts at 11 AM CST, so (a) today is only before then.
+
+## 11. The restart that loaded code -- 2026-11-21 16:35:42Z (10:35 AM CST), user "Yes, restart now" (written 16:50Z)
+
+The full entry is deploys.md `## 2026-11-21 16:35:42Z`. Here are the classification and the readings.
+
+**Why it was a decision.** §10's task met its condition but would have loaded 268 commits. So the user was asked "Restart
+refresh-worker before 10:45 AM CST, loading those 268 commits?" and answered "Yes, restart now".
+
+**Classification of what refresh-worker loaded** (`git diff 38c3a6905 0d20a6919`; 24 runtime files once offline
+monitor/study scripts are left out, 17 of them reachable from refresh-worker):
+
+| commit | what | absent = |
+|---|---|---|
+| `f29c53e91`, `56e132d40` | #835 NCAAF live total calibration (`SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION*`) | off |
+| `44184da1e` | #852 NCAAF live blowout damping (`SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING`) | off |
+| `42af6a923` | #855 smartsim2 college overtime (a `CalibrationProfile` field) | off |
+| `c37bdeab3` | #814 basketball off-floor exit (`SYNDICATE_LIVE_EXIT_OFF_FLOOR`) | off |
+| `ace2020d3` | #856 hold-value exits (`SYNDICATE_EXIT_HOLD_VALUE`) | off gate + shadow log |
+| `9931a787b` | #853 shared combined-board copy (`SYNDICATE_COMBINED_BOARD_SHARED_COPY`) | off |
+| `e5a267c1d`, `6c1a3ecee` | college live join orientation (`SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION`) | shadow: serves what the board served, counts only |
+| `eeeb62a63` | the combined read leaves the Layer 2 shortlist encoded (`SYNDICATE_COMBINED_READ_SKIP_LAYER2_SHORTLIST`) | skip; nothing on that path reads it |
+| `3d636d88e` | fill-quote logging, ledger fields only | on; its lane: NOT a betting change |
+| `3c8ba5b14`, `0d20a6919`, `ed5ed7581` | `gunicorn.conf.py` | web only |
+| `8f0d73a2e` | #851 slate sweep thread | live-odds-worker only, off |
+
+- All 12 env keys named above were absent from refresh-worker's environ before and after the TERM (checked by name
+  only). The TERM reuses the env built at the 11-19 17:00Z up, so nothing could switch on.
+- Verdict: **betting change no.**
+
+**Readings.**
+- **TERM 16:35:42Z, new pid 2313049, BOOTED 16:35:49Z.** Every load check was MET: ceiling credit, parent trim,
+  child switches, healthz 200, 0 Traceback.
+- **New parent 1,113-1,174 MB at 16:43-16:47Z.** The expectation was <900, so it is **NOT MET**; 11-19's fresh parent
+  was 785 MB.
+  - It is still 1.08-1.14 GB under the 2,249 MB baseline.
+  - Headroom is 3,795-3,949 MB vs ~1,860.
+- **First build 16:47:16Z.** The board went unbuilt from 16:07:28Z, 2,388 s, because the drain stopped builds from
+  16:04Z.
+  - The drain never read CLEAR: its last-named jobs were all live-odds-worker's (Saturday live soccer). For a
+    refresh-worker-only TERM it gated nothing and only stopped the board.
+  - A lesson for the next such restart: preflight, then TERM, without the 30 min drain wait, when refresh-worker's own
+    jobs are idle.
+- **Tonight is the parent's first evening again**, so the same §5 thresholds apply and READING 1's slate rule.

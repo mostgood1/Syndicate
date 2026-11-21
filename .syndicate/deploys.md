@@ -62664,3 +62664,46 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - post-build checks 3 of 3 `held=transient_jobs` (pair 5,859-5,955 MB vs the 6,036 line), each followed by refusals and a streak recycle;
   - over the slate day (13Z-07Z), 1 `post_build_headroom` recycle (04:14:05Z, the first ever) and 6 streak recycles, all rc 75.
 - **verify:** `findings_2026-11-18_board_split_memory_guard.md` §9. The switches work (rc 75, no dumps, 48 builds vs 28), but the parent's ~+0.6 GB/day keeps the second evening under the floor. The 11-21 9 AM floor reading and the lasting-fix decision are owed.
+
+## 2026-11-21 16:35:42Z (10:35 AM CST) -- DEPLOY (claimed refresh-worker TERM, no env change; loads the fleet checkout's 0d20a6919, 268 commits on 38c3a6905): reset the board-split parent's memory (todo #850, lane board-split-memory-guard; user "Yes, restart now")
+
+- betting change: no -- every refresh-worker-reachable change in 38c3a6905..0d20a6919 was classified, and none of them changes which bets are placed, sized, held or exited (list below)
+- **User:** "Yes, restart now", typed in session 1f9c9a40 at ~10:00 AM CST 11-21. It answered "Restart refresh-worker before 10:45 AM CST, loading those 268 commits?"
+  - The 9 AM task `board-memory-parent-reset-1121` had found the user's "Yes, if it grows" condition met: parent p50 2,166 MB >= 2,110.
+  - The task then stopped on its runtime-file gate (findings §10). The restart it was approved for was a no-code one, and this one loads code.
+- **What refresh-worker loads.** Web loaded these commits on 11-20 (3c8ba5b14, eeeb62a63, 0d20a6919, each betting change no). There are 17 refresh-worker-reachable runtime files, classified commit by commit (findings §11):
+  - **off by default:** #835 `f29c53e91` / `56e132d40`, #852 `44184da1e`, #855 `42af6a923`, #814 `c37bdeab3`, #856 `ace2020d3`, #853 `9931a787b`;
+  - **shadow only:** `e5a267c1d`. College live join; absent = shadow, which serves what the board served before and only counts.
+  - **read-path skip:** `eeeb62a63`. The combined read leaves the Layer 2 shortlist encoded; nothing on that path reads it.
+  - **ledger only:** `3d636d88e`. Its lane: NOT a betting change.
+  - **other roles only:** web-only `gunicorn.conf.py`; live-odds-worker-only `8f0d73a2e` (#851, default off).
+  - **Their 12 env keys:** absent from refresh-worker's environ before (pid 1011283) and after (pid 2313049), checked by name only. A TERM reuses the env built at the 11-19 17:00Z up.
+- **Gates:**
+  - **Claim:** acquired 16:04:06Z, ttl 5400.
+  - **Drain:** started 16:04Z, **NOT CLEAR** at its 1,800 s cap (16:34Z).
+    - Every job it named at the end was a live-odds-worker child: Saturday live soccer polls, odds refreshes, and one odds job 2,370 s old. A refresh-worker TERM does not touch them.
+    - Refresh-worker had no job of its own in flight, only its board child server.
+    - The drain was proceeded past deliberately, at the 10:45 AM deadline.
+  - **Preflight:** `CLEAR: only infrastructure processes running` at 16:35:14Z. A run at 16:34:56Z had returned NO_EXPECTATION because the baseline was 30 min old; it was re-read at 16:35:06Z.
+  - The restart kit `C:\tmp\bmg\sat\term_rw_0d20.sh` refuses unless the fleet HEAD is exactly `0d20a69191b7` and the pid is the expected one. Its dry-run passed.
+- **TERM:** 16:35:42.413Z, pid 1011283, which had been up since 17:00:29Z 11-19 (47.6 h).
+  - New pid 2313049 first seen 16:35:48Z; `[refresh_worker] BOOTED` 16:35:49Z.
+  - The drain was cleared right after.
+- **Expect vs measured:**
+  - `refresh_worker_pid` 1011283 -> new: 2313049, **MET**.
+  - `parent_rss_mb` 2,249 -> <900: **1,113-1,174 MB** at 16:43-16:47Z, **NOT MET**.
+    - 11-19's fresh parent read 785 MB at 11:23 AM (findings §8).
+    - The cause of the higher fresh base (Saturday's larger slate, the 268 commits, or both) is not established.
+    - Still, the parent is 1.08-1.14 GB below its 2,249 MB baseline, and headroom is 3,795-3,949 MB vs ~1,860 MB before.
+- **Load checks:** all MET.
+  - `BOARD_PROCESS_CEILING_CREDIT from_mb=7168 to_mb=7936`, `PARENT_TRIM_STARTED interval_s=300`.
+  - `CHILD_SWITCHES raw_lifeline=1 recycle_after_build=1 ceiling_credit=7168+768`.
+  - healthz 200 at 16:36:24Z; 0 Traceback in all three role logs since the TERM.
+  - 0 refusals and 0 board exits to 16:48Z.
+- **Cost:**
+  - First `BOARD_BUILD_TIMING` 16:47:16Z (wall 433.9 s).
+  - The last build before it was 16:07:28Z, so **the board went 2,388 s (39.8 min) unbuilt, 10:07-10:47 AM CST**.
+    - It is the drain (no new builds from 16:04Z) plus the cold first build, before the 11 AM kickoffs.
+    - A drain on a busy Saturday cannot reach CLEAR because live-odds-worker's jobs never stop. For a refresh-worker-only TERM, the preflight is the gate.
+- **Claim released** 16:48:57Z.
+- **verify:** tonight is again the parent's first evening, like 11-19 (§7). Same §5 thresholds. The rail monitor reads it.
