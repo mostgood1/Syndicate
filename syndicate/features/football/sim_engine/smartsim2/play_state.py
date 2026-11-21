@@ -44,6 +44,9 @@ class PlayState:
     # Set once per drive by `drive_simulator`; `replace()` keeps it. Not in
     # `to_dict()`: it is a rule switch, not game state.
     q2_urgency_ignores_score: bool = False
+    # todo #859: `CalibrationProfile.trailing_concede_deficit`, carried here for `classify_situation` the same way.
+    # Not in `to_dict()`: a rule switch, not game state.
+    trailing_concede_deficit: int | None = None
 
     def to_dict(self) -> dict[str, int | str]:
         return {
@@ -77,6 +80,7 @@ def build_play_state_from_possession_state(
     state: PossessionState,
     *,
     q2_urgency_ignores_score: bool = False,
+    trailing_concede_deficit: int | None = None,
 ) -> PlayState:
     possession_team = state.home_team if state.possession_owner == "home" else state.away_team
     distance = max(1, int(state.distance))
@@ -93,6 +97,7 @@ def build_play_state_from_possession_state(
         drive_index=max(0, int(state.drive_index)),
         possession_index=max(0, int(state.possession_index)),
         q2_urgency_ignores_score=bool(q2_urgency_ignores_score),
+        trailing_concede_deficit=trailing_concede_deficit,
     )
     return apply_situation_context(play_state, classify_situation(play_state))
 

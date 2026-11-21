@@ -424,6 +424,13 @@ class CalibrationProfile:
     # level re-fit (`model_engine_standard.md` 4.4).
     college_overtime: bool = False
 
+    # THE TRAILER CONCEDES. todo #859 (lane `ncaaf-margin-aware-endgame`,
+    # findings_2026-11-20_ncaaf_margin_aware_endgame.md). None = OFF: `classify_urgency` puts a trailer of ANY deficit
+    # in `trailing_urgency` (<= 360 s) or the two-minute drill, so with the end-of-half clock a team down 30 hurries
+    # where real teams do not (CFBD 2023-24: trailers ease only at 25+, pass share 0.47, 19 s a snap). ON (an int):
+    # in regulation Q4 a trailer down that many points or more plays `neutral_offense`. Default OFF, byte-identical.
+    trailing_concede_deficit: int | None = None
+
     def to_dict(self) -> dict[str, float | str]:
         return {
             "name": self.name,
@@ -467,6 +474,7 @@ class CalibrationProfile:
             "q4_kick_waits": self.q4_kick_waits,
             "kneel_out_q4_only": self.kneel_out_q4_only,
             "college_overtime": self.college_overtime,
+            "trailing_concede_deficit": self.trailing_concede_deficit,
         }
 
 

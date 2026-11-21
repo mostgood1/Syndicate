@@ -149,6 +149,7 @@ def _end_of_half_clock(
             mode = end_of_half_mode(classify_urgency(
                 quarter=quarter, seconds_remaining=clock, score_differential=diff,
                 yardline=start.field_position, q2_ignores_score=profile.q2_urgency_ignores_score,
+                concede_deficit=profile.trailing_concede_deficit,
             ))
             qm = f"{q_key}_{mode}"
             by_need = profile.end_of_half_clock_by_need and mode == "hurry"
@@ -460,7 +461,8 @@ def simulate_drive(
     # profile while the rating weights beside it were tunable.
     priors = build_drive_priors(simulation_input, possession_state=state, profile=profile)
     q2_blind = bool(profile.q2_urgency_ignores_score)
-    play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
+    concede = profile.trailing_concede_deficit  # todo #859; None = off
+    play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind, trailing_concede_deficit=concede)
     steps: list[PossessionStepResult] = []
     total_yards = 0
     total_clock = 0
@@ -482,6 +484,7 @@ def simulate_drive(
             score_differential=score_differential,
             yardline=state.field_position,
             q2_ignores_score=q2_blind,
+            concede_deficit=concede,
         )
 
         # v2 KNEEL-OUT (todo #808, `end_of_half_kneel_out`): a preservation offense that can
@@ -511,7 +514,7 @@ def simulate_drive(
             state = kneel_end
             if terminal_outcome is not None:
                 break
-            play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
+            play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind, trailing_concede_deficit=concede)
             continue
 
         # Urgency field goal: take the points before the half or game expires.
@@ -571,7 +574,7 @@ def simulate_drive(
                     total_yards += gained
                     total_clock += play_step.clock_consumed
                     state = end_state
-                    play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
+                    play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind, trailing_concede_deficit=concede)
                     continue
                 next_spot = _change_of_possession_spot(end_state, 100 - end_state.field_position)
                 end_state = replace(
@@ -680,7 +683,7 @@ def simulate_drive(
                 total_yards += gained
                 total_clock += play_step.clock_consumed
                 state = end_state
-                play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
+                play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind, trailing_concede_deficit=concede)
                 continue
             next_spot = _change_of_possession_spot(end_state, 100 - end_state.field_position)
             end_state = replace(
@@ -798,7 +801,7 @@ def simulate_drive(
             ))
             total_clock += spike_clock
             state = spike_end
-            play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind)
+            play_state = build_play_state_from_possession_state(state, q2_urgency_ignores_score=q2_blind, trailing_concede_deficit=concede)
 
         if terminal_outcome is not None:
             possession_change = terminal_outcome in {

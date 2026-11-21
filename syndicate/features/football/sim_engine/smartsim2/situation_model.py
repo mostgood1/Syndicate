@@ -36,6 +36,7 @@ def classify_urgency(
     score_differential: int,
     yardline: int,
     q2_ignores_score: bool = False,
+    concede_deficit: int | None = None,
 ) -> str:
     """Classify the offense's urgency state from game context.
 
@@ -46,7 +47,13 @@ def classify_urgency(
     in Q2 the two-minute drill fires at any score, as the league's end-of-half
     behaviour does; the `diff <= 7` gate is a Q4 rule. Default False is the
     original function exactly.
+
+    `concede_deficit` (todo #859, `CalibrationProfile.trailing_concede_deficit`): in regulation Q4 a trailer down
+    that many or more plays `neutral_offense` -- no `trailing_urgency`, no two-minute drill. None (the default) is
+    the original function exactly.
     """
+    if concede_deficit is not None and quarter == 4 and score_differential <= -int(concede_deficit):
+        return URGENCY_NEUTRAL
     if quarter >= 4 and seconds_remaining <= 150 and score_differential > 0:
         return URGENCY_END_GAME_PRESERVATION
     if quarter == 2 and seconds_remaining <= 60 and score_differential >= 0 and yardline < 50:
@@ -98,6 +105,7 @@ def classify_situation(play_state: PlayState) -> SituationContext:
         score_differential=play_state.score_differential,
         yardline=play_state.yardline,
         q2_ignores_score=bool(getattr(play_state, "q2_urgency_ignores_score", False)),
+        concede_deficit=getattr(play_state, "trailing_concede_deficit", None),
     )
     four_minute_offense = urgency_state == URGENCY_FOUR_MINUTE
     two_minute_drill = urgency_state == URGENCY_TWO_MINUTE

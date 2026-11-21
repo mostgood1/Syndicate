@@ -250,6 +250,12 @@ class NcaafLiveGameState:
     # provided, and a segment that needs one is refused by name, never guessed.
     home_linescores: tuple[int | None, ...] = ()
     away_linescores: tuple[int | None, ...] = ()
+    # TIMEOUTS LEFT IN THE CURRENT HALF, 0..3, from ESPN `situation.homeTimeouts` / `awayTimeouts` (todo #859, lane
+    # ncaaf-margin-aware-endgame; NFL's #808 pattern, `nfl/live_resim.py`). None means the feed did not say, and
+    # smartsim2 then starts the half at 3 each -- never a guess. The engine reads them ONLY with the profile's
+    # `end_of_half_clock` on (`ncaaf/live_endgame.py`); with it off they change nothing.
+    home_timeouts: int | None = None
+    away_timeouts: int | None = None
 
     @property
     def home_margin(self) -> int:
@@ -396,6 +402,8 @@ def live_state_from_espn_event(
         as_of=str(state.get("as_of") or datetime.now(timezone.utc).isoformat()),
         home_linescores=_linescore_tuple(state.get("home_linescores")),
         away_linescores=_linescore_tuple(state.get("away_linescores")),
+        home_timeouts=_timeouts_left(situation.get("homeTimeouts")),
+        away_timeouts=_timeouts_left(situation.get("awayTimeouts")),
     )
 
 
@@ -410,6 +418,29 @@ def _linescore_tuple(values: Any) -> tuple[int | None, ...]:
         except (TypeError, ValueError):
             out.append(None)
     return tuple(out)
+
+
+def _timeouts_left(value: Any) -> int | None:
+    """A timeouts-left value as 0..3, or None when it is not one (todo #859; the same rule as `nfl/live_resim.py`).
+
+    NOT clamped: a 4 or a -1 is a feed this module has not seen, and clamping it would hand the engine a confident
+    number made from a wrong one. None makes the engine start the half at 3. A bool is refused too: `True` is an int
+    to Python and would read as 1.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, float):
+        if not value.is_integer():
+            return None
+        value = int(value)
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text.isdigit():
+            return None
+        value = int(text)
+    elif not isinstance(value, int):
+        return None
+    return value if 0 <= value <= 3 else None
 
 
 def _positive_int(value: Any, *, default: int, hi: int) -> int:
@@ -935,13 +966,23 @@ def resim_live_game(
     # THE LIVE PROFILE (todo #852). No profile passed -- every production caller -- means production's NCAAF profile,
     # plus #686's leader-only blowout damping when `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING` is on
     # (`ncaaf/live_blowout_damping.py`). Off, `profile` IS `NCAAF_CALIBRATION_PROFILE` and the result has no new key.
-    damping_keys: dict[str, Any] = {}
+    # THEN THE END GAME (todo #859): #808's end-of-half clock, the trailer's concession and #855's college overtime
+    # when `SYNDICATE_NCAAF_LIVE_ENDGAME` is on (`ncaaf/live_endgame.py`). Off, it hands back the same object.
+    profile_keys: dict[str, Any] = {}
     if profile is None:
         from syndicate.features.ncaaf.live_blowout_damping import resolve as resolve_live_profile
+        from syndicate.features.ncaaf.live_endgame import resolve as resolve_live_endgame
 
         profile, damping_block = resolve_live_profile(NCAAF_CALIBRATION_PROFILE)
         if damping_block is not None:
-            damping_keys["blowout_damping"] = damping_block
+            profile_keys["blowout_damping"] = damping_block
+        profile, endgame_block = resolve_live_endgame(profile)
+        if endgame_block is not None:
+            # AUDITABLE: True only when BOTH sides' timeouts came from the feed; False means a fresh half (3 each).
+            profile_keys["endgame"] = {
+                **endgame_block,
+                "timeouts_fed": state.home_timeouts is not None and state.away_timeouts is not None,
+            }
 
     base = dict(
         home_team=state.home_team or "HOME",
@@ -957,6 +998,13 @@ def resim_live_game(
         initial_down=state.down,
         initial_distance=state.distance,
     )
+    # ONLY WHEN THE FEED SAID (todo #859, NFL's pattern). Absent stays absent, so the input is the one built before
+    # this was wired. The engine reads them only under `end_of_half_clock`, so with the end game off a fed
+    # timeout changes nothing (test-pinned).
+    if state.home_timeouts is not None:
+        base["initial_timeouts_home"] = int(state.home_timeouts)
+    if state.away_timeouts is not None:
+        base["initial_timeouts_away"] = int(state.away_timeouts)
 
     possession_unknown = state.possession_owner is None
     if possession_unknown:
@@ -1037,7 +1085,7 @@ def resim_live_game(
 
     return {
         **segment_keys,
-        **damping_keys,
+        **profile_keys,
         "home_win_prob": round(home_win_prob, 6),
         "sims_run": ran,
         "home_margin_mean": round(calibrated_margin_mean, 3),
