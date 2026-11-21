@@ -32,4 +32,8 @@ Asked by §3 of `findings_2026-11-18_board_split_memory_guard.md`: if the 11-21 
 
   - That is 24% fewer publications overnight, and no gap reached 30 min. Few games are live in those hours, so the evening is where this costs money.
 - **Expectation for the 11-21 evening** (written before it; not a pass/fail): the third evening starts with the parent ~0.55-0.6 GB higher than 11-20's did. Expect more P1-stage refusals in 5-10 PM than 11-20's 13.
+- **VOID, 12:19 PM CST: the expectation above no longer holds, because the parent was reset.**
+  - The kalshi lane restarted refresh-worker at 18:14:49Z (12:14 PM CST). Its new parent is pid 2397127: etimes 255 s and 1,109,804 KiB (1,084 MiB) at 18:19:12Z. The fleet checkout is at `b07e80882`.
+  - The owner's 4 AM CST resets for Sunday and Monday are re-pinned to that SHA (`cd849619d`).
+  - So the 11-21 evening starts from a fresh parent, as 11-19's did, not a third-day one. Compare its 9 PM RSS with 11-19's 1.55-1.60 GB, not with the ratchet.
 - Instrument: `p2_boardpub.py` lost a leftover debug print, a hard-coded 11-21 01:1x Z line dump. It printed after the numbers and did not change them. The backup in `scripts/rail_monitor/` is updated.
