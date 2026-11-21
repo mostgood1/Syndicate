@@ -187,3 +187,47 @@ betting change. Setting the switch is.
   - If the keys are absent, the engine falls back to 3 each. The block shows `timeouts_fed: false`, which is the
     `clk_3` arm, not `v4a`.
 - **It is a betting change.** Load it in a window only, on the user's yes, after #852 / #835's 12-08 decision.
+
+## JOINT RE-READ OF #852's DAMPING WITH THE END GAME ON — PRE-REGISTRATION, written 2026-11-21 12:07 PM CST before any arm was run
+
+User "Yes, run it" (2026-11-21), answering "Run the joint damping re-read on 2024 here next?". This is the re-fit the
+standard requires (`model_engine_standard.md`: adding a mechanism to a calibrated engine requires re-fitting the rates
+that were absorbing it). #852's damping, 1.0 / 17 / 14, was fitted without the clock or the concession.
+
+**Population.** The same as #858 / #859. That is the first 150 games of `C:\tmp\t852\tasks_2024.json` (the 2024
+every-2nd list): Q4 15:00 / 10:00 / 6:00 / 3:00 real CFBD states, 60 sims a state on its own seed block, paired across
+arms, with the real CFBD timeouts fed. The engine is the SHIPPED code (main `b2ff241ae`, this worktree): the concession
+is the profile field `trailing_concede_deficit = 25`, not the harness patch. The runner, `C:\tmp\t859\joint_run.py`,
+imports `C:\tmp\t852\resume.py` unchanged (the pinned slate runner imports it too) and adds these arms at import.
+
+**Arms.** All are `v4a` = #808's seven switches + `college_overtime` + concede at 25 + real timeouts, varying only #852's
+damping (strength / lead threshold / lead span):
+- **incumbent `jd1.0_t17_s14`** (1.0 / 17 / 14), which is `v4a` itself;
+- **shape grid** (#858's grid, at strength 1.0): `jd1.0_t14_s7`, `jd1.0_t14_s14`, `jd1.0_t17_s7`, `jd1.0_t21_s7`,
+  `jd1.0_t21_s14`;
+- **no damping** `jd0.0_t17_s14` (strength 0, an exact no-op): is the damping still needed with the end game on?
+
+**A reproduction check first (not a gate on the science, a gate on the instrument).** The incumbent under the built rule
+must equal the harness arm `out_2024L_v4a_60.jsonl` on every one of the 600 states (150 games x 4). If any differ, the
+read stops and the difference is reported.
+
+**Selection (the same rule as #852 and #858).** The incumbent is compared with each of the 6 alternatives on overall
+common-line log loss at Q4 15:00-6:00, against the real final. Lines come from `calib_arms.py`, with the incumbent's
+file first, and the SE is the paired, game-clustered SE. Move off the incumbent only if an alternative improves by more
+than 1 paired SE; among those, take the best. Then re-read the pick against `base` (`snap_L_c858_base.jsonl`) on:
+- G1: one-score last-2:00 points inside the real [2.55, 4.71]; one-score log loss at Q4 3:00 not above `base`'s;
+- G2: 17+ log loss at Q4 15:00-6:00 not worse than `base`'s by more than 1 paired SE;
+- G3: overall log loss not above `base`'s.
+
+**Predictions.**
+- Reproduction: 600 of 600 identical.
+- The shape grid spans within +-0.006 of the incumbent overall (#858's spanned +-0.004), and no shape cell clears 1
+  paired SE. **Keep 1.0 / 17 / 14.**
+- No damping is worse than the incumbent overall, by more than 1 paired SE. At 17+, its rest engine/actual rises from
+  v4a's 1.046 to 1.10-1.20 (the concession slows the trailer; the leader's surplus is the damping's job).
+
+**What follows.**
+- If the incumbent is kept: the damping needs no change for the end game, and this item of "Still owed" is closed.
+- If a cell is picked: the live default would change. That is a separate betting change, put to the user with the
+  re-read G1-G3. Nothing in the repo changes in this read.
+- The real-timeouts hold-out stays owed either way.
