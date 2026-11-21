@@ -479,3 +479,30 @@ The Portfolio Watch lane passed this on: 4,134 ms at 9:04 and 3,149 ms at 9:34 A
   - so the next probe lands on the oldest, largest worker each time.
 - The workers reached 1.2-1.45 GB anon in about 30 min by day, with 5-10 requests each. The growth runs with the board-overlay warmer, whose thread logs the full collections (up to 1.66 s each).
 - Bearing: this is the same full-collection cost the held GC-tuning question is about. It now has a user-visible latency of about 2-4 s on the portfolio reads. Recorded, not acted on (user "Watch kills first").
+
+## 2026-11-21 11:04:54 AM CST (17:04:54Z) -- a dump from an EXITING worker: ~55 s inside CPython's own shutdown; fix on main, not loaded
+
+- **The dump:** `Timeout (0:00:40)!` followed by ONE thread, `<no Python frame>`.
+  - A serving worker's dump lists the main loop, 4 request threads and the warmer.
+  - One thread means the interpreter had already deleted the other thread states, which happens past atexit in `Py_FinalizeEx`.
+  - No frame means the thread was in C: the final collection and the module teardown.
+- **Whose:** 2300114.
+  - It recycled normally at 17:04:19.478Z (1,289 MB anon, 52 min old) and logged `Worker exiting` at 17:04:19.987Z.
+  - Its last heartbeat re-arm can only have fallen at 17:04:14.5-15.0Z for the 40 s timer to fire between the 17:04:50.863Z line and the watch's 17:04:54Z read.
+  - Its replacement 2337523 booted at 17:05:15.731Z: about 55 s spent exiting.
+  - The master's 60 s kill would have fired at about 17:05:19Z. There was no `WORKER TIMEOUT`, so it was not a kill.
+- **The other worker:** 2319994 (1,351 MB) recycled at 17:03:46Z and exited in about 10 s; its replacement 2336943 booted at 17:04:21.7Z.
+  - The hard-recycle spacing (30 s, timed from the last recycle DECISION) let 2300114 go 33 s later, while 2319994 was still being replaced.
+  - So web had no accepting worker from about 17:04:19.9Z to 17:04:24.6Z, and one worker until about 17:05:18Z.
+- **How rare** (`wsk_exit_times.py`, 10-31..11-21):
+  - Exit to replacement boot over 5,296 unambiguous exits: median 1.5 s, p90 3.2 s, p99 9.2 s; 3 over 30 s.
+  - 5 exits were KILLED in this shutdown, 30-60 s after `Worker exiting`: 10-31, 11-06 x2, 11-08, 11-11. None since 11-11 until this near miss.
+- **Fix `b07e80882` (on main, NOT loaded).**
+  - A `worker_exit` hook calls `os._exit(0)` after flushing stdio. It acts only when `DrainingThreadWorker.run` RETURNED and no request future is running; anything else takes the stock exit and says why.
+  - web's only atexit work releases flock()s, which the kernel releases with the fds.
+  - Switch: `SYNDICATE_WEB_WORKER_FAST_EXIT`.
+  - Tests: 60 passed under the fleet venv, including a real gunicorn with the real conf recycling every 5 requests. An app atexit handler never runs with the switch on, and runs in every exiting worker with it off.
+- **Load is held on a ride-along.**
+  - The ff from 0d20a6919 carries 28 commits.
+  - One of them is `64cd634f4` (lane `kalshi-no-grade-check`: grade_check only, not a betting change), whose lane waits for the user's yes to load it.
+  - #859 (`b2ff241ae`) is inert: `SYNDICATE_NCAAF_LIVE_ENDGAME` absent = off, and no env layer names it.
