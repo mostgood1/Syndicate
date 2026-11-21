@@ -62791,3 +62791,10 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Portfolio plan:** the 13:03:01 CST plan (first after detection) carries `key_player_out=1`, but `refusals_by_sport` puts it on NCAAF (1 spread), not soccer: no row of this game reached the plan, consistent with the board withdrawing it upstream (as in NCAAF's first two readings).
 - **Not measured:** the lift (an injured keeper does not return); props (`props_refused=0`, none priced for him, inferred).
 - verify: the lines above from live-odds-worker.log and refresh-worker.log, 18:57:22Z..18:59:52Z; the ExitHold probe 18:59:47Z; /api/portfolio/plan?date=2026-11-21 read 19:04:15Z.
+
+## 2026-11-21 23:26:13Z (5:26 PM CST) -- READING (no deploy): NHL is BLIND to a real LIVE goalie change; the held fix `a65af26c1` catches it on the same box (lane `live-player-exit-gate`, #814)
+- **The change:** PIT @ NSH 2026020362, P1 10:41 left, PIT 1-0. Live api-web box: J. Saros toi 08:01 (6 SA, 1 GA), J. Annunen toi 00:57; `starter` is null for ALL four goalies (as in the 18:13Z shape capture of 2026020359). Saved: `C:/tmp/lpeg/nhlrep/live_goaliechange_2026020362_20261121T232613Z.json`.
+- **Fleet (main):** `[nhl_live_resim] PLAYER_EXIT_TICK enabled=True read=2 players_out=0 key_players_out=0 refused_games=0` at 23:26:45Z, after the change. The game stayed priced.
+- **Offline on the saved box:** main's `exits_from_nhl_boxscore` -> `players_out=()`; the held fix's -> NSH J. Annunen + J. Saros `goalie_change key=True source=boxscore`. The suspected cause (the LIVE box carries no `starter` flag) is CONFIRMED.
+- **Not measured:** the fix on the fleet (it is off main, a betting change); the lift.
+- verify: capture task b5d1s6pa3 output line GOALIE_CHANGE_LIVE 23:26:13Z; live-odds-worker.log 23:26:45Z; scratchpad run of both detectors 23:28Z CST-local 5:28 PM.
