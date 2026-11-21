@@ -26,10 +26,14 @@ The user asked on 11-20 to "make this dashboard self contained so it doesnt use 
 - **Claude, once a night:** the session cron `NIGHTLY CLOSE (lean)` at ~12:47 AM CST. Its steps:
   - check the tick log;
   - finals by date; `grade_day.py --pop-start <D>T16:00`; `perf_build.py` and a `tick.py --render-only`;
-  - P1-P6/P8 from the day's rows, P2 from `d4metrics` 23:30-04:30Z;
+  - P1-P6/P8 from the day's rows, P2 from the log with `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p2_boardpub.py <D>T23:30 <D+1>T04:30"`. Do not use `d4metrics` for this: after midnight its tail read under-covers the evening and still says `log_window_covered: true` (11-20: 9 builds and 0 sweeps, against 47 publications and 126 sweep launches);
+  - when P8 (score floor) is non-zero, look at the chip's `status_token` and `intervals.final`. A re-sim whose own final total sits below the chip's score is older than that score: timing, not the floor (11-20: all 21 rows were in the last 40 s of regulation);
+  - grade with output to a file, never through `| Select-Object -First N`. Cutting the pipe killed `grade_day.py` before it wrote its JSON (11-20: a 0-byte file);
   - the owned readings due that night (R-A..R-F);
   - a short summary in the findings file and a log line, then commit and push.
   - No day page, no claude.ai uploads, no wakeups. Renew the cron before its 7-day expiry.
+  - **#851 P6 sweep counts (night 2 on 11-21, then 11-24):** count on the exact quota-read window with `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p851_sweepcount.py <lo> <hi>"`, where lo and hi are the two `read_at` values without the Z. Append to that night's findings file, as on 11-20.
+  - **R-F's qualifier:** count the live chips by sport (`state == "live"`) in the ~7 PM reading dir's `chips.json`. The 11-20 evening was borderline (26 at 7:03 PM, 37 at 7:23 PM); its owner decides.
 - **Still Claude-driven one-shots:** R-D P6 quota reads (6 PM and 11 PM CST, 11-20, 11-21 and 11-24) and R-F's parent-floor read (9:04 AM 11-21).
 
 ## Daily schedule (CST) — the full mode, used 11-15..11-19
