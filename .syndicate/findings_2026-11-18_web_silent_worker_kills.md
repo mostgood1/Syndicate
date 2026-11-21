@@ -435,3 +435,25 @@ portfolio monitor (finding F3, `.syndicate/findings_2026-11-17_portfolio_monitor
   `eeeb62a63` fixed. 0 on 11-18 and 11-19.
 - **Lesson** (learnings.md 11-20): a gc callback, `__del__`, weakref finalizer or signal handler in a fleet role must never
   print. Every role's stdout/stderr is a `StampedStream` with a non-reentrant lock, and a collection can fire inside it.
+
+## 2026-11-21 10:15 AM CST (16:15Z) -- 20 h on `0d20a6919`, 22.6 h on `eeeb62a63`: both hold; kills per day still owed
+
+Read-only, nice 19. Full numbers are in deploys.md, under "reading 2" of the 17:38:47Z and 20:13:38Z web entries.
+
+- **0 dumps, 0 kills, 0 Traceback since the GC fix loaded.**
+  - Every one of the 78 workers booted since is accounted for:
+    - 75 left by their own recycle line;
+    - 1 was retired by the reload;
+    - 2 are live and logging.
+  - The same check finds the 20:01:56Z kill in the pre-fix window, so it is not blind to the outcome.
+- **The 3 main-loop stalls (>= 5 s) are full collections.** Each matches a generation-2 pause on a request thread of the same worker, in the same second: 7.14 s, 10.60 s and 6.60 s.
+  - The longest stall, 10.85 s, is under the 40 s dump and the 60 s kill.
+  - 3,260 of 3,273 full collections collected nothing; 1,912 s of pause in 19.9 h.
+  - This is what a `gc.freeze()` after warm-up, or a higher gen-2 threshold, would remove. Held on the user's "Watch kills first".
+- **The decode fix holds over 22.6 h.**
+  - Cold board reads over 20 s: 0 of 156. Before, 1-6 a day (1 of 243 to 6 of 340).
+  - p90 4.4-4.7 s, against 6.2-9.9 s.
+  - Fewer board queries since, so this is not a same-instant A/B.
+- **Kills per day** (CST): 0 x5, **4** (11-17), 0, 0, 1 (the instrument, 11-20), 0 so far on 11-21.
+  - The mechanism killed on 1 day in 8 before the fix, so one clean day says little.
+  - The lane closes on several clean days, read with the direct measures above.

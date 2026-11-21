@@ -62537,6 +62537,24 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - `WEB_LOOP_STALL` (gap >= 5 s): 0, as before. New stall dumps: 0 (2 on 11-20, both before the fix). `WORKER TIMEOUT`: 0. Recycles: 6. healthz 200.
   - Caveat: two different hours of the same late morning, not a same-instant A/B. Traffic differs, and n is small (10 and 6 cold reads). The direction is the same on every measure, and the 40 s single-call hold is gone by construction.
   - **Owed:** silent kills per day vs 11-17's 4, over the following days (0 a day on 11-18, 11-19 and 11-20 so far).
+- **reading 2, 2026-11-21 16:15Z (10:15 AM CST): 22.6 h on `eeeb62a63`, against 11-16..11-20 morning.** Read-only; scratchpad `wsk_fix_reading2.py`; CST days.
+  - `STATE_DECODE_SKIPPED`: 0 on every day before. After: 1,801 on 11-20 from 11:38 AM, and 369 on 11-21 to 10:15 AM.
+  - Cold `board_read` (> 100 ms), after: 0 of 156 over 20 s.
+    - 11-20 from 11:38 AM: p50 2.7 s, p90 4.4 s, max 16.6 s (n=109).
+    - 11-21 to 10:15 AM: p50 2.3 s, p90 4.7 s, max 17.0 s (n=47).
+  - Before, per day 11-16 / 11-17 / 11-18 / 11-19:
+    - p90 6.2 / 9.9 / 8.9 / 6.9 s;
+    - max 34.2 / 47.1 / 26.8 / 28.0 s;
+    - over 20 s: 3 of 337, 6 of 340, 2 of 213, 1 of 243.
+    - 11-20 to 11:03 AM: p90 15.9 s, max 64.3 s, 4 of 54 over 20 s.
+  - Caveat: fewer board queries since. 161 in 12.4 h and 50 in 10.25 h, against 329-553 a day before. Traffic differs, so this is not a same-instant A/B.
+  - Silent kills per CST day:
+    - 11-12..11-16: 0.
+    - **11-17: 4.** A fifth, at 16:13Z, was the self-inflicted portfolio GET and is not counted.
+    - 11-18: 0. 11-19: 0.
+    - 11-20: 1, at 20:01:56Z. It was the `3c8ba5b14` instrument, not this mechanism, and `0d20a6919` fixed it.
+    - 11-21: 0 so far.
+  - Read as: before the fix this mechanism killed on 1 day in 8. So a clean day is not evidence by itself; the direct measures are (0 cold reads over 20 s, 0 dumps since `0d20a6919`). Kills per day stay owed over the coming days.
 
 ## 2026-11-20 18:47:33Z (12:47 PM CST) -- READING (no deploy): soccer look-ahead anchor P1-P5 (lane soccer-pregame-odds-lane, fix 640c6d4fd)
 - Scheduled task `soccer-lookahead-anchor-reading-1120`, read-only (`scripts/read_soccer_lookahead_anchor.py`, nice 19), window 11-18 17:58:30Z .. 11-20 17:58:30Z, 35 look-ahead runs.
@@ -62588,6 +62606,28 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - `WEB_GC_PAUSE` keeps arriving at ~5 a minute with `written_after_s` <= ~1 s.
   - Watch: scratchpad `wsk_dump_watch.sh` (task `bngl82idh`, to 2026-11-21 ~25:13Z); reading: `wsk_gcfix_reading.sh`.
   - Kills per day: 11-20's one kill is this defect, not the decode mechanism. It does not count against `eeeb62a63`.
+- **reading 2, 2026-11-21 16:08:52Z (10:08 AM CST): the first 19.9 h on `0d20a6919`.** Read-only, nice 19. Scratchpad scripts: `wsk_gcfix_reading.sh`, `wsk_gcstats.py`, `wsk_pid_account.sh`.
+  - The 24-h mark is 20:13Z. The dump watch runs to 2026-11-22 ~01:14Z (7:14 PM CST 11-21). It had seen 0 dumps.
+  - Stall dumps 0, `WORKER TIMEOUT` 0, Traceback 0: **MET so far**. Fleet head `0d20a6919`, healthz 200.
+  - No silent worker: **MET so far.** Every worker booted since the load is accounted for:
+    - 78 booted;
+    - 75 left after writing their own `WEB_WORKER_MEMORY_RECYCLE` line;
+    - 1 (1874732) was retired by this deploy's own reload;
+    - the 2 live ones (2275430 / 2296629) last logged within 3 s of the read;
+    - 0 killed, 0 unaccounted.
+    - The same check over 17:38:40-20:13:30Z 11-20 finds the instrument kill (killed=1), so it can see the outcome.
+  - `WEB_GC_PAUSE` lines: 3,275, all with `written_after_s`, 0 `dropped_before`.
+    - `written_after_s`: median 0.11 s, p99 1.38 s, max 2.11 s; 214 over 1 s.
+    - Rate: 2.75 a minute averaged, following traffic. Pause time ran 86-195 s an hour from 2 PM to 11 PM CST, and 4-21 s an hour from midnight to 6 AM CST.
+    - Read as: the ~5-a-minute, <= ~1 s expectation holds by day. The 2.11 s max is the heartbeat waiting out long collections, not a stuck write.
+  - `WEB_LOOP_STALL` (main-loop gap >= 5 s): 3. Each is a full collection on a request thread of the same worker, logged in the same second:
+    - 22:22:14Z: gap 7.15 s, pause 7.14 s;
+    - 00:23:17Z: gap 10.85 s, pause 10.60 s (CPU 10.60 s; 0 collected);
+    - 11:37:09Z: gap 7.58 s, pause 6.60 s.
+    - The longest stall, 10.85 s, is under the 40 s dump and the 60 s kill.
+  - Full collections: 3,273 of the 3,275 pauses are generation 2, and 3,260 of those collected nothing. 1,912 s of pause in 19.9 h across the two workers.
+    - Not tuned. User "Watch kills first" (11-21), answering "Tune web's garbage collection next, or watch kills per day first?".
+  - Memory recycles: 75 in 19.9 h. Inside the per-UTC-day range for 11-12..11-20: 110 / 374 / 487 / 410 / 155 / 277 / 241 / 184 / 155.
 
 ## 2026-11-21 02:37:06Z (8:37 PM CST 11-20) -- READING (no deploy): first UNMODELLED basketball key exit read LIVE through every layer, plan backstop exercised for the first time -- BKN Nolan Traore (lane `live-player-exit-gate`, #814)
 - **The exit:** event 401909306, Orlando @ Brooklyn (NBA). BKN starter Nolan Traore subbed out at Q3 8:00 (pbp wallclock 02:10:44Z) and did not return. ESPN's `injuries` list stamped him `Out`, hamstring, at 02:25Z, DURING the game.
