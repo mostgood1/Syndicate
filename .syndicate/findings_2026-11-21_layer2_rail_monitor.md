@@ -49,4 +49,9 @@ local_379fd729 flagged three games. Wisconsin @ Purdue was dark at R7, R8 and R9
 - **Refresh-worker's `NCAAF_LIVE_RESIM` summary:** `key_player_out` was 1 from 17:43Z and 2 from 18:12Z. It was 3 at 18:21Z and back to 2 at 18:27Z: Army's 6-minute flap, which is why only R8 caught it.
   - At 18:58Z: 16 games live, 14 re-simmed, refusals `key_player_out` 2, `no_live_state` 12 (12 all day, games with no ESPN live state), `game_not_in_progress` 42.
 - **LEAD (not a defect):** the pbp `replaced` detection can be transient. Army's cleared in about 6 minutes, and while it held the game had no model. Count the flaps at the nightly close before calling it noise or cost.
+- **Second flag, 1:58 PM.** Syracuse @ Boston College is `key_player_out` (`SYR:Steve Angeli:replaced`, since 19:09:13Z). Mercyhurst @ Western Illinois is **I-29**: the NCAAB snapshot has the teams REVERSED (home Mercyhurst), at every reading from R9 to R12. The fix is change G on 11-24.
+- **Ticker change (the fleet-watcher's ask; Claude-free dashboard files only, no fleet change).** From R13 (2:03 PM) each row carries `live_games_no_model_reasons` {game: reason} and `live_games_no_model_detail`.
+  - `p29_orient.py` now reads every per-game snapshot: ncaab, wncaab, nba, ncaaf and nhl lens, nfl, soccer lens. It adds `reason`/`detail` and `priced`/`priced_with_model`. The page's dark list now uses the row's rule, priced full-game rows only.
+  - The first row: 13 no-model games. 5 NCAAF `key_player_out`, 1 `orientation_reversed`, 7 soccer.
+  - **The soccer live lens was 21 min old at 2:06 PM** (generated 1:45 PM; MLS and Eredivisie only), while 7 European games were live. The 2:23 reading tells whether it refreshes.
 - How to read this next time: NCAAF prints no `_LIVE_RESIM_TICK`. Use `ncaaf_events.py` (event names per role log) and `ncaaf_resim_peek.py <team> ...` (the per-game lens), both in `scripts/rail_monitor/`. The runbook says so.

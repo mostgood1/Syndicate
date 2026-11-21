@@ -5,6 +5,8 @@
 import json, subprocess, sys
 
 KEY = "syndicate:refresh-state:/home/amyn/syndicate-prod/data/live/ncaaf_live_lens.json"
+if sys.argv[1:2] and sys.argv[1].startswith("--key="):  # e.g. --key=ncaab_live_resim.json
+    KEY = KEY.rsplit("/", 1)[0] + "/" + sys.argv.pop(1)[len("--key="):]
 raw = subprocess.run(["redis-cli", "--raw", "GET", KEY], capture_output=True, text=True, errors="replace").stdout
 if not raw.strip():
     sys.exit("empty key " + KEY)

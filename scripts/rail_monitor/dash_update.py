@@ -130,6 +130,39 @@ def row(args):
                 g[1] += 1
     games_no_model = sorted(k for k, (n, m) in by_game.items() if n and not m)
 
+    # 11-21 (the fleet-watcher's ask): WHY each no-model game has none, from p29_orient.py's per-game lines (the
+    # sport's re-sim snapshot). Values: the snapshot's own refusal reason (key_player_out, game_final, no_margin_anchor,
+    # in_intermission, ...); "orientation_reversed" (I-29: the snapshot has the teams the other way round);
+    # "resimmed_no_row_model" (re-simmed, yet the priced rows carry no model: a join defect, flag it);
+    # "not_in_resim" (no snapshot entry matched, possibly this helper's name miss: check); "no_snapshot_for_sport"
+    # (soccer etc.); "unknown" (the helper's output was missing this tick).
+    reasons, details = {}, {}
+    orient = {}
+    if args.orient and os.path.exists(args.orient):
+        for line in open(args.orient, encoding="utf-8", errors="replace"):
+            if line.startswith("{"):
+                try:
+                    o = json.loads(line)
+                except ValueError:
+                    continue
+                if o.get("matchup"):
+                    orient[f"{o.get('sport')} {o.get('matchup')}"] = o
+    covered = {o.get("sport") for o in orient.values()}
+    for k in games_no_model:
+        o = orient.get(k)
+        if o is None:
+            reasons[k] = "unknown" if not orient else ("not_in_resim" if k.split(" ", 1)[0] in covered else "no_snapshot_for_sport")
+        elif o.get("resim") == "REVERSED":
+            reasons[k] = "orientation_reversed"
+        elif o.get("resim") in ("not_in_resim", "no_snapshot"):
+            reasons[k] = o["resim"]
+        elif o.get("reason") == "resimmed":
+            reasons[k] = "resimmed_no_row_model"
+        else:
+            reasons[k] = o.get("reason") or "unknown"
+        if o and o.get("detail"):
+            details[k] = o["detail"]
+
     # BC-048: pregame college totals flags on the shortlist (model edge > 0 on a non-live row)
     sl = json.load(open(os.path.join(rdir, "shortlist.json"), encoding="utf-8"))
     p6 = 0
@@ -160,6 +193,8 @@ def row(args):
         "live_games_with_rows": len(by_game),
         "live_games_no_model": len(games_no_model),
         "live_games_no_model_list": games_no_model[:5],
+        "live_games_no_model_reasons": reasons,
+        "live_games_no_model_detail": details,
         "live_rows": lr.get("n"),
         "priced_le_120": lr.get("priced_le_120"),
         "priced_age_p50_s": (lr.get("priced_age") or {}).get("p50"),
@@ -219,6 +254,7 @@ a.add_argument("--probe", required=True)
 a.add_argument("--metrics", required=True)
 a.add_argument("--dir")
 a.add_argument("--note")
+a.add_argument("--orient", help="p29_orient.py output for this tick (per-game re-sim state and refusal reason)")
 a.add_argument("--day", help="slate date YYYY-MM-DD; selects rows_<day>.jsonl")
 b = sub.add_parser("build")
 b.add_argument("--day", help="slate date YYYY-MM-DD; selects rows_<day>.jsonl")

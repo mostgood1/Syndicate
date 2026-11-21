@@ -348,15 +348,20 @@ def grading(day, results, label_day=None):
 
 def nomodel(extra, rows):
     last = extra[-1] if extra else {}
-    dark = [o for o in (last.get("orient") or []) if o.get("matchup") and not o.get("with_model")]
+    # priced rows only from 11-21 (the same rule as the row's live_games_no_model); older lines count every row
+    dark = [o for o in (last.get("orient") or []) if o.get("matchup")
+            and ((o.get("priced") and not o.get("priced_with_model")) if "priced" in o else not o.get("with_model"))]
     items = "".join(
         f"<li>{esc(o['sport'].upper())} {esc(o['matchup'])}: {o.get('rows')} rows, "
         + ("teams REVERSED against the re-sim (I-29: the slate reoriented a neutral-site game)" if o.get("resim") == "REVERSED"
-           else ("not in the re-sim yet" if o.get("resim") == "not_in_resim" else "the re-sim refused it (no anchor / gate)")) + "</li>"
+           else ("not matched in the re-sim snapshot" if o.get("resim") == "not_in_resim"
+                 else "re-simmed, but no row carries its model (join defect?)" if o.get("reason") == "resimmed"
+                 else esc("the re-sim refused it: " + str(o.get("reason") or "reason not recorded (before 11-21)")
+                          + (f" ({o['detail']})" if o.get("detail") else "")))) + "</li>"
         for o in dark)
     rev = sorted({o["matchup"] for x in extra for o in (x.get("orient") or []) if o.get("resim") == "REVERSED"})
     peak = max(g(rows, "live_games_no_model") or [0]) if g(rows, "live_games_no_model") else None
-    inner = (f"<ul>{items or '<li>None among college games at the latest reading.</li>'}</ul>" if extra else
+    inner = (f"<ul>{items or '<li>None at the latest reading.</li>'}</ul>" if extra else
              f"<p>Peak live games with no model on any line: {num(peak)}. Per-game causes are recorded from 11-20 on.</p>")
     if rev:
         inner += "<p><b>Reversed neutral-site games today:</b> " + ", ".join(esc(x) for x in rev) + ".</p>"

@@ -119,8 +119,15 @@ def tick(day, now_utc):
     rc29, p29, _, _ = wsl("cd ~/syndicate-prod && nice -n 19 ~/.venvs/syndicate/bin/python /mnt/c/tmp/railmon/p29_orient.py", 120)
     rcps, ps, _, _ = wsl("ps -eo pid,rss,etimes,args | grep -E 'run_refresh_worker.py|board_build_process --serve' | grep -v grep", 30)
     note = "auto"
+    # 11-21: hand p29's per-game lines to dash_update so the row says WHY each no-model game has none
+    orient_args = []
+    if rc29 == 0 and p29.strip():
+        orient_out = os.path.join(DASH, f"orient_auto_{dd}_{n}.txt")
+        with open(orient_out, "w", encoding="utf-8") as f:
+            f.write(p29)
+        orient_args = ["--orient", orient_out]
     rc, out, err, _ = run([PY, os.path.join(DASH, "dash_update.py"), "row", "--n", str(n), "--day", day, "--probe", probe_out,
-                           "--metrics", metrics_out, "--dir", rdir, "--note", note], 120)
+                           "--metrics", metrics_out, "--dir", rdir, "--note", note] + orient_args, 120)
     if rc != 0:
         log(f"dash_update rc={rc} {err.strip()[:200]}")
         return
@@ -219,10 +226,12 @@ def render(day):
         ("Board query now", num(last.get("query_s"), 1, " s"), "warn" if (last.get("query_s") or 0) > 8 else ""),
     ]
     tile_html = "".join(f'<div class="tile {c}"><div class="v">{v}</div><div class="k">{html.escape(k)}</div></div>' for k, v, c in tiles)
-    dark = [o for o in (last_x.get("orient") or []) if o.get("matchup") and not o.get("with_model")]
+    # priced rows only from 11-21 (the same rule as the row's live_games_no_model); older lines count every row
+    dark = [o for o in (last_x.get("orient") or []) if o.get("matchup")
+            and ((o.get("priced") and not o.get("priced_with_model")) if "priced" in o else not o.get("with_model"))]
     dark_html = "".join(f"<li>{html.escape(o['sport'].upper())} {html.escape(o['matchup'])}: {o.get('rows')} rows, "
-                        f"{'teams REVERSED vs the re-sim (I-29)' if o.get('resim') == 'REVERSED' else ('not in the re-sim yet' if o.get('resim') == 'not_in_resim' else 're-sim refused it')}</li>"
-                        for o in dark) or "<li>None among college games.</li>"
+                        f"{'teams REVERSED vs the re-sim (I-29)' if o.get('resim') == 'REVERSED' else ('not matched in the re-sim snapshot' if o.get('resim') == 'not_in_resim' else 're-simmed, but no row carries its model (join defect?)' if o.get('reason') == 'resimmed' else html.escape('re-sim refused it: ' + str(o.get('reason') or 'reason not recorded') + (' (' + str(o['detail']) + ')' if o.get('detail') else '')))}</li>"
+                        for o in dark) or "<li>None at the latest reading.</li>"
     mem = "<br>".join(html.escape(l) for l in (last_x.get("p7") or [])) or "–"
     ps_html = ", ".join(f"{html.escape(p[3])} {int(p[1]) / 1024 / 1024:.2f} GB" for p in (last_x.get("ps") or []) if len(p) >= 4 and p[1].isdigit()) or "–"
     trs = []
