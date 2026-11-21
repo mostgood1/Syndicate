@@ -457,3 +457,25 @@ Read-only, nice 19. Full numbers are in deploys.md, under "reading 2" of the 17:
 - **Kills per day** (CST): 0 x5, **4** (11-17), 0, 0, 1 (the instrument, 11-20), 0 so far on 11-21.
   - The mechanism killed on 1 day in 8 before the fix, so one clean day says little.
   - The lane closes on several clean days, read with the direct measures above.
+
+## 2026-11-21 10:20 AM CST (16:20Z) -- the slow /api/portfolio/live reads at 9:04 / 9:34 AM (Portfolio Watch): old oversized workers, not kills
+
+The Portfolio Watch lane passed this on: 4,134 ms at 9:04 and 3,149 ms at 9:34 AM CST, against 255 ms at 8:34. Read-only from web.log, nice 19.
+
+- **Not a kill and not my fixes.** 0 dumps, 0 `WORKER TIMEOUT`, 0 main-loop stalls in either window.
+- **9:04: the read went to the worker that had done nothing for 30 min.**
+  - The read was served by 2255047. Its `WEB_WORKER_MEMORY_RECYCLE` follows the access line by 5 ms.
+  - That worker was 60 min old with 949 MB anon, against a 627 MB limit.
+  - Its hard recycle was deferred at 8:34:03 (1,206 MB, the other worker had just recycled). It wrote no line of any kind after that until this read, 30 min later; its request count went from 5 to 7.
+  - Neither worker logged a collection over 0.25 s from 9:03 to 9:05. **Cause not named.**
+  - Swap is unlikely: at 10:14 the live 70-min worker held 1,277 MB resident and 10 MB in swap. That reading was taken an hour later, so it does not cover 9:04.
+- **9:34: a 1.97 s full collection on the request thread of the worker that served the read** (2275430, 30 min old).
+  - That collection freed nothing, and used only 0.32 s of CPU. So about 1.65 s of it the thread was not running: host CPU contention or page faults.
+  - That is about 2 s of the 3.1 s read.
+- **Why :04 / :34 always sees the oldest, largest workers.** In all 4 recycles in these windows, the recycle fired in the same second as the probe's burst:
+  - each of the 4 came 0-5 ms after a probe request;
+  - each replacement boots seconds after the probe;
+  - the 2 emergency recycles came at 1,796-1,799 s of age, and the other 2 at 48 and 60 min;
+  - so the next probe lands on the oldest, largest worker each time.
+- The workers reached 1.2-1.45 GB anon in about 30 min by day, with 5-10 requests each. The growth runs with the board-overlay warmer, whose thread logs the full collections (up to 1.66 s each).
+- Bearing: this is the same full-collection cost the held GC-tuning question is about. It now has a user-visible latency of about 2-4 s on the portfolio reads. Recorded, not acted on (user "Watch kills first").
