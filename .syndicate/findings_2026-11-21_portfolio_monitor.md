@@ -152,3 +152,10 @@ Flagged by the fleet-watcher from the 2:34 PM reading (`resting order 373a43d7 (
   a **betting change**: the 11-24 window, or a `broken money path` exception on the user's yes.
 - **Taken:** no venue action. A watcher is on the log for this order's `CANCEL_AT_KICKOFF`, fill or terminal
   reconcile, until 22:15Z.
+- **3:32 PM, retired unfilled:**
+  - The log line: `RECONCILED key=373a43d7 ... submitted->rejected venue_status='canceled' contracts=0` (21:32:16Z).
+  - **Our kickoff pass did not send it.** No `CANCEL_AT_KICKOFF`, `[kalshi_orders]` cancel or any other cancel request
+    appears in the live-odds-worker, refresh-worker or web logs, 21:00-21:33Z. The cancel came from outside the role
+    processes (by hand, another session's script, or Kalshi itself); which one is not known.
+  - Exposure is now 0. F27's code defect stands: the next same-named game whose own Kalshi market is missing can land
+    on the sibling sport again.
