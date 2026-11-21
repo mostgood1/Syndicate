@@ -231,3 +231,15 @@ than 1 paired SE; among those, take the best. Then re-read the pick against `bas
 - If a cell is picked: the live default would change. That is a separate betting change, put to the user with the
   re-read G1-G3. Nothing in the repo changes in this read.
 - The real-timeouts hold-out stays owed either way.
+
+### AMENDMENT 1 — written 2026-11-21 12:24 PM CST, after the runs and BEFORE any science number was read
+
+**The registered instrument check failed as written.** Of 600 states, 215 were identical and 385 differed, so the scorer
+stopped as registered (`C:\tmp\t859\joint\joint_read.txt`). The diagnosis (`C:\tmp\t859\joint_diag.py`):
+- **What differs:** ONLY the `sd` key. On all 600 states, `dist` (the draws), `rest` and every other key are identical.
+  `max |sd diff|` = 5.3e-15.
+- **Why:** `sd` is a float `sum()` (`resume.py` line 236). `v4a` ran on 11-20 under the bare Python 3.12 that `py -3`
+  had become (its log's traceback paths are `Python312`), and this run used 3.11. Python 3.12's `sum()` of floats is
+  compensated, so the last bits differ. No scorer reads `sd` (`calib_arms.py`, `paired_margin.py`, `joint_read.py`).
+- **Amended check:** every sim key except `sd` identical, and `sd` within 1e-9. The rest of the registration is
+  unchanged.
