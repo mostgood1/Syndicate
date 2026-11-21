@@ -528,7 +528,7 @@ droppable CHANGE J of batch task `nfl-level-refit-load-1120`.
 |---|---|---|---|---|
 | P1 | parent self-recycle fires | 11-25 and 11-26, 09:00-11:59Z | on each morning whose 09Z parent RSS is >= 1,500 MB: exactly 1 `BOARD_PROCESS_PARENT_RECYCLE`, then `RECYCLE_EXIT reason=board_parent_rss` and a new supervised pid | 0 recycles on a qualifying morning for a reason other than a legitimate hold (`children_running` / `board_building` / `drain_requested` / `code_on_disk_changed` throughout); or >1 in a morning; or any outside 09-12Z |
 | P2 | it costs nothing it should not | each self-recycle | the new parent reads < 1,300 MB 30 min later; the board gap across it (the last `BOARD_BUILD_TIMING` before to the first after) <= 900 s; the RECYCLE line reads `children: 0` | gap > 1,200 s; or any job child killed; or any rc -6 / `Fatal Python error` |
-| P3 | refusals per evening | 11-24, 11-25, 11-26, 5-10 PM CST | `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` <= 3 an evening (11-19: 4, 11-20: 13) | > 6 on any comparable evening |
+| P3 | refusals per evening | 11-24 and 11-25, 5-10 PM CST | `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` <= 3 an evening (11-19: 4, 11-20: 13) | > 6 on any comparable evening |
 | P4 | streak recycles per evening | same | `RECYCLE_EXIT reason=heavy_build_refused` <= 1 an evening (11-20: 3) | >= 3 on any comparable evening |
 | P5 | board cadence | same | longest `BOARD_BUILD_TIMING` gap <= 900 s; gap p50 <= 360 s (11-20: 1,062 / 330 s) | longest > 1,200 s, or p50 > 420 s (the margin's extra cold builds costing more than the refusals they save) |
 
@@ -548,3 +548,6 @@ droppable CHANGE J of batch task `nfl-level-refit-load-1120`.
 - **Safety:** tree max <= 6,936 MB; 0 OOM; 0 rc -6; no job child killed by a self-recycle.
 - **Revert:** remove the two env lines, then a drained full down/up. A revert is allowed outside a window.
 - **Reading:** owed in this lane, after the 11-26 morning. Scheduled task `board-parent-recycle-reading-1126`.
+- **Amended 2026-11-21 ~18:00Z, before any load:** P3-P5 read the 11-24 and 11-25 evenings (the task fires 11-26 7:30 AM CST,
+  so the 11-26 evening is outside it). The reader is `C:\tmp\bmg\w1124\read_850j.py`. Dry-run on the 11-20 logs, it
+  reproduced READING 2 exactly (13 refusals 3/3/3/1/3, 3 streak recycles, 3 holds, 48 builds, gaps p50 330 s / max 1,062 s, tree max 6,939 MB).
