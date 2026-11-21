@@ -489,3 +489,62 @@ monitor/study scripts are left out, 17 of them reachable from refresh-worker):
   - A lesson for the next such restart: preflight, then TERM, without the 30 min drain wait, when refresh-worker's own
     jobs are idle.
 - **Tonight is the parent's first evening again**, so the same §5 thresholds apply and READING 1's slate rule.
+
+## 12. The lasting fix -- built default-off; PRE-REGISTERED PREDICTION for its 11-24 load (written 2026-11-21 ~17:45Z = 11:45 AM CST, before any load)
+
+**User:** "Yes, build it" (2026-11-21 ~11:00 AM CST, typed in session 1f9c9a40). It answered "Build the lasting fix,
+switched off, to load in the 11-24 window?" The code is in `pipeline/board_build_process.py` ("THE PARENT'S RATCHET")
+and `syndicate/features/shared/worker_recycle.py` (`register_recycle_check`). Tests:
+`tests/test_board_split_memory_guard.py` section (d), 42 new tests, 75 in the file. They pass on Windows and on the
+fleet's Python 3.11.16, with 124 across the split's suites there.
+
+**Two switches, each absent = today**, both REFRESH_WORKER__-scoped:
+
+| key | value to load | what it does |
+|---|---|---|
+| `SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB` | 1500 | the split's parent exits at the worker main loop's own recycle point when its RSS >= 1,500 MB inside 09-12Z (3:00-5:59 AM CST), up >= 6 h, with no job child, the board child idle, no drain, and the checkout HEAD unchanged since its boot |
+| `SYNDICATE_BOARD_PROCESS_RECURRING_JOBS_MARGIN_MB` | 400 | the post-build check recycles the child when parent + child + 400 MB of recurring jobs would leave less than the 1,900 MB floor |
+
+**Why these values.**
+- **1,500 MB:**
+  - A fresh parent reads 0.8-1.2 GB (785 MB 11-19, 1,113-1,174 MB 11-21).
+  - After one live evening it is 1.55-2.3 GB, and the morning floors were 1,610 and 2,166 MB.
+  - So 1,500 resets it every morning after a live evening, and never after a quiet one.
+- **400 MB:** the role's other processes read p90 288-427 MB (11-20 day, evening and night); they run about half
+  the time.
+- **The 09-12Z window and the 6 h minimum:** at most one recycle a morning, never in an evening. The 11-24 load
+  itself (~08:30Z) cannot self-recycle that morning, because it will not have been up 6 h.
+
+**It is a betting change** (the board's build cadence, BC-053's rule), so it loads only in the window. It is queued as
+droppable CHANGE J of batch task `nfl-level-refit-load-1120`.
+
+**Load checks** (the reading is VOID without them):
+- after the up, one `BOARD_PROCESS_PARENT_RECYCLE_ARMED ... threshold_mb=1500 window_utc=09-12 min_uptime_s=21600
+  boot_head=<TARGET's first 12>`;
+- `BOARD_PROCESS_CHILD_SWITCHES ... jobs_margin_mb=400`;
+- `kit_role_env.py` showing refresh-worker carrying both keys.
+
+| # | what | window | predicted | falsified if |
+|---|---|---|---|---|
+| P1 | parent self-recycle fires | 11-25 and 11-26, 09:00-11:59Z | on each morning whose 09Z parent RSS is >= 1,500 MB: exactly 1 `BOARD_PROCESS_PARENT_RECYCLE`, then `RECYCLE_EXIT reason=board_parent_rss` and a new supervised pid | 0 recycles on a qualifying morning for a reason other than a legitimate hold (`children_running` / `board_building` / `drain_requested` / `code_on_disk_changed` throughout); or >1 in a morning; or any outside 09-12Z |
+| P2 | it costs nothing it should not | each self-recycle | the new parent reads < 1,300 MB 30 min later; the board gap across it (the last `BOARD_BUILD_TIMING` before to the first after) <= 900 s; the RECYCLE line reads `children: 0` | gap > 1,200 s; or any job child killed; or any rc -6 / `Fatal Python error` |
+| P3 | refusals per evening | 11-24, 11-25, 11-26, 5-10 PM CST | `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` <= 3 an evening (11-19: 4, 11-20: 13) | > 6 on any comparable evening |
+| P4 | streak recycles per evening | same | `RECYCLE_EXIT reason=heavy_build_refused` <= 1 an evening (11-20: 3) | >= 3 on any comparable evening |
+| P5 | board cadence | same | longest `BOARD_BUILD_TIMING` gap <= 900 s; gap p50 <= 360 s (11-20: 1,062 / 330 s) | longest > 1,200 s, or p50 > 420 s (the margin's extra cold builds costing more than the refusals they save) |
+
+- **Exploratory, not pass/fail:**
+  - the parent RSS at 9 PM CST each evening (expected <= 2.0 GB: never more than a day old);
+  - post-build `held=transient_jobs` lines per evening (11-20: 3 in the window);
+  - post-build recycles vs streak recycles;
+  - every `BOARD_PROCESS_PARENT_RECYCLE_CHECK held=` reason seen.
+- **Comparability:** the §5 rule per evening (core live NCAAB + NBA + NHL + NFL at ~7 PM CST >= 70% of 11-18's 46 = 33).
+  An evening under it is CONFOUNDED for P3-P5. Thanksgiving (11-26 Wed NBA/NCAAB; 11-27 NFL) changes the slate.
+- **Confounds named now:**
+  - The same down/up loads CHANGES A-I. C (look-ahead lane wait), D (book-grid stamp), G (college orientation join)
+    and I (off-floor exits) also run in refresh-worker or its board child, and may move its memory or build time.
+  - So P3-P5 rest on the batch, not on J alone. P1-P2 are J's own.
+  - A manual refresh-worker restart or deploy in a window resets the parent and is named; an evening with one is
+    CONFOUNDED.
+- **Safety:** tree max <= 6,936 MB; 0 OOM; 0 rc -6; no job child killed by a self-recycle.
+- **Revert:** remove the two env lines, then a drained full down/up. A revert is allowed outside a window.
+- **Reading:** owed in this lane, after the 11-26 morning. Scheduled task `board-parent-recycle-reading-1126`.

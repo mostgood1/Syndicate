@@ -67,6 +67,23 @@ n 476), and the parent (tick / overlay) grows ~+1.1 GB from 5 to 9 PM. A child r
   child's cold build then starts right after a publication. Held for: other processes' transient jobs (the board
   pair alone fits under the floor), uptime below the recycle minimum, children, a drain, recycling disabled. The
   refusal-streak recycle above stays as the fallback.
+
+THE PARENT'S RATCHET -- two more switches, same rule (user "Yes, build it", 2026-11-21; findings §9-§12). Loaded, the
+four above held the first evening (11-19: 4 refusals) and not the second (11-20: 13). The parent keeps ~+0.6 GB a day
+that its trims do not return (785 MB 11-19 11 AM -> 1,610 MB 11-20 -> 2,166 MB 11-21 9 AM), and under the split nothing
+restarts it: its refusal count stays 0 and the board child always counts as a running child.
+- `SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB=<n>`: the PARENT exits at the worker main loop's own recycle point (a check
+  it registers with `worker_recycle.maybe_recycle`; the main loop returns and the supervisor restarts the role) when
+  its own RSS >= n MB, the UTC hour is inside `SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_UTC_HOURS` (default 09-12 =
+  3:00-5:59 AM CST), it has been up >= `..._MIN_UPTIME_SECONDS` (default 6 h, so at most once a morning), no child
+  other than the board child is alive, the board child is not building, no drain is requested, and the checkout's
+  HEAD is still the one this process booted with. That last rule means a self-recycle never loads code: an ff that has
+  not been deployed holds it (`held=code_on_disk_changed`) until someone restarts the role on purpose.
+- `SYNDICATE_BOARD_PROCESS_RECURRING_JOBS_MARGIN_MB=<n>`: the post-build check above counts n MB of other jobs as
+  RECURRING. The child recycles when the pair cannot carry them (max - pair - n < floor), even if the snapshot is
+  sufficient right now. Without it, a shortfall the pair alone does not explain is "transient" and holds; measured
+  11-20, 3 of 3 such holds were followed by 3 refused builds and the same recycle anyway. The role's other processes
+  measured p50 0, p90 288-427 MB, max 784-820 MB (11-20 day, evening and night): they run about half the time.
 """
 
 from __future__ import annotations
@@ -99,6 +116,11 @@ CEILING_CREDIT_ENV = "SYNDICATE_BOARD_PROCESS_CEILING_CREDIT_MB"
 CEILING_CREDIT_APPLIED_ENV = "SYNDICATE_BOARD_PROCESS_CEILING_CREDIT_APPLIED"
 PARENT_TRIM_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_TRIM_SECONDS"
 RECYCLE_AFTER_BUILD_ENV = "SYNDICATE_BOARD_PROCESS_RECYCLE_AFTER_BUILD"
+# The parent's ratchet (2026-11-21): each absent = unchanged behaviour. See the module doc, "THE PARENT'S RATCHET".
+PARENT_RECYCLE_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB"
+PARENT_RECYCLE_HOURS_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_UTC_HOURS"
+PARENT_RECYCLE_MIN_UPTIME_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MIN_UPTIME_SECONDS"
+RECURRING_JOBS_MARGIN_ENV = "SYNDICATE_BOARD_PROCESS_RECURRING_JOBS_MARGIN_MB"
 CHILD_MODULE = "pipeline.board_build_process"
 # `check_deploy_safety.SERVICE_CHILD_CMDLINE_MARKERS` carries this exact string.
 CHILD_CMDLINE_MARKER = f"{CHILD_MODULE} --serve"
@@ -475,6 +497,223 @@ def start_parent_trim(
     return _PARENT_TRIM_THREAD
 
 
+# ------------------------------------------------------------ the parent self-recycle (parent side, #850, 2026-11-21)
+
+_PARENT_RECYCLE_DEFAULT_HOURS = (9, 12)  # [09:00, 12:00) UTC = 3:00-5:59 AM CST (4:00-6:59 AM CDT)
+_PARENT_RECYCLE_DEFAULT_MIN_UPTIME_S = 6 * 3600
+_PARENT_RECYCLE_QUIET_REASONS = frozenset({"disabled", "below_threshold"})
+PARENT_RECYCLE_CHECK_NAME = "board_parent_rss"
+
+
+def parent_recycle_window(env: Mapping[str, str] | None = None) -> tuple[int, int]:
+    """`SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_UTC_HOURS` as [start, end) UTC hours, e.g. "09-12"; it may wrap
+    ("22-03"). Absent or junk -> the default 09-12."""
+    raw = str((os.environ if env is None else env).get(PARENT_RECYCLE_HOURS_ENV) or "").strip()
+    try:
+        start_s, end_s = raw.split("-", 1)
+        start, end = int(start_s), int(end_s)
+    except ValueError:
+        return _PARENT_RECYCLE_DEFAULT_HOURS
+    if not (0 <= start <= 23 and 1 <= end <= 24) or start == end:
+        return _PARENT_RECYCLE_DEFAULT_HOURS
+    return start, end
+
+
+def _hour_in_window(hour: int, window: tuple[int, int]) -> bool:
+    start, end = window
+    return start <= hour < end if start < end else (hour >= start or hour < end)
+
+
+def parent_recycle_min_uptime_seconds(env: Mapping[str, str] | None = None) -> int:
+    return _positive_int_env(PARENT_RECYCLE_MIN_UPTIME_ENV, env) or _PARENT_RECYCLE_DEFAULT_MIN_UPTIME_S
+
+
+def parent_recycle_decision(
+    *,
+    threshold_mb: int,
+    parent_rss_mb: float | None,
+    utc_hour: int,
+    window: tuple[int, int],
+    uptime_s: float,
+    min_uptime_s: float,
+    other_children: list[int] | None,
+    board_building: bool,
+    draining: bool,
+    boot_head: str | None,
+    disk_head: str | None,
+) -> tuple[bool, str, dict[str, Any]]:
+    """(recycle, reason, detail). Pure. Should the split's PARENT exit now so the supervisor restarts it fresh?
+
+    In order: switched on; its own RSS known and >= the threshold; inside the quiet window; up long enough; no child
+    but the board child (a restart kills children exactly as a deploy does; unreadable = unknown = hold); the board
+    child not mid-build (its busy flock); no drain; and the checkout's HEAD equal to the one it booted with, so a
+    self-recycle never loads code (unreadable = hold).
+    """
+    detail: dict[str, Any] = {
+        "parent_rss_mb": None if parent_rss_mb is None else round(float(parent_rss_mb), 1),
+        "threshold_mb": int(threshold_mb),
+        "utc_hour": int(utc_hour),
+        "window_utc": f"{window[0]:02d}-{window[1]:02d}",
+        "uptime_s": int(uptime_s),
+        "min_uptime_s": int(min_uptime_s),
+    }
+    if threshold_mb <= 0:
+        return False, "disabled", detail
+    if parent_rss_mb is None:
+        return False, "rss_unknown", detail
+    if float(parent_rss_mb) < float(threshold_mb):
+        return False, "below_threshold", detail
+    if not _hour_in_window(int(utc_hour), window):
+        return False, "outside_window", detail
+    if uptime_s < min_uptime_s:
+        return False, "min_uptime", detail
+    if other_children is None:
+        return False, "children_unknown", detail
+    detail["children"] = len(other_children)
+    if other_children:
+        return False, "children_running", detail
+    if board_building:
+        return False, "board_building", detail
+    if draining:
+        return False, "drain_requested", detail
+    detail["boot_head"] = (boot_head or "")[:12] or None
+    detail["disk_head"] = (disk_head or "")[:12] or None
+    if not boot_head or not disk_head:
+        return False, "code_unknown", detail
+    if boot_head != disk_head:
+        return False, "code_on_disk_changed", detail
+    return True, "recycle", detail
+
+
+def _git_head(repo: Path = REPO_ROOT, *, run: Callable[..., Any] = subprocess.run) -> str | None:
+    """The checkout's HEAD SHA, or None when it cannot be read (None holds a self-recycle)."""
+    try:
+        out = run(["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10)
+    except Exception:  # noqa: BLE001
+        return None
+    sha = str(getattr(out, "stdout", "") or "").strip()
+    if getattr(out, "returncode", 1) != 0 or len(sha) != 40:
+        return None
+    return sha
+
+
+def _own_rss_mb() -> float | None:
+    try:
+        import psutil
+
+        return int(psutil.Process(os.getpid()).memory_info().rss) / (1024.0 * 1024.0)
+    except Exception:  # noqa: BLE001 - unknown holds
+        return None
+
+
+def _supervisor_child_pid(supervisor: Any) -> int | None:
+    proc = getattr(supervisor, "_proc", None)
+    pid = getattr(proc, "pid", None)
+    return int(pid) if pid else None
+
+
+def _gather_parent_recycle_decision(
+    *,
+    threshold_mb: int,
+    boot_head: str | None,
+    board_child_pid: Callable[[], int | None],
+    env: Mapping[str, str] | None = None,
+    head: Callable[[], str | None] | None = None,
+    now: Callable[[], float] | None = None,
+) -> tuple[bool, str, dict[str, Any]]:
+    """The live inputs for `parent_recycle_decision`. The HEAD is read only when everything else says recycle."""
+    from syndicate.features.shared import worker_recycle
+
+    head = head or _git_head
+    now = now or time.time
+
+    try:
+        children = worker_recycle.child_process_pids(os.getpid())
+    except Exception:  # noqa: BLE001
+        children = None
+    board_pid = board_child_pid()
+    try:
+        from syndicate.features.shared.deploy_drain import drain_active
+
+        draining = bool(drain_active())
+    except Exception:  # noqa: BLE001 - an unreadable drain must not read as "no drain" for an unattended exit
+        draining = True
+    args: dict[str, Any] = dict(
+        threshold_mb=threshold_mb,
+        parent_rss_mb=_own_rss_mb(),
+        utc_hour=time.gmtime(now()).tm_hour,
+        window=parent_recycle_window(env),
+        uptime_s=max(0.0, now() - _role_booted_at()),
+        min_uptime_s=parent_recycle_min_uptime_seconds(env),
+        other_children=None if children is None else [pid for pid in children if pid != board_pid],
+        board_building=child_board_busy(),
+        draining=draining,
+        boot_head=boot_head,
+    )
+    recycle, reason, detail = parent_recycle_decision(**args, disk_head=boot_head)
+    if not recycle:
+        return recycle, reason, detail
+    return parent_recycle_decision(**args, disk_head=head())
+
+
+class ParentSelfRecycler:
+    """PARENT side. Registered with `worker_recycle.maybe_recycle`, which the worker's main loop calls at its own safe
+    point every cycle. True -> the main loop returns and the supervisor restarts the role. A held check logs once per
+    reason change; below the threshold it is silent."""
+
+    def __init__(self, decide: Callable[[], tuple[bool, str, dict[str, Any]]]) -> None:
+        self._decide = decide
+        self._held: Optional[str] = None
+
+    def __call__(self) -> bool:
+        recycle, reason, detail = self._decide()
+        if recycle:
+            _log(f"BOARD_PROCESS_PARENT_RECYCLE pid={os.getpid()} {detail} -- the supervisor restarts refresh-worker")
+            return True
+        if reason in _PARENT_RECYCLE_QUIET_REASONS:
+            self._held = None
+            return False
+        if reason != self._held:
+            self._held = reason
+            _log(f"BOARD_PROCESS_PARENT_RECYCLE_CHECK held={reason} {detail}")
+        return False
+
+
+def install_parent_self_recycle(
+    supervisor: Any,
+    env: Mapping[str, str] | None = None,
+    *,
+    register: Callable[[str, Callable[[], bool]], None] | None = None,
+    head: Callable[[], str | None] | None = None,
+) -> Optional[ParentSelfRecycler]:
+    """PARENT side, process mode only. None unless `SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB` > 0: then the worker's
+    main loop and its recycle check behave exactly as before."""
+    threshold = _positive_int_env(PARENT_RECYCLE_ENV, env)
+    if threshold <= 0:
+        return None
+    if register is None:
+        from syndicate.features.shared.worker_recycle import register_recycle_check as register
+    head = head or _git_head
+    boot_head = head()
+    recycler = ParentSelfRecycler(
+        lambda: _gather_parent_recycle_decision(
+            threshold_mb=threshold,
+            boot_head=boot_head,
+            board_child_pid=lambda: _supervisor_child_pid(supervisor),
+            env=env,
+            head=head,
+        )
+    )
+    register(PARENT_RECYCLE_CHECK_NAME, recycler)
+    window = parent_recycle_window(env)
+    _log(
+        f"BOARD_PROCESS_PARENT_RECYCLE_ARMED pid={os.getpid()} threshold_mb={threshold} "
+        f"window_utc={window[0]:02d}-{window[1]:02d} min_uptime_s={parent_recycle_min_uptime_seconds(env)} "
+        f"boot_head={(boot_head or 'unknown')[:12]}"
+    )
+    return recycler
+
+
 _SUPERVISOR: Optional[BoardProcessSupervisor] = None
 
 
@@ -523,6 +762,10 @@ def start_board_loop_for_refresh_worker(in_thread_starter: Callable[[], bool] | 
     if _SUPERVISOR is None:
         _SUPERVISOR = BoardProcessSupervisor(env=child_env())
     _SUPERVISOR.start()
+    try:  # a no-op unless SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB is set (2026-11-21)
+        install_parent_self_recycle(_SUPERVISOR)
+    except Exception as exc:  # noqa: BLE001 - never cost the board its start
+        _log(f"BOARD_PROCESS_PARENT_RECYCLE_SETUP_FAILED {type(exc).__name__}: {exc}")
     return True
 
 
@@ -628,6 +871,7 @@ def post_build_recycle_decision(
     recycle_enabled: bool,
     children: list[int] | None,
     draining: bool,
+    jobs_margin_mb: float = 0.0,
 ) -> tuple[bool, str, dict[str, Any]]:
     """(recycle, reason, detail). Pure. Would the NEXT build be refused, and would recycling THIS process help?
 
@@ -635,6 +879,12 @@ def post_build_recycle_decision(
     build's guard would decide. `pair_rss_mb` is the parent's RSS plus this child's: when the pair alone leaves the
     floor free, the shortfall is someone else's transient job (an odds sweep, a sim) and a recycle would cost a cold
     build for nothing, so it holds. The rest are `worker_recycle`'s own conditions.
+
+    `jobs_margin_mb` > 0 (`SYNDICATE_BOARD_PROCESS_RECURRING_JOBS_MARGIN_MB`): the other jobs RECUR, so the question is
+    whether the pair can carry `jobs_margin_mb` of them. It fits -> hold (`headroom_ok` if the snapshot is sufficient
+    now, else `transient_jobs`); it does not -> go on to the recycle conditions, even when the snapshot is sufficient
+    right now, because the next build that overlaps a typical job will be refused. An unknown pair falls back to the
+    rule without the margin. 0 (the default) is the rule without the margin, unchanged.
     """
     snap = snapshot or {}
     detail: dict[str, Any] = {
@@ -646,15 +896,23 @@ def post_build_recycle_decision(
         "uptime_s": int(uptime_s),
         "min_uptime_s": int(min_uptime_s),
     }
+    margin = max(0.0, float(jobs_margin_mb or 0.0))
+    if margin > 0:
+        detail["jobs_margin_mb"] = round(margin, 1)
     if not recycle_enabled:
         return False, "disabled", detail
     if snapshot is None:
         return False, "headroom_unknown", detail  # the guard itself proceeds on an unreadable snapshot
-    if snapshot.get("sufficient", True):
-        return False, "headroom_ok", detail
     max_mb = snapshot.get("max_mb")
-    if pair_rss_mb is not None and isinstance(max_mb, (int, float)) and float(max_mb) - float(pair_rss_mb) >= float(floor_mb):
-        return False, "transient_jobs", detail
+    if margin > 0 and pair_rss_mb is not None and isinstance(max_mb, (int, float)):
+        if float(max_mb) - float(pair_rss_mb) - margin >= float(floor_mb):
+            return False, ("headroom_ok" if snapshot.get("sufficient", True) else "transient_jobs"), detail
+        detail["basis"] = "pair_plus_recurring_jobs"
+    else:
+        if snapshot.get("sufficient", True):
+            return False, "headroom_ok", detail
+        if pair_rss_mb is not None and isinstance(max_mb, (int, float)) and float(max_mb) - float(pair_rss_mb) >= float(floor_mb):
+            return False, "transient_jobs", detail
     if uptime_s < min_uptime_s:
         return False, "min_uptime", detail
     if children is None:
@@ -714,6 +972,7 @@ def _gather_post_build_decision(parent_pid: int, started_monotonic: float, *, tr
         recycle_enabled=worker_recycle.recycle_after_refusals() > 0,
         children=children,
         draining=draining,
+        jobs_margin_mb=float(_positive_int_env(RECURRING_JOBS_MARGIN_ENV)),
     )
 
 
@@ -842,9 +1101,11 @@ def _serve_main() -> int:
         recycler = make_post_build_recycler(service, parent_pid=parent_pid, started_monotonic=started)
     except Exception as exc:  # noqa: BLE001 - the post-build check must never cost the board
         _log(f"POST_BUILD_RECYCLE_SETUP_FAILED {type(exc).__name__}: {exc}")
+    margin = _positive_int_env(RECURRING_JOBS_MARGIN_ENV)
     _log(
         f"BOARD_PROCESS_CHILD_SWITCHES pid={os.getpid()} raw_lifeline={int(_switch_on(RAW_LIFELINE_ENV))} "
         f"recycle_after_build={int(recycler is not None)} ceiling_credit={os.environ.get(CEILING_CREDIT_APPLIED_ENV) or 'none'}"
+        + (f" jobs_margin_mb={margin}" if margin > 0 else "")
     )
     last_recycle_check = time.monotonic()
     while not gone.wait(_SERVE_POLL_SECONDS):

@@ -63,6 +63,7 @@ __all__ = [
     "heavy_builds_completed",
     "child_process_pids",
     "recycle_decision",
+    "register_recycle_check",
 ]
 
 _DEFAULT_AFTER_REFUSALS = 15
@@ -137,6 +138,35 @@ def _last_refusal_stage() -> str | None:
 def _reset_for_tests() -> None:
     with _lock:
         _state.update({"consecutive_refusals": 0, "total_refusals": 0, "total_completed": 0, "last_refusal_stage": None})
+        _extra_checks.clear()
+
+
+# Lane `board-split-memory-guard` (#850, 2026-11-21): other recycle rules, registered by the code that owns them. The
+# board split's parent registers one (`pipeline/board_build_process.py`, `SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB`)
+# because under the split this process's own refusal count stays 0. Nothing registered = `maybe_recycle` unchanged.
+_extra_checks: dict[str, Callable[[], bool]] = {}
+
+
+def register_recycle_check(name: str, check: Callable[[], bool]) -> None:
+    """Add (or replace, by name) a check `maybe_recycle` runs whenever its own streak rule does not fire. The check
+    decides AND logs its own conditions; True means exit now. It runs at the main loop's own recycle point."""
+    with _lock:
+        _extra_checks[str(name)] = check
+
+
+def _run_extra_checks() -> bool:
+    with _lock:
+        checks = list(_extra_checks.items())
+    for name, check in checks:
+        try:
+            fired = bool(check())
+        except Exception as exc:  # a broken check never exits the process
+            print(f"[worker_recycle] RECYCLE_CHECK_FAILED check={name} {type(exc).__name__}: {exc}", flush=True)
+            continue
+        if fired:
+            print(f"[worker_recycle] RECYCLE_EXIT reason={name}", flush=True)
+            return True
+    return False
 
 
 def child_process_pids(parent_pid: int, *, proc_root: Path = Path("/proc")) -> list[int] | None:
@@ -249,10 +279,10 @@ def maybe_recycle(*, parent_pid: int, **kwargs: Any) -> bool:
         )
     except Exception as exc:  # pragma: no cover - defensive
         print(f"[worker_recycle] RECYCLE_CHECK_FAILED {type(exc).__name__}: {exc}", flush=True)
-        return False
+        return _run_extra_checks()
     if reason in {"disabled", "below_threshold"}:
         _last_logged["key"] = None
-        return False
+        return _run_extra_checks()
     key = (detail.get("consecutive_refusals"), reason)
     if recycle:
         print(f"[worker_recycle] RECYCLE_EXIT reason=heavy_build_refused {detail}", flush=True)
@@ -260,4 +290,4 @@ def maybe_recycle(*, parent_pid: int, **kwargs: Any) -> bool:
     if key != _last_logged["key"]:
         _last_logged["key"] = key
         print(f"[worker_recycle] RECYCLE_CHECK held={reason} {detail}", flush=True)
-    return False
+    return _run_extra_checks()

@@ -4,6 +4,8 @@
 (b) SYNDICATE_BOARD_PROCESS_CEILING_CREDIT_MB -- the role's declared ceiling credits the second interpreter;
     SYNDICATE_BOARD_PROCESS_PARENT_TRIM_SECONDS -- the parent malloc_trims on a clock.
 (c) SYNDICATE_BOARD_PROCESS_RECYCLE_AFTER_BUILD -- recycle right after a completed build when the next would be refused.
+(d) the parent's ratchet (2026-11-21): SYNDICATE_BOARD_PROCESS_RECURRING_JOBS_MARGIN_MB -- the post-build check counts
+    recurring jobs; SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB -- the split's parent exits at the main loop's recycle point.
 
 Reachability first for each (off != on, through the real code path), then the rules.
 """
@@ -475,3 +477,311 @@ def test_heavy_builds_completed_counts_only_completed_builds():
         assert worker_recycle.heavy_builds_completed() == 1
     finally:
         worker_recycle._reset_for_tests()
+
+
+# ======================================================== (d) the parent's ratchet: recurring-jobs margin + parent recycle
+# User "Yes, build it" 2026-11-21 (findings §9-§12). Each switch absent = everything above unchanged.
+
+
+def _margin_decision(margin: float, **over):
+    args = dict(
+        snapshot={"sufficient": False, "max_mb": 7936.0, "current_mb": 6268.4, "headroom_mb": 1667.6},
+        pair_rss_mb=5870.5,  # 11-20 23:01:33Z: held=transient_jobs, then 3 refusals and a streak recycle
+        floor_mb=1900.0,
+        uptime_s=16141.0,
+        min_uptime_s=1800.0,
+        recycle_enabled=True,
+        children=[],
+        draining=False,
+        jobs_margin_mb=margin,
+    )
+    args.update(over)
+    return bbp.post_build_recycle_decision(**args)
+
+
+def test_jobs_margin_off_is_not_on_on_the_11_20_hold():
+    off = _margin_decision(0.0)
+    on = _margin_decision(400.0)
+    assert off[:2] == (False, "transient_jobs")
+    assert "jobs_margin_mb" not in off[2]
+    assert on[:2] == (True, "recycle")
+    assert on[2]["jobs_margin_mb"] == 400.0 and on[2]["basis"] == "pair_plus_recurring_jobs"
+
+
+def test_jobs_margin_anticipates_a_refusal_while_the_snapshot_is_still_sufficient():
+    sufficient = {"sufficient": True, "max_mb": 7936.0, "current_mb": 5900.0, "headroom_mb": 2036.0}
+    assert _margin_decision(0.0, snapshot=sufficient, pair_rss_mb=5800.0)[1] == "headroom_ok"
+    assert _margin_decision(400.0, snapshot=sufficient, pair_rss_mb=5800.0)[:2] == (True, "recycle")
+    # a pair that carries a typical job holds, sufficient or not
+    assert _margin_decision(400.0, snapshot=sufficient, pair_rss_mb=5000.0)[1] == "headroom_ok"
+    assert _margin_decision(400.0, pair_rss_mb=5000.0)[1] == "transient_jobs"
+
+
+@pytest.mark.parametrize(
+    "over, reason",
+    [
+        ({"pair_rss_mb": None}, "recycle"),  # unknown pair: the rule without the margin (insufficient -> on)
+        ({"pair_rss_mb": None, "snapshot": {"sufficient": True, "max_mb": 7936.0}}, "headroom_ok"),
+        ({"recycle_enabled": False}, "disabled"),
+        ({"snapshot": None}, "headroom_unknown"),
+        ({"uptime_s": 900.0}, "min_uptime"),
+        ({"children": [1]}, "children_running"),
+        ({"draining": True}, "drain_requested"),
+    ],
+)
+def test_jobs_margin_keeps_every_other_rule(over, reason):
+    assert _margin_decision(400.0, **over)[1] == reason
+
+
+def test_gather_reads_the_margin_switch(monkeypatch):
+    """Reachability: the env key reaches the decision through `_gather_post_build_decision`."""
+    from syndicate.features.shared import deploy_drain
+
+    snap = {"sufficient": False, "max_mb": 7936.0, "current_mb": 6268.4, "headroom_mb": 1667.6}
+    monkeypatch.setattr(mo, "memory_headroom_snapshot", lambda _floor: dict(snap))
+    monkeypatch.setattr(bbp, "_pair_rss_mb", lambda _pid: 5870.5)
+    monkeypatch.setattr(worker_recycle, "child_process_pids", lambda _pid: [])
+    monkeypatch.setattr(deploy_drain, "drain_active", lambda: False)
+    monkeypatch.setattr(intelligence_state, "_MIN_SAFE_MEMORY_HEADROOM_BYTES", 1900 * MB)
+    monkeypatch.delenv("SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS", raising=False)
+    started = time.monotonic() - 3600.0
+    monkeypatch.delenv(bbp.RECURRING_JOBS_MARGIN_ENV, raising=False)
+    off = bbp._gather_post_build_decision(1, started, trim=False)
+    monkeypatch.setenv(bbp.RECURRING_JOBS_MARGIN_ENV, "400")
+    on = bbp._gather_post_build_decision(1, started, trim=False)
+    assert off[1] == "transient_jobs" and on[1] == "recycle"
+    assert on[2]["jobs_margin_mb"] == 400.0
+
+
+HEAD_A = "a" * 40
+HEAD_B = "b" * 40
+
+
+def _parent_decision(**over):
+    args = dict(
+        threshold_mb=1500,
+        parent_rss_mb=2166.0,  # 11-21 9 AM floor
+        utc_hour=10,
+        window=(9, 12),
+        uptime_s=40000.0,
+        min_uptime_s=21600.0,
+        other_children=[],
+        board_building=False,
+        draining=False,
+        boot_head=HEAD_A,
+        disk_head=HEAD_A,
+    )
+    args.update(over)
+    return bbp.parent_recycle_decision(**args)
+
+
+@pytest.mark.parametrize(
+    "over, reason",
+    [
+        ({}, "recycle"),
+        ({"threshold_mb": 0}, "disabled"),
+        ({"parent_rss_mb": None}, "rss_unknown"),
+        ({"parent_rss_mb": 1400.0}, "below_threshold"),
+        ({"utc_hour": 23}, "outside_window"),  # 5 PM CST: never mid-evening
+        ({"utc_hour": 12}, "outside_window"),  # the window is [start, end)
+        ({"uptime_s": 3600.0}, "min_uptime"),
+        ({"other_children": None}, "children_unknown"),
+        ({"other_children": [4242]}, "children_running"),
+        ({"board_building": True}, "board_building"),
+        ({"draining": True}, "drain_requested"),
+        ({"disk_head": None}, "code_unknown"),
+        ({"boot_head": None}, "code_unknown"),
+        ({"disk_head": HEAD_B}, "code_on_disk_changed"),  # an ff that was not deployed: never load it
+    ],
+)
+def test_parent_recycle_decision_rules(over, reason):
+    recycle, got, detail = _parent_decision(**over)
+    assert got == reason
+    assert recycle is (reason == "recycle")
+    assert detail["threshold_mb"] == over.get("threshold_mb", 1500)
+
+
+@pytest.mark.parametrize(
+    "raw, window, inside, outside",
+    [
+        (None, (9, 12), [9, 11], [8, 12, 23]),
+        ("08-13", (8, 13), [8, 12], [7, 13]),
+        ("22-03", (22, 3), [22, 23, 0, 2], [3, 21]),
+        ("junk", (9, 12), [9], [12]),
+        ("5-5", (9, 12), [9], [5]),
+        ("25-3", (9, 12), [9], [3]),
+    ],
+)
+def test_parent_recycle_window(raw, window, inside, outside):
+    env = {} if raw is None else {bbp.PARENT_RECYCLE_HOURS_ENV: raw}
+    got = bbp.parent_recycle_window(env)
+    assert got == window
+    assert all(bbp._hour_in_window(h, got) for h in inside)
+    assert not any(bbp._hour_in_window(h, got) for h in outside)
+
+
+class _FakeProc:
+    def __init__(self, pid):
+        self.pid = pid
+
+
+class _FakeSup:
+    def __init__(self, pid):
+        self._proc = _FakeProc(pid)
+
+
+def _parent_live_inputs(monkeypatch, *, rss=2166.0, children=None, busy=False, drain=False, heads=None):
+    """The parent check's live reads, faked at their sources (the REAL gather + decision + recycler run)."""
+    from syndicate.features.shared import deploy_drain
+
+    heads = list(heads or [HEAD_A])
+    monkeypatch.setattr(bbp, "_own_rss_mb", lambda: rss)
+    monkeypatch.setattr(bbp, "_role_booted_at", lambda: time.time() - 40000.0)
+    monkeypatch.setattr(worker_recycle, "child_process_pids", lambda _pid: list(children or []))
+    monkeypatch.setattr(bbp, "child_board_busy", lambda *_a: busy)
+    if isinstance(drain, Exception):
+        def _raise():
+            raise drain
+        monkeypatch.setattr(deploy_drain, "drain_active", _raise)
+    else:
+        monkeypatch.setattr(deploy_drain, "drain_active", lambda: drain)
+    monkeypatch.setattr(bbp, "_git_head", lambda *a, **k: heads.pop(0) if len(heads) > 1 else heads[0])
+
+
+def _parent_env(**extra):
+    env = {bbp.PARENT_RECYCLE_HOURS_ENV: "0-24"}  # every hour, so the test does not depend on the clock
+    env.update(extra)
+    return env
+
+
+def test_parent_recycle_off_is_not_on_through_maybe_recycle(monkeypatch, capsys):
+    """Reachability through the worker main loop's own call: same inputs; absent registers nothing and never exits."""
+    _parent_live_inputs(monkeypatch)
+    worker_recycle._reset_for_tests()
+    try:
+        assert bbp.install_parent_self_recycle(_FakeSup(777), _parent_env()) is None
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is False
+        on = bbp.install_parent_self_recycle(_FakeSup(777), _parent_env(**{bbp.PARENT_RECYCLE_ENV: "1500"}))
+        assert isinstance(on, bbp.ParentSelfRecycler)
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is True
+    finally:
+        worker_recycle._reset_for_tests()
+    out = capsys.readouterr().out
+    assert "BOARD_PROCESS_PARENT_RECYCLE_ARMED" in out and "threshold_mb=1500" in out and "window_utc=00-24" in out
+    assert "BOARD_PROCESS_PARENT_RECYCLE pid=" in out
+    assert "[worker_recycle] RECYCLE_EXIT reason=board_parent_rss" in out
+
+
+def test_parent_recycle_ignores_the_board_child_but_not_a_job(monkeypatch):
+    worker_recycle._reset_for_tests()
+    try:
+        _parent_live_inputs(monkeypatch, children=[777])  # only the board child
+        bbp.install_parent_self_recycle(_FakeSup(777), _parent_env(**{bbp.PARENT_RECYCLE_ENV: "1500"}))
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is True
+        _parent_live_inputs(monkeypatch, children=[777, 4242])  # plus an odds job
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is False
+    finally:
+        worker_recycle._reset_for_tests()
+
+
+def test_parent_recycle_never_loads_code_an_ff_put_on_disk(monkeypatch, capsys):
+    worker_recycle._reset_for_tests()
+    try:
+        _parent_live_inputs(monkeypatch, heads=[HEAD_A, HEAD_B])  # booted on A; the checkout is now B
+        bbp.install_parent_self_recycle(_FakeSup(777), _parent_env(**{bbp.PARENT_RECYCLE_ENV: "1500"}))
+        for _ in range(3):
+            assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is False
+    finally:
+        worker_recycle._reset_for_tests()
+    out = capsys.readouterr().out
+    assert out.count("BOARD_PROCESS_PARENT_RECYCLE_CHECK held=code_on_disk_changed") == 1  # once per reason change
+
+
+@pytest.mark.parametrize(
+    "inputs, reason",
+    [
+        ({"rss": 1400.0}, None),  # below the threshold: silent
+        ({"busy": True}, "board_building"),
+        ({"drain": True}, "drain_requested"),
+        ({"drain": RuntimeError("unreadable")}, "drain_requested"),  # unknown is not "no drain"
+        ({"heads": [None]}, "code_unknown"),
+    ],
+)
+def test_parent_recycle_holds(monkeypatch, capsys, inputs, reason):
+    worker_recycle._reset_for_tests()
+    try:
+        _parent_live_inputs(monkeypatch, **inputs)
+        bbp.install_parent_self_recycle(_FakeSup(777), _parent_env(**{bbp.PARENT_RECYCLE_ENV: "1500"}))
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is False
+    finally:
+        worker_recycle._reset_for_tests()
+    out = capsys.readouterr().out
+    if reason is None:
+        assert "BOARD_PROCESS_PARENT_RECYCLE_CHECK" not in out
+    else:
+        assert f"BOARD_PROCESS_PARENT_RECYCLE_CHECK held={reason}" in out
+
+
+def test_a_broken_registered_check_never_exits(capsys):
+    worker_recycle._reset_for_tests()
+    try:
+        worker_recycle.register_recycle_check("broken", lambda: 1 / 0)
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is False
+    finally:
+        worker_recycle._reset_for_tests()
+    assert "RECYCLE_CHECK_FAILED check=broken ZeroDivisionError" in capsys.readouterr().out
+
+
+def test_the_streak_recycle_still_wins_and_runs_first(monkeypatch):
+    """A refusal streak exits as before (reason heavy_build_refused); the registered check is not even asked."""
+    asked: list[int] = []
+    worker_recycle._reset_for_tests()
+    try:
+        monkeypatch.setenv("SYNDICATE_REFRESH_WORKER_RECYCLE_AFTER_REFUSALS", "3")
+        for _ in range(3):
+            worker_recycle.note_heavy_build_refused("pre_source_state_fingerprint")
+        worker_recycle.register_recycle_check("x", lambda: asked.append(1) or False)
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0,
+                                            children_fn=lambda _p: [], drain_active_fn=lambda: False) is True
+        assert asked == []
+    finally:
+        worker_recycle._reset_for_tests()
+
+
+def test_process_mode_arms_the_parent_recycle_only_when_switched_on(monkeypatch):
+    worker_recycle._reset_for_tests()
+    try:
+        monkeypatch.setenv(bbp.SWITCH_ENV, "1")
+        _fleet_memory(monkeypatch, tree_mb=5400.0)
+        monkeypatch.setattr(bbp, "_git_head", lambda *a, **k: HEAD_A)
+        monkeypatch.delenv(bbp.PARENT_RECYCLE_ENV, raising=False)
+        _wire_start(monkeypatch)
+        bbp.start_board_loop_for_refresh_worker()
+        assert bbp.PARENT_RECYCLE_CHECK_NAME not in worker_recycle._extra_checks
+        monkeypatch.setenv(bbp.PARENT_RECYCLE_ENV, "1500")
+        _fleet_memory(monkeypatch, tree_mb=5400.0)
+        _wire_start(monkeypatch)
+        bbp.start_board_loop_for_refresh_worker()
+        assert bbp.PARENT_RECYCLE_CHECK_NAME in worker_recycle._extra_checks
+        # thread mode (no fcntl): never armed, whatever the switch says
+        worker_recycle._reset_for_tests()
+        _fleet_memory(monkeypatch, tree_mb=5400.0)
+        effects, _sup = _wire_start(monkeypatch, posix_ready=False)
+        bbp.start_board_loop_for_refresh_worker()
+        assert effects == ["in_thread"]
+        assert bbp.PARENT_RECYCLE_CHECK_NAME not in worker_recycle._extra_checks
+    finally:
+        worker_recycle._reset_for_tests()
+
+
+def test_git_head_reads_a_sha_or_none():
+    class _Out:
+        def __init__(self, rc, out):
+            self.returncode, self.stdout = rc, out
+
+    assert bbp._git_head(run=lambda *a, **k: _Out(0, HEAD_A + "\n")) == HEAD_A
+    assert bbp._git_head(run=lambda *a, **k: _Out(128, "")) is None
+    assert bbp._git_head(run=lambda *a, **k: _Out(0, "not-a-sha")) is None
+    assert bbp._git_head(run=lambda *a, **k: (_ for _ in ()).throw(OSError("no git"))) is None
+    real = bbp._git_head()  # this checkout
+    assert real is None or len(real) == 40
