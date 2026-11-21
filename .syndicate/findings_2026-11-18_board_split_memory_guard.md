@@ -412,3 +412,37 @@ SUMMARY). It was re-derived here read-only from `refresh-worker.log{,.1}` at 07:
     under 2,110, though this evening shows the multi-day rise the rule was set to detect.
 - **The lasting fix** (§8 answer 2: a parent self-recycle in quiet hours, plus the recurring-jobs margin). Both are
   betting changes, so the 11-24 window. That is the user's decision after the floor reading.
+
+## 10. 11-21 morning floor and the conditional reset (task `board-memory-parent-reset-1121`, written 2026-11-21 15:05Z = 9:05 AM CST)
+
+(The task named this section 9; section 9 is already READING 2, so it is 10.)
+
+**Floor reading** (`floor.sh`, read 15:01:02Z = 9:01 AM CST):
+- parent pid 1011283 (still the 11-19 load's process, etimes 165,637 s); parent RSS p50 **2,166 MB** (n 40 heartbeats, ~40 min);
+  child p50 3,425 MB; tree p50 5,620 MB; ceiling 7,936 MB.
+- **The condition is MET: 2,166 >= 2,110 MB** (`DECISION_RESTART=yes`). Up +556 MB on 11-20's 1,610 MB floor.
+- fleet_head `0d20a69191b7b952cdf00d3dd767a1005abd4fc8`; **runtime_files_changed_since_38c3a6905 = 71**.
+
+**Outcome: NOT restarted.** The task's rule: a non-zero runtime-file count means a TERM would load code other
+lanes put on disk, and the user decides. The fleet checkout was fast-forwarded three times since the 11-19 load
+(reflog: 3c8ba5b14 at 11:03 AM CST 11-20, eeeb62a63 at 11:38 AM, 0d20a6919 at 2:13 PM; 268 commits on
+38c3a6905). refresh-worker has not loaded any of them. Among the 71 files (10,881+/48-):
+- money-path / betting code: `syndicate/features/shared/execution_exits.py`, `execution_ledger.py`,
+  `exit_hold_value.py` (new, 663 lines), `pipeline/execute_portfolio.py`, `pipeline/intelligence_state.py`,
+  `syndicate/features/shared/board_enrichment.py`, `live_gameline_orientation.py`, `live_player_status.py`,
+  `combined_board_shared_copy.py`;
+- sim: `syndicate/features/ncaaf/live_resim.py`, `live_total_dispersion.py`, `live_blowout_damping.py`,
+  `.../sim_engine/smartsim2/game_simulator.py`, `calibration_profile.py`;
+- entrypoints: `scripts/run_refresh_worker.py` (+10), `scripts/run_live_odds_refresh_worker.py` (+119),
+  `gunicorn.conf.py` (+137);
+- the rest are offline/monitor scripts (`scripts/rail_monitor/*`, `scripts/portfolio_watch/*`, `scripts/s6/s7/s8_*`, ...).
+Whether each of these is default-off was NOT checked. A TERM now would be a load of 268 commits, possibly a
+betting change outside a window -- not the no-code restart the user approved.
+
+No claim, no drain, no preflight, no TERM. Nothing on the fleet was changed.
+
+**For the user.** The parent ratchet is a multi-day trend: 785 MB (11-19 11 AM) -> 1,610 MB (11-20 9:30 AM) ->
+2,166 MB (11-21 9 AM). Options: (a) approve the TERM with the 268-commit load (needs each runtime change classified,
+and a betting-change window or an `--outside-window` reason if any is a betting change); (b) leave it and accept
+a third evening of refusals; (c) the lasting fix, a quiet-hours parent self-recycle -- a betting change for the
+11-24 window, not built. The college slate starts at 11 AM CST, so (a) today is only before then.
