@@ -1993,6 +1993,14 @@ death, never life — do not invert it.
 - Verification: After a web/worker load: portfolio LEDGER grade_conflicts 0 for NOP@OKC (after acknowledge with user yes) and grade_check reason side_not_a_team_in_this_game count for kalshi in-game NO rows = 0 on the next day's ledger.
 - Blocked by: none
 
+### polymarket-stale-cancel — OPEN — opened 2026-11-21 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: A per-tick Polymarket stale cancel, DEFAULT-OFF behind LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_STALE_CANCEL (off|shadow|on), cancels an untouched taker order resting >= 15 min whose price the book has left by >= 1 cent, so its idempotency key frees and the executor re-evaluates it; landed on main with a self-tested kit queued for the Tue 12-08 window (user via fleet-watcher 11-21: 'yes, add the Polymarket stale cancel to the 12-08 queue', 'yes, ask the portfolio session to build it')
+- Files: syndicate/features/shared/polymarket_stale_cancel.py (NEW), pipeline/execute_portfolio.py (the Polymarket stale-cancel call after the per-tick Polymarket reconcile only), tests/test_polymarket_stale_cancel.py (NEW), .syndicate/findings_2026-11-21_polymarket_stale_cancel.md (NEW)
+- Hypothesis: an untouched Polymarket taker order that rests 15+ min with the book >= 1 cent away will not fill at its price before its kickoff expiry; today it holds its key until then (11-21: ac07e83e 6:50 AM - 7:10 PM). Baseline 11-20 16:02Z - 11-21 18:06Z: 1 of 51 reconciled Polymarket orders rested untouched (>= 4 h)
+- Falsification test: in the window load, any cancel lands on an order that then reads FILLED, on a maker-style or under-age order, or with an unreadable book; or the venue cancel route errors on its first live use
+- Verification: tests (off/shadow/on reachability through run_execution, NO-side price mapping, caps, memo); shadow-mode reading (optional, pre-window); window load per the pre-registration in findings_2026-11-21_polymarket_stale_cancel.md
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
