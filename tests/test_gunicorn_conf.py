@@ -535,3 +535,106 @@ def test_post_worker_init_arms_both_instruments_on_a_real_heartbeat(monkeypatch,
     [armed] = _lines(capsys, "WEB_STALL_INSTRUMENTS_ARMED")
     assert armed["loop_stall_log"] == "armed" and armed["gc_pause_log"] == "armed"
     assert armed["loop_stall_log_s"] == 5.0 and armed["gc_pause_log_s"] == 0.25
+
+
+# --------------------------------------------------------------------------------------------
+# `worker_exit` fast exit (2026-11-21): the 17:04:54Z dump was an EXITING worker ~55 s inside CPython's
+# own shutdown (one thread, no Python frame). These pin: a worker whose loop returned with nothing in
+# flight leaves through os._exit(0) after flushing stdio; one that never returned (boot error, a raise),
+# still has a request running, or has the switch off takes the stock exit; the hook never raises into
+# gunicorn; and gunicorn itself accepts it as `worker_exit`.
+# --------------------------------------------------------------------------------------------
+
+
+class _Future:
+    def __init__(self, done):
+        self._done = done
+
+    def done(self):
+        return self._done
+
+
+class _Stream:
+    def __init__(self, fail=False):
+        self.flushed = 0
+        self.fail = fail
+
+    def flush(self):
+        if self.fail:
+            raise ValueError("I/O operation on closed file")
+        self.flushed += 1
+
+
+def _exiting_worker(returned_at=100.0, futures=()):
+    worker = types.SimpleNamespace(futures=list(futures))
+    if returned_at is not None:
+        worker._syndicate_run_returned_at = returned_at
+    return worker
+
+
+def test_a_worker_whose_loop_returned_flushes_and_leaves_through_os_exit(monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT", raising=False)
+    codes, streams = [], [_Stream(), _Stream()]
+    worker = _exiting_worker(futures=[_Future(True)])
+    assert conf.worker_exit(None, worker, exit_now=codes.append, streams=streams, clock=lambda: 100.25) == "exited"
+    assert codes == [0]
+    assert [s.flushed for s in streams] == [1, 1]
+    [line] = _lines(capsys, "WEB_WORKER_FAST_EXIT")
+    assert line == {"pid": os.getpid(), "after_loop_s": 0.25}
+
+
+def test_a_worker_that_never_left_its_loop_takes_the_stock_exit(monkeypatch):
+    """A boot error or a raise never sets the mark, so gunicorn's own exit codes (3 / 4 halt the arbiter) survive."""
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT", raising=False)
+    codes = []
+    assert conf.worker_exit(None, _exiting_worker(returned_at=None), exit_now=codes.append, streams=[]) == "loop_did_not_return"
+    assert conf.worker_exit(None, types.SimpleNamespace(), exit_now=codes.append, streams=[]) == "loop_did_not_return"
+    assert codes == []
+
+
+def test_a_request_still_running_takes_the_stock_exit_and_says_so(monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT", raising=False)
+    codes = []
+    worker = _exiting_worker(futures=[_Future(True), _Future(False)])
+    assert conf.worker_exit(None, worker, exit_now=codes.append, streams=[]) == "request_running"
+    assert codes == []
+    [line] = _lines(capsys, "WEB_WORKER_STOCK_EXIT")
+    assert line["reason"] == "request_running" and line["running"] == 1
+
+
+@pytest.mark.parametrize("off", ["0", "false", "OFF", "no"])
+def test_off_is_not_on_for_the_fast_exit(monkeypatch, off):
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_FAST_EXIT", off)
+    codes = []
+    assert conf.worker_exit(None, _exiting_worker(), exit_now=codes.append, streams=[]) == "disabled"
+    assert codes == []
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_FAST_EXIT", "1")
+    assert conf.worker_exit(None, _exiting_worker(), exit_now=codes.append, streams=[]) == "exited"
+    assert codes == [0]
+
+
+def test_a_stream_that_cannot_flush_does_not_keep_the_worker_in_shutdown(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT", raising=False)
+    codes, good = [], _Stream()
+    assert conf.worker_exit(None, _exiting_worker(), exit_now=codes.append, streams=[_Stream(fail=True), good]) == "exited"
+    assert codes == [0] and good.flushed == 1
+
+
+def test_the_fast_exit_never_raises_into_gunicorn(monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT", raising=False)
+    codes = []
+    worker = _exiting_worker(returned_at="not a time")
+    assert conf.worker_exit(None, worker, exit_now=codes.append, streams=[]) == "error"
+    assert codes == []
+    [line] = _lines(capsys, "WEB_WORKER_STOCK_EXIT")
+    assert line["reason"] == "error"
+
+
+def test_gunicorn_itself_accepts_the_worker_exit_hook():
+    """Reachability: gunicorn validates a hook's positional arity; keyword-only test seams must not change it."""
+    config = pytest.importorskip("gunicorn.config")
+    cfg = config.Config()
+    namespace = {}
+    exec(compile(_SRC.read_text(encoding="utf-8"), str(_SRC), "exec"), namespace)
+    cfg.set("worker_exit", namespace["worker_exit"])
+    assert cfg.settings["worker_exit"].get() is namespace["worker_exit"]

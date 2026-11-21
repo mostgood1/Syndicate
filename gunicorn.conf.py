@@ -426,6 +426,56 @@ def post_worker_init(worker) -> None:
         _log("WEB_LOOP_STALL_DUMP_ERROR", {"hook": "stall_instruments", "error": f"{type(exc).__name__}: {exc}"})
 
 
+# EXIT WITHOUT CPYTHON'S SHUTDOWN (lane `web-silent-worker-kills`, 2026-11-21).
+# The 17:04:54Z 11-21 dump was ONE thread with `<no Python frame>`. Worker 2300114 had logged
+# `Worker exiting` at 17:04:19Z after a normal memory recycle (1,289 MB anon). It then spent ~55 s
+# inside CPython's own interpreter shutdown, and was reaped ~5 s before the master's 60 s kill:
+#   * a single thread means the other thread states were already deleted, so it was past atexit;
+#   * no Python frame means it was in C: the final collection and the teardown of a ~1.3 GB heap.
+# Since 10-31, 5,296 exits: median 1.5 s from `Worker exiting` to the replacement booting, p99 9.2 s.
+# 5 more were KILLED in that shutdown (10-31..11-11), 30-60 s after `Worker exiting`. Until a worker
+# is reaped its slot is not refilled: web ran on one worker for ~55 s.
+# A web worker whose loop has returned has nothing to hand over:
+#   * the drain is done and every request future has finished;
+#   * the only atexit work web registers releases flock()s, which the kernel drops with the fds;
+#   * the warmer thread is a daemon, which the stock shutdown never joins either.
+# So `worker_exit` flushes stdio and leaves with `os._exit(0)`, but only when the loop RETURNED with
+# nothing in flight. A worker that failed to boot, raised out of its loop or still has a request
+# running exits the stock way, so exit codes 3 / 4 still halt the arbiter.
+# Switch: `SYNDICATE_WEB_WORKER_FAST_EXIT` (0 / false / off restores the stock exit).
+def fast_exit_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_WEB_WORKER_FAST_EXIT") or "").strip().lower() not in {"0", "false", "off", "no"}
+
+
+def worker_exit(server, worker, *, exit_now=None, streams=None, clock=time.monotonic) -> str:  # noqa: ARG001
+    """gunicorn's child-side exit hook, after `Worker exiting`. Returns why it left it to the stock exit; on the fast
+    path it does not return."""
+    try:
+        if not fast_exit_enabled():
+            return "disabled"
+        returned_at = getattr(worker, "_syndicate_run_returned_at", None)
+        if returned_at is None:
+            return "loop_did_not_return"
+        running = sum(1 for fut in list(getattr(worker, "futures", None) or ()) if not fut.done())
+        if running:
+            _log("WEB_WORKER_STOCK_EXIT", {"pid": os.getpid(), "reason": "request_running", "running": running})
+            return "request_running"
+        _log("WEB_WORKER_FAST_EXIT", {"pid": os.getpid(), "after_loop_s": round(clock() - float(returned_at), 3)})
+        for stream in (streams if streams is not None else (sys.stdout, sys.stderr, sys.__stdout__, sys.__stderr__)):
+            try:
+                stream.flush()
+            except Exception:  # a closed stream must not keep the worker in shutdown
+                pass
+    except Exception as exc:  # never raise into gunicorn: the stock exit is the fallback
+        try:
+            _log("WEB_WORKER_STOCK_EXIT", {"pid": os.getpid(), "reason": "error", "error": f"{type(exc).__name__}: {exc}"})
+        except Exception:
+            pass
+        return "error"
+    (exit_now or os._exit)(0)
+    return "exited"
+
+
 def decide_recycle(worker, *, now: float, anon_mb_reader, stamp_path: str) -> str:
     """Returns what happened: skipped / below_limit / too_young / deferred / deferred_hard / recycled."""
     limit = float(getattr(worker, "_syndicate_limit_mb", 0.0) or 0.0)

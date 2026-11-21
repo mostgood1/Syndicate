@@ -126,5 +126,72 @@ class DrainingWorkerTests(unittest.TestCase):
         self.assertIn("WEB_WORKER_DRAINED", output)  # the drain path actually ran
 
 
+@unittest.skipUnless(POSIX, "gunicorn workers need POSIX")
+class FastExitTests(unittest.TestCase):
+    """2026-11-21: a recycled worker spent ~55 s in CPython's own shutdown (the 17:04:54Z dump: one thread,
+    no Python frame), its slot unfilled until it was reaped. With the real `gunicorn.conf.py`, a worker
+    whose loop returned leaves through `os._exit(0)`: the app's atexit handler -- standing in for the whole
+    interpreter shutdown -- never runs. Off != on: with the switch off, the same handler runs in every
+    exiting worker."""
+
+    def _recycle_twice(self, fast_exit: str) -> tuple[str, list[str]]:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "toyexit.py").write_text(textwrap.dedent("""
+                import atexit
+                import os
+
+                def _stock_shutdown_ran():
+                    with open(os.path.join(os.environ["TOY_EXIT_MARKS"], str(os.getpid())), "w") as fh:
+                        fh.write("atexit ran")
+
+                atexit.register(_stock_shutdown_ran)
+
+                def application(environ, start_response):
+                    start_response("200 OK", [("Content-Length", "2")])
+                    return [b"ok"]
+            """), encoding="utf-8")
+            marks = Path(tmp, "marks")
+            marks.mkdir()
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            env = dict(os.environ, PYTHONPATH=f"{REPO_ROOT}{os.pathsep}{tmp}", TOY_EXIT_MARKS=str(marks),
+                       SYNDICATE_WEB_WORKER_FAST_EXIT=fast_exit)
+            env.pop("GUNICORN_CMD_ARGS", None)
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "gunicorn", "-c", str(CONF), "toyexit:application",
+                 "--bind", f"127.0.0.1:{port}", "--workers", "1", "--threads", "2",
+                 "--max-requests", "5", "--max-requests-jitter", "0", "--log-level", "info"],
+                cwd=tmp, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            )
+            try:
+                served = 0
+                deadline = time.time() + 30
+                while served < 12 and time.time() < deadline:
+                    try:
+                        urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=5).read()
+                        served += 1
+                    except OSError:
+                        time.sleep(0.2)
+                time.sleep(2.0)  # let the second recycled worker finish leaving
+            finally:
+                proc.terminate()
+                output = proc.communicate(timeout=60)[0].decode(errors="replace")
+            self.assertEqual(served, 12, output[-2000:])
+            return output, sorted(p.name for p in marks.iterdir())
+
+    def test_a_returned_worker_skips_the_interpreter_shutdown(self) -> None:
+        output, marks = self._recycle_twice("1")
+        exits = output.count("Worker exiting (pid:")
+        self.assertGreaterEqual(exits, 3, output[-3000:])  # two recycles and the final stop
+        self.assertEqual(output.count("WEB_WORKER_FAST_EXIT "), exits, output[-3000:])
+        self.assertEqual(marks, [], "an atexit handler ran: the worker went through CPython's shutdown")
+
+    def test_off_is_not_on_the_stock_exit_runs_the_shutdown(self) -> None:
+        output, marks = self._recycle_twice("0")
+        self.assertNotIn("WEB_WORKER_FAST_EXIT ", output)
+        self.assertGreaterEqual(len(marks), 3, output[-3000:])
+
+
 if __name__ == "__main__":
     unittest.main()

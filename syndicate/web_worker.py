@@ -103,6 +103,9 @@ class DrainingThreadWorker(ThreadWorker):
         self.tpool.shutdown(False)
         self.poller.close()
         futures.wait(self.futures, timeout=self.cfg.graceful_timeout)
+        # The loop RETURNED (a recycle, a graceful stop, the parent gone): gunicorn.conf.py's
+        # `worker_exit` may now skip CPython's shutdown. Never set on a boot error or a raise.
+        self._syndicate_run_returned_at = time.monotonic()
 
     def on_client_socket_readable(self, conn, client) -> None:
         # Fresh connections only: a keep-alive conn has been `init()`ed (blocking,
