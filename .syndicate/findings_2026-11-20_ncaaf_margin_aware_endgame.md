@@ -243,3 +243,60 @@ stopped as registered (`C:\tmp\t859\joint\joint_read.txt`). The diagnosis (`C:\t
   compensated, so the last bits differ. No scorer reads `sd` (`calib_arms.py`, `paired_margin.py`, `joint_read.py`).
 - **Amended check:** every sim key except `sd` identical, and `sd` within 1e-9. The rest of the registration is
   unchanged.
+
+### JOINT RE-READ RESULTS — written 2026-11-21 12:26 PM CST, after the runs (nothing above was changed)
+
+`C:\tmp\t859\joint_read.py` produced `C:\tmp\t859\joint\joint_read.txt`. Runs are `C:\tmp\t859\joint\out_2024L_<arm>_60.jsonl`,
+each arm about 2 minutes on 2 Idle workers. Population: the same 150 paired 2024 games, Q4 states, 60 sims.
+
+**Instrument (amendment 1):** the built rule matches the harness `v4a` on **600 of 600** states.
+
+**Selection.** Overall log loss at Q4 15:00-6:00, against the incumbent `jd1.0_t17_s14` (= `v4a`), with se:
+
+| strength / threshold / span | overall | one-score (73) | 17+ (69) | 17+ rest engine/actual |
+|---|---|---|---|---|
+| 1.0 / 17 / 14 (incumbent) | 0 | 0 | 0 | 1.046 |
+| 1.0 / 14 / 7 | +0.0062 (0.0038) | +0.0050 | +0.0125 | 0.997 |
+| 1.0 / 14 / 14 | +0.0052 (0.0026) | +0.0022 | +0.0104 | 1.024 |
+| 1.0 / 17 / 7 | +0.0039 (0.0023) | +0.0005 | +0.0096 | 1.018 |
+| **1.0 / 21 / 7 (PICK, 1.6 SE)** | **-0.0021 (0.0013)** | -0.0018 (0.0008) | -0.0029 (0.0028) | 1.047 |
+| 1.0 / 21 / 14 | -0.0013 (0.0024) | -0.0018 | -0.0025 | 1.080 |
+| 0.0 (no damping) | +0.0156 (0.0092) | -0.0021 | +0.0379 (0.0219) | 1.197 |
+
+**The pick is 1.0 / 21 / 7, the same cell #858 picked with the clock alone** (-0.0022, se 0.0012 there). Two reads
+on different engines land on the same shape. But the margin over the incumbent is small, 1.6 paired SE, with 6
+alternatives tried.
+
+**The pick against `base`** (G1-G3 as registered):
+- **G1:**
+  - one-score last-2:00 points are **3.20, inside** [2.55, 4.71] (`base` 2.31, outside);
+  - one-score log loss at Q4 3:00 is -0.0132 (se 0.0462), not above `base`. **PASS**
+- **G2:** 17+ at Q4 15:00-6:00 is **-0.0333 (se 0.0191)**. **PASS**
+- **G3:** overall at Q4 15:00-6:00 is **-0.0127 (se 0.0114)**, slope 0.71 vs 0.71, rest ratio 0.995. **PASS**
+- **Not gated, for the record:**
+  - one-score at Q4 15:00-6:00 is +0.0067 (se 0.0169);
+  - 17+ at Q4 3:00 is +0.0333 (se 0.0473).
+
+  Both are inside noise.
+
+**Damping is still needed with the end game on.** Without it, against the incumbent at Q4 15:00:
+- the rest-of-game total moves +2.29 (se 0.23) at 25+ and +0.65 (0.17) at 17-24;
+- the shift is all the leader's (+2.30 / -0.01 at 25+).
+
+So the concession fixes the trailer and the damping fixes the leader.
+
+**Predictions:**
+- Reproduction 600 of 600: **held**, after amendment 1 (as written, it failed on `sd` only).
+- Grid within +-0.006 overall: **missed narrowly** (14 / 7 is +0.0062).
+- Keep 1.0 / 17 / 14: **FAILED.** 21 / 7 clears the registered 1-SE bar.
+- No damping worse overall by > 1 SE: **held** (+0.0156, 1.7 SE).
+- No damping's 17+ rest ratio in 1.10-1.20: **held** (1.197).
+
+**What this means for a load (the user's call; nothing in the repo changed).**
+- With the end game on, the registered rule says #852's damping should run at **threshold 21 / span 7**, not 17 / 14.
+- That needs NO code. The knobs already exist: `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING_THRESHOLD=21` and `..._SPAN=7`.
+  So the end-game load set would be:
+  - `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING=on`, `..._THRESHOLD=21`, `..._SPAN=7`;
+  - `SYNDICATE_NCAAF_LIVE_ENDGAME=on`.
+- #852 alone (without the end game) keeps 1.0 / 17 / 14. Its 11-21 hold-out and 12-08 decision are unchanged.
+- **Still owed:** the real-timeouts hold-out, and a window.

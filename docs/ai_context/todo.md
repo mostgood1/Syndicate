@@ -15,7 +15,8 @@
 - **Built 2026-11-21 (user "Build both"), default OFF, on main `b2ff241ae` (user "Push it")** (findings "## BUILD"). A fleet ff loads it off:
   1. Engine: `CalibrationProfile.trailing_concede_deficit` (None = off) in `situation_model.classify_urgency`. OFF byte-identical to 5 pinned digests; the built rule equals the harness `v4a` on 12 of 12 real states.
   2. Live: ESPN `situation.homeTimeouts` / `awayTimeouts` into `NcaafLiveGameState` and `initial_timeouts_*`; `SYNDICATE_NCAAF_LIVE_ENDGAME` (`ncaaf/live_endgame.py`) arms #808's clock + the concession at 25 + #855's OT after #852's damping. Both switches on = `v4a`. Absent / off byte-identical through the tick.
-- **Owed before any load:** a joint re-read of the damping shape; a hold-out with real timeouts (live shadow or an ESPN backfill of 11-21 / 11-28), after verifying that the poller's scoreboard row carries college timeouts on a live game. Load only in a window.
+- **Joint damping re-read DONE 2026-11-21** (user "Yes, run it"; pre-registered 206909ad7, amendment 1 45c8480fb): with the end game on, the registered rule picks #852's damping at **threshold 21 / span 7** (strength 1.0; -0.0021, se 0.0013 overall vs 17 / 14; the same cell #858 picked), and the pick passes G1-G3 against `base` (G2 17+ -0.0333 se 0.0191, G3 -0.0127 se 0.0114, one-score last-2:00 3.20 in CI). Damping is still needed: without it the 25+ rest is +2.29 (se 0.23), all the leader's. No code: the end-game load set is `..._BLOWOUT_DAMPING=on` + `_THRESHOLD=21` + `_SPAN=7` + `SYNDICATE_NCAAF_LIVE_ENDGAME=on`. #852 alone keeps 17 / 14.
+- **Owed before any load:** a hold-out with real timeouts (live shadow or an ESPN backfill of 11-21 / 11-28), after verifying that the poller's scoreboard row carries college timeouts on a live game. Load only in a window.
 
 ### `#858` — **#808'S END-OF-HALF CLOCK FOR NCAAF LIVE ONE-SCORE GAMES: NOT BUILT, the registered "reason not to".**
 
