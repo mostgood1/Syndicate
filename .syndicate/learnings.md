@@ -3738,3 +3738,8 @@ permanent, silent black hole.
 (a `deque.append` is enough), and ordinary code writes it out later: here the worker's heartbeat (`0d20a6919`). The
 same holds for any lock-holding wrapper around stdout. Test such an instrument with the REAL `StampedStream` and a REAL
 `gc.collect()` fired inside its locked section, not with a capture fixture.
+
+## 2026-11-21 -- A FINALS-ONLY ABSENCE IS NOT A LIVE ABSENCE: ESPN's NBA `injuries` list DOES stamp an in-game exit `[lane live-player-exit-gate, #814]`
+- **Belief overturned.** 11-20 11:02 AM CST I concluded an NBA in-game injury carries no ESPN stamp until the next-day report. That rested on FINAL summaries only, read after the fact. Live on 11-21, BKN Nolan Traore subbed out 02:10:44Z and ESPN stamped him `Out` (hamstring) at 02:25Z, DURING the game; the existing `injuries` path refused the game at 02:32:26Z.
+- **Why it mattered:** the wrong belief made the off-floor signal look like the ONLY NBA path. It is not; for the NBA it is a backstop, and the end-window exclusion means it would not have caught Traore at all.
+- **Rule:** a claim that a feed never carries X must be read on a LIVE population, not reconstructed from finals (see [[feedback_null_result_needs_a_live_population]]).
