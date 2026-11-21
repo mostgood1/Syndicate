@@ -62588,3 +62588,15 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - `WEB_GC_PAUSE` keeps arriving at ~5 a minute with `written_after_s` <= ~1 s.
   - Watch: scratchpad `wsk_dump_watch.sh` (task `bngl82idh`, to 2026-11-21 ~25:13Z); reading: `wsk_gcfix_reading.sh`.
   - Kills per day: 11-20's one kill is this defect, not the decode mechanism. It does not count against `eeeb62a63`.
+
+## 2026-11-21 02:37:06Z (8:37 PM CST 11-20) -- READING (no deploy): first UNMODELLED basketball key exit read LIVE through every layer, plan backstop exercised for the first time -- BKN Nolan Traore (lane `live-player-exit-gate`, #814)
+- **The exit:** event 401909306, Orlando @ Brooklyn (NBA). BKN starter Nolan Traore subbed out at Q3 8:00 (pbp wallclock 02:10:44Z) and did not return. ESPN's `injuries` list stamped him `Out`, hamstring, at 02:25Z, DURING the game.
+  - This overturns the 11-20 11:02 AM belief that an NBA in-game injury carries no stamp until the next-day report. That belief rested on finals only and was labelled not observed live; it is now observed live, at a lag of ~15 min after the sub-out.
+- **Detected:** `[nba_live_resim] PLAYER_OUT ... reason=injury key=True source=injuries since=2026-11-21T02:25Z` at 02:32:26Z. The 02:30:10Z tick (refusals={}) did not have it, so the gate caught it on the first tick after ESPN's entry appeared, as far as these lines show. Detection is ~22 min after he left the floor; the lag is ESPN's, not the gate's.
+- **Producer refused:** `NBA_LIVE_RESIM_TICK games=5 resimmed=4 refusals={'key_player_out': 1}` at 02:32:29Z and 02:34:46Z.
+- **Board:** book_grid NBA `LIVE_GAMELINE_BUILD` went `full_games=5 projected=447` (02:32:24Z, before) -> `full_games=4` at 02:33:16Z and 02:34:29Z. The game's live gamelines were withdrawn.
+- **Entry hold:** probed 02:34:33Z with refresh-worker's env: `ExitHold().check("nba", ...)` for Orlando @ Brooklyn -> `{'verdict': 'fail', 'reason': 'key_player_out', 'players': ['BKN:Nolan Traore:injury'], 'snapshot_at': '2026-11-20T20:32:29-06:00'}`. The same probe on Toronto @ Detroit (DET Ronald Holland II out, key=False, pregame stamp 00:34Z) -> pass.
+- **Portfolio plan:** the 02:30:35Z plan (before detection) had no `key_player_out`. The 02:36:09Z plan carries `refusals.key_player_out = 15` (below_min_ev_pct_after_fair_noise 4, below_min_stake 8, beyond_max_positions 139, in_play_market_fair 41). **First time the plan backstop `_refuses_key_player_out` has been exercised on a real exit** (NCAAF's two readings had 0 because the board removed the rows upstream).
+- **Not measured:** the lift (a hamstring Out does not return, and an `injuries` exit does not clear on its own until the game ends); Traore's own live props, which were not read separately.
+- **The off-floor signal (main c37bdeab3, default OFF) would NOT have caught this:** he left at 28 game-min, and N=15 fires at 43:00, inside the last-5-min exclusion. The existing `injuries` path did.
+- verify: the readings above, all within 02:32:26Z..02:36:09Z, from live-odds-worker.log, refresh-worker.log, the fleet's /api/portfolio/plan?date=2026-11-20, and the ExitHold probe.
