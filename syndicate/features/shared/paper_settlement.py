@@ -593,6 +593,8 @@ def _check_venue_grade(
         return refusal
 
     ours = str(verdict.get("outcome") or "")
+    if contract_side is not None:
+        ours = _kalshi_contract_outcome(str(order.get("side") or ""), ours)
     theirs = str(order.get("outcome") or "")
     agrees = ours == theirs
     order["grade_check"] = {
@@ -600,22 +602,37 @@ def _check_venue_grade(
         "our_outcome": ours,
         "venue_outcome": theirs,
         # The scoreboard the disagreement rests on, so a person reading the row
-        # does not have to go and look the game up to believe it.
+        # does not have to go and look the game up to believe it. On a Kalshi
+        # YES/NO row it is the NAMED club's margin (`named_club`).
         "settled_value": verdict.get("settled_value"),
         "checked_at": _utc_now(),
     }
     if contract_side is not None:
-        # Which club the contract side was read as, so a conflict on a YES/NO row
-        # can be checked against the ticker without re-deriving it.
-        order["grade_check"]["side_from_ticker"] = contract_side["side"]
+        # Which club the ticker names, so a conflict on a YES/NO row can be
+        # checked against the ticker without re-deriving it.
+        order["grade_check"]["named_club"] = contract_side["side"]
     return "agrees" if agrees else "conflict"
 
 
+def _kalshi_contract_outcome(contract: str, named_outcome: str) -> str:
+    """Kalshi's outcome for a YES/NO contract, from our grade of "the named club wins".
+
+    A Kalshi "X wins" market pays YES only on a WIN: a tie (NFL) or a draw (soccer) resolves NO. Our
+    two-way grade calls a level score a push and the three-way one calls it a loss for X, so:
+    YES = won -> won, anything else -> lost; NO = won -> lost, anything else -> won.
+    """
+    named_won = named_outcome == OUTCOME_WON
+    if contract.strip().lower() == "no":
+        return OUTCOME_LOST if named_won else OUTCOME_WON
+    return OUTCOME_WON if named_won else OUTCOME_LOST
+
+
 def _kalshi_contract_side_order(order: Mapping[str, Any]) -> tuple[dict[str, Any] | None, str]:
-    """For a Kalshi YES/NO game moneyline: `(a COPY of the order with side = the backed club, "")`.
+    """For a Kalshi YES/NO game moneyline: `(a COPY of the order with side = the NAMED club, "")`.
 
     `(None, "")` when the order is not one (every other row is untouched), and `(None, reason)`
-    when it is one and the club cannot be read (lane kalshi-no-grade-check, 2026-11-21).
+    when it is one and the club cannot be read (lane kalshi-no-grade-check, 2026-11-21). The
+    caller grades the copy ("the named club wins") and maps it with `_kalshi_contract_outcome`.
 
     WHY. The in-game entries record the CONTRACT side, `side "no"`, and `_our_verdict` handed it
     to the sport resolver as if it were a club. `canonical_team(.., "no")` is New Orleans, so a
@@ -628,7 +645,7 @@ def _kalshi_contract_side_order(order: Mapping[str, Any]) -> tuple[dict[str, Any
     from syndicate.features.shared.game_line_bet import (
         REASON_UNKNOWN_GAME_MARKET,
         is_game_line_market,
-        kalshi_contract_backed_side,
+        kalshi_contract_named_side,
     )
 
     contract = str(order.get("side") or "").strip().lower()
@@ -642,22 +659,20 @@ def _kalshi_contract_side_order(order: Mapping[str, Any]) -> tuple[dict[str, Any
         key = str(order.get("position_key") or "")
         # `ingame:<ticker>:<leg>` (inplay_entries_live.POSITION_PREFIX).
         ticker = key.split(":")[1] if key.count(":") >= 2 else None
-    backed, reason = kalshi_contract_backed_side(
+    named, reason = kalshi_contract_named_side(
         sport=sport,
         market=market,
-        contract_side=contract,
         venue_ticker=ticker,
         home_team=order.get("home_team"),
         away_team=order.get("away_team"),
-        draw_possible=str(sport or "").strip().lower() == "soccer",
     )
-    if backed is None:
+    if named is None:
         if reason == REASON_UNKNOWN_GAME_MARKET:
             # A spread: a YES/NO spread is a different translation (the line flips with the club),
             # not built here. Left exactly as it was.
             return None, ""
         return None, str(reason)
-    return {**order, "side": backed}, ""
+    return {**order, "side": named}, ""
 
 
 def _stamp_grade(order: dict[str, Any], verdict: Mapping[str, Any], resolved: Mapping[str, Any]) -> None:
