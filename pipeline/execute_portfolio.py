@@ -564,6 +564,29 @@ def _run_execution(
                                 f"[execute_portfolio] MAKER_PILOT_FAIR_REVIEW_FAILED {type(exc).__name__}: {exc}",
                                 flush=True,
                             )
+                # A POLYMARKET TAKER ORDER THE BOOK HAS LEFT  [2026-11-21, user via the
+                # fleet-watcher: "yes, add the Polymarket stale cancel to the 12-08 queue",
+                # lane polymarket-stale-cancel]. This is the only per-tick read of what
+                # rests at Polymarket; `cancel_stale_resting_orders` is Kalshi-only and
+                # runs from the worker's boot dump. Polymarket's own scope only, so the
+                # Kalshi run's reconcile of Polymarket does not repeat it. DEFAULT OFF:
+                # `polymarket_stale_cancel.mode()` reads absent as off.
+                if (
+                    reconcile_venue == "polymarket"
+                    and str(venue_scope or "").strip().lower() == "polymarket"
+                    and outcome.get("resting")
+                ):
+                    try:
+                        from syndicate.features.shared.polymarket_stale_cancel import (
+                            cancel_stale_polymarket_resting,
+                        )
+
+                        cancel_stale_polymarket_resting(outcome["resting"])
+                    except Exception as exc:  # noqa: BLE001 -- never fatal, like the reconcile
+                        print(
+                            f"[execute_portfolio] POLYMARKET_STALE_CANCEL_FAILED {type(exc).__name__}: {exc}",
+                            flush=True,
+                        )
         except Exception as exc:
             print(
                 f"[execute_portfolio] RECONCILE_FAILED {type(exc).__name__}: {exc}",
