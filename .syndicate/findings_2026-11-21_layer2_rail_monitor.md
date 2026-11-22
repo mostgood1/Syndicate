@@ -121,7 +121,11 @@ Hypothesis written to the lane before the test (`8749da338`). **Verdict: CONFIRM
   - the board build.
 
   MLB and WNBA are skipped by the same gate in the same ticks; out of season, that is harmless. NBA, NHL and NFL lenses are ungated, which is why soccer is the only in-season sport that stalls.
-- **Not measured:** how much of the summed RSS is shared pages counted once per process (PSS against RSS). Every child is a separately exec'd Python, so the share is likely tens of MB each, but that is unread.
+- **Shared pages, measured by the peer lane.** Lane `board-split-memory-guard` reached the same reading independently: `findings_2026-11-18_board_split_memory_guard.md` §14, `2ef5a433b`, pushed a minute before this block, with the verdict "belongs to lane `layer2-rail-monitor`".
+  - Its gate count, soccer 135 from 14Z to 00Z, matches this block's 137 from 05Z: the 2 extra are this block's 05:06Z and 05:21Z.
+  - It measured what this block had left unread: tree PSS 1,940 MB against RSS 2,379 MB (-18%) at 00:23Z, a quiet moment. So the 4.6 GB peaks are ~3.7-3.9 GB unique, still over the 2,772 MB line.
+  - The median False tick may not be. At 3,122 MB RSS, an 18% discount gives ~2,560 MB, under the line. The 18% comes from one quiet reading with a different process mix, so how many of the 137 skips a PSS-based gate would have passed is not measured.
+  - The host has 15,746 MB with 5,348 MB available at 00:23Z, so 3,072 is a declared budget that nothing else enforces.
 - **Fix options** (none taken; all are outside this lane, and any that changes when the lens runs changes which live soccer bets are placed, so it is a betting change for a window):
   - (a) stop the soccer live odds runs from stacking: the guard defect above, plus the next run starting only after the last has finished;
   - (b) drop the duplicate per-league live-state poll from the odds run, since the lens already writes those files;
