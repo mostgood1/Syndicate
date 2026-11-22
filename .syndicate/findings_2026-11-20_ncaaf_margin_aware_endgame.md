@@ -362,3 +362,119 @@ damping settings but not the end game.
 - The cache is per process (`_E0_CACHE`), and env is built only at `up`, so a cached E0 cannot outlive an end-game
   change on the fleet.
 - In a process whose env flips, it could. Add `("endgame", deficit)` to the key if the code is next touched.
+
+## REAL-TIMEOUTS HOLD-OUT — PRE-REGISTRATION, written 2026-11-21 8:22 PM CST before any arm was run on its states
+
+The user said "Yes, pre-register it" (2026-11-21), answering "Pre-register the real-timeouts hold-out now, while its
+data is still unread?". This is condition 2 of the 12-08 queue entry above.
+
+**Why 2026, and why it need not wait for the M2 verdict.**
+- No earlier CFBD season is clean:
+  - 2023-24 chose the concession at 25;
+  - 2024 chose #852's damping and ran #858's and #859's re-reads;
+  - #808's clock rates were fitted on 2024-25 (`scripts/football_end_of_half_clock_rates.py`, `SEASONS = (2024, 2025)`).
+- 2026 is out of sample for every choice inside the end game.
+- Weeks 1-10 lie wholly before M2's blind window:
+  - week 11 is left out ENTIRELY, because one of its regular-season games starts after the cut;
+  - weeks 12+ are never pulled.
+
+  So none of slates 11-15..11-22 is read.
+
+**Data.** Pulled before this was written; only counts were read (`C:\tmp\t859h\pull.txt`, `build.txt`).
+- **Pull:** CFBD 2026 weeks 1-10, plays and `/lines`, via the repo's own loaders (`ensure_plays_cached`,
+  `fetch_ncaaf_market_lines.fetch_lines`), into a PRIVATE dir, `C:\tmp\t859h\truth` (never the shared mirror).
+  - The fleet's `games_2026` (refreshed 11-21) was filtered to games starting before 2026-11-15T10:00Z before anything
+    else read it: 751 kept; 137 at or after the cut, not read.
+  - Real timeouts are present on 99.4-100% of plays in each week.
+- **Ratings:** SP+ 2026, the fleet's 11-21 copy. This is the 2024 instrument's source: a season table, in hindsight.
+- **States:** the harness's own builder (`resume.build_tasks`; `resume.py` imported unchanged, TRUTH pointed at the
+  private dir), at Q4 15:00 / 10:00 / 6:00 / 3:00.
+  - **548 FBS-vs-FBS games and 2,191 states. Every state has a possession owner and both teams' real CFBD timeouts.**
+  - Dropped: 123 not FBS-vs-FBS, 66 with too few plays (including week 11's, never pulled), 14 regulation mismatches.
+  - Each week has 46-61 games.
+- **Closes:** each game's median CFBD provider `overUnder`, joined by game id (`h_close.py`).
+
+**Engine and arms.** The engine is a pinned export of main `f6b63e181` (`C:\tmp\t859h\code\COMMIT`). The arms are in
+`h_arms.py`, injected into `resume.ARMS` at import:
+- **`h_pair`:** #852 alone, which is what loads if the end game fails: damping 1.0 / 17 / 14.
+- **`h_eg`:** the QUEUED set: #808's seven switches + college OT + concede at 25 + damping 1.0 / 21 / 7, with real
+  timeouts fed.
+- **`off`:** production today, for context only.
+
+Each state gets 60 sims on its own seed block, paired across arms, at Idle with 2 workers.
+
+**Instrument check.** Run BEFORE this was written; it reads no outcome (`h_verify.py`, `verify.txt`).
+- **What it compares:** on 48 real 2026 states (12 games), each harness arm against the BUILT live path:
+  `resim_live_game` with `NcaafLiveGameState.home_timeouts` / `away_timeouts`, under the env lines read from the queued
+  kit file itself, at production's 120 seeds.
+- **What must match:** the mean, at the payload's 3 decimals, and the full draw distribution.
+- **Result:** `h_eg` 48 of 48 (timeouts fed on all 48), `h_pair` 48 of 48.
+
+So the arms ARE the queued load set, run through the code that would run on the fleet.
+
+**#835 on top: what bets are priced from.**
+- Each arm's draws pass through production's own `live_total_dispersion.apply`, with the switch on and the default K
+  schedule.
+- Each arm uses its OWN E0. That is `h_e0.py`: the built `resim_live_game` at kickoff, 120 sims, `total_mean`, under
+  the arm's kit env, which is production's E0 call.
+- The close is CFBD's.
+
+**Blind smoke test:** before this was written, the whole pipeline ran on the first 4 games into
+`C:\tmp\t859h\smoke`. Only return codes and section presence were checked; no number was read.
+
+**Gates.** All four must pass for condition 2 to be MET. The scorer is `h_read.py`. It runs `calib_arms.py`
+unchanged: common lines from `h_pair`'s (or `cal_h_pair`'s) own quartiles, and a game-clustered paired SE.
+- **C1:** calibrated overall log loss at Q4 15:00-6:00: `h_eg - h_pair` <= +1 paired SE.
+- **C2:** calibrated 17+ at Q4 15:00-6:00: <= +1 paired SE.
+- **C3:** calibrated one-score (|m| <= 8) at Q4 3:00: <= +1 paired SE.
+- **R1:** `h_eg`'s one-score last-2:00 engine points fall inside the real 2026 95% interval. The interval is a
+  bootstrap over those games' real points (2000 resamples, seed 859).
+
+**Reported, not gated:**
+- the raw-draw reads of all three arms, with slopes and rest ratios;
+- the rest of game by margin (`paired_margin.py`);
+- the calibrated overall by half-season, weeks 1-5 vs 6-10. #835's K was fitted on the fleet's 10-03..11-14 ledger
+  (weeks 6-11).
+
+**Predictions.** For scale: in the 2024 joint re-read, the pick beat `base` by -0.0127 overall, -0.0333 at 17+, and
+-0.0132 one-score at Q4 3:00.
+- **Raw `h_eg - h_pair`:**
+  - overall in [-0.020, 0.000];
+  - 17+ in [-0.050, -0.005];
+  - one-score Q4 3:00 in [-0.030, +0.010].
+- **Calibrated:** smaller in size:
+  - overall in [-0.015, +0.002];
+  - 17+ in [-0.040, 0.000].
+  - C1-C3 all PASS.
+- **R1:** `h_eg` inside the interval; `h_pair` and `off` below its centre. In 2024, `base` was 2.31, outside and below.
+- **Rest of game by margin:**
+  - at 17-24, `h_eg` >= `h_pair`, because 21 / 7 damps a 17-20 lead less;
+  - at 25+, `h_eg` < `h_pair`, from the concession.
+- **Half-seasons:** weeks 1-5 and 6-10 agree in sign.
+
+**What follows.**
+- **MET:** condition 2 holds. Conditions 1, 3 and 4 remain: the pair's own load; a live ESPN scoreboard row carrying
+  college timeouts, which can be read on any slate from 11-24 (MACtion) on, outside the blind window; and the user's
+  yes in the window.
+- **NOT MET:** the end game leaves the 12-08 queue, the pair loads alone at 17 / 14, and the failing gate is reported.
+- **Either way:** nothing changes on the fleet. The 11-21 / 11-28 / 12-05 slates are not part of this read. 11-28 and
+  12-05 may be added later as a confirmation, reported but not gating.
+
+**Pins (sha256):**
+
+| file | sha256 |
+|---|---|
+| `h_arms.py` | `aa41e98e905c307cf8d2b2581b6e60ab04796b08171ef2133357a682bcddd976` |
+| `h_verify.py` | `7ace0a174b7ab2a4119a0dbfba0d5030a6ff0fbdc9007fc7dedb22a353172ad7` |
+| `h_run.py` | `638a16416b20b725b9f18a8d915071ebc2006290be2f3a40db97921d1745be4c` |
+| `h_e0.py` | `e717b7a084e0b3168f24785695d6ea5443e5875bd97d4672c5737dbb079907bb` |
+| `h_close.py` | `0da41ced76251fb555692bbda12e6da9ec45237dcce6ec66ba450620cb587993` |
+| `h_read.py` | `4d424406cdad1df817b93f1aa363deb3a4f994ed44255d336b6e26a99d2cf59d` |
+| `pull.py` | `7d94e9e82896fcc0d0a72236fba8a450f60e9c7970be7794377b9042ebb44adc` |
+| `h_build.py` | `db915a65b910233fa614aecf5b93f5bb14b4b5a1d9e2092913b377b227955456` |
+| `tasks_2026.json` | `44c539d5e90e5db217520f104fb3a0e26e9a6f59df5a371bcd87cfe5d3e7191c` |
+| `verify.txt` | `e7a299af22a17d1c06b579b9d8b609e4f090ee3c536fe4dab3a1ce69e0102daa` |
+| `C:\tmp\t852\resume.py` (unchanged) | `ef89b077310a777c6f6a33ec43f4905eb855b687f82cd39d8ee38178aedaf2b8` |
+| `C:\tmp\t852\calib_arms.py` | `9c8c852b7e876d4d80487ab9bcb71862cbd2a07d656d9e87bdb0e3a532e4ccd3` |
+| `C:\tmp\t852\paired_margin.py` | `10a991f4cb3a83b581f1b45a11f09be70abc3f71a5dbe6e6c5090e70df984acc` |
+| the kit `kit_env_ncaaf.sh` | `4f31d0ac2b4888b5ca72fa32fa33a6e66482dd7264b5354d00ed360c1a3e4174` |
