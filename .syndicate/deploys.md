@@ -62798,3 +62798,18 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Offline on the saved box:** main's `exits_from_nhl_boxscore` -> `players_out=()`; the held fix's -> NSH J. Annunen + J. Saros `goalie_change key=True source=boxscore`. The suspected cause (the LIVE box carries no `starter` flag) is CONFIRMED.
 - **Not measured:** the fix on the fleet (it is off main, a betting change); the lift.
 - verify: capture task b5d1s6pa3 output line GOALIE_CHANGE_LIVE 23:26:13Z; live-odds-worker.log 23:26:45Z; scratchpad run of both detectors 23:28Z CST-local 5:28 PM.
+
+## 2026-11-22 05:33Z (11:33 PM CST 11-21) -- READING for the 2026-11-15 19:26:10Z load (and the 2026-11-18 08:03:01Z memo load): todo #809, the book-grid pivot's anchor-line index + incremental quote read + per-build memo, NCAAF Saturday 11-21 8-11 PM CST (lane `ncaaf-grid-build-speed`; scheduled task `ncaaf-grid-pivot-reading-1121`, session fd8f34da) -- **P1 MET (12.5 s vs 28.5 s, like shard; confounded by the board split), P2 MET (IDENTICAL, pivot CPU 12.7 -> 5.1 s, 2.5x), P3 MET**
+- betting change: no (a reading; nothing loaded, nothing on the fleet changed; read-only, nice 19)
+- Window 2026-11-22T02:00:00Z..05:00:00Z, from `refresh-worker.log` (its first line is 11-21 08:13:28Z, so it covers the window). refresh-worker pid 2397127 booted 11-21 18:14:59Z, before the window, and there are 0 boot lines inside it, so nothing was excluded. Fleet head `b07e80882`; its last ff was 11-21 12:07 PM CST.
+- **P1 MET:** `build_seconds.ncaaf` n=125, median **12.5 s**, p90 18.3, max 51.5. Against the 11-14 baseline (n=80, 28.5 / 52.0 / 81.1) the bar was <= 20 s. The shard has 715,002 lines before 05:00Z (719,666 in total) against 753,745, i.e. **-5.1%**, so it is like-for-like. The three grid changes are read together.
+- **P1 CONFOUND (material):** `SYNDICATE_BOARD_BUILD_PROCESS=1` is in pid 2397127's environ. The board split has been on since the 2026-11-18 08:30:50Z down/up. The prompt's check (`grep -c BOARD_BUILD_PROCESS` = 0) is blind to it, because the log tags it `[board_process]`.
+  - NCAAB fell by the same share (15.2 -> 6.7 s, -56%) as NCAAF (28.5 -> 12.5 s, -56%), so less contention plausibly carries much of the live cut.
+  - P1 cannot apportion the cut between the split and the grid code; P2 is the clean pivot measure.
+  - Other grid commits since `3920a2d4d`: `f29c53e91` (#835, default off), `25a5e480d` (#844, default off; the key is not set) and `09eddabf2` (the split's call site).
+- **P2 MET:** `pivotab.sh 2026-11-21 ncaaf` was run on `/home/amyn/Syndicate` (loaded code) under refresh-worker's environ, from 05:31:44Z to 05:32:15Z, exit 0.
+  - 129,396 rows -> 5,306 grid rows in both arms, **IDENTICAL=True** (24,792,879 B, sha b2435e10679a both).
+  - Pivot CPU old 12.7 s, new 5.1 s, **2.5x** (on 11-14 it was 3.1x).
+- **P3 MET:** 396 ticks, `BOOK_GRID_BUILD_ERROR` 0, Traceback 0, `BOOK_GRID_QUOTE_READ_VERIFY` 0, and 885 `BOOK_GRID_QUOTE_READ` lines, all `mode=incremental`.
+  - The literal `MISMATCH` grep returns 205 lines, and none are book-grid lines: all are `[venue_quote_fanin] SEGMENT_MISMATCH_GRID` (179) / `_ROWS` (26), the venue fan-in's segment guard.
+- verify: `grid809_ticks.py 2026-11-22T02:00:00 2026-11-22T05:00:00` on refresh-worker.log 05:31Z; `grid809_ncaaf_lines_before.py ncaaf 2026-11-21 2026-11-22T05:00:00`; `C:\tmp\railload\r809_1121_pivotab.out`; `/proc/2397127/environ`. Report: `C:\tmp\railload\reading_809_1121.md`.
