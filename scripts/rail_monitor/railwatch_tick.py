@@ -116,7 +116,17 @@ def tick(day, now_utc):
         return
     since_ct = dt.datetime.combine(dt.date.fromisoformat(day), dt.time(5, 0), CT).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S")
     rc7, p7, _, _ = wsl(f"cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p7count.py {since_ct}", 240)
-    rc29, p29, _, _ = wsl("cd ~/syndicate-prod && nice -n 19 ~/.venvs/syndicate/bin/python /mnt/c/tmp/railmon/p29_orient.py", 120)
+    p29_cmd = "cd ~/syndicate-prod && nice -n 19 ~/.venvs/syndicate/bin/python /mnt/c/tmp/railmon/p29_orient.py"
+    rc29, p29, err29, s29 = wsl(p29_cmd, 120)
+    # 11-22 R21 (the fleet-watcher's flag): p29 failed for the whole tick, so every no-model game read "unknown", and
+    # this line threw away its rc and stderr, so the cause was never recorded. Its live-rail GET never reached web.log,
+    # and a by-hand rerun 16 min later took 0.35 s with rc 0. Log the failure, then retry once: the retry is one 60 ms
+    # live-rail GET plus snapshot reads, all read-only.
+    if rc29 != 0 or not p29.strip():
+        log(f"p29 rc={rc29} {s29:.0f}s {err29.strip()[-200:]!r}; retrying once")
+        rc29, p29, err29, s29 = wsl(p29_cmd, 120)
+        if rc29 != 0 or not p29.strip():
+            log(f"p29 retry rc={rc29} {s29:.0f}s {err29.strip()[-200:]!r}")
     rcps, ps, _, _ = wsl("ps -eo pid,rss,etimes,args | grep -E 'run_refresh_worker.py|board_build_process --serve' | grep -v grep", 30)
     note = "auto"
     # 11-21: hand p29's per-game lines to dash_update so the row says WHY each no-model game has none
