@@ -478,3 +478,112 @@ unchanged: common lines from `h_pair`'s (or `cal_h_pair`'s) own quartiles, and a
 | `C:\tmp\t852\calib_arms.py` | `9c8c852b7e876d4d80487ab9bcb71862cbd2a07d656d9e87bdb0e3a532e4ccd3` |
 | `C:\tmp\t852\paired_margin.py` | `10a991f4cb3a83b581f1b45a11f09be70abc3f71a5dbe6e6c5090e70df984acc` |
 | the kit `kit_env_ncaaf.sh` | `4f31d0ac2b4888b5ca72fa32fa33a6e66482dd7264b5354d00ed360c1a3e4174` |
+
+### REAL-TIMEOUTS HOLD-OUT RESULTS — written 2026-11-21 9:37 PM CST, after the runs (nothing above was changed)
+
+**Verdict: condition 2 is MET.** All four pre-registered gates pass.
+- **Where it helps:** on 2026 states the pair alone puts one-score late scoring a third short, and the end game puts
+  it on the real number.
+- **Where it costs:** big leads late. This is not gated, but it has the same sign in 2024 and in both 2026 reads (see
+  "Where it costs").
+
+**Run.** `C:\tmp\t859h\run_all.sh`, log `run.log`.
+- Every pin was checked OK at 02:23:55Z 11-22.
+- The three arms ran 548 of 548 games each: `h_pair` 4.8 min, `h_eg` 5.9 min, `off` 4.8 min (2 Idle workers, 60
+  sims a state).
+- E0 ran 548 of 548 for each test arm, 0 refused. Closes were found for 548 of 548 games.
+- The pinned `h_read.py` wrote `C:\tmp\t859h\read.txt`. Its instrument re-check: `h_eg` 48 of 48 identical (timeouts
+  fed on 48), `h_pair` 48 of 48.
+- #835 anchored all 2,191 states in both arms.
+
+**Gates** (calibrated, `h_eg - h_pair`, game-clustered paired SE):
+
+| gate | reading | rule | verdict |
+|---|---|---|---|
+| C1 overall, Q4 15:00-6:00 (548 games) | -0.0015 (se 0.0045) | <= +1 SE | PASS |
+| C2 17+, Q4 15:00-6:00 (249) | +0.0089 (se 0.0092) | <= +1 SE | PASS, by 0.03 SE |
+| C3 one-score, Q4 3:00 (203) | **-0.0858 (se 0.0257)** | <= +1 SE | PASS, better by 3.3 SE |
+| R1 one-score last-2:00 points (236 games one-score at Q4 15:00) | `h_eg` **3.23**; real 3.16 [2.66, 3.67] | inside | PASS |
+
+On R1, `h_pair` (2.35) and `off` (2.36) are both outside, below. 2024's `base` was 2.31.
+
+**Where it helps.** One-score games at Q4 3:00:
+- The pair's rest of game is 0.673 of the real points (engine minus actual -1.83, se 0.43). The end game's is 1.004
+  (+0.14, se 0.44).
+- Raw log loss there: -0.0419 (se 0.0309).
+- That is #808's clock with real timeouts doing what it was built for, now out of sample.
+
+**Where it costs** (NOT gated; stated because the sign holds across reads). At 17+ the end game is behind the pair
+after calibration:
+- **Q4 15:00-6:00:** +0.0089 (se 0.0092), the C2 reading. Raw, it was ahead: -0.0045 (se 0.0122).
+- **Q4 3:00:** **+0.0443 (se 0.0293)** calibrated, +0.0246 (se 0.0198) raw. 2024's joint re-read had +0.0333
+  (se 0.0473) raw at the same cell. Three reads, one sign, 0.7-1.5 SE.
+- **The shape is over-confidence, not a wrong centre.** At 17+ at Q4 3:00 (calibrated read, same lines for both arms):
+
+  | arm | rest ratio | slope |
+  |---|---|---|
+  | end game | 0.940 | 0.62 |
+  | pair | 1.110 | 0.92 |
+
+  - The end game's centre is closer to the truth, but its spread is too tight.
+  - #835's widening was fitted on production's `off` draws (fleet ledger 10-03..11-14).
+  - The likely reason, not measured here: the end game's late blowout draws are narrower, because the trailer
+    concedes at 25+ and #808's clock slows the end of the game.
+- This is `model_engine_standard.md`'s mechanism-vs-estimator case: the estimator on top was fitted without the
+  mechanism.
+
+**Not gated, for the record:**
+- **Raw draws** (lines from `h_pair`'s quartiles), against the pair:
+
+  | Q4 15:00-6:00 | `h_eg` | `off` |
+  |---|---|---|
+  | overall | -0.0019 (se 0.0065) | +0.0164 (se 0.0047) |
+  | 17+ | -0.0045 (se 0.0122) | +0.0442 (se 0.0124) |
+
+  So on 2026 the pair alone beats production today by 3.5 SE at 17+, the pair's own claim, out of sample.
+- **Rest of game by margin:** `h_eg` minus `h_pair`, with engine minus actual for pair -> end game.
+
+  | checkpoint | margin | `h_eg` minus `h_pair` | engine minus actual |
+  |---|---|---|---|
+  | Q4 15:00 | 0-8 | +1.33 | -1.06 -> +0.27 |
+  | Q4 15:00 | 9-16 | +0.62 | -0.51 -> +0.11 |
+  | Q4 15:00 | 17-24 | -0.22 | +0.35 -> +0.13 |
+  | Q4 15:00 | 25+ | -1.43 | +0.57 -> -0.86 (se 0.75) |
+  | Q4 15:00 | all | | -0.42 -> +0.03 |
+  | Q4 3:00 | 0-8 | +1.97 | -1.83 -> +0.14 |
+  | Q4 3:00 | 25+ | -0.50 | +0.43 -> -0.08 |
+
+- **Calibrated overall by half-season:** weeks 1-5 -0.0041 (se 0.0063); weeks 6-10 +0.0009 (se 0.0064).
+- **Calibrated Q4 3:00, all margins:** -0.0110 (se 0.0166).
+
+**Predictions** (6 of 11 held):
+- Raw overall in [-0.020, 0.000]: -0.0019, **held**.
+- Raw 17+ in [-0.050, -0.005]: -0.0045, **missed narrowly** (a smaller gain).
+- Raw one-score Q4 3:00 in [-0.030, +0.010]: -0.0419, **missed** (a bigger gain).
+- Calibrated overall in [-0.015, +0.002]: -0.0015, **held**.
+- Calibrated 17+ in [-0.040, 0.000]: +0.0089, **FAILED, wrong sign** (see "Where it costs").
+- C1-C3 all PASS: **held**.
+- R1, `h_eg` inside: **held**.
+- R1, `h_pair` and `off` below its centre: **held**.
+- 17-24, `h_eg` >= `h_pair`: **FAILED** at all four checkpoints (-0.22, -0.22, -0.10, -0.21; se 0.10-0.14).
+  - The shift is mostly the trailer's (-0.20 of -0.22 at Q4 15:00).
+  - At every checkpoint the end game sits closer to the real points: engine minus actual +0.35 -> +0.13,
+    +0.30 -> +0.08, +0.92 -> +0.82, +0.24 -> +0.03.
+- 25+, `h_eg` < `h_pair`: **held** at all four (-1.43, -1.44, -1.56, -0.50).
+- Half-seasons agree in sign: **FAILED** (-0.0041 vs +0.0009). Both are inside 1 SE of zero.
+
+**What follows (the pre-registered rule).**
+- Condition 2 holds.
+- Still owed:
+  1. the pair's own load: its 11-21 hold-out after the M2 verdict, and its window;
+  2. a live ESPN college scoreboard row with `homeTimeouts` / `awayTimeouts` (any slate from 11-24 MACtion on);
+  3. the user's yes in the window.
+- Nothing changed on the fleet.
+
+**Open, for the user before 12-08: the 17+ late over-confidence.** The registered gates did not cover 17+ at Q4
+3:00, and the rule is the rule, so the end game stays queued.
+- The standard asks for a re-fit of #835's widening on top of the end-game draws. It can be done without reusing this
+  hold-out: fit on 2024 states, confirm on the 11-28 and 12-05 slates. Those are CFBD plays, outside the blind window.
+- A different K would be one more thing to load. So the choice is the user's:
+  - re-fit before 12-08;
+  - or load the end game on the current K and watch 17+ late.
