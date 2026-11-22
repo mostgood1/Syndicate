@@ -596,3 +596,28 @@ The hypothesis went into the lane first (H1 code, H2 slate). The readers were al
   - Its P3-P5 read the 11-24/11-25 weekday evenings under the comparability rule.
   - Its line "a fresh parent reads 0.8-1.2 GB" holds only for a boot at a quiet hour, as here. J fires only 09-12Z, which is a quiet hour.
 - **The morning task:** the parent read 1,657 MB at 00:12Z, so Sunday's 4 AM reset will very likely run (threshold 1,500).
+
+## 14. Side reading: live-odds-worker's 150% "container" memory (written 2026-11-22 ~01:00Z = 7:00 PM CST 11-21)
+
+Sent by the fleet-watcher on the user's "yes, send the memory overshoot to the memory-guard lane". The hypothesis went into the lane first. Readers: `C:\tmp\bmg\w1124\low_peak.sh`, `low_tree.sh` and `low_gates.sh`, read-only at nice 19, over `live-odds-worker.log` (from the 06:13Z restart).
+
+- **What the number is.** On the fleet, `container_memory_mb` is `_local_process_tree_rss_bytes`
+  (`memory_observability.py:115-157`): psutil RSS summed over the role's tree, against `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` (3,072).
+  There is no cgroup, so it is not page cache.
+- **The peak, 20:36:19Z:** container 4,632 MB and tree sum 4,619. The worker held 1,452 MB and 26 children held 3,167:
+  - `refresh_odds_sources.py` 1,283;
+  - `poll_soccer_live_state.py` 769;
+  - `run_refresh_odds_job.py` 176;
+  - `live_resim_workers` 174;
+  - fetchers ~300.
+- **The other top peaks:** 20:18Z read 4,669 / 4,657 with 27 children, and 20:04Z read 4,597 / 4,573 with 26.
+- **Per hour (p50):** container 1,257 MB with 1 child at 08Z; 3,031 with 15 at 16Z; 3,088 with 16 at 20Z; 2,376 with 9 at 23Z.
+  The worker itself stays at 1.25-1.48 GB, so the overshoot is the children, and they scale with the live slate.
+- **PSS vs RSS, the live tree at 00:23Z** (13 processes; the worker had self-recycled to pid 2685796): RSS 2,379 MB, PSS 1,940 MB (-18%).
+  The forked children share 35-50% of their pages (a `refresh_odds_sources.py` read 145 RSS / 92 PSS).
+  This reading is from now, not the peak, so the peak's unique memory is an estimate (~3.7-3.9 GB).
+- **Gates:** 384 `[LIVE_LENS_TICK_DIAG] ok=False reason=low_headroom` (needs 300 MB) between 14Z and 00Z: soccer 135, wnba 131, mlb 118.
+  No other gate line was found. (The `MEMORY_GUARD_ABORT` and `no_headroom` hits were key names inside `ALL_PROCESS_MEMORY` payloads, not gate lines.)
+- **Verdict.** It is real RSS, inflated about 18% by shared pages, against a declared budget that nothing enforces.
+  The host itself had 5.3 GB available at 00:23Z. The gate already acts on it, at the cost of soccer's 135 live-lens ticks.
+  **It belongs to lane `layer2-rail-monitor`**, whose open hypothesis is exactly this gate. It is not refresh-worker's board.
