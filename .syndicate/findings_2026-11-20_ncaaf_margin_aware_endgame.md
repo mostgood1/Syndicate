@@ -707,3 +707,89 @@ return codes and section presence were checked.
 | `/c/tmp/t859h/h_arms.py` | `aa41e98e905c307cf8d2b2581b6e60ab04796b08171ef2133357a682bcddd976` |
 | `/c/tmp/t852/resume.py` | `ef89b077310a777c6f6a33ec43f4905eb855b687f82cd39d8ee38178aedaf2b8` |
 | `/c/tmp/w1208_ncaaf/kit_env_ncaaf.sh` | `4f31d0ac2b4888b5ca72fa32fa33a6e66482dd7264b5354d00ed360c1a3e4174` |
+
+### LATE-WIDENING RE-FIT RESULTS — written 2026-11-22 12:54 PM CST
+
+**Verdict: F2_FAIL, so NO CHANGE. The end game loads on K_LATE 1.6, as queued. There is no candidate, so the weeks
+13-14 confirmation is not owed and `k_pull26c.py` is not run.**
+
+**Run.** The scorer and data are the ones pinned above, and the pins were checked before every step (`run.log`, `fit.txt`).
+- Both arms ran all 730 games, and both E0 passes refused 0.
+- Closes were found for 730 of 730 games, so 730 were scored and none dropped.
+
+**The slope curve over all fit states** (`s_ref`, the pair at 1.6, is 0.957):
+
+| h_eg K_LATE | 1.2 | 1.4 | 1.6 | 1.7 | 1.8 | 2.0 | 2.4 | 3.0 |
+|---|---|---|---|---|---|---|---|---|
+| slope | 0.786 | 0.862 | 0.906 | 0.914 | **0.915** | 0.907 | 0.896 | 0.874 |
+| log loss vs h_eg 1.6 (se) | -0.0151 (0.0031) | -0.0079 (0.0015) | 0 | +0.0045 (0.0006) | +0.0088 (0.0011) | +0.0166 (0.0017) | +0.0284 (0.0026) | +0.0454 (0.0036) |
+
+- **h_eg's slope peaks at 0.915 (K 1.8) and then FALLS.** It never reaches 0.957, so the first-crossing estimator ran
+  off the end of the grid: K_FIT 3.0 (`beyond_grid_end`), K_NEW 3.0. The bootstrap 95% interval is [1.67, 3.00]; the
+  resamples where it crossed did so near 1.7.
+- **F1:** 3.0 != 1.6.
+- **F2:** h_eg at 3.0 minus h_eg at 1.6 = **+0.0454 (se 0.0036), FAIL**.
+- **Not gated:** the log-loss argmin on the grid is **1.2 for h_eg and 1.3 for h_pair**, the NARROW end. That is the
+  opposite of the prediction.
+
+**Why widening cannot move the late slope** (by checkpoint, h_eg at 1.6 then at 3.0):
+
+| checkpoint | slope at 1.6 | slope at 3.0 |
+|---|---|---|
+| Q3 7:30 | 0.98 | 1.24 |
+| Q4 15:00 | 1.25 | 1.75 |
+| Q4 10:00 | 1.06 | 1.28 |
+| Q4 6:00 | 0.77 | 0.61 |
+| Q4 3:00 | 0.63 | 0.57 |
+
+- At the early checkpoints, K behaves like a width: slope rises with it, and those states are already under-confident
+  at 1.6.
+- At Q4 6:00 and Q4 3:00, widening makes the over-confidence WORSE.
+- Likely reason, not measured here: the widening is floored at the score so far. Late in a game, draws pushed below the
+  mean pile up at "no more scoring", so K changes the mass at the line `S + 0.5` rather than the spread. One knob cannot
+  fix both ends.
+
+**Predictions: 1 of 5 read held; CONFIRM was not run.**
+
+| prediction | result |
+|---|---|
+| h_eg at 1.6 has a lower slope than `s_ref` | **HELD**: 0.906 vs 0.957 |
+| K_NEW is in [1.7, 2.0], with a 95% interval under +-0.2 wide | **FAILED**: 3.0 off the grid; [1.67, 3.00] |
+| F2 passes, within +-0.003 | **FAILED**: +0.0454 (se 0.0036) |
+| at K_NEW, the 17+ Q4 3:00 gap narrows but does not close | **FAILED**: it WIDENS; slope 0.52 at 1.6 and 0.43 at 3.0, pair 0.65 |
+| both arms' log-loss argmins are >= 1.8 | **FAILED**: 1.2 and 1.3 |
+| CONFIRM passes | not run (no candidate) |
+
+**What 2023 says about the queued end game at 1.6** (NOT GATED; h_eg minus h_pair, both at 1.6). This is a second
+season, out of sample for #808's clock rates. It has the same shape as the 2026 hold-out: the end game helps close games
+and costs at blowouts.
+
+| states | h_eg - h_pair (se) | slopes h_pair / h_eg |
+|---|---|---|
+| all fit states | -0.0017 (0.0042) | 0.96 / 0.91 |
+| \|m\| <= 8 | -0.0214 (0.0071) | 0.90 / 0.95 |
+| \|m\| 9-16 | +0.0009 (0.0061) | 1.04 / 1.00 |
+| \|m\| >= 17 | **+0.0171 (0.0076)** | 0.96 / 0.81 |
+| Q3 7:30, 17+ | **+0.0306 (0.0082)** | 1.02 / 0.86 |
+| Q4 3:00, one-score (\|m\| <= 8) | -0.0696 (0.0258) | 0.58 / 0.66 |
+| Q4 3:00, 17+ | +0.0326 (0.0210) | 0.65 / 0.52 |
+
+- **The 17+ cost replicates.** It is 2.2 SE over all late 17+ states and 3.7 SE at Q3 7:30. In 2026 it was +0.0443
+  (se 0.0293) at Q4 3:00 calibrated.
+- The arms also differ in damping (17/14 against 21/7), which acts at every checkpoint, so this run does not separate
+  which piece costs at 17+.
+- The hold-out's gates (C1-C3, R1) are unchanged by this: they were pre-registered on 2026 and MET. This is a known,
+  ungated cost for the user to weigh at the load.
+
+**Not gated, a lead for #835 itself** (both arms): on 2023, a NARROWER K_LATE beats 1.6 on log loss. h_eg at 1.2 is
+-0.0151 (se 0.0031), and h_pair's argmin is 1.3.
+- It rests on one season of reconstructed states at 60 sims per state, on the harness rather than the fleet.
+- #835 chose 1.6 on the fleet's 2026 live finals and Kalshi's late width.
+- It changes nothing in the queue, and testing it would need its own pre-registration.
+
+**What follows (as pre-registered for NO CHANGE).**
+- The end game loads on 1.6 as queued, on the user's yes in the 12-08 window. There is no 7th line, and the kit stays
+  as pinned (sha 4f31d0ac).
+- The 17+ late over-confidence is not a width effect that K_LATE can move: widening makes it worse.
+- Any fix is a code change for a later window, and the user's call: for example, the late "no more scoring" mass, or
+  the end game or damping at 17+.
