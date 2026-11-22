@@ -62771,6 +62771,14 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Exit to replacement boot: 0.18-0.84 s, median 0.29 s, 11 of 11 under 1 s (before: median 1.5 s, p99 9.2 s). **MET** so far on the ~2 s p99 bar.
   - 0 dumps, 0 `WORKER TIMEOUT`, 0 Traceback, 0 `Exception during worker exit`. healthz 200.
   - Kills per CST day (`wsk_kills_cst.py`, web.log): 11-12..11-16: 0 / 0 / 0 / 0 / 0; 11-17: 5 (4 silent, plus the 10:13 AM one this lane caused); 11-18: 0; 11-19: 0; 11-20: 1 (the GC hook, fixed by `0d20a6919`); 11-21: 0 to 2:14 PM.
+- **reading 3, 2026-11-22 18:30:00Z (12:30 PM CST, +24.4 h), scratchpad `wsk_day_reading.sh` / `wsk_fastexit_day.py` (whole web.log, no tail cut): verify MET.**
+  - 85 `Worker exiting` since the load. 83 took `WEB_WORKER_FAST_EXIT`; the other 2 are the reload's old-config workers (18:07:34Z). 0 `WEB_WORKER_STOCK_EXIT`.
+  - Fast exit to the next boot: median 0.23 s, p90 0.41 s, p99 0.84 s, max 0.84 s, 0 over 2 s (before: median 1.5 s, p99 9.2 s).
+  - 0 dumps, 0 `WORKER TIMEOUT`, 0 Traceback, 0 `Exception during worker exit`. Fleet head `b07e80882`, healthz 200.
+  - The 24-h dump watch (`bgeqza0oy`, 18:25:55Z 11-21 to 18:25:55Z 11-22) ended `NO_DUMP within cap`.
+  - Kills per CST day: 11-21 (whole day): **0** (1 dump, the exiting worker at 11:04 AM, before this load; 85 recycles); 11-22 to 12:30 PM: **0** (0 dumps; 31 recycles).
+  - Workers booted since 20:14Z 11-21: 72. 70 left by their own recycle line, 2 live, 0 killed, 0 unaccounted.
+  - Main-loop stalls >= 5 s since 20:14Z 11-21: 7, max **19.09 s** (00:22:52Z 11-22 = 6:22 PM CST 11-21: an 18.57 s generation-2 collection that freed nothing, on a request thread). 5 of the 7 sit on a collection of 5.65-18.57 s; 2 (6:10 PM CST, pid 2677997, 6.47 / 5.22 s) have none. The longest is now about half the 40 s dump (before: 10.85 s).
 
 ## 2026-11-21 18:14:49Z (12:14 PM CST) -- DEPLOY (claimed refresh-worker TERM, no env change, no ff by me): loads the fleet checkout's b07e80882 -- the Kalshi YES/NO venue grade check, FIRST version 64cd634f4 (lane kalshi-no-grade-check; user "Yes, load it")
 

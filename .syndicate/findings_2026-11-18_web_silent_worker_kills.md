@@ -541,3 +541,22 @@ Read-only, nice 19, from the fleet's `~/syndicate-prod/logs/web.log`. Scratchpad
 - **`b07e80882` at +2.1 h:** 11 of 11 new-config exits took `WEB_WORKER_FAST_EXIT` within 5 ms of `Worker exiting`. Replacements booted 0.18-0.84 s later (median 0.29 s; before, median 1.5 s and p99 9.2 s). 0 stock exits, dumps or kills.
 - **Not established:** whether 11-17's four silent kills were all the 40 MB decode. The 11-20 dumps named that mechanism for the cold read, and kills have stayed at 0 since (bar the instrument). The 11-17 kills left no dump: the dump instrument went in later.
 - **Next:** kills per CST day for the coming days, with the dump watch (`bgeqza0oy`, to ~18:26Z 11-22) catching any stall at 40 s. Then the goal verdict.
+
+## 2026-11-22 12:30 PM CST (18:30Z) -- the day reading: 0 kills on 11-21 (whole day) and on 11-22 to 12:30 PM; the fast exit holds 83 of 83; the longest collection grew to 18.6 s
+
+Read-only, nice 19. Scratchpad scripts: `wsk_day_reading.sh` (fired 18:30:00Z), `wsk_fastexit_day.py`, `wsk_quiet_check.sh`, `wsk_quiet_check2.sh`. The deploy-side reading is in `deploys.md` (the 18:07:33Z 11-21 entry, reading 3).
+
+- **Kills per CST day:** 0 x5 (11-12..16), 5 (11-17), 0 (11-18), 0 (11-19), 1 (11-20, the instrument), **0 (11-21, whole day)**, **0 (11-22 to 12:30 PM)**.
+  - 11-21's one stall dump is the exiting worker at 11:04 AM, which `b07e80882` then fixed. Since that load: 0 dumps; the 24-h dump watch ended `NO_DUMP within cap`.
+  - Recycles: 85 on 11-21, 31 on 11-22 to 12:30 PM.
+- **Fast exit at +24.4 h:** 83 of 83 new-config exits fast, 0 stock. Next boot median 0.23 s, p99 0.84 s, 0 over 2 s.
+- **Workers:** 72 booted since 20:14Z 11-21; all accounted for (70 by their own recycle line, 2 live), 0 killed.
+- **Main-loop stalls >= 5 s: 7 since 20:14Z 11-21, max 19.09 s.** The longest is an 18.57 s generation-2 collection that freed nothing (6:22 PM CST 11-21, request thread, 18.1 s CPU). 5 of the 7 sit on a collection of 5.65-18.57 s; two at 6:10 PM CST on one worker have no collection line.
+  - The longest collection was 10.60 s in the previous 24 h. A full collection's cost grows with the number of live objects, so this is the one path seen on these readings that could still reach the 40 s dump and the 60 s kill.
+  - Collections: 3,220 of 3,232 generation-2 pauses freed nothing; 2,382 s of pause in 22.3 h; 6-9 PM CST ran 246-285 s an hour.
+  - Not tuned: held on the user's "Watch kills first".
+- **A false alarm, recorded so nobody chases it:** web.log had no line from 18:25:55Z to 18:30:36Z, read at 18:30:36Z.
+  - Quiet stretches are normal on a slow Sunday: 93 gaps of 120 s or more on 11-22 UTC, up to 1,631 s (09:07-09:34Z).
+  - Both workers sat in `do_epoll_wait` / `futex_do_wait`, and healthz answered in under 1 ms.
+  - A real request (`GET /`) returned 200, but took 10.5 s on a worker 7 min old. That is not attributed here.
+  - Silence alone does not tell: the 11-20 deadlock also silenced all of web. What tells is a real request being served, and the stall dump (re-armed only by a running main loop) not firing.
