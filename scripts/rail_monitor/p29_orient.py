@@ -30,6 +30,21 @@ _PRICED = {"totals", "total", "totals_alt", "alternate_totals", "spreads", "run_
            "alternate_spreads"}
 
 
+def counts_as_priced(sport, market):
+    """The full-game markets the live join prices FOR THIS SPORT (dash_update.counts_as_priced is the same rule).
+    NHL: live totals are refused by design (no total distribution), so puck lines only. NFL (11-22 R9, the
+    fleet-watcher's flag): the re-sim publishes NO totalRunsDist / marginDist on purpose (nfl/live_resim.py:714,
+    nfl-live-distribution-grade graded live margins a FAIL), so every NFL live total and spread is withheld by design
+    and the full-game moneyline is the one priced market. Counting totals/spreads put all 6 re-simmed games on the
+    no-model list as "resimmed_no_row_model" while their moneylines carried the model (5 of 5 rows at R9)."""
+    s, m = str(sport or "").lower(), str(market or "").strip().lower()
+    if s == "nfl":
+        return m in ("h2h", "moneyline")
+    if s == "nhl" and "total" in m:
+        return False
+    return m in _PRICED
+
+
 def norm(s):
     return " ".join(str(s or "").lower().replace(".", "").split())
 
@@ -85,9 +100,7 @@ for r in rows:
     m = matchups.setdefault((r.get("sport"), r.get("matchup")), {"rows": 0, "with_model": 0, "priced": 0, "priced_with_model": 0})
     m["rows"] += 1
     m["with_model"] += 1 if r.get("live_model_probability") is not None else 0
-    if (str(r.get("segment") or "full") == "full" and str(r.get("market") or "").strip().lower() in _PRICED
-            # NHL live totals are refused at the join by design (no total distribution); dash_update skips them too
-            and not (str(r.get("sport") or "").lower() == "nhl" and "total" in str(r.get("market") or "").lower())):
+    if str(r.get("segment") or "full") == "full" and counts_as_priced(r.get("sport"), r.get("market")):
         m["priced"] += 1
         m["priced_with_model"] += 1 if r.get("live_model_probability") is not None else 0
 

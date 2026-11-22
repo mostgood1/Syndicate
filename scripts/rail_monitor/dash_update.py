@@ -117,18 +117,28 @@ def row(args):
     # row mix, not a refusal. h2h is out for every sport: layer2_board leaves some h2h rows blank by design.
     _PRICED = {"totals", "total", "totals_alt", "alternate_totals", "spreads", "run_line", "ats", "spreads_alt",
                "alternate_spreads"}
+
+    def counts_as_priced(sport, market):  # the same rule as p29_orient.counts_as_priced
+        s, m = str(sport or "").lower(), str(market or "").strip().lower()
+        if s == "nfl":
+            return m in ("h2h", "moneyline")
+        if s == "nhl" and "total" in m:
+            return False
+        return m in _PRICED
     by_game = {}
     if os.path.exists(lr_path):
         for r in (json.load(open(lr_path, encoding="utf-8")).get("rows") or []):
             if r.get("player_name") or str(r.get("segment") or "full") != "full":
                 continue
-            if str(r.get("market") or "").strip().lower() not in _PRICED:
-                continue
             # 11-21 R27: NHL live TOTALS are refused at the join by design (no total distribution published;
             # findings_2026-11-13_nhl_live_total_calibration.md), 0 of 16-21 rows modelled every reading. Counting them
             # put Pittsburgh @ Nashville (3 totals) and Vegas @ Winnipeg (2) on this list while their h2h / puck-line
             # rows carried models. NHL counts its puck lines only.
-            if str(r.get("sport") or "").lower() == "nhl" and "total" in str(r.get("market") or "").lower():
+            # 11-22 R9: NFL live totals AND spreads are withheld by design (nfl/live_resim.py:714: no totalRunsDist /
+            # marginDist, nfl-live-distribution-grade graded live margins a FAIL; 0 modelled on every saved NFL reading
+            # since 11-15). Counting them put all 6 re-simmed games here as resimmed_no_row_model while their
+            # full-game moneylines carried the model (5 of 5 rows at R9). NFL counts its full-game moneyline only.
+            if not counts_as_priced(r.get("sport"), r.get("market")):
                 continue
             g = by_game.setdefault(f"{r.get('sport')} {r.get('matchup')}", [0, 0])
             g[0] += 1
