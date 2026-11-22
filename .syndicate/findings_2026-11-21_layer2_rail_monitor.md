@@ -192,7 +192,7 @@ The rest of the flag was the monitor's own labelling:
   | 11-19 6-11 PM (Thu) | 221-254 | 247-548 | 8-11 |
   | 11-22 8-11 AM (Sun) | 165-173 | 221-285 | 13-14 |
 
-  The refresh-worker parent reset at 12:14 PM CST 11-21 did not bring it down, and neither did the code that loaded with it. The rise started before both, at 16Z.
+  Neither refresh-worker restart on 11-21 brought it down: 10:35 AM CST (16:35:42Z, loading 268 commits, `0d20a6919`) and 12:14 PM (`b07e80882`). The jump predates both. Walls were 205-311 s to 15:55Z; the 16:07:28Z build ran 552 s and started about 15:58Z. After the restart they stayed at 341-536 s (`walls_list.py`). CORRECTION 11-22 11:36 AM CST: this line first named only the 12:14 PM reset.
 - **Not the candidate pool's size.** `pool_json_bytes` ran 42-49 MB on every evening. Across 1,225 builds, r(pool MB, wall) = -0.01 (`pool_vs_wall.py`). What changed is CPU per pool MB:
   - 11-19 / 11-20 / Saturday morning: 4.5-4.8;
   - Saturday from 16Z: 7.4-9.2;
@@ -207,3 +207,106 @@ The rest of the flag was the monitor's own labelling:
   - `pool_vs_wall.py`;
   - `quote_read_growth.py`;
   - `kept_vs_wall.py`.
+
+## R-D #851 P6 baseline, night 2 (OddsAPI credits; 00-05Z on 2026-11-22 = 11-21, 6-11 PM CST): CREDITS NOT MEASURED
+
+**The 05Z read was missed.** Its one-shot cron fired at 11:28 AM CST 11-22, 12.5 h late; the session was busy until then. Night 2's credits per hour for 00-05Z cannot be recovered:
+- `/api/ops/oddsapi/quota` keeps only a baseline (00:02:33Z, used 2,780,368), the latest reading, and per-hour aggregates that are cumulative since 10-01.
+- No role log prints the counter, and Redis holds only the aggregate key.
+
+The late read is recorded under a truthful label, `late1121_05Z_read_at_1729Z`, not `base1121_05Z`.
+
+| | 00Z read | late read |
+|---|---|---|
+| read_at | 2026-11-21T23:59:10Z (5:59 PM CST) | 2026-11-22T17:29:07Z (11:29 AM CST 11-22) |
+| `quota.latest.used` | 2,779,960 | 2,894,214 |
+| fleet `credits_per_hour` | 5,966.3 | 6,527.3 |
+
+- **Not the evening rate:** 114,254 credits in 17.50 h = 6,529/h. This spans the evening, the night and the morning.
+- **Lane sweeps on the window the 05Z read would have closed** (`p851_sweepcount.py 2026-11-21T23:59:10 2026-11-22T05:00:13`; the script now reads `live-odds-worker.log.1` too, because the evening had rotated):
+  - **109 `ODDS_SWEEP_LAUNCHED`, 615 sport sweeps:** nba, ncaab, ncaaf, nhl and wncaab 109 each, soccer 42, nfl 28.
+  - Night 1 had 126 and 535; NHL rode 109 sweeps against 14 on night 1.
+  - `p851_loopstages.py 2026-11-22`'s own 00-05Z iteration window shows 130 launches in tick spans, with sweep gaps p50 93 s / p90 277 s (ALL, n 730).
+- **Consequence:** P6's 11-24 comparison has ONE baseline night (11-20: 12,849 credits/h, at most 120 credits per sport sweep), not the mean of two.
+
+## DAILY SUMMARY — Sat 11-21 (day 7), closed 11:38 AM CST 11-22 (12 h late)
+
+48 readings by the Windows task, 10:06 AM to 1:43 AM CST, every 20 min, 0 failed ticks (`railwatch\tick.log`). POP_START 16:00Z. Flags are graded on their first sighting against the finals by date (`C:\tmp\railmon\grade_2026-11-21_out.json`).
+
+The close ran 12 h late. The session was diagnosing until morning and its crons fired once it was idle.
+
+### The grade
+
+| bucket | flags | games | W-L-P | hit | fair | hit − fair, 90% CI (game-clustered) |
+|---|---|---|---|---|---|---|
+| **ALL** | 900 | 141 | 458-434-8 | **0.513** | 0.491 | [−0.016, +0.061] |
+| P3 first reading: yes | 154 | 82 | 83-71 | 0.539 | 0.486 | [−0.007, +0.117] |
+| P4 fair < 0.40 | 76 | 34 | 19-57 | 0.250 | 0.232 | [−0.068, +0.114] |
+| P5 NCAAB full totals | 131 | 48 | 74-57 | 0.565 | 0.500 | [−0.028, +0.156] |
+| sport: NCAAF | 426 | 58 | 226-197-3 | 0.534 | 0.508 | [−0.026, +0.076] |
+| sport: NCAAB | 283 | 49 | 154-129 | 0.544 | 0.498 | [−0.012, +0.107] |
+| **sport: NBA** | 146 | 6 | 50-96 | **0.342** | 0.413 | [−0.191, +0.033] |
+| sport: soccer | 31 | 19 | 20-6-5 | 0.769 | 0.536 | [+0.068, +0.374] |
+
+- **The flags hit their fair once more, slightly above it**: the 4th day in a row (11-18 to 11-21). The model's mean p was 0.595 against a 0.513 hit, so it is again ~8 pp over-confident on its own side (#847).
+- **NBA under fair for the 4th day** (0.342 vs 0.413), in only 6 games; the CI crosses 0 this time.
+- The college Saturday (NCAAF 426 flags / 58 games) sat at fair.
+
+### Pre-registered verdicts (standing P1-P6, P8)
+
+| # | prediction | result | verdict |
+|---|---|---|---|
+| P1 | 0 rail-card contradictions | 0 at all 48 readings | **MET** |
+| P2 | board publication gap median ≤ 600 s, none > 1,800 s, 5:30-10:30 PM | 25 publications, median **657 s**, max 1,555 s, 16 over 600 s (`p2_boardpub.py`) | **NOT MET** (median). The board cost (flag 5) and #850's refusals; 11-20 had 47 publications, median 338 s |
+| P3 | first-reading flags at or below fair | 0.539 vs 0.486, CI [−0.007, +0.117] | **within noise** (above, not significant, as on 11-19 and 11-20) |
+| P4 | long shots (fair < 0.40) at most fair + 2 pp | 0.250 vs 0.232 | **MET** (by 0.2 pp) |
+| P5 | report NCAAB calibrated live full totals | 131 / 48 games, 0.565 vs 0.500; under 88 (0.614) / over 43 (0.465); the flagged lines went over 54 of 131 | report |
+| P6 | 0 pregame NCAAB / WNCAAB totals flags | 0 at all 48 readings | **MET** |
+| P8 | score floor: 0 college calibrated full totals below the score | 1 row at R13 (2:03 PM): Denver @ Eastern Michigan under 136.5, total 137.8 vs 138 scored | **NOT MET as written; timing, not the floor.** The chip read H2 0:00 and its own re-sim final total was 141.4, while the flagged row's quote was 326 s old |
+
+### What the day found
+
+Each item has its block above:
+- **Soccer live lens stalls at kickoff** (`2c12933ce`). The lens is skipped by its own memory gate, 137 of 799 ticks. The soccer live odds refresh stacks 2-3 runs when 5+ leagues are in play. Fix options (a)-(d) are untaken.
+- **Every St. Louis Blues game misses its NHL live lane** (flag 4). Fix built default-off: #860, `cb98b201a`, queued for 11-24.
+- **Dark rows are board cadence** (flag 3).
+- **The board build ran ~1.7x the weekday walls all Saturday** (flag 5). It is CPU inside the build, I-20's evening cost; not #850.
+- **Games with no live model, as unique games:**
+  - NCAAF `key_player_out`: 16 (#814 by design);
+  - `not_in_resim` at tip-off: 10;
+  - NHL `in_intermission`: 8;
+  - NCAAF `game_not_in_progress` / `overtime_not_modelled`: 4 / 2;
+  - NCAAB `no_plays`: 1.
+  - The 14 `no_snapshot_for_sport` games were the helper's own empty read (renamed); the NHL `resimmed_no_row_model` ones were NHL totals counted as priceable (fixed).
+- **I-29:** 3 college games reversed against their re-sim: Mercyhurst @ Western Illinois, Troy @ Valparaiso, and Nicholls St / Southern Miss. 52 joined directly. Change G is on 11-24.
+- **LEAD (11-22's slate, from R43 at 12:03 AM, still 5 at every 11-22 reading so far): MLS playoff team cards.**
+  - CIN @ NSH, CLT @ CHI and RSL @ VAN show chip count 0 while 39-61 rows match them (`det3`).
+  - Rows for Charlotte FC @ Chicago Fire and Real Salt Lake @ Vancouver Whitecaps FC carry no chip (`chipless`; row keys `chicago fire fc` / `vancouver whitecaps`).
+  - These are the first nonzero team-card defects in 7 days. Not diagnosed: a soccer naming split between the chip and the odds rows is the first suspect.
+- 0 false and 0 missed flags at every reading; dark rows at most 16 (R1 and R7, board cadence).
+
+### Owned readings
+
+- **R-D #851:** night 2's credits NOT measured (block above). The 11-24 reading compares against night 1 only.
+- **R-F #850, the 11-21 evening (5-10 PM CST), sent to local_d0f83044:**
+  - Qualifier: 34 core live at 7:03 PM (threshold 33). The parent was restarted at 10:35 AM and 12:14 PM, so the evening ran on a fresh parent, not the multi-day ratchet.
+  - P1: 10 refusals at stage `pre_source_state_fingerprint` (2/4/0/3/1 an hour; 12 at every stage). 11-20 had 13 with a third-day parent.
+  - P2: 2 child exits, both rc 75, 0 fatal; 1 recycle (`heavy_build_refused`).
+  - P3: longest build gap 1,555 s; 4 gaps over 900 s.
+  - Parent RSS 8-10 PM p50 ~1,914 MB (n 7, 1,838-1,954), against 11-19's fresh-parent evening of 1.55-1.60 GB.
+- **R-B / R-G:** 11-24, only if their changes load.
+
+### Loads (11-21 slate)
+
+All betting change no:
+- **10:35 AM:** refresh-worker TERM, loading `0d20a6919` (268 commits), #850 parent reset.
+- **12:07 PM:** web exit fix `b07e80882` (BC-057).
+- **12:14 PM:** refresh-worker TERM, loading `b07e80882` (the Kalshi grade check).
+- **4:37 AM 11-22:** refresh-worker parent reset, no code change.
+
+### Open user decisions
+
+- **#860 (the St. Louis join fix):** loading it in the 11-24 window takes your yes then. It is built, tested and queued with the fleet-watcher.
+- **The soccer live lens fix** (options (a)-(d) in the soccer block): open, not requested.
+- **#851's cost:** P6 now rests on one baseline night. It is your call whether that is enough to keep change E in the 11-24 batch.
+- **#850's next lever** comes through local_d0f83044.

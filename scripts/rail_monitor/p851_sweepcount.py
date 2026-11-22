@@ -5,8 +5,9 @@
 import collections, re, subprocess, sys
 
 lo, hi = sys.argv[1], sys.argv[2]
-out = subprocess.run(["grep", "-a", "ODDS_SWEEP_LAUNCHED", "logs/live-odds-worker.log"],
-                     capture_output=True, text=True, errors="replace").stdout
+# 11-22: the rotated file too (the 11-21 evening had already rotated into .log.1 by 11-22 10:57 AM CST)
+out = "".join(subprocess.run(["grep", "-a", "ODDS_SWEEP_LAUNCHED", f], capture_output=True, text=True, errors="replace").stdout
+              for f in ("logs/live-odds-worker.log.1", "logs/live-odds-worker.log"))
 lines = [l for l in out.splitlines() if "ALL_PROCESS_MEMORY" not in l and lo <= l[:19] <= hi]
 print("lines", len(lines))
 if lines:
