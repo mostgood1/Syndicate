@@ -167,3 +167,43 @@ The rest of the flag was the monitor's own labelling:
 
   Either changes which live NHL bets can be placed on Blues games, so it is a betting change for a window (next: Tue 11-24, 2-7 AM CST).
 - Instruments: `nhl_lens_peek.py [team | resimmed]` (`C:\tmp\railmon\`, backed up to `scripts/rail_monitor/`).
+- **BUILT 11-22 ~11:20 AM CST (todo `#860`, lane `nhl-live-join-stl-alias`): on main `cb98b201a`, DEFAULT OFF behind `SYNDICATE_LIVE_GAMELINE_NHL_TEAM_ALIASES`. The kit is `C:\tmp\w1124_stl\`. Queued for the 11-24 window by the fleet-watcher. Loading is the user's decision.**
+- **PRE-REGISTERED before any load (written 11-22 11:27 AM CST).** Each reading is taken during a live NHL slate after the key is on, with `kit_after_up_stl.sh` plus the rail monitor's `p29_orient.py` lines:
+  - **P1 (reachability):** on a live St. Louis Blues game, its full-game moneyline and puck-line rows carry `live_model_probability` at the same rate as the other live NHL games at the same reading: N of N once the game has been re-simmed. Today's baseline is 0 of N.
+  - **P2 (no side effect):** no other live NHL game's moneyline/puck-line modelled share falls. 11-21 6:43 PM baseline: 8 of 8 games all modelled.
+  - **P3 (no wrong join):** no NHL row joins a different game. There are no `team_pair_covers_more_than_one_game` refusals for NHL; the NHL slate has no doubleheaders.
+  - **P4 (unchanged elsewhere):** NCAAF rows join exactly as before; its fallback switch is untouched.
+  - **FALSIFIED IF:** P1 reads below N of N on a re-simmed Blues game with the key on; or P2's share falls on any non-Blues game; or any NHL row shows a different game's model.
+
+## Fleet-watcher flag 5: board_wall_max_s 473-612 s at R28-R33 (7:03-8:43 PM CST 11-21) while live games fell 43 -> 28 (diagnosed 11-22 ~11:25 AM CST; read-only)
+
+**Verdict: not #850. The wall is CPU work inside the board build, and on Saturday it ran ~1.7x the weekday evenings from about 10 AM CST, when the college slate went live.** It is the known evening board-cost problem (backlog I-20, lane `layer2-board-process-split`, GOAL NOT MET). #850's memory-guard refusals ran alongside it: they make the publication gaps, not the wall.
+
+- **What the number is.** `d4metrics.py` takes the maximum `BOARD_BUILD_TIMING wall_s` in the reading window. That line also carries `cpu_s`: a 433 s build at 02:20Z 11-22 was `cpu_s` 392.6, off-CPU 9.4%; one at 18:03Z was 406.3 / 378.6, 6.8%. So the build is computing, not waiting on memory or locks.
+- **The rise is the whole Saturday, not the evening.** Wall p50 by UTC hour, with builds per hour (`board_evening.py`):
+
+  | span (CST) | wall p50 | wall max | builds/h |
+  |---|---|---|---|
+  | 11-21 8-10 AM | 225-250 | 293-311 | 9 |
+  | 11-21 10 AM-noon | 376-434 | 536-552 | 3-6 |
+  | 11-21 noon-6 PM | 307-479 | 403-548 | 5-7 |
+  | 11-21 6-11 PM | 378-473 | 498-770 | 3-6 |
+  | 11-20 6-11 PM (Fri) | 242-257 | 265-340 | 7-10 |
+  | 11-19 6-11 PM (Thu) | 221-254 | 247-548 | 8-11 |
+  | 11-22 8-11 AM (Sun) | 165-173 | 221-285 | 13-14 |
+
+  The refresh-worker parent reset at 12:14 PM CST 11-21 did not bring it down, and neither did the code that loaded with it. The rise started before both, at 16Z.
+- **Not the candidate pool's size.** `pool_json_bytes` ran 42-49 MB on every evening. Across 1,225 builds, r(pool MB, wall) = -0.01 (`pool_vs_wall.py`). What changed is CPU per pool MB:
+  - 11-19 / 11-20 / Saturday morning: 4.5-4.8;
+  - Saturday from 16Z: 7.4-9.2;
+  - this morning: 3.4.
+- **It tracks the day's accumulated quote rows, which is why it did not fall with the live count.** `BOOK_GRID_QUOTE_READ kept` grew monotonically all Saturday (`quote_read_growth.py`): NCAAB 11.5k -> 54k, NCAAF 48k -> 130k, NHL 11.8k -> 21k, soccer 54k -> 65k.
+  - On Saturday, r(total kept rows, wall) = 0.62 over 176 builds; at 350-400k kept, wall p50 was 384 s, max 770 (`kept_vs_wall.py`).
+  - On Friday r was only 0.20, and Saturday's 16Z jump is larger than the row growth alone. So the slate's live load also plays a part, and the split between the two is not measured.
+- **#850 in the same hours:** `MEMORY_GUARD_ABORT` (stage `pre_source_state_fingerprint`) 1-4 an hour, plus 3 board-child exits / recycles in 01-04Z. Publication gaps peaked at 1,221-1,555 s. That is #850's part: its 11-24 fix is pending, and the 4 AM CST 11-22 parent reset (`deploys.md` 2026-11-22T10:37:58Z) is tonight's baseline.
+- Instruments, read-only, in `C:\tmp\railmon\` and backed up to `scripts/rail_monitor/`:
+  - `board_evening.py <from> <to> ...`;
+  - `board_build_ctx.py <utc>`;
+  - `pool_vs_wall.py`;
+  - `quote_read_growth.py`;
+  - `kept_vs_wall.py`.
