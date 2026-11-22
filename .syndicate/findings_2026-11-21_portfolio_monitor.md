@@ -168,3 +168,71 @@ Flagged by the fleet-watcher from the 2:34 PM reading (`resting order 373a43d7 (
 - Baseline: 21,349 archived Kalshi rows have the same sport on the row and its series; 3 differ (the F27 class),
   plus the 1 live row. `event_matches_two_games` read 13 to 23 markets per build (22:56Z to 00:18Z), which caps what
   `on` can newly resolve. Details and predictions: `findings_2026-11-21_kalshi_join_sport_scope.md`.
+
+## DAILY SUMMARY — Sat 11-21 (Central), written Sun 11-22 2:10 AM CST by the daily learning review
+
+Counts and percentages only (the repo is public). Sources: `daily_rollup.json` and `performance.json` built from the
+2:04 AM CST 11-22 watch reading (ledger saved 08:04:06Z), and the 47 watch readings dated 11-21 CST. Every 11-21 game
+is graded: 0 started and unsettled, 0 late.
+
+**Performance.**
+- **11-21: 62 graded bets / 47 games, ROI +5.33% [-12.8, +23.5].** Won 58.1% against a 62.2% breakeven (excess -2.5
+  wins): as on 11-19 and 11-20, the gain came from where the stakes sat, not from winning more than the prices implied.
+- **7 d: 367 bets / 197 games, +1.68% [-7.4, +10.8]** (11-20: -3.40%). First positive 7 d since 11-15 (+0.07%).
+- **30 d: 1,709 bets / 773 games, -4.91% [-10.2, +0.34]** (11-20: -7.06%). **The 30 d range includes 0 for the first
+  time in the rollup since at least 11-07** — the window dropped its oldest losing days and 11-21 was positive.
+  All-time: 2,262 bets / 1,234 games, -10.41% [-17.4, -3.4].
+- **Fee-net CLV:** 30 d -0.39 pp; 7 d -0.64 pp (clv_n-weighted over the last 7 rollup days, 179 priced closes);
+  11-21 alone -1.73 pp on 35.
+- **Fees: 2.87% of stake on 11-21, 4.0% over 30 d** — now about 81% of the 30 d loss (ROI before fees ~ -0.9%).
+- **Gate: 83 of 800 events**, clock BC-053 since 11-19 17:00Z (11:00 AM CST); since then +4.53% (lower -9.0), excess
+  wins -7.6; condition 3 fails (fee-net CLV -1.47 pp against ROI +4.53%, close calibration -8.44 pp, z -1.37).
+  2 deploys.md loads still unclassified.
+- **Revision:** the 11-20 rollup row now reads 30 bets / 23 games, +4.06% (yesterday's summary had 23 / 17, +13.47%);
+  later grades landed on that date. Not re-derived further.
+
+**30-day slices beyond noise (95% range excludes 0):**
+- EV band 2-5 -7.47% [-14.8, -0.12] against a predicted +4.11% (1,036 bets / 573 games);
+- price 0.30-0.45 -12.32% [-23.6, -1.0] (305 / 199).
+- **Left beyond-noise today:** totals -11.13% [-22.4, +0.17] (412 / 325); largest-stake quartile (63.7% of dollars)
+  -4.99% [-12.4, +2.4]; the `model_edge` path -4.99% [-11.6, +1.7]. Kalshi -3.38% [-9.0, +2.2], Polymarket -10.41%
+  [-23.1, +2.3], both noise.
+
+**Operations (47 readings).** Anomaly kinds, by readings flagged: GATE 47 (the 2 unclassified loads); LEDGER
+grade_conflicts 1 in all 47 (the F26 false alarm, unchanged); ORDERS resting taker order 25 (22 for one order, 3 for
+the F27 order 373a43d7); ORDERS failed/rejected 19 (at most 3 of 68 by day end); CAP Polymarket dollars over the day
+cap 14 (5:04-11:34 PM, 424-1322% of cap — not investigated here); ENDPOINT slow 5. Endpoint reads over 2 s: 9, of which
+6 over 3 s (live_today 4, page 1, plan 1), all but one inside 9:04-11:04 AM. Plan age: median 6.2 min, max 31.7 min.
+Orders 11-21: 68, 65 filled, 3 not filled.
+
+**Studies.** S8 heartbeat 08:06:05Z (cycle 2,407, 0 errors), fresh; LOOK 1 due after 11-23 9:00 AM CST. S6 forward:
+73 distinct events with settled orders submitted from 11-20T00:00Z (need 150; counted from the newest `live_all.json`,
+not the tool's fleet join) — not run. S5 forward: 94 events with selected_date >= 11-19 (need 150) — not run. 11-24
+window check not yet due; baseline: `venue_quote_at_submit` is populated on 86 and `venue_filled_at` on 94 of 2,552
+ledger rows already, so the 11-24 read must count rows submitted after the load, not presence. F27 readings not due
+(11-25).
+
+### What the data teaches (11-21)
+- The 30 d trend turned: -7.39% (11-19) → -7.06% (11-20) → -4.91% (11-21, 773 games), and the upper bound crossed 0
+  (+0.34). Most of the one-day move is the window roll, not new skill: 11-21 itself was +5.33% on 47 games.
+- The recent upturn is not backed by prices: 7 d ROI +1.68% while 7 d fee-net CLV is -0.64 pp (179 closes) and the
+  gate's close calibration is -8.44 pp. Results and the instrument disagree in sign, so treat the upturn as variance.
+- Of the five persistent signals from 11-17..11-20, two hold: price 0.30-0.45 (-12.3%, unchanged point estimate) and
+  EV 2-5 overstatement (realised -7.47% vs +4.11%, gap narrowed from 14.5 to 11.6 pp). Totals (-11.1%) and the
+  largest-stake quartile (-5.0%, from -8.6%) fell into noise as the window rolled; totals' point estimate barely moved,
+  the quartile's did — so yesterday's stake-cap lead lost most of its motivation.
+- Fees are 4.0% of stake against a -4.91% ROI: before fees the 30 d book is about -0.9%. Fees are now the bulk of
+  the loss, and 11-21's lower 2.87% fee share is one day.
+- Winning frequency still trails the prices: 30 d excess wins -29.6 (55.2% won vs 56.9% breakeven); every one of the
+  last three positive days also had negative excess wins.
+
+**One optimization lead (pre-registrable, offline, changes nothing live).**
+- *Hypothesis:* our fair price over-rates underdogs: on bets priced 0.30-0.45 the model's win probability exceeds the
+  realised win rate, which is what drives that band's -12% and part of the EV 2-5 overstatement.
+- *Data:* the 30 d graded book in `live_all.json`, bets with fill price 0.30-0.45 (305 / 199 games): per game, the
+  stake-weighted mean model probability (fill price + model_edge) against the realised win rate, event-clustered; then
+  a forward copy on bets selected from 11-23 once that band reaches 150 games.
+- *Decision rule:* GO (name a longshot fair-price shrink toward the market, with w fitted on the 30 d set, as a
+  challenger for the 12-08 window) iff realised-minus-predicted has a 95% upper bound < 0 on BOTH the 30 d set and the
+  forward set, AND the same check on the 0.45-0.55 band is inside noise (so it is a longshot effect, not a global
+  over-confidence). Otherwise KILL.
