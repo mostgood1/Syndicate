@@ -62826,3 +62826,42 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - Findings section 13's prediction: a new parent at 700-900 MB ~10 min after boot supports H2 (the slate), >= 1,100 supports H1 (the code). Read 657-727 MB at +4..+8 min (n 5 minute samples): SUPPORTS H2. The +1 h reading (~11:38Z) is not taken by this task.
 - Claim released 10:47:07Z (rc 0).
 - verify: wait_first_build2.sh 2026-11-22T10:37:58 (per-minute parent RSS of pid 3094013 + the first BOARD_BUILD_TIMING); after_term.sh (healthz, boot lines, Traceback counts).
+
+## 2026-11-22 15:03Z (9:03 AM CST 11-22) -- READING, no deploy: todo #780's post-load grade against finals, SECOND LOOK (after Saturday 11-21) -- **NCAAF spreads now HELPS (-0.009 +- 0.006, 117 g); NCAAF totals still INCONCLUSIVE (-0.011 +- 0.011, 117 g); NBA totals HELPS (-0.029 +- 0.011, 62 g) but NBA totals board WORSE THAN MARKET (+0.028 +- 0.016); NBA spreads k 1.57 HELPS (54 g); NCAAB spreads HELPS (349 g); NCAAF totals board BEATS MARKET (marginal); NCAAB h2h WORSE -> NO DIFFERENCE; no cell HURTS**
+- **Scheduled task:** `live-780-postload-grade-1122` (user, 2026-11-15: "Schedule the re-run after Saturday 11-21 too"). Read-only; nothing changed, restarted or deployed.
+- **First look landed:** the 11-17 14:52Z (8:52 AM CST) READING above, output `C:\tmp\livegrade\grade780\grade_1117.out`.
+- **Loads still in the fleet checkout** (`~/Syndicate`, `git merge-base --is-ancestor`): YES `0f6e4a723` (120 s quote ceiling), YES `89e2d2a0c` (live totals scale), YES `273a4a599` (live spreads scale).
+- **Grader is the one fixed 11-14 ~9:15 PM CST:** sha256 prefixes `post_load_grade.py` 04b84c2cf2f3db9a, `live_totals_grade.py` be754fe41ee8cca2 -- both match.
+- **Rule (fixed 11-14 ~9:15 PM CST, applied UNCHANGED):** population = ledger rows (segment full) recorded after the last load that changed their market, matched to ESPN finals, one row per (event_id, live_state_as_of, line). A = Brier(served) - Brier(unscaled) on k != 1 rows, game-clustered 95% CI: INSUFFICIENT < 30 games; HELPS if upper < 0; HURTS (= FALSIFIED) if lower > 0; else INCONCLUSIVE. B = priced served model - market Brier: BEATS MARKET if upper < 0; WORSE THAN MARKET if lower > 0; else NO DIFFERENCE; INSUFFICIENT < 30 games. **This is the SECOND look at a growing population; the 95% CI is not adjusted for two looks.**
+- **Command:** `wsl -d Ubuntu-24.04 -- bash -c 'nice -n 19 python3 /mnt/c/tmp/livegrade/grade780/post_load_grade.py </dev/null > /mnt/c/tmp/livegrade/grade780/grade_1122.out 2>&1'` -- rc 0, run 9:01 AM CST, ledger dates <= 2026-11-21 (UNTIL default). Output `C:\tmp\livegrade\grade780\grade_1122.out` (read whole; ends in SUMMARY, no traceback).
+- **Population** (ledger dates; states; games with a unique final / dropped):
+  - NCAAB totals: 11-13..11-21; 62,557 states; 355 / 49. spreads: 11-13..11-21; 50,340; 355 / 49. h2h: 11-11..11-21; 6,575; 405 / 61.
+  - WNCAAB totals: 11-13..11-21; 8,154; 98 / 8. spreads: 11-13..11-21; 5,981; 88 / 8. h2h: 11-11..11-21; 779; 97 / 9.
+  - NBA totals: 11-13..11-21; 11,463; 62 / 5. spreads: 11-13..11-21; 9,457; 62 / 5 (k 1.57 on 54 g, k 2.02 on 8 g -- unchanged since 11-17, so k 2.02 got no new rows). h2h: 11-11..11-21; 2,272; 76 / 5.
+  - NCAAF totals: 11-13, 11-14, 11-15, 11-17, 11-18, 11-19, 11-20, 11-21; 23,337; 124 / 5. spreads: same dates; 24,072; 124 / 5. h2h: 11-11..11-15, 11-17..11-21; 6,424; 127 / 5.
+  - Drop share at most 13% (NCAAB h2h 61 of 466; NCAAB totals/spreads 49 of 404 = 12%; NCAAF 5 of 129 = 4%): no sport crosses the one-third instrument threshold.
+  - **NCAAF rests on ledger dates 11-13, 11-14, 11-15 (Friday 11-13 and Saturday 11-14 incl. its post-midnight-UTC kickoffs), 11-17, 11-18 (weeknight MACtion), 11-19, 11-20 and 11-21.** No 11-16 file, as expected. NCAAF drops rose 2 -> 5; the grader does not split drops by date, so the 3 new drops cannot be attributed to 11-21 specifically. **Caveat:** ledger files are dated in UTC (the 11-17 look found 11-14's late kickoffs in the 11-15 file), so Saturday 11-21 rows recorded after 00:00Z 11-22 (6 PM CST 11-21) sit in the 11-22 file, beyond UNTIL = 11-21. This look therefore holds 11-21's day games but NOT its evening slate; the 11-29 look picks those up. The rule was applied unchanged regardless.
+- **A (tempering), from SUMMARY -- this look vs the 11-17 look vs the fit's prediction:**
+  - NCAAB spreads k 1.34: -0.003 +- 0.001 / 349 g **HELPS** | 11-17: -0.002 +- 0.002 / 146 g HELPS | fit -0.003 +- 0.003. Agree.
+  - NCAAF totals k 2.48: -0.011 +- 0.011 / 117 g **INCONCLUSIVE** (upper end rounds to 0.000; the grader's unrounded check put it at >= 0) | 11-17: -0.009 +- 0.017 / 54 g INCONCLUSIVE | fit -0.015 +- 0.006. Agree; CI narrowed.
+  - NCAAF spreads k 1.8: -0.009 +- 0.006 / 117 g **HELPS** | 11-17: -0.004 +- 0.010 / 54 g INCONCLUSIVE | fit -0.006 +- 0.004. **The two looks disagree** (INCONCLUSIVE -> HELPS); the 11-22 one rests on twice the games, uncorrected for two looks.
+  - NBA totals k 2.16: -0.029 +- 0.011 / 62 g **HELPS** | 11-17: -0.009 +- 0.011 / 29 g INSUFFICIENT | fit -0.006 +- 0.005. Helps about 5x more than the fit predicted: the unscaled model was badly over-confident on 11-17..11-21 (unscaled - market +0.046 +- 0.021).
+  - NBA spreads k 1.57 (margin anchor): -0.008 +- 0.006 / 54 g **HELPS** | 11-17: -0.006 +- 0.007 / 21 g INSUFFICIENT | fit -0.006 +- 0.007.
+  - NBA spreads k 2.02: +0.008 +- 0.019 / 8 g INSUFFICIENT | 11-17: identical (8 g) | fit -0.006 +- 0.007. No new rows since 11-14: k 1.57 carries NBA spreads, so this cell will not reach 30.
+  - **No cell HURTS.** Every judged point estimate is negative.
+- **B (board, priced rows), from SUMMARY -- this look vs 11-17:**
+  - NCAAB totals +0.007 +- 0.011 / 346 g NO DIFFERENCE | 11-17 +0.011 +- 0.016 / 146 g NO DIFFERENCE.
+  - NCAAB spreads -0.000 +- 0.007 / 349 g NO DIFFERENCE | 11-17 -0.004 +- 0.010 / 146 g NO DIFFERENCE.
+  - NCAAB h2h +0.007 +- 0.008 / 341 g **NO DIFFERENCE** | 11-17 +0.012 +- 0.011 / 168 g WORSE THAN MARKET. **The looks disagree** (WORSE -> NO DIFFERENCE); point estimate still positive.
+  - WNCAAB totals +0.019 +- 0.024 / 86 g, spreads +0.023 +- 0.024 / 87 g, h2h +0.009 +- 0.023 / 77 g: all NO DIFFERENCE | 11-17 all NO DIFFERENCE (43 / 34 / 41 g).
+  - NBA totals k 2.16 +0.028 +- 0.016 / 62 g **WORSE THAN MARKET** | 11-17 +0.004 +- 0.019 / 29 g INSUFFICIENT. Even tempered, the served totals model is worse than the market (realised edge -0.120 +- 0.087); every quote-age bin 0-90 s is +0.03.
+  - NBA spreads k 1.57 +0.011 +- 0.021 / 54 g NO DIFFERENCE | 11-17 INSUFFICIENT (21 g). k 2.02 -0.027 +- 0.039 / 8 g INSUFFICIENT | 11-17 identical.
+  - NBA h2h +0.005 +- 0.030 / 75 g NO DIFFERENCE | 11-17 -0.010 +- 0.034 / 43 g NO DIFFERENCE.
+  - NCAAF totals -0.014 +- 0.014 / 117 g **BEATS MARKET** (marginal: upper end rounds to 0.000; unrounded check < 0) | 11-17 -0.018 +- 0.021 / 54 g NO DIFFERENCE. **The looks disagree** (NO DIFFERENCE -> BEATS); marginal and uncorrected for two looks.
+  - NCAAF spreads -0.008 +- 0.014 / 117 g NO DIFFERENCE | 11-17 -0.016 +- 0.025 / 54 g NO DIFFERENCE.
+  - NCAAF h2h +0.016 +- 0.022 / 117 g NO DIFFERENCE | 11-17 -0.012 +- 0.031 / 54 g NO DIFFERENCE.
+- **Still owed:**
+  - NCAAF totals A INCONCLUSIVE on 117 games (ledger dates 11-13..11-21, without 11-21's evening slate). Next looks already scheduled: 11-29 (after Saturday 11-28), 12-06 (after 12-05), 1-03 (bowl season, NCAAF only) and 1-26 (CFP semifinals and title game, NCAAF only). Nothing scheduled here.
+  - NBA totals: the tempering HELPS, but the served board is WORSE THAN MARKET on 62 games -- a board finding for whoever owns NBA live totals; k 2.16 is not enough (helped 5x the fit), which suggests the unscaled NBA totals model drifted more over-confident than the fit window. Not judged further here.
+  - NBA spreads k 2.02 will not grow (k 1.57 took over from 11-14); treat it as closed at 8 games.
+- **betting change:** no (reading only). **Claims:** none.
