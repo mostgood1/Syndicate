@@ -2212,17 +2212,35 @@ def _norm_team(value: Any) -> str:
 # refused AMBIGUOUS when they cannot be. `SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off` restores exact-only (absent = on).
 TEAM_ALIAS_JOIN_ENV = "SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES"
 _TEAM_ALIAS_JOIN_OFF = frozenset({"0", "false", "no", "off"})
+_TEAM_ALIAS_JOIN_ON = frozenset({"1", "true", "yes", "on"})
 _TEAM_ALIAS_JOIN_SPORTS = frozenset({"ncaaf"})
+# NHL, OPT-IN (lane nhl-live-join-stl-alias, 2026-11-21; user "Yes, build it"). The NHL live lens names the club
+# "St. Louis Blues" and the odds rows say "St Louis Blues". `_norm_team` keeps the period, so EVERY Blues game, home
+# or away, missed its live lane: on the fleet 11-21 6:43 PM CST every other live NHL game's moneyline and puck-line
+# rows carried a live model and New Jersey @ St. Louis's did not (`findings_2026-11-21_layer2_rail_monitor.md`,
+# flag 4). `team_aliases.chip_join_key("nhl", ...)` already folds both spellings to one key (its map is derived from
+# `local_nhl_odds.TEAM_NAME_TO_ABBR`, the NHL pipeline's own). ABSENT = OFF, unlike NCAAF's: it changes which live
+# NHL bets can be placed, so it loads only in a betting-change window. `SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off`
+# still turns every sport's fallback off.
+NHL_TEAM_ALIAS_JOIN_ENV = "SYNDICATE_LIVE_GAMELINE_NHL_TEAM_ALIASES"
+_TEAM_ALIAS_JOIN_OPT_IN_SPORTS: dict[str, str] = {"nhl": NHL_TEAM_ALIAS_JOIN_ENV}
 # `resolve_live_gameline`'s reason for a hit found only through the fallback; counted as `rows_joined_by_team_alias`.
 TEAM_ALIAS_HIT = "team_alias"
 
 
 def team_alias_join_enabled(sport: Any, environ: Mapping[str, str] | None = None) -> bool:
-    """True for a sport in `_TEAM_ALIAS_JOIN_SPORTS` unless the switch reads off. Absent = ON."""
-    if str(sport or "").strip().lower() not in _TEAM_ALIAS_JOIN_SPORTS:
+    """True for a sport in `_TEAM_ALIAS_JOIN_SPORTS` (absent = ON), or an opt-in sport whose own switch reads on
+    (absent = OFF). `TEAM_ALIAS_JOIN_ENV` off turns every sport off."""
+    slug = str(sport or "").strip().lower()
+    opt_in_env = _TEAM_ALIAS_JOIN_OPT_IN_SPORTS.get(slug)
+    if slug not in _TEAM_ALIAS_JOIN_SPORTS and opt_in_env is None:
         return False
     env = os.environ if environ is None else environ
-    return str(env.get(TEAM_ALIAS_JOIN_ENV) or "").strip().lower() not in _TEAM_ALIAS_JOIN_OFF
+    if str(env.get(TEAM_ALIAS_JOIN_ENV) or "").strip().lower() in _TEAM_ALIAS_JOIN_OFF:
+        return False
+    if slug in _TEAM_ALIAS_JOIN_SPORTS:
+        return True
+    return str(env.get(opt_in_env) or "").strip().lower() in _TEAM_ALIAS_JOIN_ON
 
 
 def team_alias_pair_key(sport: Any, away: Any, home: Any) -> tuple[str, str] | None:
@@ -2282,7 +2300,8 @@ class LiveGamelineIndex(dict):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.candidates: dict[tuple[str, str], list[dict[str, Any]]] = {}
-        # The same projections again, filed under their CANONICAL pair (`team_alias_pair_key`; NCAAF only, #791).
+        # The same projections again, filed under their CANONICAL pair (`team_alias_pair_key`; NCAAF #791, and NHL
+        # when `NHL_TEAM_ALIAS_JOIN_ENV` is on).
         # Read by `resolve_live_gameline` only after the exact pair has no candidate.
         self.alias_candidates: dict[tuple[str, str], list[dict[str, Any]]] = {}
 
@@ -2313,7 +2332,7 @@ def resolve_live_gameline(
     falls back to the mapping and keeps its old behaviour.
 
     `row_teams` (the row's raw away/home names) is read ONLY when the exact pair has no candidate: the lens games
-    filed under the row's canonical pair (`alias_candidates`, NCAAF, #791) are then separated by the same rules, and
+    filed under the row's canonical pair (`alias_candidates`, NCAAF #791, NHL opt-in) are then separated by the same rules, and
     a hit returns `TEAM_ALIAS_HIT`.
     """
     pool = getattr(index, "candidates", None)
