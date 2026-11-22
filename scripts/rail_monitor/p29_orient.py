@@ -85,7 +85,9 @@ for r in rows:
     m = matchups.setdefault((r.get("sport"), r.get("matchup")), {"rows": 0, "with_model": 0, "priced": 0, "priced_with_model": 0})
     m["rows"] += 1
     m["with_model"] += 1 if r.get("live_model_probability") is not None else 0
-    if str(r.get("segment") or "full") == "full" and str(r.get("market") or "").strip().lower() in _PRICED:
+    if (str(r.get("segment") or "full") == "full" and str(r.get("market") or "").strip().lower() in _PRICED
+            # NHL live totals are refused at the join by design (no total distribution); dash_update skips them too
+            and not (str(r.get("sport") or "").lower() == "nhl" and "total" in str(r.get("market") or "").lower())):
         m["priced"] += 1
         m["priced_with_model"] += 1 if r.get("live_model_probability") is not None else 0
 
@@ -124,5 +126,14 @@ for sport in sorted({s for s, _ in matchups if s in SNAP}):  # soccer etc.: no p
     if snap is not None:
         summaries.append(dict(sport=sport, resim_generated=snap.get("generatedAt") or snap.get("generated_at"),
                               resim_games=len(index), counts=snap.get("counts") or snap.get("coverage")))
+# 11-21: what this helper's OWN live-rail GET held, per sport. dash_update labels a no-model game of a sport this read
+# lacks entirely "sport_absent_from_helper_read"; this line is how to tell that apart from a snapshot miss next time
+# (R26 6:26 PM: no NHL in this read while the fleet's merge 4 s later held 91 NHL cards). No "matchup" key, so
+# dash_update and the page skip it.
+by_sport = {}
+for (s, _mu) in matchups:
+    by_sport[s] = by_sport.get(s, 0) + 1
+summaries.append({"rail": {"read_at": rail.get("read_at"), "newest_written_at": rail.get("newest_written_at"),
+                           "rows": len(rows), "games_by_sport": by_sport, "sports": rail.get("sports")}})
 for o in out + summaries:
     print(json.dumps(o, default=str))

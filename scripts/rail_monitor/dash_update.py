@@ -124,6 +124,12 @@ def row(args):
                 continue
             if str(r.get("market") or "").strip().lower() not in _PRICED:
                 continue
+            # 11-21 R27: NHL live TOTALS are refused at the join by design (no total distribution published;
+            # findings_2026-11-13_nhl_live_total_calibration.md), 0 of 16-21 rows modelled every reading. Counting them
+            # put Pittsburgh @ Nashville (3 totals) and Vegas @ Winnipeg (2) on this list while their h2h / puck-line
+            # rows carried models. NHL counts its puck lines only.
+            if str(r.get("sport") or "").lower() == "nhl" and "total" in str(r.get("market") or "").lower():
+                continue
             g = by_game.setdefault(f"{r.get('sport')} {r.get('matchup')}", [0, 0])
             g[0] += 1
             if r.get("live_model_probability") is not None:
@@ -134,8 +140,10 @@ def row(args):
     # sport's re-sim snapshot). Values: the snapshot's own refusal reason (key_player_out, game_final, no_margin_anchor,
     # in_intermission, ...); "orientation_reversed" (I-29: the snapshot has the teams the other way round);
     # "resimmed_no_row_model" (re-simmed, yet the priced rows carry no model: a join defect, flag it);
-    # "not_in_resim" (no snapshot entry matched, possibly this helper's name miss: check); "no_snapshot_for_sport"
-    # (soccer etc.); "unknown" (the helper's output was missing this tick).
+    # "not_in_resim" (no snapshot entry matched, possibly this helper's name miss: check); "sport_absent_from_helper_read"
+    # (the helper's own live-rail GET, made a few minutes after the probe's, held no game of this sport; NOT a missing
+    # snapshot. Renamed 11-21 from "no_snapshot_for_sport", which read as an NHL snapshot miss at R26; the helper's
+    # `{"rail": ...}` line says what its read held); "unknown" (the helper's output was missing this tick).
     reasons, details = {}, {}
     orient = {}
     if args.orient and os.path.exists(args.orient):
@@ -151,7 +159,7 @@ def row(args):
     for k in games_no_model:
         o = orient.get(k)
         if o is None:
-            reasons[k] = "unknown" if not orient else ("not_in_resim" if k.split(" ", 1)[0] in covered else "no_snapshot_for_sport")
+            reasons[k] = "unknown" if not orient else ("not_in_resim" if k.split(" ", 1)[0] in covered else "sport_absent_from_helper_read")
         elif o.get("resim") == "REVERSED":
             reasons[k] = "orientation_reversed"
         elif o.get("resim") in ("not_in_resim", "no_snapshot"):

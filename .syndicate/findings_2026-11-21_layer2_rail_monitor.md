@@ -137,3 +137,33 @@ Hypothesis written to the lane before the test (`8749da338`). **Verdict: CONFIRM
   - `run_manifests.py <date> soccer live <lane>` (overlaps, from the Redis manifests);
   - `tree_at.py <utc>` (the role tree at a tick);
   - `soccer_fast_runs.py`, `logwin.py`, `apm_peek.py`.
+
+## Fleet-watcher flag 4: NHL New Jersey @ St. Louis with no live model, R26-R27 (6:23 and 6:43 PM CST); read-only
+
+**Verdict: a real NHL join defect, specific to St. Louis.**
+- The live lens names the team "St. Louis Blues" and the odds rows say "St Louis Blues".
+- `live_gameline_join._norm_team` (`live_gameline_join.py:2190`) lowercases and collapses whitespace but keeps the period, and the join keys on the exact pair (`:2472`, `:2628`, `:2757`).
+- The name-alias fallback is NCAAF-only (`_TEAM_ALIAS_JOIN_SPORTS`, `:2215`).
+- So a Blues game, home or away, never reaches its live lane. The monitor's own helper matched it ("direct", "resimmed") only because `p29_orient.norm` strips periods.
+- The same spelling split was fixed in `sgp_pool` before (todo around line 2304, "St. Louis Blues" vs "St Louis Blues"). `nhl/sources.py:190-191` already maps both spellings to STL. No other NHL club has punctuation; Montréal carries its accent on both sides and joins.
+
+The rest of the flag was the monitor's own labelling:
+
+- **R26 `no_snapshot_for_sport` was a monitor label, not a missing NHL snapshot.**
+  - `dash_update` assigned it to every no-model game of a sport that the helper's OWN live-rail GET held no game of.
+  - That GET (web access log 6:26:06 PM, 200, 353,678 bytes, 363 ms) held no NHL game. Yet the probe's read at 6:23:30 PM held 127 NHL rows, and the fleet's `INPLAY_OVERLAY_MERGED` 4 s later held 91 NHL cards (newest overlay 6:25:47 PM).
+  - The NHL overlay itself published every 1-2 min: 6:23:28 PM 127 cards, 6:24:10 PM 116, 6:25:48 PM 91. The write is atomic (`os.replace`, `book_grid_artifact.py:1185-1187`) and the age limit is 360 s.
+  - Why that one response held no NHL is **not determined** (one reading).
+  - **Monitor fix:** the label is now `sport_absent_from_helper_read`, and `p29_orient.py` prints a `{"rail": {read_at, newest_written_at, rows, games_by_sport, sports}}` line, so the next one can be checked. Tested at 7:05 PM: 9 NHL games in the read.
+- **R27 `resimmed_no_row_model` overstated NHL.**
+  - NHL live totals are refused at the join by design: no total distribution is published (`findings_2026-11-13_nhl_live_total_calibration.md`). They were 0 of 16 rows modelled at R26 and 0 of 21 at R27.
+  - At R27 every NHL game's moneyline and puck-line rows on the full rail carried a model, except St. Louis (0 of 1). New Jersey @ St. Louis's rows were 3 totals plus an alternate +2.5 puck line; alternates do price elsewhere, e.g. Buffalo @ Florida +3.5 at 0.98.
+  - Pittsburgh @ Nashville (3 totals; its h2h at 0.49 is outside the priced set) and Vegas @ Winnipeg (2 totals) were false positives from counting NHL totals.
+  - **Monitor fix:** `dash_update` and `p29_orient` now skip NHL totals in the priced rule, so NHL counts its puck lines only.
+  - R26's four unmodelled games at 6 PM CT (Detroit, Ottawa, St. Louis, Winnipeg) were puck-drop lag. All but St. Louis carried models by 6:43 PM.
+- **The fleet fix (not taken; outside this lane).** Either:
+  - strip punctuation in `_norm_team`, which changes every sport's exact key; or
+  - add NHL to the alias fallback with the STL map, which is narrower.
+
+  Either changes which live NHL bets can be placed on Blues games, so it is a betting change for a window (next: Tue 11-24, 2-7 AM CST).
+- Instruments: `nhl_lens_peek.py [team | resimmed]` (`C:\tmp\railmon\`, backed up to `scripts/rail_monitor/`).
