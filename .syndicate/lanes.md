@@ -2019,6 +2019,14 @@ death, never life — do not invert it.
 - Status 2026-11-21 6:35 PM CST: GOAL: NOT MET. Built and landed on main b65707658 (default report; 23 new tests, 0 new failures over 32 Kalshi suites). Left: the report reading after the next fleet ff, then the `on` load in a betting-change window on the user's yes. Pre-registration: .syndicate/findings_2026-11-21_kalshi_join_sport_scope.md
 - Blocked by: none
 
+### nhl-live-join-stl-alias — OPEN — opened 2026-11-21 — session d58574cb-c55a-4f1f-aa9a-ab530a5f63e0
+- Goal: NHL live gameline rows for St. Louis Blues games join their live lane through the existing team-alias fallback (team_aliases.chip_join_key folds 'St Louis Blues' and 'St. Louis Blues' to one key), behind a NEW switch SYNDICATE_LIVE_GAMELINE_NHL_TEAM_ALIASES (absent = OFF); NCAAF's alias behaviour byte-identical; off != on test; on main default-off; the load is the user's call in the 11-24 betting-change window (user 11-21 'Yes, build it')
+- Files: syndicate/features/shared/live_gameline_join.py (the team-alias fallback section ONLY: TEAM_ALIAS_JOIN_* constants, team_alias_join_enabled, and the NCAAF-only comments on LiveGamelineIndex.alias_candidates and resolve_live_gameline), tests/test_live_gameline_nhl_team_alias.py (NEW), .syndicate/findings_2026-11-21_layer2_rail_monitor.md (shared with lane layer2-rail-monitor, same session)
+- Hypothesis: Every St. Louis Blues live row misses its lane only because the exact key keeps the period (lens 'st. louis blues' vs odds 'st louis blues'); with NHL in the alias fallback, those rows join through chip_join_key and no other NHL row changes, because every other NHL pair already joins exactly and the fallback is read only on an exact miss
+- Falsification test: With the switch on, a replay of tonight's fleet NHL lens against the 11-21 R27 rail rows either still leaves New Jersey @ St. Louis unjoined, or changes the join result of any row whose exact pair already matched
+- Verification: Tests: off reproduces today's miss, on joins the Blues rows, NCAAF unchanged with the new switch absent/on/off, a non-NHL sport never reads it; a read-only replay on tonight's fleet lens + rails reports rows joined off vs on; landed on main default-off; queued in .syndicate/betting_change_windows.md for 11-24
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
