@@ -69,3 +69,67 @@ local_379fd729 flagged three games. Wisconsin @ Purdue was dark at R7, R8 and R9
   - R11-R13's 0 were readings that landed early in a cycle. The flag is withheld by design (fail-closed). Its cost is the share of time these rows cannot flag, which is the board cadence lane's number.
   - `dark_rows_detail` (from the 3:03 PM tick) names each row, its grid age and a reason: `board_cadence`, `grid_stale` or `cadence_edge`.
 - How to read this next time: NCAAF prints no `_LIVE_RESIM_TICK`. Use `ncaaf_events.py` (event names per role log) and `ncaaf_resim_peek.py <team> ...` (the per-game lens), both in `scripts/rail_monitor/`. The runbook says so.
+
+## Why the soccer live lens stalls at kickoff (diagnosed 6:20-7:10 PM CST, read-only; user "find out why the soccer live lens stalled at kickoff")
+
+Hypothesis written to the lane before the test (`8749da338`). **Verdict: CONFIRMED on all three falsifiers.** The soccer lens is not failing. Its own memory gate skips it, and the soccer live ODDS refresh fills the gate. That refresh runs only while leagues are in play, and at the European kickoffs its runs stack on each other.
+
+- **(1) Every soccer `False` is the gate.**
+  - Over 05:00Z to ~00:10Z 11-22 there were 799 soccer lens ticks, each joined to its `live_lens_tick_before_soccer` sample. 662 were True and 137 False.
+  - **137 of 137 False ticks carry `LIVE_LENS_TICK_DIAG sport=soccer ok=False reason=low_headroom`. No True tick does, and no other reason appears.**
+  - The gate is `live_lens_loop.py:701-731`: `_soccer_live_lens_min_headroom_bytes` defaults to 300 MB, and its own comment says that number is "NOT yet backed by a real production measurement".
+- **What the gate reads on the fleet** (`memory_observability.py:115-157`, `353-440`).
+  - With `SYNDICATE_LOCAL_MEMORY_LIMIT_MB` set and no cgroup limit, "current" is the RSS of the ROLE's whole process tree: the worker plus every child, summed. The ceiling is 3,072 MB, the role's old Render plan.
+  - So the lens refuses whenever live-odds-worker's tree passes 2,772 MB. The log line's `basis: reclaimable_cache` means there is no memory.stat breakdown on this host, not that cache was counted.
+- **(2) The worker alone never trips it.** In False ticks the worker's own RSS ran median 1,421 MB, max 1,688 MB. The whole tree ran median 3,122 MB (min 2,753, max 4,630). In True ticks the tree ran median 1,993 MB.
+- **(3) The child that differs is the soccer live odds refresh.**
+  - That is the `SOCCER_LIVE_AUTORUN` run on lane `live-odds-worker-soccer-live`: `refresh_odds_sources.py --sports soccer --phase live --mode fast`.
+  - It was alive in **0.96 of False ticks against 0.28 of True ticks**, at a median 751 MB vs 323 MB when present.
+  - The other children barely separate the two: soccer pregame/full 0.89 vs 0.53 (~290 MB either way); re-sim workers 0.80 vs 0.40 (~180 MB).
+  - Each run spawns `poll_soccer_live_state.py --league <x>` per in-play league, at 113-511 MB each (epl, championship and la_liga 275-300 MB; serie_a up to 511 MB). That is the same per-league live-state poll the lens itself makes in-process every ~70 s, and it writes the same `live_state_<date>.json` files.
+- **Why at kickoff: the runs outlast their own 120 s relaunch interval, then stack.** 206 runs today (204 finished, 2 failed), joined 206 of 206 to their `SOCCER_LIVE_AUTORUN_LAUNCHED in_play=...` line:
+
+  | leagues in play | runs | seconds median / p90 / max | over 120 s | launched while a same-lane run was still alive |
+  |---|---|---|---|---|
+  | 1 | 31 | 43 / 76 / 142 | 0.03 | 0.00 |
+  | 2 | 27 | 80 / 97 / 298 | 0.04 | 0.00 |
+  | 3 | 42 | 85 / 125 / 153 | 0.17 | 0.00 |
+  | 4 | 21 | 88 / 126 / 256 | 0.19 | 0.00 |
+  | 5 | 17 | 226 / 291 / 325 | 0.82 | 0.41 |
+  | 6 | 45 | 203 / 338 / 598 | 0.93 | 0.58 |
+  | 7 | 23 | 267 / 320 / 470 | 1.00 | 0.87 |
+
+  - **53 of 206 launches started while another run of the same lane was alive.** Up to 3 were alive at once (15:31:56Z), with 5,604 s (93 min) of 2+ alive.
+  - The overlapping launches fell in UTC hours 15 (15), 16 (13), 18 (8), 19 (2), 20 (11) and 21 (4). Those are the hours of the lens stalls.
+  - Seen in the tree: three runs alive at 16:10:39Z (tree 3,435 MB) and two at 20:21:08Z (2,985 MB).
+- **The longer stalls** (consecutive False ticks; CST):
+  - 9:26-9:38 AM (11 ticks);
+  - 9:57-10:28 AM (24 ticks, the longest);
+  - 12:09-12:23 PM (8);
+  - 1:46-2:04 PM (14);
+  - 2:14-2:25 PM (8).
+
+  Most of the other 37 runs are 1-3 ticks. In all, 137 of 799 ticks (17%) of the day's soccer lens ticks were skipped. Every skipped tick leaves every live soccer game on the last lens, which is how the rail showed 7 games with no live model at 2:06 PM.
+- **A contributing defect in the lane guard, found and not fully explained.**
+  - The guard does refuse. `REFRESH_LAUNCH_REFUSED reason=lane_busy lane=live-odds-worker-soccer-live` fired at 15:22:05, 15:22:18, 15:22:35 and 15:23:06Z against run `20261121_152002`, and that run's manifest says it ended at 15:25:26Z. Yet the next run launched at 15:23:40Z.
+  - `run_refresh_odds_job.py:153` (`_update_state`) writes a finishing run's terminal manifest over the lane's shared `latest` pointer unconditionally. So once two runs overlap, the older one finishing marks the lane free while the newer one is still running. That fits most of the chain at 15:23-15:42Z.
+  - It does NOT explain the first overlap (15:23:40Z), nor `20261121_153156` (15:31:56Z), which launched with no same-lane run finishing since the previous launch. Not diagnosed.
+- **What this is not:**
+  - an exception in the poller: 0 non-gate False. The day's one `LEAGUE_POLL_FAILED` (mls, a 30 s `ReadTimeout` to americansocceranalysis at 4:14 PM CST) is swallowed per league and does not fail a tick;
+  - the keyvalue write;
+  - the 12:14 PM refresh-worker TERM, which is a different role;
+  - the board build.
+
+  MLB and WNBA are skipped by the same gate in the same ticks; out of season, that is harmless. NBA, NHL and NFL lenses are ungated, which is why soccer is the only in-season sport that stalls.
+- **Not measured:** how much of the summed RSS is shared pages counted once per process (PSS against RSS). Every child is a separately exec'd Python, so the share is likely tens of MB each, but that is unread.
+- **Fix options** (none taken; all are outside this lane, and any that changes when the lens runs changes which live soccer bets are placed, so it is a betting change for a window):
+  - (a) stop the soccer live odds runs from stacking: the guard defect above, plus the next run starting only after the last has finished;
+  - (b) drop the duplicate per-league live-state poll from the odds run, since the lens already writes those files;
+  - (c) re-measure the 300 MB soccer floor, which its comment says was never measured;
+  - (d) the 3,072 MB ceiling, an env change.
+- Instruments, read-only, in `C:\tmp\railmon\` and `scripts/rail_monitor/`:
+  - `soccer_gate_test.py <since>` (the three falsifiers);
+  - `soccer_run_vs_leagues.py <date>` (the table);
+  - `run_manifests.py <date> soccer live <lane>` (overlaps, from the Redis manifests);
+  - `tree_at.py <utc>` (the role tree at a tick);
+  - `soccer_fast_runs.py`, `logwin.py`, `apm_peek.py`.
