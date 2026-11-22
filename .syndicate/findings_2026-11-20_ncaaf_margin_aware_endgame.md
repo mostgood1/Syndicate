@@ -300,3 +300,65 @@ So the concession fixes the trailer and the damping fixes the leader.
   - `SYNDICATE_NCAAF_LIVE_ENDGAME=on`.
 - #852 alone (without the end game) keeps 1.0 / 17 / 14. Its 11-21 hold-out and 12-08 decision are unchanged.
 - **Still owed:** the real-timeouts hold-out, and a window.
+
+### QUEUED FOR THE 12-08 WINDOW — written 2026-11-21 6:15 PM CST
+
+**User 2026-11-21 ~6:10 PM CST, this session:** "queue the end-game load set for the 12-08 window". Queued
+CONDITIONALLY on the shared 12-08 queue (the fleet-watcher's, under the NCAAF live totals pair). Nothing changed on
+the fleet: none of the six keys is set on any role (read 00:14Z 11-22, key names only).
+
+**The load set.** It rides ONLY on top of #835 + #852's pair, and all six lines are GLOBAL in `local_production.env`:
+- the pair, 3 lines (its own 12-08 entry and conditions, unchanged):
+  - `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION=on`
+  - `SYNDICATE_LIVE_TOTALS_PROB_SCALE_NCAAF=1`
+  - `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING=on`
+- the end game, 3 more lines:
+  - `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING_THRESHOLD=21`
+  - `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING_SPAN=7`
+  - `SYNDICATE_NCAAF_LIVE_ENDGAME=on`
+
+The end game never loads without the pair, and the damping never stays at 17 / 14 once the end game is on. The joint
+re-read above measured 17 / 14 with the end game, and the rule moved it to 21 / 7. If the end game's conditions
+fail, the pair loads alone at 17 / 14.
+
+**Conditions:** all must hold, or the end game waits for a later window.
+1. **The pair loads in the same window.** Its own conditions are its 11-21 hold-out and the user's yes.
+2. **A real-timeouts hold-out passes.** It is pre-registered before any of its data is read.
+   - **What it scores:** the CALIBRATED totals (#835's anchor and widening on top), which are what bets are priced
+     from, not the raw draws.
+     - #835's spread schedule was fitted on the engine without the end game.
+     - E0 (the kickoff re-sim that anchors to the close) is the same function, so it moves with the end game.
+     - So the hold-out must show the stack still calibrates. Prediction: the calibrated stack is not worse than the
+       pair's.
+   - **Data:**
+     - Slates 11-15..11-22 stay blinded until `C:\tmp\elp\m2gate_kit\out\m2_verdict.txt` exists.
+     - Slates 11-28 .. 12-05 are outside that blind window: rivalry week and the conference championships.
+3. **A live college scoreboard row shows `situation.homeTimeouts` / `awayTimeouts`.** Without them, the clock runs
+   on the engine's default timeouts, and `profile_keys.endgame.timeouts_fed` says `false`.
+4. **The user's final yes in this session's chat in the window.** A betting change, `--betting-change yes`.
+
+**Kit:** `C:\tmp\w1208_ncaaf\kit_env_ncaaf.sh`, sha256 `4f31d0ac2b4888b5ca72fa32fa33a6e66482dd7264b5354d00ed360c1a3e4174`.
+- Modes: `check` | `apply pair` | `apply endgame` | `restore <backup>`.
+- It prints only these switches' lines; no other env value.
+- `apply` backs the file up first (mode kept) and never edits a line. It refuses if any of its keys is already
+  present under any role prefix.
+- `apply endgame` refuses unless each of the pair's three lines is there exactly once.
+- The self-test `kit_selftest_ncaaf.sh` passed on a dummy file, and the real file was unchanged (`selftest.out`).
+
+**Verify after the drained down/up:**
+- refresh-worker prints `NCAAF_LIVE_BLOWOUT_DAMPING on strength=1.0 lead_threshold=21.0 lead_span=7.0 ...` and
+  `NCAAF_LIVE_ENDGAME on concede_deficit=25 end_of_half_clock=7/7 college_overtime=True blowout_damping_strength=1.0 ...`;
+- live NCAAF re-sim lanes carry `endgame.on=true`, `concede_deficit=25` and `timeouts_fed=true`;
+- the pair's own read: `total_calibration.anchored > 0`.
+
+**Kill rule:** restore the kit's EARLIEST backup and run a drained down/up (a revert, exception (a)) in any of these
+cases:
+- the end-game line is absent at the first live NCAAF tick;
+- `timeouts_fed` is false on every live lane through a full Saturday;
+- or the pair's own kill rule fires.
+
+**Noted, not a defect on the fleet:** `live_total_dispersion._live_profile_key()` (the E0 cache key) carries #852's
+damping settings but not the end game.
+- The cache is per process (`_E0_CACHE`), and env is built only at `up`, so a cached E0 cannot outlive an end-game
+  change on the fleet.
+- In a process whose env flips, it could. Add `("endgame", deficit)` to the key if the code is next touched.

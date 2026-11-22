@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#859` — **A MARGIN-AWARE END-GAME LETS #808'S CLOCK HELP NCAAF LIVE TOTALS. The concede rule (a trailer down 25+ in Q4 stops hurrying) on top of the clock with real timeouts, damping 1.0/17 and college OT passes #858's gates against the live candidate. BUILT default-off and ON MAIN `b2ff241ae` (user "Build both", "Push it"); turning it on is a betting change, the user's call in a window**
+### `#859` — **A MARGIN-AWARE END-GAME LETS #808'S CLOCK HELP NCAAF LIVE TOTALS. The concede rule (a trailer down 25+ in Q4 stops hurrying) on top of the clock with real timeouts, damping 1.0/17 and college OT passes #858's gates against the live candidate. BUILT default-off and ON MAIN `b2ff241ae` (user "Build both", "Push it"); turning it on is a betting change, the user's call in a window. QUEUED for Tue 12-08, CONDITIONALLY, on top of the #835 + #852 pair (user "queue the end-game load set for the 12-08 window")**
 
 `[2026-11-20, lane ncaaf-margin-aware-endgame, session 617b553b; user "Start v4 here"; pre-registered 7b28b5f82; findings .syndicate/findings_2026-11-20_ncaaf_margin_aware_endgame.md]`
 
@@ -16,7 +16,11 @@
   1. Engine: `CalibrationProfile.trailing_concede_deficit` (None = off) in `situation_model.classify_urgency`. OFF byte-identical to 5 pinned digests; the built rule equals the harness `v4a` on 12 of 12 real states.
   2. Live: ESPN `situation.homeTimeouts` / `awayTimeouts` into `NcaafLiveGameState` and `initial_timeouts_*`; `SYNDICATE_NCAAF_LIVE_ENDGAME` (`ncaaf/live_endgame.py`) arms #808's clock + the concession at 25 + #855's OT after #852's damping. Both switches on = `v4a`. Absent / off byte-identical through the tick.
 - **Joint damping re-read DONE 2026-11-21** (user "Yes, run it"; pre-registered 206909ad7, amendment 1 45c8480fb): with the end game on, the registered rule picks #852's damping at **threshold 21 / span 7** (strength 1.0; -0.0021, se 0.0013 overall vs 17 / 14; the same cell #858 picked), and the pick passes G1-G3 against `base` (G2 17+ -0.0333 se 0.0191, G3 -0.0127 se 0.0114, one-score last-2:00 3.20 in CI). Damping is still needed: without it the 25+ rest is +2.29 (se 0.23), all the leader's. No code: the end-game load set is `..._BLOWOUT_DAMPING=on` + `_THRESHOLD=21` + `_SPAN=7` + `SYNDICATE_NCAAF_LIVE_ENDGAME=on`. #852 alone keeps 17 / 14.
-- **Owed before any load:** a hold-out with real timeouts (live shadow or an ESPN backfill of 11-21 / 11-28), after verifying that the poller's scoreboard row carries college timeouts on a live game. Load only in a window.
+- **QUEUED 2026-11-21 ~6:10 PM CST for the 12-08 window** (user "queue the end-game load set for the 12-08 window"; findings "### QUEUED FOR THE 12-08 WINDOW"). Six GLOBAL lines: the pair's three, then `..._BLOWOUT_DAMPING_THRESHOLD=21`, `..._SPAN=7`, `SYNDICATE_NCAAF_LIVE_ENDGAME=on`. Kit `C:\tmp\w1208_ncaaf\kit_env_ncaaf.sh` (self-tested; `apply endgame` refuses without the pair). If its conditions fail, the pair loads alone at 17 / 14.
+- **Owed before the load (the queue's conditions):**
+  - a PRE-REGISTERED hold-out with real timeouts that scores the CALIBRATED totals (#835's anchor on top). Slates 11-15..11-22 are blinded until the M2 verdict; 11-28..12-05 are not.
+  - a live college scoreboard row showing `homeTimeouts` / `awayTimeouts`;
+  - the pair loading in the same window, and the user's final yes in session 617b553b.
 
 ### `#858` — **#808'S END-OF-HALF CLOCK FOR NCAAF LIVE ONE-SCORE GAMES: NOT BUILT, the registered "reason not to".**
 
