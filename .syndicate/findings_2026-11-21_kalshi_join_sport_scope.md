@@ -95,7 +95,81 @@ preflight with `--betting-change yes`. Read at +24 h and +7 d.
 
 **Revert:** remove the line, then a drained `down`/`up`. Absent is `report`, which is today's behaviour.
 
+## Queued for the 11-24 window (CHANGE L)
+
+User, in this session's chat, 11-21 about 8:00 PM CST, answering "Queue turning the Kalshi same-sport fix on for the Tue
+11-24 window?": "Yes, queue 11-24".
+
+- CHANGE L of the batch task `nfl-level-refit-load-1120` (fires 11-24 2:15 AM CST): one claimed ff and one drained full
+  `down`/`up` for all its changes. Pre-edit copy of that prompt: `C:/tmp/w1124_kscope/SKILL.before_L.md`.
+- Droppable: an L step that fails drops L only, never the batch. If L does not load, it waits for 12-08.
+- **Kit** (`C:/tmp/w1124_kscope/`):
+  - `kit_env_kscope.sh`: check | apply | restore. Self-tested on a dummy file 11-21 8:05 PM CST: append, idempotent
+    second apply, restore, mode 600 kept. The real file was untouched and the key was ABSENT on all three roles.
+  - `run_replay.sh` / `kscope_replay.py`: the read-only replay below.
+  - `kit_after_up_kscope.sh`: counts `SPORT_SCOPE` lines by mode.
+  - `kscope_p1.sh`: the P1 reader.
+- **Readings:**
+  - +24 h: task `kalshi-sport-scope-reading-1125` (11-25 9:30 AM CST, read-only).
+  - +7 d: the daily `portfolio-learning-review`, first run after 12-01 5:00 AM CST. It is also the backstop if the
+    11-25 task does not run.
+- **The 11-24 ff loads this code and turns it `on` in one go.** R1-R4 (the `report` readings) therefore never happen
+  on the fleet. The replay's `report` mode stands in for them.
+
+## Replay on the fleet's real inputs (pre-load baseline, 11-21)
+
+`kscope_replay.py` runs `join_kalshi_to_board` in off, report and on. It runs under refresh-worker's environ, from a
+checkout that carries `b65707658`, on exactly what the portfolio commit joins: `kalshi_markets.json` through
+`markets_from_state`, plus `read_layer2_shortlist(<date>)`. The join writes nothing.
+
+- **First run (8:10 PM CST): a broken instrument, now fixed.**
+  - off matched 553, where the live join printed 854 on a board of the same size. The fleet's own checkout gave 522.
+  - Cause: the replay lacked the series discovery that every live process runs once at boot
+    (`ensure_series_discovered`, one public catalogue GET). Without it, 207 of the artifact's 286 series read
+    `unmapped_series`: 6,410 markets.
+  - The replay now runs that discovery.
+- **Same-instant run (`same_instant.sh`).** It waits for the next live `KALSHI_BOARD_JOIN` line, then replays both
+  board dates within 11 s.
+
+  | 11-22 02:19:24Z (8:19 PM CST) | markets | board rows | matched | refusal counts |
+  |---|---|---|---|---|
+  | live join | 16,421 | 4,976 | 802 | (15 reasons) |
+  | replay, off | 16,421 | 4,976 | 802 | every one of the 15 equal |
+
+  **The instrument reproduces the live join exactly.**
+- **What `on` changes on these inputs:**
+
+  | board date | board rows | matched, off and on | `lost_by_on` | `gained_by_on` | `report_pairs_equal_off` | `would_change` |
+  |---|---|---|---|---|---|---|
+  | 11-21 | 4,976 | 802 | 0 | 0 | True | 0 |
+  | 11-22 | 4,009 | 325 | 0 | 0 | True | 0 |
+
+  - The 13 and 23 `event_matches_two_games` refusals stay under `on`. So the 13-23 ceiling in "Baseline" above holds
+    **no** cross-sport pairs today: all of them are same-sport (doubleheaders or collided codes).
+  - The expected per-build effect of `on` is about 0. L is a guard for the rare men's/women's same-names pair, not a
+    volume change.
+  - With the discovery map, P1's reader sees a sport on both sides for all 1,874 of 11-21's Kalshi order rows
+    (`unknown_sport=0`). 3 of them differ: paper rows on `KXNCAAWBGAME`, the F27 game.
+- Files: `C:/tmp/w1124_kscope/same_instant2_2026-11-21.txt`; the first run is in `replay_20261121_2010.txt`.
+
+## Amendment, 11-21 8:35 PM CST, before any load: how P2 and P3 are read
+
+- P2 and P3 as written compare `matched` across builds against "the last pre-load" report counts. But the load turns
+  the code on with no report period in between.
+- The same window also loads D (#844, the grid stamp) and G (#854, the college orientation join). Both change board
+  rows, so a cross-build `matched` difference would mix their effects with this one.
+- **So P2 and P3 are read with the same-inputs replay**, at load, at +24 h and at +7 d:
+  - **P2 PASS:** `gained_by_on_other_sport=0`. Everything `on` adds is a pair of the market's own sport.
+  - **P3 PASS:** `lost_by_on_own_sport=0`. `on` drops no own-sport pair.
+  - **KILL** on either.
+- The cross-build comparison stays as a secondary, confounded reading.
+- P1 is unchanged.
+
 ## Log
 
 - 11-21 6:32 PM CST: built and tested locally. The pre-registration was written before any load. Landed on main
   default `report`. The fleet is unchanged until someone fast-forwards it.
+- 11-21 8:35 PM CST: queued as CHANGE L of the 11-24 window batch on the user's "Yes, queue 11-24". The kit was
+  self-tested. The same-inputs replay reproduced the live join (802 = 802), and `on` changed 0 pairs on both board
+  dates. Readings are scheduled for 11-25 9:30 AM CST (+24 h) and in the daily review after 12-01 (+7 d). Nothing is
+  loaded; the fleet is at `b07e808823`, which does not carry `b65707658`.
