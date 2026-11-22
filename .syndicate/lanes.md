@@ -2006,6 +2006,14 @@ death, never life — do not invert it.
 - Verification: tests (off/shadow/on reachability through run_execution, NO-side price mapping, caps, memo); shadow-mode reading (optional, pre-window); window load per the pre-registration in findings_2026-11-21_polymarket_stale_cancel.md
 - Blocked by: none
 
+### kalshi-join-sport-scope — OPEN — opened 2026-11-21 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: A Kalshi game-line or prop market resolves only onto a board game of its OWN sport (sport_for_series vs the game's sport; a game with no sport stays eligible), so a men's NCAAB market can never land on a women's NCAAB game or the reverse (F27, order 373a43d7 11-21): behind SYNDICATE_KALSHI_JOIN_SPORT_SCOPE (absent = report = today's matches byte-identical plus a would-change count and log line; on = scoped; off = no check), reachability-tested (off != on), landed on origin/main default-report; on loads only in a betting-change window on the user's yes
+- Files: syndicate/features/shared/kalshi_board_join.py (the SYNDICATE_KALSHI_JOIN_SPORT_SCOPE switch + the sport field in _distinct_games + the sport scope in _resolve_event + the sport_scope report and its log line in join_kalshi_to_board ONLY), tests/test_kalshi_join_sport_scope.py (NEW), .syndicate/findings_2026-11-21_kalshi_join_sport_scope.md (NEW)
+- Hypothesis: n/a (fix; the cause was reproduced locally 11-21: a market whose own game is absent resolves ok onto the sibling sport's same-named game)
+- Falsification test: n/a
+- Verification: tests: off and absent leave matches byte-identical, on refuses the F27 case and resolves the both-sports ambiguous case; after an ff, refresh-worker prints SPORT_SCOPE mode=report each build; after an on load, 0 archived Kalshi rows whose row sport differs from the series sport
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
