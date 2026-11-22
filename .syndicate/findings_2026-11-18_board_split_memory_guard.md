@@ -621,3 +621,60 @@ Sent by the fleet-watcher on the user's "yes, send the memory overshoot to the m
 - **Verdict.** It is real RSS, inflated about 18% by shared pages, against a declared budget that nothing enforces.
   The host itself had 5.3 GB available at 00:23Z. The gate already acts on it, at the cost of soccer's 135 live-lens ticks.
   **It belongs to lane `layer2-rail-monitor`**, whose open hypothesis is exactly this gate. It is not refresh-worker's board.
+
+## 15. The 11-20 host OOM and the small crash dumps (written 11:16 AM CST 11-22 (17:16Z))
+
+Chased on the user's "Yes, chase it" (the section 9 lead). The hypothesis went into the lane first (main `25f092342`). Readers, read-only at nice 19: `C:\tmp\bmg\w1124\oom_chase.sh`, `oom_ci.sh`, `oom_rss.sh`, `oom_series.sh`, `oom_files.sh`, `oom_chunks.py`.
+
+- **H-O1 MET: the victim was the nightly ci-suite's pytest chunk 6/8, not a fleet role.**
+  - dmesg: `global_oom`, `Killed process 30203 (python) total-vm:12533896kB, anon-rss:8806248kB`, `oom_score_adj` 0.
+    (30203 is the VM's global pid; the distro's own pids differ.)
+  - `job-ci-suite.log`, the 11-20 run on tree 38c3a6905e2: chunk 6/8 (257 files, first `tests/test_alert_mailer.py`) started at
+    2:40:22 AM CST and stopped at ~82% of its tests with `produced NO JUNIT REPORT`; the pytest step read `rc=3 2861s`.
+    The run ended at 08:49:33Z, after 50 min, against 61-71 min on 11-19, 11-21 and 11-22.
+  - refresh-worker's `ALL_PROCESS_MEMORY` lists every host process. It had the chunk (distro pid 1411860) at 8,386 MB at
+    08:49:26Z, its last sample. So the kill was at 08:49:26-33Z. **dmesg's 08:46:27Z (section 9) runs ~3 min behind:** its
+    wall time is boot time plus a monotonic clock, like `ps lstart`, and is not a clock.
+  - Fleet effect: one slow build. No role pid changed, there was no guard refusal and no child exit. The build across the
+    squeeze took 205.8 s (off-CPU 19.6%), against 159.1 s and 142.0 s either side.
+- **H-O2 PARTLY MET: a ~3 GB test process runs every night; 11-20 was a runaway.**
+  - Peak RSS per chunk, MB (heartbeat samples about every 12 s, 08-09Z, so true peaks are higher):
+
+    | chunk | 11-19 | 11-20 | 11-21 | 11-22 |
+    |---|---|---|---|---|
+    | 1 | 434 | 2,012 | 1,156 | 1,207 |
+    | 2 | 666 | 542 | 537 | 532 |
+    | 3 | 499 | 432 | 752 | 742 |
+    | 4 | 861 | 578 | 2,742 | 705 |
+    | 5 | **3,052** | 1,318 | **3,366** | 2,042 |
+    | 6 | 574 | **8,386, killed** | 522 | **3,229** |
+    | 7 | 560 | (not run) | 628 | 1,328 |
+    | 8 | 1,959 | (not run) | 450 | 548 |
+
+  - The heaviest chunk each night holds the same 30 files, which move between chunks together: positions 147-176 of 257 in
+    11-20's chunk 6, `test_ncaaf_player_stats_refresh.py` through `test_paper_ladder.py` (the NCAAF / NFL / NHL / odds / ops block).
+    Rebuilt from `pytest_baseline._split_test_files` (sorted `tests/**/test_*.py`, round-robin over 8) and each night's tree;
+    the file counts match the log (2,059 / 2,061 / 2,074 / 2,077). The log line itself is cut, so it cannot be read directly.
+  - Shape: on 11-19, 11-21 and 11-22 that chunk climbs ~2.5 GB in 2-3 min, then sits at 3.05-3.37 GB. On 11-20 it climbed from
+    852 MB at 08:44:40Z to 8,386 MB at 08:49:26Z, about 1.6 GB a minute, with no plateau.
+  - None of the 30 test files changed between the three trees, so the runaway came from code under test (21 commits
+    d78a448c463..38c3a6905e2) or from input. **Which test: NOT IDENTIFIED.** That needs the 30 files run one at a time under an
+    RSS sampler, which puts multi-GB test processes on the fleet host.
+  - Host margin: the listed-RSS total peaked at 14,168 MB on 11-20 (host 15,746), and at 12,080 / 11,997 on 11-21 / 11-22.
+- **H-O3 MET, and the dumps are this lane's own test.** The four 25-27 MB dumps in `wsl-crashes` are signal 6 from a
+  `python -c "import sys, threading, time ..."` child, at 08:19:56Z 11-20, 08:30:49Z 11-21, 17:22:16Z 11-21 and 08:33:39Z 11-22.
+  - Each image carries `PYTEST_CURRENT_TEST=tests/test_board_split_memory_guard.py::test_lifeline_off_is_not_on_through_a_real_exit (call)`
+    and the `Fatal Python error: _enter_buffered_busy` it reproduces. It is the lifeline switch's off != on test, which makes a
+    real child abort on purpose. Three are the nightly suite; 17:22Z 11-21 was a run outside it.
+  - Cost: 25 MB a night. WSL keeps the latest 10, so within ~10 nights this test's dumps push any real crash dump out of the folder.
+- **The exposure, and this lane's reason to care.** Every role and the suite run at `oom_score_adj` 0 (read 17:08Z 11-22,
+  `oom_score`: board child 808, refresh-worker 716, live-odds-worker 704, redis 694). A global OOM kills the largest process.
+  - On 11-20 that was the 8.4 GB test. A runaway that stops at ~3.5 GB, on a night when the board child is at 4.1 GB, would kill the
+    board child instead (a cold rebuild, ~8 min) or a worker.
+  - `_ci_run_suite` (`scripts/local_production.py:2108-2139`) runs the suite at `nice -n 15` with no memory cap and no `oom_score_adj`.
+- **Levers, none applied:**
+  1. Run the suite at `oom_score_adj` 1000 (`choom -n 1000 --` ahead of `nice` in `_ci_run_suite`). An unprivileged process may
+     raise its own score and its children inherit it, so the kernel kills a test before any role. Not a betting change. The job
+     spawns the code from the checkout, so it takes effect at the first 08:00Z run after an ff, with no restart.
+  2. Make the lifeline test's child non-dumpable (`prctl(PR_SET_DUMPABLE, 0)` before it aborts), so it stops writing a dump a night.
+  3. Find the heavy test: run the 30 files one at a time under an RSS sampler, at Idle. Needs the user's OK.
