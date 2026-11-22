@@ -551,3 +551,48 @@ droppable CHANGE J of batch task `nfl-level-refit-load-1120`.
 - **Amended 2026-11-21 ~18:00Z, before any load:** P3-P5 read the 11-24 and 11-25 evenings (the task fires 11-26 7:30 AM CST,
   so the 11-26 evening is outside it). The reader is `C:\tmp\bmg\w1124\read_850j.py`. Dry-run on the 11-20 logs, it
   reproduced READING 2 exactly (13 refusals 3/3/3/1/3, 3 streak recycles, 3 holds, 48 builds, gaps p50 330 s / max 1,062 s, tree max 6,939 MB).
+
+## 13. A busy Saturday on a fresh parent -- the slate, not the ratchet (written 2026-11-22 ~00:30Z = 6:30 PM CST 11-21)
+
+The hypothesis went into the lane first (H1 code, H2 slate). The readers were all read-only, at nice 19: `C:\tmp\bmg\w1124\tonight.sh`, `parents.sh`, `same_clock.sh`, `build_wall.sh` and `stage_cmp.sh`, over `refresh-worker.log` and `.1`/`.2` (11-18 18:11Z on).
+
+**Every split parent's RSS by age** (MB; median of the refresh_worker heartbeats within 15 min of each age):
+
+| pid | first heartbeat (CST) | checkout then | +10 min | +1 h | +3 h | +6 h | +12 h | +24 h | last |
+|---|---|---|---|---|---|---|---|---|---|
+| 152916 | Wed 11-18 6:12 PM, live evening | a3104a5b6 | 1,569 | 1,797 | 2,136 | 2,345 | 2,292 | - | 2,273 at 16.8 h |
+| 1011283 | Thu 11-19 11:01 AM, quiet morning | 38c3a6905 + the 4 switches | 731 | 761 | 764 | 845 | 1,490 | 1,677 | 2,286 at 47.6 h |
+| 2313049 | Sat 11-21 10:37 AM, NCAAF day | 0d20a6919 | 1,175 | 1,335 | - | - | - | - | 1,554 at 1.6 h |
+| 2397127 | Sat 11-21 12:16 PM, NCAAF day | b07e80882 | 1,328 | 1,538 | 1,528 | 1,665 | - | - | 1,671 at 6.0 h |
+
+**The same clock window, 12:30-6:00 PM CST (18:30-24:00Z), on three days:**
+
+| day | live games the builds saw (median, all sports) | builds | build wall p50 / p90 s | gap p50 / max s | gaps > 900 s | pre_source refusals | post_build_overview refusals |
+|---|---|---|---|---|---|---|---|
+| Thu 11-19 | 2 | 77 | 168 / 210 | 249 / 355 | 0 | 0 | 0 |
+| Fri 11-20 | 4 | 60 | 207 / 250 | 290 / 828 | 0 | 11 | 0 |
+| Sat 11-21 | 28 (NCAAF 14, NCAAB 10) | 32 | 371 / 479 | 575 / 1,098 | 4 | 14 | 5 |
+
+- **Saturday's builds are CPU-bound:** cpu p50 337 s, off-CPU 6.4% on the latest.
+- **Where the time went, Fri -> Sat** (stage medians, same window):
+  - `board_publication` 209 -> 371 s;
+  - `layer2_shortlist_build` 96 -> 153 s;
+  - `portfolio_commit` 20 -> 61 s;
+  - `build_intelligence_overview` 2 -> 37 s (its NCAAF overview 17 -> 35 s);
+  - `kalshi_odds_refresh` 42 -> 43 s.
+
+**Verdict.**
+- **H2 (slate) SUPPORTED.** A parent's RSS follows what is live while it runs:
+  - Booted into a quiet morning, it stays at 730-850 MB until the evening slate: 1011283 read 845 MB at 5 PM CST and 1,490 by 11 PM.
+  - Booted into a live slate, it reaches 1,500-1,800 MB within an hour: 152916 on Wednesday evening on older code, and 2397127 on Saturday.
+  - It then keeps its high-water mark. That is the ratchet: 1011283 read 2,286 MB at 47.6 h.
+- **H1 (code) NOT ESTABLISHED, NOT EXCLUDED.** Both 11-21 parents booted into a Saturday slate.
+  - **The decisive reading is Sunday's 4 AM reset**, whose new parent runs b07e80882 on a quiet board.
+  - PREDICTION, written now: H2 holds if it reads 700-900 MB at +10 min and +1 h. H1 holds if it reads >= 1,100 MB at either. The task's `wait_first_build2.sh` records it.
+- **Tonight's long gaps are mostly build COST, not memory.**
+  - 32 builds against 60-77 in the same hours, with each build 1.8-2.2x longer. The 14 refusals come on top of that.
+  - Neither CHANGE J nor the morning resets touch build cost. It is not this lane's mechanism; the stage deltas above name where the cost is.
+- **Section 12 is unchanged.**
+  - Its P3-P5 read the 11-24/11-25 weekday evenings under the comparability rule.
+  - Its line "a fresh parent reads 0.8-1.2 GB" holds only for a boot at a quiet hour, as here. J fires only 09-12Z, which is a quiet hour.
+- **The morning task:** the parent read 1,657 MB at 00:12Z, so Sunday's 4 AM reset will very likely run (threshold 1,500).
