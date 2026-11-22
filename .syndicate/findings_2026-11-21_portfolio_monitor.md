@@ -159,3 +159,12 @@ Flagged by the fleet-watcher from the 2:34 PM reading (`resting order 373a43d7 (
     processes (by hand, another session's script, or Kalshi itself); which one is not known.
   - Exposure is now 0. F27's code defect stands: the next same-named game whose own Kalshi market is missing can land
     on the sibling sport again.
+
+## 6:35 PM — F27 fix built (lane `kalshi-join-sport-scope`), not loaded
+
+- User "Yes, build it". Sport-scoped event resolution landed on main at `b65707658`, default `report`. Today's
+  matches are unchanged, and refresh-worker prints one `SPORT_SCOPE` count per build once the fleet carries the
+  commit. `on` is a betting change (window only).
+- Baseline: 21,349 archived Kalshi rows have the same sport on the row and its series; 3 differ (the F27 class),
+  plus the 1 live row. `event_matches_two_games` read 13 to 23 markets per build (22:56Z to 00:18Z), which caps what
+  `on` can newly resolve. Details and predictions: `findings_2026-11-21_kalshi_join_sport_scope.md`.

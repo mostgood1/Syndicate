@@ -2016,6 +2016,7 @@ death, never life — do not invert it.
 - Hypothesis: n/a (fix; the cause was reproduced locally 11-21: a market whose own game is absent resolves ok onto the sibling sport's same-named game)
 - Falsification test: n/a
 - Verification: tests: off and absent leave matches byte-identical, on refuses the F27 case and resolves the both-sports ambiguous case; after an ff, refresh-worker prints SPORT_SCOPE mode=report each build; after an on load, 0 archived Kalshi rows whose row sport differs from the series sport
+- Status 2026-11-21 6:35 PM CST: GOAL: NOT MET. Built and landed on main b65707658 (default report; 23 new tests, 0 new failures over 32 Kalshi suites). Left: the report reading after the next fleet ff, then the `on` load in a betting-change window on the user's yes. Pre-registration: .syndicate/findings_2026-11-21_kalshi_join_sport_scope.md
 - Blocked by: none
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
