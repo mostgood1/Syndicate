@@ -22,6 +22,7 @@
   - R1 one-score last-2:00 3.23 inside the real 3.16 [2.66, 3.67] (pair 2.35 and `off` 2.36 outside).
   - **Not gated, open:** 17+ at Q4 3:00 calibrated +0.0443 (se 0.0293), the same sign as 2024 (+0.0333 raw). It is over-confidence (slope 0.62 vs the pair's 0.92; rest ratio 0.94 vs 1.11): #835's widening was fitted without the end game. A re-fit (2024 states, confirmed on 11-28 / 12-05) is the user's call before 12-08.
 - **Owed before the load (the queue's remaining conditions):**
+  - the late-widening re-fit (user "Yes, re-fit it"), PRE-REGISTERED 2026-11-22 11:19 AM CST (findings "## LATE-WIDENING RE-FIT"): `..._TOTAL_CALIBRATION_K_LATE` re-fitted for the end game on CFBD 2023 (730 games, 3,598 states, out of sample for #808's rates) by matching the pair's calibration slope at 1.6; a new value rides ONLY with the end game and only if F2 passes and a weeks 13-14 confirmation (pulled after 12-05) passes before the window. Otherwise the end game loads on 1.6.
   - DONE: the real-timeouts hold-out, PRE-REGISTERED 2026-11-21 8:22 PM CST (user "Yes, pre-register it"; findings "## REAL-TIMEOUTS HOLD-OUT"): CFBD 2026 weeks 1-10 (548 games, 2,191 Q4 states, all with real timeouts; wholly before the M2 blind window), the queued set vs #852 alone, gated on #835's CALIBRATED log loss (C1-C3) and the one-score last-2:00 points (R1). Instrument 48 of 48 against the built live path under the kit's env.
   - a live college scoreboard row showing `homeTimeouts` / `awayTimeouts`;
   - the pair loading in the same window, and the user's final yes in session 617b553b.

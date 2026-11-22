@@ -587,3 +587,123 @@ after calibration:
 - A different K would be one more thing to load. So the choice is the user's:
   - re-fit before 12-08;
   - or load the end game on the current K and watch 17+ late.
+
+## LATE-WIDENING RE-FIT — PRE-REGISTRATION, written 2026-11-22 11:19 AM CST before any arm was run on its states
+
+The user said "Yes, re-fit it" (2026-11-22), answering "Re-fit #835's widening for the end game before
+the 12-08 window?". This follows the hold-out's open item: at 17+ at Q4 3:00 the calibrated end game is over-confident
+(slope 0.62 against the pair's 0.92). #835's widening was fitted on the engine without the end game, which is
+`model_engine_standard.md`'s mechanism-vs-estimator case.
+
+**What is re-fitted: one existing knob, no code.** `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION_K_LATE` (default 1.6).
+- K runs at 1.2 until half-time, then rises linearly to K_LATE at 95% of regulation (Q4 3:00) and holds there
+  (`live_total_dispersion.k_at`).
+- So K_LATE moves every second-half state past Q3 15:00. K early (1.2) is not touched.
+- The shape of the schedule is not touched.
+
+**Why 2023, not 2024.** I said "fit on 2024 states" when I asked; this changes it, for one reason:
+- #808's clock rates were fitted on 2024-25 (`scripts/football_end_of_half_clock_rates.py`, `SEASONS = (2024, 2025)`).
+  On those seasons the end game's draws are in sample, so they would look better calibrated than they are out of
+  sample, and the fit would widen too little.
+- 2024 also chose #852's damping and the end game's 21 / 7.
+- 2023's only earlier use was the concession threshold, a measurement of real trailers' pass rate and snap time. That
+  is behaviour, not totals.
+- #835's own K was fitted on the fleet's 2026 ledger, with no overlap.
+
+**Data.** Pulled and built before this was written; only counts were read (`C:\tmp\t859k\pull23.txt`,
+`build23.txt`).
+- **Lines:** CFBD 2023 regular-season `/lines`, through the repo's own fetcher, into a PRIVATE dir. Closes: each game's
+  median provider `overUnder`.
+- **States:** the harness's own builder (`resume.build_tasks`, unchanged), on the primary tree's CFBD 2023 mirror, at
+  Q3 7:30 and Q4 15:00 / 10:00 / 6:00 / 3:00. These are the states where K_LATE acts (played share 0.625-0.95).
+  - **730 FBS-vs-FBS games, 3,598 states.**
+  - **Every state has a possession owner and both teams' real timeouts.**
+  - Dropped: 118 not FBS-vs-FBS, 20 regulation mismatches.
+
+**Engine and arms: the hold-out's, unchanged.**
+- `k_arms.py` imports `C:\tmp\t859h\h_arms.py` unchanged, on the same pinned engine (main `f6b63e181`, whose
+  `live_total_dispersion.py` equals main's today in content).
+  - `h_pair` is #852 alone.
+  - `h_eg` is the queued end game with real timeouts.
+- Each state gets 60 sims on its own seed block, paired across arms. Each arm has its own E0 (`k_e0.py`: the built
+  `resim_live_game` at kickoff, 120 sims, under the arm's kit env).
+
+**Instrument.** Run BEFORE this was written, on synthetic draws, reading no outcome (`k_inst.py`, `inst.txt`).
+- The fleet's tick function `calibrate_snapshot_totals`, given a live re-sim lane and the K_LATE env line, applies
+  exactly `k_at(rho, 1.2, K_LATE)`. It writes exactly the draws that the scorer's `apply(..., env)` call returns: **25 of
+  25** (5 K_LATE values x 5 checkpoints).
+- An absent K_LATE is 1.6, and a typo (`2,0`) falls back to 1.6.
+
+**Blind smoke test:** the whole pipeline (fit and confirmation paths) ran on 4 games into `C:\tmp\t859k\smoke`. Only
+return codes and section presence were checked.
+
+**Scoring (`k_fit.py`, pinned).**
+- Each arm's raw draws pass through production's `apply`, with the switch on and K_LATE on the grid 1.2-3.0 in
+  steps of 0.1.
+- Each arm's draws use its own E0 and the close. Only games with a close and both E0s are scored.
+- **Lines:** the calib_arms rule on ONE reference, the pair at 1.6: S-inclusive 25/50/75% quantiles of its calibrated
+  total, + 0.5. The same lines are used for every arm and every K.
+- **Measures:** the weighted logistic slope on logit p, and log loss. SEs are clustered by game.
+
+**Estimator: match the pair's calibration, not the finals' optimum.**
+- `s_ref` = the pair's slope at 1.6 on all fit states.
+- K_fit = the first K, scanning up from 1.2 and interpolating linearly, where `h_eg`'s slope reaches `s_ref`.
+- **K_NEW = K_fit to one decimal.** Its 95% interval is a bootstrap over games (2000 resamples, seed 859).
+- Why a match:
+  - #835 chose 1.6 partly on Kalshi's late width, over the finals' wider optimum (1.8 gave slope 0.81 against 0.73).
+  - Matching keeps that choice and removes only the end game's change to it.
+  - The finals' log-loss argmin for each arm is reported, but not used.
+
+**Rule.**
+- **F1:** K_NEW == 1.6 means no change. The end game loads on the current K, as queued.
+- **F2:** otherwise, on 2023, `h_eg` at K_NEW minus `h_eg` at 1.6 must be <= +1 paired SE in log loss, over all fit
+  states. If F2 fails, there is no change.
+- **CONFIRM** (only if F2 passes): read later, out of sample, on CFBD 2026 weeks 13-14.
+  - That is 11-24..11-28 (MACtion and rivalry week) and 12-04 / 12-05 (conference championships), all outside the M2
+    blind window.
+  - `k_pull26c.py` runs ONCE, after every week-14 game is final. It refuses otherwise.
+  - The same pipeline then runs on those states: `h_eg` at K_NEW minus `h_eg` at 1.6 must be <= +1 paired SE.
+- **Not gated:**
+  - the slope and log-loss table by checkpoint and margin, including 17+ at Q4 3:00;
+  - K_NEW on the 2026 weeks 1-10 hold-out (`report2026`, Q4 only). That is the read that raised this, so it is no
+    confirmation.
+
+**Predictions** (2026's Q4 read had `h_eg` 1.04 vs 1.10 at Q4 15:00-6:00 and 0.74 vs 0.80 at Q4 3:00):
+- On 2023, `h_eg` at 1.6 has a lower slope than `s_ref`. **K_NEW is in [1.7, 2.0]**, with a 95% interval under +-0.2
+  wide.
+- F2 passes, and `h_eg` at K_NEW vs 1.6 is within +-0.003 in log loss.
+- At K_NEW, the 17+ Q4 3:00 slope gap to the pair narrows but does not close. One knob moves every margin.
+- Both arms' log-loss argmins are >= 1.8.
+- CONFIRM passes.
+
+**What follows.**
+- **NO CHANGE (F1 or F2):** the end game loads on 1.6 as queued. The 17+ late over-confidence is then a margin effect
+  a single knob cannot move. A margin-aware widening would be a code change for a later window, the user's call.
+- **CANDIDATE (F2 passes):** the 12-08 entry gains a CONDITIONAL 7th GLOBAL line,
+  `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION_K_LATE=<K_NEW>`, ONLY with the end game (never with the pair alone).
+  - The kit gets a new version that writes it, self-tested before the window.
+  - It loads only if CONFIRM passes and is read before the window.
+  - If not, the end game loads on 1.6 (its condition 2 is already met), and K_NEW waits for a later window.
+- **Either way:** nothing changes on the fleet now. The load is the user's yes in the window, a betting change.
+
+**Pins (sha256, `C:\tmp\t859k\pins.sha256`; `run_fit.sh` checks them before anything runs):**
+
+| file | sha256 |
+|---|---|
+| `k_arms.py` | `5c909b3c1906d43af3f04ace3359e1b6e74043185d5e97fd1dfbb43fb9ee30d3` |
+| `k_build.py` | `fae2ea46e62fdebb270d5219193f0ddeb7c2ff761644dde24f0c145972948334` |
+| `k_pull23.py` | `bff405e8bc6e2fea2a91db3d43b844db1d0b22639ad95cf34dd600f64812e9b4` |
+| `k_run.py` | `c91b93f9af5b5475fbf6f728eff2525362a22ec75233f37246fb9b6a4a8f0e95` |
+| `k_e0.py` | `9f5595677a502424115a1556f38774e92d46e2b21f73fe659fcd52babbe1987a` |
+| `k_close.py` | `b6c5e8ecbfc7d466034f24c2c23eb361de0dd4e28eda5a6f188cad7e9192718c` |
+| `k_inst.py` | `f4e7f1c40ef5cf5de5aae43a922e8bc6c1d9b8bdd5f8d9ef4610bf997132ed2c` |
+| `inst.txt` | `2ea27fcb4a8d5640852625d036b5bb681db0bcf8a96d56021fc8cd8383ef362d` |
+| `k_fit.py` | `531dbc348ab17d14f2ae807d8105c26aa80aac3a1c11d2f6ad2d1938d025ab3c` |
+| `k_pull26c.py` | `e3b3116b643f74b18d31b5b4e9a6c62fc6f1b32aea709f89922a1b12b349de49` |
+| `run_fit.sh` | `f0fa5a5e664bcb0c4791494c7a128bd8ae4bb78ae4f887d7163b0f3915996a60` |
+| `tasks_2023.json` | `d366f9b54c8d2b99691072ab0680e09576c953bf443d33a432e04ab8d0af6af4` |
+| `build23.txt` | `ce7a49f5737bf9ab993631c73feb8ae5c8f9919e99de636224f1b38e9ff8e513` |
+| `pull23.txt` | `bcc166e6e5817dba3fff6e47683e09f4c34cf40eb9be0cf27e2cfe6a1673dc6b` |
+| `/c/tmp/t859h/h_arms.py` | `aa41e98e905c307cf8d2b2581b6e60ab04796b08171ef2133357a682bcddd976` |
+| `/c/tmp/t852/resume.py` | `ef89b077310a777c6f6a33ec43f4905eb855b687f82cd39d8ee38178aedaf2b8` |
+| `/c/tmp/w1208_ncaaf/kit_env_ncaaf.sh` | `4f31d0ac2b4888b5ca72fa32fa33a6e66482dd7264b5354d00ed360c1a3e4174` |
