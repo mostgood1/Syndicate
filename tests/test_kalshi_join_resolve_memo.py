@@ -88,7 +88,8 @@ def test_a_memo_hit_is_a_copy_so_a_caller_cannot_poison_it():
 def test_distinct_games_is_first_row_per_event_and_skips_blank_ids():
     games = kbj._distinct_games(_rows())
     assert [g["event_id"] for g in games] == ["early", "late", "sea", "tb"]
-    assert set(games[0]) == {"event_id", "home_team", "away_team", "commence_time"}
+    # `sport` since lane kalshi-join-sport-scope (2026-11-21): the sport scope reads it.
+    assert set(games[0]) == {"event_id", "home_team", "away_team", "commence_time", "sport"}
 
 
 def test_the_join_uses_the_memo_and_its_report_is_unchanged(monkeypatch):

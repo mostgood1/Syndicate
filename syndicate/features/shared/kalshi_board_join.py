@@ -372,6 +372,64 @@ def kalshi_ladder_monotonic_mode() -> str:
     return "report"
 
 
+def kalshi_join_sport_scope_mode() -> str:
+    """`off` | `report` | `on`. **Absent means `report`.** `[2026-11-21, lane
+    kalshi-join-sport-scope, user "Yes, build it"]`
+
+    WHICH GAMES A KALSHI MARKET MAY RESOLVE ONTO. `_resolve_event` matched a
+    market's club blob against EVERY game on the board, and the board is
+    cross-sport. The sport only chose the club map. So a market whose own game
+    is not on the board resolved `ok` onto another sport's game whose teams have
+    the same names. Measured 11-21: live order `373a43d7`, a men's NCAAB bet
+    (UC Irvine @ San Diego, tip 21:30Z), went to `KXNCAAWBGAME-26NOV21UCIUSD-UCI`,
+    the WOMEN'S game (tip 03:00Z). With both games on the board the same market
+    reads `ambiguous` and is refused, which loses the right bet. The quote fan-in
+    already scopes by sport (`venue_quote_fanin._distinct_games(rows, sport)`);
+    this is the order join catching up.
+
+      off     no check at all: today's code path exactly.
+      report  (absent, and any unknown value) today's resolution, byte-identical,
+              PLUS a second match over the market's own sport's games wherever the
+              answer could differ. A difference is stamped on the resolution as
+              `sport_scope_would` and counted per build (`sport_scope` in the
+              join's report; one `SPORT_SCOPE` log line). No bet changes.
+      on      the market resolves only onto games of its own sport. A game whose
+              sport is blank stays eligible, and so does every game when the
+              market's sport is unknown. A BETTING CHANGE: it loads only in a
+              betting-change window.
+
+    Read per call, like the two switches above.
+    """
+    raw = str(os.environ.get("SYNDICATE_KALSHI_JOIN_SPORT_SCOPE") or "").strip().lower()
+    if raw in {"1", "true", "yes", "on", "enforce"}:
+        return "on"
+    if raw in {"0", "false", "no", "off"}:
+        return "off"
+    return "report"
+
+
+def _game_sport(game: Mapping[str, Any]) -> str:
+    return str(game.get("sport") or "").strip().lower()
+
+
+def _own_sport_games(
+    games: Sequence[Mapping[str, Any]], sport: Any
+) -> list[Mapping[str, Any]]:
+    """The games a market of `sport` may resolve onto: its sport's, plus any blank.
+
+    THE SAME VOCABULARY ON BOTH SIDES, MEASURED. Over every archived Kalshi order
+    row on the fleet (11-21), the board row's `sport` and `sport_for_series` of
+    its ticker's series agreed on 21,349 rows in 9 sports (soccer as `soccer`,
+    women's college basketball as `wncaab`) and differed on 3, all the men's /
+    women's NCAAB case this exists for. So an exact comparison is safe, and a
+    game with no sport is kept rather than guessed at.
+    """
+    wanted = str(sport or "").strip().lower()
+    if not wanted:
+        return list(games)
+    return [g for g in games if _game_sport(g) in ("", wanted)]
+
+
 # Market-type tokens a soccer series ticker ends with. Longest first, because
 # `KXLALIGA1HSPREAD` must not be cut at `SPREAD` and leave `KXLALIGA1H`.
 _SERIES_MARKET_SUFFIXES = (
@@ -703,7 +761,16 @@ def _resolve_event(
     # every other code resolves exactly as before (byte-identical).
     event_own = (event_names or {}).get((family, _event_segment(market.get("ticker")))) if event_names else None
     own_names = {c: n for c, n in (event_own or {}).items() if c in (family_collided or ())} or None
-    key = (blob, family, sport, repr(commence_hint), tuple(sorted(own_names.items())) if own_names else None)
+    # The sport-scope mode is part of the answer, so it is part of the memo key.
+    scope_mode = kalshi_join_sport_scope_mode()
+    key = (
+        blob,
+        family,
+        sport,
+        repr(commence_hint),
+        tuple(sorted(own_names.items())) if own_names else None,
+        scope_mode,
+    )
     if memo is not None and key in memo:
         return dict(memo[key])
     if games is None:
@@ -714,53 +781,118 @@ def _resolve_event(
     family_names = (code_names or {}).get(family) if code_names else None
     if own_names:
         family_names = {**(family_names or {}), **own_names}
-    result = match_event_blob(
-        blob,
-        [dict(g) for g in games],
-        sport=sport,
-        code_names=family_names,
-        # The ticker's own start stamp, in Eastern, converted through zoneinfo.
-        # Used ONLY to separate an otherwise-ambiguous pair -- it never matches
-        # a game on its own, because a slate has many simultaneous starts.
-        commence_hint=commence_hint,
-    )
-    result.setdefault("sport", sport)
-    if own_names and result.get("status") == "ok":
-        # THE EVENT NAMED ITS CLUBS, SO THE MATCH MUST CONTAIN THEM. `match_event_blob`
-        # still tries each raw code beside its name, and the global map reads a raw
-        # `CEL` as Celta Vigo: without this check, lifting the collision refusal below
-        # would let a Celtic contract land on a Celta Vigo game -- the 2026-10-15 defect
-        # `build_club_code_collisions` exists for. Refuse rather than trust the code.
-        from syndicate.features.shared.kalshi_catalogue import club_key
 
-        matched = next((g for g in games if str(g.get("event_id") or "") == str(result.get("event_id") or "")), None)
-        game_clubs = {club_key(sport, matched.get(side)) for side in ("home_team", "away_team")} if matched else set()
-        named = {club_key(sport, name) for name in own_names.values()}
-        if None in named or not named <= game_clubs:
-            result = {
-                "status": "ambiguous",
-                "reason": "event_names_disagree_with_game",
-                "blob": blob,
-                "sport": sport,
-            }
-    if family_collided and result.get("status") == "ok":
-        upper = str(blob).upper()
-        # The same lengths `_splits` tries (`kalshi-five-char-codes`): a collided
-        # 5-character code must be refused as surely as a 3-character one.
-        lengths = club_code_lengths()
-        ends = {upper[:n] for n in lengths} | {upper[-n:] for n in lengths}
-        hit = sorted((ends & set(family_collided)) - set(own_names or ()))
-        if hit:
-            result = {
-                "status": "ambiguous",
-                "reason": "club_code_collides_in_series_family",
-                "blob": blob,
-                "codes": hit,
-                "sport": sport,
-            }
+    def _match(candidates: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+        """Every resolution step, over one candidate game list.
+
+        ONE BODY FOR BOTH LISTS, so the sport-scoped answer (`on`, and the
+        `report` comparison) passes through the same two refusals as today's.
+        """
+        result = match_event_blob(
+            blob,
+            [dict(g) for g in candidates],
+            sport=sport,
+            code_names=family_names,
+            # The ticker's own start stamp, in Eastern, converted through zoneinfo.
+            # Used ONLY to separate an otherwise-ambiguous pair -- it never matches
+            # a game on its own, because a slate has many simultaneous starts.
+            commence_hint=commence_hint,
+        )
+        result.setdefault("sport", sport)
+        if own_names and result.get("status") == "ok":
+            # THE EVENT NAMED ITS CLUBS, SO THE MATCH MUST CONTAIN THEM. `match_event_blob`
+            # still tries each raw code beside its name, and the global map reads a raw
+            # `CEL` as Celta Vigo: without this check, lifting the collision refusal below
+            # would let a Celtic contract land on a Celta Vigo game -- the 2026-10-15 defect
+            # `build_club_code_collisions` exists for. Refuse rather than trust the code.
+            from syndicate.features.shared.kalshi_catalogue import club_key
+
+            matched = next(
+                (g for g in candidates if str(g.get("event_id") or "") == str(result.get("event_id") or "")),
+                None,
+            )
+            game_clubs = {club_key(sport, matched.get(side)) for side in ("home_team", "away_team")} if matched else set()
+            named = {club_key(sport, name) for name in own_names.values()}
+            if None in named or not named <= game_clubs:
+                result = {
+                    "status": "ambiguous",
+                    "reason": "event_names_disagree_with_game",
+                    "blob": blob,
+                    "sport": sport,
+                }
+        if family_collided and result.get("status") == "ok":
+            upper = str(blob).upper()
+            # The same lengths `_splits` tries (`kalshi-five-char-codes`): a collided
+            # 5-character code must be refused as surely as a 3-character one.
+            lengths = club_code_lengths()
+            ends = {upper[:n] for n in lengths} | {upper[-n:] for n in lengths}
+            hit = sorted((ends & set(family_collided)) - set(own_names or ()))
+            if hit:
+                result = {
+                    "status": "ambiguous",
+                    "reason": "club_code_collides_in_series_family",
+                    "blob": blob,
+                    "codes": hit,
+                    "sport": sport,
+                }
+        return result
+
+    if scope_mode == "on" and sport:
+        # ONLY THIS SPORT'S GAMES (and any with no sport). See
+        # `kalshi_join_sport_scope_mode`.
+        result = _match(_own_sport_games(games, sport))
+    else:
+        result = _match(games)
+        if scope_mode == "report" and sport:
+            would = _sport_scope_would(result, games, sport, _match)
+            if would:
+                result["sport_scope_would"] = would
     if memo is not None:
         memo[key] = dict(result)
     return result
+
+
+def _sport_scope_would(
+    result: Mapping[str, Any],
+    games: Sequence[Mapping[str, Any]],
+    sport: Any,
+    match: Any,
+) -> dict[str, Any] | None:
+    """What `on` would resolve instead of `result`, or None when it agrees.
+
+    ONLY TWO TODAY-ANSWERS CAN CHANGE, so only they pay for a second match:
+      other_sport_game         `ok` onto a game of ANOTHER sport (the 11-21 order):
+                               `on` refuses it, or finds the market's own game.
+      ambiguous_across_sports  `ambiguous` on a board holding another sport's
+                               games: `on` may find exactly one of its own.
+    Narrowing the candidate list cannot turn `no_match` into a match. Nor can it
+    move an `ok` that is already on a game of this sport (or of no sport).
+    """
+    wanted = str(sport or "").strip().lower()
+    status = str(result.get("status") or "")
+    matched_sport = None
+    if status == "ok":
+        event_id = str(result.get("event_id") or "")
+        matched = next((g for g in games if str(g.get("event_id") or "") == event_id), None)
+        matched_sport = _game_sport(matched) if matched is not None else ""
+        if matched_sport in ("", wanted):
+            return None
+        kind = "other_sport_game"
+    elif status == "ambiguous":
+        if not any(_game_sport(g) not in ("", wanted) for g in games):
+            return None
+        kind = "ambiguous_across_sports"
+    else:
+        return None
+    scoped = match(_own_sport_games(games, sport))
+    if (scoped.get("status"), scoped.get("event_id")) == (result.get("status"), result.get("event_id")):
+        return None
+    return {
+        "kind": kind,
+        "status": scoped.get("status"),
+        "event_id": scoped.get("event_id"),
+        "today_event_sport": matched_sport,
+    }
 
 
 def _distinct_games(board_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -781,6 +913,10 @@ def _distinct_games(board_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, A
                 # how the first version of that fix shipped INERT -- the matcher
                 # was correct and the caller handed it nothing to decide on.
                 "commence_time": row.get("commence_time"),
+                # CARRIED FOR THE SPORT SCOPE (`kalshi_join_sport_scope_mode`).
+                # `match_event_blob` returns only event_id and the two team
+                # names, so this key cannot reach a resolution by itself.
+                "sport": row.get("sport"),
             }
     return list(seen.values())
 
@@ -1476,6 +1612,37 @@ def join_kalshi_to_board(
     # Props restricted to their ticker's own game (see REASON_PROP_GAME_UNRESOLVED).
     prop_game_resolved = 0
 
+    # THE SPORT SCOPE'S OWN COUNTS (`kalshi_join_sport_scope_mode`), per MARKET,
+    # with one sample per distinct blob. Reported in every mode, `off` included,
+    # so the mode itself is a reading. In `report` they are the population `on`
+    # would change, counted before anyone turns it on.
+    sport_scope_mode = kalshi_join_sport_scope_mode()
+    sport_scope_by_kind: dict[str, int] = {}
+    sport_scope_samples: list[dict[str, Any]] = []
+    sport_scope_blobs: set[str] = set()
+
+    def _count_sport_scope(market: Mapping[str, Any], resolution: Mapping[str, Any]) -> None:
+        would = resolution.get("sport_scope_would")
+        if not isinstance(would, Mapping):
+            return
+        kind = str(would.get("kind") or "")
+        sport_scope_by_kind[kind] = sport_scope_by_kind.get(kind, 0) + 1
+        blob = str(resolution.get("blob") or "")
+        if blob not in sport_scope_blobs and len(sport_scope_samples) < 8:
+            sport_scope_blobs.add(blob)
+            sport_scope_samples.append(
+                {
+                    "ticker": market.get("ticker"),
+                    "sport": resolution.get("sport"),
+                    "kind": kind,
+                    "today": resolution.get("status"),
+                    "today_event": resolution.get("event_id"),
+                    "today_event_sport": would.get("today_event_sport"),
+                    "on": would.get("status"),
+                    "on_event": would.get("event_id"),
+                }
+            )
+
     # `segment_for_board_row` is imported here rather than at module scope to
     # match how `_segments_agree` and `_row_key` already reach it -- this file
     # keeps kalshi_catalogue imports local on purpose.
@@ -1807,6 +1974,7 @@ def join_kalshi_to_board(
                 collided=club_code_collisions,
                 event_names=club_code_event_names,
             )
+            _count_sport_scope(market, resolution)
             status = str(resolution.get("status") or "")
             if resolution.get("matched_by") == "commence_time":
                 # A doubleheader half that was separated on start time. Counted
@@ -2126,6 +2294,7 @@ def join_kalshi_to_board(
                 market, rows, club_code_names, collided=club_code_collisions,
                 event_names=club_code_event_names,
             )
+            _count_sport_scope(market, resolution)
             wanted_event = str(resolution.get("event_id") or "")
             if str(resolution.get("status") or "") != "ok" or not wanted_event:
                 _refuse(REASON_PROP_GAME_UNRESOLVED)
@@ -2346,6 +2515,22 @@ def join_kalshi_to_board(
         if name:
             board_markets[name] = board_markets.get(name, 0) + 1
 
+    sport_scope_report = {
+        "mode": sport_scope_mode,
+        "would_change": sum(sport_scope_by_kind.values()),
+        "by_kind": dict(sorted(sport_scope_by_kind.items())),
+        "samples": sport_scope_samples,
+    }
+    # ONE LINE PER BUILD, printed by the join itself: its callers each print
+    # their own summary, and this count must not depend on which caller ran.
+    print(
+        f"[kalshi_board_join] SPORT_SCOPE mode={sport_scope_mode}"
+        f" would_change={sport_scope_report['would_change']}"
+        f" by_kind={sport_scope_report['by_kind']}"
+        + (f" samples={sport_scope_samples}" if sport_scope_samples else ""),
+        flush=True,
+    )
+
     return {
         "kalshi_markets": len(kalshi_markets),
         "board_rows": len(board_rows),
@@ -2377,6 +2562,8 @@ def join_kalshi_to_board(
         # in report-only" is exactly the kind of claim `learnings.md` says must
         # be checked, not assumed.
         "ladder_monotonic": ladder_monotonic_report,
+        # THE SPORT SCOPE'S COUNTS, in every mode (see `kalshi_join_sport_scope_mode`).
+        "sport_scope": sport_scope_report,
         "kalshi_key_sample": kalshi_keys,
         # One refused title per series: what grammar is missing, not how many.
         "unreadable_titles": unreadable_titles,
