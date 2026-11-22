@@ -179,3 +179,40 @@ A single gap over 60 s needs two or three 429s in a row on one market's batch.
   Only the pooled and per-market numbers are compared.
 - The real after-reading is the first Saturday nightly on the new code. The tool reads it as is:
   `py -3 scripts/inplay_poll_gaps.py C:/tmp/inplay_2026-11-21`.
+
+## 4. Live reading: Saturday 2026-11-21
+
+Taken Sun 2026-11-22 ~10:05 AM CST by the scheduled task `inplay-saturday-1121-gap-reading` (READING ONLY; fleet, recorder and nightly task untouched).
+Night completed: `C:/tmp/inplay_nightly.log` has `DONE 2026-11-21` (logged 3:00 AM CST 11-22). Recording span (first/last `kalshi.jsonl` row ts): **Sat 11-21 10:30:13 AM CST -> Sun 11-22 1:25:38 AM CST = 895.4 min**.
+Tool: `scripts/inplay_poll_gaps.py` at `origin/main` 21a135245, run standalone at Idle priority (57.7 s); JSON at `C:/tmp/inplay_2026-11-21/poll_gaps_reading.json`.
+Both changes in force: Kalshi list + paced poll loop (e9eb52568 + a2af81258) and Normal priority (c0d9cf9b8).
+
+**Verdict: MET** -- share_time_no_quote_60s 0.00025 (<= 0.02) AND share_any_gap_over_120 0.0 (<= 0.05). **No flags.**
+
+| field | 11-14 (before) | 11-21 (after) | expected (dry A/B) |
+|---|---|---|---|
+| markets | 5,014 | 5,081 | 4,663 (A/B set) |
+| gap p50 / p90 / p99 / max | 24.4 / 56.3 / 322.0 / 7,137.9 s | 15.7 / 23.7 / 41.9 / 74.4 s | max 47.7-69.8 s |
+| market_maxgap p50 / p90 | 560.1 / 2,028.3 s | 61.9 / 74.4 s | -- |
+| share_any_gap_over_120 | 0.824 | **0.0** (0 of 5,081 markets) | 0 gaps > 120 s |
+| share_time_no_quote_60s | **0.267** | **0.00025** (33,610 s excess over 60 s / 132,372,306 summed quoted market-seconds) | 0.000-0.009 |
+| kalshi_429 | 1,552 | 260 = **4.36 per 15 min** (895.4 min) | 3-6 per 15 min |
+| loop stalls > 60 s | 0 | 0 (0 s) | -- |
+| kalshi.jsonl size | 1.01 GB | 2.25 GB (2,250,629,641 B = 2.10 GiB) | <= ~3.6 GB |
+
+Other fields: rows 7,728,871; gaps 7,723,790; cycles 4,182; span_s (batch span) 53,725 s; `gaps_over_120_by_cause` = {} (0 list / 0 starve); `loop_stalls` 0; `tail_unresolved` 0.
+
+by_sport:
+
+| sport | markets | gap p50 | gap p90 | gap max | share_any_gap_over_120 |
+|---|---|---|---|---|---|
+| nba | 404 | 12.2 s | 22.5 s | 64.5 s | 0.0 (0/404) |
+| ncaaf | 4,535 | 16.5 s | 23.9 s | 74.4 s | 0.0 (0/4,535) |
+| nhl | 142 | 12.1 s | 22.8 s | 74.4 s | 0.0 (0/142) |
+
+Series markets: KXNBAGAME 12, KXNBASPREAD 198, KXNBATOTAL 194, KXNCAAFGAME 232, KXNCAAFSPREAD 2,463, KXNCAAFTOTAL 1,840, KXNHLGAME 28, KXNHLSPREAD 114.
+
+Flags (pre-registered): 429s 4.36/15 min <= 16 -- clear; file 2.25 GB <= 3.6 GB -- clear; loop stalls > 60 s: 0 -- clear.
+Note: gap max 74.4 s is 4.6 s above the A/B's 69.8 s upper bound; it is not a pre-registered criterion and no gap reached 120 s.
+Host: C: free 160.5 GB (well above the 20 GB floor).
+Share denominator re-derived independently (same gap logic, scratch script): 0.00025 reproduces.
