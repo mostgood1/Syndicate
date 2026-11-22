@@ -678,3 +678,35 @@ Chased on the user's "Yes, chase it" (the section 9 lead). The hypothesis went i
      spawns the code from the checkout, so it takes effect at the first 08:00Z run after an ff, with no restart.
   2. Make the lifeline test's child non-dumpable (`prctl(PR_SET_DUMPABLE, 0)` before it aborts), so it stops writing a dump a night.
   3. Find the heavy test: run the 30 files one at a time under an RSS sampler, at Idle. Needs the user's OK.
+
+## 16. The 11-21 evening, 5-10 PM CST: the rail monitor's R-F reading, re-derived; it amends section 13 (written 11:40 AM CST 11-22 (17:40Z))
+
+From the rail monitor's nightly close (main `4655c7ae7`, `findings_2026-11-21` "Owned readings"), sent to this lane as R-F #850.
+Re-derived read-only from `refresh-worker.log{.2,.1}`, 23:00Z 11-21 to 04:00Z 11-22 (`C:\tmp\bmg\w1124\eve1121.sh`, nice 19).
+
+- **The evening, by the monitor:**
+  - Qualifier: 34 core live at 7:03 PM (threshold 33).
+  - The parent was FRESH: pid 2397127, restarted at 12:14 PM CST, not a third-day parent. The monitor marks it VOID for section 12.
+  - P1: 10 refusals at `pre_source_state_fingerprint` (23Z 2, 00Z 4, 01Z 0, 02Z 3, 03Z 1); 12 at every stage. 11-20 had 13, on a third-day parent.
+  - P2: 2 `BOARD_PROCESS_EXITED`, both rc 75, 0 `Fatal Python error`; 1 `RECYCLE_EXIT heavy_build_refused`, at 02:28:39Z.
+  - P3: 26 builds; longest gaps 1,555, 1,344 and 1,221 s; 4 over 900 s.
+  - Parent RSS 8-10 PM CST: p50 ~1,914 MB (n 7, 1,838-1,954), against 1.55-1.60 GB on 11-19's fresh-parent evening.
+- **Re-derived here:**
+  - 28 `BOARD_BUILD_TIMING ok=True` builds (the monitor counts 26) and 12 `MEMORY_GUARD_ABORT` lines. Gap p50 621 s, build wall p50 393 s.
+  - 3 gaps over 900 s (the monitor counts 4). Each holds 2 refusals and ends in a slow build:
+    - 00:20:30 -> 00:46:25Z, 1,555 s: refusals at 00:29:49 and 00:34:30Z, then a 473 s build;
+    - 00:46:25 -> 01:06:46Z, 1,221 s: refusals at 00:48:00 and 00:52:55Z, then a 567 s build;
+    - 02:24:29 -> 02:43:12Z, 1,123 s: refusals at 02:27:01 and 02:28:27Z, the recycle at 02:28:39Z (child 2761177 rc 75,
+      respawned as 2805672 at 02:28:53Z), then a 612 s cold build.
+  - The parent read 1,819 MB at 02:05:30Z (`next_check.sh`), in line with the monitor's p50.
+- **What it amends.** Section 13 called Saturday's gaps "mostly build cost, not memory". That holds for its window, 12:30-6 PM CST.
+  After 6 PM the long gaps were refusals plus build cost: each refusal costs a cycle, and the build that ends the gap runs
+  473-612 s (CPU ~92% of wall, the NCAAF slate).
+- **What it means for the lane.**
+  - With this morning's reset reading (a new parent at 657-727 MB 4-8 min after boot), the parent's RSS follows the slate, not its age (H2).
+  - A fresh parent on a busy slate reaches the refusal zone by evening. So the morning resets, and CHANGE J (a self-recycle only
+    in 09-12Z), cannot cover a busy evening. Section 12's weekday prediction is untouched: Saturday is outside its comparability rule.
+  - The guard refuses against the declared credit (7,936 MB less the 1,900 floor), not the host. At 00:23Z, 6 min before the
+    longest gap's first refusal, the host had 5,348 MB available (section 14).
+  - So the next lever is in the guard's budget (host-aware headroom, or a larger credit), not in when the parent restarts.
+    Any such change is a betting change and goes to a window. Not built.
