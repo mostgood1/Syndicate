@@ -823,6 +823,57 @@ NCAAF h2h (37), Kalshi NBA totals 40-55c pregame (23). Multiple-comparison cauti
 read `filled_as=maker taker_cost=0.0`; fills of 11-09..11-11 predate retained logs. 0 `FAIR_CANCEL` lines. Maker shadow
 11-16: 678 counted, all `CONTINUE`.
 
+## s14. Test B LOOK 4 + 2026-W47 `[read 2026-11-23 15:08-15:30Z, fleet ledger, read-only; scheduled Monday read]`
+
+**Substrate.** Fleet ledger dump 15:08:39Z, 65,212 rows, `live_document_read_ok=True`, newest submit 15:06:07Z. Pinnacle
+join 15:25:32Z: 37,049 orders, 10,989 with Pinnacle at submit, 35,611 with consensus, 26,342 capture-age known. Test B as of
+2026-11-23T00:00:00Z (28.35 days since REG); W47 = submitted 11-16..11-23 UTC.
+
+**Test B LOOK 4** (32,061 settled since REG).
+
+| arm | n | games | staked | ROI flat | CI95 | close edge pp (n) | status |
+|---|---|---|---|---|---|---|---|
+| P1 | 1,704 | 500 | $2,621.09 | -5.9% | [-13.9, +1.7] | +0.66 (1,561) | sized; no PASS (lower < 0), no FUTILITY (upper > 0, edge > -0.5) |
+| P2 | 7,015 | 764 | $8,481.29 | -2.7% | [-5.8, +0.6] | -2.23 (6,831) | not confirmed (upper +0.6) |
+| C1 | 5,476 | 1,216 | $7,013.24 | -3.9% | [-8.2, +0.9] | +0.51 (4,799) | control |
+| C1-only | 4,779 | 1,190 | $6,070.08 | -4.2% | [-9.2, +0.6] | +0.41 (4,125) | |
+| population | 32,061 | 1,780 | $38,718.51 | -4.7% | [-6.4, -3.0] | -1.71 (12,242) | |
+
+C2 = -1.7pp (look 3 -4.4, look 2 -0.6, look 1 +2.5). **No verdict reached.** P1 capture age: <= 2m n 691 / 305 g +1.5%
+[-9.6, +14.1]; **> 2m n 1,005 / 375 g -11.3% [-19.9, -2.5]**; unknown n 8. NCAAB still has 0 Pinnacle coverage (4,056 orders
+since REG).
+
+**W47 live** (settled, CI90 flat by game): Kalshi pregame 203 bets / 138 g, $196.83, -$4.37, -9.6% flat [-19, -1] LOSES;
+Kalshi in-game 24 / 23 g, $65.42, +$8.88, +14.7% [-11, +38]; Polymarket pregame 149 / 101 g, $73.81, -$10.03, -11.3%
+[-24, +0]. **Total 376 bets, $336.06 staked, -$5.52 (-1.6%).** Drops: live not_filled 129, live unsettled 44. One family
+n >= 8 flagged: Kalshi NHL props 51 / 30 g -21.4% [-36, -7] LOSES (cell 55-75c pregame 45 / 26 g -16.2% [-31, -2]). Ladder:
+Kalshi pregame 3,098 / 539 g -5.5% [-9, -2], Polymarket pregame 2,133 / 475 g -9.2% [-13, -5], Kalshi in-game 1,066 / 237 g
+-8.6% [-13, -4], Polymarket in-game 532 / 201 g -8.5% [-16, -1], all LOSES.
+
+**Gate** (evaluated 14:38:49Z, 67 cells): **2 new trips**, 6 tripped in all, no re-arm.
+- New: `kalshi|ncaab|spread|pregame` at 2026-11-20T07:06:41Z (n 42, 41 g, pnl +$1.10, roi_flat -22.85, ci90 [-43.8, -2.5]).
+- New: `kalshi|nhl|prop|pregame` at 2026-11-22T03:44:06Z (n 187, 102 g, -$35.56, -7.64, ci90 [-14.9, -0.3]).
+- Unchanged: mlb prop pregame, nba prop pregame, nba spread in_game, parlay.
+- Both new trips have matching anchored `[live_cell_gate] CELL_TRIP` lines.
+
+**Nightly flags 11-23** (13:30:02Z): 191 (166 LOSES / 25 EDGE), up from 140 (114 / 26) on 11-16. Changes vs 11-22: 28 new,
+23 cleared. Live EDGE: `kalshi|nhl|h2h` n 24 +28.9% [+4.0, +52.3]; `kalshi|ncaaf|spread|40-55c|pregame` n 79 +17.0%
+[+2.7, +30.7]; `kalshi|nba|h2h|55-75c|in_game` n 27 +24.9% [+6.4, +41.1]; `kalshi|nhl|h2h|55-75c|in_game` n 10 +52.9%
+[+43.9, +61.2] (narrow-bootstrap pattern). The 11-16 live EDGEs on `polymarket|nba|spread|40-55c`, `polymarket|soccer|total|55-75c`
+and the since-10-20 `kalshi|nfl|h2h` are gone. New live LOSES this week:
+- `kalshi|nhl|prop|55-75c|pregame` n 160 -8.1% [-15.9, -0.7] (the gate tripped its family);
+- `polymarket|soccer|total|40-55c|pregame` n 21 -43.1%;
+- `live|polymarket|pregame` headline, all-time n 654 -8.0% [-14.1, -1.3].
+
+Multiple-comparison caution applies.
+
+**Maker pilot** (last copy per key): 73 posts, 40 filled / 30 cancelled / 1 failed / 2 resting. Since 11-16: 9 filled,
+4 cancelled, 2 resting. 40 settled fills (22 won), $209.95 staked, **held -$2.47, realised +$2.82** (9 fills settled since
+the 11-16 read, 7 won: held +$15.33, realised +$5.09). **0 taker fills**: `taker_fill_cost_dollars` None on every row, and all
+7 retained `MAKER_PILOT FILL` lines (11-20..11-22) read `filled_as=maker taker_cost=0.0`. Fills of 11-16..11-19 predate the
+retained logs (oldest 11-19 22:29Z). 0 `FAIR_CANCEL` lines. Maker shadow 11-23: 880 counted, all `CONTINUE`; soccer:totals
+took its 200 threshold look (n 210 / 125 events, ROI -8.6% CI99 [-29.0, +11.5]) -> CONTINUE.
+
 ## s5. Running it
 
 **NIGHTLY JOB (built 2026-10-24, NOT LIVE until the coordinator's restart).**
