@@ -132,7 +132,7 @@ rows. The 1:34 PM test reading read all 4,479 rows:
 disclaimer marker. Every path after it had been claimed by nobody. The line was rewritten without marker words and
 now claims 9 of 9 paths, 0 lost (`.claude/hooks/lane_claims._claims`). The new reader was added to it.
 
-## Why none of the board's Suggested rows are bought -- HYPOTHESIS (written before the per-row test), 1:55 PM CST
+## Why none of the board's Suggested rows are bought -- HYPOTHESIS (written before the per-row test), 1:44 PM CST
 
 The user, 11-23: "why are none of the board's picks being bought? ... we need to solve for this since portfolio
 endpoint is trading on real money".
