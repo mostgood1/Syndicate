@@ -233,6 +233,35 @@ Measured on the served payload:
   - Of today's 5 headline picks, 3 carry a "loses" sim verdict and 2 are unmeasured. That is information about the
     sim, not about the price edge the pick rests on.
 
+## Step 1b -- "Our sim has X at Y%" quotes the sim `[built 2026-11-23, user "Yes, do the Our sim wording next"; NOT DEPLOYED]`
+
+`layer2_row_context.row_explainer` wrote "Our sim has {subject} at {model}", where `model` is the SERVED probability
+(`_model_prob_for_side`). Where the board does not trust the sim yet, that number is the market's.
+
+**The fix.** It now reads the sim's own `p_model_raw` (stamped by every blend and calibration step). It maps the
+number to the row's side through `_model_prob_for_side` itself, and says which number is which:
+- book blend weight 0: "Our sim has X at 59.2%, but it carries no weight in this market yet, so the board uses the
+  market's number; the no-vig market across 7 books says 38.7%."
+- partial blend: "... at 60.6%, weighted 10% against the market for a board probability of 48.7%; ..."
+- calibrated: "... at 62.5%, calibrated to 49.3% for this market; ..."
+- unchanged when the served number is the sim's (within 0.05 pp), or on a live row (the live re-sim's number).
+
+The "N% of its simulations finish over it" sentence now takes the sim's number too. The sentence keeps its opening
+and its "; the no-vig market ... says Z%." close, so `intelligence_state`'s live-strip regex and the cheat sheet's
+`_ASK_MODEL_LEADS` still match. Both are tested.
+
+**Replay** over the fleet's 21:00:24Z shortlist, through the new code. Pregame rows with a model and a fair: 1,765.
+- 757: the sim had no weight, and the old text called the market's number the sim's (NBA 729, NCAAB 24, WNCAAB 4).
+- 318: a partial blend; the old text gave the blended number (all NBA).
+- 13: a calibration (NCAAB 12, WNCAAB 1).
+- 677: unchanged.
+
+**So 1,088 of 1,765 (62%) pregame explainers said something other than the sim's number under the sim's name.**
+
+**Where it runs.** `layer2_board.py:4360`, in the board build on refresh-worker. The text reaches the board cards, Ask
+cards and cheat-sheet picks, all from that one `detail`. It is display only: no score, floor, plan or stake reads
+`detail`. Tests: `tests/test_layer2_explainer_sim_attribution.py`, 9 new; 43 pass with the explainer suites.
+
 ### Reading 4 -- the peer's report on Suggested vs the purchaser, re-measured `[20:15:43Z-20:19:41Z, fleet, read-only]`
 
 `portfolio-monitor` (session 69d80317) messaged at 19:46Z. It said explicitly that it was not asking for a change.

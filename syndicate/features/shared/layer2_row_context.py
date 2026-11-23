@@ -373,6 +373,63 @@ def _projection_sentence(row: Mapping[str, Any], model: float, projected: float,
     return f"It projects an average of {projected:.1f} against the {line_text} line."
 
 
+# Below this the served probability IS the sim's to the printed precision (0.1%).
+_SIM_ATTRIBUTION_GAP = 0.0005
+
+
+def _sim_raw_for_side(row: Mapping[str, Any], projection: Mapping[str, Any]) -> float | None:
+    """The SIM'S OWN probability for this row's side, before any blend or calibration.
+
+    `projection["p_model_raw"]` is stamped by every serving step that changes the
+    number: `nba_prop_calibration.served_prop_probability` /
+    `served_game_probability` (book blend) and
+    `college_game_projections._served` (margin blend, total calibration). It is
+    in the same over/home framing as `model_prob_over`, so the side mapping is
+    `_model_prob_for_side`'s own, not a second copy of it.
+    """
+    raw_over = _as_float(projection.get("p_model_raw"))
+    if raw_over is None or not 0.0 <= raw_over <= 1.0:
+        return None
+    return _model_prob_for_side({**row, "projection": {**projection, "model_prob_over": raw_over}})
+
+
+def _pregame_model_sentence(
+    projection: Mapping[str, Any], subject: str, model: float, raw: float | None, fair: float, across: str
+) -> str:
+    """"Our sim has X at Y%": Y must BE the sim's number (todo #861, lane surface-consistency-oversight).
+
+    It quoted `_model_prob_for_side`, the SERVED probability, under the sim's
+    name. On rows whose sim the board does not trust yet, the served number is
+    the market's. Measured on the fleet 2026-11-23: 733 of 1,151 pregame Layer 2
+    rows with a sim ladder served `model_probability_cal` EQUAL to the market
+    fair (book blend weight 0), and 643 had a raw sim more than 5 pp away. One
+    was Cedric Coward over 2.5 threes. The sim ladder said 59.2%, the served
+    number was 38.7% (the market), and Ask and the cheat sheet both read "Our sim
+    has Cedric Coward over 2.5 threes at 39.0%".
+
+    The opening ("Our sim has ...") and the closing clause ("; the no-vig
+    market ... says Z%.") are KEPT. `intelligence_state` strips this sentence
+    from cards that turn live with exactly that regex, and the cheat sheet skips
+    it by its first words.
+    """
+    tail = f"; the no-vig market{across} says {fair:.1%}."
+    if raw is None or abs(raw - model) < _SIM_ATTRIBUTION_GAP:
+        return f"Our sim has {subject} at {model:.1%}{tail}"
+    weight = _as_float(projection.get("book_blend_w"))
+    if str(projection.get("book_blend") or "") == "applied" and weight is not None:
+        if weight <= 0.0:
+            return (
+                f"Our sim has {subject} at {raw:.1%}, but it carries no weight in this market yet, "
+                f"so the board uses the market's number{tail}"
+            )
+        if weight < 1.0:
+            return (
+                f"Our sim has {subject} at {raw:.1%}, weighted {weight:.0%} against the market "
+                f"for a board probability of {model:.1%}{tail}"
+            )
+    return f"Our sim has {subject} at {raw:.1%}, calibrated to {model:.1%} for this market{tail}"
+
+
 def row_explainer(
     row: Mapping[str, Any], quote: Mapping[str, Any], context: Mapping[str, Any] | None = None
 ) -> str | None:
@@ -386,12 +443,17 @@ def row_explainer(
     model = _model_prob_for_side(row)
     projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
     live = str(projection.get("basis") or "").strip().lower() == "live_resim" or projection.get("live_prob_over") is not None
+    # Pregame only. On a live row `model_prob_over` is the live re-sim's own
+    # number, while `p_model_raw` is still the PREGAME sim's.
+    raw = None if live else _sim_raw_for_side(row, projection)
     books = int(_as_float(quote.get("books_quoting")) or 0)
     across = f" across {books} books" if books > 1 else ""
     parts: list[str] = []
     if model is not None and fair is not None:
-        who = "The live re-sim" if live else "Our sim"
-        parts.append(f"{who} has {subject} at {model:.1%}; the no-vig market{across} says {fair:.1%}.")
+        if live:
+            parts.append(f"The live re-sim has {subject} at {model:.1%}; the no-vig market{across} says {fair:.1%}.")
+        else:
+            parts.append(_pregame_model_sentence(projection, subject, model, raw, fair, across))
     else:
         price = _fmt_american(quote.get("price"))
         book = str(quote.get("bookmaker") or "").strip().upper()
@@ -405,7 +467,9 @@ def row_explainer(
     projected = _as_float(projection.get("projected"))
     line = _as_float(row.get("line"))
     if model is not None and projected is not None and line is not None and _is_count_market(row):
-        parts.append(_projection_sentence(row, model, projected, line))
+        # "N% of its simulations finish over it" is a claim about the SIM's
+        # draws, so it takes the sim's own number when the served one differs.
+        parts.append(_projection_sentence(row, raw if raw is not None else model, projected, line))
     narrative = row_narrative(row, context)
     if narrative and narrative.get("text"):
         parts.append(str(narrative["text"]))
