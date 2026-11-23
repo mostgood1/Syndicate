@@ -2086,6 +2086,7 @@ death, never life — do not invert it.
 - Blocked by: none
 
 ### live-ev-floor-off — OPEN — opened 2026-11-23 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Status 2026-11-23 2:22 PM CST: GOAL: NOT MET. QUEUED as CHANGE P of the 11-24 window batch (task nfl-level-refit-load-1120, prompt sha 57a40bb886a54f1f, after the peer's 80dbb08f3 line; add script C:/tmp/w1124_floor/add_p.py hash-guarded, dry == real; pre-edit copy SKILL.before_P.md). Nothing loaded yet: the batch removes the env line at ~2:15 AM CST 11-24 and the drained full down/up loads it. Daily review item added (portfolio-learning-review sha b11fc877a6ef6e92).
 - Goal: The 0% live EV floor is OFF on the fleet from the 11-24 window batch (user 11-23 'Yes, add it tonight'): refresh-worker's environ carries no SYNDICATE_LIVE_EV_FLOOR, 0 LIVE_EV_FLOOR lines after the up, and every live-plan position is a Suggested row
 - Files: .syndicate/findings_2026-11-23_live_ev_floor_off.md (NEW)
 - Hypothesis: n/a (a user decision on measured evidence: the floor's 1,249 settled live bets since 10-20 returned -7.06% [-13.60 -0.46])
