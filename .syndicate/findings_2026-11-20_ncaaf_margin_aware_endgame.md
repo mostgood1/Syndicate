@@ -969,3 +969,109 @@ the fleet and the 12-08 queue are unchanged.**
   - Using it would need its own pre-registered check on a season not used here, before any window.
 - **The end game stays queued as it is, unless the user decides otherwise.** Nothing changes on the fleet or in the
   12-08 queue.
+
+## CONCESSION-OFF CHECK — PRE-REGISTRATION, written 2026-11-23 9:57 AM CST before any arm was run on its states
+
+The user said "Yes, pre-register it" (2026-11-23), answering "Pre-register a check of switching off the concession by
+env on another season?".
+- On 2023, the diagnosis (### 17+ COST DIAGNOSIS RESULTS) found the concession costing +0.0213 (se 0.0084) at Q3 7:30
+  17+, and +0.0061 (se 0.0072) over all 17+ states.
+- The concession switches off by env alone: `SYNDICATE_NCAAF_LIVE_ENDGAME_CONCEDE_DEFICIT=60`. The parser accepts 1-60,
+  and a 60-point deficit in Q4 is in effect never.
+- **The question:** should the queued end game load with that line as a 7th?
+
+**Why 2022.** No part of the end game was fitted or chosen on it.
+- #808's clock rates were fitted on 2024-25.
+- #852's damping and the end game's 21/7 were chosen on 2024.
+- The concession threshold (25) was measured on real trailers in 2023-24.
+- The re-fit and the diagnosis ran on 2023, and the hold-out on 2026 weeks 1-10.
+- #835's K was fitted on the fleet's 2026 ledger.
+- 2022 is not in the repo's mirror, so it was pulled for this.
+
+**Data.** Pulled and built before this was written; only counts were read (`C:\tmp\t859c\pull22.txt`,
+`build22.txt`).
+- **The pull:** 19 CFBD calls through the pinned export's own loaders, into a PRIVATE dir (`C:\tmp\t859c\truth22`),
+  never the shared mirror. Before the pull, CFBD's header read 645 calls left this month; the key is shared with the
+  fleet.
+- **Lines:** `/lines` 2022 (week 0 returns the whole season). Closes use k_close's rule unchanged: each game's median
+  provider `overUnder`. 703 of 703 games have one.
+- **SP+:** `/ratings/sp` 2022, put into the mirror's shape by the repo's own `_sp_index_from_payload` (131 teams).
+- **States:** the harness's own builder (`resume.build_tasks`, unchanged), at the re-fit's checkpoints (Q3 7:30 and
+  Q4 15:00 / 10:00 / 6:00 / 3:00).
+  - **703 FBS-vs-FBS games, 3,470 states.**
+  - Every state has a possession owner. Both teams' real timeouts are on 3,465 of 3,470; the other 5 run unfed in every
+    arm.
+  - Dropped: 120 not FBS-vs-FBS, 29 regulation mismatches, 2 with too few plays.
+
+**Arms.** All three run on 2022's states, 60 sims a state on its own seed block, paired. Each arm gets its own E0 from
+the BUILT `resim_live_game` at kickoff (120 sims) under the arm's env lines.
+
+| arm | what it is | env |
+|---|---|---|
+| `h_pair` | #852 alone, damping 17/14 (context only) | the kit's PAIR |
+| `h_eg` | the QUEUED end game: #808's clock (real timeouts) + college OT + the concession at 25 + damping 21/7 | PAIR + ENDG |
+| `h_egn` | `h_eg` with the concession at 60 | PAIR + ENDG + `..._ENDGAME_CONCEDE_DEFICIT=60` |
+
+**Instrument** (`c_verify.py`, run before this was written; `verify.txt`). Each gated arm in the harness gives draws
+identical to the BUILT live path (`resim_live_game`) under its env lines, at 120 sims on production's seeds, on 2022
+states:
+- `h_egn`: 56 states, 56 identical, 0 differ; endgame.timeouts_fed on 56; concede_deficit [60]
+- `h_eg`: 56 states, 56 identical, 0 differ; endgame.timeouts_fed on 56; concede_deficit [25]
+
+**Blind smoke test:** the whole pipeline (closes, three runs, three E0s and the scorer) ran on 4 games into
+`C:\tmp\t859c\smoke`. Only line counts were read: `RUN_DONE=3 E0_DONE=3 sections=4 verdict_lines=1 tracebacks=0 (the Idle wrapper hides exit codes, so these counts are the check)`.
+
+**Scorer (`c_score.py`, pinned).** It is d_score's rule unchanged:
+- each arm is calibrated through production's `apply`, with its own E0 and the close, at K_LATE 1.6;
+- the lines are `h_pair`'s calibrated 25/50/75% + 0.5, the same for every arm;
+- log loss, with SEs clustered by game.
+
+**Rule** (on OFF = `h_egn` - `h_eg`, calibrated log loss):
+- **C1:** at Q3 7:30, |m| >= 17, OFF <= -1 paired SE. That is the cell where 2023 found the concession's cost. It was
+  picked from 2023's numbers, so this is its replication. By chance alone it passes about one time in six.
+- **C2:** over all fit states at |m| >= 17, OFF <= 0.
+- **C3:** over all fit states and all margins, OFF <= +1 paired SE.
+- **PASS = C1 and C2 and C3.** The scorer prints the gates first, then a VERDICT line.
+
+**What follows (the user's call each time; a betting change only in a window):**
+- **PASS:** the line becomes a candidate 7th for the 12-08 window. It would ride with the end game in the same load,
+  which is already a betting change. The window kit stays as pinned (sha `4f31d0ac`); adding the line means a new kit
+  version on the user's yes, self-tested again.
+- **FAIL:** no change. The end game loads as queued, with the concession.
+- **Either way:** the clock's late blowout cost (the diagnosis's S1) is untouched. That is a code fix, for a later
+  window.
+
+**Not gated** (context for the load):
+- EG = `h_eg` - `h_pair` by margin: does the end game's shape hold on a third season?
+- The SHAPE tables: bias, PIT and p0 per arm.
+- OFF in close games. On 2023, switching the concession off gave back +0.0011 (se 0.0006) there, through the anchor;
+  C3 covers the overall effect.
+
+**Predictions** (not gates):
+- **P1:** C1-C3 pass: the concession's 17+ cost replicates in direction.
+- **P2:** OFF at |m| <= 8 is >= 0 and under +0.002 (the small close-game give-back).
+- **P3:** EG at 17+ is > 0 and EG at |m| <= 8 is < 0: the end game's shape holds on 2022.
+- **P4:** at 17+, `h_egn`'s calibrated mean of the points still to come is higher than `h_eg`'s, and nearer the actual.
+
+**Pins** (sha256, first 16 characters; full list in `C:\tmp\t859c\pins.sha256`; `run_conc.sh` checks them before
+the runs and again before the scorer):
+
+| file | sha256 |
+|---|---|
+| `c_arms.py` | `255bc6d10d3bece7` |
+| `c_build.py` | `ae4c20e4918dcfdf` |
+| `c_close.py` | `798713c9f48d411a` |
+| `c_run.py` | `dd6d592f320a2147` |
+| `c_e0.py` | `36614a85f1fa78b7` |
+| `c_verify.py` | `318a177e7a62d5d5` |
+| `c_score.py` | `820a7b4542763c71` |
+| `run_conc.sh` | `a5e8cc6b4bce1f68` |
+| `verify.txt` | `666b7347defe01d2` |
+| `tasks_2022.json` | `28ca3e3848a0df99` |
+| `out/2022/close.json` | `0d425e6a74ca64f2` |
+| `truth22/sp_ratings_2022.json` | `8bd852a3bf517e8c` |
+| `truth22/cfbd_lines_2022_wk0.json` | `148fc52b4d89a011` |
+| `/c/tmp/t859h/h_arms.py` | `aa41e98e905c307c` |
+| `/c/tmp/t852/resume.py` | `ef89b077310a777c` |
+| `/c/tmp/t859h/code/syndicate/features/ncaaf/live_total_dispersion.py` | `ee44d570609d4d12` |
+| `/c/tmp/w1208_ncaaf/kit_env_ncaaf.sh` | `4f31d0ac2b4888b5` |
