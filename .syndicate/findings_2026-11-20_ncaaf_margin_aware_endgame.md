@@ -1431,3 +1431,91 @@ MONEYLINE: in paper, the sim's NCAAF in-play moneyline edges lose 24% (2.5 SE).
   - refuse NCAAF in-play moneylines on a sim edge (a per-cell refusal);
   - diagnose the in-play moneyline's over-confidence first: its win-probability calibration by price band, from this
     book and from the re-sim's own replay.
+
+## IN-PLAY MONEYLINE DIAGNOSIS — PRE-REGISTRATION, written 2026-11-23 1:56 PM CST before any arm was run on its states
+
+The user said "Yes, diagnose it" (2026-11-23), answering "Diagnose the in-play moneyline's over-confidence?". **It gates
+nothing:** the fleet and the 12-08 queue are unchanged whatever it reads.
+
+**The question.** In paper, the sim's in-play NCAAF moneyline edges lose 24.4% (se 9.7), mostly on favourites priced
+0.50-0.75 that won 35.5% (### THE PAPER BOOK). Two readings could explain it:
+- **THE MODEL:** the sim's in-play win probability is too sharp on real game states.
+- **THE EXECUTION:** the win probability is sound, and the loss comes from how the bets were chosen. Candidates are stale
+  quotes (the ceiling was 600 s until #780's 120 s on 11-11), a stale game state, or a join error.
+
+That paper's favourites won 27 pp LESS than their own price points at the execution, because a calibrated but
+uninformed sim would lose only toward the price, not below it. That is a hunch, not a gate.
+
+**PART B, GATED: the win-probability replay (no market data, real states).**
+- **States:** CFBD 2026 weeks 1-10 from t859h's private truth, all before the 11-15..11-22 blind window. 548 games and
+  3,287 states, built by `resume.build_tasks` unchanged. The checkpoints are Q1 7:30, Q2 7:30, Q2 2:00, Q3 7:30, Q4 7:30
+  and Q4 3:00. The paper bets spread over the whole game: 76 of 222 in the first hour after kickoff.
+  - Possession is known on 3,287 of 3,287, and both teams' timeouts on 3,287.
+  - Only counts were read.
+- **Arms:** `off` is production today and is the gated arm; `h_eg`, the queued 12-08 load, is context. Each runs 120
+  sims a state, production's count, on resume's paired seed blocks.
+- **Instrument** (`w_verify.py`, `verify.txt`). The harness, with `simulate_game` wrapped only to record each draw's final
+  score, gives the BUILT live path's `home_win_prob` and total draws exactly, at production's seeds 1..120 under each
+  arm's env lines:
+  - `INSTRUMENT off: 48 states, 48 identical, 0 differ (home_win_prob and total draws)`;
+  - `INSTRUMENT h_eg: 48 states, 48 identical, 0 differ (home_win_prob and total draws)`.
+- **Ratings:** t859h's SP+ 2026, the fleet's 11-21 copy, which is a season table in hindsight. They know more than
+  production knew on the day, so this replay's calibration is an upper bound on production's.
+- **Scorer** (`w_score.py`, pinned). Each state is folded to the side the sim favours by its ODD draws (p_a). That side's
+  probability is then scored by the EVEN draws (p_b) against whether it won, overtime included. Binning on one half and
+  scoring the other keeps Monte Carlo noise from faking over-confidence. SEs are clustered by game.
+- **Rule** (`off`, favourites at [0.60, 0.90) by p_a; diff = win rate - mean p_b):
+  - **OVER-CONFIDENT:** diff <= -2 SE.
+  - **UNDER-CONFIDENT:** diff >= +2 SE.
+  - **CALIBRATED:** otherwise.
+- Also printed: the same by band and game phase, the Brier of the full p_home per arm, and paired `h_eg` - `off`.
+
+**PART A, EXPLORATORY and NOT gated** (`a_split.py`). It splits the same 222 paper moneyline bets by the fields a bet
+row carries:
+- the book (the price source);
+- minutes since kickoff;
+- `sim_probability_railed`;
+- the edge size;
+- the slate, before or after the 120 s ceiling;
+- favourite or underdog.
+
+Their ROI by price band was already read, so nothing here is a test. Each split shows the win rate, the price and
+price + edge.
+
+**Blind smoke:** both arms and the scorer ran on 4 games into `C:\tmp\t859w\smoke`. Only line counts were read:
+`RUN_DONE=2 lines=50 tracebacks=0 end=1 headline_lines=2 (Idle wrapper hides exit codes; counts are the check)`.
+
+**Predictions** (not gates):
+- **P1:** `off` reads CALIBRATED. The 09-27 spread grade at quarter ends found P(cover) calibrated (worst bucket 0.041),
+  and a moneyline is the margin line at 0.
+- **P2:** whatever the replay finds, it is far smaller than the paper gap: |diff| < 0.10, against paper's 27 pp below
+  the price.
+- **P3:** `h_eg`'s Brier is within +-1 paired SE of `off`'s over all states, because the end game acts late.
+
+**What follows (each the user's call; nothing changes on the fleet now):**
+- **CALIBRATED:** the sim's win probability is sound on real states, so the paper loss is an execution effect. The next
+  step is to trace a sample of the losing bets through the board's records: quote age, state age and side.
+- **OVER-CONFIDENT:** the in-play win probability is too sharp. A fix is a re-fit; `home_win_prob` is counted from RAW
+  margins, so the existing margin spread knob does not reach it. That is a betting change, for a window.
+- **UNDER-CONFIDENT:** reported as read.
+
+**Pins** (sha256, first 16 characters; full list in `C:\tmp\t859w\pins.sha256`; `run_w.sh` checks them before the
+runs and again before the scorer):
+
+| file | sha256 |
+|---|---|
+| `w_arms.py` | `e5fc2662962d00ad` |
+| `w_build.py` | `4e9614d781c615e0` |
+| `w_verify.py` | `4e9f8678c8a63151` |
+| `w_run.py` | `1afade213e5b5568` |
+| `w_score.py` | `df635d34b25da3ae` |
+| `a_split.py` | `2a4dc18fb01779e6` |
+| `run_w.sh` | `bf4232739947b5d9` |
+| `verify.txt` | `63b7b56f4649928c` |
+| `tasks_2026w.json` | `1adcf0e1822caf2b` |
+| `smoke/summary.txt` | `ae4889c129747c10` |
+| `/c/tmp/t859h/h_arms.py` | `aa41e98e905c307c` |
+| `/c/tmp/t852/resume.py` | `ef89b077310a777c` |
+| `/c/tmp/t859h/code/syndicate/features/ncaaf/live_resim.py` | `2bd483adcc80c0a2` |
+| `/c/tmp/t859s/paper_ncaaf.py` | `5d010014a991f55a` |
+| `/c/tmp/t859s/paper_detail.py` | `487e1b978c339c2d` |
