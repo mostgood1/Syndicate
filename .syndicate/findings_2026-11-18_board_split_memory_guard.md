@@ -820,3 +820,16 @@ the switches line carries `host_overdraft_mb=1024 host_reserve_mb=2048`. Without
   the guard; that is a NEITHER, not a pass.
 - Confound: CHANGE J loads 11-24. The comparison is to 11-20 / 11-21 and to the J-only evenings that section 12's reading
   records; a P-H1 pass that J-only evenings also meet is NEITHER.
+
+### 18.2 The host's evening memory: a sampler (started 1:11 PM CST 11-23 (19:11Z), user "Yes, start it")
+
+Section 18's weak point: the switch grants only while MemAvailable >= floor + 2,048 MB (3,948 for the heavy guard), and the
+evening low was never sampled. Nothing on the host records it (no sysstat / atop; Rail Watch's probe has no memory field).
+Two midday reads 11-23 show how fast it moves: 4,852 MB at 19:03Z and 5,986 MB at 19:05Z (swap 1.2-1.3 GB used).
+- The sampler: a READ-ONLY host memory sampler, `C:\tmp\w1208_hosthead\hostmem_sampler.sh` (pid 347935, nice 19, setsid, outside the supervisor; launched 19:08:54Z 11-23, self-exits 2026-11-26T05:00:00Z): every 30 s from 22:00Z to 05:00Z (4-11 PM CST) it appends UTC, MemAvailable MB and SwapFree MB to `C:\tmp\w1208_hosthead\hostmem_samples.tsv`. It reads `/proc/meminfo` only and touches no role.
+- The replay: `C:\tmp\w1208_hosthead\hostmem_replay.py` (fleet host, nice 19). It applies a copy of
+  `host_headroom_decision` at 9a9a0b207 to every refusal with a host sample within 45 s, for overdraft 1024 / 512 / 2048
+  (reserve 2048) and 1024 / reserve 1024. Its "granted" is an UPPER bound (a grant spends memory the next gate sees);
+  `host_below_floor_plus_reserve` is the share the switch cannot reach. Dry run 19:06Z: 268 refusals across 6 logs, 0 samples.
+- Read by Thursday's `board-parent-recycle-reading-1126` (STEP 0b), separately for 11-23 (before J) and 11-24 / 11-25.
+  If most evening refusals land in `host_below_floor_plus_reserve`, the 12-08 load case is weak.
