@@ -793,3 +793,91 @@ and costs at blowouts.
 - The 17+ late over-confidence is not a width effect that K_LATE can move: widening makes it worse.
 - Any fix is a code change for a later window, and the user's call: for example, the late "no more scoring" mass, or
   the end game or damping at 17+.
+
+## 17+ COST DIAGNOSIS — PRE-REGISTRATION, written 2026-11-23 8:09 AM CST before either in-between arm was run on its states
+
+The user said "Yes, diagnose it" (2026-11-23), answering "Diagnose the end game's 17+ blowout cost on 2023 next?". On
+2023 the queued end game (`h_eg`) costs against #852 alone (`h_pair`) at |m| >= 17: +0.0171 (se 0.0076) over all late
+states, and +0.0306 (se 0.0082) at Q3 7:30 (### LATE-WIDENING RE-FIT RESULTS). The two arms differ in four things at
+once:
+- #808's clock, fed real timeouts;
+- college overtime;
+- the concession at 25;
+- the damping move from 17/14 to 21/7.
+
+This is a DIAGNOSIS. It gates nothing, and nothing changes on the fleet or in the 12-08 queue because of it.
+
+**Design: two in-between arms on the re-fit's exact 2023 states, seeds and sims.** Each in-between arm is a real set
+the env can express, so its E0 comes from the built live path under its own lines.
+
+| arm | what it is | env |
+|---|---|---|
+| `h_pair` | #852 alone, damping 17/14 | the kit's PAIR (t859k output, reused unchanged) |
+| `e17n` | `h_pair` + #808's clock (real timeouts) + college OT, concession at 60 (in effect never) | PAIR + `..._LIVE_ENDGAME=on` + `..._ENDGAME_CONCEDE_DEFICIT=60` |
+| `e17` | `e17n` with the concession at 25: the end game at the pair's damping | PAIR + `..._LIVE_ENDGAME=on` |
+| `h_eg` | `e17` with damping 21/7: the queued set | PAIR + ENDG (t859k output, reused unchanged) |
+
+- **Steps, paired:**
+  - S1 = `e17n` - `h_pair` (the clock, timeouts and OT);
+  - S2 = `e17` - `e17n` (the concession);
+  - S3 = `h_eg` - `e17` (the damping move);
+  - TOT = S1 + S2 + S3 = `h_eg` - `h_pair`.
+- OT is not split from the clock. It acts only on games tied at the end of regulation, which are rare from a 17+
+  margin this late. That is assumed, not measured here.
+- **Instrument** (`d_verify.py`, run before this was written; `verify.txt`): each in-between arm in the harness gives
+  draws identical to the BUILT live path (`resim_live_game`) under its env lines, at 120 sims on production's seeds.
+  - `e17n`: 60 states, 60 identical, 0 differ; endgame.timeouts_fed on 60; concede_deficit [60]
+  - `e17`: 60 states, 60 identical, 0 differ; endgame.timeouts_fed on 60; concede_deficit [25]
+
+**Scorer (`d_score.py`, pinned).**
+- Calibration is k_fit's rule, unchanged: each arm uses its own E0 and the close, with K_LATE 1.6. Lines are the
+  pair's 25/50/75% at 1.6 + 0.5, the same for every arm.
+- It reports log loss for each step, and slopes, by checkpoint and margin (17-24 and 25+ are split out).
+- It also reports SHAPE per state, for raw and calibrated draws:
+  - bias = the predicted mean of the points still to come minus the actual;
+  - the randomized PIT's mean and its sd / sqrt(1/12), where above 1 means the spread is too narrow;
+  - the predicted against the actual share of "no more scoring".
+- **Disclosed:** a wiring smoke ran the scorer with `e17n` set to `h_pair`'s files and `e17` to `h_eg`'s. Its TOT
+  reproduced the re-fit exactly: +0.0171 (0.0076) at 17+ and -0.0017 (0.0042) overall. So the SHAPE numbers of
+  `h_pair` and `h_eg` were seen before this was written. For example, calibrated at 17+, `h_eg` has bias -0.66 against
+  `h_pair`'s +0.29, and p0 0.290 against 0.261, with the actual at 0.278. Nothing of `e17n` or `e17` has been run.
+
+**Predictions** (on all fit states at |m| >= 17 unless a checkpoint is named):
+- **P1 (check, not a prediction):** TOT equals the re-fit's, +0.0171 (se 0.0076), so all four E0s cover the same 730
+  games.
+- **P2 (main):** the cost is in the end game's mechanisms, not the damping move: S1 + S2 > S3, so S3 < +0.0086 (half
+  of TOT).
+- **P3:** the concession is not the main piece: |S2| <= 1 SE at 17+. It acts only at a 25+ deficit in Q4.
+- **P4:** the step that costs most at 17+ also LOWERS the calibrated mean of the points still to come (its bias step
+  is < 0). The cost is the end game taking away late points that real blowouts still score, not a spread effect alone.
+
+**What follows (the user's call each time; a betting change only in a window):**
+- **If S3 carries most of it:** an ENV-ONLY option exists. Load the end game at the pair's damping (`e17`: drop the
+  kit's THRESHOLD / SPAN lines). It would need its own pre-registered check on a season not used for this, before any
+  window.
+- **If S1 or S2 carries most of it:** a fix is code, a margin-aware piece of the clock or the concession, for a later
+  window.
+- **Either way:** the end game stays queued as it is unless the user decides otherwise.
+
+**Pins** (sha256, first 16 characters; full list in `C:\tmp\t859d\pins.sha256`; `run_diag.sh` checks them before
+anything runs):
+
+| file | sha256 |
+|---|---|
+| `d_arms.py` | `a3b65e58c207531a` |
+| `d_verify.py` | `26dccf25efdf1484` |
+| `d_run.py` | `73d1e1cf83ec0e49` |
+| `d_e0.py` | `037d96a49d023597` |
+| `d_score.py` | `46e9a7cda4e6dcfa` |
+| `run_diag.sh` | `71614c1d00c55c7f` |
+| `verify.txt` | `c228ede0d672cbb7` |
+| `/c/tmp/t859h/h_arms.py` | `aa41e98e905c307c` |
+| `/c/tmp/t852/resume.py` | `ef89b077310a777c` |
+| `/c/tmp/t859k/tasks_2023.json` | `d366f9b54c8d2b99` |
+| `/c/tmp/t859k/out/2023/out_h_pair_60.jsonl` | `e77ffc4b3bd5d2cc` |
+| `/c/tmp/t859k/out/2023/out_h_eg_60.jsonl` | `ef9da98e2a643c7e` |
+| `/c/tmp/t859k/out/2023/e0_h_pair.json` | `3c4cf7bb44bb76d0` |
+| `/c/tmp/t859k/out/2023/e0_h_eg.json` | `2a564ba8cbc82c56` |
+| `/c/tmp/t859k/out/2023/close.json` | `7662485aa3c48249` |
+| `/c/tmp/t859h/code/syndicate/features/ncaaf/live_total_dispersion.py` | `ee44d570609d4d12` |
+| `/c/tmp/w1208_ncaaf/kit_env_ncaaf.sh` | `4f31d0ac2b4888b5` |
