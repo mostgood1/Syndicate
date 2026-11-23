@@ -1383,3 +1383,51 @@ call:
 - **leave it:** the money route is throttled, and the load more than halves the lean;
 - **after the load, measure what is left** in the board's own live spread grade, split by leader rather than by home.
   The 09-27 grade read the home frame, where a leader lean cancels.
+
+### THE PAPER BOOK, and a correction to the section above — written 2026-11-23 1:40 PM CST (user "check the paper portfolio too")
+
+**Source.** The fleet's execution-ledger archive on disk (`reports/intelligence/execution_ledger_archive/`,
+`orders_2026-10.jsonl` and `orders_2026-11.jsonl`), paper rows only, read at nice 19 (`C:\tmp\t859s\paper*.txt`).
+- 13,760 NCAAF paper rows dated in the blind window (slates 11-15..11-22) were dropped by date before any other field
+  was read.
+- 14,156 were kept, the last copy per identity, with selected dates 10-02..11-24. The in-play side bets run 10-03..11-13.
+- Not read: the newest rows (the keyvalue document, not yet archived). September's paper rows are not in the archive,
+  which began 10-08.
+
+**In the paper book, the sim's live side edge IS bet.** 695 in-play NCAAF side bets filled, and 683 carried a sim edge.
+Where `sim_share_of_stake` is recorded, the sim sized about half the stake (mean 0.47 for spreads, 0.46 for moneylines).
+
+| in-play, with a sim edge | bets / events | staked | ROI (event-clustered se) |
+|---|---|---|---|
+| moneylines | 222 / 87 | $6,479 | **-24.4% (9.7)** |
+| spreads | 461 / 148 | $4,418 | +8.9% (10.5) |
+
+- **The moneyline loss sits in favourites priced 0.50 to 0.90.**
+
+  | price | bets / events | won | mean price | ROI (se) |
+  |---|---|---|---|---|
+  | 0.50-0.75 | 76 / 40 | 35.5% | 0.630 | **-54.2% (14.1)** |
+  | 0.75-0.90 | 79 / 26 | 74.7% | 0.817 | -15.7% (15.1) |
+  | 0.25-0.50 | 41 / 25 | — | — | +13.1% (38.3) |
+
+- Home and away sides both lose (-31.0%, se 15.0; and -20.1%, se 13.8), so this is not the close-game home-margin bias.
+- That fits the live join's own grade comment (`live_gameline_join.py`, the quote-age table): "h2h shows no positive
+  realised edge at any age under 300s".
+- **The blowout lean cannot be read here.** Leader-side spreads at 16.5+ returned -2.0% (se 30.9) on 34 bets; the
+  trailer side +16.6% (se 34.8) on 38.
+
+**Correction to the section above.** It said "The throttles above stop nearly every live-sim side edge." That is WRONG:
+the board releases them, and 683 such bets reached the paper book between 10-03 and 11-13. What keeps them out of live
+money comes after the board, most likely the venue step that `[live-plan-empty-funnel]` measured (the venue's own
+price is <= 0 EV after the taker fee). That was not traced order by order here. The live-money count itself stands: 2 of
+32.
+
+**What follows.** Nothing changes on the fleet. The finding that matters is not the blowout lean but the in-play
+MONEYLINE: in paper, the sim's NCAAF in-play moneyline edges lose 24% (2.5 SE).
+- Live money has placed no such bet on a sim edge.
+- Nothing blocks the first one. The per-cell live gate (`live_cell_gate.py`, where it is on) trips a cell only on that
+  cell's own LIVE record, so a cell with no live bets starts armed, and paper losses do not trip it.
+- Options, each the user's call (a refusal is a betting change, for a window):
+  - refuse NCAAF in-play moneylines on a sim edge (a per-cell refusal);
+  - diagnose the in-play moneyline's over-confidence first: its win-probability calibration by price band, from this
+    book and from the re-sim's own replay.
