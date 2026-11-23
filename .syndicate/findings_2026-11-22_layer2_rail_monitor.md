@@ -66,3 +66,20 @@ local_379fd729 flagged an 18-minute live overlay gap: R24 `overlay_gap_max_s` 1,
 - **What the fix could hide.** If an overlay ever publishes `rows_inplay=0` while a game IS in play (for example a soccer live refresh that fails at kickoff), the gap after it now reads as idle. Seeing that is the soccer lens and autorun counters' job, not this metric's.
 - New readers: `overlay_lines.py <sport> <lo> <hi>`, `soccer_live_window.py <lo> <hi>` and `soccer_live_state_peek.py <league> <date>`.
 - Backups: `scripts/rail_monitor/{d4metrics.py,overlay_lines.py,soccer_live_window.py,soccer_live_state_peek.py,RUNBOOK.md}`.
+
+## Fleet-watcher flag: R27 (6:43 PM CST) ours_contradictions=1, NCAAB Rice @ Lamar u167.5 p=0.69, ours 167.7; read-only
+
+**Verdict: a skew artefact, not a contradiction. The counter now tells the two apart.** Diagnosed 6:58-7:01 PM CST.
+
+- **The flagged u167.5 row's OWN `live_total` is 167.69**, the number the card shows as OURS. The probability and the mean therefore come from one distribution. Its sibling rows on the same total read P(over 165.5) 0.72, P(over 166.5) 0.68, P(over 167.5) 0.31 and P(under 167.5) 0.69.
+- That is a right-skewed end game. The chip read H2 0:00 at 85-81 (166 scored); the re-sim's state was a little earlier. Most sims finish at or below 167, and a tail runs well above it, the shape of an extra-period branch. This is the non-defect the counter's own comment already named ("a late tie"), as with 11-20's Niagara @ Delaware St.
+- These full-game rows carry `live_total_basis: None` (not calibrated). That is not checked here and is the I-17 owner's question if it matters.
+- **Why not p vs 0.5 or a median, as asked:** every counted flag already has p > 0.5, so p vs 0.5 counts nothing, and no median is published on the card or the row.
+- **The rule that separates the cases:** is OURS the flagged row's own total? The real defect this counter exists for (11-18 reading 13) was the card taking OURS from ANOTHER row, 152-249 s older.
+- **Fix (`dash_update.py`, monitor file only):**
+  - A flag whose OURS equals the flagged row's own `live_total` (within 0.05) goes to `ours_skew_consistent` / `_list`, not to `ours_contradictions`. A mismatched OURS still counts.
+  - Replays into a throwaway rows file, deleted afterwards:
+    - R27: 0 contradictions, 1 skew-consistent (Rice @ Lamar, own 167.69).
+    - 11-18 00:40:35Z: still the 2 real ones (Chattanooga @ Winthrop OURS 156.0, Coppin St @ La Salle 146.0) and 0 skew-consistent.
+  - Compiled at 01:00:07Z, before the 7:03 PM tick. R28 (7:03 PM) ran on it cleanly, with 0 contradictions and 0 skew-consistent.
+- Backups: `scripts/rail_monitor/{dash_update.py,RUNBOOK.md}`.

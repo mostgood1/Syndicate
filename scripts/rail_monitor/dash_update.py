@@ -55,6 +55,25 @@ def row(args):
             pass
     i17 = below = college_flags = 0
     i17_list = []
+    # 11-22 R27 (the fleet-watcher's flag, Rice @ Lamar u167.5 p=0.69, ours 167.7): a mean across the line from a
+    # side the model favours is NOT a contradiction when OURS is the flagged row's OWN live_total. Then the probability and
+    # the mean come from one distribution, and a skewed end game (an extra-period branch, discrete free-throw endings)
+    # puts them on opposite sides of the line: that row read P(over 165.5) 0.72, P(over 166.5) 0.68, P(over 167.5) 0.31
+    # around one mean of 167.69. The real defect this counter exists for (11-18: the card's OURS taken from ANOTHER row,
+    # 152-249 s older) shows as OURS != the flagged row's own total, and still counts. p vs 0.5 cannot replace it: every
+    # counted flag already has p > 0.5. No median is published on the card or the row.
+    own_total = {}
+    _lr = os.path.join(rdir, "liverail_0.json")
+    if os.path.exists(_lr):
+        for r in (json.load(open(_lr, encoding="utf-8")).get("rows") or []):
+            if (r.get("market") == "totals" and str(r.get("segment") or "full") == "full" and not r.get("player_name")
+                    and r.get("live_total") is not None and r.get("line") is not None):
+                try:
+                    own_total[(r.get("sport"), r.get("matchup"), str(r.get("side"))[:1], float(r["line"]))] = float(r["live_total"])
+                except (TypeError, ValueError):
+                    pass
+    skew_consistent = 0
+    skew_list = []
     for card in rail.get("cards") or []:
         if card.get("sport") not in COLLEGE or not card.get("live"):
             continue
@@ -71,7 +90,14 @@ def row(args):
                 ours = None
             if mline and ours is not None and (e.get("model") or 0) > 0.5:
                 line = float(mline.group(2))
-                if (mline.group(1) == "o" and ours < line) or (mline.group(1) == "u" and ours > line):
+                own = own_total.get((card.get("sport"), card.get("matchup"), mline.group(1), line))
+                if ((mline.group(1) == "o" and ours < line) or (mline.group(1) == "u" and ours > line)) \
+                        and own is not None and abs(own - ours) <= 0.051:
+                    skew_consistent += 1
+                    if len(skew_list) < 5:
+                        skew_list.append(f"{card.get('sport')} {card.get('matchup')} {side} p={e.get('model')} ours {ours} "
+                                         f"own {own}")
+                elif (mline.group(1) == "o" and ours < line) or (mline.group(1) == "u" and ours > line):
                     i17 += 1
                     # Name it (11-20 8:50 PM: the fleet-watcher could not tell which game). Two known non-defects
                     # trip this: the chip's re-sim lagging the flagged row by one build (OURS is the chip's final),
@@ -239,6 +265,8 @@ def row(args):
         "college_total_flags": college_flags,
         "ours_contradictions": i17,
         "ours_contradictions_list": i17_list,
+        "ours_skew_consistent": skew_consistent,
+        "ours_skew_consistent_list": skew_list,
         "ours_below_points": below,
         "floor_calibrated_rows": floor_rows,
         "floor_violations": floor_viol,

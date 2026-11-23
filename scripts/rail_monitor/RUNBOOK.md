@@ -95,7 +95,7 @@ Then:
 - Upload `readings.json` (and `findings.json` / `loads.json` / `levers.json` if changed), then update the datasets, pinned by `if_version`.
 - Check:
   - flags: false, missed, dark;
-  - P1 (`ours_contradictions`) and #824 (`ours_below_points`);
+  - P1 (`ours_contradictions`) and #824 (`ours_below_points`). From 11-22 7:03 PM (R28), a flag whose card OURS equals the flagged row's OWN `live_total` (within 0.05) is counted in `ours_skew_consistent`, not as a contradiction. There the mean and p come from one distribution, and a skewed end game puts them on opposite sides of the line (R27 Rice @ Lamar u167.5 p=0.69, mean 167.69). An OURS taken from another row (11-18's real defect) still counts;
   - the score floor (`floor_violations`, owned reading R-A) and, while NCAAB is live, the #844 sampler (R-B);
   - (R-E's NHL timeout watcher is retired as of 11-20);
   - `live_games_no_model`: live games whose full-game rail rows carry no live model at all (I-29, added 11-19). A game can lack a model before its first re-sim, so confirm on the next reading. From the 11-21 2:03 PM tick on, each row also carries `live_games_no_model_reasons` {game: reason} and `live_games_no_model_detail`, from `p29_orient.py` (now every sport with a per-game snapshot: ncaab, wncaab, nba, ncaaf, nhl, nfl, and soccer's live lens). For `not_in_resim`, the detail gives the snapshot's `generatedAt`, so a game that started after the snapshot shows as such. At 2:06 PM 11-21 the soccer lens was 21 min old and held only MLS and Eredivisie, while 7 European games were live. If that persists, the lens has stopped refreshing. **The cause (diagnosed 11-21; findings "Why the soccer live lens stalls at kickoff"):**
