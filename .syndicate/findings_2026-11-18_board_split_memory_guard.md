@@ -833,3 +833,57 @@ Two midday reads 11-23 show how fast it moves: 4,852 MB at 19:03Z and 5,986 MB a
   `host_below_floor_plus_reserve` is the share the switch cannot reach. Dry run 19:06Z: 268 refusals across 6 logs, 0 samples.
 - Read by Thursday's `board-parent-recycle-reading-1126` (STEP 0b), separately for 11-23 (before J) and 11-24 / 11-25.
   If most evening refusals land in `host_below_floor_plus_reserve`, the 12-08 load case is weak.
+
+## 19. Per-test memory lines for the nightly ci-suite: built, on a branch; PRE-REGISTERED (written 1:49 PM CST 11-23 (19:49Z))
+
+User "Yes, build it" (11-23), answering "Build a per-test memory line for the nightly test run, landing after Tuesday's
+batch?". Plan in the lane first (`2d29768e8`). Section 16 H-O2 left it open: one chunk climbs ~2.5 GB in 2-3 min and sits at
+3.05-3.37 GB every night, and on 11-20 it ran away to 8,386 MB and was killed; the 12 s heartbeat names the chunk (30 files,
+`test_ncaaf_player_stats_refresh.py` .. `test_paper_ladder.py`), not the test. Running those files one by one would put
+multi-GB processes on the fleet host, and at 1:24 PM CST 11-23 Windows had 399 MB available (WSL VM 13.6 GB, 29 Claude
+processes 5.5 GB, Chrome 4.1 GB).
+
+**The change** (branch `ci-test-rss-850` (`32e865723`); lands on main after the 11-24 batch has finished, then reaches the suite at the
+next fleet ff; tooling only, NOT a betting change; no role imports it):
+- `scripts/pytest_rss_watch.py`, loaded only by `run_ci_suite._pytest_step` (`-p scripts.pytest_rss_watch`); GitHub CI
+  calls `pytest_baseline.py` directly and never loads it. `pytest_baseline._split_test_files` keeps the flag in every chunk.
+- Per test (setup + call + teardown): start VmRSS, the peak (VmHWM after a `/proc/self/clear_refs` 5 reset, and the
+  watchdog's highest sample) and end VmRSS. `TEST_RSS_JUMP nodeid= start_mb= peak_mb= end_mb= seconds=` when the peak is
+  >= 256 MB over the start. A watchdog thread (every 2 s) writes `TEST_RSS_CLIMB nodeid= rss_mb= start_mb= test_elapsed_s=`
+  while a test runs, at >= 2,048 MB and each 512 MB it grows, so a test the kernel kills is still named. At the end:
+  `TEST_RSS_TOP` (10 by peak - start), `TEST_RSS_FILE_TOP` (10 by file peak), `TEST_RSS_FILE_GROWTH_TOP` (10 by the
+  file's retained growth), `TEST_RSS_SUMMARY tests= jumps= climbs= start_mb= session_peak_mb= end_mb=`; first
+  `TEST_RSS_WATCH on pid= ... hwm_reset=yes|no`. Every line starts with a UTC timestamp, then `[pytest_rss_watch]`.
+- It writes through a dup of fd 1 taken when `-p` imports it, before pytest's capture starts, so the watchdog's lines
+  reach the log during a captured test. It never fails a test: the first error writes `TEST_RSS_WATCH off reason=error`
+  and it goes quiet. In an xdist worker it does nothing (execnet's channel); with `-n` > 0 it says `off reason=xdist_workers`.
+  The fleet suite runs `-n 0`. It sees THIS process only: memory spent in a child process is invisible to it.
+
+**Tests** (`tests/test_pytest_rss_watch.py`): the wiring (the flag pair survives the chunk split; GitHub CI does not
+load it), the knobs, the bookkeeping with injected readers (jump, climb steps and no climb on a plateau, the sampled
+peak without an HWM reset, the summary ranks, an error goes quiet), and real pytest processes on Linux: off != on (off
+prints nothing; on writes JUMP, a CLIMB from a test whose output pytest captured, TOP and SUMMARY, all timestamped), a
+run SIGKILLed mid-climb that still names its test, and `-n 1` passing with only the `off` line. Windows 46 passed /
+2 skipped; the fleet host's Linux (nice 19, scrubbed env) 47 passed / 1 skipped. Through the real chunked step
+(`pytest_baseline.py --chunks 2 ... -n 0 -p scripts.pytest_rss_watch`) both chunks printed their lines, collected 47 / 47.
+Overhead on `test_board_split_memory_guard.py` (75 tests), off / on / off / on: 22.3 / 20.2 / 17.9 / 18.3 s, within
+noise. No new `wsl-crash` dump.
+
+### 19.1 PRE-REGISTERED (before the fleet carries it)
+
+Reading: the first nightly ci-suite (08:00Z) on a fleet HEAD that contains `scripts/pytest_rss_watch.py`
+(`git -C ~/Syndicate cat-file -e HEAD:scripts/pytest_rss_watch.py`), from `~/syndicate-prod/logs/job-ci-suite.log`.
+Baselines, the three runs before (11-21 / 11-22 / 11-23): collected 30,615 / 30,705 / 30,705, failing 6 / 22 / 21, the
+pytest step 3,830.8 / 4,133.1 / 3,475.9 s (rc 1 each night, the baseline gate).
+
+| # | quantity | PREDICTED | FALSIFIED |
+|---|---|---|---|
+| P-T1 | chunks printing `TEST_RSS_WATCH on ... hwm_reset=yes` | 8 of 8 | fewer than 8 on a carrying HEAD (the code did not run) |
+| P-T2 | the suite unchanged | collected within -0.5% of the night before; no new failure in `test_pytest_rss_watch.py`; step <= 4,550 s | a lost chunk, a new failure from the plugin, or step > 4,550 s |
+| P-T3 | the heavy chunk is named | on a night its `session_peak_mb` >= 2,500: TOP rank 1 has peak - start >= 1,000 MB (one test), or FILE_GROWTH_TOP rank 1 >= 1,000 MB (one file leaking) | NEITHER: `session_peak_mb` < 1,500 while the heartbeat saw >= 2,500 for that chunk (the memory is in a child process) |
+| P-T4 | safety | no new `wsl-crash` dump in the run; every role still reads `oom_score_adj` 0 | any |
+
+- What P-T3 is for: the named test or file, and then whether the code it tests is something a live role also runs.
+- A CLIMB line in a chunk that never wrote its SUMMARY = a killed run, with its test named: record it whatever P-T3 says.
+- Owed: this reading. Thursday's `board-parent-recycle-reading-1126` reads it only if the fleet carries the file by then
+  (likely NOT YET); otherwise it is owed at the first run after the next fleet ff that carries it.
