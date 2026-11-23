@@ -34,9 +34,19 @@ MB = 1024 * 1024
 # ============================================================================================ (a) the lifeline exit
 
 
+# The switch-off child ABORTS on purpose (SIGABRT). On the fleet host WSL pipes every core dump to `wsl-capture-crash`,
+# which wrote a 25-27 MB dump a night to Windows' wsl-crashes folder (findings section 15). That folder keeps the
+# latest 10, so this test was pushing real crash dumps out. A pipe core pattern ignores RLIMIT_CORE, but the kernel
+# writes no dump at all for a process that is not dumpable. The child reads the flag back so the test can assert it.
 _CHILD_SCRIPT = textwrap.dedent(
     """
     import sys, threading, time
+    if sys.platform.startswith("linux"):
+        import ctypes
+        _libc = ctypes.CDLL(None, use_errno=True)
+        _libc.prctl(4, 0, 0, 0, 0)                  # PR_SET_DUMPABLE 0: the abort below writes no core dump
+        sys.stderr.write("LIFELINE_TEST_DUMPABLE=%d\\n" % _libc.prctl(3, 0, 0, 0, 0))  # PR_GET_DUMPABLE
+        sys.stderr.flush()
     from pipeline import board_build_process as bbp
     bbp._start_lifeline(0, threading.Event())   # the REAL lifeline; parent_pid 0 = the ppid watch never fires
     time.sleep(0.5)                               # the reader is now blocked on the open pipe
@@ -80,6 +90,8 @@ def test_lifeline_off_is_not_on_through_a_real_exit():
     if os.name == "posix":
         assert off.returncode == -6  # SIGABRT, exactly the fleet's BOARD_PROCESS_EXITED rc=-6
         assert "_enter_buffered_busy" in off.stderr
+    if sys.platform.startswith("linux"):
+        assert "LIFELINE_TEST_DUMPABLE=0" in off.stderr  # the deliberate abort leaves no core dump
     assert "_enter_buffered_busy" not in on.stderr
 
 

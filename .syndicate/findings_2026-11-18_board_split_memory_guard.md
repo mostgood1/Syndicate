@@ -710,3 +710,45 @@ Re-derived read-only from `refresh-worker.log{.2,.1}`, 23:00Z 11-21 to 04:00Z 11
     longest gap's first refusal, the host had 5,348 MB available (section 14).
   - So the next lever is in the guard's budget (host-aware headroom, or a larger credit), not in when the parent restarts.
     Any such change is a betting change and goes to a window. Not built.
+
+## 17. The two 11-22 levers, built; not loaded (written 8:15 AM CST 11-23 (14:15Z))
+
+On the user's "Yes, build both" (section 15, levers 1 and 2). The plan and predictions went into the lane first (main `25fedae19`).
+
+- **Lever 1: the ci-suite runs at `oom_score_adj` 1000.**
+  - `scripts/local_production.py`: `CI_SUITE_OOM_SCORE_ADJ_ENV` and `ci_suite_oom_score_adj` (~2115); `spawn_ci_suite` (~2153), which
+    `_ci_run_suite` now calls in place of `subprocess.run` (~2201).
+  - The child writes `/proc/self/oom_score_adj` in a `preexec_fn`, before it execs `nice`. The value survives the exec, and the pytest
+    chunks inherit it. A failed write is swallowed, so it never stops the suite.
+  - Switch `SYNDICATE_CI_SUITE_OOM_SCORE_ADJ`. **Absent = ON (1000)**, and so is an unparseable value. `0` / `off` / `false` / `no` /
+    a negative = the old behaviour (the inherited value). Unlike this lane's board switches, absent is on: this is not a betting
+    change, it touches no role, and an absent-off switch would need a drained `down`/`up` to do anything.
+  - It prints `CI_SUITE_OOM_SCORE_ADJ switch=<v|off> pid=<pid> read=<value>`. The value is read back from the child's `/proc`
+    after the exec, so the line shows what the suite actually runs at.
+- **Lever 2: the lifeline test's child is non-dumpable.**
+  - `tests/test_board_split_memory_guard.py` `_CHILD_SCRIPT`: on Linux it calls `prctl(PR_SET_DUMPABLE, 0)` and prints the value of
+    `PR_GET_DUMPABLE`. `test_lifeline_off_is_not_on_through_a_real_exit` asserts `LIFELINE_TEST_DUMPABLE=0` alongside rc -6.
+  - `core_pattern` on the host is `|/wsl-capture-crash %t %E %p %s`. A pipe pattern ignores RLIMIT_CORE, so a core limit would
+    not have stopped the dump. The kernel writes no dump at all for a non-dumpable process.
+- **Tests.**
+  - `tests/test_local_production_ci_oom.py` (NEW). Reachability first: off != on through a real child and the process it forks,
+    behind `nice`. Then the absent switch reaching `_ci_run_suite` with 1000, no `preexec_fn` when off or on Windows, the rules, and
+    a failed write.
+  - Windows: 54 passed, 1 skipped (the Linux-only reachability test).
+  - The fleet host's Linux (fleet venv, nice 19, a scrubbed env shaped like `ci_env`, the worktree on /mnt/c): 28 passed, 0 skipped.
+    `wsl-crashes` held 5 files before and after, with the same newest file, so the lifeline test's abort wrote no dump.
+  - `tests/test_local_production.py` and the source-scan suites: 201 passed, 2 skipped.
+  - Runner: `C:\tmp\bmg\w1124\wsl_tests.sh`.
+- **This morning, before any ff:** the nightly wrote the fifth dump, `wsl-crash-1795422460-4077505-...-6.dmp`, at 08:27:40Z 11-23
+  (2:27 AM CST). That is the one-a-night pattern, as expected without the fix.
+- **Shipping.** Both changes run at the fleet checkout's HEAD: `_ci_run_suite` fetches `git_commit()` into `ci-checkout`, and the
+  ScheduledJob spawns `local_production.py ci-run` from the checkout each night. So they load at the first 08:00Z run after a fleet ff
+  past this commit, with no role restart. Not a betting change. An ff ships ALL of main, so whoever ffs next carries them.
+- **Predictions (pre-registered in the lane, `25fedae19`), for that first run:**
+  - P-O1: `job-ci-suite.log` reads `CI_SUITE_OOM_SCORE_ADJ switch=1000 ... read=1000`.
+  - P-O2: no new `wsl-crash-*` dump between 08:00Z and the run's end.
+  - P-O3: every role still reads `oom_score_adj` 0.
+- **Ledger side-fix (`575330331`).** `syndicate-decision-engine`'s scope note on `scripts/local_production.py` held commas. The
+  claim parser splits on every comma, so it saw no section, and the file read as contested. The lane guard blocked this edit on
+  that. Commas became "and", with the scope unchanged, per the 2026-11-17 learnings rule. `check_lane_invariants`: 4 -> 3
+  contested files.

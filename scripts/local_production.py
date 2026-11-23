@@ -2105,6 +2105,68 @@ def _janitor_quietly(args: argparse.Namespace) -> None:
         print(f"janitor: skipped ({type(exc).__name__})", flush=True)
 
 
+# The suite's own oom_score_adj (todo #850, findings_2026-11-18_board_split_memory_guard.md section 15). Every role
+# runs at 0, and the suite did too. On 2026-11-20 at 08:49Z a pytest chunk ran away to 8.4 GB and the host's global
+# OOM killed it. That was luck: the kernel kills the largest process, so a ~3.5 GB runaway on a night the board child
+# sits at 4.1 GB kills the board child. At 1000 the kernel picks the suite first. Its chunks inherit the value through
+# fork and exec. An unprivileged process may raise its own value.
+# ABSENT = ON (1000). This is not a betting change and touches no role, and an absent-off switch would need a drained
+# `down`/`up` to do anything. `0` / `off` = the old behaviour (the inherited value is left alone).
+CI_SUITE_OOM_SCORE_ADJ_ENV = "SYNDICATE_CI_SUITE_OOM_SCORE_ADJ"
+CI_SUITE_OOM_SCORE_ADJ_DEFAULT = 1000
+_OFF_WORDS = ("0", "off", "false", "no")
+
+
+def ci_suite_oom_score_adj(environ: dict[str, str] | None = None) -> int | None:
+    """The value to spawn the suite at, or None for off. Absent or unparseable -> the default (on)."""
+    raw = str((os.environ if environ is None else environ).get(CI_SUITE_OOM_SCORE_ADJ_ENV, "")).strip().lower()
+    if raw in _OFF_WORDS:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        return CI_SUITE_OOM_SCORE_ADJ_DEFAULT
+    return min(value, 1000) if value > 0 else None
+
+
+def _set_own_oom_score_adj(value: int):
+    """A preexec_fn: runs in the forked child before exec. It never raises, because a failed write must not stop
+    the suite. The CI_SUITE_OOM_SCORE_ADJ line reads the value back, so a failure shows as read=0."""
+
+    def _apply() -> None:
+        try:
+            with open("/proc/self/oom_score_adj", "w") as fh:
+                fh.write(str(value))
+        except OSError:
+            pass
+
+    return _apply
+
+
+def read_oom_score_adj(pid: int) -> str:
+    try:
+        return Path(f"/proc/{int(pid)}/oom_score_adj").read_text().strip()
+    except (OSError, ValueError):
+        return "unreadable"
+
+
+def spawn_ci_suite(command: list[str], *, cwd: str, env: dict[str, str], environ: dict[str, str] | None = None) -> int:
+    """Run the suite's command at the switch's oom_score_adj and return its exit code. It prints
+    CI_SUITE_OOM_SCORE_ADJ with the value read back from the child's /proc. Popen returns only after the exec
+    succeeded, so the preexec_fn has already run when the value is read."""
+    adj = ci_suite_oom_score_adj(environ)
+    preexec = _set_own_oom_score_adj(adj) if adj is not None and not IS_WINDOWS else None
+    with subprocess.Popen(command, cwd=cwd, env=env, preexec_fn=preexec) as proc:
+        try:
+            read = read_oom_score_adj(proc.pid) if not IS_WINDOWS else "n/a"
+            print(f"CI_SUITE_OOM_SCORE_ADJ switch={adj if adj is not None else 'off'} pid={proc.pid} read={read}",
+                  flush=True)
+            return proc.wait()
+        except BaseException:
+            proc.kill()
+            raise
+
+
 def _ci_run_suite(args: argparse.Namespace) -> int:
     """run_ci_suite.py at this checkout's HEAD, in a
     SEPARATE clone (<home>/ci-checkout) so test output never dirties the
@@ -2136,7 +2198,7 @@ def _ci_run_suite(args: argparse.Namespace) -> int:
         command = ["nice", "-n", "15"] + command
     env = ci_env(reset_ci_home(settings.home / "ci-home"))
     print(f"ci-suite at {head[:12]} in {checkout} (env scrubbed to {sorted(env)}, HOME={env['HOME']})", flush=True)
-    return subprocess.run(command, cwd=str(checkout), env=env).returncode
+    return spawn_ci_suite(command, cwd=str(checkout), env=env)
 
 
 def role_loaded_commit(pid: int | None) -> str | None:
