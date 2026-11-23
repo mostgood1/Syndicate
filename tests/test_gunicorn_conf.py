@@ -9,6 +9,7 @@ arena cap before the worker loads the app.
 
 from __future__ import annotations
 
+import gc
 import importlib.util
 import json
 import os
@@ -21,6 +22,14 @@ _SRC = pathlib.Path(__file__).resolve().parents[1] / "gunicorn.conf.py"
 _spec = importlib.util.spec_from_file_location("gunicorn_conf", _SRC)
 conf = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(conf)
+
+
+@pytest.fixture(autouse=True)
+def _restore_gc_thresholds():
+    """`post_fork` tunes THIS process's collector; no test may leave it tuned for the next one."""
+    saved = gc.get_threshold()
+    yield
+    gc.set_threshold(*saved)
 
 
 def _worker(limit=650.0, born=0.0, requests=4):
@@ -193,6 +202,78 @@ def test_post_fork_respects_both_switches(monkeypatch, capsys):
     assert calls == [] and worker._syndicate_limit_mb == 0.0
     [armed] = _lines(capsys, "WEB_MEMORY_GUARD_ARMED")
     assert armed["arena_cap_applied"] is None
+
+
+# No automatic full collections in a web worker (lane `web-silent-worker-kills`, 2026-11-23): the longest main-loop
+# stall of 11-21, 18.57 s, was one full collection that freed nothing.
+def test_post_fork_stops_automatic_full_collections_and_says_so(monkeypatch, capsys):
+    import syndicate.features.shared.memory_observability as mo
+
+    monkeypatch.setattr(mo, "configure_malloc_arenas", lambda n: True)
+    monkeypatch.delenv("SYNDICATE_WEB_GC_AUTO_FULL", raising=False)
+    gc.set_threshold(700, 10, 10)
+    worker = types.SimpleNamespace(alive=True)
+    conf.post_fork(None, worker)
+    assert gc.get_threshold() == (700, 10, conf.GC_FULL_THRESHOLD_OFF)
+    [tuned] = _lines(capsys, "WEB_GC_TUNED")
+    assert tuned == {"pid": os.getpid(), "applied": True, "before": [700, 10, 10], "after": [700, 10, 2**31 - 1]}
+    assert len(worker._syndicate_gc_at_fork) == 3, "the fast exit counts collections from here"
+
+
+@pytest.mark.parametrize("on", ["1", "true", "ON", "yes"])
+def test_off_is_not_on_for_the_gc_tuning(monkeypatch, on):
+    gc.set_threshold(700, 10, 10)
+    monkeypatch.setenv("SYNDICATE_WEB_GC_AUTO_FULL", on)
+    assert conf.tune_gc()["applied"] is False and gc.get_threshold() == (700, 10, 10)
+    monkeypatch.setenv("SYNDICATE_WEB_GC_AUTO_FULL", "0")
+    assert conf.tune_gc()["applied"] is True and gc.get_threshold() == (700, 10, conf.GC_FULL_THRESHOLD_OFF)
+
+
+def test_a_growing_heap_gets_no_automatic_full_collection_once_tuned(monkeypatch):
+    """Reachability on the real collector: the same growth runs full collections stock and none tuned."""
+    monkeypatch.delenv("SYNDICATE_WEB_GC_AUTO_FULL", raising=False)
+
+    def full_collections_while_the_heap_grows() -> int:
+        gc.collect()  # sets the long-lived count the quarter rule compares against
+        before = gc.get_stats()[2]["collections"]
+        keep = [[] for _ in range(max(300_000, len(gc.get_objects())))]
+        after = gc.get_stats()[2]["collections"]
+        del keep
+        return after - before
+
+    gc.set_threshold(700, 10, 10)
+    stock = full_collections_while_the_heap_grows()
+    conf.tune_gc()
+    tuned = full_collections_while_the_heap_grows()
+    assert stock >= 1, "the stock collector must run a full collection here, or this test proves nothing"
+    assert tuned == 0
+
+
+def test_young_collections_still_free_cycles_once_tuned(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_WEB_GC_AUTO_FULL", raising=False)
+    conf.tune_gc()
+    young_before = gc.get_stats()[0]["collected"] + gc.get_stats()[1]["collected"]
+    for _ in range(5_000):
+        a, b = [], []
+        a.append(b)
+        b.append(a)
+    del a, b
+    for _ in range(20_000):  # allocation pressure, so the young collections run
+        [[]]
+    assert gc.get_stats()[0]["collected"] + gc.get_stats()[1]["collected"] - young_before >= 9_000
+
+
+def test_the_gc_tuning_never_raises_into_gunicorn(monkeypatch, capsys):
+    import syndicate.features.shared.memory_observability as mo
+
+    def boom(*a, **k):
+        raise RuntimeError("no collector")
+
+    monkeypatch.setattr(conf, "tune_gc", boom)
+    monkeypatch.setattr(mo, "configure_malloc_arenas", lambda n: True)
+    conf.post_fork(None, types.SimpleNamespace(alive=True))
+    out = capsys.readouterr().out
+    assert '"hook": "post_fork_gc"' in out and "WEB_MEMORY_GUARD_ARMED " in out, "the guard still arms"
 
 
 @pytest.mark.parametrize("raw, expected", [("", 650), ("700", 700), ("garbage", 650), ("0", 0)])
@@ -581,6 +662,17 @@ def test_a_worker_whose_loop_returned_flushes_and_leaves_through_os_exit(monkeyp
     assert [s.flushed for s in streams] == [1, 1]
     [line] = _lines(capsys, "WEB_WORKER_FAST_EXIT")
     assert line == {"pid": os.getpid(), "after_loop_s": 0.25}
+
+
+def test_the_fast_exit_counts_each_generations_collections_since_the_fork(monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT", raising=False)
+    fake_gc = types.SimpleNamespace(get_stats=lambda: [{"collections": 950}, {"collections": 90}, {"collections": 4}])
+    worker = _exiting_worker()
+    worker._syndicate_gc_at_fork = [10, 1, 4]
+    codes = []
+    conf.worker_exit(None, worker, exit_now=codes.append, streams=[], clock=lambda: 100.0, gc_module=fake_gc)
+    [line] = _lines(capsys, "WEB_WORKER_FAST_EXIT")
+    assert line["gc_collections"] == [940, 89, 0] and codes == [0]
 
 
 def test_a_worker_that_never_left_its_loop_takes_the_stock_exit(monkeypatch):

@@ -176,7 +176,55 @@ def _touch(stamp_path: str) -> None:
         pass
 
 
+# NO AUTOMATIC FULL COLLECTIONS IN A WEB WORKER (lane `web-silent-worker-kills`, 2026-11-23, user "Tune GC next").
+# A full (generation 2) collection holds the GIL while it walks the whole heap, so every thread stops -- the main
+# loop included, and its heartbeat is what the master's 60 s kill reads. Measured from `WEB_GC_PAUSE` (>= 0.25 s):
+#   * 3,344 / 3,830 / 4,262 full collections a CST day on 11-20 / 11-21 / 11-22, 1,910-3,039 s of pause a day;
+#   * they were 4 of the 7 main-loop stalls >= 5 s in the 22 h after 11-21 20:14Z, and the longest, 18.57 s: worker
+#     2641469 at 1,199 MB (6:22 PM CST 11-21). The pause grows with the heap, and the memory guard only checks
+#     on requests, so a quiet worker's heap is not bounded (that one had served 10 requests in 79 min);
+#   * they free almost nothing: 7,079 objects in all, over 11,989 logged full collections 11-20 17:03Z..11-23 14:03Z.
+# CPython 3.11 (the fleet's) runs one whenever the survivors since the last exceed a quarter of the long-lived
+# count, and the board warmer's rebuilds keep that true about once a minute per worker.
+# So a web worker keeps the young collections (generations 0 and 1, which catch nearly every cycle) and never
+# starts a full one on its own. Cost: a cycle that reaches the old generation stays until the worker recycles,
+# which the memory guard does anyway. An explicit `gc.collect()` still runs a full collection.
+# Switch: `SYNDICATE_WEB_GC_AUTO_FULL` -- absent / 0 / off = no automatic full collections; 1 / true / on restores
+# CPython's own. Proof line: `WEB_GC_TUNED` per worker; `WEB_WORKER_FAST_EXIT` carries the collections per generation
+# since the fork, so a full collection that still ran is counted, not merely absent from the pause log.
+GC_FULL_THRESHOLD_OFF = 2**31 - 1
+
+
+def gc_auto_full_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_WEB_GC_AUTO_FULL") or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def _gc_collections(gc_module) -> list[int]:
+    return [int(stats.get("collections", 0)) for stats in gc_module.get_stats()]
+
+
+def tune_gc(worker=None, *, gc_module=None) -> dict:
+    """Stop automatic full collections in this process (unless switched back on). Returns the `WEB_GC_TUNED` payload."""
+    import gc
+
+    g = gc_module or gc
+    before = list(g.get_threshold())
+    payload = {"pid": os.getpid(), "before": before}
+    if worker is not None:
+        worker._syndicate_gc_at_fork = _gc_collections(g)
+    if gc_auto_full_enabled():
+        payload.update(applied=False, reason="SYNDICATE_WEB_GC_AUTO_FULL", after=before)
+        return payload
+    g.set_threshold(before[0], before[1], GC_FULL_THRESHOLD_OFF)
+    payload.update(applied=True, after=list(g.get_threshold()))
+    return payload
+
+
 def post_fork(server, worker) -> None:  # noqa: ARG001 - gunicorn's hook signature
+    try:
+        _log("WEB_GC_TUNED", tune_gc(worker))
+    except Exception as exc:  # never take the worker down
+        _log("WEB_MEMORY_GUARD_ERROR", {"hook": "post_fork_gc", "error": f"{type(exc).__name__}: {exc}"})
     try:
         worker._syndicate_born = time.time()
         worker._syndicate_requests = 0
@@ -447,7 +495,7 @@ def fast_exit_enabled() -> bool:
     return str(os.environ.get("SYNDICATE_WEB_WORKER_FAST_EXIT") or "").strip().lower() not in {"0", "false", "off", "no"}
 
 
-def worker_exit(server, worker, *, exit_now=None, streams=None, clock=time.monotonic) -> str:  # noqa: ARG001
+def worker_exit(server, worker, *, exit_now=None, streams=None, clock=time.monotonic, gc_module=None) -> str:  # noqa: ARG001
     """gunicorn's child-side exit hook, after `Worker exiting`. Returns why it left it to the stock exit; on the fast
     path it does not return."""
     try:
@@ -460,7 +508,17 @@ def worker_exit(server, worker, *, exit_now=None, streams=None, clock=time.monot
         if running:
             _log("WEB_WORKER_STOCK_EXIT", {"pid": os.getpid(), "reason": "request_running", "running": running})
             return "request_running"
-        _log("WEB_WORKER_FAST_EXIT", {"pid": os.getpid(), "after_loop_s": round(clock() - float(returned_at), 3)})
+        payload = {"pid": os.getpid(), "after_loop_s": round(clock() - float(returned_at), 3)}
+        at_fork = getattr(worker, "_syndicate_gc_at_fork", None)
+        if at_fork:
+            try:
+                import gc
+
+                now_counts = _gc_collections(gc_module or gc)
+                payload["gc_collections"] = [now - then for now, then in zip(now_counts, at_fork)]
+            except Exception:  # a count is evidence, never a reason to stay in shutdown
+                pass
+        _log("WEB_WORKER_FAST_EXIT", payload)
         for stream in (streams if streams is not None else (sys.stdout, sys.stderr, sys.__stdout__, sys.__stderr__)):
             try:
                 stream.flush()
