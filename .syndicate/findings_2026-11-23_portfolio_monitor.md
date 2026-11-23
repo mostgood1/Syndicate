@@ -58,3 +58,37 @@ The rail's rows are `source=layer2_inplay_overlay`: the board's in-play overlay.
   rows with a market fair only. In-play buys are 8% of orders, recorded without an EV, and none is in the one sport the
   rail shows now.
 - Nothing here was changed. No ledger or venue write.
+
+## Who cancelled the 11-21 unfilled Kalshi order? Its own kickoff expiry -- 1:13 PM CST
+
+The ask was relayed by the fleet-watcher on the user's words, about 1:10 PM CT: "no, I didn't cancel it", then
+"yes, ask the portfolio session to trace it". The order is one Kalshi h2h order of 11-21: a men's NCAAB away moneyline,
+placed on the WOMEN's game market (the series is the women's-basketball game series). It ended with 0 of 1 contract
+filled. The order id and ticker are kept out of this public file; the fleet-watcher has them.
+
+Everything below is read-only: the fleet role logs, the ledger row via `/api/portfolio/live?on=all`, and ONE
+`GET /portfolio/orders/{id}` at Kalshi under live-odds-worker's environ (`/mnt/c/tmp/w_align/kalshi_order_read.py`, which
+prints an allowlist of fields).
+
+| time (11-21, UTC) | source | what |
+|---|---|---|
+| 17:40:33 | live-odds-worker `[kalshi_orders] SUBMIT` | `tif=good_till_canceled`, `expiry=1795296600` = **21:30:00Z**, the board game's `commence_time` (`SYNDICATE_KALSHI_EXPIRE_AT_KICKOFF`, user decision 2026-10-20 "Build option C") |
+| 17:40:50 | `[execution_ledger] RECONCILED` | `venue_status='resting'`, 0 contracts |
+| 18:26:35 | `[execution_ledger] CANCEL_SKIPPED_NO_PRICE` | the stale pass could not read a price and left the order resting; no cancel request was sent |
+| 21:25-21:36 | all role logs | NO cancel or exit request for this order from any role |
+| **21:30:00.000078** | **Kalshi's own record** | `status=canceled`, `expiration_time=2026-11-21T21:30:00Z`, `last_update_time=2026-11-21T21:30:00.000078Z`, fill 0 of 1, remaining 0 |
+| 21:32:16 | `[execution_ledger] RECONCILED` | `submitted->rejected venue_status='canceled'`: our reconciler RECORDED it; it did not cause it |
+
+**Verdict.** Nobody cancelled it.
+- Kalshi expired it at the `expiration_time` our own executor set at submit, the kickoff of the board game. Kalshi
+  reports an expired order as `canceled`.
+- The venue's update time is 0.08 ms after the expiry, which leaves no room for a person, another process or another
+  session.
+- So nothing outside our three roles placed or cancelled a live order. I did not search the session transcripts: the
+  venue's record settles it.
+
+**Two side notes, not causes.**
+1. This order is an **F27 case**: a men's game paired with a women's Kalshi market. F27's fix,
+   `SYNDICATE_KALSHI_JOIN_SPORT_SCOPE=on`, is CHANGE L of the 11-24 batch.
+2. The ledger row's `venue_resolved_at` / `settled_at` read 17:40:34Z, the submit acknowledgement, on a row that ended
+   at 21:30Z. Do not read those fields as the cancel time; that misled the first timing guess here.
