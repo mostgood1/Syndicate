@@ -1177,3 +1177,78 @@ built on it.** It was found by reading the code before building, after the user 
   The cut is right from the late states and too much from the early ones. Why is not measured: the run records only
   each draw's total, not when its points came.
 - Nothing changes: the end game loads at 12-08 as queued. The todo, the lane and the queue memory are corrected to match.
+
+## LATE-POINTS TIMING DIAGNOSTIC — PRE-REGISTRATION, written 2026-11-23 1:12 PM CST before the scorer read any window number
+
+The user said "Run the diagnostic" (2026-11-23), answering "Leave the concession as queued, or diagnose when the sim's
+late points come?". **It gates nothing:** the fleet and the 12-08 queue are unchanged whatever it reads.
+
+**The question.** On 2022 the concession lowers the raw forecast by about the same amount from early and late states
+(Q3 7:30 17+: -1.55 points; Q4 6:00 25+: -1.81), and it acts in the same window from both, the game's last 6:00
+(### CORRECTION). With it, the forecast is right from the late states and short from the early ones. Two readings:
+- **COMPENSATION:** the queued end game is short BEFORE the concession's window in early-start blowouts, and right
+  inside it. Switching the concession off only hid that by adding late points.
+- **OVER-CUT:** it is right before the window and short INSIDE it, so from early starts the concession cuts too much.
+
+**Data: no new sims.** The finished runs already hold, for every state, each arm's sim mean by window (`resume.run_state`)
+and the CFBD actuals for the same windows (`resume.build_tasks`, `state.act`):
+- 2022 (`C:\tmp\t859c\out\2022`): `h_pair`, `h_eg` and `h_egn`.
+- 2023 (`C:\tmp\t859k` and `C:\tmp\t859d`, the re-fit's and the diagnosis's runs): `h_pair`, `h_eg`, and `e17n` and
+  `e17`. The last two differ only in the concession, at damping 17/14.
+- Until this was written, only their counts and the scored log-loss and SHAPE tables were read. No window field was.
+
+**The windows**, by the step's (sim) or the snap's (actual) start clock:
+- `late` = Q4 b + c: regulation points that start with 5:00 or less left;
+- `pre` = regulation - `late`: everything before Q4 5:00 (for a Q3 7:30 start, the rest of Q3 too);
+- `ot`.
+
+The concession acts from 6:00, so its first minute falls in `pre`; the harness's window edge is 300 s.
+
+**Bias** = sim mean - actual, per state, raw (before #835's calibration), with SEs clustered by game.
+
+**Scorer:** `C:\tmp\t859t\t_score.py`, pinned. It also prints the concession's cut by window (the no-concession arm
+minus the concession arm, paired), a full table by checkpoint and margin, late-window step counts, and a trailer /
+leader split of the whole rest.
+
+**Blind smoke:** the scorer ran on the 4-game 2022 smoke outputs. Only line counts were read: `lines=67 tracebacks=0 score_end=1 sections=6 reading_lines=1 p0_lines=1`.
+
+**Rule** (the reading, on `h_eg`, the queued end game, at Q3 7:30 |m| >= 17, per season):
+- COMPENSATION: `pre` bias <= -1 SE, and `late` bias within +-1 SE of 0.
+- OVER-CUT: `pre` bias within +-1 SE of 0, and `late` bias <= -1 SE.
+- Anything else: MIXED.
+
+**Check P0** (must hold, or the readings are void and the mechanism reading in ### CORRECTION is wrong): the
+concession is Q4-only. So on paired seeds, every Q3 start's Q3 points are IDENTICAL in the two arms that differ only in
+it (`h_egn` / `h_eg` on 2022, `e17n` / `e17` on 2023).
+
+**Predictions** (not gates):
+- **P1:** 2022 reads COMPENSATION. The reason: `h_pair`, with no concession and no end-of-half clock, also runs short
+  from Q3 7:30 at 17+ (raw -0.59). From every Q4 start it runs long (+0.42 to +1.04). That points at points scored
+  before Q4.
+- **P2:** at Q4 6:00 |m| >= 25, `h_eg`'s `late` bias is within +-1 SE of 0 on 2022, where the concession was right.
+- **P3:** the concession's cut sits mostly inside the window. At Q3 7:30 17+ on 2022, its `late` part is more than half
+  of its whole-rest cut.
+- **P4:** 2023 gives the same reading as 2022.
+
+**What follows (each the user's call; none changes the fleet or the queue):**
+- **COMPENSATION:** the concession is right where it acts and stays as queued. The early-start shortfall is a separate
+  question (what the sim scores before Q4 5:00 in blowouts), for later.
+- **OVER-CUT:** the concession cuts too much late from early starts. The next question is how often the sims reach a
+  25+ deficit at 6:00 against reality; that is not recorded, so it needs an instrument.
+- **MIXED:** reported as read; nothing follows.
+
+**Pins** (sha256, first 16 characters; full list in `C:\tmp\t859t\pins.sha256`; `run_t.sh` checks them before the
+scorer):
+
+| file | sha256 |
+|---|---|
+| `t_score.py` | `d5a392f4af3156a8` |
+| `run_t.sh` | `6d12392c903041a5` |
+| `smoke/summary.txt` | `c045ce85bf06926b` |
+| `/c/tmp/t859c/out/2022/out_h_pair_60.jsonl` | `6b94b0b6cf4087d3` |
+| `/c/tmp/t859c/out/2022/out_h_eg_60.jsonl` | `f131fff4b1fa50c5` |
+| `/c/tmp/t859c/out/2022/out_h_egn_60.jsonl` | `0000817d0e68327b` |
+| `/c/tmp/t859k/out/2023/out_h_pair_60.jsonl` | `e77ffc4b3bd5d2cc` |
+| `/c/tmp/t859d/out/2023/out_e17n_60.jsonl` | `356198de46f34847` |
+| `/c/tmp/t859d/out/2023/out_e17_60.jsonl` | `5a33e7909fd6371f` |
+| `/c/tmp/t859k/out/2023/out_h_eg_60.jsonl` | `ef9da98e2a643c7e` |
