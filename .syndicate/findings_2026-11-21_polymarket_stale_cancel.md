@@ -98,9 +98,63 @@ whole revert. The gate's clock: a `yes` betting change restarts the 800-event co
 
 ## Kit
 
-`C:\tmp\w1208_pmstale\kit_env_pmstale.sh` (`check | apply [on|shadow] | restore <backup>`) and
+`C:\tmp\w1208_pmstale\kit_env_pmstale.sh` (`check | apply <shadow|on> | restore <backup>`) and
 `kit_selftest_pmstale.sh`. Same pattern as `C:\tmp\w1124_851\`: a role-scoped line, backup first, idempotent, prints
 only this key. Self-test result: see the log below.
+
+**Changed 11-23, before any load:**
+- `apply` now needs the value. It used to default to `on`, so a bare `apply` could have written the betting change.
+- `apply on` over the shadow line promotes it in place. That is the 12-08 load once the shadow is in. Before, it read
+  `already_present` and would have left the shadow line.
+- Any other line of this key is refused (`CONFLICT`, rc 5).
+- The old copy is `kit_env_pmstale.before_shadow_1123.sh`.
+
+## Shadow load: CHANGE N of the 11-24 window batch
+
+User, typed in this session, 11-23 about 8:00 AM CST: **"load the polymarket stale cancel in shadow before 12-08"**.
+
+- **Vehicle.** It rides the drained full `down`/`up` of the 11-24 window batch (task `nfl-level-refit-load-1120`, fires
+  11-24 2:15 AM CST) as CHANGE N. That costs no extra restart. The batch's ff carries `7bc613347` anyway, so it needs
+  none of its own.
+  - CHANGE M was already taken that morning by the rail monitor's #860 (8:07 AM CST). N anchors after M in every step.
+  - The batch prompt's pre-edit copy is `C:/tmp/w1124_pmshadow/SKILL.before_M.md`. The edit script is `add_n.py`,
+    hash-guarded.
+- **Line and role.** One role-scoped line, `LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_STALE_CANCEL=shadow`.
+- **Not a betting change**, so no window gates it.
+  - In shadow the pass calls `cancel_order(execute=False)`: a GET and a `CANCEL_DRY_RUN` line.
+  - It remembers nothing (`_CANCELLED` grows only in `on`).
+  - The executor discards its return value.
+  - Only this pass calls the Polymarket `cancel_order` (grep, 11-23). So any `CANCEL_SENT` in live-odds-worker's log
+    would be this pass.
+- **Droppable.** A failed N step drops N only.
+  - If the batch does not load N, N needs another drained full `down`/`up` before 12-08. That is the user's call; the
+    reading task and the daily review say so.
+- **Instrument.** `C:/tmp/w1208_pmstale/pmstale_shadow_read.sh <from_utc> [to_utc]` is read-only. It reads
+  live-odds-worker's current and rotated logs, only lines that START with a timestamp followed directly by the marker.
+  - It counts the pass's lines (`WOULD_CANCEL`, `CANCEL_*`, `PASS`, hook failures) and gives S1-S3.
+  - It also counts the population: Polymarket orders the venue showed `NEW` with cum 0 at least 15 min after creation.
+  - Self-tested 11-23 on a synthetic log: every expected count matched, a memory line quoting the pattern was ignored,
+    and a window older than the logs reads `covered=NO`.
+- **Pre-load baseline, 11-23 8:05 AM CST.** The logs reach back to 11-19 22:29Z.
+
+  | window | Polymarket orders with a venue state read | rested untouched >= 15 min | later |
+  |---|---|---|---|
+  | 11-19 22:30Z to 11-23 14:05Z (3.6 days) | 104 | 1 (the 11-21 case, about 12.3 h) | expired unfilled |
+  | 11-22 14:00Z to 11-23 14:05Z (24 h) | 37 | 0 | n/a |
+
+  The instrument finds the known case. The shadow should see about one WOULD_CANCEL a day or fewer.
+- **Readings:**
+  - At load (batch step 9): live-odds-worker's environ reads `shadow`. `cancel_stale=0`, `cancel_sent=0` and
+    `hook_failed=0` since the up.
+  - +3 d: task `pm-stale-shadow-reading-1127` (11-27 9:45 AM CST, read-only): S1-S3 from the load.
+  - The daily `portfolio-learning-review` runs these until 12-08:
+    - a one-line daily tally (logs rotate after about 3.5 days, so the tally keeps the whole period);
+    - the +3 d backstop;
+    - a summary on its first run after 12-07 5:00 AM CST, for the user's 12-08 decision.
+- **Kill rule in shadow.** Any `cancel_stale` or `cancel_sent` above 0 is a defect: a live venue write nobody approved.
+  It is reported first. The revert (remove the line, plus a drained `down`/`up`) needs the user's yes.
+- **The 12-08 `on` load** is unchanged: the window, the user's final yes, and the P1-P5 above.
+  - S2 or S3 failing in the shadow means `on` should not load until it is understood.
 
 ## Log
 
@@ -112,3 +166,18 @@ only this key. Self-test result: see the log below.
   - `restore` returns the file byte-for-byte;
   - `apply shadow` appends the shadow line;
   - the real `local_production.env` is unchanged (`real_file_unchanged=yes`), and every role reads the key ABSENT.
+- 11-23 8:09 AM CST: the kit was changed and re-self-tested (dummy file, in WSL). All of these held:
+  - `apply` with no value, or a bad one, is refused (rc 2) and the file is unchanged;
+  - `apply shadow` appends one line;
+  - a second apply reads `already_present`;
+  - `apply on` promotes shadow to on in place;
+  - `apply shadow` over `on` reads `CONFLICT` (rc 5);
+  - the two restores step back, the last one byte-identical to the original;
+  - mode 600 is kept;
+  - the real file is unchanged and every role reads the key ABSENT.
+- 11-23 8:25 AM CST: queued the SHADOW load as CHANGE N of the 11-24 window batch, on the user's "load the polymarket
+  stale cancel in shadow before 12-08".
+  - Reader self-tested. Baseline: 1 of 104 orders untouched >= 15 min over 3.6 days; 0 of 37 in the last 24 h.
+  - The 43 tests pass (17 s).
+  - The +3 d task and the daily-review items are scheduled.
+  - Nothing is loaded: the fleet is at `b07e808823`, which lacks `7bc613347`.
