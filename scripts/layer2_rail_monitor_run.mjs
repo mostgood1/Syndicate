@@ -43,39 +43,50 @@ const recommendationState = (item) => {
 };
 const names = ['deriveGameCards', 'chipForGame', 'gameKey', 'mergeLiveRailFresh', 'liveRailMarketKey', 'liveRailSummary',
   'liveRowFreshEdge', 'liveRowGap', 'liveQuotePricingAgeSeconds', 'liveQuoteAgeNowSeconds', 'normalizeClubName',
-  'rehydrateAliases', 'liveRailIdentity', 'matchesDateFilter'];
+  'rehydrateAliases', 'liveRailIdentity', 'matchesDateFilter', 'pickChipByStart'];
 const fn = new Function('state', 'gameChipsById', 'gameChipsByMatchup', 'gameChipsByCanonical', 'gameChipsByMatchupLoose',
   'gameKeyMergeMap', 'recommendationState',
   `${src}\n; return { ${names.map((n) => `${n}: typeof ${n} === "function" ? ${n} : null`).join(', ')} };`);
 const api = fn(state, gameChipsById, gameChipsByMatchup, gameChipsByCanonical, gameChipsByMatchupLoose, gameKeyMergeMap, recommendationState);
 const missing = names.filter((n) => !api[n]);
 
-// Chips indexed as loadGameChips() does (collision removal included) -- same as game_rail_production_replay.mjs.
+// Chips indexed as loadGameChips() does. The exact index (since 2026-09-22, addExactMatchup) and the canonical
+// index (since 2026-11-23, addCanonical, 3983309ce) keep a LIST per key, and chipForGame chooses through
+// pickChipByStart. Only the loose index still drops a collided key. Until 11-23 this script dropped canonical
+// collisions too, so the MLS playoff pair (LAFC @ St. Louis on 11-24 01:00Z and 12-03 01:00Z) read chip-less here
+// while the page joined it; and its exact index kept only the last chip, a doubleheader's later half.
 const chips = JSON.parse(fs.readFileSync(chipsPath, 'utf8')).chips || [];
 const norm = api.normalizeClubName;
-const looseCollisions = new Set(), canonicalCollisions = new Set();
+const looseCollisions = new Set();
+// One GAME listed twice (same game_key) replaces its entry; a different game on the key is another candidate.
+const addListed = (index, indexKey, chip) => {
+  const list = index.get(indexKey);
+  if (!list) { index.set(indexKey, [chip]); return; }
+  if (list.includes(chip)) return;
+  const chipKey = String(chip.game_key || '').trim();
+  const same = chipKey ? list.findIndex((o) => String(o.game_key || '').trim() === chipKey) : -1;
+  if (same >= 0) list[same] = chip; else list.push(chip);
+};
 for (const chip of chips) {
   const sport = String(chip.sport || '').toLowerCase();
   const key = String(chip.game_key || '').trim();
   if (key) gameChipsById.set(`${sport}|${key}`, chip);
   const matchup = String(chip.matchup || '').trim().toLowerCase();
-  if (matchup) gameChipsByMatchup.set(`${sport}|${matchup}`, chip);
+  if (matchup) addListed(gameChipsByMatchup, `${sport}|${matchup}`, chip);
   const awayName = String((chip.away || {}).name || '').trim().toLowerCase();
   const homeName = String((chip.home || {}).name || '').trim().toLowerCase();
-  if (awayName && homeName) gameChipsByMatchup.set(`${sport}|${awayName} @ ${homeName}`, chip);
+  if (awayName && homeName) addListed(gameChipsByMatchup, `${sport}|${awayName} @ ${homeName}`, chip);
   const awayKey = String((chip.away || {}).key || '').trim().toLowerCase();
   const homeKey = String((chip.home || {}).key || '').trim().toLowerCase();
-  if (awayKey && homeKey) {
-    const c = `${sport}|${awayKey} @ ${homeKey}`;
-    if (gameChipsByCanonical.has(c)) canonicalCollisions.add(c); else gameChipsByCanonical.set(c, chip);
-  }
+  if (awayKey && homeKey) addListed(gameChipsByCanonical, `${sport}|${awayKey} @ ${homeKey}`, chip);
   if (awayName && homeName && norm) {
     const l = `${sport}|${norm(awayName)} @ ${norm(homeName)}`;
     if (gameChipsByMatchupLoose.has(l)) looseCollisions.add(l); else gameChipsByMatchupLoose.set(l, chip);
   }
 }
 for (const k of looseCollisions) gameChipsByMatchupLoose.delete(k);
-for (const k of canonicalCollisions) gameChipsByCanonical.delete(k);
+// A page older than 3983309ce has no list-aware chipForGame; fail loud rather than read every list as a chip.
+if (!/pickChipByStart\(gameChipsByCanonical\.get\(/.test(html)) throw new Error('served page predates the list canonical index (3983309ce)');
 
 const q = JSON.parse(fs.readFileSync(qPath, 'utf8'));
 const resp = q.response || q;
@@ -139,12 +150,13 @@ function resolveChip(c) {
   const sport = slugOfCard(c);
   if (gameChipsById.has(c.key)) return gameChipsById.get(c.key);
   const matchup = String(c.matchup || '').trim().toLowerCase();
-  const exact = gameChipsByMatchup.get(`${sport}|${matchup}`);
+  // Both indexes hold lists (see the indexing above); a list is chosen on the card's start, or refused.
+  const exact = api.pickChipByStart(gameChipsByMatchup.get(`${sport}|${matchup}`), c);
   if (exact) return exact;
   const ak = String(c.awayKey || '').trim().toLowerCase();
   const hk = String(c.homeKey || '').trim().toLowerCase();
   if (ak && hk) {
-    const canonical = gameChipsByCanonical.get(`${sport}|${ak} @ ${hk}`);
+    const canonical = api.pickChipByStart(gameChipsByCanonical.get(`${sport}|${ak} @ ${hk}`), c);
     if (canonical) return canonical;
   }
   const sides = matchup.split(' @ ');

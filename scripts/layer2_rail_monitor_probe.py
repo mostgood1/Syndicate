@@ -259,7 +259,10 @@ def main() -> int:
     ap.add_argument("--out-dir", default=r"C:\tmp\railmon\readings")
     ap.add_argument("--log-minutes", type=int, default=30)
     ap.add_argument("--rail-date", default=None, help="default: today, Central (the page's default day)")
-    ap.add_argument("--no-page", action="store_true", help="skip the 19 MB page fetch; reuse the last served.html")
+    ap.add_argument("--no-page", action="store_true",
+                    help="skip the ~25 MB page fetch while the saved served.html is younger than --page-max-age-min")
+    ap.add_argument("--page-max-age-min", type=float, default=60.0,
+                    help="with --no-page, refetch the page once the saved copy is older than this (default 60)")
     ap.add_argument("--no-row-refs", action="store_true",
                     help="send the board query WITHOUT row_refs (the pre-5db26434e full response), for an A/B")
     args = ap.parse_args()
@@ -276,9 +279,23 @@ def main() -> int:
     reading = {"read_at": iso(start), "read_at_ct": start.astimezone(CT).strftime("%Y-%m-%d %I:%M:%S %p CT"),
                "rail_date": rail_date, "base": base, "load": []}
     # ---- LOAD
+    # THE RAIL CODE COMES FROM THIS PAGE, so its age is the age of the rules being run. --no-page used to
+    # reuse served.html forever: measured 2026-11-23, the 20-min task had run an 11-19 11:00 PM copy for four
+    # days, through every web load since, and reported LAFC @ St. Louis chip-less while the live page (3983309ce)
+    # joined it. Now the copy is refetched once it is older than --page-max-age-min (~7 s, ~5 MB on the wire).
     page = out_dir / "served.html"
-    if not args.no_page or not page.exists():
-        reading["load"].append(fetch(base, "/intelligence", page))
+    page_age_min = (time.time() - page.stat().st_mtime) / 60 if page.exists() else None
+    if not args.no_page or page_age_min is None or page_age_min > args.page_max_age_min:
+        part = out_dir / "served.html.part"
+        try:
+            reading["load"].append(fetch(base, "/intelligence", part))
+            os.replace(part, page)
+            page_age_min = 0.0
+        except Exception as exc:  # keep the old copy; the runner refuses one that predates its index
+            reading["page_fetch_error"] = f"{type(exc).__name__}: {exc}"
+            if page_age_min is None:
+                raise
+    reading["page_age_min"] = round(page_age_min, 1)
     reading["load"].append(fetch(base, "/api/board/layer2-shortlist", rdir / "shortlist.json"))
     reading["load"].append(fetch(base, f"/api/board/game-chips?sports={CHIP_SPORTS}", rdir / "chips.json"))
     query_body = {k: v for k, v in QUERY_BODY.items() if not (args.no_row_refs and k == "row_refs")}
@@ -468,6 +485,7 @@ def summary(r):
     load = {x["path"].split("?")[0]: f'{x["seconds"]}s/{x["wire_bytes"]/1e6:.2f}MBwire/{x["bytes"]/1e6:.2f}MB' for x in r["load"]}
     return {
         "read_at_ct": r["read_at_ct"], "rail_date": r["rail_date"], "load": load,
+        "page_age_min": r.get("page_age_min"), "page_fetch_error": r.get("page_fetch_error"),
         "live_rail": [(x["rows"], x["newest_age_s"]) for x in r["live_rail"]],
         "board": {"shortlist_written_age_s": r["shortlist"]["written_age_s"], "build_age_s": r["shortlist"]["build_age_seconds"],
                   "rows_live_state_stale": r["shortlist"]["rows_live_state_stale"], "query_snapshot_age_s": r["query"]["snapshot_age_s"], "query_today_age_s": r["query"].get("today_written_age_s"),"board_built_age_s": r["query"].get("board_built_age_s")},
