@@ -881,3 +881,91 @@ anything runs):
 | `/c/tmp/t859k/out/2023/close.json` | `7662485aa3c48249` |
 | `/c/tmp/t859h/code/syndicate/features/ncaaf/live_total_dispersion.py` | `ee44d570609d4d12` |
 | `/c/tmp/w1208_ncaaf/kit_env_ncaaf.sh` | `4f31d0ac2b4888b5` |
+
+### 17+ COST DIAGNOSIS RESULTS — written 2026-11-23 9:41 AM CST, after the runs (nothing above was changed)
+
+**Verdict: the end game's 17+ cost is its own mechanisms, not the damping move. The clock is the larger piece and the
+concession the smaller; the move from 17/14 to 21/7 is about 7% of it. P1-P3 held and P4 FAILED. This gates nothing:
+the fleet and the 12-08 queue are unchanged.**
+
+**Run.** The pins were checked before the runs and again before the scorer (`run.log`, `score.txt`).
+- Both in-between arms ran all 730 games (`e17n` 14.3 min, `e17` 9.9 min), and both E0 passes refused 0.
+- 730 of 730 games were scored and none dropped.
+- `d_score.py`'s docstring still names sd(z), but its code and this pre-registration use the randomized PIT.
+
+**The split** (calibrated log loss; each step's diff (se), clustered by game; bold is 1.8 SE or more):
+
+| states | S1 clock+OT | S2 concession | S3 damping | TOT | slopes h_pair / e17n / e17 / h_eg |
+|---|---|---|---|---|---|
+| all fit states, \|m\| >= 17 | **+0.0099 (0.0052)** | +0.0061 (0.0072) | +0.0012 (0.0011) | +0.0171 (0.0076) | 0.96 / 0.89 / 0.82 / 0.81 |
+| \|m\| 17-24 | +0.0089 (0.0063) | **+0.0094 (0.0048)** | +0.0012 (0.0016) | +0.0195 (0.0060) | 0.89 / 0.84 / 0.79 / 0.77 |
+| \|m\| >= 25 | +0.0108 (0.0083) | +0.0028 (0.0128) | +0.0012 (0.0015) | +0.0148 (0.0137) | 1.04 / 0.95 / 0.85 / 0.85 |
+| Q3 7:30, 17+ | +0.0060 (0.0066) | **+0.0213 (0.0084)** | +0.0033 (0.0024) | +0.0306 (0.0082) | 1.02 / 0.96 / 0.88 / 0.86 |
+| Q4 10:00, 17-24 | -0.0045 (0.0104) | **+0.0242 (0.0112)** | +0.0006 (0.0033) | +0.0203 (0.0106) | 1.09 / 1.08 / 0.87 / 0.85 |
+| Q4 6:00, 17+ | +0.0176 (0.0105) | -0.0100 (0.0138) | +0.0018 (0.0024) | +0.0094 (0.0150) | 0.74 / 0.64 / 0.64 / 0.63 |
+| Q4 3:00, 17+ | **+0.0267 (0.0149)** | +0.0053 (0.0172) | +0.0006 (0.0014) | +0.0326 (0.0210) | 0.65 / 0.55 / 0.53 / 0.52 |
+| close games (\|m\| <= 8) | **-0.0205 (0.0071)** | -0.0011 (0.0006) | +0.0003 (0.0003) | -0.0214 (0.0071) | 0.90 / 0.95 / 0.95 / 0.95 |
+| all fit states, all margins | -0.0038 (0.0037) | +0.0016 (0.0027) | +0.0005 (0.0004) | -0.0017 (0.0042) | 0.96 / 0.95 / 0.91 / 0.91 |
+
+- The pre-registered reading is the first row.
+- The checkpoint and margin cells below it were picked after the fact from 120 step numbers, and a few at 2 SE are
+  expected by chance.
+- S1 and S2 at 17+ overlap within their SEs, so this run does not rank them with confidence.
+
+**Predictions: 3 of 4 held; P4 FAILED.**
+
+| prediction | result |
+|---|---|
+| P1 (check): TOT at 17+ is the re-fit's +0.0171 (0.0076) | **HELD**: +0.0171 (0.0076), on 730 of 730 games |
+| P2: S3 < +0.0086 (half of TOT) | **HELD**: S3 is +0.0012 (0.0011); S1 + S2 is +0.0160 |
+| P3: \|S2\| <= 1 SE at 17+ | **HELD as written**: +0.0061 (0.0072), 0.85 SE. Its stated reason was wrong (below) |
+| P4: the costliest step lowers the calibrated mean of the points still to come | **FAILED**: the costliest by point estimate is S1, and it leaves the calibrated mean where it was (bias +0.29 to +0.30). Raw, it RAISES it (+0.36 to +0.94) |
+
+**What each step does to the forecast at 17+** (SHAPE, all fit states, calibrated; the actual p0 is 0.278):
+
+| arm | bias (se) | PIT mean | PIT sd ratio | p0 |
+|---|---|---|---|---|
+| `h_pair` | +0.29 (0.28) | 0.489 | 0.94 | 0.261 |
+| `e17n` (+ S1) | +0.30 (0.28) | 0.498 | 0.94 | 0.262 |
+| `e17` (+ S2) | -0.66 (0.28) | 0.535 | 0.98 | 0.290 |
+| `h_eg` (+ S3) | -0.66 (0.28) | 0.535 | 0.98 | 0.290 |
+
+- **S1, the clock (with timeouts and OT), is 58% of TOT at 17+, and it is LATE.** It is +0.0176 (0.0105) at Q4 6:00
+  and +0.0267 (0.0149) at Q4 3:00, but about 0 at Q4 15:00 and 10:00.
+  - It barely moves the averaged shape. At 17+ overall, the calibrated bias, PIT mean, sd ratio and p0 each move by
+    0.01 or less. At Q4 6:00 and 3:00 the bias moves by 0.2 points or less.
+  - Yet the slope falls: 0.96 to 0.89 at 17+, and 0.65 to 0.55 at Q4 3:00.
+  - Likely reason, not measured: the cost is in how the forecast varies from one late blowout state to the next, which
+    per-arm averages cannot show.
+- **S1 is also the whole close-game gain:** -0.0205 (0.0071) of the end game's -0.0214 at \|m\| <= 8. The clock is
+  the piece that earns its keep AND the larger piece of the 17+ cost, so turning it off would give both back.
+- **S2, the concession, is the main piece EARLIER:** +0.0213 (0.0084) at Q3 7:30 17+, the bulk of that checkpoint's
+  +0.0306, and +0.0094 (0.0048) at 17-24 over all states.
+  - It lowers the calibrated mean of the points still to come by about a point at 17+ (+0.30 to -0.66).
+  - It lifts p0 past the actual: 0.262 to 0.290, against 0.278.
+  - So it takes away points that real blowouts still score. That is P4's mechanism, but in the step P4 did not name.
+- **P3's reason was wrong.** It said the concession acts only at a 25+ deficit in Q4. That is true inside the SIM, but
+  a sim from Q3 7:30 at 17-24 often reaches a 25+ deficit in Q4. So the concession costs at states that start below 25
+  and before Q4. At 25+ itself its cost is not resolved: +0.0028 (0.0128).
+- **At 25+, a mechanism-against-estimator interaction** (seen in the shape, not resolved in log loss):
+  - Raw, the concession brings those states close to the actual: p0 0.235 to 0.306 (actual 0.325), and bias +1.39
+    to -0.18.
+  - #835's calibration then adds 0.05 to 0.07 of "no more scoring" to every arm (`h_pair` 0.253 to 0.300, `e17`
+    0.306 to 0.361). That helps the pair and, with the concession, overshoots (calibrated bias -0.61).
+  - #835 was fitted on the fleet's live re-sims, which ran without the end game (it is default off).
+- **S3, the damping move from 17/14 to 21/7, is small everywhere:** +0.0012 (0.0011) at 17+ and +0.0005 (0.0004)
+  overall. No cell reaches 1.5 SE.
+- OT is still not split from the clock. That it is rare from a 17+ margin late is assumed, not measured.
+
+**What follows (as pre-registered: S1 and S2 carry it, so a fix is code).**
+- **The env-only option the pre-registration named, the end game at 17/14, is not worth a check.** It recovers S3
+  only: +0.0012 (0.0011) at 17+.
+- **The clock's late blowout cost is a code fix:** a margin-aware piece of #808's clock. It is a betting change, for a
+  later window, and the user's call.
+- **Not pre-registered, an observation:** the concession can be switched off by env alone, with
+  `SYNDICATE_NCAAF_LIVE_ENDGAME_CONCEDE_DEFICIT=60` (as `e17n` does; the closest tested arm is at 17/14, not 21/7).
+  - On 2023 that would give back S2: +0.0061 (0.0072) at 17+, not resolved, and +0.0213 (0.0084) at Q3 7:30.
+  - It would also give up a small close-game gain: -0.0011 (0.0006).
+  - Using it would need its own pre-registered check on a season not used here, before any window.
+- **The end game stays queued as it is, unless the user decides otherwise.** Nothing changes on the fleet or in the
+  12-08 queue.
