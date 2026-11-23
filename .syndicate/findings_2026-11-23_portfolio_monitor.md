@@ -152,3 +152,76 @@ between 0% and 2%.
 **Falsified if** most listed Suggested rows show EV >= 0 net of fee at the venue's price and are refused for another
 reason (stake, cap, positions, a join, or a price-source problem). That would make it a purchaser defect, not a price
 difference.
+
+### RESULT, 1:49 PM CST: H1 SURVIVES; H2 SURVIVES; the purchaser is not dropping good bets
+
+Method, read-only. Each Suggested row, and each row of today's live orders, was repriced at Kalshi and Polymarket by
+the plan's own code (`_venue_price_resolver` + `scope_rows_to_venue`), under refresh-worker's environ, at 19:46Z
+(`/mnt/c/tmp/w_align/suggested_diag.py`). The board had 4,550 rows, 34 of them Suggested.
+
+**Where the board's edge comes from.** The board's best book on its 34 Suggested rows:
+
+| best book | Suggested rows |
+|---|---|
+| BetMGM | 10 |
+| DraftKings | 5 |
+| BetRivers | 5 |
+| FanDuel | 4 |
+| ProphetX | 3 |
+| Novig | 3 |
+| Bovada | 2 |
+| Kalshi | 1 |
+| Pinnacle | 1 |
+
+That is 33 of 34 at a book the purchaser does not trade. Median net EV at that book: +2.9%.
+
+**The same rows at the venues the purchaser trades:**
+
+| venue | listed | not listed | net EV > 0 at the venue's price | net EV >= 2% |
+|---|---|---|---|---|
+| Kalshi | 23 | 9 not quoting, 2 implausible | 3 (+0.3, +0.3, +1.0%) | **0** |
+| Polymarket | 10 | 23 not quoting, 1 implausible | 3 (+0.3, +0.8, +1.0%) | **0** |
+
+The other listed rows are negative at the venue: Kalshi typically -3 to -8% net, NHL props -3 to -7%.
+
+**The venue joins are correct.** For every listed row, the matched market is the same game, player, line and side (for
+example `KXNHLAST-...-UTAMWEEGAR52-1`). The pregame gap is the price itself: sportsbooks pay more than the two
+exchanges on these lines.
+
+**A SECOND DEFECT, in the board and not the purchaser: 7 of the 34 Suggested rows are NCAAB games already in play.**
+Their best-book price is far from the live venue price:
+- Charlotte @ FGCU moneyline: the board shows Kalshi -669, while Kalshi's live feed reads -9900;
+- Long Beach St @ FIU: +390 at DraftKings, against +178 on Kalshi and +156 on Polymarket;
+- Ole Miss @ Clemson under 149.5: -115 at Bovada, against -156 and -203.
+
+The purchaser refuses these correctly (`in_play_market_fair`, or EV < 0). But the board labels them Suggested on
+prices that no longer exist, and `suspect_stale_quote` did not catch them.
+
+**What the purchaser buys instead.** Today's 33 live orders: 19 matched a board row at 19:46Z. All 19 are
+non-Suggested. Their reasons were EV-only for 11 (`ev_below_min` and/or `ev_net_of_fee_below_min`), and
+`ev_below_min` + `suspect_stale_quote` for 8 (NBA alt lines). The board's best book for those rows was the order's own
+venue on 7 of them.
+
+**Results by admission path.** Settled live orders since the 0% floor began, 2026-10-20 (floor position log, 3,910
+entries). ROI on stake with a 95% range clustered by game, 2,000 resamples:
+
+| path | bets | games | ROI | 95% range | won-lost |
+|---|---|---|---|---|---|
+| admitted by the 0% floor (non-Suggested) | 1,249 | 663 | **-7.06%** | **[-13.60, -0.46]** | 717-531 |
+| every other live order (Suggested path, in-play, maker pilot) | 660 | 396 | -6.37% | [-13.83, +1.15] | 328-332 |
+
+The floor population **loses beyond noise**. The floor's own stop rule (user 2026-10-20: "revert to Suggested-only if
+live 0-2% rows show ROI below -5% after 100 settled bets") would read TRIPPED, 1,249 settled at -7.06%. That global
+stop was replaced on 2026-10-24 by the per-cell gate (user "Per-cell trip only (C)"), which keeps admitting rows cell
+by cell. The other path is not better at the venue price either: its point estimate is the same and its range includes
+zero.
+
+**Verdict.**
+- Nothing in the purchaser drops a good bet. The board's Suggested flag answers "is this +EV at the best sportsbook?",
+  and the purchaser can only ask "is this +EV at Kalshi or Polymarket?". On today's board the answer to the second is
+  no for all 34 picks (0 at >= 2% net).
+- The money goes through the 0% floor, onto thin venue edges the board itself rates below its bar, and that
+  population has lost beyond noise.
+- Separately, the board marks stale in-play NCAAB rows Suggested.
+- Decisions owed to the user (no change made): the floor (a betting change, window or risk reduction); a venue-priced
+  view on the board (display only); the in-play stale Suggested label (board defect, Layer 2).
