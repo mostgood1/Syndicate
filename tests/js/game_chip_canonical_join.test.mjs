@@ -49,7 +49,12 @@ function check(label, actual, expected) {
 check('the canonical index is declared', /let gameChipsByCanonical = new Map\(\);/.test(html), true);
 check('the canonical index is populated from chip.key', /const awayKey = String\(\(chip\.away \|\| \{\}\)\.key \|\| ""\)/.test(html), true);
 check('the canonical index is committed', /gameChipsByCanonical = byCanonical;/.test(html), true);
-check('collisions are removed, not resolved arbitrarily', /for \(const key of canonicalCollisions\) byCanonical\.delete\(key\);/.test(html), true);
+// Since 2026-11-23 a shared key keeps EVERY chip and `chipForGame` chooses on
+// start (see the playoff-series block at the end). Not resolved arbitrarily and
+// not removed either.
+check('collisions are no longer removed', /canonicalCollisions/.test(html), false);
+check('the canonical index keeps a list per key', /if \(awayKey && homeKey\) addCanonical\(/.test(html), true);
+check('the canonical lookup chooses on start', /pickChipByStart\(gameChipsByCanonical\.get\(/.test(html), true);
 check('chipForGame consults it', /gameChipsByCanonical\.get\(/.test(html), true);
 check('the group carries the row keys', /awayKey: String\(item\.away_key \|\| ""\)/.test(html), true);
 
@@ -123,6 +128,59 @@ check('Racing Santander joins on the canonical key', join('Elche @ Real Racing C
 check('an unresolvable club still falls through', join('Someone FC @ Nobody United', '', ''), null);
 // And a row that predates the stamp keeps working through the exact index.
 check('a keyless row still joins when the names match', join('Sevilla @ Athletic Club', '', ''), 'SEV @ ATH');
+
+// ---------------------------------------------------------- playoff series
+// Reported 2026-11-23: the rail showed LAFC @ St. Louis as a bare "Los Angeles
+// @ St. Louis City / 52 opportunities" card. The board rows carried
+// `lafc` / `st. louis city sc`, the same keys as the chip, but the MLS playoff
+// chips held that pair TWICE (game 1 tonight, game 3 on 12-03). The old
+// collision guard removed the key, so neither game had a chip. These are the
+// real fleet chips. They run through the page's own `addCanonical` and
+// `chipForGame`, not a copy.
+function sliceOf(fromMarker, toMarker) {
+  const a = html.indexOf(fromMarker);
+  const b = html.indexOf(toMarker, a + 1);
+  if (a < 0 || b < 0 || b <= a) throw new Error(`slice ${fromMarker} .. ${toMarker} not found`);
+  return html.slice(a, b);
+}
+const pageById = new Map(), pageByMatchup = new Map(), pageByCanonical = new Map(), pageByLoose = new Map();
+const { addCanonical } = new Function('byCanonical',
+  `${sliceOf('const addCanonical', 'for (const chip of chips) {')}; return { addCanonical };`)(pageByCanonical);
+const { chipForGame } = new Function(
+  'gameChipsById', 'gameChipsByMatchup', 'gameChipsByCanonical', 'gameChipsByMatchupLoose',
+  `${sliceOf('const CLUB_AFFIXES', '// `layer2-board-chip-race`. The FIRST call to `renderGameCards`')}
+   ${sliceOf('function chipForGame', 'function chipTeamRow')}; return { chipForGame };`,
+)(pageById, pageByMatchup, pageByCanonical, pageByLoose);
+
+const LAFC = { name: 'LAFC', key: 'lafc' };
+const STL = { name: 'St. Louis CITY SC', key: 'st. louis city sc' };
+const series = [
+  ['401933728', LAFC, STL, '2026-11-24T01:00:00+00:00'],
+  ['401933726', STL, LAFC, '2026-11-29T01:30:00+00:00'],
+  ['401933735', LAFC, STL, '2026-12-03T01:00:00+00:00'],
+].map(([game_key, away, home, start_time_utc]) => ({
+  sport: 'soccer', league: 'mls', game_key, start_time_utc, away, home,
+  matchup: `${away === LAFC ? 'LAF' : 'STL'} @ ${home === LAFC ? 'LAF' : 'STL'}`,
+}));
+for (const chip of series) addCanonical(`soccer|${chip.away.key} @ ${chip.home.key}`, chip);
+addCanonical('soccer|lafc @ st. louis city sc', series[0]); // the same chip twice is still one game
+check('the shared key holds both LAFC @ STL games', (pageByCanonical.get('soccer|lafc @ st. louis city sc') || []).length, 2);
+
+const seriesRow = (commenceTime) => ({
+  key: 'soccer|odds-event-hash', sport: 'SOCCER', sportSlug: 'soccer',
+  matchup: 'Los Angeles FC @ St. Louis City SC', awayKey: 'lafc', homeKey: 'st. louis city sc',
+  ownGameKey: null, commenceTime,
+});
+const gk = (chip) => (chip ? chip.game_key : null);
+check("tonight's rows join game 1", gk(chipForGame(seriesRow('2026-11-24T01:00:00Z'))), '401933728');
+check("game 3's rows join game 3, not game 1", gk(chipForGame(seriesRow('2026-12-03T01:00:00Z'))), '401933735');
+// Still refuses rather than guess: a row with no start cannot pick a game.
+check('a startless row on the shared key stays chip-less', gk(chipForGame(seriesRow(null))), null);
+// A key with one chip behaves exactly as before.
+check('the reversed fixture (one chip) still joins', gk(chipForGame({
+  ...seriesRow('2026-11-29T01:30:00Z'), awayKey: 'st. louis city sc', homeKey: 'lafc',
+  matchup: 'St. Louis City SC @ Los Angeles FC',
+})), '401933726');
 
 console.log(failures === 0 ? '\nall assertions passed' : `\n${failures} assertion(s) failed`);
 process.exit(failures === 0 ? 0 : 1);

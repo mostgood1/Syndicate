@@ -2505,16 +2505,16 @@
       const byMatchupLoose = new Map();
       const looseCollisions = new Set();
       const byCanonical = new Map();
-      const canonicalCollisions = new Set();
       // THE EXACT INDEX HOLDS EVERY CHIP ON A MATCHUP, NOT THE LAST ONE SEEN.
       // It was `Map.set`, so on a doubleheader the later game silently owned
       // the key -- measured on production 2026-09-22, TB @ NYY: G1 (gamePk
       // 823543, 17:05Z) and G2 (823494, 23:05Z) share both the abbr and the
       // full-name key, so every board row for EITHER half joined G2's chip, the
       // two halves merged into one rail card, and G1's chip was left unclaimed
-      // and seated as a second, empty card. The canonical and loose indexes
-      // below refuse a collision outright; this one keeps the candidates and
-      // lets `chipForGame` choose on the row's own start time, or refuse.
+      // and seated as a second, empty card. The loose index below refuses a
+      // collision outright; this one and the canonical index keep the
+      // candidates and let `chipForGame` choose on the row's own start time,
+      // or refuse.
       // One GAME listed twice (same `game_key`) is still one game, so it
       // replaces its earlier entry the way `byId` does rather than becoming a
       // second candidate that could never be told apart from the first.
@@ -2522,6 +2522,20 @@
         const list = byMatchup.get(indexKey);
         if (!list) {
           byMatchup.set(indexKey, [chip]);
+          return;
+        }
+        if (list.includes(chip)) return;
+        const chipKey = String(chip.game_key || "").trim();
+        const sameGame = chipKey ? list.findIndex((other) => String(other.game_key || "").trim() === chipKey) : -1;
+        if (sameGame >= 0) list[sameGame] = chip;
+        else list.push(chip);
+      };
+      // The canonical index keeps every chip the same way. See the comment
+      // above its use below.
+      const addCanonical = (indexKey, chip) => {
+        const list = byCanonical.get(indexKey);
+        if (!list) {
+          byCanonical.set(indexKey, [chip]);
           return;
         }
         if (list.includes(chip)) return;
@@ -2577,21 +2591,23 @@
         // Santander" -- their cards printed the odds-feed name verbatim beside
         // cards showing tri-codes, which is the reported mismatch.
         //
-        // Collisions are removed here for the SAME reason as the loose index
-        // below: two chips on one key would attach one game's score to another
-        // game's card. Two fixtures between the same clubs in one chip window
-        // (two legs, a cup tie) is exactly that case, so it is guarded rather
-        // than assumed away.
+        // EVERY CHIP ON A KEY, CHOSEN BY START -- not removed (lane
+        // evening-utc-date-split, 2026-11-23). Two fixtures between the same
+        // clubs in one chip window (two legs, a playoff series) share this key.
+        // Removing the key kept one game's score off the other's card, but it
+        // also left BOTH games chip-less. Measured on the fleet 2026-11-23: the
+        // MLS playoff chips held LAFC @ St. Louis twice (401933728 at 11-24
+        // 01:00Z and 401933735 at 12-03 01:00Z), so tonight's 159 board rows,
+        // keyed `lafc` / `st. louis city sc` exactly like the chip, found no
+        // chip. The rail showed a bare "Los Angeles @ St. Louis City / 52
+        // opportunities" card. The list goes through `pickChipByStart`, the
+        // same rule the exact index uses since 2026-09-22. It picks the nearest
+        // start only when the runner-up is at least 45 minutes farther, and a
+        // group with no start still gets null. So one game's score still never
+        // lands on the other's card.
         const awayKey = String((chip.away || {}).key || "").trim().toLowerCase();
         const homeKey = String((chip.home || {}).key || "").trim().toLowerCase();
-        if (awayKey && homeKey) {
-          const canonical = `${sport}|${awayKey} @ ${homeKey}`;
-          if (byCanonical.has(canonical)) {
-            canonicalCollisions.add(canonical);
-          } else {
-            byCanonical.set(canonical, chip);
-          }
-        }
+        if (awayKey && homeKey) addCanonical(`${sport}|${awayKey} @ ${homeKey}`, chip);
         if (awayName && homeName) {
           const loose = `${sport}|${normalizeClubName(awayName)} @ ${normalizeClubName(homeName)}`;
           if (byMatchupLoose.has(loose)) {
@@ -2602,7 +2618,6 @@
         }
       }
       for (const key of looseCollisions) byMatchupLoose.delete(key);
-      for (const key of canonicalCollisions) byCanonical.delete(key);
       gameChipsById = byId;
       gameChipsByMatchup = byMatchup;
       gameChipsByMatchupLoose = byMatchupLoose;
@@ -2690,7 +2705,8 @@
     const awayKey = String(group.awayKey || "").trim().toLowerCase();
     const homeKey = String(group.homeKey || "").trim().toLowerCase();
     if (awayKey && homeKey) {
-      const canonical = gameChipsByCanonical.get(`${sport}|${awayKey} @ ${homeKey}`);
+      // A LIST since 2026-11-23 (see `addCanonical`), so it is chosen on start.
+      const canonical = pickChipByStart(gameChipsByCanonical.get(`${sport}|${awayKey} @ ${homeKey}`), group);
       if (canonical) return canonical;
       // THE SAME GAME, NAMED THE OTHER WAY ROUND (lane wncaab-module,
       // 2026-11-07). OddsAPI changed the neutral-site Nebraska / Providence
@@ -2703,7 +2719,7 @@
       // teams. Only after the exact pair missed, and only on the same Central
       // day as the chip: an NHL home-and-home is the same pair reversed on
       // the NEXT day, and a start missing on either side refuses.
-      const flipped = gameChipsByCanonical.get(`${sport}|${homeKey} @ ${awayKey}`);
+      const flipped = pickChipByStart(gameChipsByCanonical.get(`${sport}|${homeKey} @ ${awayKey}`), group);
       if (flipped) {
         const chipDay = centralDateOfMs(chipStartMs(flipped.start_time_utc));
         const groupDay = centralDateOfMs(chipStartMs(group.commenceTime));
