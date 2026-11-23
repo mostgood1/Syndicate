@@ -1,5 +1,38 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#861` — **ONE DECISION RECORD PER LINE, READ BY EVERY SURFACE. Today every surface starts from the same Layer 2 rows, then re-derives fair, price, EV and the pick with its own rules. Per-sport pages run a parallel raw-sim producer. Measured on the fleet 2026-11-23 19:25-19:39Z: 8 of 8 cross-surface checks over their limit. OVERSIGHT LANE OPEN; the instrument is built; no surface changed yet** `[2026-11-23, lane surface-consistency-oversight, session d5aa3287; user "we need a session that has oversight over the entire Syndicate application", chose "Do it here"; findings `.syndicate/findings_2026-11-23_surface_consistency.md`]`
+- **Instrument:** `scripts/surface_consistency_check.py` (read-only, 3 in flight, exit 0 / 1 over / 2 incomplete; 11 tests). It ran at 19:38Z:
+  - `same_price_ev` (board vs cheat sheet): 35 of 235;
+  - `pick_flag`: 42 of 296;
+  - `ask_headline`: 5 of 5 (4 losing models, 1 unmeasured; 5 of 5 off-sport on an NBA question);
+  - `sim_attribution`: 2 of 15;
+  - `plan_vs_orders`: 33 of 33 live orders absent from the Stage A plan;
+  - `venue_price_hidden`: 12 of 16;
+  - NHL sport cards: away team +4.11 pp above the market fair, same sign on 7 of 7.
+- **The single source already exists and is shadow-only:** `syndicate/features/shared/decision_record.py` ("ONE decision record per board line"). Nothing reads it for placement, sizing or display. Its two siblings are:
+  - `cell_calibration.py` (#847): one model probability, default-off;
+  - `layer2_board._stamp_suggested`: one pick definition, which Ask, the cheat-sheet verdict, play cards, the live EV floor and the in-play rule each bypass.
+
+  Code trace: 15 divergences, D1-D15, in the findings. `.syndicate/findings_2026-10-20_one_engine_audit.md` (F1-F5) measured five of them already, and its code paths are still present.
+- **Target:** promote `DecisionRecord` from shadow to the read path. It carries:
+  - one fair;
+  - the sim's own number, labelled with its skill verdict;
+  - one "model" probability (market until #847 loads);
+  - EV at the best book AND net of fee at the executable venue;
+  - one pick flag, one rank, one stake.
+
+  Every surface reads it and computes none of it.
+- **Order, honouring the betting-change windows:**
+  1. (display only, any deploy)
+     - Ask's headline comes from the record's rank, routed to the asked sport.
+     - "Our sim has X%" quotes the sim, or names the market's number as the market's.
+     - The cheat sheet reads the record's fair, EV and flag.
+     - Per-sport picks/cards headline the record, with the raw sim shown as a labelled view.
+     - The board shows the venue price beside the sportsbook best.
+  2. (betting change, 12-08 window at the earliest, the user's call) the live plans and the displayed pick become one policy, with one model probability.
+- **Decision owed (user):** which pick is canonical. One option is what the live book buys (venue price net of fee, 0% floor); the other is the board's Suggested (sportsbook price). Today money follows the first and every display shows the second.
+- **Coordinate, do not cross:** `fair-price-v2` (`_resolve_fair`, `_consensus_fair`), `board-market-gone-snapshot-age` (`pipeline/layer2_shortlist.py`), `cheat-sheets` / `cheat-sheet-section-optimization`, `cell-calibration-847`, `syndicate-decision-engine` (check its `Files:` for `decision_record.py`), `paper-alongside-live`, `ask-engine-monitor`, `portfolio-monitor`.
+
 ### `#860` — **EVERY ST. LOUIS BLUES GAME MISSES ITS NHL LIVE LANE: the lens names the club "St. Louis Blues", the odds rows say "St Louis Blues", and `live_gameline_join._norm_team` keeps the period, so a Blues game's moneyline and puck-line rows never carry a live model (fleet 11-21 6:43 PM CST: every other live NHL game all, New Jersey @ St. Louis 0 of 1; 11-22's Edmonton @ St. Louis the same). Fix ON MAIN `cb98b201a`, DEFAULT OFF: NHL opts into the existing team-alias fallback behind `SYNDICATE_LIVE_GAMELINE_NHL_TEAM_ALIASES` (absent = OFF); switching it on is a BETTING CHANGE, the user's call, queued for the 11-24 window** `[2026-11-22, lane nhl-live-join-stl-alias, session d58574cb (rail monitor); user "Yes, build it" 11-21 ~8 PM CST; findings `.syndicate/findings_2026-11-21_layer2_rail_monitor.md` flag 4]`
 - **IN THE 11-24 WINDOW BATCH (2026-11-23 8:10 AM CST)** as CHANGE M of task `nfl-level-refit-load-1120` (2:15 AM CST 11-24; droppable). User "yes, have the rail monitor add J to the batch" (to the fleet-watcher) and "Yes, add it" (session d58574cb), ~8:05-8:07 AM CST. The load is verified when the first live St. Louis game reads N of N modelled (`kit_after_up_stl.sh`, the rail monitor). Lane `nhl-live-join-stl-alias`.
 - **Mechanism:** `team_aliases.chip_join_key("nhl", ...)` (map from `local_nhl_odds.TEAM_NAME_TO_ABBR`) folds both spellings to one key; the fallback is read only on an exact miss, so every pair that joins today joins identically. NCAAF's own switch (absent = ON) is unchanged; `SYNDICATE_LIVE_GAMELINE_TEAM_ALIASES=off` still turns every sport off.

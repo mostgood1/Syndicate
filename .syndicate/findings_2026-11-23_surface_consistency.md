@@ -138,6 +138,42 @@ The check turns Reading 1 into a repeatable test (todo `#861`).
 The test suite caught one defect in the check before this run: "beats the close" contains the letters "lose". The
 check now matches the whole word.
 
+## Reading 3 -- the code paths behind it `[code read, main at e86a2083e; nothing run]`
+
+Every surface starts from the Layer 2 shortlist rows (`read_layer2_shortlist`, `pipeline/intelligence_state.py:3612`)
+or the quote grid under them. Each then recomputes something of its own. The ones that move a shown or placed bet:
+
+| # | what | one side | other side |
+|---|---|---|---|
+| D1 | in-play row source | the board and the rail read the in-play overlay (`book_grid_artifact.py:973`, merged `intelligence_state.py:1877`), which is not venue re-priced | the plan, Ask and the cheat sheets read the older shortlist row for the same market (`portfolio_commit.py:2279`, `ask_the_syndicate_adapter.py:1270`, `build_cheat_sheets.py:179`) |
+| D2 | Suggested vs staked | Suggested is judged at the best bettable book (`layer2_board.py:3712`) | the live and paper2 books re-price at the venue and admit on venue net EV > 0. With `SYNDICATE_LIVE_EV_FLOOR=0`, non-Suggested rows reach the live book (`venue_scope.py:183-217`, `pipeline/portfolio_commit.py:527-553`) |
+| D3 | fee | the board's score passes no phase (`layer2_board.py:4687-4700`) | venue scope passes phase and ticker (`venue_scope.py:206-216`); the cheat sheet passes neither and treats a failed lookup as 0 (`cheat_sheets.py:63-76`); the in-play bot fixes Kalshi at 1.0 (`inplay_entries_paper.py:133-136`) |
+| D4 | EV gross vs net | the board EV column is gross (`layer2_board.py:5436`) | the Suggested gate, the sheet's "value" and the play cards are net (`cheat_sheets.py:207`, `play_cards.py:69-78`) |
+| D5 | model probability | board Win% is the raw projection (`layer2_board.py:5454-5487`) | the stake probability is the L2 fair + `model_edge_pct` (`portfolio_commit.py:765,805`), and that edge was measured against the projection's own fair (`prop_projections.py:1415-1442`) |
+| D6 | fair | Layer 2: per-book de-vig, then the median (`layer2_board.py:1681`) | the projection fair de-vigs the mean vigged price (`prop_projections.py:1179-1219`); Layer 1 recomputes fair in JS (`layer1_board.html:734-753`); the live lens uses one quote (`app_slice.py:10482`); the in-play bot polls OddsAPI itself (`inplay_entries_paper.py:148-183`) |
+| D7 | "top" | shortlist score (`layer2_board.py:3600`) | Ask sorts by model edge first and never reads Suggested (`ask_the_syndicate_data.py:3657-3664`, `ask_the_syndicate_adapter.py:1208-1229`); the hub sorts by `edge` (`hub_summary.py:24-30`); sheet picks, play cards and NHL picks each use their own rule (`cheat_sheets.py:1190`, `play_cards.py:69-78`, `nhl/picks.py:34-41`) |
+| D8 | meaning of `edge` | Layer 2 cards: the market EV fraction (`layer2_board.py:4285`) | legacy cards: model minus fair (`recommendation_engine.py:499`). Both feed the board's `edgeValue` and the hub sort |
+| D9 | stake | paper: 1/4 Kelly x credibility (`portfolio_commit.py:1244`) | live: a $5-10 band on full Kelly (`live_stake_band.py:170-183`); in-play: 1 contract; MLB card: `stake_u` |
+| D10-D13 | live and freshness | board live edge = live p - projection fair | rail flag = live p - L2 fair (`intelligence.html:3416-3436`); a live row can show a pregame Win% beside a live edge (`live_gameline_join.py:3092-3113`); chip age is trusted 120 s on one path and 600 s on another (`intelligence.py:3618` vs `intelligence_state.py:2207`) |
+| D14 | per-sport win probability | board: NBA histogram + book blend (`nba_game_projections.py:347-363`) | NBA cards: logistic on margin (`nba/cards.py:1686-1691`); NBA/MLB chips: raw sim (`game_chip_intervals.py:588-603,1058`) |
+| D15 | identity | the plan's `position_key` includes the book (`portfolio_commit.py:1013`) | `pick_id` is book-free (`layer2_ledger.py:52-64`); board dedupe uses matchup text (`intelligence_board.py:394-400`); the overlay ignores line and side (`book_grid_artifact.py:1321`) |
+
+The intended single sources already exist, and each one is bypassed:
+- **`decision_record.py`** ("ONE decision record per board line") is shadow only: written from `intelligence_state.py:8209`, and
+  nothing reads it for placement, sizing or display.
+- **`cell_calibration.py`** (#847): one model probability, all four switches off.
+- **`_stamp_suggested`** (`layer2_board.py:3636`): one pick definition.
+- **`venue_fees.taker_fee_per_contract`**: one fee lookup, called with different arguments per surface.
+- **`opportunity_signals`**: the de-vig and EV maths, re-implemented in Layer 1 JS, the live lens, the in-play bot, the
+  cheat sheet and NBA cards.
+
+`.syndicate/findings_2026-10-20_one_engine_audit.md` (forks F1-F5) measured D2, D5, D7 and the NHL-picks fork a month
+ago, and the code paths are still there. **What it lacked was an instrument that fails while they stay.**
+
+Not verified here: the fleet values of the flags these depend on (`SYNDICATE_PRICING_CALIBRATION`,
+`SYNDICATE_CELL_CALIBRATION_*`, `SYNDICATE_FAIR_DEVIG_METHOD`, `SYNDICATE_LIVE_EV_FLOOR`, `SYNDICATE_LIVE_STAKE_BAND`,
+`SYNDICATE_SCORE_FEE_NET`).
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:
