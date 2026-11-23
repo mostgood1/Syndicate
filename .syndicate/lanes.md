@@ -2083,6 +2083,14 @@ death, never life — do not invert it.
 - Verification: surface_consistency_check.py against the fleet: fair/EV disagreement 0 on same-price pairs, one pick set across board/Ask/cheat/sport pages, every 'our sim' sentence quotes the sim; findings file records each reading
 - Blocked by: none
 
+### live-ev-floor-off — OPEN — opened 2026-11-23 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: The 0% live EV floor is OFF on the fleet from the 11-24 window batch (user 11-23 'Yes, add it tonight'): refresh-worker's environ carries no SYNDICATE_LIVE_EV_FLOOR, 0 LIVE_EV_FLOOR lines after the up, and every live-plan position is a Suggested row
+- Files: .syndicate/findings_2026-11-23_live_ev_floor_off.md (NEW)
+- Hypothesis: n/a (a user decision on measured evidence: the floor's 1,249 settled live bets since 10-20 returned -7.06% [-13.60 -0.46])
+- Falsification test: after the up: a LIVE_EV_FLOOR date= line or a live-plan position tagged live_ev_floor=0 while the role env reads ABSENT
+- Verification: /mnt/c/tmp/w1124_floor/kit_after_up_floor.sh <up UTC> after the first plan writes: live_ev_floor_on_lines=0 and each venue's rows_in at the Suggested scope (tens) vs 514/463 before; kit_role_env.py SYNDICATE_LIVE_EV_FLOOR ABSENT; the next day's live orders carry no floor tag
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
