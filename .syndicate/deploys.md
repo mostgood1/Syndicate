@@ -62982,3 +62982,26 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **verify:** the LAFC @ STL card keeps its chip (score and clock) in play tonight. The 12-03 game 3 rows join 401933735, not game 1.
 - **Revert:** `git revert 3983309ce` on main, then ff + reload-web.
 - **Effect on the 11-24 batch:** its STEP 4 range now starts at `3983309ce`, so this class (c) commit is no longer a ride-along there.
+
+
+## 2026-11-23 20:30:02Z (2:30:02 PM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): Ask's headline is the board's own picks, in the board's order, for the sport asked about, `d845fe345` (lane `surface-consistency-oversight`, todo #861 step 1a, user "Deploy to web now")
+- betting change: no (Ask places and sizes nothing; display only)
+- **Why:** measured 19:29Z. "Best NBA bets tonight?" and "What are the best bets today?" headlined the SAME 5 rows from other sports. They were ranked on 22-28 point model edges, 4 of 5 from models whose own card says they lose to the market, and 0 of the 5 were Suggested. Cause 1: the ranking took `model_edge_pct` first. Cause 2: the router's inferred sport never reached the headline. The headline now takes `_is_board_pick` (Suggested, EV > 0, and not in play on a market price alone, which is the purchaser's own rule) in `_board_pick_rank_key` order. Findings: `.syndicate/findings_2026-11-23_surface_consistency.md`, "Step 1a" and "Reading 4".
+- **Ride-alongs `3983309ce..d845fe345`.** The listing was its own call, before the merge, with vendor/ included (empty). Runtime code:
+  - `80dbb08f3` + `a5637a517`: this change (`ask_the_syndicate.py`, `_adapter.py`, `_data.py`).
+  - `bbbbb4b3f`: rail-monitor probe scripts only. `scripts/ask_syndicate_regression.py` and `scripts/prop_evidence_checklist.py` are operator scripts. No role imports any of the three (app references are comments).
+  - The rest is ledger and tests.
+  - Overlap with the fleet checkout's 14 locally modified data files: none (20 files in the ff).
+- **Preflight** `--betting-change no`, 2 expect / baseline pairs (baseline read 20:28:34Z): **CLEAR 20:29:48Z**. Claim acquired 20:29:39Z.
+- **ff + reload:**
+  - `git merge --ff-only d845fe345` at **20:30:02Z** (`3983309ce` -> `d845fe345`, ancestor checked first).
+  - `RELOAD_WEB {"elapsed_s": 2.3, "failures": 0, "state": "done"}`.
+  - Workers 375156 / 376812 -> **376924 / 376925**; master 1011213 unchanged.
+  - Ask's answer cache is per-process memory, so the new workers start empty.
+- **expect / measured** (served `POST /api/syndicate/query`, 20:30:12Z):
+  - `ask_nba_headline_off_sport_rows` 5 -> 0: **MET**. Served: "The board suggests no NBA bets right now. Of its 1,145 NBA lines, 1,123 have a stale quote, 1,062 are below the board's minimum EV and 235 have a fair price from one book only."
+  - `ask_best_headline_suggested_rows` 0 -> 5: **MET**. NCAAB / NCAAF / WNCAAB, "Best EV +4.1% at the posted price. 5 in-play board picks left out: on a market price alone, the purchaser does not buy them."
+  - Second reading 20:30:28Z (`scripts/surface_consistency_check.py`): `ask_headline:nba` OK, 0 rows.
+- **verify:** the next `surface_consistency_check.py` run reads `ask_headline:nba` OK, and the "best bets" headline rows all carry `suggested: true`. The instrument's `ask_headline` check still counts "losing model" rows as bad. That is the old failure shape: board picks are picked on price, and the sim's verdict is shown beside them as information. The check is being changed to fail on non-picks and off-sport rows instead.
+- **Revert:** `git revert a5637a517 80dbb08f3` on main, then ff + reload-web.
+- **Effect on the 11-24 batch:** its STEP 4 range now starts at `d845fe345`. This display-only change is no longer a ride-along there.

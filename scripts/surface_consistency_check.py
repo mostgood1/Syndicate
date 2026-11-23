@@ -25,8 +25,8 @@ block per check:
 
   same_price_ev      pairs at the same book and price whose EVs differ by more than 0.5
   pick_flag          lines where Layer 2 Suggested and the cheat sheet's flag disagree
-  ask_headline       Ask headline rows from a model measured to lose, or not routed
-                     to the asked sport
+  ask_headline       Ask headline rows that are not the board's picks, or not in
+                     the asked sport (model-skill counts reported, not judged)
   sim_attribution    Ask card text "Our sim has ... at X%" where X is the market fair
                      and the sim's own ladder differs by more than 5 pp
   plan_vs_orders     today's live orders absent from the Stage A plan, or not Suggested
@@ -220,20 +220,32 @@ _LOSES_RE = re.compile(r"\blos(?:es|e|ing)\b", re.IGNORECASE)
 
 
 def check_ask_headline(answer: dict, *, asked_sport: str | None) -> dict:
+    """Ask's headline must be the BOARD'S picks, in the asked sport.
+
+    Changed 2026-11-23 after step 1a was deployed (`d845fe345`). This first
+    counted any row from a model measured to lose, or never measured, as bad.
+    That was the shape of the defect when the headline ranked on model edge.
+    Since the deploy, the headline rows are board picks chosen on PRICE, and the
+    sim's skill verdict rides beside them as information. So a row is bad when
+    it is not a board pick (`suggested` is not True) or is off-sport. The skill
+    counts are still reported.
+    """
     rows = ((answer.get("structured_response") or {}).get("top_opportunities")) or []
     # whole word: "beats the close" contains the letters "lose" (caught by the test)
     losing = [r for r in rows if _LOSES_RE.search(str(r.get("model_skill_verdict") or ""))]
     unmeasured = [r for r in rows if str(r.get("model_skill_status") or "") != "measured"]
     off_sport = [r for r in rows if asked_sport and str(r.get("sport") or "").lower() != asked_sport]
-    bad = {id(r) for r in losing + unmeasured + off_sport}
+    not_a_pick = [r for r in rows if r.get("suggested") is not True]
+    bad = {id(r) for r in not_a_pick + off_sport}
     return {
         "check": f"ask_headline:{asked_sport or 'all'}",
         "n": len(rows),
         "bad": len(bad),
         "limit": 0,
+        "not_a_board_pick": len(not_a_pick),
+        "off_sport": len(off_sport),
         "losing_model": len(losing),
         "unmeasured_model": len(unmeasured),
-        "off_sport": len(off_sport),
         "examples": [
             {"sport": r.get("sport"), "market": r.get("market"), "edge_pct": r.get("edge_pct"), "verdict": str(r.get("model_skill_verdict") or "")[:90]}
             for r in rows[:5]

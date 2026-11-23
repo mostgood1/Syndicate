@@ -223,6 +223,16 @@ asserted "headline = max model edge" were rewritten to the board-pick contract.
 **Lead it exposed, not followed.** 1,100 of 1,128 NBA lines carry `suspect_stale_quote` at 1:30 PM CT on game day, so
 the board can pick no NBA bet at all. Whether that is quote cadence or a capture gap is unmeasured.
 
+**DEPLOYED to web at 20:30:02Z** (`d845fe345`, user "Deploy to web now"; `deploys.md` entry of the same instant).
+Measured on the served payload:
+- **20:30:12Z:** the NBA headline went from 5 off-sport rows to 0, explained in the board's reasons. The best-bets
+  headline went from 0 Suggested rows to 5, with "5 in-play board picks left out".
+- **20:32:02Z,** with the revised instrument: `ask_headline:all` 0 of 5 bad and `ask_headline:nba` 0 of 0.
+  - The check now fails on non-picks and off-sport rows. It reports the sim's skill verdict and no longer judges
+    it: board picks are chosen on price, and the verdict rides beside them.
+  - Of today's 5 headline picks, 3 carry a "loses" sim verdict and 2 are unmeasured. That is information about the
+    sim, not about the price edge the pick rests on.
+
 ### Reading 4 -- the peer's report on Suggested vs the purchaser, re-measured `[20:15:43Z-20:19:41Z, fleet, read-only]`
 
 `portfolio-monitor` (session 69d80317) messaged at 19:46Z. It said explicitly that it was not asking for a change.

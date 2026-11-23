@@ -84,19 +84,24 @@ def test_pick_flag():
     assert scc.check_pick_flag(l2, scc.cheat_records({"rows": [_cheat_row(suggested=False)]}))["bad"] == 1
 
 
-def test_ask_headline_flags_losing_unmeasured_and_off_sport_rows():
-    good = {"structured_response": {"top_opportunities": [{"sport": "nba", "model_skill_status": "measured", "model_skill_verdict": "beats the close"}]}}
-    assert scc.check_ask_headline(good, asked_sport="nba")["bad"] == 0
+def test_ask_headline_flags_non_picks_and_off_sport_rows_and_only_reports_model_skill():
+    good = {"structured_response": {"top_opportunities": [
+        {"sport": "nba", "suggested": True, "model_skill_status": "measured", "model_skill_verdict": "beats the close"},
+        # a board pick on price whose sim is rated as losing is NOT bad: the verdict is information
+        {"sport": "nba", "suggested": True, "model_skill_status": "measured", "model_skill_verdict": "loses to the close"},
+    ]}}
+    out = scc.check_ask_headline(good, asked_sport="nba")
+    assert (out["bad"], out["losing_model"]) == (0, 1)
     bad = {
         "structured_response": {
             "top_opportunities": [
-                {"sport": "nfl", "model_skill_status": "measured", "model_skill_verdict": "loses to the de-vigged market"},
+                {"sport": "nfl", "suggested": True, "model_skill_status": "measured", "model_skill_verdict": "loses to the de-vigged market"},
                 {"sport": "nba", "model_skill_status": "unmeasured", "model_skill_verdict": "never backtested"},
             ]
         }
     }
     out = scc.check_ask_headline(bad, asked_sport="nba")
-    assert (out["bad"], out["losing_model"], out["unmeasured_model"], out["off_sport"]) == (2, 1, 1, 1)
+    assert (out["bad"], out["not_a_board_pick"], out["off_sport"], out["losing_model"], out["unmeasured_model"]) == (2, 1, 1, 1, 1)
 
 
 def test_sim_attribution_catches_the_market_number_under_the_sims_name():
