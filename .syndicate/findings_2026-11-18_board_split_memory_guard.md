@@ -752,3 +752,71 @@ On the user's "Yes, build both" (section 15, levers 1 and 2). The plan and predi
   claim parser splits on every comma, so it saw no section, and the file read as contested. The lane guard blocked this edit on
   that. Commas became "and", with the scope unchanged, per the 2026-11-17 learnings rule. `check_lane_invariants`: 4 -> 3
   contested files.
+
+## 18. The host headroom switch: built default-off; PRE-REGISTERED PREDICTION for its load (written 9:52 AM CST 11-23 (15:52Z), before any load)
+
+User "Yes, build it" (11-23), answering "Build the host-aware guard budget now, off by default, for the 12-08 window?".
+Section 16 named the lever: the guard refuses against the DECLARED ceiling, not the host. Plan in the lane first (`c454f3798`).
+
+**The evidence it rests on** (read-only, nice 19; `C:\tmp\bmg\w1124\guard_shortfall.py` over `refresh-worker.log{.3,.2,.1,}`,
+which reach back to 11-20 ~01:00Z):
+- 149 heavy-build refusals from 11-20 to 11-23 03:09Z. Every one was floor 1,900 against max 7,936.
+- The declared shortfall (floor - headroom) per UTC day: 11-20 n 23, p50 157, max 486; 11-21 n 91, p50 129, p90 394, max 940;
+  11-22 n 24, p50 85, max 398; 11-23 n 11, p50 145, max 303 MB.
+- Over 512 MB: 4 of 149. Over 768: 1. Over 1,024: 0.
+- The host (the WSL VM: 15,746 MB, swap 4 GB with 1.9 GB used at 15:41Z 11-23) had 5,348 MB available at 00:23Z 11-21
+  (section 14), 6.47 GB at 10:03 PM CST 11-19 (rail monitor) and 5,354-10,928 MB in the ask monitor's 11-17 samples.
+  **The evening minimum was never sampled**, so this section cannot say how many of the 149 the host would have covered.
+  The switch logs the host at every refusal it sees, so the first evening after a load measures it.
+
+**The change** (`pipeline/board_build_process.py` "THE HOST'S HEADROOM"; `memory_observability.py` "THE HOST HEADROOM HOOK"):
+- `SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB=<n>` (absent / 0 / junk = off; capped at 2,048). In the board CHILD only,
+  a headroom gate the declared ceiling refuses is allowed when the shortfall is at most n MB AND `/proc/meminfo` MemAvailable is
+  at least the gate's floor + `SYNDICATE_BOARD_PROCESS_HOST_RESERVE_MB` (default 2,048; 0 / junk = the default).
+  An unreadable host refuses.
+- Mechanism: `memory_headroom_snapshot` asks a registered hook about an INSUFFICIENT snapshot only. It flips the verdict only on
+  `host_override: True`, and a hook that raises grants nothing. Only `_serve_main` registers it, and only with the child marker.
+  So the parent, web, live-odds-worker and the in-thread loop never reach it, and with the key absent nothing changes.
+- It covers every gate the child runs: the heavy guard (1,900), the Layer 2 shortlist floor (600) and the post-build recycle check.
+- Lines: `[board_process] BOARD_PROCESS_HOST_HEADROOM installed pid= overdraft_mb= reserve_mb= host_available_mb=` at each child
+  boot; `host_overdraft_mb= host_reserve_mb=` on `BOARD_PROCESS_CHILD_SWITCHES`; per grant `MEMORY_GUARD_HOST_OVERRIDE stage=
+  caller= floor_mb= headroom_mb= shortfall_mb= host_available_mb= overdraft_mb= reserve_mb=`. A grant is NOT a
+  `MEMORY_GUARD_ABORT`, so every counter of refusals keeps its meaning. A refusal's snapshot gains `host_available_mb`,
+  `host_override_reason` (host_unreadable / no_declared_headroom / overdraft_exceeded / host_below_floor_plus_reserve),
+  `declared_shortfall_mb` and `declared_sufficient`.
+
+**Tests** (`tests/test_board_host_headroom.py`, 28): off != on through the real `_abort_if_memory_critical` (11-23 02:39Z's refusal
+on 11-21's evening host), through `_serve_main` (the switches line), and in a real `--serve` dry-run child process; every refusal
+rule with its boundaries; the 11-21 22:23Z case (short 571) still refused under 512; a sufficient snapshot never asks the hook;
+a broken or malformed hook grants nothing; outside the child it never installs. With the neighbours (`test_board_split_memory_guard`,
+`test_memory_observability`, `..._local_limit`, `test_intelligence_overview_memory_guard`, `test_board_build_process_split`):
+Windows 186 passed / 2 skipped; the fleet host's Linux Python (nice 19, scrubbed env) 188 passed, no new `wsl-crash` dump.
+
+**It is a betting change** (it decides whether the board builds; BC-042's rule). Default-off on main, so the 11-24 batch's ff
+carries the code and loads nothing. Earliest load: the 12-08 window, as ONE `REFRESH_WORKER__` line in that window's drained
+down/up, on the user's yes. Proposed value: `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB=1024` (covers 149 of the
+149 measured shortfalls), reserve left at its default 2,048. The load decision should wait for section 12's Thursday reading
+(CHANGE J, the parent self-recycle) and the weekday evenings after 11-24: if J alone keeps refusals <= 3 an evening, this may
+not be needed.
+
+### 18.1 PRE-REGISTERED (before any load)
+
+Window: 5-10 PM CST (23:00-04:00Z) of the FIRST evening after the load with >= 33 core live at 7 PM (section 5's rule).
+Load checks first: every child boot logs `BOARD_PROCESS_HOST_HEADROOM installed ... overdraft_mb=1024 reserve_mb=2048`, and
+the switches line carries `host_overdraft_mb=1024 host_reserve_mb=2048`. Without both, nothing below is read.
+
+| # | quantity (refresh-worker log, the window) | before (11-20 / 11-21 evenings) | PREDICTED | FALSIFIED |
+|---|---|---|---|---|
+| P-H1 | `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` | 13 / 10 | <= 3 | > 6 |
+| P-H2 | `MEMORY_GUARD_HOST_OVERRIDE` grants | 0 (no switch) | >= 1, each shortfall <= 1,024 and host >= 3,948 | a grant breaking either rule |
+| P-H3 | longest gap between `BOARD_BUILD_TIMING ok=True` | 1,062 / 1,555 s | <= 900 s | > 1,200 s |
+| P-H4 | host OOM kills (`dmesg` oom-kill lines in the window) | 0 / 0 | 0 | any |
+| P-H5 | board child exits rc -9 or a role restart not on purpose | 0 / 0 | 0 | any |
+
+- P-H1's remaining refusals each carry a `host_override_reason`; their split (overdraft vs host) is recorded, not predicted.
+- P-H4 and P-H5 are the safety half: any one of them FALSIFIES the change whatever P-H1..P-H3 read, and is a revert
+  (an allowed outside-window exception: drop the line in a drained down/up).
+- If the evening's refusals carry `host_below_floor_plus_reserve` in most cases, the host is the limit and the lever is not
+  the guard; that is a NEITHER, not a pass.
+- Confound: CHANGE J loads 11-24. The comparison is to 11-20 / 11-21 and to the J-only evenings that section 12's reading
+  records; a P-H1 pass that J-only evenings also meet is NEITHER.

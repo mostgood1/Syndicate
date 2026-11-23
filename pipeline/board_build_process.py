@@ -84,6 +84,21 @@ restarts it: its refusal count stays 0 and the board child always counts as a ru
   sufficient right now. Without it, a shortfall the pair alone does not explain is "transient" and holds; measured
   11-20, 3 of 3 such holds were followed by 3 refused builds and the same recycle anyway. The role's other processes
   measured p50 0, p90 288-427 MB, max 784-820 MB (11-20 day, evening and night): they run about half the time.
+
+THE HOST'S HEADROOM -- one more switch, same rule (user "Yes, build it", 2026-11-23; findings §16 and §18). A fresh
+parent on a busy slate still reaches the refusal zone by evening (11-21: 12 refusals, gaps of 19-26 min), so neither the
+morning restart nor the parent self-recycle covers it. The guard compares the role tree with a DECLARED ceiling that
+nothing on the fleet enforces; the global OOM acts on the VM's MemAvailable. Measured 11-20 to 11-23 (149 heavy-build
+refusals): the declared shortfall was p50 85-157 MB a day, max 940; the host had 5.3 and 6.5 GB available in the only
+two evening samples (6:23 PM CST 11-21, 10:03 PM CST 11-19). The evening minimum was never sampled.
+- `SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB=<n>`: in the board CHILD only (registered at `_serve_main` start; the
+  parent, web, live-odds-worker and the in-thread loop never register it), a headroom gate that the declared ceiling
+  refuses is allowed when (1) the shortfall is at most n MB (capped at `HOST_OVERDRAFT_MAX_MB`) and (2) `/proc/meminfo`
+  `MemAvailable` is at least the gate's floor + `SYNDICATE_BOARD_PROCESS_HOST_RESERVE_MB` (default 2048, the room the
+  host's other roles keep for their own transients). An unreadable host refuses. Each grant logs
+  `MEMORY_GUARD_HOST_OVERRIDE`, its own token, so `MEMORY_GUARD_ABORT` still counts refusals only; a refusal's snapshot
+  carries `host_available_mb` and `host_override_reason`. This applies to every gate the child runs: the heavy-build
+  guard, the Layer 2 shortlist's floor, and the post-build recycle check, which then agrees with the next build's guard.
 """
 
 from __future__ import annotations
@@ -121,6 +136,11 @@ PARENT_RECYCLE_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB"
 PARENT_RECYCLE_HOURS_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_UTC_HOURS"
 PARENT_RECYCLE_MIN_UPTIME_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MIN_UPTIME_SECONDS"
 RECURRING_JOBS_MARGIN_ENV = "SYNDICATE_BOARD_PROCESS_RECURRING_JOBS_MARGIN_MB"
+# The host's headroom (2026-11-23): absent = unchanged behaviour. See the module doc, "THE HOST'S HEADROOM".
+HOST_OVERDRAFT_ENV = "SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB"
+HOST_RESERVE_ENV = "SYNDICATE_BOARD_PROCESS_HOST_RESERVE_MB"
+HOST_RESERVE_DEFAULT_MB = 2048
+HOST_OVERDRAFT_MAX_MB = 2048  # a typo (10000) must not turn the declared ceiling into nothing
 CHILD_MODULE = "pipeline.board_build_process"
 # `check_deploy_safety.SERVICE_CHILD_CMDLINE_MARKERS` carries this exact string.
 CHILD_CMDLINE_MARKER = f"{CHILD_MODULE} --serve"
@@ -451,6 +471,102 @@ def apply_ceiling_credit(env: MutableMapping[str, str] | None = None) -> dict[st
     target[CEILING_CREDIT_APPLIED_ENV] = f"{base}+{credit}"
     _log(f"BOARD_PROCESS_CEILING_CREDIT from_mb={base} to_mb={base + credit} credit_mb={credit}")
     return {"from_mb": base, "to_mb": base + credit, "credit_mb": credit}
+
+
+# THE HOST'S HEADROOM (module doc). `/proc/meminfo` is the WSL VM's on the fleet: every role, redis and the ci-suite.
+_MEMINFO_PATH = Path("/proc/meminfo")
+_MIB = 1024 * 1024
+
+
+def host_available_mb(path: Path | None = None) -> float | None:
+    """`MemAvailable` in MB, or None when it cannot be read (no /proc, a junk line). None always refuses."""
+    try:
+        with open(_MEMINFO_PATH if path is None else path, "r", encoding="ascii", errors="replace") as handle:
+            for line in handle:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) / 1024.0
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+
+def host_headroom_decision(
+    *,
+    headroom_mb: float | None,
+    floor_mb: float,
+    host_mb: float | None,
+    overdraft_mb: int,
+    reserve_mb: int,
+) -> tuple[bool, str]:
+    """(granted, reason) for one snapshot the declared ceiling refused. Every unknown refuses."""
+    if host_mb is None:
+        return False, "host_unreadable"
+    if headroom_mb is None:
+        return False, "no_declared_headroom"
+    if floor_mb - headroom_mb > overdraft_mb:
+        return False, "overdraft_exceeded"
+    if host_mb < floor_mb + reserve_mb:
+        return False, "host_below_floor_plus_reserve"
+    return True, "granted"
+
+
+def _make_host_headroom_hook(overdraft_mb: int, reserve_mb: int) -> Callable[..., dict[str, Any]]:
+    def _hook(snapshot: Mapping[str, Any], min_required_bytes: int, context: Mapping[str, str]) -> dict[str, Any]:
+        floor_mb = min_required_bytes / _MIB
+        try:
+            headroom_mb: float | None = float(snapshot.get("headroom_mb"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            headroom_mb = None
+        host_mb = host_available_mb()
+        granted, reason = host_headroom_decision(
+            headroom_mb=headroom_mb, floor_mb=floor_mb, host_mb=host_mb, overdraft_mb=overdraft_mb, reserve_mb=reserve_mb,
+        )
+        shortfall = None if headroom_mb is None else round(floor_mb - headroom_mb, 1)
+        host = None if host_mb is None else round(host_mb, 1)
+        if granted:
+            _log(
+                f"MEMORY_GUARD_HOST_OVERRIDE stage={context.get('stage', '-')} caller={context.get('caller', '-')} "
+                f"floor_mb={floor_mb:.0f} headroom_mb={headroom_mb} shortfall_mb={shortfall} host_available_mb={host} "
+                f"overdraft_mb={overdraft_mb} reserve_mb={reserve_mb}"
+            )
+        return {
+            "host_override": granted,
+            "host_override_reason": reason,
+            "host_available_mb": host,
+            "declared_shortfall_mb": shortfall,
+            "host_overdraft_mb": overdraft_mb,
+            "host_reserve_mb": reserve_mb,
+        }
+
+    return _hook
+
+
+def install_host_headroom_override(env: Mapping[str, str] | None = None) -> dict[str, int] | None:
+    """CHILD side: register the host headroom hook in this process. Absent / 0 / junk: nothing (returns None).
+
+    Refuses outside the board child (no `CHILD_MARKER_ENV`), so a stray key on the role can never reach the parent's
+    or any in-thread caller's gates. The reserve's absent / 0 / junk is the default, never zero.
+    """
+    source = os.environ if env is None else env
+    overdraft = _positive_int_env(HOST_OVERDRAFT_ENV, source)
+    if overdraft <= 0:
+        return None
+    if str(source.get(CHILD_MARKER_ENV) or "").strip() != "1":
+        _log(f"BOARD_PROCESS_HOST_HEADROOM held=not_board_child overdraft_mb={overdraft}")
+        return None
+    if overdraft > HOST_OVERDRAFT_MAX_MB:
+        _log(f"BOARD_PROCESS_HOST_HEADROOM capped from_mb={overdraft} to_mb={HOST_OVERDRAFT_MAX_MB}")
+        overdraft = HOST_OVERDRAFT_MAX_MB
+    reserve = _positive_int_env(HOST_RESERVE_ENV, source) or HOST_RESERVE_DEFAULT_MB
+    from syndicate.features.shared.memory_observability import set_headroom_override
+
+    set_headroom_override(_make_host_headroom_hook(overdraft, reserve))
+    host = host_available_mb()
+    _log(
+        f"BOARD_PROCESS_HOST_HEADROOM installed pid={os.getpid()} overdraft_mb={overdraft} reserve_mb={reserve} "
+        f"host_available_mb={None if host is None else round(host, 1)}"
+    )
+    return {"overdraft_mb": overdraft, "reserve_mb": reserve}
 
 
 _PARENT_TRIM_MIN_SECONDS = 60
@@ -1079,6 +1195,12 @@ def _serve_main() -> int:
             _log(f"SHUTDOWN_RECORDER_FAILED {type(exc).__name__}: {exc}")
     _start_lifeline(parent_pid, gone)
     apply_role_clock(parent_booted_at)
+    # Before the dry-run branch, so a dry-run child shows the switch reaching a real process (it builds nothing).
+    host_headroom: Optional[dict[str, int]] = None
+    try:
+        host_headroom = install_host_headroom_override()
+    except Exception as exc:  # noqa: BLE001 - a broken install grants nothing and must never cost the board
+        _log(f"HOST_HEADROOM_SETUP_FAILED {type(exc).__name__}: {exc}")
     if dry_run:
         _log(f"BOARD_PROCESS_CHILD_READY pid={os.getpid()} dry_run=1")
         while not gone.wait(1.0):
@@ -1106,6 +1228,11 @@ def _serve_main() -> int:
         f"BOARD_PROCESS_CHILD_SWITCHES pid={os.getpid()} raw_lifeline={int(_switch_on(RAW_LIFELINE_ENV))} "
         f"recycle_after_build={int(recycler is not None)} ceiling_credit={os.environ.get(CEILING_CREDIT_APPLIED_ENV) or 'none'}"
         + (f" jobs_margin_mb={margin}" if margin > 0 else "")
+        + (
+            f" host_overdraft_mb={host_headroom['overdraft_mb']} host_reserve_mb={host_headroom['reserve_mb']}"
+            if host_headroom
+            else ""
+        )
     )
     last_recycle_check = time.monotonic()
     while not gone.wait(_SERVE_POLL_SECONDS):

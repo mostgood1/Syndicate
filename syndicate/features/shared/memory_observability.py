@@ -350,6 +350,63 @@ def _unreclaimable_bytes(stat: dict[str, int], current_bytes: int | None = None)
     return max(0, proven, residual_basis)
 
 
+# THE HOST HEADROOM HOOK (lane board-split-memory-guard, todo #850, findings section 18). OFF unless a process
+# registers one, and only the Layer 2 board CHILD does (`pipeline.board_build_process.install_host_headroom_override`,
+# switch SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB). On the fleet the declared ceiling is a number nothing enforces
+# (there is no cgroup); an OOM kill acts on the VM's MemAvailable. The hook is asked only about an INSUFFICIENT
+# snapshot, and it turns one sufficient only by returning `host_override: True`. So with no hook -- every process but
+# that child, and the child with the switch absent -- `memory_headroom_snapshot` is exactly what it was. A hook that
+# raises grants nothing.
+_HEADROOM_OVERRIDE: Any = None
+
+
+def set_headroom_override(hook: Any) -> None:
+    """Register (or, with None, remove) this process's host headroom hook: `hook(snapshot, min_required_bytes, context)`."""
+    global _HEADROOM_OVERRIDE
+    _HEADROOM_OVERRIDE = hook
+
+
+def headroom_override_installed() -> bool:
+    return _HEADROOM_OVERRIDE is not None
+
+
+def _caller_context(depth: int) -> dict[str, str]:
+    """Who asked for the snapshot, for the override's log line: the caller's name and its `stage` local if it has one."""
+    try:
+        frame = sys._getframe(depth)
+    except Exception:
+        return {}
+    context = {"caller": frame.f_code.co_name}
+    stage = frame.f_locals.get("stage")
+    if isinstance(stage, str):
+        context["stage"] = stage
+    return context
+
+
+def _apply_headroom_override(snapshot: dict[str, Any], min_required_bytes: int) -> dict[str, Any]:
+    hook = _HEADROOM_OVERRIDE
+    if hook is None or snapshot.get("sufficient", True):
+        return snapshot
+    # Frames: 0 _caller_context, 1 this function, 2 memory_headroom_snapshot, 3 its caller.
+    try:
+        extra = hook(dict(snapshot), int(min_required_bytes), _caller_context(3))
+    except Exception as exc:
+        snapshot["host_override"] = False
+        snapshot["host_override_error"] = type(exc).__name__
+        return snapshot
+    if not isinstance(extra, dict):
+        return snapshot
+    granted = extra.get("host_override") is True
+    for key, value in extra.items():
+        if key != "sufficient":
+            snapshot[key] = value
+    snapshot["declared_sufficient"] = False
+    snapshot["host_override"] = granted
+    if granted:
+        snapshot["sufficient"] = True
+    return snapshot
+
+
 def memory_headroom_snapshot(min_required_bytes: int) -> dict[str, Any] | None:
     # Shared by any caller that wants to defer heavy in-process work rather
     # than guess from elapsed time or trigger type -- originally lived only in
@@ -456,6 +513,8 @@ def memory_headroom_snapshot(min_required_bytes: int) -> dict[str, Any] | None:
         # nothing outside this module's own tests reads it, and leaving the old
         # key in place would preserve the exact misreading it caused.
         snapshot["headroom_excluding_file_cache_mb"] = round(raw_headroom_bytes / 1024 / 1024, 1)
+    if _HEADROOM_OVERRIDE is not None:
+        snapshot = _apply_headroom_override(snapshot, min_required)
     return snapshot
 
 
