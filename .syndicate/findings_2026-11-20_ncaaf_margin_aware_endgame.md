@@ -1152,3 +1152,28 @@ were read after the fact from 36 OFF cells, and a few at 2 SE are expected by ch
     check on a season neither reading used (2021), before any window. It is not proposed here.
 - The lane's HYPOTHESIS line for this check said "instrument 60 of 60"; `verify.txt` reads 56 of 56 for both gated
   arms, as the pre-registration above and its commit say.
+
+### CORRECTION to the results' lead — written 2026-11-23 1:05 PM CST
+
+**The lead above ("A lead, NOT pre-registered": a concession with a clock term) is WRONG and is withdrawn. Nothing was
+built on it.** It was found by reading the code before building, after the user said "Yes, build it" to that lead.
+- **The concession acts only in the LAST 6:00 of regulation.**
+  - `classify_urgency` (`situation_model.py:55`) returns `neutral_offense` for a trailer down N or more in Q4.
+  - Without it, a trailer with more than 360 s left is `neutral_offense` already: `trailing_urgency` starts at 360 s
+    and the two-minute drill at 120 s.
+  - The end-of-half clock, which it also reaches, works inside the last 120 s (`END_OF_HALF_WINDOW_SECONDS`).
+  - `calibration_profile.py:427-432` says the same.
+- **So the lead's premise was false.** It claimed "a sim from Q3 7:30 that reaches a 25+ deficit concedes for all of
+  Q4". In fact, from every starting state the concession acts in the same window, the game's last 6:00.
+- **A clock term cannot separate early starts from late ones.**
+  - Starting it at or before 6:00 left changes nothing.
+  - Starting it later also shortens the window for the Q4 6:00 and 3:00 states, which is where 2022 credits the
+    concession with its gain.
+- **What the 2022 split does show.** The concession lowers the raw forecast by about the same amount from both kinds of
+  state:
+  - Q3 7:30, 17+: -1.55 points (`h_eg` -1.06 against `h_egn` +0.49);
+  - Q4 6:00, 25+: -1.81 (+0.41 against +2.22).
+
+  The cut is right from the late states and too much from the early ones. Why is not measured: the run records only
+  each draw's total, not when its points came.
+- Nothing changes: the end game loads at 12-08 as queued. The todo, the lane and the queue memory are corrected to match.
