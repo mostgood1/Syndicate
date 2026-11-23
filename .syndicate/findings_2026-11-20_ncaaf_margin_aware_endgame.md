@@ -1328,3 +1328,58 @@ and 728 of 728 on 2023. The mechanism reading in ### CORRECTION stands.
 - **The observations open two questions.** Each is the user's call, and neither gates the 12-08 load:
   - the base engine's Q3 shortfall: -1.0 to -1.1 points from Q3 7:30, at every margin, on both seasons;
   - the blowout split (trailer short, leader long), which biases the live margin toward the leader.
+
+## LIVE SIDE-MARKET CHECK — written 2026-11-23 1:32 PM CST (user "Yes, check it"; a read, not pre-registered)
+
+**The question.** The timing diagnostic saw the sim's blowout margin lean toward the leader. Does any NCAAF live side
+market (spread or moneyline) read that margin, and has it reached live money?
+
+**Answer: the board prices it, and live money has barely touched it.**
+
+**The path** (code on main `0b18678ee`):
+1. **`ncaaf/live_resim.py`.** `resim_live_game` (`:920`) publishes `margin_dist` (`:1101`) and `home_win_prob`
+   (`:1055`), both from the raw draws. `calibrate_margin_distribution` (`:640`) is identity, by the 2026-09-27 decision.
+2. **`shared/live_gameline_join.py`.** Live spreads price `marginDist`; moneylines price `modelHomeWinProb`. The edge
+   is `edge_vs_market_pct` with `edge_basis` "live" (`:3182`), and `layer2_board` carries it as `model_edge_pct`. Three
+   throttles stand in the way:
+   - quotes at most 120 s old for NCAAF (`:589`); by its own comment this refuses 77% of priced spread rows;
+   - a 2-SE priceability bar at 120 sims (`PRICEABLE_SIGMA`, `:81`);
+   - the 15-point model-edge cap (`layer2_board.py:1897`).
+3. **`shared/portfolio_commit.py`.** A row with a model edge is sized on it (`_sizing_model_edge`, `:405`: the edge
+   times the measured-skill factor). The in-play market-fair refusal does not touch such a row (`:575`). So an in-play
+   NCAAF spread or moneyline with a live-sim edge can be placed and sized with live money.
+4. **The other in-play route,** `inplay_entries_live.py`, bets a book-consensus rule and reads no sim.
+
+**What reached live money** (the fleet's `/api/portfolio/live`, read 19:31Z; `C:\tmp\t859s\ledger.txt`):
+- **Coverage.** 116 NCAAF orders dated in the blind window (slates 11-15..11-22) were dropped by date before any other
+  field was read. 275 were kept, selected dates 09-03..11-23.
+- **32 NCAAF in-play side bets filled, $59.55:** 30 spreads ($53.89) and 2 moneylines ($5.66).
+- **Only 2 carried a model edge:** 2 spreads, $5.91, with `sim_share_of_stake` 0.00. The other 30 rested on book prices:
+  10 through the in-play entries rule, and 20 with no sizing basis recorded and no model edge.
+- **5 were at a line of 16.5 or more:** 4 laying it with the leader ($9.15) and 1 taking it ($2.70). None carried a model
+  edge.
+- **Graded:** -$11.32 on $59.55. Spreads -$9.51 on $53.89 (ROI -17.6%); moneylines -$1.81 on $5.66.
+- **So the bias has had almost no route into live money.** The throttles above stop nearly every live-sim side edge.
+- **Not checked:** the paper portfolio, which also sizes on the sim edge, and the blind-window slates.
+
+**How big the bias is in what the board prices today.** This is not pre-registered. It reads the 2026 hold-out's runs
+(`C:\tmp\t859s\margin_2026.txt`): weeks 1-10, all before the blind window, Q4 checkpoints only. The numbers are raw
+sim - actual (se), clustered by game. `off` is production today: no damping and no end game (`h_arms.py`).
+
+| Q4 states, \|m\| >= 17 (829) | trailer | leader | margin toward the leader |
+|---|---|---|---|
+| `off` (production today) | -0.14 (0.22) | +1.92 (0.20) | **+2.06 (0.28)** |
+| `h_pair` | -0.17 (0.22) | +0.84 (0.19) | +1.00 (0.28) |
+| `h_eg` (the 12-08 load) | -0.47 (0.21) | +0.39 (0.19) | +0.86 (0.28) |
+
+- From Q4 15:00, production's margin leans +3.26 (0.52) toward the leader at 17+, and +3.73 (0.77) at 25+.
+- In production it is the LEADER that scores too much, and #852's damping removes most of that. The queued load cuts the
+  lean by about 60%, from +2.06 to +0.86.
+- In close games every arm under-predicts the home margin: -0.90 (0.31) over Q4 states at \|m\| <= 8. That is the
+  signed home-frame bias the 2026-09-27 margin grade saw (-0.387, CI spanning zero), not the blowout lean.
+
+**What follows.** Nothing changes on the fleet, and the 12-08 load already cuts the lean. Two options, each the user's
+call:
+- **leave it:** the money route is throttled, and the load more than halves the lean;
+- **after the load, measure what is left** in the board's own live spread grade, split by leader rather than by home.
+  The 09-27 grade read the home frame, where a leader lean cancels.
