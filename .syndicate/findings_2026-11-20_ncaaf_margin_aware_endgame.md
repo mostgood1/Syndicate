@@ -1519,3 +1519,85 @@ runs and again before the scorer):
 | `/c/tmp/t859h/code/syndicate/features/ncaaf/live_resim.py` | `2bd483adcc80c0a2` |
 | `/c/tmp/t859s/paper_ncaaf.py` | `5d010014a991f55a` |
 | `/c/tmp/t859s/paper_detail.py` | `487e1b978c339c2d` |
+
+### IN-PLAY MONEYLINE DIAGNOSIS RESULTS — written 2026-11-23 3:05 PM CST, after the runs (nothing above was changed)
+
+**Verdict: OVER-CONFIDENT. Production's in-play NCAAF win probability is too sharp on real states: favourites it rates
+0.60-0.90 win 7.4 points less often than it says (3.4 SE), even on hindsight ratings. P2 and P3 held; P1 FAILED. Seen
+after the fact: the sim's projected final margin leans toward the favourite by about 2 points, most in the first half. It
+gates nothing: the fleet and the 12-08 queue are unchanged.**
+
+**Run** (`C:\tmp\t859w\run.log`).
+- The pins were checked before the runs (19:57:15Z) and again before the scorer.
+- `off` ran 548 of 548 games in 35.0 min, `h_eg` 548 in 31.0 min. The scorer printed 69 lines and Part A 41, with no
+  traceback.
+- 3,287 states per arm. `off` simulates a tie (NFL-shaped overtime) in 1.1% of draws; `h_eg`, with college overtime,
+  in 0.
+
+**The gated reading** (favourite by the odd-draw half, scored by the even half; diff = win rate - predicted, se
+clustered by game):
+
+| arm | states / games | predicted | won | diff (se) | reading |
+|---|---|---|---|---|---|
+| `off` (production, GATED) | 1,038 / 369 | 0.761 | 0.687 | **-0.074 (0.022)** | OVER-CONFIDENT |
+| `h_eg` (the 12-08 load) | 1,080 / 369 | 0.757 | 0.696 | -0.061 (0.021) | OVER-CONFIDENT |
+
+- **It runs through every favourite band** (`off`, all phases):
+
+  | predicted band | diff (se) |
+  |---|---|
+  | 0.50-0.60 | -0.030 (0.031) |
+  | 0.60-0.70 | -0.063 (0.034) |
+  | 0.70-0.80 | -0.069 (0.030) |
+  | 0.80-0.90 | -0.087 (0.029) |
+  | 0.90-0.97 | -0.032 (0.017) |
+  | 0.97-1.00 | -0.016 (0.005) |
+
+- **The ratings flatter the replay.** SP+ is a season table in hindsight, so production, rating teams on the day, is
+  likely worse than this.
+
+**Predictions: P2 and P3 held; P1 FAILED.**
+
+| prediction | result |
+|---|---|
+| P1: `off` reads CALIBRATED | **FAILED**: OVER-CONFIDENT, -0.074 (0.022) |
+| P2: \|diff\| < 0.10, far smaller than the paper gap | **HELD**: 0.074. The paper's model probability ran 0.196 above its own win rate (0.764 against 0.568) |
+| P3: `h_eg`'s Brier within +-1 paired SE of `off`'s | **HELD**: -0.00055 (0.00078) |
+
+**Seen after the fact: the projected margin leans toward the favourite** (`x_mean.py`, `x_mean.txt`; the sim's mean
+final margin minus the actual, signed toward the side it favours, `off`):
+
+| phase | favourite at 0.60-0.90 | favourite at 0.90+ |
+|---|---|---|
+| all | **+2.18 (0.44)** | +3.21 (0.38) |
+| first half | +2.80 (0.60) | +5.25 (0.69) |
+| Q3 7:30 | +1.78 (0.63) | — |
+| Q4 | +0.48 (0.35) | — |
+
+- It is largest early and fades as the score takes over. That points at the team-strength input (the rating gap), not
+  the end-game mechanics, and `h_eg` carries it too (+1.85, se 0.44).
+- A 2-point lean is about the size that moves a 0.75 favourite by several points. A margin spread that is also too narrow
+  is not excluded: the run records no margin spread.
+- This is the same reason the 09-27 margin grade read fine. It scored in the HOME frame, where a lean toward the
+  favourite (home and away alike) cancels.
+
+**Part A, exploratory** (`a_split.txt`; the 222 paper moneylines, whose ROI by band was already read):
+- **Win rate, price and the sim's probability:** they won 0.568 against an average price of 0.682, while the sim's
+  probability (price + edge) averaged 0.764. The edge, +8.2 points, is about the size of the replay's over-confidence.
+- **The bigger the disagreement, the worse:**
+  - edges of 10-20 pp: won 0.456 against a 0.610 price, -33.9% (se 14.2);
+  - edges under 10 pp: won 0.685 against 0.757, -13.6% (se 11.1).
+- **Most were priced on exchanges:** Novig 64, ProphetX 42, Kalshi 39 and Polymarket 33, which is 178 of 222.
+- **The quote ceiling cannot be judged:** 216 of the 222 bets came before the 120 s ceiling.
+- **No pattern** by minutes since kickoff, and the railed flag is on only 2 bets.
+- **Reading:** an over-confident sim, selected where it disagrees with the market most, buys favourites the market
+  prices about right. The bets fell below the price as well (0.568 against 0.682); selection on the largest
+  disagreements is the likely reason, and execution is not excluded.
+
+**What follows (as pre-registered: OVER-CONFIDENT means a fix is a re-fit, a betting change for a window, the user's
+call).**
+- **Nothing changes now.** Live money has placed no NCAAF in-play moneyline on a sim edge. Nothing blocks the first one.
+- **The lean, not the end game, is the target.** A re-fit would shrink the live re-sim's team-strength gap, or anchor it
+  to the market's pregame spread as the college basketball boards do. It would be fitted on this replay and checked on
+  another season.
+- **Live spreads price the same margin, so a fix moves them too.** The paper spreads read +8.9% (se 10.5), not resolved.
