@@ -291,3 +291,28 @@ exactly as registered. Nothing in the method changed after the push.
 ```json
 {"features":["pin_age","cons_age","n_books","disp","t_start","price","vmove","ev"],"scaler":{"pin_age":{"mean":2.561217723893779,"sd":1.359681652539368,"n":7239},"cons_age":{"mean":2.633276993448257,"sd":1.4601288459565112,"n":8654},"n_books":{"mean":6.924385859796285,"sd":5.6342170408297125,"n":8345},"disp":{"mean":3.153683090157077,"sd":2.1813228418597808,"n":7729},"t_start":{"mean":2.4702895520208057,"sd":1.228416729367897,"n":8684},"price":{"mean":0.4617220247217501,"sd":0.9062753564267492,"n":8684},"vmove":{"mean":0.09877734877734878,"sd":0.5232524838626971,"n":3108},"ev":{"mean":2.7738487333026294,"sd":1.493854338517888,"n":8684}},"theta":[-0.14750479443928025,-0.001010184465993903,-0.0013440732071124584,0.0005845129684608608,-4.498152637874893e-05,0.0005813092178178048,0.000198708098015205,0.00014243945598907244,-0.0001831946390099571],"lambda":100000.0,"keep":0.5,"cut":-0.06533858872957998,"clip_z":4.0,"fit_end":"2026-11-08T00:00:00Z","test_end":"2026-11-19T00:00:00Z","forward_start":"2026-11-20T00:00:00Z","forward_events":150}
 ```
+
+
+## FORWARD TEST READ -- NO-GO (run 2026-11-23 08:06Z = 2:06 AM CST by the daily learning review, read-only, exactly as registered)
+
+- **Substrate:** fresh fleet dump `live_cell_scorecard.py dump` 08:00:27-08:00:33Z (`live_document_read_ok=True`,
+  64,682 rows, newest submit 07:56:27Z), joined on the fleet 08:00:33-08:05:57Z (fleet checkout `b07e80882`,
+  refresh-worker env, nice 19, MemAvailable 6.2 GB before): `S6_JOIN orders=25011 pin_known=16844 cons_known=21838
+  books_known=24462 vmove_known=8996`. Files in `C:/tmp/s6fwd/` (ledger.json, rows.json, forward.txt).
+- **Command:** `py -3 scripts/s6_adverse_selection.py forward --rows C:/tmp/s6fwd/rows.json --model-from
+  .syndicate/findings_2026-11-19_s6_adverse_selection.md` (worktree at origin/main `e8ea1d7a2`).
+- **Decision set:** orders submitted >= 2026-11-20T00:00Z, first 150 events: 1,062 orders.
+
+| set | n / events | ROI | 95% |
+|---|---|---|---|
+| all | 1062 / 150 | -6.57% | [-13.84, +0.71] |
+| kept | 428 / 86 | -2.30% | [-10.14, +5.53] |
+| dropped | 634 / 137 | -9.45% | [-20.29, +1.40] |
+
+- **D = kept - all: +4.26 pp [-3.81, +12.33]; keep share 40.3%. Verdict as registered: NO-GO** (GO needed the lower
+  bound > 0). As the power statement said, a GO needed D of about +6.6 pp; the point estimate is about 2x TEST's +2.0
+  but inside noise.
+- Slices (descriptive, deciding nothing): live 55 / 39, D +9.36 [-7.02, +25.73]; paper twin + ladder +4.64 [-3.39,
+  +12.67]; paper twin +13.13 [-16.21, +42.47]; ladder +4.40 [-3.55, +12.35]; Kalshi +6.20 [-3.35, +15.75]; Polymarket
+  +1.46 [-9.32, +12.23]. None excludes 0.
+- **S6 ends. No challenger is named; nothing changes live and nothing is queued for a window.**
