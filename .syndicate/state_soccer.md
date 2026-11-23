@@ -1395,3 +1395,11 @@ Lane `soccer-shot-woodwork-undercount` (readings in `deploys.md` 2026-09-17 21:1
   - Players: ESPN realised goals/assists per 90 lose to Understat xG/xA by +0.0083 / +0.0138 per appearance at equal data (9,366 appearances); the player freeze is worth about 0 on goals/assists; <2% of outage-match shots came from players outside the frozen squad. Do NOT re-source players.
 - **Recovery reads as:** the marker flips to `state: up` with `last_outage`, the 10 steps go rc 0, and the `teams_2026.csv` / `players_2026.csv` mtimes move.
 - Findings: `.syndicate/findings_2026-11-18_understat_fetch_failures.md`, `.syndicate/findings_2026-11-18_understat_fallback_backtest.md`; todo `#841`, `#845`.
+
+## [soccer-quote-shard-utc] SOCCER QUOTES SHARD BY THE UTC KICKOFF DAY, SO EVENING MLS (KICKOFF >= 00:00Z) HAS NO LIVE MODEL; THE CENTRAL-DAY FIX IS ON MAIN, DEFAULT OFF `[verified 2026-11-23, lane evening-utc-date-split, main e5a0ecd29]`
+- Writers: `scripts/fetch_soccer_oddsapi_{odds,props}_local.py` go through `soccer_quote_shard.soccer_quote_shard_date`.
+  - With `SYNDICATE_SOCCER_QUOTE_SHARD_CENTRAL` absent (the fleet today, all 3 roles ABSENT at 14:24Z), that is `commence_time[:10]`, the UTC day.
+  - With it on, it is the Central kickoff day, like NCAAF/NFL.
+- Measured 11-22, RSL @ VAN: the 11-22 live index held the match (indexed=1) but considered=2, while its 473 rows sat in book_grid_2026-11-23. 0 orders.
+- Load kit: C:\tmp\w_eud. The load is a betting change and waits for a window.
+- Findings: `.syndicate/findings_2026-11-23_evening_utc_date_split.md`.

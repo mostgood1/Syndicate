@@ -3743,3 +3743,8 @@ same holds for any lock-holding wrapper around stdout. Test such an instrument w
 - **Belief overturned.** 11-20 11:02 AM CST I concluded an NBA in-game injury carries no ESPN stamp until the next-day report. That rested on FINAL summaries only, read after the fact. Live on 11-21, BKN Nolan Traore subbed out 02:10:44Z and ESPN stamped him `Out` (hamstring) at 02:25Z, DURING the game; the existing `injuries` path refused the game at 02:32:26Z.
 - **Why it mattered:** the wrong belief made the off-floor signal look like the ONLY NBA path. It is not; for the NBA it is a backstop, and the end-window exclusion means it would not have caught Traore at all.
 - **Rule:** a claim that a feed never carries X must be read on a LIVE population, not reconstructed from finals (see [[feedback_null_result_needs_a_live_population]]).
+
+## 2026-11-23 -- A per-writer fix of a cross-sport bug class leaves the sibling writers broken (lane evening-utc-date-split)
+- The UTC-vs-Central shard bug was fixed in the NCAAF game-line writer on 09-21 (`kickoff_shard_date`). Soccer's two writers kept `commence_time[:10]` for 2 more months. Measured cost on 11-22: RSL @ VAN had no live model and placed 0 orders. 7 crossing MLS matches 11-23..11-29 hit the same bug.
+- The lane's hypothesis blamed the GRID. The date was set one stage earlier, by the quote WRITER. Working backward stage by stage (CLAUDE.md's pipeline rule) found it: the index held the match, so the join's other half (the rows) was where to look.
+- RULE: when fixing a date or key convention in one writer of a shared log, grep EVERY writer of that log (`append_book_quotes(` callers) in the same change, or record the unconverted ones as a lead.
