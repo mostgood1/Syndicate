@@ -175,7 +175,7 @@ User, typed in this session, 11-23 about 8:00 AM CST: **"load the polymarket sta
   - the two restores step back, the last one byte-identical to the original;
   - mode 600 is kept;
   - the real file is unchanged and every role reads the key ABSENT.
-- 11-23 8:25 AM CST: queued the SHADOW load as CHANGE N of the 11-24 window batch, on the user's "load the polymarket
+- 11-23 8:16 AM CST: queued the SHADOW load as CHANGE N of the 11-24 window batch, on the user's "load the polymarket
   stale cancel in shadow before 12-08".
   - Reader self-tested. Baseline: 1 of 104 orders untouched >= 15 min over 3.6 days; 0 of 37 in the last 24 h.
   - The 43 tests pass (17 s).
