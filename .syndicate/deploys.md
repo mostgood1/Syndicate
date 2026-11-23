@@ -62873,3 +62873,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - NBA totals: the tempering HELPS, but the served board is WORSE THAN MARKET on 62 games -- a board finding for whoever owns NBA live totals; k 2.16 is not enough (helped 5x the fit), which suggests the unscaled NBA totals model drifted more over-confident than the fit window. Not judged further here.
   - NBA spreads k 2.02 will not grow (k 1.57 took over from 11-14); treat it as closed at 8 games.
 - **betting change:** no (reading only). **Claims:** none.
+
+## 2026-11-23 01:17:33Z (7:17 PM CST 11-22) -- READING (no deploy): second NBA key exit read LIVE through every layer -- UTA Jaxson Hayes, injury (lane `live-player-exit-gate`, #814)
+- **The exit:** DAL @ UTA, event 401910033. ESPN's in-game `injuries` list stamped Hayes out `since=2026-11-23T01:13Z`.
+- **Detected:** `[nba_live_resim] PLAYER_OUT event=401910033 team=UTAH player='Jaxson Hayes' reason=injury key=True source=injuries` at 01:17:33Z; tick `players_out=1 key_players_out=1` at 01:17:34Z. The 01:15:07Z tick read 0, so detection came on the first tick after the stamp was readable (<= ~4.5 min after the stamp).
+- **Board:** book_grid nba `LIVE_GAMELINE_BUILD date=2026-11-22` full_games=5 (01:16:49Z) -> 4 (01:17:21Z); index 5 -> 4 at 01:18:04Z.
+- **Entry hold:** probed 01:20:23Z with refresh-worker's env (`/mnt/c/tmp/lpeg/lpeg_holdprobe_soc.sh nba`): `ExitHold().check("nba", "Utah Jazz", "Dallas Mavericks")` -> `{'verdict': 'fail', 'reason': 'key_player_out', 'players': ['UTAH:Jaxson Hayes:injury'], 'snapshot_at': '2026-11-22T19:17:34-06:00'}`.
+- **Portfolio plan:** the 19:14:49 CST plan (before) had no `key_player_out`; the 19:20:55 CST plan (first after) carries `key_player_out=4`, `refusals_by_sport={"nba": 4}`, `refusals_by_market={"spreads_alt": 1, "totals_alt": 3}` -- the backstop refused rows the board had not yet withdrawn (as with Traore 11-21).
+- **Not measured:** the lift (he did not return in the window read); his own live props.
+- verify: live-odds-worker.log + refresh-worker.log 01:15:07Z..01:20:06Z; ExitHold probe 01:20:23Z; /api/portfolio/plan?date=2026-11-22 read after 19:20:55 CST.
