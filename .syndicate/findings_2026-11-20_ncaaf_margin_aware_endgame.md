@@ -1075,3 +1075,80 @@ the runs and again before the scorer):
 | `/c/tmp/t852/resume.py` | `ef89b077310a777c` |
 | `/c/tmp/t859h/code/syndicate/features/ncaaf/live_total_dispersion.py` | `ee44d570609d4d12` |
 | `/c/tmp/w1208_ncaaf/kit_env_ncaaf.sh` | `4f31d0ac2b4888b5` |
+
+### CONCESSION-OFF CHECK RESULTS — written 2026-11-23 11:48 AM CST, after the runs (nothing above was changed)
+
+**Verdict: FAIL. C1 passed; C2 and C3 failed, both on the side of KEEPING the concession. As pre-registered, nothing
+changes: the end game loads at 12-08 as queued, with the concession at 25, and no 7th line is added. P2 and P3 held;
+P1 and P4 FAILED.**
+
+**Run** (`C:\tmp\t859c\run.log`, `score.txt`).
+- The pins were checked before the runs (15:58:33Z) and again before the scorer. `SCORE_DONE` printed at 17:45:25Z.
+  The script exits 3 on a pin mismatch, and the Idle wrapper hides exit codes, so that line is the evidence.
+- All three arms ran all 703 games (`h_pair` 8.3 min, `h_eg` 8.2, `h_egn` 7.8), and all three E0 passes refused 0.
+- 703 of 703 games were scored and none dropped.
+
+**The gates** (OFF = `h_egn` - `h_eg`, calibrated log loss at K_LATE 1.6; diff (se), clustered by game; a + means
+switching the concession off is WORSE):
+
+| gate | games | OFF | needs | result |
+|---|---|---|---|---|
+| C1: Q3 7:30, \|m\| >= 17 | 215 | -0.0140 (0.0083) | <= -0.0083 | PASS, 1.7 SE |
+| C2: all fit states, \|m\| >= 17 | 359 | +0.0090 (0.0063) | <= 0 | **FAIL**, 1.4 SE the wrong way |
+| C3: all fit states, all margins | 703 | +0.0035 (0.0024) | <= +0.0024 | **FAIL**, 1.5 SE worse |
+
+**Predictions: P2 and P3 held; P1 and P4 FAILED.**
+
+| prediction | result |
+|---|---|
+| P1: C1-C3 pass | **FAILED**: C1 passed, C2 and C3 failed |
+| P2: OFF at \|m\| <= 8 is >= 0 and under +0.002 | **HELD**: +0.0006 (0.0007) |
+| P3: EG at 17+ > 0 and EG at \|m\| <= 8 < 0 | **HELD**: +0.0053 (0.0074) and -0.0322 (0.0066) |
+| P4: at 17+, `h_egn`'s calibrated mean of the points still to come is higher than `h_eg`'s and nearer the actual | **FAILED**: higher (bias +0.92 against -0.14, se 0.28), but FARTHER from the actual |
+
+**Where the concession costs and where it gains** (its cost = with - without, so a + means it costs; 2022 is
+`h_eg` - `h_egn` at damping 21/7, 2023 is the diagnosis's S2, `e17` - `e17n` at 17/14). Below the gates, these cells
+were read after the fact from 36 OFF cells, and a few at 2 SE are expected by chance.
+
+| \|m\| >= 17 | 2022 | 2023 (S2) |
+|---|---|---|
+| Q3 7:30 | +0.0140 (0.0083) | +0.0213 (0.0084) |
+| Q4 15:00 | +0.0099 (0.0087) | not in the 2023 table |
+| Q4 10:00 | -0.0080 (0.0106) | 17-24 only: +0.0242 (0.0112) |
+| Q4 6:00 | **-0.0248 (0.0108)** | -0.0100 (0.0138) |
+| Q4 3:00 | **-0.0293 (0.0130)** | +0.0053 (0.0172) |
+| all fit states | -0.0090 (0.0063) | +0.0061 (0.0072) |
+| close games (\|m\| <= 8) | -0.0006 (0.0007) | -0.0011 (0.0006) |
+
+- **Early, the concession costs on both seasons.** At Q3 7:30 17+, with it the calibrated forecast runs short of what
+  real blowouts still score: bias -1.42 (0.58) for `h_eg` against -0.28 for `h_egn`.
+- **Late, on 2022, it gains more than it costs early.** At 25+ the gain is -0.0342 (0.0172) at Q4 6:00 and -0.0427
+  (0.0219) at Q4 3:00. Without it the forecast expects too many points: at Q4 6:00 25+, calibrated bias +0.33 (0.32)
+  for `h_eg` against +2.02 (0.33) for `h_egn`, and p0 0.417 against 0.330 (actual 0.497).
+- **At 17+ overall, the two seasons disagree in sign.** It costs +0.0061 (0.0072) on 2023 and gains -0.0090 (0.0063) on
+  2022; neither resolves. Over all margins on 2022 it gains -0.0035 (0.0024).
+- **Its calibrated shape at 17+ on 2022 favours keeping it:** bias -0.14 (0.28) for `h_eg` against +0.92 (0.28) for
+  `h_egn`, and p0 0.270 against 0.241 (actual 0.285).
+
+**The end game on a third season** (EG = `h_eg` - `h_pair`, not gated). Its shape holds.
+- All margins: -0.0116 (0.0041), 2.8 SE better than #852 alone.
+- Close games (\|m\| <= 8): -0.0322 (0.0066). At Q4 3:00 close: -0.1103 (0.0259).
+- 17+: +0.0053 (0.0074), not resolved; about a third of 2023's +0.0171 (0.0076).
+- At 17+ it is the least biased of the three arms, calibrated: bias -0.14 (0.28), against +0.74 (0.27) for `h_pair`
+  and +0.92 (0.28) for `h_egn`.
+- The late over-confidence is still there: at Q4 3:00 17+ the slopes are 0.68 / 0.57 / 0.49 (`h_pair` / `h_eg` /
+  `h_egn`), and EG there is +0.0181 (0.0221), not resolved.
+
+**What follows (as pre-registered: a FAIL changes nothing).**
+- The end game loads at 12-08 as queued, with the concession at 25. No 7th line is added, and the window kit stays as
+  pinned (sha `4f31d0ac`).
+- The clock's late blowout cost (2023's S1) is still a code fix, for a later window and the user's call.
+- **A lead, NOT pre-registered.** On both seasons the concession costs from Q3 7:30; on 2022 it gains from Q4 6:00 on.
+  - The rule has no clock term: in regulation Q4, a trailer down N or more plays neutral offense
+    (`situation_model.py:55` in the pinned export).
+  - So a sim from Q3 7:30 that reaches a 25+ deficit concedes for all of Q4. Real trailers still score early in Q4.
+  - A concession that starts only later in Q4 might keep the late gain and drop the early cost.
+  - That is code and a betting change. It was read from after-the-fact cells, so it would need its own pre-registered
+    check on a season neither reading used (2021), before any window. It is not proposed here.
+- The lane's HYPOTHESIS line for this check said "instrument 60 of 60"; `verify.txt` reads 56 of 56 for both gated
+  arms, as the pre-registration above and its commit say.
