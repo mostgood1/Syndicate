@@ -238,11 +238,25 @@ Re-derived here, same instant per read:
   - At 20:19Z the count was 11 in play, 10 of them market-only.
 - **Not re-derived:** the peer's -7.06% [-13.60, -0.46] over 1,249 bets for the 0% floor population. It is cited as
   theirs.
-- **New here: the purchaser's in-play rule is role-dependent.** `portfolio_commit._refuses_in_play_market_fair`
-  first checks `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`. Read from the running roles at about 20:25Z, that key is
-  `mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer` on refresh-worker and ABSENT on live-odds-worker. No env layer my reader
-  parsed carries it (spec, `fleet_env/*.json`, `local_production.env`), so where it comes from is unlocated. On any
-  role without it, the function returns False for every row.
+- **The purchaser's in-play rule reads a role-scoped key. That is harmless for the purchaser and matters only to a
+  caller elsewhere.**
+  - `portfolio_commit._refuses_in_play_market_fair` first checks `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`. Read from
+    the running roles at about 20:25Z, it is `mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer` on refresh-worker and ABSENT
+    on live-odds-worker. On a role without it the function returns False for every row.
+  - **CORRECTED 2026-11-23 ~20:40Z.** This section first called the key's source "unlocated". It is
+    `~/syndicate-prod/fleet_env/refresh-worker.json`, under `values`: the frozen 10-01 snapshot layer. My reader
+    looked for an `env` block and missed that shape. Re-read with a shape-blind search: present in refresh-worker,
+    ABSENT in web and live-odds-worker. `portfolio-monitor` found it first.
+  - **No unguarded path, so the "risk" framing is withdrawn.** Code checked here: the only callers are
+    `portfolio_commit.py:1197` (the plan commit) and `paper_ladder.py:159`. `portfolio-monitor` reports, and I have
+    not re-derived:
+    - the plan commit runs only on refresh-worker (38 PLAN_WRITTEN and 152 LIVE_PLAN_WRITTEN there in 3 h, 0 on
+      live-odds-worker);
+    - live-odds-worker only executes written plans;
+    - absent is STRICTER, because with the allowlist empty every row with no model edge is refused
+      `no_model_edge_pct` before the in-play check.
+  - What stands is narrower: **a caller on another role**, such as Ask on web, cannot call the function and get the
+    purchaser's answer. That is why Ask builds the rule from its parts.
 
 **Step 1a amended by this.** Ask's headline leaves out a Suggested row that is in play on a market price alone. That
 is the purchaser's rule, and the system would not buy that row. Ask builds the rule from `portfolio_commit`'s own
@@ -252,6 +266,17 @@ calling the function from web would be a silent no-op. The headline then says ho
 The board still flags these rows Suggested. That is a **board defect owed to the board's owner and the user**:
 - changing `_stamp_suggested` changes the Suggested series that the daily grader and the paper book read;
 - the live plans also read Suggested, so changing it may be a betting change.
+
+**The canonical-pick decision is partly made, by the user, elsewhere.** The batch kit
+(`C:\tmp\w1124_floor\dry_SKILL.md`, CHANGE P, lane `live-ev-floor-off`) records the user's answer in session 69d80317,
+about 2:15 PM CST 11-23: "Yes, add it tonight". That turns the 0% live EV floor OFF in tonight's 11-24 window batch.
+After it loads, the live plans buy Suggested rows only, re-priced at the venue. Pregame, Ask's headline, the board's
+picks and the purchaser's pool will then be one set.
+
+What is still split is the **price**. Suggested is judged at the best sportsbook. The purchaser re-prices at the
+venue, where 3 of 30 venue-listed picks cleared +2% gross at 20:15Z (`portfolio-monitor`: 0 of 34 net). So the
+purchaser should be expected to buy very few rows after the load. That is a decision about what a pick is priced
+against, and it is the user's.
 
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
