@@ -144,10 +144,18 @@ FAST_STEPS: tuple[tuple[str, list[str]], ...] = (
 # inside this step. `-n auto` spawns one xdist worker per CPU and each holds a
 # full import of the app, so the peak scales with core count on a box that has
 # more cores than gigabytes.
+#
+# `-p scripts.pytest_rss_watch` (lane board-split-memory-guard, todo #850, findings section 19) is the
+# second deliberate divergence: per-test memory lines (`TEST_RSS_JUMP`, `TEST_RSS_CLIMB`, `TEST_RSS_TOP`)
+# so the nightly ~3 GB chunk, and a runaway like 11-20's 8.4 GB one, name their test. Tooling only: it
+# changes no result, and `pytest_baseline._split_test_files` keeps the flag pair with every chunk.
+RSS_WATCH_PLUGIN = "scripts.pytest_rss_watch"
+
+
 def _pytest_step(workers: str, chunks: int) -> tuple[str, list[str]]:
     return ("pytest vs baseline",
             ["scripts/pytest_baseline.py", "--runnable", "--chunks", str(chunks), "--",
-             "tests/", "-n", workers, "--dist=loadscope"])
+             "tests/", "-n", workers, "--dist=loadscope", "-p", RSS_WATCH_PLUGIN])
 
 
 # The fleet's service markers (`syndicate/features/shared/service_identity.py`), scrubbed
