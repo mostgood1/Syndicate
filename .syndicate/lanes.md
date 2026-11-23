@@ -2039,6 +2039,14 @@ death, never life — do not invert it.
 - Verification: Tests: off reproduces today's miss, on joins the Blues rows, NCAAF unchanged with the new switch absent/on/off, a non-NHL sport never reads it; a read-only replay on tonight's fleet lens + rails reports rows joined off vs on; landed on main default-off; queued in .syndicate/betting_change_windows.md for 11-24
 - Blocked by: none
 
+### evening-utc-date-split — OPEN — opened 2026-11-23 — session 86352bc9-921d-487c-bd24-c943dc6b8b98
+- Goal: Games whose UTC kickoff is after midnight but still the same CT slate day (e.g. evening MLS) are filed under the NEXT UTC date in the book grid while their live state stays on the CT day, so they get NO live model, refresh only on the next-day grid rebuild (13-16 min) and never appear on the live rail. Measured 11-22: Real Salt Lake @ Vancouver (MLS, 7:30 PM CT) -- 9 of 9 LIVE_GAMELINE_BUILDs index=0 considered=0, overlay gaps 785/809/667 s, 0 orders. User 11-23: 'yes, open a lane for the evening-MLS date bug'. Fix is production code and a BETTING CHANGE: default-off on main, window load only.
+- Files: .syndicate/findings_2026-11-23_evening_utc_date_split.md (new); code files to be added after diagnosis names the date-assignment site (book_grid / live_refresh_loop / live_gameline join candidates)
+- Hypothesis: The book grid keys a game's slate date from its UTC commence_time while live state/autorun and the live rail key from the CT (America/Chicago) slate day; using the CT slate day for the grid (or joining across both dates) restores the live model for after-midnight-UTC kickoffs.
+- Falsification test: Replay 11-22's RSL @ Vancouver: if keying the grid by CT day still yields index=0 considered=0 for its LIVE_GAMELINE_BUILDs, or the gap also hits non-crossing games, the hypothesis is wrong.
+- Verification: Next evening MLS/late game crossing 00:00Z: LIVE_GAMELINE_BUILD considered > 0 for it, overlay_offdate_inplay empty on Rail Watch, live model on its rows.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
