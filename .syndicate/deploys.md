@@ -62904,3 +62904,60 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - Second fresh-parent morning reading in a quiet hour (599-662 MB at +2..+6 min, 11-22: 657-727): again consistent with findings section 13's H2 (the slate). The +1 h reading is not taken by this task.
 - Claim released after the ledger push (see the lane bullet). This was the last bridge task; CHANGE J loads in the Tue 11-24 window.
 - verify: wait_first_build2.sh 2026-11-23T10:17:25 (per-minute parent RSS of pid 4109821 + the first BOARD_BUILD_TIMING); after_term.sh (healthz, boot lines, Traceback counts).
+
+## 2026-11-23 14:17:09Z (8:17:09 AM CST) -- web: no automatic full GC collections in a web worker `05a2ce65e` (lane `web-silent-worker-kills`, user "Tune GC next" to "Tune web's garbage collection next, or keep watching kills?") -- **LOADED on web; MET at +30 min, the overnight reading is owed**
+- betting change: **no** (BC-058). Only which collections run inside web's worker processes; web places, sizes, holds and exits no bets.
+- **Ride-alongs** (`b07e80882..05a2ce65e`, 85 commits; listed before the merge by `wsk_ridealong3.sh`). None loads at this deploy: web imports none of them on a path it runs, and each worker role loads them at its next restart.
+  - `732902ebb` (lane `kalshi-no-grade-check`, the rework): grade the NAMED club, then map YES/NO.
+    - It writes `grade_check` only. The settle fallback now refuses a contract side instead of grading "no" as New Orleans.
+    - The user's "Wait, next restart" (11-21) let it ride the next fleet ff plus refresh-worker restart, so it loads at refresh-worker's next restart. Named here as that lane asked.
+  - `b65707658` (F27, Kalshi same-sport join): `SYNDICATE_KALSHI_JOIN_SPORT_SCOPE` absent = report. Matches are byte-identical, plus a count; `on` is CHANGE L of the 11-24 window.
+  - `1127d28d3` (#850, board-split parent recycle and recurring-jobs margin): default off; its keys are CHANGE J of 11-24.
+  - `7bc613347` (Polymarket stale cancel): absent = off; shadow is CHANGE N of 11-24.
+  - `cb98b201a` (#860, NHL St. Louis join): default off; CHANGE M of 11-24.
+  - Everything else is ledger, docs, tests, or `scripts/rail_monitor/` tooling, which no role imports.
+  - No env layer names any new key (`local_production.env`, `fleet_env/*.json`, `fleet_role_spec.json`; names read, never values). 0 dirty fleet paths touched by the ff.
+  - The board-parent resets of 11-22 and 11-23 pinned `b07e80882`. Both have run, and no later task pins it. The 11-24 window batch (task `nfl-level-refit-load-1120`) reads the fleet HEAD itself at its step 4, so it starts from `05a2ce65e`.
+- **Why:**
+  - A full (generation 2) collection holds the GIL over the whole heap, and the main loop's heartbeat stops with it.
+  - Measured from `WEB_GC_PAUSE` (>= 0.25 s):
+    - 3,344 / 3,830 / 4,262 full collections per CST day on 11-20 / 11-21 / 11-22, totalling 1,910 / 3,039 / 2,364 s of pause.
+    - Main-loop stalls of 5 s or more: 2 / 9 / 2 per day, max 10.85 / 19.09 / 8.37 s.
+    - The longest, 18.57 s, was worker 2641469 at 1,199 MB, 6:22 PM CST 11-21. It had served 10 requests in 79 min, and the memory guard checks only on requests.
+  - They freed 7,079 objects in all across 11,989 logged full collections, 11-20 17:03Z..11-23 14:03Z.
+  - The last one on the old config: 14:16:5xZ, a 9.95 s generation-2 collection on 4163353 with a 10.0 s main-loop stall, 20 s before the load.
+- **The change:**
+  - `gunicorn.conf.py` `post_fork` calls `tune_gc`: threshold 2 set to 2**31-1, so CPython 3.11 never starts a full collection on its own.
+  - Generations 0 and 1 are unchanged. An explicit `gc.collect()` still runs a full one.
+  - Proof line `WEB_GC_TUNED` (before / after thresholds). `WEB_WORKER_FAST_EXIT` now carries each generation's collections since the fork.
+  - Switch: `SYNDICATE_WEB_GC_AUTO_FULL` (1 / true / on restores CPython's own). It is in no env layer.
+  - Tests: 59 passed / 3 skipped on Windows; 69 passed under the fleet venv with the draining-worker suite.
+    - On the real collector, the same heap growth runs at least 1 full collection with stock thresholds and 0 once tuned.
+    - Young collections still free 5,000 cycles.
+- **Gates:**
+  - Claim web 14:16:15Z (holder `web-silent-worker-kills`, ACQUIRED, rc 0).
+  - Baseline 14:16:39Z: fleet head `b07e80882`, healthz 200, `WEB_GC_TUNED` 0, 34 generation-2 `WEB_GC_PAUSE` lines in the hour before.
+  - Preflight `--service web --target-commit 05a2ce65e --betting-change no`, from a worktree at origin/main, 4 expect / baseline pairs: **CLEAR 14:16:53Z**.
+- **ff + reload:**
+  - `git merge --ff-only 05a2ce65e` at **14:17:09Z** (`b07e808823d2` -> `05a2ce65e454`).
+  - `RELOAD_WEB {"elapsed_s": 4.9, "failures": 0, "max_latency_s": 2.92}`.
+  - Workers 4160017 / 4163353 -> **4191596 / 4191604**; master 1011213 unchanged. Both retired workers took the fast exit.
+- **expect / measured (14:47:30Z, +30 min, scratchpad `wsk_gctune_reading.sh`; the 30 min before the load as the comparison):**
+  - `fleet_head` b07e80882 -> 05a2ce65e: **MET**.
+  - `healthz` 200 -> 200: **MET**.
+  - `gc_tuned_lines_at_least_one` no -> yes: **MET**. 4 workers booted since the load and all 4 logged `WEB_GC_TUNED` applied, `[700, 10, 10]` -> `[700, 10, 2147483647]`.
+  - `gen2_gc_lines_per_hour_tuned_workers` 34 -> 0: **MET**. 0 `WEB_GC_PAUSE` lines of any generation from tuned workers. The 30 min before had 22 generation-2 lines, 22.1 s, max 9.95 s.
+  - Confirmed in the counter, not just by the log's silence: the 2 tuned workers that exited logged `gc_collections` `[4409, 401, 0]` and `[6912, 629, 0]`. That is 0 full collections over their lives, with young collections running.
+  - Main-loop stalls >= 5 s: 0 (before: 1, 10.0 s). 0 dumps, 0 `WORKER TIMEOUT`, 0 Traceback, 0 guard errors.
+  - **Memory cost, early (scratchpad `wsk_firstcycle.py`):**
+    - The 2 first-cycle tuned workers recycled at 485 s / 823 s, 648 / 638 MB, both soft.
+    - The first-cycle workers of the 4 earlier reloads (11-20 17:03Z, 17:38Z, 20:13Z; 11-21 18:07Z) recycled at 156-1,510 s, 7 of 8 hard, at 760-1,190 MB.
+    - In the 24 h before, recycle age was median 1,182 s (p10 176 s, p90 2,756 s), 39 of 103 under 900 s.
+    - Not worse so far. The overnight reading carries the real comparison.
+- **verify:**
+  - Every web worker logs `WEB_GC_TUNED` applied, and every fast exit counts 0 generation-2 collections.
+  - Main-loop stalls >= 5 s fall from 2-9 a day (max 8.37-19.09 s) toward the young-collection ones only.
+  - Recycles per day and age at recycle stay within the 11-20..11-22 range (81-102 a day; median age 1,182 s), so the cost of uncollected old cycles stays unmeasurable.
+  - Kills per day stay 0, and they are still the lane's measure.
+  - The reading must land BEFORE the 11-24 window batch's drained down/up (task `nfl-level-refit-load-1120`, 08:15Z 11-24). That batch changes web's env (CHANGE F, the shared board copy), which confounds any later comparison.
+- **Claim released** 14:48:54Z.

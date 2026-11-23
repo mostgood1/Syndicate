@@ -560,3 +560,31 @@ Read-only, nice 19. Scratchpad scripts: `wsk_day_reading.sh` (fired 18:30:00Z), 
   - Both workers sat in `do_epoll_wait` / `futex_do_wait`, and healthz answered in under 1 ms.
   - A real request (`GET /`) returned 200, but took 10.5 s on a worker 7 min old. That is not attributed here.
   - Silence alone does not tell: the 11-20 deadlock also silenced all of web. What tells is a real request being served, and the stall dump (re-armed only by a running main loop) not firing.
+
+## 2026-11-23 8:50 AM CST (14:50Z) -- GC tuning loaded (`05a2ce65e`, user "Tune GC next"): web workers start no full collection on their own; +30 min MET
+
+Read-only readings at nice 19. Scratchpad scripts: `wsk_gctune_base.sh`, `wsk_gctune_reading.sh` / `.py`, `wsk_firstcycle.py`. Deploy entry: `deploys.md` `## 2026-11-23 14:17:09Z` (BC-058 no).
+
+- **Kills per CST day:** 0 x5 (11-12..16), 5 (11-17), 0, 0, 1 (11-20, the instrument), 0 (11-21), **0 (11-22, whole day: 0 dumps, 102 recycles)**, 0 (11-23 to 8:49 AM).
+- **Why tune, from the three days before:**
+  - Full (generation 2) collections of 0.25 s or more, per CST day on 11-20 / 11-21 / 11-22: 3,344 / 3,830 / 4,262, totalling 1,910 / 3,039 / 2,364 s of pause.
+  - Main-loop stalls of 5 s or more: 2 / 9 / 2, max 10.85 / 19.09 / 8.37 s.
+  - They freed 7,079 objects in all, over 11,989 logged since 11-20 17:03Z. The two 470-514-object ones recur at the picks-run minutes (:03 / :22 / :43); what they hold is not measured.
+  - Web runs CPython **3.11** (`/usr/bin/python3.11`), whose full collection walks the whole heap whenever the survivors since the last exceed a quarter of the long-lived count.
+- **The 18.57 s one (6:22 PM CST 11-21) names a second lever, not taken here.**
+  - Worker 2641469 was 79 min old at 1,199 MB against a 634 MB limit, and had served 10 requests.
+  - The memory guard checks only in `post_request` (every 5th request), so a quiet worker's heap, and with it every full collection's cost, has no bound.
+  - 34 s before it, an 8.66 s generation-1 collection hit the same worker. Young collections stay on, so a stall of that kind is still possible.
+- **The change:** threshold 2 set to 2**31-1 in `post_fork`, with young collections unchanged. Switch `SYNDICATE_WEB_GC_AUTO_FULL`. Proof lines are `WEB_GC_TUNED`, plus `gc_collections` on `WEB_WORKER_FAST_EXIT`.
+- **+30 min (14:47:30Z):**
+  - 4 of 4 new workers tuned.
+  - 0 `WEB_GC_PAUSE` lines of any generation from tuned workers, against 22 full ones (22.1 s, max 9.95 s) in the 30 min before.
+  - The 2 tuned workers that exited counted `[4409, 401, 0]` / `[6912, 629, 0]` collections per generation: 0 full ones.
+  - 0 stalls of 5 s or more, against 1 (10.0 s) before. 0 dumps, kills or Tracebacks.
+  - Memory cost, early: the first-cycle tuned workers recycled soft at 485 / 823 s and 648 / 638 MB. The first-cycle workers of the 4 earlier reloads went at 156-1,510 s, 7 of 8 hard, at 760-1,190 MB. Not worse so far.
+- **Owed:** the overnight reading, before the 11-24 window batch's drained down/up (08:15Z). It is the comparison against 11-20..11-22 for:
+  - full collections and their pause;
+  - stalls of 5 s or more;
+  - recycles per hour and median age at recycle (the cost of old cycles that are no longer collected);
+  - kills and dumps.
+  The batch changes web's env (CHANGE F, the shared board copy), so later readings are confounded.
