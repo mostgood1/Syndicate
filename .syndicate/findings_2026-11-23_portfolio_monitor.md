@@ -225,3 +225,25 @@ zero.
 - Separately, the board marks stale in-play NCAAB rows Suggested.
 - Decisions owed to the user (no change made): the floor (a betting change, window or risk reduction); a venue-priced
   view on the board (display only); the in-play stale Suggested label (board defect, Layer 2).
+
+### The floor by venue EV at purchase -- 2:14 PM CST (asked for a recommendation on the floor)
+
+Settled live bets since 2026-10-20, split by the order's recorded `ev_pct` at purchase. ROI on stake, with a 95%
+range clustered by game:
+
+| path | EV band | bets | games | ROI | 95% range |
+|---|---|---|---|---|---|
+| floor | 2-4% | 386 | 256 | -9.16% | [-19.46, +1.58] |
+| floor | 4%+ | 845 | 516 | -6.10% | [-15.27, +3.06] |
+| floor | <2% | 18 | 14 | n too small | |
+| not floor | 2-4% | 64 | 57 | -37.14% | [-60.58, -10.70] |
+| not floor | 4%+ | 127 | 103 | +3.11% | [-17.16, +21.96] |
+| not floor | no EV (in-play) | 469 | 285 | -4.87% | [-13.42, +3.62] |
+
+**A higher edge bar does not rescue the floor.** The bets recorded at 4%+ EV lost about as much as the rest, so the
+EV the purchaser computes at the venue's price is not showing up in results.
+
+**The switch** is ONE role-scoped line in `~/syndicate-prod/local_production.env` (line 141):
+`REFRESH_WORKER__SYNDICATE_LIVE_EV_FLOOR=0`. refresh-worker's environ reads it; web and live-odds-worker are ABSENT.
+Absent means off, which makes the live plans Suggested-only. Removing the line is a betting change. It would load in a
+drained full down/up, and the 11-24 2:15 AM batch is already doing one.
