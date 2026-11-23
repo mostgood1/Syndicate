@@ -141,6 +141,14 @@ td.num { text-align:right; white-space:nowrap; }
     <h2>System</h2>
     <div class="tiles" id="status"></div>
   </div>
+  <section id="alignment"><h2>Purchaser vs Layer 2 board and rail</h2>
+    <p class="muted">What the purchaser buys, against what the board recommends and the rail shows. Suggested rows are
+      the board's picks; a live plan buys any row that clears the venue's fee at the venue's own price, Suggested or
+      not, and stakes follow price until a model is shown to beat the market. Today's orders are matched to the board
+      as it is now, so a row that moved after the purchase reads as another line or off the board. Informational:
+      no anomaly is raised from this panel.</p>
+    <div class="tiles" id="align-tiles"></div>
+    <svg class="chart" id="align" style="margin-top:12px"></svg><div class="legend" id="align-legend"></div></section>
   <section id="history"><h2 id="hist-title">History</h2><svg class="chart" id="hist"></svg><div class="legend" id="hist-legend"></div>
     <div class="tablewrap" style="margin-top:12px"><table id="hist-table"></table></div></section>
   <section><h2>30-day ROI over readings</h2><svg class="chart" id="roi"></svg><div class="legend" id="roi-legend"></div></section>
@@ -269,7 +277,36 @@ td.num { text-align:right; white-space:nowrap; }
       { time: true, bands: [{ lo: "d30_roi_lo95", hi: "d30_roi_hi95" }], refs: [{ y: 0, name: "breakeven", color: css("--muted") }], dec: 1 });
     lineChart("lat", "lat-legend", [{ key: "live_all_s", name: "All-dates ledger (5 s)", color: css("--s4"), budget: "5 s" }, { key: "live_s", name: "Live today (3 s)", color: css("--s1"), budget: "3 s" }, { key: "plan_s", name: "Plan (6 s)", color: css("--s3"), budget: "6 s" }, { key: "page_s", name: "Portfolio page (3 s)", color: css("--s2"), budget: "3 s" }],
       { time: true, dots: true, refs: [{ y: 3, name: "3 s budget (live, page)", color: css("--bad") }], floor: 0, dec: 2 });
+    const AR = R.filter(r => r.al_suggested != null);
+    if (AR.length) lineChart("align", "align-legend", [
+        { key: "al_same_row_pct", name: "today's orders on the board's row %", color: css("--s1") },
+        { key: "al_suggested_bought_pct", name: "board picks bought today %", color: css("--s4") },
+        { key: "al_sim_disagrees_pct", name: "sim disagreed at purchase, 7 d %", color: css("--s2") },
+        { key: "al_rail_model_pct", name: "rail rows with a model %", color: css("--s3") }],
+      { rows: AR, time: true, dots: true, floor: 0, dec: 0 });
   }
+  // the purchaser against the board and the rail (probe `alignment`, 11-23 on)
+  (function () {
+    const box = document.getElementById("align-tiles");
+    const at = (name, big, ...subs) => { const t = el("div", "tile"); t.append(el("h3", null, name)); t.append(el("div", "big", big)); subs.forEach(s => t.append(el("div", "sub", s))); box.append(t); };
+    const of = (a, b) => (a == null || b == null) ? "—" : a + " of " + b;
+    const v = (x) => x ?? "—";
+    if (last.al_error) { at("Alignment", "—", "not read this reading: " + last.al_error); return; }
+    if (last.al_suggested == null) { at("Alignment", "—", "no alignment reading yet"); return; }
+    at("Board picks bought", of(last.al_suggested_bought, last.al_suggested),
+      "Suggested rows bought today; " + v(last.al_suggested_planned) + " in a live plan now",
+      "Kalshi lists " + v(last.al_kalshi_listed) + ", " + v(last.al_kalshi_listed_positions) + " clear its price · Polymarket lists " + v(last.al_polymarket_listed) + ", " + v(last.al_polymarket_listed_positions) + " clear");
+    at("Today's orders on the board", last.al_board_read === false ? "—" : of(last.al_same_row, last.al_orders_today),
+      "same row now: " + v(last.al_same_row_suggested) + " Suggested, board EV > 0 on " + v(last.al_same_row_ev_pos) + ", model edge > 0 on " + v(last.al_same_row_me_pos),
+      "other side only " + v(last.al_other_side) + " · other line " + v(last.al_other_line) + " · off board " + v(last.al_off_board));
+    at("Sim at purchase, 7 days", num(last.al_sim_agrees_pct, 0) + "% agree",
+      num(last.al_sim_disagrees_pct, 0) + "% disagree, of " + v(last.al_week_orders) + " orders",
+      "in play " + num(last.al_inplay_week_pct, 0) + "% of orders; rejected " + num(last.al_inplay_rejected_pct, 0) + "% in play vs " + num(last.al_pregame_rejected_pct, 0) + "% pregame");
+    at("Live plans now", "K " + v(last.al_kalshi_live_positions) + " · P " + v(last.al_polymarket_live_positions),
+      "positions; Suggested among them: Kalshi " + v(last.al_kalshi_live_suggested) + ", Polymarket " + v(last.al_polymarket_live_suggested));
+    at("Rail rows with a model", of(last.al_rail_model, last.al_rail_rows),
+      v(last.al_rail_on_board) + " also on the board · today's orders on a rail game " + v(last.al_rail_orders));
+  })();
   const H = (D.history || []);
   if (H.length) {
     document.getElementById("hist-title").textContent = "History since " + H[0].date + " (rolling ROI ending each day, 95% range shaded)";

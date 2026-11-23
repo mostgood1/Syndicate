@@ -17,6 +17,11 @@ What it measures, each with its denominator:
     SETTLE_LAG_H after their start.
   * CAP USE: today's live dollars and orders per venue against the venue's day caps.
   * GATE: the adopted scale-up gate on the betting-change clock (`live_book_edge_readout`).
+  * ALIGNMENT: the purchaser against the Layer 2 board and the live rail. It covers the board's Suggested rows bought
+    or planned, what each venue lists of them and what its live plan holds, today's orders matched to the board's row
+    (same row / other side only / other line / off board), the sim's verdict at order time, the pregame/in-play mix,
+    and the rail's modelled share. The board and the live plans are read from the fleet's store by
+    `portfolio_alignment_reader.py`, through WSL, because web serves neither whole.
 
 NEVER READ, by design: /api/portfolio/summary and /api/portfolio/paper. On 2026-11-17 ~16:10Z one GET of
 /api/portfolio/paper ran ~177 s and its web worker was SIGKILLed by the gunicorn timeout (summary dropped
@@ -60,6 +65,8 @@ ENDPOINTS: tuple[tuple[str, str, float], ...] = (
     ("settings", "/api/portfolio/settings", 2.0),
     ("books", "/api/portfolio/books", 2.0),
     ("page", "/portfolio", 3.0),
+    # The ALIGNMENT section's rail (~80 KB). 2026-11-23 first read 0.1 s.
+    ("rail", "/api/board/live-rail", 3.0),
 )
 NEVER_READ = ("/api/portfolio/summary", "/api/portfolio/paper")
 SETTLE_LAG_H = 8.0      # a filled bet still unsettled this long after its start is late
@@ -601,6 +608,40 @@ def fleet_logs(cutoff: str, work_dir: Path, plan_cutoff: str | None = None
     return web.splitlines(), workers.splitlines(), plans.splitlines(), None
 
 
+ALIGN_SH = r"""#!/bin/bash
+# $1 = the alignment reader (WSL path), $2 = date. Runs it under refresh-worker's own interpreter, at nice 19.
+# A script FILE, not `bash -c`: the grep pattern must not appear in this process's own command line.
+pid=$(ps -eo pid=,args= --sort=pid | grep '[r]un_refresh_worker.py' | awk 'NR==1{print $1}')
+[ -n "$pid" ] || { echo '{"error": "no refresh-worker process"}'; exit 0; }
+py=$(tr '\0' '\n' < "/proc/$pid/cmdline" | head -1)
+cd /home/amyn/Syndicate || { echo '{"error": "no fleet checkout"}'; exit 0; }
+exec nice -n 19 "$py" "$1" "$pid" "$2"
+"""
+ALIGN_READER = HERE / "portfolio_alignment_reader.py"
+
+
+def fleet_alignment(work_dir: Path, today: str) -> tuple[dict[str, Any], str | None]:
+    """(the reader's document, error). Measured 2026-11-23: 1.9 s, 205 MB peak on the fleet, ~1.1 MB of JSON."""
+    sh = work_dir / "portfolio_alignment.sh"
+    sh.write_bytes(ALIGN_SH.encode())  # LF only: bash rejects CRLF
+    try:
+        r = subprocess.run(["wsl", "--", "bash", to_wsl_path(sh), to_wsl_path(ALIGN_READER), today],
+                           capture_output=True, timeout=180)
+    except Exception as exc:  # noqa: BLE001 -- the alignment half is optional
+        return {}, f"{type(exc).__name__}: {exc}"
+    text = r.stdout.decode("utf-8", "replace").strip()
+    tail = r.stderr.decode("utf-8", "replace").strip()[-200:]
+    try:
+        doc = json.loads(text) if text else {}
+    except ValueError:
+        return {}, f"reader output not JSON (rc {r.returncode}): {tail}"
+    if doc.get("error"):
+        return {}, str(doc["error"])
+    if r.returncode or not doc:
+        return {}, f"reader rc {r.returncode}: {tail}"
+    return doc, None
+
+
 def set_idle_priority() -> None:
     if sys.platform != "win32":
         return
@@ -752,6 +793,175 @@ def perf_signals(windows: Mapping[str, Any], clv: Mapping[str, Any],
     return out
 
 
+# ---------------------------------------------------------------- alignment
+# THE PURCHASER AGAINST THE BOARD AND THE RAIL (user 2026-11-23: "yes, add the alignment check to the readings").
+# First reading, 11-23 1:07 PM CST (.syndicate/findings_2026-11-23_portfolio_monitor.md):
+#   - 0 of 36 Suggested rows were bought or planned;
+#   - every live-plan position came from the 0% live EV floor;
+#   - 2 of 85 rail rows carried a model edge.
+# INFORMATIONAL: it raises no anomaly. Most of the gap is by design (a venue lists few Suggested rows, and stakes
+# follow price until a model is measured to beat the market), so the SERIES is the reading, not one value.
+ALIGN_VENUES = ("kalshi", "polymarket")
+ALIGN_DAYS = 7  # the sim-verdict and in-play mix window, in CST days including today
+
+
+def align_key(x: Mapping[str, Any], with_side: bool = True) -> tuple:
+    """One bet's identity across the board, the plans, the orders and the rail."""
+    try:
+        line = round(float(x.get("line")), 2)
+    except (TypeError, ValueError):
+        line = None
+    key = (str(x.get("event_id") or ""), str(x.get("market") or "").strip().lower(), line,
+           str(x.get("player_name") or "").strip().lower(), str(x.get("segment") or "full").strip().lower() or "full")
+    return key + ((str(x.get("side") or "").strip().lower(),) if with_side else ())
+
+
+def order_phase(o: Mapping[str, Any]) -> str:
+    sub, kick = parse_ts(o.get("submitted_at")), parse_ts(o.get("commence_time"))
+    if sub is None or kick is None:
+        return "unknown"
+    return "in_play" if sub >= kick else "pregame"
+
+
+def sim_verdict(o: Mapping[str, Any]) -> str:
+    v = o.get("sim_view")
+    v = v.get("verdict") if isinstance(v, Mapping) else v
+    return str(v or "none")
+
+
+def _phases(orders: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    every = collections.Counter(order_phase(o) for o in orders)
+    bad = collections.Counter(order_phase(o) for o in orders if o.get("status") in ("rejected", "failed"))
+    return {"pregame": every["pregame"], "in_play": every["in_play"], "unknown": every["unknown"],
+            "pregame_rejected": bad["pregame"], "in_play_rejected": bad["in_play"]}
+
+
+def alignment(fleet: Mapping[str, Any], orders: Sequence[Mapping[str, Any]], rail: Mapping[str, Any],
+              today: str, now: dt.datetime) -> dict[str, Any]:
+    """Counts only. `fleet` is `portfolio_alignment_reader.py`'s document: the board's rows and the venue plans.
+
+    The board is read NOW and the orders were placed earlier, so an order whose row has since moved or dropped reads
+    as "other line" or "off board": that is drift, not a conflict.
+    """
+    board = (fleet or {}).get("board") or {}
+    rows = [r for r in board.get("rows") or [] if isinstance(r, Mapping)]
+    by_key: dict[tuple, Mapping[str, Any]] = {}
+    for r in rows:
+        by_key.setdefault(align_key(r), r)
+    sides = {align_key(r, False) for r in rows}
+    games = {(str(r.get("event_id") or ""), str(r.get("market") or "").strip().lower()) for r in rows}
+    suggested = [r for r in rows if r.get("suggested")]
+    live = [o for o in orders if o.get("mode") == "live"]
+    today_orders = [o for o in live if str(o.get("selected_date") or "") == today]
+    bought = {align_key(o) for o in today_orders}
+    plans = (fleet or {}).get("plans") or {}
+    planned = {align_key(p) for v in ALIGN_VENUES for p in (plans.get(f"live_{v}") or {}).get("positions") or []}
+
+    out: dict[str, Any] = {"board": {
+        "rows": len(rows), "written_at": board.get("written_at"), "error": board.get("error"),
+        "suggested": len(suggested),
+        "suggested_by_sport": dict(collections.Counter(str(r.get("sport")) for r in suggested).most_common()),
+        "suggested_bought_today": sum(align_key(r) in bought for r in suggested),
+        "suggested_in_live_plan": sum(align_key(r) in planned for r in suggested),
+    }}
+    venues: dict[str, Any] = {}
+    for v in ALIGN_VENUES:
+        lp, p2 = plans.get(f"live_{v}") or {}, plans.get(f"paper2_{v}") or {}
+        pos = [p for p in lp.get("positions") or [] if isinstance(p, Mapping)]
+        venues[v] = {
+            "live_plan_at": lp.get("generated_at"), "live_plan_absent": bool(lp.get("absent")) or not lp,
+            "live_rows_in": lp.get("rows_in"), "live_positions": len(pos),
+            "live_positions_suggested": sum(bool(p.get("suggested")) for p in pos),
+            "live_refusals_top": dict(collections.Counter(lp.get("refusals") or {}).most_common(3)),
+            # paper2 runs the same gates over the Suggested rows alone, at this venue's own price.
+            "suggested_listed": p2.get("rows_in"),
+            "suggested_not_listed": (p2.get("scope_refusals") or {}).get("venue_not_quoting"),
+            "suggested_positions": len(p2.get("positions") or []),
+            "suggested_refusals": dict(p2.get("refusals") or {}),
+        }
+    out["venues"] = venues
+
+    cls: collections.Counter = collections.Counter()
+    same: collections.Counter = collections.Counter()
+    for o in today_orders:
+        r = by_key.get(align_key(o))
+        if r is not None:
+            cls["same_row"] += 1
+            same["suggested"] += bool(r.get("suggested"))
+            same["board_ev_positive"] += (r.get("ev") or 0) > 0
+            same["model_edge_positive"] += (r.get("me") or 0) > 0
+        elif align_key(o, False) in sides:
+            cls["other_side_only"] += 1
+        elif (str(o.get("event_id") or ""), str(o.get("market") or "").strip().lower()) in games:
+            cls["other_line"] += 1
+        else:
+            cls["off_board"] += 1
+    out["orders_today"] = {
+        "orders": len(today_orders), "board_read": bool(rows),
+        **{k: cls.get(k, 0) for k in ("same_row", "other_side_only", "other_line", "off_board")},
+        **{f"same_row_{k}": same.get(k, 0) for k in ("suggested", "board_ev_positive", "model_edge_positive")},
+    }
+
+    since = (now.astimezone(CT).date() - dt.timedelta(days=ALIGN_DAYS - 1)).isoformat()
+    week = [o for o in live if str(o.get("selected_date") or "") >= since]
+    out["sim_at_order"] = {"today": dict(collections.Counter(sim_verdict(o) for o in today_orders)),
+                           "week": dict(collections.Counter(sim_verdict(o) for o in week)),
+                           "week_orders": len(week), "since": since}
+    out["phase"] = {"today": _phases(today_orders), "week": _phases(week)}
+
+    rrows = [r for r in (rail or {}).get("rows") or [] if isinstance(r, Mapping)]
+    rail_games = {str(r.get("event_id") or "") for r in rrows}
+    out["rail"] = {
+        "read_at": (rail or {}).get("read_at"), "rows": len(rrows), "sports": (rail or {}).get("sports"),
+        "with_model_edge": sum(r.get("model_edge_pct") is not None for r in rrows),
+        "model_edge_positive": sum((r.get("model_edge_pct") or 0) > 0 for r in rrows),
+        "on_board": sum(align_key(r) in by_key for r in rrows),
+        "today_orders_on_rail_games": sum(str(o.get("event_id") or "") in rail_games for o in today_orders),
+    }
+    return out
+
+
+def render_alignment(al: Mapping[str, Any]) -> list[str]:
+    if not al:
+        return []
+    if al.get("error"):
+        return [f"  ALIGNMENT error: {al['error']}"]
+    b, ot = al.get("board") or {}, al.get("orders_today") or {}
+    n_sugg = b.get("suggested") or 0
+    lines = [f"  ALIGNMENT (purchaser vs Layer 2 board vs rail): board {b.get('rows')} rows, {n_sugg} Suggested "
+             f"{b.get('suggested_by_sport')}; Suggested bought today {rate(b.get('suggested_bought_today') or 0, n_sugg)},"
+             f" in a live plan now {rate(b.get('suggested_in_live_plan') or 0, n_sugg)}"]
+    for v, x in (al.get("venues") or {}).items():
+        lines.append(f"    {v}: lists {x.get('suggested_listed')} of the Suggested rows -> {x.get('suggested_positions')}"
+                     f" positions at its price {x.get('suggested_refusals')}; live plan {x.get('live_positions')}"
+                     f" positions ({x.get('live_positions_suggested')} Suggested) from {x.get('live_rows_in')} rows,"
+                     f" top refusals {x.get('live_refusals_top')}")
+    n = ot.get("orders") or 0
+    same = ot.get("same_row") or 0
+    if ot.get("board_read"):
+        lines.append(f"    today's {n} orders vs the board now: same row {rate(same, n)} (Suggested"
+                     f" {rate(ot.get('same_row_suggested') or 0, same)}, board EV > 0"
+                     f" {rate(ot.get('same_row_board_ev_positive') or 0, same)}, model edge > 0"
+                     f" {rate(ot.get('same_row_model_edge_positive') or 0, same)}), other side only"
+                     f" {rate(ot.get('other_side_only') or 0, n)}, other line {rate(ot.get('other_line') or 0, n)},"
+                     f" off board {rate(ot.get('off_board') or 0, n)}")
+    else:
+        lines.append(f"    today's {n} orders: board not read ({b.get('error')})")
+    sim, ph = al.get("sim_at_order") or {}, al.get("phase") or {}
+    wk, td = ph.get("week") or {}, ph.get("today") or {}
+    n_wk = sim.get("week_orders") or 0
+    lines.append(f"    sim verdict at order: today {sim.get('today')}; since {sim.get('since')} {sim.get('week')} of {n_wk};"
+                 f" in play: today {rate(td.get('in_play') or 0, n)}, week {rate(wk.get('in_play') or 0, n_wk)}"
+                 f" (rejected {rate(wk.get('in_play_rejected') or 0, wk.get('in_play') or 0)} vs pregame"
+                 f" {rate(wk.get('pregame_rejected') or 0, wk.get('pregame') or 0)})")
+    ra = al.get("rail") or {}
+    nr = ra.get("rows") or 0
+    lines.append(f"    rail: {nr} rows {ra.get('sports')}; model edge {rate(ra.get('with_model_edge') or 0, nr)}"
+                 f" ({ra.get('model_edge_positive')} positive); on the board {rate(ra.get('on_board') or 0, nr)};"
+                 f" today's orders on a rail game {ra.get('today_orders_on_rail_games')}")
+    return lines
+
+
 def render(r: Mapping[str, Any]) -> str:
     lines = [f"PORTFOLIO READING {r['label']} ({r['at']}), log window {r['log_minutes']} min"]
     for name, ep in r["endpoints"].items():
@@ -835,6 +1045,7 @@ def render(r: Mapping[str, Any]) -> str:
         lines += [f"      - {s}" for s in perf.get("signals") or []]
     elif perf.get("error"):
         lines.append(f"  PERFORMANCE error: {perf['error']}")
+    lines += render_alignment(r.get("alignment") or {})
     lines.append("  ANOMALIES: " + ("none" if not r["anomalies"] else ""))
     lines += [f"    - {a}" for a in r["anomalies"]]
     return "\n".join(lines)
@@ -846,6 +1057,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--out-dir", default=r"C:\tmp\pfmon\readings")
     ap.add_argument("--log-minutes", type=int, default=60)
     ap.add_argument("--no-logs", action="store_true")
+    ap.add_argument("--no-alignment", action="store_true", help="skip the fleet-side board/plan read (WSL)")
     args = ap.parse_args(argv)
     if not re.match(r"^http://(127\.0\.0\.1|localhost)(:\d+)?$", args.base_url.rstrip("/")):
         print(f"refused: {args.base_url} is not the fleet (loopback only)", file=sys.stderr)
@@ -913,6 +1125,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         reading["plan_commits"] = plan_commits(plan_lines, now)
         if err:
             reading["log_error"] = err
+    if not args.no_logs and not args.no_alignment:
+        try:
+            fleet, err = fleet_alignment(rdir, today)
+            reading["alignment"] = (alignment(fleet, all_orders, bodies.get("rail") or {}, today, now)
+                                    if fleet else {"error": err})
+        except Exception as exc:  # noqa: BLE001 -- the alignment half is optional
+            reading["alignment"] = {"error": f"{type(exc).__name__}: {exc}"}
     reading["anomalies"] = anomalies(reading)
     (rdir / "reading.json").write_text(json.dumps(reading, indent=1, default=str), encoding="utf-8")
     with (out_dir / "readings.jsonl").open("a", encoding="utf-8") as fh:

@@ -278,3 +278,90 @@ def test_perf_signals_flag_only_slices_beyond_noise_with_enough_events():
     assert not any("ev 5-10" in x for x in s) and not any("wnba" in x for x in s)
     assert any(x.startswith("market h2h: wins beyond noise") for x in s) and any(x.startswith("SIZING") for x in s)
     assert not any(x.startswith("CLV and results disagree") for x in s)    # both negative: they agree
+
+
+# ---------------------------------------------------------------- alignment (user 2026-11-23)
+
+def _row(eid, market, side, line=None, *, suggested=False, ev=None, me=None, sport="nba", player=None, segment="full"):
+    return {"event_id": eid, "market": market, "side": side, "line": line, "player_name": player, "segment": segment,
+            "sport": sport, "suggested": suggested, "ev": ev, "me": me}
+
+
+def test_align_key_normalises_case_line_and_segment():
+    row = {"event_id": "e", "market": "totals", "line": 200.5, "side": "over", "segment": "full"}
+    a = pm.align_key({"event_id": "e", "market": "Totals", "line": "200.50", "side": "Over", "segment": None})
+    b = pm.align_key(row)
+    assert a == b
+    assert pm.align_key(row, with_side=False) == b[:-1]
+
+
+def test_alignment_classifies_orders_and_counts_the_board_plans_and_rail():
+    fleet = {
+        "board": {"written_at": "2026-11-17T15:55:00Z", "rows": [
+            _row("e1", "h2h", "home", suggested=True, ev=2.0, me=1.0, sport="nhl"),
+            _row("e2", "totals", "over", 200.5, ev=-1.0, me=-0.5),
+            _row("e3", "totals", "over", 150.5, sport="ncaab"),
+            _row("e4", "h2h", "away", suggested=True, ev=3.0, sport="soccer"),
+        ]},
+        "plans": {
+            "live_kalshi": {"generated_at": "x", "rows_in": 400, "refusals": {"below_live_net_floor": 390, "below_min_stake": 2},
+                            "positions": [_row("e2", "totals", "over", 200.5)]},
+            "paper2_kalshi": {"rows_in": 1, "positions": [], "refusals": {"below_min_ev_pct": 1},
+                              "scope_refusals": {"venue_not_quoting": 1}},
+            "live_polymarket": {"absent": True}, "paper2_polymarket": {"absent": True},
+        },
+    }
+    kick = "2026-11-17T20:00:00Z"
+    orders = [
+        _order(event_id="e2", market="totals", side="over", line=200.5, sim_view="disagrees", commence_time=kick),
+        _order(event_id="e1", market="h2h", side="away", sim_view={"verdict": "agrees"}, commence_time=kick),
+        _order(event_id="e3", market="totals", side="over", line=151.5, sim_view="neutral", commence_time=kick),
+        _order(event_id="e9", market="h2h", side="home", sim_view="agrees", status="rejected",
+               commence_time="2026-11-17T14:00:00Z", submitted_at="2026-11-17T14:30:00Z"),       # in play, off board
+        _order(selected_date="2026-11-14", commence_time="2026-11-14T20:00:00Z",
+               submitted_at="2026-11-14T21:00:00Z"),                                              # in play, this week
+        _order(selected_date="2026-11-09"),                                                       # outside the week
+        _order(mode="paper", event_id="e1", market="h2h", side="home"),                          # paper: ignored
+    ]
+    rail = {"read_at": "2026-11-17T16:00:00Z", "sports": {"ncaab": 2}, "rows": [
+        {"event_id": "e3", "market": "totals", "line": 150.5, "side": "over", "segment": "full", "model_edge_pct": 1.2},
+        {"event_id": "e5", "market": "h2h", "side": "home", "model_edge_pct": None},
+    ]}
+    al = pm.alignment(fleet, orders, rail, "2026-11-17", NOW)
+
+    b = al["board"]
+    assert (b["rows"], b["suggested"], b["suggested_bought_today"], b["suggested_in_live_plan"]) == (4, 2, 0, 0)
+    assert b["suggested_by_sport"] == {"nhl": 1, "soccer": 1}
+    k = al["venues"]["kalshi"]
+    assert (k["live_positions"], k["live_positions_suggested"], k["live_rows_in"]) == (1, 0, 400)
+    assert (k["suggested_listed"], k["suggested_not_listed"], k["suggested_positions"]) == (1, 1, 0)
+    assert k["live_refusals_top"] == {"below_live_net_floor": 390, "below_min_stake": 2}
+    assert al["venues"]["polymarket"]["live_plan_absent"] is True
+
+    ot = al["orders_today"]
+    assert ot["orders"] == 4 and ot["board_read"] is True
+    assert (ot["same_row"], ot["other_side_only"], ot["other_line"], ot["off_board"]) == (1, 1, 1, 1)
+    assert (ot["same_row_suggested"], ot["same_row_board_ev_positive"], ot["same_row_model_edge_positive"]) == (0, 0, 0)
+
+    assert al["sim_at_order"]["today"] == {"disagrees": 1, "agrees": 2, "neutral": 1}
+    assert al["sim_at_order"]["week_orders"] == 5 and al["sim_at_order"]["since"] == "2026-11-11"
+    assert al["phase"]["today"] == {"pregame": 3, "in_play": 1, "unknown": 0, "pregame_rejected": 0,
+                                    "in_play_rejected": 1}
+    assert al["phase"]["week"]["in_play"] == 2
+
+    ra = al["rail"]
+    assert (ra["rows"], ra["with_model_edge"], ra["model_edge_positive"], ra["on_board"]) == (2, 1, 1, 1)
+    assert ra["today_orders_on_rail_games"] == 1  # the e3 order
+
+    text = "\n".join(pm.render_alignment(al))
+    assert "Suggested bought today 0/2 (0.0%)" in text
+    assert "same row 1/4 (25.0%)" in text and "off board 1/4 (25.0%)" in text
+    assert "model edge 1/2 (50.0%)" in text
+
+
+def test_alignment_without_a_board_says_so_and_renders_the_error():
+    al = pm.alignment({"board": {"error": "no shortlist for 2026-11-17"}, "plans": {}}, [_order()], {}, "2026-11-17", NOW)
+    assert al["orders_today"]["board_read"] is False
+    assert "board not read (no shortlist for 2026-11-17)" in "\n".join(pm.render_alignment(al))
+    assert pm.render_alignment({"error": "reader rc 1: boom"}) == ["  ALIGNMENT error: reader rc 1: boom"]
+    assert pm.render_alignment({}) == []

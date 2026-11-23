@@ -81,7 +81,51 @@ def row(r: dict) -> dict:
         "anomalies": len(r.get("anomalies") or []),
         # The live book's results (probe `performance`, 11-18 on). Percentages and counts only.
         **_perf_fields(r),
+        # The purchaser against the Layer 2 board and the rail (probe `alignment`, 11-23 on). Counts and rates only.
+        **_align_fields(r),
     }
+
+
+def _share(n, d):
+    return round(100.0 * n / d, 1) if (n is not None and d) else None
+
+
+def _align_fields(r: dict) -> dict:
+    al = r.get("alignment")
+    if not al:
+        return {}
+    if al.get("error"):
+        return {"al_error": str(al["error"])[:160]}
+    b, ot, ra = al.get("board") or {}, al.get("orders_today") or {}, al.get("rail") or {}
+    sim, wk = al.get("sim_at_order") or {}, (al.get("phase") or {}).get("week") or {}
+    week, n_wk = sim.get("week") or {}, sim.get("week_orders") or 0
+    out = {
+        "al_board_rows": b.get("rows"), "al_suggested": b.get("suggested"),
+        "al_suggested_bought": b.get("suggested_bought_today"), "al_suggested_planned": b.get("suggested_in_live_plan"),
+        "al_suggested_bought_pct": _share(b.get("suggested_bought_today"), b.get("suggested")),
+        "al_orders_today": ot.get("orders"), "al_board_read": ot.get("board_read"),
+        "al_same_row": ot.get("same_row"), "al_same_row_pct": _share(ot.get("same_row"), ot.get("orders")),
+        "al_same_row_suggested": ot.get("same_row_suggested"),
+        "al_same_row_ev_pos": ot.get("same_row_board_ev_positive"),
+        "al_same_row_me_pos": ot.get("same_row_model_edge_positive"),
+        "al_other_side": ot.get("other_side_only"), "al_other_line": ot.get("other_line"),
+        "al_off_board": ot.get("off_board"),
+        "al_week_orders": n_wk,
+        "al_sim_agrees_pct": _share(week.get("agrees", 0), n_wk),
+        "al_sim_disagrees_pct": _share(week.get("disagrees", 0), n_wk),
+        "al_inplay_week_pct": _share(wk.get("in_play"), n_wk),
+        "al_inplay_rejected_pct": _share(wk.get("in_play_rejected"), wk.get("in_play")),
+        "al_pregame_rejected_pct": _share(wk.get("pregame_rejected"), wk.get("pregame")),
+        "al_rail_rows": ra.get("rows"), "al_rail_model": ra.get("with_model_edge"),
+        "al_rail_model_pct": _share(ra.get("with_model_edge"), ra.get("rows")),
+        "al_rail_on_board": ra.get("on_board"), "al_rail_orders": ra.get("today_orders_on_rail_games"),
+    }
+    for v, x in (al.get("venues") or {}).items():
+        out[f"al_{v}_listed"] = x.get("suggested_listed")
+        out[f"al_{v}_listed_positions"] = x.get("suggested_positions")
+        out[f"al_{v}_live_positions"] = x.get("live_positions")
+        out[f"al_{v}_live_suggested"] = x.get("live_positions_suggested")
+    return out
 
 
 def _perf_fields(r: dict) -> dict:

@@ -92,3 +92,42 @@ prints an allowlist of fields).
    `SYNDICATE_KALSHI_JOIN_SPORT_SCOPE=on`, is CHANGE L of the 11-24 batch.
 2. The ledger row's `venue_resolved_at` / `settled_at` read 17:40:34Z, the submit acknowledgement, on a row that ended
    at 21:30Z. Do not read those fields as the cancel time; that misled the first timing guess here.
+
+## Alignment check added to every Portfolio Watch reading -- 1:45 PM CST
+
+The user, 11-23: "yes, add the alignment check to the readings".
+
+**The probe** (`scripts/portfolio_monitor_probe.py`) has a new `alignment` section and prints an `ALIGNMENT` block. It
+covers:
+- the board's Suggested rows bought today and in a live plan;
+- per venue: how many Suggested rows it lists, how many clear its price, and the live plan's positions;
+- today's orders against the board's row: same row (and whether that row is Suggested, board EV > 0, model edge > 0),
+  other side only, other line, off board;
+- the sim's verdict at purchase and the in-play share, over the last 7 CST days;
+- the rail: rows, how many carry a model edge, how many are also board rows, and today's orders on a rail game.
+
+**The reader** (`scripts/portfolio_alignment_reader.py`, new) reads the whole shortlist and the venue plans from the
+fleet's store, under refresh-worker's environ, at nice 19. It is run through WSL, and it prints key fields and flags
+only.
+- Why the store and not web: web caps a shortlist reply at 2,000 rows. The board holds about 4,500, and per-sport web
+  reads would cost about 14 MB a reading.
+- Measured cost: 1.9 s, 205 MB peak, 1.1 MB of JSON. The whole reading takes 12.5 s.
+
+**The page.** It gains a "Purchaser vs Layer 2 board and rail" panel: five tiles and a series chart
+(`scripts/portfolio_watch/build_page_data.py` `_align_fields`, `build_dashboard.py`).
+- Informational: it raises no anomaly.
+- Tests: 24 probe tests and 7 Portfolio Watch tests pass. The page build was checked in the browser.
+
+**The full board corrects the first reading's order match.** The 1:07 PM reading above used the API's capped 2,000
+rows. The 1:34 PM test reading read all 4,479 rows:
+- today's 33 orders: **same row 22 (67%), none of them Suggested**; board EV > 0 on 10 of 22, model edge > 0 on 4 of 22;
+- other side only 4, other line 4, off board 3;
+- Suggested rows: 45, of which **0 were bought today**. Kalshi lists 21 (1 clears its price) and Polymarket 7 (1 clears);
+- live plans: Kalshi 3 positions and Polymarket 4, none Suggested;
+- 7 days: the sim agreed with 31% of 396 purchases and disagreed with 29%. In-play buys were 8%, and 27% of them were
+  rejected, against 1% pregame;
+- rail: 15 of 169 rows carry a model edge.
+
+**Lane.** The `portfolio-monitor` `Files:` line read "(NEW, read-only probe)", and "read-only" is a lane-claims
+disclaimer marker. Every path after it had been claimed by nobody. The line was rewritten without marker words and
+now claims 9 of 9 paths, 0 lost (`.claude/hooks/lane_claims._claims`). The new reader was added to it.
