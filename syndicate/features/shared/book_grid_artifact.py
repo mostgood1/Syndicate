@@ -413,6 +413,23 @@ def drop_events_moved_to_another_date(
 
     reader = read_last_seen or read_quote_last_seen
     enabled = _moved_kickoff_drop_enabled()
+
+    # SOCCER'S OLD UTC SHARD (lane evening-utc-date-split). While
+    # SYNDICATE_SOCCER_QUOTE_SHARD_CENTRAL is on, soccer quotes file by the Central
+    # kickoff day. A match quoted before the switch also has rows in its UTC-day
+    # shard, and that shard filed them by their own (UTC) kickoff, so they are a
+    # moved kickoff, not a forward game captured under the slate date. Without
+    # this they would stay in the UTC-day grid at their last pre-switch prices.
+    # Off: never true, so the rule is unchanged.
+    from syndicate.features.shared.soccer_quote_shard import (
+        soccer_quote_shard_central_enabled,
+        utc_shard_date,
+    )
+
+    soccer_central = str(sport).strip().lower() == "soccer" and soccer_quote_shard_central_enabled()
+
+    def legacy_utc_shard(row: Mapping[str, Any]) -> bool:
+        return soccer_central and utc_shard_date(row) == str(date_str).strip()
     counters: dict[str, Any] = {
         "enabled": enabled,
         "candidates": 0,
@@ -450,7 +467,7 @@ def drop_events_moved_to_another_date(
             # soccer on 10-18/10-19); those are that day's view, not a moved
             # kickoff. Replayed on the fleet without this: 28 NFL and 154 soccer
             # events dropped from past grids, none of them a move.
-            if kickoff_shard_date(row) != str(date_str).strip():
+            if kickoff_shard_date(row) != str(date_str).strip() and not legacy_utc_shard(row):
                 continue
             if (now - look).total_seconds() > _MOVED_KICKOFF_QUIET_SECONDS:
                 candidates[event_id] = look

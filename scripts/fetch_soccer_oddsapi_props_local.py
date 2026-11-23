@@ -495,6 +495,7 @@ def _append_soccer_prop_book_quotes(*, league: str, payloads: list[dict[str, Any
     try:
         from syndicate.features.shared.odds_book_quotes import append_book_quotes
         from syndicate.features.shared.odds_book_quotes import quote_rows_from_oddsapi_events
+        from syndicate.features.shared.soccer_quote_shard import soccer_quote_shard_date
 
         rows = quote_rows_from_oddsapi_events(payloads)
         if not rows:
@@ -502,7 +503,10 @@ def _append_soccer_prop_book_quotes(*, league: str, payloads: list[dict[str, Any
         now = datetime.now(timezone.utc)
         by_date: dict[str, list[dict[str, Any]]] = {}
         for row in rows:
-            commence = str(row.get("commence_time") or "")[:10] or now.date().isoformat()
+            # `soccer_quote_shard_date` is this same UTC slice while
+            # SYNDICATE_SOCCER_QUOTE_SHARD_CENTRAL is absent, and the Central kickoff
+            # day when it is on (lane evening-utc-date-split).
+            commence = soccer_quote_shard_date(row, now=now)
             by_date.setdefault(commence, []).append(row)
         for date_str, date_rows in by_date.items():
             append_book_quotes(
