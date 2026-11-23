@@ -223,6 +223,36 @@ asserted "headline = max model edge" were rewritten to the board-pick contract.
 **Lead it exposed, not followed.** 1,100 of 1,128 NBA lines carry `suspect_stale_quote` at 1:30 PM CT on game day, so
 the board can pick no NBA bet at all. Whether that is quote cadence or a capture gap is unmeasured.
 
+### Reading 4 -- the peer's report on Suggested vs the purchaser, re-measured `[20:15:43Z-20:19:41Z, fleet, read-only]`
+
+`portfolio-monitor` (session 69d80317) messaged at 19:46Z. It said explicitly that it was not asking for a change.
+Re-derived here, same instant per read:
+
+- **Best book.** 47 Suggested rows at 20:15Z. The best price is a sportsbook on all 47: FanDuel 14, BetMGM 13,
+  ProphetX 6, BetRivers 4, DraftKings 4, Novig 3, Bovada 2, Fanatics 1. 30 also carry a Kalshi or Polymarket price,
+  and 3 of those clear +2% GROSS at the board's fair; fees would cut that further. The peer read 0 of 34 at +2% NET.
+  That agrees in direction. **The purchaser can buy almost none of the board's picks, by construction.**
+- **Stale in-play picks.** 7 of 47 Suggested rows were in play at 20:15Z, all on a market price alone.
+  - NCAAB Long Beach St @ FIU, under 159.5 at BetMGM -102 on a 0.52 fair (quote age 113 s), at 75-75 with 0:57 left.
+    That is a price the market has left, and `suspect_stale_quote` did not catch it.
+  - At 20:19Z the count was 11 in play, 10 of them market-only.
+- **Not re-derived:** the peer's -7.06% [-13.60, -0.46] over 1,249 bets for the 0% floor population. It is cited as
+  theirs.
+- **New here: the purchaser's in-play rule is role-dependent.** `portfolio_commit._refuses_in_play_market_fair`
+  first checks `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`. Read from the running roles at about 20:25Z, that key is
+  `mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer` on refresh-worker and ABSENT on live-odds-worker. No env layer my reader
+  parsed carries it (spec, `fleet_env/*.json`, `local_production.env`), so where it comes from is unlocated. On any
+  role without it, the function returns False for every row.
+
+**Step 1a amended by this.** Ask's headline leaves out a Suggested row that is in play on a market price alone. That
+is the purchaser's rule, and the system would not buy that row. Ask builds the rule from `portfolio_commit`'s own
+role-independent pieces (`_in_play_market_fair_allowed`, `_in_play_market_fair_cells`, `_market_fair_family`), because
+calling the function from web would be a silent no-op. The headline then says how many it left out:
+"10 in-play board picks left out: on a market price alone, the purchaser does not buy them" (replay, 20:19Z read).
+The board still flags these rows Suggested. That is a **board defect owed to the board's owner and the user**:
+- changing `_stamp_suggested` changes the Suggested series that the daily grader and the paper book read;
+- the live plans also read Suggested, so changing it may be a betting change.
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:

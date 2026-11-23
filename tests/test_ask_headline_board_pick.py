@@ -129,3 +129,59 @@ def test_absence_sentence_wording():
     # an unknown reason is shown by its own name, not dropped
     odd = adapter._BoardExclusion(count=2, considered=2, reasons=(("new_gate", 2),))
     assert adapter._board_summary_sentence([], odd) == "The board suggests no bets right now. Of its 2 lines, 2 new gate."
+
+
+# --- the purchaser's in-play rule (todo #861, peer report 2026-11-23 19:46Z, re-measured 20:15Z) ---------------
+#
+# 7 of 47 Suggested rows were in play on a market price alone; one was an NCAAB under 159.5 at -102 on a 0.52
+# fair, at 75-75 with 0:57 left. The purchaser refuses exactly these (`in_play_market_fair`); Ask does not
+# headline them either, and says how many it left out.
+
+def _live(row, **over):
+    out = dict(row, is_live=True, market_state="live", game_state="live")
+    out.update(over)
+    return out
+
+
+def test_an_in_play_pick_on_a_market_price_alone_is_not_headlined(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR", raising=False)
+    monkeypatch.delenv("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR_CELLS", raising=False)
+    stale = _live(_row("ncaab", "Stale Live", ev=3.1, score=9.0, suggested=True), market="totals", kind="game",
+                  player_name=None)
+    pregame = _row("ncaab", "Pregame Pick", ev=2.5, score=1.0, suggested=True)
+    modelled = _live(_row("ncaab", "Live With Model", ev=2.2, score=0.5, suggested=True, edge=3.0))
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist",
+                        lambda _d: {"rows": [stale, pregame, modelled]}, raising=False)
+    schema = adapter._market_summary_schema(SNAPSHOT, question="best ncaab bets", context={}, routed_sport="ncaab")
+    names = [r["selection"].split(" over")[0] for r in schema["top_opportunities"]]
+    assert "Stale Live" not in " ".join(names)
+    assert names == ["Pregame Pick", "Live With Model"]
+    assert "1 in-play board pick left out" in schema["rationale_summary"]["summary"]
+
+
+def test_the_purchasers_in_play_cells_and_override_are_honoured(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR", raising=False)
+    monkeypatch.delenv("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR_CELLS", raising=False)
+    ncaaf_total = _live(_row("ncaaf", "x", ev=3.0, score=1.0, suggested=True), market="totals", kind="game",
+                        player_name=None)
+    nba_total = _live(_row("nba", "x", ev=3.0, score=1.0, suggested=True), market="totals", kind="game",
+                      player_name=None)
+    assert adapter._is_board_pick(ncaaf_total) is True  # default cell ncaaf:totals, staked in play
+    assert adapter._is_board_pick(nba_total) is False
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR", "allow")
+    assert adapter._is_board_pick(nba_total) is True
+
+
+def test_the_in_play_rule_does_not_depend_on_the_sizing_sport_allowlist(monkeypatch):
+    """The purchaser's own function returns False everywhere when SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS is
+    absent, which it is on every role but refresh-worker. Ask's rule must refuse regardless."""
+    monkeypatch.delenv("SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS", raising=False)
+    monkeypatch.delenv("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR", raising=False)
+    monkeypatch.delenv("SYNDICATE_PORTFOLIO_IN_PLAY_MARKET_FAIR_CELLS", raising=False)
+    from syndicate.features.shared.portfolio_commit import _refuses_in_play_market_fair
+
+    row = _live(_row("ncaab", "x", ev=3.0, score=1.0, suggested=True), market="spreads", kind="game", player_name=None)
+    assert _refuses_in_play_market_fair(row) is False  # the no-op on a role without the allowlist
+    assert adapter._in_play_on_market_price_only(row) is True
+    monkeypatch.setenv("SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS", "mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer")
+    assert _refuses_in_play_market_fair(row) is adapter._in_play_on_market_price_only(row) is True  # refresh-worker

@@ -598,6 +598,13 @@ def _board_summary_sentence(rows: Any, excluded_negative: int | _BoardExclusion 
         evs = [ev for ev in (_to_float(row.get("EV")) for row in items) if ev is not None]
         if evs:
             sentence += f" Best EV {max(evs):+.1f}% at the posted price."
+        in_play_left_out = exclusion.in_play_left_out
+        if in_play_left_out:
+            plural = "s" if in_play_left_out != 1 else ""
+            sentence += (
+                f" {in_play_left_out} in-play board pick{plural} left out: on a market price alone,"
+                " the purchaser does not buy them."
+            )
         return sentence
     if not items:
         # AN EXPLAINED ABSENCE, NOT A BARE ONE. "No opportunities" reads as
@@ -1251,11 +1258,58 @@ def _is_board_pick(row: dict[str, Any]) -> bool:
 
     `is True`, not truthiness, and bools are excluded from `ev_pct`: a stray
     `1` or `"yes"` is not the board's flag, and `True` is not an EV of 1.0.
+
+    **ONE EXCEPTION, the purchaser's own: an in-play row on a market price
+    alone** (`_in_play_on_market_price_only`). Measured on the fleet 2026-11-23
+    20:15Z: 7 of 47 Suggested rows were in play, all on a market price only. One
+    was NCAAB Long Beach St @ FIU, under 159.5 at -102 on a 0.52 fair, at 75-75
+    with 0:57 left. The purchaser refuses exactly these (`in_play_market_fair`),
+    so Ask does not headline a bet the system itself would not buy. The board
+    still flags them, and that is recorded as a board defect (todo #861).
     """
     if row.get("suggested") is not True:
         return False
     ev = row.get("ev_pct")
-    return isinstance(ev, (int, float)) and not isinstance(ev, bool) and float(ev) > 0.0
+    if not (isinstance(ev, (int, float)) and not isinstance(ev, bool) and float(ev) > 0.0):
+        return False
+    return not _in_play_on_market_price_only(row)
+
+
+def _in_play_on_market_price_only(row: dict[str, Any]) -> bool:
+    """An IN-PLAY row backed by nothing but a market price, which the purchaser does not buy.
+
+    The same rule as `portfolio_commit._refuses_in_play_market_fair`, built from
+    that module's own pieces rather than by calling it. **That function cannot
+    be called from web.** Its first gate is the sizing sport allowlist
+    `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`, read from the role's env. Measured
+    on the fleet 2026-11-23 ~20:25Z, the key reads
+    `mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer` on refresh-worker, the role that
+    commits, and is ABSENT on live-odds-worker. On a role without it, the
+    function returns False for every row, so on web it would be a silent no-op
+    (absent is not off).
+
+    The parts that ARE role-independent are reused as-is: the in-play test, "no
+    model edge", the `allow` override, and the per-cell exceptions
+    (`nfl:prop`, `ncaaf:totals` by default), which the purchaser does stake in
+    play.
+    """
+    from syndicate.features.shared.opportunity_gate import game_state_of
+    from syndicate.features.shared.portfolio_commit import (
+        _in_play_market_fair_allowed,
+        _in_play_market_fair_cells,
+        _market_fair_family,
+    )
+
+    market_state = str(row.get("market_state") or "").strip().lower()
+    in_play = market_state == "live" or row.get("is_live") is True or game_state_of(row) == "live"
+    if not in_play:
+        return False
+    if _to_float(row.get("model_edge_pct")) is not None:
+        return False
+    if _in_play_market_fair_allowed():
+        return False
+    sport = str(row.get("sport") or "").strip().lower()
+    return (sport, _market_fair_family(row)) not in _in_play_market_fair_cells()
 
 
 def _board_pick_rank_key(row: dict[str, Any]) -> tuple[int, float, float]:
@@ -1271,7 +1325,7 @@ def _board_pick_rank_key(row: dict[str, Any]) -> tuple[int, float, float]:
     score = _to_float(_mapping_or_empty(row.get("score")).get("score"))
     ev = _to_float(row.get("ev_pct"))
     return (
-        1 if row.get("suggested") is True else 0,
+        1 if _is_board_pick(row) else 0,
         score if score is not None else float("-inf"),
         ev if ev is not None else float("-inf"),
     )
@@ -1286,6 +1340,8 @@ _NOT_PICKED_REASON_TEXT = {
     "ev_net_of_fee_below_min": "are below the minimum EV after the venue fee",
     "single_book_fair": "have a fair price from one book only",
     "one_sided_fair": "have a fair price from one side only",
+    # not a board reason: Suggested rows Ask leaves out (`_in_play_on_market_price_only`)
+    "in_play_market_price_only": "are in play on a market price alone, which the purchaser does not buy",
 }
 
 
@@ -1298,6 +1354,10 @@ class _BoardExclusion:
     sport: str | None = None
     reasons: tuple[tuple[str, int], ...] = ()
     no_rows_for_sport: bool = False
+    # Board picks Ask left out (`_in_play_on_market_price_only`). Its own field,
+    # because `reasons` keeps the top 3 and the board's own non-picks
+    # (~1,950 of 2,000 rows) always crowd it out.
+    in_play_left_out: int = 0
 
 
 def _board_top_opportunities(
@@ -1388,17 +1448,21 @@ def _board_top_opportunities(
     considered = len(rows)
     not_picked = [row for row in rows if not _is_board_pick(row)]
     rows = [row for row in rows if _is_board_pick(row)]
-    reasons = Counter(
-        str(reason)
-        for row in not_picked
-        for reason in (row.get("suggested_reasons") or [])
-        if isinstance(reason, str) and reason
-    )
+    reasons: Counter[str] = Counter()
+    for row in not_picked:
+        if row.get("suggested") is True:
+            # the board picked it; Ask left it out (see `_is_board_pick`)
+            reasons["in_play_market_price_only" if _in_play_on_market_price_only(row) else "ev_not_positive"] += 1
+            continue
+        reasons.update(
+            str(reason) for reason in (row.get("suggested_reasons") or []) if isinstance(reason, str) and reason
+        )
     exclusion = _BoardExclusion(
         count=len(not_picked),
         considered=considered,
         sport=sport or None,
         reasons=tuple(reasons.most_common(3)),
+        in_play_left_out=reasons.get("in_play_market_price_only", 0),
     )
 
     rows.sort(key=_board_pick_rank_key, reverse=True)

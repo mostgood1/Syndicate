@@ -3658,7 +3658,12 @@ def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[s
     # board actually suggests. One key, shared with the headline
     # (`_board_pick_rank_key`), so the two cannot order the board two ways. Every
     # matched row is still listed; nothing is dropped for having no model.
-    from syndicate.blueprints.ask_the_syndicate_adapter import _board_pick_rank_key, _market_label
+    from syndicate.blueprints.ask_the_syndicate_adapter import (
+        _board_pick_rank_key,
+        _in_play_on_market_price_only,
+        _is_board_pick,
+        _market_label,
+    )
 
     rows.sort(key=_board_pick_rank_key, reverse=True)
     top = rows[:15]
@@ -3685,7 +3690,9 @@ def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[s
             price_cell,
             f"{float(ev):+.2f}%" if isinstance(ev, (int, float)) else "-",
             f"{float(edge):+.2f}%" if isinstance(edge, (int, float)) else "no model",
-            "Suggested" if row.get("suggested") is True else "—",
+            "Suggested" if _is_board_pick(row)
+            else ("Suggested, in play: market price only" if row.get("suggested") is True and _in_play_on_market_price_only(row)
+                  else "—"),
         ])
 
     scope = ", ".join(filters) if filters else "whole board"
@@ -3704,10 +3711,7 @@ def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[s
     points = [
         {"x": _board_row_chart_label(row), "y": round(float(row["ev_pct"]), 2)}
         for row in top
-        if row.get("suggested") is True
-        and isinstance(row.get("ev_pct"), (int, float))
-        and not isinstance(row.get("ev_pct"), bool)
-        and float(row["ev_pct"]) > 0
+        if _is_board_pick(row)
     ]
     # No board pick in the result, so a "board picks" chart would be an empty
     # frame implying we had nothing to say. Drop it and let the table stand.
