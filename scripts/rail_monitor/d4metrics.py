@@ -108,33 +108,48 @@ out["deferred_slow_ticks"] = deferred
 # ~23:22Z, Charlotte @ Chicago kicked off ~23:41Z against a listed 23:30Z). A gap that STARTS at an empty publish is that
 # sport's idle time, so it goes to overlay_idle_gap_max_s, not to overlay_gap_max_s / overlay_gaps_over_360. A gap after
 # a line with rows in play still counts in full, because that is a stall.
+# 11-22 R34/R36 (the fleet-watcher's flag): soccer's 785-962 s gaps WERE a stall, of one overlay FILE. Real Salt Lake @
+# Vancouver (MLS, 01:30Z kickoff) was filed under the NEXT UTC date, so its in-play rows sat in the 11-23 grid, which
+# rebuilt only every ~13-16 min, while the 2-min live autorun kept serving the 11-22 date. Each overlay file is one
+# sport AND date, so gaps are keyed on both (keying on sport alone interleaved the two files' lines). The max gap now
+# names its date, and overlay_offdate_inplay lists any sport@date OTHER than the slate day that published rows in play:
+# the live rail reads only the slate day's overlay, so those rows never reach it.
 last, gmax, over = {}, collections.defaultdict(float), collections.Counter()
 idle_max = collections.defaultdict(float)
+offdate = {}
 for l in rw:
-    m = re.search(r"INPLAY_OVERLAY sport=(\w+)", l)
+    m = re.search(r"INPLAY_OVERLAY sport=(\w+)(?: date=(\S+))?", l)
     if not m:
         continue
     sp, t = m.group(1), ts(l)
     if t is None:
         continue
+    key = (sp, m.group(2) or "")
     ri = re.search(r"rows_inplay=(\d+)", l)
     empty = ri is not None and int(ri.group(1)) == 0
-    if sp in last:
-        prev_t, prev_empty = last[sp]
+    if key[1] and key[1] != TODAY and ri is not None and int(ri.group(1)) > 0:
+        tag = f"{sp}@{key[1]}"
+        offdate[tag] = max(offdate.get(tag, 0), int(ri.group(1)))
+    if key in last:
+        prev_t, prev_empty = last[key]
         g = (t - prev_t).total_seconds()
         if prev_empty:
-            idle_max[sp] = max(idle_max[sp], g)
+            idle_max[key] = max(idle_max[key], g)
         else:
-            gmax[sp] = max(gmax[sp], g)
+            gmax[key] = max(gmax[key], g)
             if g > 360:
                 over[sp] += 1
-    last[sp] = (t, empty)
-out["overlay_idle_gap_max_s"] = round(max(idle_max.values()), 1) if idle_max else None
-out["overlay_idle_gap_max_sport"] = max(idle_max, key=idle_max.get) if idle_max else None
-out["overlay_gap_max_s"] = round(max(gmax.values()), 1) if gmax else None
-out["overlay_gap_max_sport"] = max(gmax, key=gmax.get) if gmax else None
+    last[key] = (t, empty)
+_imax = max(idle_max, key=idle_max.get) if idle_max else None
+_gmax = max(gmax, key=gmax.get) if gmax else None
+out["overlay_idle_gap_max_s"] = round(idle_max[_imax], 1) if _imax else None
+out["overlay_idle_gap_max_sport"] = _imax[0] if _imax else None
+out["overlay_gap_max_s"] = round(gmax[_gmax], 1) if _gmax else None
+out["overlay_gap_max_sport"] = _gmax[0] if _gmax else None
+out["overlay_gap_max_date"] = (_gmax[1] or None) if _gmax else None
 out["overlay_gaps_over_360"] = sum(over.values())
 out["overlay_over_360_by_sport"] = dict(over)
+out["overlay_offdate_inplay"] = offdate
 
 # web merges
 merges, stale = 0, collections.Counter()

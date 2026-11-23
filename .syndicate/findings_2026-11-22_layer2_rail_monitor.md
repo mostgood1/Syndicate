@@ -83,3 +83,46 @@ local_379fd729 flagged an 18-minute live overlay gap: R24 `overlay_gap_max_s` 1,
     - 11-18 00:40:35Z: still the 2 real ones (Chattanooga @ Winthrop OURS 156.0, Coppin St @ La Salle 146.0) and 0 skew-consistent.
   - Compiled at 01:00:07Z, before the 7:03 PM tick. R28 (7:03 PM) ran on it cleanly, with 0 contradictions and 0 skew-consistent.
 - Backups: `scripts/rail_monitor/{dash_update.py,RUNBOOK.md}`.
+
+## Fleet-watcher flag: R36 (9:43 PM CST) score floor, Tenn-Martin @ Utah Valley u152.5; read-only
+
+The flag: "total 152.5 < 153 scored, age 104.9". It asked whether the row was shown, recommended or bet, and whether the age caused it. **Verdict: shown only, never recommended or bet. Score timing between two chip feeds, not the age.** Diagnosed 9:58-10:08 PM CST.
+
+- **Shown only, as a book line.** The row was betrivers u152.5 at -265, with one book quoting.
+  - The live-rail read (grid `03:42:28Z`) carried `live_model_probability` 0.5008, `live_total` 152.5 (calibrated) and `model_edge_pct` None.
+  - In `query.json` its edge was **-6.6 pp, against the under**. It was not on the shortlist, and the card's total edge was u162.5.
+  - The next grid (`03:43:20Z`, in `rail.json`) carried no model on that row.
+- **Not bet.** The live book (`/api/portfolio/live?on=all&show=all`, ops token) holds 0 orders for event `4564c6b6...` or Utah Valley. New reader: `live_bets_for.py <substr>`.
+- **The age is not the cause.** 104.9 s is the BOOK QUOTE's `book_age_seconds`, which `floor_examples` prints and the floor never uses.
+- **The cause is the grid's score.**
+  - `college_calibrated_total` returns P(over t) = 1 below the points it is given (`live_gameline_join.py:1418`), so its answer cannot fall below that score. It returned 152.5, so the 03:42:28Z grid saw at most 152.
+  - The chip the rail read had 76-77 = 153 (OT 1:31), from the chip artifact published `03:41:32Z`, 56 s BEFORE that grid.
+  - The grid's score comes from refresh-worker's own chip build, not that artifact: `board_enrichment.attach_game_state` → `build_game_chips`, a 30 s cache served up to 300 s stale while another build is in flight (`game_chip_scoreboard.py:33,62`).
+  - So the floor and #824 act on a score that can be a minute old. Here that was harmless, since the row had no edge. It is a lead for the I-17 / #824 owner if that matters on end games, not a guard defect.
+- **Rate:** 23 violations in 7,964 calibrated rows (0.29%), in 4 of 237 readings over 11-15..11-22: 11-20 R32 (14) and R33 (7), 11-21 R13 (1), 11-22 R36 (1).
+- Runbook P8 note extended: a grid newer than the chip artifact can still hold an older score.
+
+## Fleet-watcher flag: overlay gaps R32 785 s / R34 809 s / R36 667 s (8:23-9:43 PM CST); read-only
+
+The question: which sport, and did it have rows in play? **Verdict: soccer, with 31-64 rows in play, a REAL stall of one match. Real Salt Lake @ Vancouver Whitecaps (MLS, kickoff 01:30Z / 7:30 PM CST, final 2-0) was filed under the NEXT UTC date.** Diagnosed 10:00-10:09 PM CST.
+
+- **The grid and the live machinery used different dates.**
+  - The book grid holds the match in `soccer_source/data/book_grid/book_grid_2026-11-23.json` (473 rows, `commence_time` 2026-11-23T01:30:00Z).
+  - Its live state and the live autorun stayed on 11-22: `SOCCER_LIVE_AUTORUN_LAUNCHED date=2026-11-22 ... in_play=mls` ran every ~2 min until 03:33:28Z.
+- **(a) Its rows refreshed only when the 11-23 grid rebuilt.** The soccer `date=2026-11-23` overlay published at 01:48, 02:03, 02:16, 02:30, 02:45, 02:58, 03:12 and 03:28, then 03:39 (`rows_inplay=0`, final). The gaps were 613-962 s with 31-64 rows in play.
+  - The `date=2026-11-22` soccer overlay stopped at 01:53:33Z (`rows_inplay=1`).
+  - R35's 144 s hid the 962 s gap (03:12:08 → 03:28:10), which spans two windows.
+- **(b) No live model for the whole match.** All 9 `LIVE_GAMELINE_BUILD sport=soccer date=2026-11-23` lines (01:48-03:39Z) read `index=0 considered=0`: the live index for that date was empty.
+- **(c) Never on the live rail.** The rail reads only the slate day's overlay (`read_inplay_overlay_cards(date_str)`, `book_grid_artifact.py:1270`). The R36 live-rail read had `soccer: stale_6573s`, stale since 01:53Z.
+- **Not bet:** 0 live-book orders for event `78c0145b...` or a Vancouver 01:30Z match.
+- **Not** the R25 idle-gap change: every one of these gaps starts at a line with rows in play, so they counted as stalls, correctly.
+- **Whose:** a fix is production code, and it is a betting change, because it would put a live model on these matches. It needs a window and the user's yes. No open lane covers it; routed to the fleet-watcher. Related: 11-21's chipless MLS rows for the same two late matches (the MLS team-card LEAD, findings 11-21 line 284).
+- **Monitor fix (`d4metrics.py`, monitor file only):**
+  - Overlay gaps are keyed on sport AND date, since each overlay file is one of each; keying on sport alone interleaved the 11-22 and 11-23 soccer lines.
+  - New outputs: `overlay_gap_max_date`, and `overlay_offdate_inplay` (sport@date of in-play overlay rows off the slate day).
+  - Replays:
+    - R34 window: 809 s soccer 2026-11-23, `{soccer@2026-11-23: 37}`.
+    - R36: 667 s, 31.
+    - R35: 144 s NFL, with `soccer@2026-11-23: 39`.
+- New readers: `grid_lines_for.py <sport> <date> <lo> <hi>`, `grid_game_states.py <sport> <date>`, `overlay_file_peek.py <sport> <date>`, `live_bets_for.py <substr>`.
+- Backups: `scripts/rail_monitor/{d4metrics.py,grid_lines_for.py,grid_game_states.py,overlay_file_peek.py,live_bets_for.py,RUNBOOK.md}`.
