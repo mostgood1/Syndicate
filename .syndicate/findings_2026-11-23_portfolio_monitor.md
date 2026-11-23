@@ -247,3 +247,26 @@ EV the purchaser computes at the venue's price is not showing up in results.
 `REFRESH_WORKER__SYNDICATE_LIVE_EV_FLOOR=0`. refresh-worker's environ reads it; web and live-odds-worker are ABSENT.
 Absent means off, which makes the live plans Suggested-only. Removing the line is a betting change. It would load in a
 drained full down/up, and the 11-24 2:15 AM batch is already doing one.
+
+## The in-play market-fair refusal's env key: no exposure -- 2:25 PM CST
+
+Raised by the consistency-oversight session (surface-consistency-oversight): `_refuses_in_play_market_fair` returns
+False on a role without `SYNDICATE_PORTFOLIO_MARKET_FAIR_SPORTS`. live-odds-worker lacks the key, and no env layer
+it parsed sets it. Traced, read-only:
+
+- **Where the key is set.** In `~/syndicate-prod/fleet_env/refresh-worker.json`, the frozen 10-01 snapshot layer. That
+  parse missed it. refresh-worker's environ reads `mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,soccer`. live-odds-worker and the
+  supervisor read ABSENT.
+- **Who runs the refusal.** Only `commit_portfolio` and `paper_ladder` call it. The plan commit runs ONLY on
+  refresh-worker: over the 3 h to 2:25 PM CST, refresh-worker logged 38 `PLAN_WRITTEN` and 152 `LIVE_PLAN_WRITTEN`,
+  live-odds-worker 0 and 0. live-odds-worker executes those plans (`read_placeable_plan_for_venue`) and never
+  re-sizes.
+- **Absent is stricter, not looser.** With the allowlist empty, `sizing_inputs_with_provenance` refuses EVERY row with
+  no model edge as `no_model_edge_pct`, pregame or in play, before the in-play check would matter. So a commit on a
+  keyless role would buy fewer market-fair rows, never more.
+- **In-play live orders** (33 of 396 over 7 days) come from the in-play entry program, sized `inplay_order_dollars`.
+  That program does not call this refusal.
+
+**Verdict: no unguarded path.** If anyone edits the key, the place is `fleet_env/refresh-worker.json`, followed by a
+drained full down/up (or a role-scoped `REFRESH_WORKER__` line in `local_production.env`, which wins over the
+snapshot).
