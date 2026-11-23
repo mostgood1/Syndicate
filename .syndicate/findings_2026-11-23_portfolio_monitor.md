@@ -131,3 +131,24 @@ rows. The 1:34 PM test reading read all 4,479 rows:
 **Lane.** The `portfolio-monitor` `Files:` line read "(NEW, read-only probe)", and "read-only" is a lane-claims
 disclaimer marker. Every path after it had been claimed by nobody. The line was rewritten without marker words and
 now claims 9 of 9 paths, 0 lost (`.claude/hooks/lane_claims._claims`). The new reader was added to it.
+
+## Why none of the board's Suggested rows are bought -- HYPOTHESIS (written before the per-row test), 1:55 PM CST
+
+The user, 11-23: "why are none of the board's picks being bought? ... we need to solve for this since portfolio
+endpoint is trading on real money".
+
+**H1, venue price.** The board's Suggested flag (`layer2_board._suggested_reasons`) requires:
+- +2% EV net of fee at the BEST book quoting the line (any sportsbook);
+- a two-book fair.
+
+The purchaser can trade only Kalshi and Polymarket, and repricing at the venue's own price (`venue_scope`) removes the
+edge. So a Suggested row is either not listed at the venue, or listed at a price with EV <= 0. The plan's `min_ev_pct`
+is 0.0 (env), so a `below_min_ev_pct` refusal means EV < 0 at the venue's price.
+
+**H2, two populations.** The rows the purchaser does buy are mostly ones the board refused for EV alone
+(`live_ev_floor` = 0, user 2026-10-20). For those, the venue is itself the best book, or close to it, with a net EV
+between 0% and 2%.
+
+**Falsified if** most listed Suggested rows show EV >= 0 net of fee at the venue's price and are refused for another
+reason (stake, cap, positions, a join, or a price-source problem). That would make it a purchaser defect, not a price
+difference.
