@@ -62882,3 +62882,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Portfolio plan:** the 19:14:49 CST plan (before) had no `key_player_out`; the 19:20:55 CST plan (first after) carries `key_player_out=4`, `refusals_by_sport={"nba": 4}`, `refusals_by_market={"spreads_alt": 1, "totals_alt": 3}` -- the backstop refused rows the board had not yet withdrawn (as with Traore 11-21).
 - **Not measured:** the lift (he did not return in the window read); his own live props.
 - verify: live-odds-worker.log + refresh-worker.log 01:15:07Z..01:20:06Z; ExitHold probe 01:20:23Z; /api/portfolio/plan?date=2026-11-22 read after 19:20:55 CST.
+
+## 2026-11-23 04:19:56Z (10:19 PM CST 11-22) -- READING (no deploy): FIRST NFL key exit read LIVE through every layer -- MIN Kirk Cousins, replaced (lane `live-player-exit-gate`, #814)
+- **The exit:** MIN @ SF (Sunday night), event 401873077. ESPN pbp shows Cousins replaced at QB `since=2026-11-23T04:17:40Z` (late in the game).
+- **Detected:** `[nfl_live_resim] PLAYER_OUT event=401873077 team=MIN player='Kirk Cousins' reason=replaced key=True source=pbp` at 04:19:56Z; tick `players_out=3 key_players_out=1`. The 04:14:31Z tick read key 0, so detection came on the first tick after the stamp (~2.3 min after it). The two SF McKivitz rows (OL) stayed key=False, as designed.
+- **Board:** book_grid nfl `LIVE_GAMELINE_BUILD date=2026-11-22` index=1 full_games=1 (04:19:36Z) -> index=0 full_games=0 (04:21:14Z). Caveat: priceable was already 0 before the exit (NFL live distributions are deliberately gated, nfl-live-distribution-grade FAIL 09-27), so the withdrawal removed a game that priced nothing -- the gate's PATH is measured, its pricing effect on NFL is nil today.
+- **Entry hold:** probed 04:21:18Z with refresh-worker's env (`lpeg_holdprobe_soc.sh nfl`): game minnesota vikings @ san francisco 49ers -> `{'verdict': 'fail', 'reason': 'key_player_out', 'players': ['MIN:Kirk Cousins:replaced'], 'snapshot_at': '2026-11-22T22:19:56-06:00'}`.
+- **Portfolio plan:** 22:15:11 CST (before) and 22:25:07 CST (first after) both carry no `key_player_out` -- expected, since no NFL live gameline row was priced for the backstop to refuse. 22:25 plan: rows_in 31, live positions 0.
+- **Not measured:** the lift; his own live props (NFL live props not captured this tick: `PROP_CAPTURE_TICK no_period_or_clock=12`).
+- verify: refresh-worker.log 04:14:31Z..04:21:14Z; ExitHold probe 04:21:18Z; /api/portfolio/plan?date=2026-11-22 read 04:25:42Z.
