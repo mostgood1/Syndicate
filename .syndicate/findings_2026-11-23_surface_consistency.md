@@ -174,6 +174,55 @@ Not verified here: the fleet values of the flags these depend on (`SYNDICATE_PRI
 `SYNDICATE_CELL_CALIBRATION_*`, `SYNDICATE_FAIR_DEVIG_METHOD`, `SYNDICATE_LIVE_EV_FLOOR`, `SYNDICATE_LIVE_STAKE_BAND`,
 `SYNDICATE_SCORE_FEE_NET`).
 
+## Step 1a -- Ask's headline is the board's picks, for the asked sport `[built 2026-11-23, user "Yes, start with Ask"; NOT DEPLOYED]`
+
+Display only: Ask places and sizes nothing, so this is not a betting change.
+
+There were two causes, and both are fixed in code:
+
+1. **Ranking.**
+   - `_board_top_opportunities` used to rank `model_edge_pct` first and vet rows on "every edge term positive". It
+     now takes the board's own pick:
+     - `_is_board_pick`: `suggested is True` (from `_stamp_suggested`) and `ev_pct > 0`;
+     - `_board_pick_rank_key`: picks first, then the shortlist's own `score.score`, then EV.
+   - The board-ranking table (`_board_candidates_evidence`) shares the same key. It gains a `Board pick` column, and
+     its chart now draws the board's picks by EV, not model edges.
+   - A Suggested row with a negative model edge is published. The board bets the price, and the prose states the
+     sim's view and skill.
+2. **Routing.**
+   - The view passed only the client's `context` into `build_syndicate_query_response`. The router's inferred sport
+     reached the response only after the headline had been built. It now goes in as `routed_sport`.
+   - A sport with no board lines now gets "The board has no MLB lines today.", not the cross-sport snapshot.
+   - The "No board opportunity matches ..." note is suppressed when the headline is already sport-scoped.
+   - The snapshot's own summary is no longer shown over a board answer.
+
+**Contract changed with it.**
+- `scripts/ask_syndicate_regression.py`: `top_edge_matches_board` (chat max edge == board max `model_edge_pct`, which
+  is the defect, encoded as the test) becomes `top_pick_matches_board`. The headline's first row must be the board's
+  top pick by EV, and must be a pick. It uses the same two predicates, imported.
+- New check: a sport-specific ranking question must not headline another sport.
+- `prop_evidence_checklist.py`'s exempt title "Top edges" becomes "Board picks".
+- That checklist FAILS on two other titles ("... by game ...", "... last ..."). They fail identically on unchanged
+  `main`, so this change did not cause them.
+
+**Replay on the fleet's 19:32:46Z shortlist**, through the new code:
+
+| question | headline |
+|---|---|
+| best bets today | 5 board picks: soccer corners x3, NCAAB h2h x2; "Best EV +5.2% at the posted price" |
+| best NBA bets | none. "Of its 1,128 NBA lines, 1,100 have a stale quote, 1,039 are below the board's minimum EV and 230 have a fair price from one book only" |
+| best NHL bets | 5 NHL picks, EV +2.4 to +4.7 |
+| best MLB bets | "The board has no MLB lines today." |
+
+Before the change, the first two were the same 5 cross-sport rows, from losing models.
+
+**Tests.** 365 passed, 6 skipped across the 14 Ask test files. That includes 7 new end-to-end tests through
+`POST /api/syndicate/query` (`tests/test_ask_headline_board_pick.py`, routed sport off != on). The old tests that
+asserted "headline = max model edge" were rewritten to the board-pick contract.
+
+**Lead it exposed, not followed.** 1,100 of 1,128 NBA lines carry `suspect_stale_quote` at 1:30 PM CT on game day, so
+the board can pick no NBA bet at all. Whether that is quote cadence or a capture gap is unmeasured.
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:

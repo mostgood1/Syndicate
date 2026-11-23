@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 import re
+from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -538,14 +540,65 @@ def _excluded_clause(count: int) -> str:
     return f"{count} row{plural} with a non-positive edge {verb} left out."
 
 
-def _board_summary_sentence(rows: Any, excluded_negative: int = 0) -> str:
+def _board_pick_absence_sentence(exclusion: _BoardExclusion) -> str:
+    """Why the board picks nothing, in the board's own reasons. Never a bare "none".
+
+    Measured 2026-11-23 19:32Z: 0 of 1,128 NBA lines were Suggested. 1,100 of
+    them carried `suspect_stale_quote` and 1,039 `ev_below_min`. "The board
+    suggests no NBA bets" with no reason would read as an empty slate.
+    """
+    scope = f"{exclusion.sport.upper()} " if exclusion.sport else ""
+    if exclusion.no_rows_for_sport:
+        return f"The board has no {scope}lines today."
+    head = f"The board suggests no {scope}bets right now"
+    if not exclusion.considered:
+        return head + "."
+    noun = "line" if exclusion.considered == 1 else "lines"
+
+    def _clause(reason: str, n: int) -> str:
+        text = _NOT_PICKED_REASON_TEXT.get(reason, reason.replace("_", " "))
+        if n == 1:  # "1 has a stale quote", not "1 have"
+            text = re.sub(r"^have\b", "has", re.sub(r"^are\b", "is", text))
+        return f"{n:,} {text}"
+
+    clauses = [_clause(reason, n) for reason, n in exclusion.reasons]
+    if not clauses:
+        return f"{head}: none of its {exclusion.considered:,} {scope}{noun} is a pick."
+    joined = clauses[0] if len(clauses) == 1 else ", ".join(clauses[:-1]) + f" and {clauses[-1]}"
+    overlap = " (a line can have more than one reason)" if len(clauses) > 1 else ""
+    return f"{head}. Of its {exclusion.considered:,} {scope}{noun}, {joined}{overlap}."
+
+
+def _board_summary_sentence(rows: Any, excluded_negative: int | _BoardExclusion = 0) -> str:
     """A factual one-liner describing the opportunities actually returned.
 
     Everything here is read off the rows -- count, sports covered, and the
     best edge present. Nothing is inferred or narrated, so this stays true
     whether or not the optional LLM briefing is enabled.
+
+    Board rows (the board's own picks, `_is_board_pick`) are described as picks
+    and lead with EV at the posted price: the number the board judged them on.
+    Snapshot fallback rows keep the older "opportunities ... best edge" wording.
     """
     items = [row for row in (rows or []) if isinstance(row, dict)]
+    if isinstance(excluded_negative, _BoardExclusion):
+        exclusion = excluded_negative
+        if not items:
+            return _board_pick_absence_sentence(exclusion)
+        sports = []
+        for row in items:
+            label = str(row.get("sport") or "").strip().upper()
+            if label and label not in sports:
+                sports.append(label)
+        n = len(items)
+        sentence = f"Showing the board's top {n} suggested bet{'' if n == 1 else 's'}"
+        if sports:
+            sentence += f" across {', '.join(sports[:4])}" if len(sports) > 1 else f" in {sports[0]}"
+        sentence += ", in the board's order."
+        evs = [ev for ev in (_to_float(row.get("EV")) for row in items) if ev is not None]
+        if evs:
+            sentence += f" Best EV {max(evs):+.1f}% at the posted price."
+        return sentence
     if not items:
         # AN EXPLAINED ABSENCE, NOT A BARE ONE. "No opportunities" reads as
         # "the board is empty" when the truth may be "the board is full and the
@@ -1167,70 +1220,102 @@ def _board_row_probabilities(row: dict[str, Any]) -> tuple[float | None, float |
     return (round(model_p * 100.0, 2), round(market_p * 100.0, 2))
 
 
-def _has_positive_edge(row: dict[str, Any]) -> bool:
-    """Is the number this row is RANKED ON actually positive?
+def _is_board_pick(row: dict[str, Any]) -> bool:
+    """Is this row a bet THE BOARD recommends? Its own flag, nothing re-derived.
 
-    **A negative edge is the model saying "do not bet this".** Served
-    2026-08-16 20:5xZ under the headline "Showing the top 5 opportunities on
-    today's board in MLB. Best edge 4.9%": three of the five carried
-    `model_edge_pct` of -1.83, -4.87 and -8.20. The ranker was not wrong -- the
-    board had thinned to 70 rows with only 6 carrying a model edge and only 2 of
-    those positive, so "the best 5" genuinely included four bad bets. Sorting
-    correctly is not the same as having something to show.
+    **ASK USED TO PICK ITS OWN HEADLINE, AND IT PICKED THE MODELS THAT LOSE**
+    `[2026-11-23, lane surface-consistency-oversight, todo #861]`. Eligibility
+    was "every edge term the row carries is positive", and ranking was
+    `model_edge_pct` first. Measured on the fleet 2026-11-23 19:29Z, the
+    headline for "What are the best bets today?" AND for "Best NBA bets
+    tonight?" was the same 5 rows, ranked on model edges of 22-28 points. 4 of
+    the 5 carried a `model_skill_verdict` saying the model LOSES to the de-vigged
+    market or the close, and the 5th model had never been backtested. 0 of
+    the 5 were Suggested. The board ranks those same rows far below its picks
+    (many at EV -8%), because a raw sim's disagreement with the market is not
+    evidence of value until the model is measured to beat it
+    (state `[portfolio-sim-sizing-gate]`).
 
-    This is the second time this exact shape has shipped. `_market_summary_schema`
-    already carries a note about 2026-08-03, when the summary "returned 4
-    negative-edge rows with the only positive one (+16.9%) ranked LAST", and the
-    fix then was to SORT. Sorting was necessary and never sufficient: it orders a
-    pool, it does not decline to publish one.
+    So the headline now takes the board's own decision:
+    `layer2_board._stamp_suggested` is the ONE definition of a pick. It
+    already vetoes stale quotes, one-book fairs, one-sided fairs and EV below
+    the floor (net of the venue fee where one applies). Ask restates it and
+    adds nothing.
 
-    **ELIGIBILITY IS DELIBERATELY STRICTER THAN RANKING, and that is a change
-    from the first cut.** `_board_rank_key` picks ONE term -- `model_edge_pct`
-    when present, `ev_pct` otherwise -- and the first version of this function
-    mirrored it, judging a row on the same single term it is ordered by. That
-    published `Pittsburgh Pirates` at **model edge +9.18% with EV -2.18%**
-    (production, 21:0xZ, found in the post-deploy read): the model liked the side
-    while the offered price was worse than consensus fair. Ranking wants one
-    number to sort on; eligibility is a veto, and a veto should hear every term
-    that can object.
+    `ev_pct > 0` is kept as a second veto, so a flag that somehow disagreed with
+    its own price could not publish a bet priced worse than fair: the
+    2026-08-16 Pittsburgh row (model edge +9.18%, EV -2.18%) stays out either
+    way. A Suggested row whose model edge is NEGATIVE is published: the board
+    bets the price, and the answer's prose states the sim's view and its skill
+    verdict beside it, rather than hiding the board's pick.
 
-    So: every edge term the row actually carries must be positive. A row with
-    both must satisfy both; a row with one must satisfy that one; a row with
-    neither is not an opportunity. Ordering is untouched -- this only decides
-    what is allowed into the pool being ordered.
-
-    `ev_pct` is checked at all because it is NOT floored at zero: the served
-    board's `min_value_pct` is **-2.0**, and 6 of 70 rows had `ev_pct <= 0`.
-
-    `isinstance(True, int)` is True in Python, so bools are excluded explicitly
-    -- a stray flag must not be read as an edge of 1.0.
+    `is True`, not truthiness, and bools are excluded from `ev_pct`: a stray
+    `1` or `"yes"` is not the board's flag, and `True` is not an EV of 1.0.
     """
-    terms = [
-        float(value)
-        for value in (row.get("model_edge_pct"), row.get("ev_pct"))
-        if isinstance(value, (int, float)) and not isinstance(value, bool)
-    ]
-    return bool(terms) and all(term > 0.0 for term in terms)
-
-
-def _board_rank_key(row: dict[str, Any]) -> tuple[int, float]:
-    """The ranking M1 uses, kept identical on purpose.
-
-    Rows carrying a model comparison sort above rows that only have EV -- only
-    19 of 105 published rows carried `model_edge_pct` when this was written, so
-    ranking on edge alone would drop most of the board. Because model-bearing
-    rows sort first and by descending edge, the top row IS the board's maximum
-    `model_edge_pct`, which is precisely what the divergence check compares.
-    """
-    edge = row.get("model_edge_pct")
-    if isinstance(edge, (int, float)):
-        return (1, float(edge))
+    if row.get("suggested") is not True:
+        return False
     ev = row.get("ev_pct")
-    return (0, float(ev) if isinstance(ev, (int, float)) else float("-inf"))
+    return isinstance(ev, (int, float)) and not isinstance(ev, bool) and float(ev) > 0.0
 
 
-def _board_top_opportunities(context: dict[str, Any], result: Any) -> tuple[list[dict[str, Any]] | None, int]:
+def _board_pick_rank_key(row: dict[str, Any]) -> tuple[int, float, float]:
+    """The board's order: its picks first, then its own shortlist score, then EV.
+
+    `score.score` is the shortlist's `blended_score` after
+    `_apply_skill_reliability` (`layer2_board.py`), the number the board ranks
+    on. It is NOT `model_edge_pct`: ranking on the sim's raw disagreement is
+    what put four losing models at the top (see `_is_board_pick`). Shared with
+    the board-ranking table in `ask_the_syndicate_data._board_candidates_evidence`,
+    so the headline and the table cannot order the board two ways.
+    """
+    score = _to_float(_mapping_or_empty(row.get("score")).get("score"))
+    ev = _to_float(row.get("ev_pct"))
+    return (
+        1 if row.get("suggested") is True else 0,
+        score if score is not None else float("-inf"),
+        ev if ev is not None else float("-inf"),
+    )
+
+
+# The board's own words for why a line is not a pick (`_stamp_suggested`'s
+# `suggested_reasons`), as clauses that read after "N lines". An unknown reason
+# is shown by its own name rather than dropped.
+_NOT_PICKED_REASON_TEXT = {
+    "suspect_stale_quote": "have a stale quote",
+    "ev_below_min": "are below the board's minimum EV",
+    "ev_net_of_fee_below_min": "are below the minimum EV after the venue fee",
+    "single_book_fair": "have a fair price from one book only",
+    "one_sided_fair": "have a fair price from one side only",
+}
+
+
+@dataclass(frozen=True)
+class _BoardExclusion:
+    """What the board-pick filter left out, kept beside the rows, never on them."""
+
+    count: int = 0
+    considered: int = 0
+    sport: str | None = None
+    reasons: tuple[tuple[str, int], ...] = ()
+    no_rows_for_sport: bool = False
+
+
+def _board_top_opportunities(
+    context: dict[str, Any],
+    result: Any,
+    *,
+    routed_sport: str | None = None,
+) -> tuple[list[dict[str, Any]] | None, _BoardExclusion]:
     """`top_opportunities` sourced from the SAME artifact the board serves.
+
+    **THE BOARD'S PICKS, IN THE BOARD'S ORDER, FOR THE SPORT ASKED ABOUT**
+    `[2026-11-23, todo #861]`. See `_is_board_pick` for the measurement.
+    `routed_sport` is the sport the router inferred from the question. It never
+    reached this function before: the view passed only the CLIENT's context,
+    and the inferred sport was written onto the response after the headline had
+    already been built. So "Best NBA bets tonight?" was answered with 5 of 5
+    rows from other sports. A sport with no rows on the board now gets an
+    explained empty answer, not the cross-sport snapshot.
 
     **Why this exists.** `M1` gave aggregation questions a board-wide table but
     left `structured_response.top_opportunities` reading the snapshot, so chat
@@ -1260,7 +1345,7 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> tuple[list
         # fails because the environment is broken. Found while fixing `#517`,
         # in a container where a missing `_cffi_backend` was breaking imports
         # across the suite.
-        return None, 0
+        return None, _BoardExclusion()
 
     selected_date = (
         str(_result_value(result, "selected_date", "") or "").strip()
@@ -1270,38 +1355,55 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> tuple[list
         payload = read_layer2_shortlist(selected_date or central_today_iso())
     except Exception:
         # A headline is worth degrading, not worth 500ing an answer over.
-        return None, 0
+        return None, _BoardExclusion()
     if not isinstance(payload, dict):
-        return None, 0
+        return None, _BoardExclusion()
     rows = [row for row in (payload.get("rows") or []) if isinstance(row, dict)]
     if not rows:
-        return None, 0
+        return None, _BoardExclusion()
 
-    sport = str(context.get("sport_slug") or context.get("sport") or "").strip().lower()
+    sport = (
+        str(context.get("sport_slug") or context.get("sport") or "").strip().lower()
+        or str(routed_sport or "").strip().lower()
+    )
     if sport:
         # EXACT match, not a substring test: `"nba" in "wnba"` is True and
         # would answer an NBA question with WNBA rows.
         scoped = [row for row in rows if str(row.get("sport") or "").strip().lower() == sport]
-        # Unlike M1 -- which REPORTS an empty sport filter, because "no NHL rows
-        # on the board" answers an aggregation question -- an empty headline
-        # answers nothing. Fall back to the snapshot instead of emptying the
-        # only rows a non-aggregation market summary has.
+        # A sport the board has no lines for is an ANSWER ("no NBA lines on the
+        # board today"), not a reason to widen. This used to fall back to the
+        # snapshot, which is cross-sport. That was harmless while only a
+        # client-supplied sport reached here, and it would have answered every
+        # out-of-season question with other sports once the routed sport did.
         if not scoped:
-            return None, 0
+            return [], _BoardExclusion(sport=sport, no_rows_for_sport=True)
         rows = scoped
 
-    # DECLINE TO PUBLISH A BAD BET. Filtering before the slice, not after, so a
-    # thin board returns fewer rows rather than padding the five out with
-    # negatives. An EMPTY list here is a real answer ("nothing qualifies right
-    # now") and is deliberately distinguished from the `None` returned above for
-    # a missing artifact -- see the caller, which tests `is not None`.
+    # THE BOARD'S PICKS ONLY. Filtering before the slice, not after, so a board
+    # with 2 picks returns 2 rather than padding the five out with rows the
+    # board declined. An EMPTY list here is a real answer ("the board suggests
+    # nothing right now"), and it is deliberately distinguished from the `None`
+    # returned above for a missing artifact: see the caller, which tests
+    # `is not None`.
     considered = len(rows)
-    rows = [row for row in rows if _has_positive_edge(row)]
-    excluded = considered - len(rows)
+    not_picked = [row for row in rows if not _is_board_pick(row)]
+    rows = [row for row in rows if _is_board_pick(row)]
+    reasons = Counter(
+        str(reason)
+        for row in not_picked
+        for reason in (row.get("suggested_reasons") or [])
+        if isinstance(reason, str) and reason
+    )
+    exclusion = _BoardExclusion(
+        count=len(not_picked),
+        considered=considered,
+        sport=sport or None,
+        reasons=tuple(reasons.most_common(3)),
+    )
 
-    rows.sort(key=_board_rank_key, reverse=True)
+    rows.sort(key=_board_pick_rank_key, reverse=True)
     top: list[dict[str, Any]] = []
-    for row in rows[:5]:
+    for rank, row in enumerate(rows[:5], start=1):
         model_pct, market_pct = _board_row_probabilities(row)
         score = _mapping_or_empty(row.get("score"))
         # EXACT on this path: `written_at` is the timestamp of the very artifact
@@ -1328,6 +1430,10 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> tuple[list
                 "confidence": model_pct,
                 "adjusted_score": _to_float(score.get("score")),
                 "source": "layer2_shortlist",
+                # The board's own flag and this row's place among its picks, so
+                # a reader can match the headline to the board line for line.
+                "suggested": True,
+                "board_rank": rank,
                 # Was hardcoded `None`, so every briefing row arrived with an
                 # empty prose slot and the panel rendered a bare name over a
                 # raw market key. Layer2 rows have no `detail` field for
@@ -1339,12 +1445,12 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> tuple[list
                 ),
             }
         )
-    # `top` may legitimately be EMPTY when every row was filtered out. That is a
+    # `top` may legitimately be EMPTY when the board picks nothing. That is a
     # published fact, not a missing one, so it is returned as-is; only the
-    # missing-artifact paths above return None. The excluded count travels
-    # BESIDE the rows rather than on them -- a private key stashed on a row would
-    # be serialised straight into the API payload.
-    return top, excluded
+    # missing-artifact paths above return None. The exclusion travels BESIDE the
+    # rows rather than on them -- a private key stashed on a row would be
+    # serialised straight into the API payload.
+    return top, exclusion
 
 
 def _market_summary_schema(
@@ -1353,6 +1459,7 @@ def _market_summary_schema(
     question: str = "",
     relevance_matched: bool | None = None,
     context: dict[str, Any] | None = None,
+    routed_sport: str | None = None,
 ) -> dict[str, Any]:
     recommendations = _items_to_dicts(_result_value(result, "recommendations", ()))
     # Was `recommendations[:5]` with no sort -- an arbitrary slice of
@@ -1376,7 +1483,9 @@ def _market_summary_schema(
     # 3/8 against a same-slate control -- one case, F07, and this line is all of
     # it. So: replace a non-empty pool, never manufacture one.
     board_opportunities, board_excluded = (
-        _board_top_opportunities(_mapping_or_empty(context), result) if recommendations else (None, 0)
+        _board_top_opportunities(_mapping_or_empty(context), result, routed_sport=routed_sport)
+        if recommendations
+        else (None, _BoardExclusion())
     )
     # `is not None`, NOT truthiness. An EMPTY board list means "the board had
     # rows and none of them qualify", which is an answer; falling through to the
@@ -1421,7 +1530,17 @@ def _market_summary_schema(
 
     explanation = _explanation_payload(result)
     summary_text = _result_value(result, "summary", None)
-    if relevance_matched is False and not _is_general_board_question(question):
+    # A headline the board already scoped to the asked sport IS about the
+    # question. Served 2026-11-23 19:29Z without this: "No board opportunity
+    # matches 'Best NBA bets tonight?' specifically -- showing today's top
+    # opportunities instead", over 5 rows from other sports. The word matcher
+    # below cannot see a sport scope, so it must not speak over one.
+    sport_scoped_board = board_opportunities is not None and bool(board_excluded.sport)
+    if board_opportunities is not None:
+        # The snapshot's own summary describes the snapshot's rows, which are
+        # not what this answer shows once the board answered.
+        summary_text = None
+    if relevance_matched is False and not _is_general_board_question(question) and not sport_scoped_board:
         # Unlike bet_analysis/matchup_analysis (a single framed "answer"),
         # a market summary is inherently a plural "here's today's board" --
         # less likely to be misread as being about the question's subject,
@@ -1443,7 +1562,12 @@ def _market_summary_schema(
         # summary empty. Describe what is actually being shown instead,
         # entirely from the rows themselves -- no narration, no LLM, and
         # nothing asserted that the data does not support.
-        summary_text = _board_summary_sentence(top_opportunities, board_excluded)
+        # The exclusion is passed only when the board path answered. Snapshot
+        # fallback rows are not the board's picks and must not be described
+        # as them.
+        summary_text = _board_summary_sentence(
+            top_opportunities, board_excluded if board_opportunities is not None else 0
+        )
     return {
         "schema_type": "market_summary",
         "top_opportunities": top_opportunities,
@@ -1586,6 +1710,7 @@ def build_syndicate_query_response(
     result: Any,
     board_row: dict[str, Any] | None = None,
     board_as_of: Any = None,
+    routed_sport: str | None = None,
 ) -> dict[str, Any]:
     query_type = _result_value(result, "query_type", None) or decision.intent or "bet_analysis"
     pipeline_context = _mapping_or_empty(_result_value(result, "pipeline_context", {}))
@@ -1622,7 +1747,8 @@ def build_syndicate_query_response(
         schema = _matchup_analysis_schema(question, result, relevance_matched=relevance_matched)
     elif decision.intent == "market_summary":
         schema = _market_summary_schema(
-            result, question=question, relevance_matched=relevance_matched, context=context
+            result, question=question, relevance_matched=relevance_matched, context=context,
+            routed_sport=routed_sport,
         )
     else:
         schema = _bet_analysis_schema(

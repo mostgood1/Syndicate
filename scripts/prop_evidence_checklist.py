@@ -90,7 +90,7 @@ FIXTURE_ROWS: dict[str, tuple[str, dict[str, Any]]] = {
 
 # Titles that are not prop evidence and never render on a board-row prop answer:
 # the ranking/leaderboard fetcher's tables, and the coverage table itself.
-_EXEMPT_TITLE_PREFIXES = ("Published board", "Top edges", "Top HR candidates", "Top {X} candidates",
+_EXEMPT_TITLE_PREFIXES = ("Published board", "Board picks", "Top HR candidates", "Top {X} candidates",
                           "What this answer could not show")
 _EXEMPT_TITLE_CONTAINS = (" probability leaders",)
 

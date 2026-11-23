@@ -90,7 +90,7 @@ CASES: list[dict] = [
     # candidate pool, and the evidence pack carries at most 12 rows.
     {"id": "B01", "cls": "ranking", "sport": "any", "expect": "answer",
      "q": "What are the biggest edges on the board tonight?",
-     "checks": {"top_edge_matches_board": True}},
+     "checks": {"top_pick_matches_board": True}},
     {"id": "B02", "cls": "ranking", "sport": "any", "expect": "answer",
      "q": "Rank today's best opportunities across every sport.",
      "checks": {"multi_sport_expected": True}},
@@ -262,6 +262,23 @@ def _load_truth(base: str) -> dict:
     """
     board = _get(base, "/api/board/layer2-shortlist") or {}
     rows = [r for r in (board.get("rows") or []) if isinstance(r, dict)]
+    # THE BOARD'S TOP PICK, from the whole shortlist (the endpoint's 200-row
+    # default can miss Suggested rows, which are not stored in score order).
+    # Ask's headline is the board's picks in the board's order since todo #861
+    # (2026-11-23); it used to be the max model edge, which put models measured
+    # to LOSE to the market at the top.
+    # The SAME two predicates the adapter uses, imported rather than copied, so
+    # the harness cannot drift from the code it checks.
+    repo_root = str(Path(__file__).resolve().parents[1])
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from syndicate.blueprints.ask_the_syndicate_adapter import _board_pick_rank_key, _is_board_pick
+
+    full = _get(base, "/api/board/layer2-shortlist?limit=2000") or {}
+    picks = sorted(
+        (r for r in (full.get("rows") or []) if isinstance(r, dict) and _is_board_pick(r)),
+        key=_board_pick_rank_key, reverse=True,
+    )
     edges = [r.get("model_edge_pct") for r in rows if isinstance(r.get("model_edge_pct"), (int, float))]
     evs = [r.get("ev_pct") for r in rows if isinstance(r.get("ev_pct"), (int, float))]
     teams: set[str] = set()
@@ -280,6 +297,8 @@ def _load_truth(base: str) -> dict:
         "active_sports": board.get("active_sports") or [],
         "per_sport": board.get("per_sport") or {},
         "max_model_edge_pct": max(edges) if edges else None,
+        "board_picks": len(picks),
+        "top_pick_ev_pct": float(picks[0]["ev_pct"]) if picks else None,
         "max_ev_pct": max(evs) if evs else None,
         "teams": teams,
         "players": players,
@@ -456,15 +475,32 @@ def _score(case: dict, payload: dict, truth: dict) -> dict:
         if not board_rows and not refused:
             fail("no_board_table_for_an_aggregation_question")
 
-    if checks.get("top_edge_matches_board") and truth.get("max_model_edge_pct") is not None:
-        claimed = [float(r["edge"]) for r in rows if isinstance(r.get("edge"), (int, float))]
-        if claimed:
-            top_claimed_pct = max(claimed) * 100.0 if max(claimed) < 1.5 else max(claimed)
-            board_top = float(truth["max_model_edge_pct"])
-            result["chat_top_edge_pct"] = round(top_claimed_pct, 3)
-            result["board_top_edge_pct"] = round(board_top, 3)
-            if abs(top_claimed_pct - board_top) > 0.5:
-                fail(f"top_edge_diverges_from_board:{top_claimed_pct:.2f}_vs_{board_top:.2f}")
+    # THE HEADLINE IS THE BOARD'S TOP PICK (todo #861). Its first row's EV
+    # must be the EV of the board's highest-ranked Suggested row, and a board
+    # that picks nothing must get an empty headline, not a substitute.
+    if checks.get("top_pick_matches_board") and "board_picks" in truth:
+        result["board_picks"] = truth["board_picks"]
+        if truth.get("top_pick_ev_pct") is None:
+            if rows:
+                fail(f"headline_has_{len(rows)}_rows_when_the_board_picks_nothing")
+        elif rows:
+            first_ev = rows[0].get("EV")
+            board_ev = float(truth["top_pick_ev_pct"])
+            result["chat_top_pick_ev_pct"] = first_ev
+            result["board_top_pick_ev_pct"] = round(board_ev, 3)
+            if not isinstance(first_ev, (int, float)):
+                fail("headline_first_row_has_no_ev")
+            elif abs(float(first_ev) - board_ev) > 0.5:
+                fail(f"top_pick_diverges_from_board:{float(first_ev):.2f}_vs_{board_ev:.2f}")
+            if rows[0].get("suggested") is not True:
+                fail("headline_first_row_is_not_a_board_pick")
+    # A SPORT-SPECIFIC RANKING QUESTION GETS A HEADLINE IN THAT SPORT. Measured
+    # 2026-11-23: "Best NBA bets tonight?" returned 5 of 5 rows from other
+    # sports, because the routed sport never reached the headline.
+    if case["cls"] == "ranking" and case["sport"] not in ("any", None, "") and rows:
+        off_sport = [r for r in rows if str(r.get("sport") or "").lower() not in ("", str(case["sport"]).lower())]
+        if off_sport:
+            fail(f"headline_off_sport:{len(off_sport)}_of_{len(rows)}")
     if checks.get("count_matches_board") and truth.get("returned") is not None:
         if not re.search(rf"\b{int(truth['returned'])}\b", text):
             warn(f"board_count_{truth['returned']}_not_stated")
@@ -531,7 +567,8 @@ def main() -> int:
     print("loading board truth (same-instant source for every numeric check)...")
     truth = _load_truth(args.base_url)
     print(f"  board rows={truth['rows']} considered={truth['considered']} "
-          f"active_sports={truth['active_sports']} max_model_edge={truth['max_model_edge_pct']}")
+          f"active_sports={truth['active_sports']} board_picks={truth['board_picks']} "
+          f"top_pick_ev={truth['top_pick_ev_pct']} max_model_edge={truth['max_model_edge_pct']}")
     print(f"running {len(cases)} cases\n")
 
     results, latencies, errors = [], [], 0

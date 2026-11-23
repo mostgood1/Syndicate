@@ -657,6 +657,10 @@ def ask_the_syndicate_query_api():
         result=result,
         board_row=board_row,
         board_as_of=board_as_of,
+        # The sport the router inferred from the question. `context` above is
+        # only what the CLIENT sent, so without this the headline never saw
+        # "NBA" in "Best NBA bets tonight?" (todo #861, 2026-11-23).
+        routed_sport=str(shaped_payload.get("sport") or "").strip().lower() or None,
     )
 
     response["answer_source"] = "snapshot"

@@ -3,10 +3,11 @@
 The lane this covers exists because `M1` added a board-wide TABLE while leaving
 the headline reading the snapshot, so chat and the board still answered from two
 pools and still disagreed (measured 23.81% vs 14.09%). The check that matters is
-therefore not "is there a table" but "does the headline's max edge equal the
-board's max `model_edge_pct`" -- reproduced here as
-`test_regression_divergence_predicate_holds`, which is deliberately written the
-same way `scripts/ask_syndicate_regression.py` writes it.
+therefore not "is there a table" but "is the headline the board's own picks,
+in the board's order" -- reproduced here as `test_regression_top_pick_predicate_holds`,
+written the way `scripts/ask_syndicate_regression.py` writes it. (Until todo
+#861, 2026-11-23, the predicate was "headline max edge == board max
+`model_edge_pct`", which made losing models the headline.)
 
 Row fixtures below are trimmed copies of real `/api/board/layer2-shortlist`
 rows fetched 2026-08-15, including the side/projection-side mismatch that makes
@@ -79,54 +80,56 @@ def test_probability_is_absent_when_the_projection_block_is_missing():
     assert adapter._board_row_probabilities(_row(projection={})) == (None, None)
 
 
-# --- ranking: the top row must BE the board's maximum ------------------------
+# --- ranking: the headline is the BOARD'S picks, in the board's order ----------
+#
+# `[2026-11-23, lane surface-consistency-oversight, todo #861]`. This section
+# used to assert that the headline led with the board's MAX `model_edge_pct`,
+# and that model-bearing rows outrank EV-only rows. On the fleet 2026-11-23 that
+# rule put 22-28 point "edges" from models measured to LOSE to the market at
+# the top of Ask, above every row the board Suggested. The board's own flag
+# (`_stamp_suggested`) and its own score are now the contract.
 
-def test_model_bearing_rows_outrank_ev_only_rows():
-    """Ranking on edge alone would drop most of the board.
-
-    Only 19 of 105 live rows carried `model_edge_pct`. An EV-only row with a
-    huge EV must still sort below the weakest model-bearing row, or the headline
-    stops being the board's model headline.
-    """
-    ev_only = _row(model_edge_pct=None, ev_pct=99.0, projection={})
-    weak_model = _row(model_edge_pct=0.1)
-    assert adapter._board_rank_key(weak_model) > adapter._board_rank_key(ev_only)
+def test_board_picks_outrank_non_picks_whatever_their_model_edge():
+    """The measured case: a non-pick with a 28-point model edge and a high score
+    must sort below a Suggested row with a modest score."""
+    losing_model = _row(model_edge_pct=28.15, ev_pct=-8.3, score={"score": 3.6}, suggested=False)
+    pick = _row(model_edge_pct=None, ev_pct=4.1, score={"score": 2.1}, suggested=True, projection={})
+    assert adapter._board_pick_rank_key(pick) > adapter._board_pick_rank_key(losing_model)
+    stronger_pick = _row(ev_pct=3.0, score={"score": 2.5}, suggested=True)
+    assert adapter._board_pick_rank_key(stronger_pick) > adapter._board_pick_rank_key(pick)
 
 
-def test_top_opportunities_lead_with_the_boards_max_edge(monkeypatch):
-    """`#517`. Two contract changes this had to catch up with, and the second
-    makes the test stronger than it was.
-
-    1. The call returns `(rows, excluded_count)`, so `top` had to be
-       destructured -- iterating the tuple raised `TypeError: list indices must
-       be integers or slices, not str`.
-    2. `_has_positive_edge` is now a VETO over EVERY edge term the row carries,
-       not just the one it is ranked on. The default fixture is a real board row
-       carrying `ev_pct=-2.8895`, so under the current rule every row here is
-       ineligible and the old expected list -- which ENDED in `-4.0` -- was
-       asserting that a bad bet gets published. `ev_pct` is now positive so the
-       rows are eligible on merit, and `-4.0` is expected to be vetoed rather
-       than ranked last.
-    """
-    rows = [_row(model_edge_pct=e, ev_pct=2.0) for e in (1.2, 6.35, -4.0, 3.1)]
+def test_top_opportunities_are_the_boards_picks_in_board_order(monkeypatch):
+    rows = [
+        _row(model_edge_pct=1.2, ev_pct=2.0, score={"score": 1.0}, suggested=True),
+        _row(model_edge_pct=28.15, ev_pct=-8.3, score={"score": 3.6}, suggested=False,
+             suggested_reasons=["ev_below_min"]),
+        _row(model_edge_pct=-4.0, ev_pct=4.5, score={"score": 2.4}, suggested=True),
+        _row(model_edge_pct=3.1, ev_pct=3.0, score={"score": 1.8}, suggested=True),
+        _row(model_edge_pct=9.0, ev_pct=1.0, score={"score": 9.9}, suggested=False,
+             suggested_reasons=["suspect_stale_quote", "ev_below_min"]),
+    ]
     _patch_shortlist(monkeypatch, {"rows": rows})
     top, excluded = adapter._board_top_opportunities({}, {"selected_date": "2026-08-15"})
-    assert [item["edge"] for item in top] == [6.35, 3.1, 1.2]
-    assert excluded == 1, "the -4.0 row must be vetoed, not ranked last"
-    assert all(item["source"] == "layer2_shortlist" for item in top)
+    # board order (score), not model edge; the -4.0 model edge is the board's
+    # pick on price and is published, with the sim's view in its prose
+    assert [item["EV"] for item in top] == [4.5, 3.0, 2.0]
+    assert [item["board_rank"] for item in top] == [1, 2, 3]
+    assert all(item["suggested"] is True and item["source"] == "layer2_shortlist" for item in top)
+    assert (excluded.count, excluded.considered) == (2, 5)
+    assert dict(excluded.reasons) == {"ev_below_min": 2, "suspect_stale_quote": 1}
 
 
 # --- the fallbacks, so an answer never gets worse than before -----------------
 #
-# `#517`. These assert `== (None, 0)`, not `is None`. `_board_top_opportunities`
-# returns `(rows_or_None, excluded_count)` -- the second term is how many rows
-# the positive-edge veto removed, which the caller needs in order to say "1 row
-# with a non-positive edge was left out" rather than a bare "nothing found".
-# The tests were written against the older scalar contract and every one of
-# them raised `assert (None, 0) is None`.
-#
-# The SOURCE is the correct side here and the sole caller
-# (`ask_the_syndicate_adapter.py:1360`) already destructures a 2-tuple.
+# `#517` made every branch return a 2-tuple, `(rows_or_None, exclusion)`; the
+# import-failure branch once returned a bare None and the destructuring caller
+# raised instead of degrading. Since todo #861 the second term is a
+# `_BoardExclusion` (count, considered, sport, the board's reasons), so the
+# answer can say WHY the board picks nothing rather than a bare "nothing".
+
+_NOTHING = adapter._BoardExclusion()
+
 
 @pytest.mark.parametrize(
     "payload",
@@ -135,17 +138,21 @@ def test_top_opportunities_lead_with_the_boards_max_edge(monkeypatch):
 )
 def test_absent_artifact_falls_back_rather_than_emptying_the_headline(monkeypatch, payload):
     _patch_shortlist(monkeypatch, payload)
-    assert adapter._board_top_opportunities({}, {}) == (None, 0)
+    assert adapter._board_top_opportunities({}, {}) == (None, _NOTHING)
 
 
-def test_sport_filter_that_matches_nothing_falls_back(monkeypatch):
-    _patch_shortlist(monkeypatch, {"rows": [_row(sport="nfl")]})
-    assert adapter._board_top_opportunities({"sport": "nhl"}, {}) == (None, 0)
+def test_a_sport_with_no_board_lines_is_an_explained_empty_answer(monkeypatch):
+    """Not a fallback any more: the snapshot is cross-sport, and an NHL question
+    must not be answered with NFL rows (todo #861)."""
+    _patch_shortlist(monkeypatch, {"rows": [_row(sport="nfl", suggested=True, ev_pct=3.0)]})
+    top, excluded = adapter._board_top_opportunities({"sport": "nhl"}, {})
+    assert top == [] and excluded.no_rows_for_sport and excluded.sport == "nhl"
 
 
 def test_sport_filter_is_exact_so_nba_does_not_match_wnba(monkeypatch):
-    _patch_shortlist(monkeypatch, {"rows": [_row(sport="wnba")]})
-    assert adapter._board_top_opportunities({"sport": "nba"}, {}) == (None, 0)
+    _patch_shortlist(monkeypatch, {"rows": [_row(sport="wnba", suggested=True, ev_pct=3.0)]})
+    top, excluded = adapter._board_top_opportunities({"sport": "nba"}, {})
+    assert top == [] and excluded.no_rows_for_sport
 
 
 def test_an_unimportable_reader_degrades_instead_of_raising_typeerror(monkeypatch):
@@ -162,7 +169,7 @@ def test_an_unimportable_reader_degrades_instead_of_raising_typeerror(monkeypatc
     import sys
 
     with mock.patch.dict(sys.modules, {"pipeline.intelligence_state": None}):
-        assert adapter._board_top_opportunities({}, {}) == (None, 0)
+        assert adapter._board_top_opportunities({}, {}) == (None, _NOTHING)
 
 
 def test_a_raising_reader_degrades_instead_of_failing_the_answer(monkeypatch):
@@ -172,13 +179,13 @@ def test_a_raising_reader_degrades_instead_of_failing_the_answer(monkeypatch):
         raise RuntimeError("artifact store unavailable")
 
     monkeypatch.setattr(state, "read_layer2_shortlist", _boom, raising=False)
-    assert adapter._board_top_opportunities({}, {}) == (None, 0)
+    assert adapter._board_top_opportunities({}, {}) == (None, _NOTHING)
 
 
 # --- the schema actually prefers the board -----------------------------------
 
 def test_market_summary_prefers_the_board_over_the_snapshot(monkeypatch):
-    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35, ev_pct=2.81)]})
+    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35, ev_pct=2.81, suggested=True)]})
     snapshot = {"recommendations": [{"selection": "SNAPSHOT ROW", "edge": 13.59}]}
     schema = adapter._market_summary_schema(snapshot, question="biggest edges?", context={})
     edges = [item["edge"] for item in schema["top_opportunities"]]
@@ -196,7 +203,7 @@ def test_an_empty_snapshot_is_a_refusal_and_the_board_must_not_fill_it(monkeypat
     tomorrow's game" with five unrelated NFL totals (refusal 4/8 -> 3/8 against
     a same-slate control). The board may REPLACE a pool, never create one.
     """
-    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35, ev_pct=2.81)]})
+    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35, ev_pct=2.81, suggested=True)]})
     schema = adapter._market_summary_schema(
         {"recommendations": []}, question="Ohtani's exact stats for tomorrow?", context={}
     )
@@ -204,22 +211,19 @@ def test_an_empty_snapshot_is_a_refusal_and_the_board_must_not_fill_it(monkeypat
     assert "no opportunities" in schema["rationale_summary"]["summary"].lower()
 
 
-def test_summary_reports_a_board_edge_as_a_percent_not_635(monkeypatch):
-    """`Best edge 635.0%` was served live for 14 minutes.
-
-    Snapshot rows carry `edge` as a fraction, board rows as a percent, and the
-    sentence multiplied by 100 unconditionally.
+def test_summary_reports_board_ev_as_a_percent_not_281(monkeypatch):
+    """`Best edge 635.0%` was served live for 14 minutes, when the sentence
+    multiplied a percent by 100. Board rows now lead with EV at the posted price
+    (todo #861), and the same scale rule holds: a percent is printed as one.
     """
-    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35, ev_pct=2.81)]})
+    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35, ev_pct=2.81, suggested=True)]})
     schema = adapter._market_summary_schema(
         {"recommendations": [{"selection": "x", "edge": 0.1}]}, question="biggest edges?", context={}
     )
     summary = schema["rationale_summary"]["summary"]
-    # 6.3, not 6.4: 6.35 is fractionally below the tie in binary float, so
-    # `.1f` rounds down. Asserting the real production value rather than a
-    # tidier one keeps this honest about what the user actually sees.
-    assert "Best edge 6.3%." in summary, summary
-    assert "635" not in summary
+    assert "Showing the board's top 1 suggested bet in NFL" in summary, summary
+    assert "Best EV +2.8% at the posted price." in summary, summary
+    assert "281" not in summary and "635" not in summary
 
 
 def test_snapshot_rows_still_get_the_fraction_conversion():
@@ -237,30 +241,28 @@ def test_market_summary_keeps_the_snapshot_when_the_board_has_nothing(monkeypatc
 
 # --- the predicate the lane is actually judged by ----------------------------
 
-def test_regression_divergence_predicate_holds(monkeypatch):
-    """Written the way `ask_syndicate_regression.py:450-458` writes it.
+def test_regression_top_pick_predicate_holds(monkeypatch):
+    """Written the way `ask_syndicate_regression.py`'s `top_pick_matches_board`
+    writes it, with the SAME two predicates imported from the adapter.
 
-    Testing my own paraphrase of the check would prove nothing about the check.
-    Board truth is `max(model_edge_pct)` over the shortlist; chat's claim is
-    `max(edge)` over `structured_response.top_opportunities`; the harness fails
-    the case when they differ by more than 0.5.
+    Board truth is the EV of the highest-ranked board pick; chat's claim is the
+    EV of the headline's first row; the harness fails the case when they differ
+    by more than 0.5, or when that row is not a board pick.
     """
-    # `ev_pct` positive: `_has_positive_edge` vetoes on EVERY edge term, and the
-    # default fixture's real `ev_pct` is -2.8895, which emptied the pool and
-    # made this fail on `max()` of an empty sequence rather than on the
-    # divergence it exists to check.
-    board_rows = [_row(model_edge_pct=e, ev_pct=2.0) for e in (1.2, 6.35, -4.0, 3.1, 5.9)]
+    board_rows = [
+        _row(model_edge_pct=1.2, ev_pct=2.0, score={"score": 1.0}, suggested=True),
+        _row(model_edge_pct=28.15, ev_pct=-8.3, score={"score": 3.6}, suggested=False),
+        _row(model_edge_pct=3.1, ev_pct=3.4, score={"score": 2.2}, suggested=True),
+    ]
     _patch_shortlist(monkeypatch, {"rows": board_rows})
-
-    board_top = max(r["model_edge_pct"] for r in board_rows)
+    picks = sorted(
+        (r for r in board_rows if adapter._is_board_pick(r)), key=adapter._board_pick_rank_key, reverse=True
+    )
     schema = adapter._market_summary_schema(
         {"recommendations": [{"selection": "SNAPSHOT", "edge": 13.59}]},
         question="What are the biggest edges on the board tonight?",
         context={},
     )
-    claimed = [float(r["edge"]) for r in schema["top_opportunities"] if isinstance(r.get("edge"), (int, float))]
-    top_claimed_pct = max(claimed) * 100.0 if max(claimed) < 1.5 else max(claimed)
-
-    assert abs(top_claimed_pct - board_top) <= 0.5, (
-        f"top_edge_diverges_from_board:{top_claimed_pct:.2f}_vs_{board_top:.2f}"
-    )
+    first = schema["top_opportunities"][0]
+    assert first["suggested"] is True
+    assert abs(float(first["EV"]) - float(picks[0]["ev_pct"])) <= 0.5

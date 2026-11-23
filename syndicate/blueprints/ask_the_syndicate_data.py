@@ -3650,21 +3650,18 @@ def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[s
             "tables": [], "charts": [], "as_of": selected_date, "sport": sport or None,
         }
 
-    # Rank on the model's disagreement with the market where it exists, and on
-    # EV where it does not. Measured 2026-08-14: only 57 of 200 published rows
-    # carry `model_edge_pct` at all, so ranking on it alone would silently drop
-    # three quarters of the board -- including all of soccer and all of WNBA.
-    def _rank_key(row: dict[str, Any]) -> tuple[int, float]:
-        edge = row.get("model_edge_pct")
-        if isinstance(edge, (int, float)):
-            return (1, float(edge))
-        ev = row.get("ev_pct")
-        return (0, float(ev) if isinstance(ev, (int, float)) else float("-inf"))
+    # THE BOARD'S ORDER: its picks first, then its own shortlist score
+    # `[2026-11-23, lane surface-consistency-oversight, todo #861]`. This used
+    # to rank on `model_edge_pct` first, the sim's raw disagreement with the
+    # market. On the fleet 2026-11-23 that put 22-28 point "edges" from models
+    # measured to LOSE to the market at the top of Ask, above every bet the
+    # board actually suggests. One key, shared with the headline
+    # (`_board_pick_rank_key`), so the two cannot order the board two ways. Every
+    # matched row is still listed; nothing is dropped for having no model.
+    from syndicate.blueprints.ask_the_syndicate_adapter import _board_pick_rank_key, _market_label
 
-    rows.sort(key=_rank_key, reverse=True)
+    rows.sort(key=_board_pick_rank_key, reverse=True)
     top = rows[:15]
-
-    from syndicate.blueprints.ask_the_syndicate_adapter import _market_label
 
     table_rows = []
     for row in top:
@@ -3688,32 +3685,37 @@ def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[s
             price_cell,
             f"{float(ev):+.2f}%" if isinstance(ev, (int, float)) else "-",
             f"{float(edge):+.2f}%" if isinstance(edge, (int, float)) else "no model",
+            "Suggested" if row.get("suggested") is True else "—",
         ])
 
     scope = ", ".join(filters) if filters else "whole board"
     tables = [{
         "title": f"Published board — {scope} ({matched} of {total_published} rows)",
-        "columns": ["Sport", "Market", "Selection", "Price", "EV", "Model edge"],
+        "columns": ["Sport", "Market", "Selection", "Price", "EV", "Model edge", "Board pick"],
         "rows": table_rows,
     }]
-    # POSITIVE ONLY. The chart is titled "Top edges"; a -9.17% bar under that
-    # heading is not a top edge, it is the model saying "do not bet this".
-    # The TABLE above keeps every row on purpose -- it is an inventory with an
-    # explicit "N of M rows" count and a signed `Model edge` column, so a
-    # negative there is information rather than a recommendation.
+    # THE BOARD'S PICKS, BY EV AT THE POSTED PRICE. This chart was "Top edges",
+    # the sim's model edge, which is the ranking `_board_pick_rank_key` retired
+    # (todo #861). Only Suggested rows with a positive EV are drawn: a bar under
+    # "board picks" must be one. The TABLE above keeps every row on purpose --
+    # it is an inventory with an explicit "N of M rows" count, a signed
+    # `Model edge` column and a `Board pick` column, so a non-pick there is
+    # information rather than a recommendation.
     points = [
-        {"x": _board_row_chart_label(row), "y": round(float(row["model_edge_pct"]), 2)}
+        {"x": _board_row_chart_label(row), "y": round(float(row["ev_pct"]), 2)}
         for row in top
-        if isinstance(row.get("model_edge_pct"), (int, float)) and float(row["model_edge_pct"]) > 0
+        if row.get("suggested") is True
+        and isinstance(row.get("ev_pct"), (int, float))
+        and not isinstance(row.get("ev_pct"), bool)
+        and float(row["ev_pct"]) > 0
     ]
-    # No row in the result carries a model number, so a "top edges" chart would
-    # be an empty frame implying we had nothing to say. Drop it and let the
-    # table -- which says `no model` per row -- stand on its own.
+    # No board pick in the result, so a "board picks" chart would be an empty
+    # frame implying we had nothing to say. Drop it and let the table stand.
     charts = [{
         "type": "bar",
-        "title": f"Top edges — {scope}",
+        "title": f"Board picks — {scope}",
         "x_label": "Selection",
-        "y_label": "Model edge %",
+        "y_label": "EV % at the posted price",
         "points": points,
     }] if points else []
 

@@ -705,61 +705,52 @@ def test_result_as_of_reads_state_meta_not_only_freshness():
 
 
 # --------------------------------------------------------------------------
-# 8. A negative edge is not an opportunity.
+# 8. The headline is the BOARD'S pick, never Ask's own.
 #
 # Served 2026-08-16 20:5xZ under "Showing the top 5 opportunities on today's
 # board in MLB. Best edge 4.9%": three of the five carried `model_edge_pct` of
-# -1.83, -4.87 and -8.20. The ranker was correct -- the board had thinned to 70
-# rows with 6 carrying a model edge and only 2 positive -- so "the best 5"
-# genuinely included four bad bets. Sorting a pool is not the same as declining
-# to publish one, which is the lesson the 2026-08-03 note in
-# `_market_summary_schema` half-learned.
+# -1.83, -4.87 and -8.20, and a later cut published `Pittsburgh Pirates` at
+# model edge +9.18% with EV -2.18%. Ask answered both by vetoing on every edge
+# term and ranking on model edge. That rule then headlined, on 2026-11-23, five
+# 22-28 point model edges from models measured to LOSE to the market, none of
+# them Suggested (todo #861). Eligibility is now the board's own flag
+# (`_stamp_suggested`) plus a positive EV at the posted price; the Pittsburgh
+# row stays out either way.
 # --------------------------------------------------------------------------
 
-def test_every_edge_term_the_row_carries_must_be_positive():
-    """A veto should hear every term that can object, not just the ranking one.
-
-    The first cut mirrored `_board_rank_key` (one term: model edge if present,
-    else EV) and published `Pittsburgh Pirates` at model edge +9.18% with EV
-    -2.18% -- the model liked the side while the price was worse than consensus
-    fair. Both-or-nothing now.
-    """
-    # both present -> both must pass
-    assert adapter._has_positive_edge({"model_edge_pct": 4.91, "ev_pct": 3.45}) is True
-    assert adapter._has_positive_edge({"model_edge_pct": 9.18, "ev_pct": -2.18}) is False  # Pittsburgh
-    assert adapter._has_positive_edge({"model_edge_pct": -8.20, "ev_pct": 4.16}) is False
-    assert adapter._has_positive_edge({"model_edge_pct": -1.0, "ev_pct": -1.0}) is False
-    # only one present -> that one decides
-    assert adapter._has_positive_edge({"ev_pct": 1.35}) is True
-    assert adapter._has_positive_edge({"ev_pct": -2.16}) is False
-    assert adapter._has_positive_edge({"model_edge_pct": 2.5}) is True
-    assert adapter._has_positive_edge({"model_edge_pct": -2.5}) is False
-    # neither -> not an opportunity
-    assert adapter._has_positive_edge({}) is False
-    assert adapter._has_positive_edge({"model_edge_pct": None, "ev_pct": None}) is False
+def test_only_the_boards_own_flag_makes_a_pick():
+    assert adapter._is_board_pick({"suggested": True, "ev_pct": 3.45}) is True
+    # a big model edge is not a pick if the board did not suggest it
+    assert adapter._is_board_pick({"suggested": False, "model_edge_pct": 28.15, "ev_pct": 4.0}) is False
+    assert adapter._is_board_pick({"model_edge_pct": 28.15, "ev_pct": 4.0}) is False
+    # the board bets the price: a negative model edge does not veto its pick
+    assert adapter._is_board_pick({"suggested": True, "model_edge_pct": -8.20, "ev_pct": 4.16}) is True
 
 
-def test_ranking_is_unchanged_by_the_stricter_eligibility():
-    """This filters the pool; it must not reorder what survives."""
+def test_a_pick_priced_worse_than_fair_is_still_vetoed():
+    # Pittsburgh: model +9.18, EV -2.18. Even if a flag said yes, the price says no.
+    assert adapter._is_board_pick({"suggested": True, "model_edge_pct": 9.18, "ev_pct": -2.18}) is False
+    assert adapter._is_board_pick({"suggested": True, "ev_pct": 0.0}) is False
+    assert adapter._is_board_pick({"suggested": True}) is False
+
+
+def test_flags_and_evs_must_be_real_values_not_truthy_ones():
+    """`isinstance(True, int)` is True -- a bool must not pass as an EV, and a
+    truthy non-bool must not pass as the board's flag."""
+    assert adapter._is_board_pick({"suggested": True, "ev_pct": True}) is False
+    assert adapter._is_board_pick({"suggested": 1, "ev_pct": 3.0}) is False
+    assert adapter._is_board_pick({"suggested": "yes", "ev_pct": 3.0}) is False
+
+
+def test_board_order_is_picks_first_then_the_boards_score():
     rows = [
-        {"model_edge_pct": 2.0, "ev_pct": 1.0},
-        {"model_edge_pct": 9.0, "ev_pct": 1.0},
-        {"ev_pct": 5.0},
+        {"suggested": True, "ev_pct": 2.0, "score": {"score": 1.0}},
+        {"suggested": False, "model_edge_pct": 28.0, "ev_pct": -8.0, "score": {"score": 3.6}},
+        {"suggested": True, "ev_pct": 1.0, "score": {"score": 2.5}},
+        {"suggested": True, "ev_pct": 5.0},  # no score sorts below a scored pick
     ]
-    kept = [r for r in rows if adapter._has_positive_edge(r)]
-    kept.sort(key=adapter._board_rank_key, reverse=True)
-    # model-bearing rows still sort above EV-only, and by descending edge
-    assert [r.get("model_edge_pct") for r in kept] == [9.0, 2.0, None]
-
-
-def test_zero_edge_is_not_positive():
-    assert adapter._has_positive_edge({"model_edge_pct": 0.0}) is False
-    assert adapter._has_positive_edge({"ev_pct": 0.0}) is False
-
-
-def test_booleans_are_not_edges():
-    """`isinstance(True, int)` is True -- a bool must not pass as a number."""
-    assert adapter._has_positive_edge({"model_edge_pct": True}) is False
+    rows.sort(key=adapter._board_pick_rank_key, reverse=True)
+    assert [(r["suggested"], r["ev_pct"]) for r in rows] == [(True, 1.0), (True, 2.0), (True, 5.0), (False, -8.0)]
 
 
 def test_summary_says_why_the_list_is_short():

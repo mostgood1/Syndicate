@@ -42,6 +42,11 @@ def _row(sport, market, **kw):
         "away_team": kw.get("away", "Away FC"),
         "kind": kw.get("kind", "prop"),
     }
+    # The board's own pick flag and score (todo #861): the table orders on them.
+    if "suggested" in kw:
+        row["suggested"] = kw["suggested"]
+    if "score" in kw:
+        row["score"] = {"score": kw["score"]}
     return row
 
 
@@ -50,10 +55,12 @@ PAYLOAD = {
     "opportunities_considered": 14216,
     "active_sports": ["mlb", "nfl", "soccer", "wnba"],
     "rows": [
-        _row("mlb", "batter_total_bases", ev=3.1, edge=11.5, player="A Judge"),
-        _row("mlb", "batter_rbis", ev=2.0, edge=4.2, player="B Witt"),
+        # the measured 11-23 shape: the biggest model edge and the highest
+        # score, and NOT a board pick
+        _row("mlb", "batter_total_bases", ev=3.1, edge=11.5, player="A Judge", suggested=False, score=4.0),
+        _row("mlb", "batter_rbis", ev=2.0, edge=4.2, player="B Witt", suggested=True, score=1.5),
         _row("mlb", "batter_total_bases", ev=1.0, edge=6.0, player="C Ruiz"),
-        _row("soccer", "player_shots", ev=5.5, edge=None, player="D Saka"),
+        _row("soccer", "player_shots", ev=5.5, edge=None, player="D Saka", suggested=True, score=2.0),
         _row("soccer", "goal_scorer", ev=4.0, edge=None, player="E Haaland"),
         _row("wnba", "player_points", ev=-1.0, edge=None, player="F Wilson"),
         _row("nfl", "totals", ev=0.5, edge=2.0, player=None, kind="game"),
@@ -125,24 +132,37 @@ class BoardCandidatesTests(unittest.TestCase):
         # aggregation rather than a sample.
         self.assertEqual(evidence["opportunities_considered"], 14216)
 
-    def test_the_top_edge_is_the_boards_top_edge(self) -> None:
-        # The divergence case: chat said 5.02% while the board served 13.59%.
+    def test_the_table_leads_with_the_boards_top_pick(self) -> None:
+        """Todo #861. This asserted the top row was the board's max model edge
+        (11.5), the rule that put losing models at the top of Ask on 2026-11-23.
+        The board's picks lead now, by the board's own score."""
         result = _fetch("what are the biggest edges on the board tonight?")
-        self.assertAlmostEqual(result["evidence"]["top"][0]["model_edge_pct"], 11.5)
+        top = result["evidence"]["top"]
+        self.assertEqual([r["player_name"] for r in top[:2]], ["D Saka", "B Witt"])
+        self.assertGreater(
+            [r["player_name"] for r in top].index("A Judge"),
+            [r["player_name"] for r in top].index("B Witt"),
+        )
 
-    def test_rows_without_a_model_are_ranked_below_but_not_dropped(self) -> None:
-        # Only 57 of 200 published rows carry model_edge_pct; ranking on it
-        # alone would silently drop soccer and WNBA entirely.
+    def test_every_matched_row_is_listed_picks_first(self) -> None:
+        # Nothing is dropped for having no model or not being a pick: soccer and
+        # WNBA stay in the inventory, and the Board pick column says which is which.
         result = _fetch("rank every opportunity on the board")
-        sports = {row["sport"] for row in result["evidence"]["top"]}
-        self.assertIn("soccer", sports)
-        self.assertIn("wnba", sports)
-        modelled = [r for r in result["evidence"]["top"] if r.get("model_edge_pct") is not None]
-        unmodelled = [r for r in result["evidence"]["top"] if r.get("model_edge_pct") is None]
-        self.assertTrue(modelled and unmodelled)
-        last_modelled = result["evidence"]["top"].index(modelled[-1])
-        first_unmodelled = result["evidence"]["top"].index(unmodelled[0])
-        self.assertLess(last_modelled, first_unmodelled)
+        top = result["evidence"]["top"]
+        self.assertEqual(len(top), 7)
+        self.assertIn("soccer", {row["sport"] for row in top})
+        self.assertIn("wnba", {row["sport"] for row in top})
+        flags = [row.get("suggested") is True for row in top]
+        self.assertEqual(flags, sorted(flags, reverse=True))
+        table = result["tables"][0]
+        column = table["columns"].index("Board pick")
+        self.assertEqual([row[column] for row in table["rows"]].count("Suggested"), 2)
+
+    def test_the_chart_draws_board_picks_by_ev(self) -> None:
+        result = _fetch("rank every opportunity on the board")
+        chart = result["charts"][0]
+        self.assertTrue(chart["title"].startswith("Board picks"))
+        self.assertEqual([p["y"] for p in chart["points"]], [5.5, 2.0])
 
     def test_a_row_without_a_model_says_so_rather_than_showing_a_number(self) -> None:
         """`#517`. Resolves the column BY NAME, not by position.
@@ -206,10 +226,12 @@ class BoardCandidatesTests(unittest.TestCase):
         result = _fetch("best edges tonight")
         self.assertEqual(result["evidence"]["as_of"], "2026-08-14T20:00:00Z")
 
-    def test_no_chart_when_no_row_carries_a_model_number(self) -> None:
+    def test_no_chart_when_no_row_is_a_board_pick(self) -> None:
         # An empty bar chart implies we had nothing to say; the table already
-        # says "no model" per row.
-        result = _fetch("best bets today", {"sport": "soccer", "selected_date": "2026-08-14"})
+        # says per row that it is not a pick. (The chart drew model edges until
+        # todo #861; it draws the board's picks by EV now.)
+        result = _fetch("best bets today", {"sport": "wnba", "selected_date": "2026-08-14"})
+        self.assertEqual(result["evidence"]["matched"], 1)
         self.assertEqual(result["charts"], [])
 
     def test_missing_artifact_stands_down(self) -> None:
