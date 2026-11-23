@@ -62961,3 +62961,24 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Kills per day stay 0, and they are still the lane's measure.
   - The reading must land BEFORE the 11-24 window batch's drained down/up (task `nfl-level-refit-load-1120`, 08:15Z 11-24). That batch changes web's env (CHANGE F, the shared board copy), which confounds any later comparison.
 - **Claim released** 14:48:54Z.
+
+## 2026-11-23 20:08:51Z (2:08:51 PM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): the rail keeps every chip on a canonical key and chooses on start, `3983309ce` (lane `evening-utc-date-split`, user "Yes, deploy now" to "Deploy the rail fix to web now, before the 7 PM CST kickoff?") -- **LOADED on web; MET**
+- betting change: no (display-only template change; the ride-alongs are tooling or default-OFF, below)
+- **Why:** user report 11-23: the rail showed LAFC @ St. Louis (MLS playoff, 7 PM CST) as a bare "Los Angeles @ St. Louis City / 52 opportunities" card. The chip existed (401933728), and the 159 board rows carried the chip's keys `lafc` / `st. louis city sc`. But `loadGameChips` removed any canonical key two chips share, and the playoff chips hold that pair twice (401933735, 12-03 01:00Z).
+- **Ride-alongs `05a2ce65e..3983309ce`**, each default read in the code:
+  - `9a9a0b207` host headroom: `install_host_headroom_override` returns None when `SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB` is absent. The key is in 0 env lines and 0 fleet_env files.
+  - `e5a0ecd29` soccer Central shard: absent = OFF. The key is in 0 env lines and 0 fleet_env files. It is CHANGE O of the 11-24 batch, which now finds it already on the fleet ("not in the range").
+  - `3be7fb2e6` ci-suite `oom_score_adj`: absent = ON, but only the nightly `ci-run` subcommand reaches it, and no role does. The batch already classifies it (a). Its lane's P-O1..P-O3 now read at the 08:00Z 11-24 `ci-run`.
+  - `a9cf2a350`, `be6d0c364`: scripts only (portfolio monitor, surface-consistency instrument). No role imports them.
+- **Preflight** `--betting-change no`, 2 expect / baseline pairs (baseline read 20:08:14Z): **CLEAR 20:08:24Z**.
+- **ff + reload:**
+  - `git merge --ff-only 3983309ce` at **20:08:51Z** (`05a2ce65e` -> `3983309ce`, head checked before the merge).
+  - `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "state": "done"}`.
+  - Workers 367587 / 367877 -> **367969 / 367970**; master 1011213 unchanged.
+- **expect / measured** (served `/intelligence`, 20:09:03Z):
+  - `served_add_canonical` 0 -> 1: **MET**.
+  - `served_canonical_collisions` 3 -> 0: **MET**.
+  - In the built-in browser at about 20:10Z, the live page had 88 mini cards, 1 of them LAFC @ STL. It reads "MLS · 7:00P CT PREGAME LAF – STL – PROJ ... Proj STL −0.4 · O/U 3.3 · STL 48% · D 21% ... 50 plays", and 0 cards read "Los Angeles @ St. Louis City".
+- **verify:** the LAFC @ STL card keeps its chip (score and clock) in play tonight. The 12-03 game 3 rows join 401933735, not game 1.
+- **Revert:** `git revert 3983309ce` on main, then ff + reload-web.
+- **Effect on the 11-24 batch:** its STEP 4 range now starts at `3983309ce`, so this class (c) commit is no longer a ride-along there.
