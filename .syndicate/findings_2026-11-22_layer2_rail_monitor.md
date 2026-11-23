@@ -126,3 +126,83 @@ The question: which sport, and did it have rows in play? **Verdict: soccer, with
     - R35: 144 s NFL, with `soccer@2026-11-23: 39`.
 - New readers: `grid_lines_for.py <sport> <date> <lo> <hi>`, `grid_game_states.py <sport> <date>`, `overlay_file_peek.py <sport> <date>`, `live_bets_for.py <substr>`.
 - Backups: `scripts/rail_monitor/{d4metrics.py,grid_lines_for.py,grid_game_states.py,overlay_file_peek.py,live_bets_for.py,RUNBOOK.md}`.
+
+## DAILY SUMMARY — Sun 11-22 (day 8), closed 1:05 AM CST 11-23
+
+45 readings by the Windows task, 10:03 AM to 12:43 AM CST, every 20 min, 0 failed ticks (`railwatch\tick.log`). POP_START 16:00Z. Flags are graded on their first sighting against the finals by date (`C:\tmp\railmon\grade_2026-11-22_out.json`). The grade ran while San José St @ Loyola Chicago (11 PM tip) was still live. That game carried no model all night (I-29 below), so it has no flags to grade.
+
+### The grade
+
+| bucket | flags | games | W-L-P | hit | fair | hit − fair, 90% CI (game-clustered) |
+|---|---|---|---|---|---|---|
+| **ALL** | 363 | 59 | 189-174-0 | **0.521** | 0.474 | [+0.004, +0.094] |
+| P3 first reading: yes | 60 | 31 | 34-26 | 0.567 | 0.486 | [−0.037, +0.196] |
+| P4 fair < 0.40 | 50 | 11 | 6-44 | 0.120 | 0.216 | [−0.158, −0.021] |
+| P5 NCAAB full totals | 78 | 28 | 48-30 | 0.615 | 0.504 | [−0.003, +0.226] |
+| sport: NCAAB | 173 | 29 | 104-69 | 0.601 | 0.510 | [+0.015, +0.171] |
+| **sport: NBA** | 141 | 7 | 55-86 | **0.390** | 0.410 | [−0.050, +0.007] |
+| sport: soccer | 22 | 9 | 14-8 | 0.636 | 0.520 | [−0.049, +0.337] |
+| sport: WNCAAB | 19 | 7 | 10-9 | 0.526 | 0.500 | [−0.186, +0.238] |
+
+- **The flags beat their fair price for the 5th day in a row (11-18 to 11-22), and today the CI clears 0.** The model's mean p was 0.587 against a 0.521 hit, so it is again ~7 pp over-confident on its own side (#847).
+- **NCAAB carried the day** (0.601 vs 0.510, CI clear of 0).
+- **NBA was under fair for the 5th day** (0.390 vs 0.410, 7 games; the CI crosses 0 by 0.7 pp). Its long shots went 2-20 (S4 tail).
+- **Long shots lost more often than their own price said** (0.120 vs 0.216, CI below 0). P4 only caps them at fair + 2 pp, so it is MET, but these flags did worse than the market's price, not just no better.
+- 16 flags were not graded: 7 had no chip, 4 had no probability, 1 had an unmatched team, and 4 were early (before POP_START).
+
+### Pre-registered verdicts (standing P1-P6, P8)
+
+| # | prediction | result | verdict |
+|---|---|---|---|
+| P1 | 0 rail-card contradictions | 3 counted (R19, R26, R27), all before the 7:01 PM counter fix. All three replay as skew-consistent: OURS is the flagged row's own total (Troy @ Nicholls u155.5 156.6 vs 156.635; Rice @ Lamar u164.5 164.9 vs 164.87, u167.5 167.7 vs 167.69). 0 at R28-R45 | **MET** under the fixed rule |
+| P2 | board publication gap median ≤ 600 s, none > 1,800 s, 5:30-10:30 PM | 54 publications, median **317 s**, max 724 s, 3 over 600 s (`p2_boardpub.py`) | **MET** (11-21: 25 publications, median 657 s) |
+| P3 | first-reading flags at or below fair | 0.567 vs 0.486, CI [−0.037, +0.196] | **within noise** (above, not significant, as on 11-19 to 11-21) |
+| P4 | long shots (fair < 0.40) at most fair + 2 pp | 0.120 vs 0.216 | **MET** (and below fair, CI clear) |
+| P5 | report NCAAB calibrated live full totals | 78 / 28 games, 0.615 vs 0.504; under 54 (0.593) / over 24 (0.667); the flagged lines went over 38 of 78 | report |
+| P6 | 0 pregame NCAAB / WNCAAB totals flags | 0 at all 45 readings | **MET** |
+| P8 | score floor: 0 college calibrated full totals below the score | 1 row of 1,311 at R36 (9:43 PM): Tenn-Martin @ Utah Valley u152.5, shown only, never bet | **NOT MET as written; timing, not the floor.** The price grid's own chip score lagged the rail's chip by ≥ 56 s (block above) |
+
+### What the day found
+
+Each item has its block above:
+- **NFL "no live model" at 12:23-12:43 PM was the helper's label, not a defect.** NFL prices its full-game moneyline only, by design (`nfl/live_resim.py:714`). The helpers now count only that row as priced.
+- **R21's "unknown" games** came from a one-off helper failure. `tick.py` now logs the reason and retries once.
+- **R24's 1,098 s overlay gap** was soccer's idle time between two MLS matches. The metric now counts it apart.
+- **R27's contradiction** was a skewed end game; the counter now tells the two apart.
+- **R36's score floor** was score timing (P8 above).
+- **R32-R36's soccer overlay gaps were a REAL stall.** Real Salt Lake @ Vancouver (MLS, 7:30 PM CST) was filed under the 11-23 date. It refreshed every 13-16 min, had no live model all match and never reached the live rail. Not bet. A fix is a betting change and was routed to the fleet-watcher.
+- **I-29 hit 16 college games, up from 3 on 11-21.** 14 of 46 NCAAB and 2 of 13 WNCAAB games had their teams the other way round from the re-sim, and **none of the 16 ever carried a live model**. Examples: Butler @ Nebraska (7 readings), New Mexico St @ Robert Morris (7), Cal Baptist @ Portland (6). Why so many today was not checked. Change G (the I-29 fix) is in the 11-24 batch, so this is its size on a busy day.
+- **Other games with no live model, as unique games:**
+  - NCAAB `not_in_resim` at tip-off: 11 (most are the reversed games' other spelling);
+  - NHL `in_intermission`: 5;
+  - NFL `uninformative_probability`: 4 and `degenerate_ratings`: 2;
+  - NCAAB / WNCAAB `pbp_score_mismatch`: 3 / 1;
+  - key player out: 1 NBA (Utah, Jaxson Hayes) and 1 NFL (Minnesota, Kirk Cousins), both #814 by design.
+- **One NCAAB game ran past midnight CT** (San José St @ Loyola Chicago). At the roll the live rail and the chips switched to 11-23 (`central_today_iso()`, `intelligence.py:3628`). From 12:03 AM the rail showed 0 NCAAB rows while the 11-23 overlay held the game on and off (`rows_inplay` 0-14). It was reversed (no model) and has 0 orders, so only book rows were lost. This is the midnight family (#792 / #782), not a new defect.
+- **LEAD, now 3 slates old: MLS playoff team cards.** Each match has chip count 0 and rows with no chip:
+  - 11-22: CIN @ NSH, CLT @ CHI and RSL @ VAN;
+  - 11-23 from 12:03 AM: LAF @ STL, row keys `lafc` / `st. louis city sc`.
+  Not diagnosed. A naming split between the chip and the odds rows is still the first suspect.
+- 0 false and 0 missed flags at every reading; dark rows at most 2.
+
+### Owned readings
+
+- **R-F #850 did not qualify:** 10 core live games at 7:03 PM (threshold 33), so nothing was sent to local_d0f83044. For context, on the same parent since the 4:37 AM reset:
+  - 9 refusals at the P1 stage (1/2/3/3 an hour);
+  - 1 exit (rc 75, `heavy_build_refused`, 9:09 PM);
+  - longest build gap 724 s;
+  - parent RSS 8-10 PM p50 1,974 MB (n 6, 1,950-2,056).
+  So the refusals came on a light Sunday too.
+- **R-B / R-D / R-G:** 11-24, only if their changes load (one-shot crons exist).
+
+### Loads (11-22 slate)
+
+- **4:37 AM:** refresh-worker parent reset (#850), no code change. Betting change no.
+- Nothing else: all 45 readings ran on `b07e80882`, and deploys.md has only readings after 4:37 AM.
+
+### Open user decisions
+
+- **The 11-24 window batch:** #860 (the St. Louis Blues NHL join) and change G (I-29, 16 games today) each take your yes then. The fleet-watcher keeps the queue.
+- **The late soccer date split** (RSL @ Vancouver had no live model or rail): a fix would be a betting change. It is routed to the fleet-watcher, and no lane holds it yet.
+- **The soccer live lens fix** (11-21, options (a)-(d)): open, not requested.
+- **#850's next lever** comes through local_d0f83044.
