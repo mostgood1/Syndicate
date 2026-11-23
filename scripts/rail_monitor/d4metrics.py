@@ -103,7 +103,13 @@ out["tick_gap_max_s"] = round(max(gaps), 1) if gaps else None
 out["deferred_slow_ticks"] = deferred
 
 # overlay
+# 11-22 R24 (the fleet-watcher's flag): soccer read a 1,098 s gap that was NOT a stall. The overlay prints a sport's line
+# with rows_inplay=0 when its last game leaves play, then prints nothing until the next one is in play (MLS: one match final
+# ~23:22Z, Charlotte @ Chicago kicked off ~23:41Z against a listed 23:30Z). A gap that STARTS at an empty publish is that
+# sport's idle time, so it goes to overlay_idle_gap_max_s, not to overlay_gap_max_s / overlay_gaps_over_360. A gap after
+# a line with rows in play still counts in full, because that is a stall.
 last, gmax, over = {}, collections.defaultdict(float), collections.Counter()
+idle_max = collections.defaultdict(float)
 for l in rw:
     m = re.search(r"INPLAY_OVERLAY sport=(\w+)", l)
     if not m:
@@ -111,12 +117,20 @@ for l in rw:
     sp, t = m.group(1), ts(l)
     if t is None:
         continue
+    ri = re.search(r"rows_inplay=(\d+)", l)
+    empty = ri is not None and int(ri.group(1)) == 0
     if sp in last:
-        g = (t - last[sp]).total_seconds()
-        gmax[sp] = max(gmax[sp], g)
-        if g > 360:
-            over[sp] += 1
-    last[sp] = t
+        prev_t, prev_empty = last[sp]
+        g = (t - prev_t).total_seconds()
+        if prev_empty:
+            idle_max[sp] = max(idle_max[sp], g)
+        else:
+            gmax[sp] = max(gmax[sp], g)
+            if g > 360:
+                over[sp] += 1
+    last[sp] = (t, empty)
+out["overlay_idle_gap_max_s"] = round(max(idle_max.values()), 1) if idle_max else None
+out["overlay_idle_gap_max_sport"] = max(idle_max, key=idle_max.get) if idle_max else None
 out["overlay_gap_max_s"] = round(max(gmax.values()), 1) if gmax else None
 out["overlay_gap_max_sport"] = max(gmax, key=gmax.get) if gmax else None
 out["overlay_gaps_over_360"] = sum(over.values())

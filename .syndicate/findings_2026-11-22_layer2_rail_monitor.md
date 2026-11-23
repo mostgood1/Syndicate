@@ -44,3 +44,25 @@ local_379fd729 flagged Maryland-Eastern Shore @ IUPUI and UC Irvine @ Loyola Mar
   - Next time the tick log will say why.
 - New reader: `web_liverail_reqs.py <lo> <hi>`, every live-rail GET in `web.log` with status, bytes, agent and ms.
 - Backups: `scripts/rail_monitor/{railwatch_tick.py,web_liverail_reqs.py}`.
+
+## Fleet-watcher flag: R24 (5:43 PM CST) overlay_gap_max_s 1,098 s; read-only
+
+local_379fd729 flagged an 18-minute live overlay gap: R24 `overlay_gap_max_s` 1,098 and `overlay_gaps_over_360` 1, where R21-R23 read 117-141 s. **Verdict: not a stall. The gap was soccer's idle time between two MLS matches, and `d4metrics.py` counted it as a gap. The metric is fixed.** Diagnosed 5:58-6:04 PM CST.
+
+- **The gap is soccer's alone,** 23:23:51Z to 23:42:09Z (`overlay_gap_max_sport: soccer`). Every other sport's overlay published throughout 23:20-23:45Z, with gaps up to 108 s (NFL), 105 s (NHL) and 82 s (NCAAB) (`overlay_lines.py`).
+- **The earlier MLS match went final about 23:22Z.**
+  - Soccer `rows_inplay` was 50 at 23:22:33Z and 0 at 23:23:51Z, the last line before the gap.
+  - MLS `final_cached=1` at 23:25:08Z.
+  - `SOCCER_LIVE_AUTORUN_LAUNCHED in_play=mls` ran every ~2 min to 23:21:57Z, then stopped. That is correct: `_soccer_in_play_leagues` (`run_live_odds_refresh_worker.py:794`) found no MLS game in play.
+- **Charlotte FC @ Chicago Fire is listed for 23:30:00Z (`commence_time`) but kicked off about 23:41Z.** MLS's own `live_state_2026-11-22.json` read 20' at 00:01:01Z.
+  - `FIXTURE_CADENCE sport=soccer league=mls due:live_now` fired from 23:24:42Z, because the schedule had the match due.
+  - The live state held no in-play game until kickoff, so nothing launched.
+- **The refresh launched again at 23:42:01Z.** The overlay had 7 soccer rows at 23:42:09Z and 270 at 23:42:48Z, about a minute after kickoff.
+- **Not** the live-odds-worker self-recycle (22:58Z, 25 min before), not `low_headroom`, and not the evening board cost (I-20).
+- **Fix (Claude-free monitor file only, no fleet change):**
+  - `d4metrics.py` sends a gap that STARTS at a `rows_inplay=0` overlay line to the new `overlay_idle_gap_max_s` / `_sport`. A gap after a line with rows in play still counts in `overlay_gap_max_s` / `overlay_gaps_over_360`, because that is a stall.
+  - Replaying the R24 window: `overlay_gap_max_s` 108 (NFL), `overlay_gaps_over_360` 0, soccer idle 1,098.
+  - Live from R25 (6:03 PM), which read `overlay_gap_max_s` 122 (NHL), `overlay_gaps_over_360` 0, and no idle gap.
+- **What the fix could hide.** If an overlay ever publishes `rows_inplay=0` while a game IS in play (for example a soccer live refresh that fails at kickoff), the gap after it now reads as idle. Seeing that is the soccer lens and autorun counters' job, not this metric's.
+- New readers: `overlay_lines.py <sport> <lo> <hi>`, `soccer_live_window.py <lo> <hi>` and `soccer_live_state_peek.py <league> <date>`.
+- Backups: `scripts/rail_monitor/{d4metrics.py,overlay_lines.py,soccer_live_window.py,soccer_live_state_peek.py,RUNBOOK.md}`.
