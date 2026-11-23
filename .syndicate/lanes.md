@@ -2071,6 +2071,14 @@ death, never life — do not invert it.
 - Diagnosis 11-23 (session 20548d56): date-assignment site is the soccer QUOTE WRITER, not the grid. scripts/fetch_soccer_oddsapi_odds_local.py:451 and fetch_soccer_oddsapi_props_local.py:505 shard by commence_time[:10] (UTC); NCAAF/NFL already shard by odds_book_quotes.kickoff_shard_date (Central) since 09-21, and the grid builds one shard per date. Fleet logs: the 11-22 soccer LIVE_GAMELINE_BUILD had RSL in its index (indexed=1, games_in_snapshot=1) for all 10 builds 01:42-03:25Z but considered=2 (two Kalshi rows, which land on the Central day); its 473 OddsAPI rows sat in book_grid_2026-11-23. Non-crossing 11-22 matches built about once a minute with considered 28-90. Hypothesis SURVIVES (refined: the shard key, not the grid key).
 - Blocked by: none
 
+### surface-consistency-oversight — OPEN — opened 2026-11-23 — session d5aa3287-9736-4080-bbac-59f9767838aa
+- Goal: Every surface (Layer 2 board, live rail, Layer 1, portfolio plan and live book, Ask, cheat sheets, every per-sport endpoint) shows and uses ONE decision record per line -- one fair, one model probability, one EV, one pick flag -- measured by a cross-surface consistency check that exits 0
+- Files: .syndicate/findings_2026-11-23_surface_consistency.md, scripts/surface_consistency_check.py, tests/test_surface_consistency_check.py, docs/ai_context/todo.md (#861 section only)
+- Hypothesis: Surfaces disagree because each re-derives fair, price, EV and the pick from the shared rows with its own rules, and per-sport pages run a separate raw-sim producer; not because the inputs differ
+- Falsification test: A same-book, same-price pair that differs only by age, on every surface pair (it already fails: 5 same-price pairs differ between Layer 2 and the cheat sheet)
+- Verification: surface_consistency_check.py against the fleet: fair/EV disagreement 0 on same-price pairs, one pick set across board/Ask/cheat/sport pages, every 'our sim' sentence quotes the sim; findings file records each reading
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
