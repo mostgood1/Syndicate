@@ -1252,3 +1252,79 @@ scorer):
 | `/c/tmp/t859d/out/2023/out_e17n_60.jsonl` | `356198de46f34847` |
 | `/c/tmp/t859d/out/2023/out_e17_60.jsonl` | `5a33e7909fd6371f` |
 | `/c/tmp/t859k/out/2023/out_h_eg_60.jsonl` | `ef9da98e2a643c7e` |
+
+### LATE-POINTS TIMING DIAGNOSTIC RESULTS — written 2026-11-23 1:16 PM CST, after the scorer ran (nothing above was changed)
+
+**Verdict: MIXED on both seasons, by the rule, and P0 held. In substance, the concession does NOT over-cut, and the
+early-start shortfall is not the end game's. P3 and P4 held; P1 and P2 FAILED. This gates nothing: the fleet and the
+12-08 queue are unchanged.**
+
+**Run** (`C:\tmp\t859t\score.txt`).
+- The pins were checked (19:13:21Z). The scorer took 3 s and printed 138 lines, with no traceback.
+- 2022: 3,470 states in every arm (703 games). 2023: 3,598 (730 games).
+
+**P0, the check: HELD.** Every Q3 start's Q3 points are identical in the paired concession arms: 701 of 701 on 2022
+and 728 of 728 on 2023. The mechanism reading in ### CORRECTION stands.
+
+**The reading** (`h_eg`, Q3 7:30, |m| >= 17; raw bias = sim - actual (se)):
+
+| season | states | pre (before Q4 5:00) | late (last 5:00) | OT | reading |
+|---|---|---|---|---|---|
+| 2022 | 215 | **-1.59 (0.51)** | +0.52 (0.32) | +0.01 (0.03) | MIXED |
+| 2023 | 228 | **-1.22 (0.55)** | +0.54 (0.30) | -0.23 (0.15) | MIXED |
+
+- **Why MIXED rather than COMPENSATION:** the late window runs HIGH (1.6 and 1.8 SE), not within 1 SE of 0.
+- **That is the opposite of OVER-CUT.** Even with the concession, the queued end game expects about half a point too
+  many in the last 5:00. Without it, the excess is +1.96 (2022, `h_egn`) and +1.88 (2023, `e17n`).
+- **So the concession does not cut too much where it acts.** The short forecast from early starts comes before Q4 5:00.
+
+**Predictions: P3 and P4 held; P1 and P2 FAILED.**
+
+| prediction | result |
+|---|---|
+| P0 (check): Q3 points identical | **HELD**: 701 / 701 and 728 / 728 |
+| P1: 2022 reads COMPENSATION | **FAILED** as written: it reads MIXED. Its first half held (pre -1.59, 3.1 SE); its second did not (late +0.52, not near 0) |
+| P2: Q4 6:00 \|m\| >= 25, `h_eg` late within +-1 SE on 2022 | **FAILED**: +0.42 (0.31). On 2023 it is -0.03 (0.29), within |
+| P3: the cut is mostly late | **HELD**: 1.44 of 1.55 points (93%) at Q3 7:30 17+ on 2022; 1.31 of 1.41 on 2023 |
+| P4: 2023 reads as 2022 | **HELD**: MIXED, the same pattern |
+
+**The concession's cut** (no-concession arm - concession arm, raw, paired):
+
+| \|m\| | start | 2022 | 2023 |
+|---|---|---|---|
+| >= 17 | before 6:00 (Q3 7:30, Q4 15:00, Q4 10:00) | 1.55, 1.52, 1.45 | 1.41, 1.39, 1.32 |
+| >= 17 | Q4 6:00 | 1.21 | 1.04 |
+| >= 17 | Q4 3:00 | 0.60 | 0.61 |
+| >= 25 | before 6:00 | 1.8 to 1.9 | 1.8 to 1.9 |
+
+90% to 100% of each cut falls in the last 5:00; the rest falls in the minute from 6:00 to 5:01.
+
+**Observations, read after the fact** (not pre-registered, but each the same on both seasons):
+- **The pre-5:00 shortfall from Q3 7:30 is at every margin and in every arm.**
+  - Over all margins it is -1.10 (0.30) on 2022 and -1.04 (0.29) on 2023 for `h_pair`, and -1.12 / -1.06 for `h_eg`.
+    In close games it is -1.06 / -0.99.
+  - Starts at Q4 15:00 show little in the same window: close +0.23 / -0.05, 17+ -0.44 / -0.17.
+  - So the base engine likely under-scores the rest of Q3. That is a base-engine matter, not the end game's, and #835's
+    calibration absorbs part of it. No earlier NCAAF finding records it.
+- **In blowouts the sim gives the trailer too few points and the leader too many, in every arm.**
+
+  | `h_eg`, whole rest | 2022 trailer | 2022 leader | 2023 trailer | 2023 leader |
+  |---|---|---|---|---|
+  | \|m\| >= 17 | -0.72 (0.22) | +0.77 (0.19) | -0.58 (0.22) | +0.39 (0.19) |
+  | from Q3 7:30 | -1.94 (0.46) | +0.88 (0.41) | -1.40 (0.49) | +0.49 (0.43) |
+
+  - The total hides it, because the two cancel. The MARGIN does not: at 17+ it runs about +1.5 (2022) and +1.0 (2023)
+    points toward the leader, and +2.8 / +1.9 from Q3 7:30.
+  - The concession cuts the LEADER more than the trailer: at Q3 7:30 17+ on 2022, -0.98 against -0.57. A trailer that
+    stops hurrying runs clock, so the leader gets fewer possessions.
+  - Whether any NCAAF side market (a live spread or win probability) reads this margin was not checked here.
+- **The end game's last 5:00 runs high in close games too:** +0.75 (0.26) on 2022 and +0.63 (0.26) on 2023 at
+  \|m\| <= 8, against -0.25 / -0.33 for `h_pair`. Its OT runs -0.33 / -0.35. That bears on the clock (2023's S1),
+  the code fix for a later window.
+
+**What follows (as pre-registered: MIXED is reported as read, and nothing follows from it).**
+- **Nothing changes.** The end game loads at 12-08 as queued, with the concession at 25. OVER-CUT is ruled out, which
+  supports keeping the concession.
+- **The observations open two questions.** Each is the user's call, and neither gates the 12-08 load:
+  - the base engine's Q3 shortfall: -1.0 to -1.1 points from Q3 7:30, at every margin, on both seasons;
+  - the blowout split (trailer short, leader long), which biases the live margin toward the leader.
