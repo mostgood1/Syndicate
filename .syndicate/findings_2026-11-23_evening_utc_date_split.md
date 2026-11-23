@@ -120,3 +120,14 @@ The 2-10 rows in other grids are Kalshi rows or forward captures.
   - A 11-24 window load is verifiable on 11-25 03:00Z (HOU @ SJ), 11-28 and 11-29.
   - A 12-08 load may have no crossing MLS match until the 2027 season.
   - LAFC @ STL (11-24 01:00Z) happens before either window, and will again have no live model.
+
+## Queued for the 11-24 window (2026-11-23 9:45 AM CST)
+
+- The user typed "11-24 window" in session 20548d56.
+- CHANGE O was added to the batch task `nfl-level-refit-load-1120` (fires 11-24 2:15 AM CST), after N. It runs the kit's
+  `apply` after every earlier change, expects the key on all three roles, and adds `soccer_quote_shard_central_in_environ`
+  expectations to the refresh-worker and live-odds-worker preflights. Both workers run the soccer writers (fleet logs: 59
+  and 338 invocations).
+- O is droppable and never stops A-N. If the batch does not load it, O waits for 12-08.
+- The batch's step 9 reads P-E1 on HOU @ SJ (Central day 11-24) within 45 min of the up. P-E3 is owed at its kickoff,
+  11-24 9:00 PM CST (11-25 03:00Z).
