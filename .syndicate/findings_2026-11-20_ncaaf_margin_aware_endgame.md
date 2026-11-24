@@ -1780,3 +1780,79 @@ the queued load neither helps nor hurts the win probability.
   on.
 - **This tested probability accuracy, not ROI.** Live money has barely touched in-play NCAAF sides (2 of 32 carried a
   sim edge). In paper, the sim's in-play moneyline edges lost -24.4% (se 9.7), most of it on 0.50-0.75 favourites.
+
+### THE ANCHOR AS BUILT, 2026-11-24 10:29 AM CST (user "Yes, build it")
+
+**Where it is:** code `c5fb62165` on branch `ncaaf-live-margin-anchor` (worktree `frosty-edison-10dcd8`). It is NOT pushed
+to main and NOT loaded; pushing it default-off is the user's call. Nothing changed on the fleet.
+
+**What it is:**
+- `syndicate/features/ncaaf/live_margin_anchor.py`, plus one call in `run_refresh_worker._run_ncaaf_live_resim_tick`
+  after #835's.
+- Switch `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR`. Absent means off, and off is byte-identical (tested through the tick).
+- E0 is one kickoff re-sim per game per process, on the tick's own ratings and engine, cached and capped at 8 a tick.
+- The close is each book's last full-game home spread before the commence, median across books, read from the NCAAF
+  quote log through #835's name join (a feed that orients a neutral-site game the other way is negated).
+- A lane with no close, no E0, or market-implied ratings is served RAW (today's lane), and the refusal is named.
+- Totals and the segment blocks are untouched.
+
+**Two departures from the replay's rule.** The coherence tripwire caught both
+(`test_ncaaf_live_resim`'s moneyline vs spread-at-the-pivot bar, applied to anchored lanes):
+- **The win probability is read off the shifted histogram** (NCAAB's cumulative rounding, a 0 counting half). The
+  replay scored "draw + shift > 0". Football margins pile up on 3 and 7: that rule called +3 moved by -2.5 a win while
+  a -0.5 spread priced it as no cover, 8.5 pp apart on one test state. It also jumps whenever the shift crosses a
+  whole point, and the shift moves with the clock. The histogram rule is continuous in the shift, and the moneyline
+  and every spread come from one distribution.
+- **A shifted pile landing on 0 is split +1/-1.** No football game ends level. Left at 0, the moneyline counts it as
+  half and a -0.5 spread as nothing (5.25 pp apart). Split symmetrically, the count, the mean and the moneyline are
+  unchanged.
+
+**Re-scored as served** (`C:\tmp\t859r\b_asbuilt.py`, `asbuilt.txt`). Same draws, shifts and states, and the
+pre-registered gates. This re-score is NOT pre-registered:
+- **2026 hold-out: PASS.**
+  - (a) Brier minus `h_eg` -0.00706 (se 0.00239);
+  - (b) headline -0.0244 (se 0.0194);
+  - (c) cover Brier -0.01350 (se 0.00328).
+  - Served minus the replay's rule: Brier -0.00024 (se 0.00025). Single states differ by up to 0.17 (a key-number
+    pile), but on average the two rules agree.
+- **2025 fit season (context, never gated):**
+  - (a) -0.00366 (se 0.00234), 1.6 SE;
+  - (b) -0.0453 (se 0.0224), which reads OVER-CONFIDENT by 0.02 SE under the served rule (the replay's rule: -0.0428,
+    se 0.0222, 0.07 SE inside);
+  - (c) -0.00829 (se 0.00332).
+  - **The anchor narrows the over-confidence; it does not remove it.**
+
+**The spreads k** (post hoc, NOT gated, and at the PREGAME line only: the replay has no live lines). The join tempers
+NCAAF live spreads by k = 1.80 (#780), fitted on raw margins, and an anchored NCAAF lane gets the same 1.80.
+- At k 1.80 the anchor still beats today's raw lane: 2026 -0.00726 (se 0.00211); 2025 -0.00350 (se 0.00214).
+- The best k on 2025 is 1.5 raw and 1.2 anchored. On 2026 at those values: raw 0.16000, anchored 0.14897 (0.15415 at
+  1.80).
+- **So a k re-fit on anchored margins is owed.** It belongs with the load or soon after, on the fleet's live spread
+  ledger, the way NBA's was refit (`scripts/replay_nba_live_margin_anchor.py`). It can ride as
+  `SYNDICATE_LIVE_SPREADS_PROB_SCALE_NCAAF` with no code change.
+- Moneylines are not tempered, so the gated win-probability gain reaches the price as measured.
+
+**The close is fed.** On the fleet's 11-07 shard (read only, pre-blind, run under the refresh-worker's own
+`SYNDICATE_NCAAF_SOURCE_ROOT`):
+- 50 of 62 week-10 games get a closing home margin (median 28 books), the same 50 games #835's total anchor finds.
+  The 12 others are not on that shard; they were not checked further.
+- The signs match the slate, e.g. Arkansas @ Auburn +10.5 and BYU @ Utah +4.5.
+- Without `SYNDICATE_NCAAF_SOURCE_ROOT` the team registry is empty and BOTH anchors find 0 of 62. The refresh-worker
+  sets it (`/home/amyn/syndicate-prod/data/ncaaf_source`, read 11-24).
+
+**Tests:**
+- `tests/test_ncaaf_live_margin_anchor.py`, 32 tests. Reachability through the tick first: absent never runs, off is
+  byte-identical, on moves the win probability and the margin and nothing else, and the real join prices the
+  anchored lane and marks it anchored. Then E0 is the kickoff re-sim, computed once and keyed on the engine's
+  settings; at kickoff the anchored margin IS the close; the cap; the named refusals; the orientation flip; the close
+  rule; continuity; the zero split; and coherence.
+- 180 neighbouring NCAAF live tests pass.
+
+**Lanes:** the worker-tick file was edited under lane `ncaaf-live-total-dispersion`, taken over 11-24 under its own
+takeover note, because two lanes claiming one file block every edit.
+
+**What follows (each the user's call):**
+1. Push `c5fb62165` to main default-off.
+2. The load is a betting change for a window. 12-08 already holds the pair and the end game, and the anchor was
+   tested only on top of them; 12-22 is the next window. Either way its first games are Army-Navy and the bowls.
+3. The spreads k re-fit on anchored margins.
