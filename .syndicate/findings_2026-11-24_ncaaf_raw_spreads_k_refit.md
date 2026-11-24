@@ -116,3 +116,110 @@
 
 Run: `wsl -d Ubuntu-24.04 -- env T780K_MODE=full nice -n 19 /home/amyn/.venvs/syndicate/bin/python
 /mnt/c/tmp/t780k_ncaaf/fit.py` -> `C:\tmp\t780k_ncaaf\out\full.txt`.
+
+## RESULTS — read 2026-11-24 2:41 PM CST (nothing above was changed)
+
+The pinned run (`C:\tmp\t780k_ncaaf\out\full.txt`; every pin OK, `P0 PASS`, `FULL_END`) read the fleet's ledger at
+nice 19 and changed nothing on the fleet. The ranges below are game-clustered 95% intervals.
+
+### VERDICT: KEEP-1.80. The rule passes at k 1.87, but the re-fit does not beat the served 1.80 since it shipped.
+
+**PRIMARY (P-ALL, I-AC, 10-01..11-21):**
+- 116,788 graded states / 449 games over 37 dates. Dropped: 672 pushes, 30 with score > final, and 810 unmatched to
+  an ESPN final.
+- In-sample k **1.872**. Log loss 0.6829 at k = 1, 0.6629 at 1.872, and 0.6629 at 1.80: the surface is flat between
+  them.
+- **Walk-forward** (35 dates, 115,009 states / 444 games):
+  - gain against k = 1: **-0.007 +- 0.003** (-0.00658, se 0.00161);
+  - model - market: -0.001 +- 0.009 at k = 1, then **-0.008 +- 0.006** at the fitted k (94,290 states).
+- The walk-forward k held **1.76-1.86 from 10-27 on**, and 1.81 entering 11-21.
+- **The rule (#780's): PASS. Its k is 1.87.**
+
+**C2, POST-SHIP (gated; 22,576 states / 121 games on 11-14..11-21):**
+- The walk-forward k on those dates was 1.78 / 1.77 / 1.77 / 1.76 / 1.77 / 1.78 / 1.81.
+- **Walk-forward re-fit minus the served 1.80: +0.00000 +- 0.0001 (se 0.00005).** So the pre-registered verdict is
+  KEEP-1.80.
+- The served 1.80 minus k = 1 on the same states: **-0.011 +- 0.006.** The shipped scale keeps paying out of sample.
+- Model - market on those states: -0.004 +- 0.008 at 1.80, and the same at the walk-forward k.
+- In-sample, not gated: the all-dates 1.87 minus 1.80 on these states is -0.000 +- 0.000.
+
+**Reported, not gated:**
+
+| read | states / games | k | walk-forward gain vs k=1 | model - market, k=1 -> k |
+|---|---|---|---|---|
+| S1 P-MKT (rows with a market price; all AC points) | 94,891 / 369 | 1.878 | -0.009 +- 0.003 | +0.004 -> -0.004 |
+| S2 I-REC (#780's script + the unscaled read only) | 116,788 / 449 | 1.894 | -0.007 +- 0.003 | -0.001 -> -0.007 |
+| S3 t859s's window 11-10..11-21 | 24,776 / 131 | 2.578 | -0.010 +- 0.008 | +0.005 -> -0.004 |
+| S4 shipped window (<= 11-12) on I-AC | 93,683 / 325 | 1.775 | -0.006 +- 0.004 | -0.003 -> -0.009 |
+| TRAP: #780's script unchanged | 116,788 / 449 | **1.800** | -0.005 +- 0.003 | -0.003 -> -0.007 |
+
+- **Per progress bucket** (in-sample, P-ALL I-AC): early (< 0.40) k 2.910 on 47,937 states / 446 games; mid
+  (0.40-0.75) 1.737 on 44,970 / 445; late (>= 0.75) 1.457 on 23,881 / 422.
+- **S3's walk-forward path** was 3.00 / 2.32 / 2.51 / 1.75 / 1.75 / 1.71 / 1.75 / 1.91 / 2.38: the same volatility
+  t859s saw (1.73 / 1.77 / 1.93 / 2.44).
+
+### Predictions
+
+- **Q1 HELD:** 1.872 is in [1.85, 2.15].
+- **Q2 HELD:** the rule passed.
+- **Q3 HELD:** C2 is +0.00000 and its interval spans 0.
+- **Q4 FAILED, just above:** S3 is 2.578, against [2.1, 2.5]. It is the same high reading as t859s's 2.314 on a
+  different population: t859s used tick-joined states only and read through 11-23.
+- **Q5 HELD IN DIRECTION ONLY:** TRAP 1.800 against 1.872. Post-ship rows are 19% of the states, so on all dates the
+  trap moves k little. On a post-ship-only window it would divide k by about 1.8.
+  - **The trap reads exactly the shipped 1.800.** A naive re-run of #780's script would have "confirmed" 1.80 for the
+    wrong reason.
+- **Q6 HELD:** S4 is 1.775, below the recorded 1.797.
+
+### Why the short window reads high: one Saturday, inside the date-to-date noise (POST-HOC, gates nothing)
+
+`C:\tmp\t780k_ncaaf\posthoc_dates.py` (sha256 `dd594fea23d96f47`, written after the results were read) ->
+`out\posthoc_dates.txt`, P-ALL I-AC:
+
+- **Each Saturday alone:**
+
+  | Saturday | k | games |
+  |---|---|---|
+  | 10-03 | 1.33 | 50 |
+  | 10-10 | 1.36 | 42 |
+  | 10-17 | 2.15 | 46 |
+  | **10-24** | **3.00** | 41 |
+  | 10-31 | 1.58 | 44 |
+  | 11-07 | 1.30 | 46 |
+  | 11-14 | 1.63 | 53 |
+  | **11-21** | **2.81** | 56 |
+
+  A single Saturday has ranged 1.30-3.00, and the bound was hit before the load (10-24). 11-21's 2.81 is inside that
+  spread. October and November show no trend.
+- **Weeknight dates** (1-6 games each) sit at the fit's bounds about as often before the load as after it:
+  - k 3.00 on 10-08, 10-15, 10-22, 10-23, 10-29, 10-30, 11-03, 11-04, 11-10, 11-11, 11-13, 11-18, 11-19 and 11-20;
+  - k 0.70-1.03 on 10-02, 10-13, 10-20, 10-27, 11-05, 11-06 and 11-12.
+- **Leaving dates out:**
+  - all dates without 11-21: k **1.815**;
+  - the post-ship dates alone: k 2.584 (22,576 states / 121 games); without 11-21, 2.364.
+- **So the "rising k":** t859s's 1.73 -> 2.44, and S3 here, are short windows that two Saturdays and a handful of
+  one-game weeknights dominate. On every date, 11-21 moves k from 1.815 to 1.872, and the walk-forward never left
+  1.76-1.86 after October.
+
+### What this does not show
+
+- **C2 has little power here.** It can tell a re-fit from 1.80 only when the walk-forward k has moved away from 1.80,
+  and it never did. C2 = 0 says that re-running #780's method date by date would not have changed the served number.
+  It does not say that a much larger k (2.3-2.6, the post-ship in-sample fit) would not have done better on those
+  dates. That claim rests on an in-sample fit to about two Saturdays whose per-date k spans 1.3-3.0, and it is not
+  established.
+- **The per-bucket spread is larger than any change of the single k:** early 2.91, mid 1.74, late 1.46. On <= 11-12,
+  #780's own per-bucket walk-forward gained -0.007 against the one k's -0.006 (`out\p0.txt`), about 0.001 more.
+  - LEAD, not this lane's: a per-progress k (or a k that falls with game progress) for NCAAF spreads.
+- **The engine:** the post-12-08 engine (#852 damping, #859 end game, if loaded) changes what k corrects. Re-fit after
+  it loads, as #780's raw k, on its own ticks.
+
+### What follows
+
+- **No code change:** `_SPREADS_PROB_SCALE_BY_SPORT["ncaaf"]` stays 1.80. No branch, no betting change, nothing
+  queued for a window.
+- **#780's re-fit script has a defect (the user's call):** `scripts/live_totals_width_fit.py` reads
+  `model_home_win_prob`, which on every post-load row of a tempered market (NBA / NCAAF totals, NBA / NCAAF / NCAAB
+  spreads) is the tempered number. Any re-fit owed under #780 must read `model_home_win_prob_unscaled`. The kit's
+  `psrc` is the fix, and it is not on main.
+- **Re-fit again:** after the 12-08 engine loads, or after a few more Saturdays (each adds about 10-14k states).

@@ -1644,6 +1644,15 @@ On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL 
   - PASS if the one-sided 95% lower bound clears 0.524 (hit >= 0.581). KILL if hit <= 0.524. INCONCLUSIVE extends once to 400 games.
   - Count any time with `PREREG_780=count`. Grade ONCE, at 200 games, with `PREREG_780=grade` (deadline 12-15).
   - The window starts at 11-13, not 11-10. Before registering, a default-mode run printed the cell over 11-02..11-12 (151 games, 0.596).
+- **NCAAF RAW SPREADS k RE-FIT, 11-24: KEEP 1.80** (pre-registered `bb87ed091` before any post-11-12 outcome; read 2:41 PM CST; NOTHING changes on the fleet, no branch, no betting change) `[2026-11-24, lane ncaaf-raw-spreads-k-refit, session 6bcf0cef; asked by session 4f0a5e3e after t859s's raw read of 2.31; .syndicate/findings_2026-11-24_ncaaf_raw_spreads_k_refit.md]`:
+  - Method: #780's own (`live_totals_width_fit.py`, spreads, ncaaf), every ledger date 10-01..11-21, run at nice 19 on the fleet. The kit `C:\tmp\t780k_ncaaf\fit.py` reproduces the shipped fit exactly (P0: 93,683 / 325, k 1.797).
+  - Result: 116,788 states / 449 games give k **1.872**, with a walk-forward gain of -0.007 +- 0.003 and model - market -0.001 -> -0.008. **The rule PASSES at 1.87.**
+  - **The gated post-ship check:** on 11-14..11-21 (22,576 states / 121 games), the walk-forward re-fit minus the served 1.80 is **+0.00000** (its k stayed 1.76-1.81). **So 1.80 is kept.** The served 1.80 still beats k=1 there by -0.011 +- 0.006.
+  - **The "rising k" is noise.** t859s's 2.31 and the 11-10..11-21 window here (2.58) are carried by two Saturdays and a handful of one-game weeknights. Single Saturdays ranged 1.30-3.00 before the load (10-24 was 3.00), and 11-21 read 2.81. Without 11-21, all dates read 1.815.
+  - **TRAP, for every #780 re-fit:** `live_totals_width_fit.py` reads `model_home_win_prob`, which is the TEMPERED number on every post-load row of a tempered market. Re-run unchanged on NCAAF spreads, it returns exactly 1.800, a false confirmation.
+    - A re-fit must read `model_home_win_prob_unscaled`. Rows with no market price hold the raw share; the AC point of that share is what the pricer would temper.
+    - The fix is the kit's `psrc`; it is NOT on main (the user's call). Owed re-fits: NBA / NCAAB spreads, NBA / NCAAF totals.
+  - **Lead:** the per-progress k (early 2.91 / mid 1.74 / late 1.46) dwarfs any change of the single k. Re-fit the raw k after the 12-08 engine loads.
 - **Detail:** `.syndicate/findings_2026-11-10_live_totals_grade.md`. Re-run on the fleet host (nice 19): `scripts/live_totals_grade.py` (totals, engine read) and `scripts/live_gameline_age_grade.py` (every market, by quote age).
 
 ### `#778` — **CLOSED 2026-11-11 (GOAL MET) — NBA GAMES SIMMED AFTER THE DAY'S SIM INDEX WAS WRITTEN CARRY NO PREGAME PROJECTION: `cards_sim_detail_<D>.json` written on D-1 with a partial slate was never rebuilt. FIX `54c43581d` LOADED 00:30:09Z 11-11; ADDING BRANCH OBSERVED 11-11 06:03Z (5 -> 10 games); run-log line `63e56dbb4` not loaded** `[2026-11-10, lane nba-sim-index-missing-games, session 2ba5509d]`
