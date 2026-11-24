@@ -57,3 +57,46 @@ So after CHANGE P every Kalshi live position is a Suggested row, as designed. Th
 - Kalshi: 2 positions, 2 Suggested on the board, 0 from the floor.
 - Polymarket: 0 positions.
 - The probe returned rc 0 in 9.5 s, and every step after it returned rc 0.
+
+## Polymarket: 2 Suggested rows in paper2, 0 in the live plan -- HYPOTHESIS (11:28 AM CST)
+
+User 11-24: "trace the Polymarket one too".
+
+**The reading.** At 10:31 AM, Polymarket's paper2 sized 2 positions, both matching Suggested board rows, but its live plan held 0 positions from 21 rows. The live plan's top refusals were `aggregator_priced` 8, `below_min_ev_pct` 8 and `below_min_ev_pct_net_of_fee` 4.
+
+**Hypothesis H-S2.** Both rows are refused by `placeable_refusal` (`pipeline/portfolio_commit.py:177`) as `aggregator_priced`:
+- their `price_source` is not `venue_feed`;
+- so paper2 prices them at an aggregator's quote for Polymarket, not at Polymarket's own book;
+- this is by design: live places only at the venue's own price and contract.
+
+**Falsification.** Run the fleet's own `placeable_refusal` on each of the 2 paper2 positions, and read the LIVE_PLAN_WRITTEN line's `paper2_placeable` and `paper2_placeable_missing`. Any of these proves H-S2 wrong:
+- `None` for either row, which would make it placeable and missing from the live plan, the regression that line exists to catch;
+- `no_venue_contract`;
+- the rows being dropped for another reason.
+
+### RESULT (11:29 AM CST): H-S2 CONFIRMED. The rows were never placeable live, because aggregator prices refused them
+
+**The window.** refresh-worker's logs hold 48 Polymarket LIVE_PLAN_WRITTEN lines for 11-24, from 7:40 to 11:29 AM CST (13:40-17:29Z). The 2:30-7:40 AM builds are not in those files.
+
+**Builds by paper and live counts:**
+
+| builds | paper2 positions | paper2 placeable | missing from live | live positions | window (CST) |
+|---|---|---|---|---|---|
+| 41 | 2 | 0 | 0 | 0 | 7:40 AM - 11:06 AM |
+| 2 | 1 | 0 | 0 | 0 | 8:06 - 8:09 AM |
+| 5 | 0 | 0 | 0 | 0 | 11:11 - 11:29 AM |
+
+The fleet's own self-check (`paper2_placeable`, computed by `placeable_refusal` from the output) found 0 of paper2's Polymarket positions placeable in any of the 43 builds that had one. 0 were placeable and missing, so the live plan dropped nothing it should have kept.
+
+**Why they were not placeable: `aggregator_priced`, by elimination.**
+- The live plan runs `placeable_refusal` on the same scoped rows paper2 sizes, and folds each refusal into `refusals`.
+- A position fails it only as `aggregator_priced` (no `venue_feed` price) or `no_venue_contract` (no ticker).
+- `aggregator_priced` appeared in 48 of 48 builds, at 4-8 rows a build. `no_venue_contract` appeared in 0 of 48.
+
+**Live read at 11:24 AM CST, the newest build.** Polymarket's paper2 had 0 positions, so the 2 rows had left paper2. For comparison, Kalshi's paper2 had 2 positions, both `venue_feed` with a ticker and placeable, and 1 of them was in its live plan. The other was refused in sizing (`zero_kelly_stake` 1 / `below_min_stake` 2 in its live refusals). That case needs no explanation: the live plan sizes against its own cap and budget.
+
+**Reading.** This is by design. paper2 records a Suggested row at whatever Polymarket quote the board has, even an aggregator's. Live places only at Polymarket's own price with its own contract id (`placeable_refusal`'s docstring). So "Polymarket lists N Suggested rows -> M positions at its price" on the panel counts paper positions that live could never take.
+
+**Leads, not followed:**
+- `aggregator_priced` is 4-8 of Polymarket's ~20 scoped rows in every build. That is a venue-feed coverage gap, whose owner was not checked.
+- The panel could show paper2's placeable count next to its positions. This needs `venue_ticker` in the reader's compact row; tooling only.
