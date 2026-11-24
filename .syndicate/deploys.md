@@ -63203,3 +63203,25 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - A: `git revert 04d199abe` + claimed ff + a drained refresh-worker TERM.
   - Whole env: restore the EARLIEST backup above.
 - **Claims:** released after this entry and the register rows were pushed.
+
+## 2026-11-24 15:43:16Z (9:43:16 AM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): `/rail-watch` serves the Claude-free Rail Watch page from the data root, `2b191302f` (lane `rail-watch-fleet-page`, user 11-20 "Page on the fleet app" to "Where should the self-updating dashboard live?", whose option read "Needs a small web route and a web reload, a not-betting deploy") -- **LOADED on web; MET**
+- betting change: no (a read-only display route; web places, sizes, holds and exits no bets)
+- **What:** `syndicate/blueprints/rail_watch.py` reads `<data root>/reports/rail_watch/index.html`, which the Windows task `SyndicateRailWatch` writes every 20 min (10:03 AM-2:03 AM CST). It does no computation and no fleet calls; a missing file returns a 404 page. It is `Cache-Control: no-store`. 2 lines in `syndicate/app.py` (import + `register_blueprint`). Cherry-pick of `a9e95a7b8` (branch `rail-watch-route`, built 11-20 and held until after the 11-24 window batch) onto `e7b0c09be`, no conflict. `tests/test_rail_watch_route.py` 4 passed.
+- **Gate 0:** the 11-24 batch had finished (deploys.md 08:30:10Z entry: fleet head `672a18e87`, every role up, claims released).
+- **Ride-alongs `672a18e87..2b191302f`** (6 commits), listed before the merge:
+  - `7bec0901f` (lane `board-split-memory-guard`): `scripts/pytest_rss_watch.py` + `scripts/run_ci_suite.py`. Only `local_production.py ci-run` (the nightly ci-suite, in its own checkout) reaches them; no role imports either. Tooling (a); its owner wrote that it "reaches the nightly ci-suite at the next fleet ff".
+  - The rest is ledger (`cc8da92e0`, `be4fa3a62`, `963b573a3`, `e7b0c09be`) and this change.
+  - Overlap with the fleet checkout's 14 locally modified data files: none (vendor/ empty).
+- **Claim** web, holder `rail-watch-fleet-page`, acquired 15:42:48Z. **Preflight** from the worktree at origin/main `2b191302f`, `--betting-change no`, 2 expect / baseline pairs (baseline read 15:42:26Z): **CLEAR 15:43:02Z**, rc 0.
+- **ff + reload:**
+  - Head checked = `672a18e87`, ancestor checked, `git merge --ff-only 2b191302f` at **15:43:16.748Z**.
+  - `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "state": "done"}` (venv python).
+  - Workers 1132937 / 1133172 -> **1135586 / 1135587**, both `WEB_GC_TUNED applied`; master 753703 unchanged.
+- **expect / measured** (15:43:37Z):
+  - `rail_watch_status` 404 -> **200**: **MET**.
+  - `rail_watch_content_type` text/html -> **text/html; charset=utf-8**, 285,011 B, 27 ms, `no-store`: **MET**.
+  - The served page reads "updated Tue Nov 24, 1:44 AM CST", the newest tick in `C:\tmp\railmon\railwatch\tick.log` (07:44:23Z, n=47): **MET**.
+  - **LAN:** `http://10.0.0.199:10000/rail-watch` returned 200 from this PC. The path: Windows portproxy 10.0.0.199:10000 -> 127.0.0.1:10000 and the firewall rule "Syndicate local web (LAN)" (TCP 10000, LocalSubnet, Private; Wi-Fi is Private). Not tested from a second device. The route has no login, so any device on the local subnet can read it.
+  - **Harm:** web.log since the reload: 0 Tracebacks, 0 WORKER TIMEOUT (read 15:44:22Z).
+- **verify:** the 10:03 AM CST tick rewrites the data-root copy, and `/rail-watch`'s "updated" stamp then reads 10:0x AM CST.
+- **Revert:** `git revert 2b191302f` on main, then a claimed ff + reload-web.
