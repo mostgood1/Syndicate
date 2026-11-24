@@ -851,6 +851,7 @@ def alignment(fleet: Mapping[str, Any], orders: Sequence[Mapping[str, Any]], rai
     sides = {align_key(r, False) for r in rows}
     games = {(str(r.get("event_id") or ""), str(r.get("market") or "").strip().lower()) for r in rows}
     suggested = [r for r in rows if r.get("suggested")]
+    suggested_keys = {align_key(r) for r in suggested}
     live = [o for o in orders if o.get("mode") == "live"]
     today_orders = [o for o in live if str(o.get("selected_date") or "") == today]
     bought = {align_key(o) for o in today_orders}
@@ -871,7 +872,12 @@ def alignment(fleet: Mapping[str, Any], orders: Sequence[Mapping[str, Any]], rai
         venues[v] = {
             "live_plan_at": lp.get("generated_at"), "live_plan_absent": bool(lp.get("absent")) or not lp,
             "live_rows_in": lp.get("rows_in"), "live_positions": len(pos),
-            "live_positions_suggested": sum(bool(p.get("suggested")) for p in pos),
+            # BY THE BOARD, not by a flag on the position: a plan position never carries `suggested` (it is built
+            # from the identity fields plus a carried block), and the floor tag only ever writes False. So the old
+            # count read 0 on every reading, and 11-24 it said "0 Suggested" of 2 Kalshi positions that were both
+            # Suggested board rows (findings_2026-11-24_portfolio_monitor.md, H-S1).
+            "live_positions_suggested": sum(align_key(p) in suggested_keys for p in pos),
+            "live_positions_floor": sum(p.get("live_ev_floor") == 0 for p in pos),
             "live_refusals_top": dict(collections.Counter(lp.get("refusals") or {}).most_common(3)),
             # paper2 runs the same gates over the Suggested rows alone, at this venue's own price.
             "suggested_listed": p2.get("rows_in"),
@@ -934,7 +940,8 @@ def render_alignment(al: Mapping[str, Any]) -> list[str]:
     for v, x in (al.get("venues") or {}).items():
         lines.append(f"    {v}: lists {x.get('suggested_listed')} of the Suggested rows -> {x.get('suggested_positions')}"
                      f" positions at its price {x.get('suggested_refusals')}; live plan {x.get('live_positions')}"
-                     f" positions ({x.get('live_positions_suggested')} Suggested) from {x.get('live_rows_in')} rows,"
+                     f" positions ({x.get('live_positions_suggested')} Suggested on the board now,"
+                     f" {x.get('live_positions_floor')} from the 0% floor) from {x.get('live_rows_in')} rows,"
                      f" top refusals {x.get('live_refusals_top')}")
     n = ot.get("orders") or 0
     same = ot.get("same_row") or 0

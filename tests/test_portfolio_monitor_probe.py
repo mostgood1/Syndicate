@@ -359,6 +359,28 @@ def test_alignment_classifies_orders_and_counts_the_board_plans_and_rail():
     assert "model edge 1/2 (50.0%)" in text
 
 
+def test_a_live_position_is_suggested_by_the_board_row_not_by_a_flag_it_never_carries():
+    # 2026-11-24 (H-S1): the reader's `compact` writes suggested=False on every plan position, because a position
+    # carries no `suggested` key, so the old count read "0 Suggested" of 2 Kalshi positions that were Suggested rows.
+    fleet = {
+        "board": {"rows": [_row("e1", "h2h", "home", suggested=True), _row("e2", "totals", "over", 200.5)]},
+        "plans": {
+            "live_kalshi": {"rows_in": 19, "positions": [
+                _row("e1", "h2h", "home", suggested=False),                                       # a Suggested row
+                {**_row("e2", "totals", "over", 200.5, suggested=False), "live_ev_floor": 0},     # floor-admitted
+                _row("e7", "h2h", "away", suggested=False),                                       # not on the board now
+            ]},
+            "live_polymarket": {"absent": True},
+        },
+    }
+    al = pm.alignment(fleet, [], {}, "2026-11-24", NOW)
+    k = al["venues"]["kalshi"]
+    assert (k["live_positions"], k["live_positions_suggested"], k["live_positions_floor"]) == (3, 1, 1)
+    assert al["board"]["suggested_in_live_plan"] == 1
+    assert "3 positions (1 Suggested on the board now, 1 from the 0% floor) from 19 rows" in "\n".join(
+        pm.render_alignment(al))
+
+
 def test_alignment_without_a_board_says_so_and_renders_the_error():
     al = pm.alignment({"board": {"error": "no shortlist for 2026-11-17"}, "plans": {}}, [_order()], {}, "2026-11-17", NOW)
     assert al["orders_today"]["board_read"] is False
