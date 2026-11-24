@@ -2004,3 +2004,18 @@ behind the anchor's switch?"):
   `tests/test_ncaaf_live_resim_wiring.py` run ahead of it (alias resolution returns None, as if an empty team
   registry were cached). A lead for the alias test's owner.
 - Pushing it is the user's call. Pushed, it is inert until the anchor itself loads in a window.
+
+**CAVEAT ON THE 2.37, 2026-11-24 2:49 PM CST (post hoc; it reverses no gate, and it is why the push is held):** the raw re-fit lane
+(`ncaaf-raw-spreads-k-refit`, `.syndicate/findings_2026-11-24_ncaaf_raw_spreads_k_refit.md`, read on main) fitted
+#780's method on every ledger date, 10-01..11-21:
+- The raw k on all dates is **1.872**, on a flat surface (log loss 0.6629 at both 1.872 and 1.80). Without 11-21 it is
+  1.815. Its gated check against the served 1.80 reads +0.00000.
+- **This lane's window, 11-09..11-23, is the window that reads high.** It holds two Saturdays (11-14 k 1.63, 11-21 k
+  2.81) and one-game weeknights that each sit at the fit's 3.00 bound (11-10, 11-11, 11-13, 11-18, 11-19, 11-20).
+  Single Saturdays ranged 1.30-3.00 before the load. That is why the raw k here read 2.31 against 1.87 on all dates.
+- **On identical states the anchored k is the raw k plus 0.05** (2.37 against 2.31). So the anchor barely moves the k,
+  and the 2.37 most likely carries the same short-window noise. The long-window anchored k cannot be fitted yet:
+  ticks with the full margin histogram exist only from 11-09.
+- **What follows:** without an NCAAF anchored entry, an anchored lane gets the raw table's 1.80, which sits on that
+  flat surface. `d8d0af0b7` (branch `ncaaf-anchored-spreads-k`) stays unpushed. Re-fit the anchored k on a longer tick
+  window, and on the 12-08 engine's own ticks, before the anchor loads.
