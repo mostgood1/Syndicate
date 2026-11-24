@@ -42,7 +42,12 @@
     - That number is the current fair plus the model's edge vs its own market reading: `identity` on every pregame row, no curve.
     - Replay over 1,725 fleet rows: Win%-vs-edge misses 1,004 -> 2 (both railed at 1.0); opposite-side cards 9 -> 0; sentence != Win% 0.
     - Accuracy: W vs E Brier +0.00001 [-0.00016, +0.00018] on 53,474 graded rows (448 games, 11-10..11-23); both lose to the market fair by +0.0033.
-    - Classed a betting change for the load (the evaluation ledger's field changes basis). NOT queued for any window: 12-08 at the earliest, the user's call. Findings "One model number per card".
+    - Classed a betting change for the load (the evaluation ledger's field changes basis). Findings "One model number per card".
+    - **QUEUED for the 12-08 window** (user "Queue for 12-08", 2026-11-24 ~11:25 AM CST).
+      - ONE GLOBAL line `SYNDICATE_LAYER2_ONE_MODEL_NUMBER=on`; droppable; betting change yes.
+      - Kit `C:\tmp\w1208_onenum\kit_env_onenum.sh` (self-tested PASS; real file check: ABSENT on all roles).
+      - Reader `C:\tmp\w1208_onenum\read_after_load.py`, rc 3 = not loaded. BEFORE reading 17:29Z: Win%-vs-edge misses 1,678 of 3,906 pregame cards, opposite sides 46. Predicted after: 0 / 0 / 0.
+      - Nothing loads it automatically: it goes into the 12-08 window's batch.
   - `row_explainer` now quotes the sim's own `p_model_raw` under "Our sim has". It names the board's number as the market's (blend weight 0), as weighted, or as calibrated.
   - Replay over the fleet's 21:00Z shortlist: 1,088 of 1,765 pregame explainers (62%; NBA 1,047) had put another number under the sim's name.
   - Runs in the board build on refresh-worker; display only. Findings "Step 1b".

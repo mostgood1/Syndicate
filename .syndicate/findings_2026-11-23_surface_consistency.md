@@ -446,6 +446,28 @@ optimizer readings of that field see E from then on: a break in the series, expe
 grade the same. So it loads only in a window. It is NOT in any window's queue: queuing it (12-08 at the
 earliest) is the user's call.
 
+**QUEUED FOR THE 12-08 WINDOW `[2026-11-24 ~11:25 AM CST]`.** The user was asked "Queue the one-number switch for
+the 12-08 window?" and answered "Queue for 12-08". Nothing loads it automatically; it goes into the 12-08 window's
+batch (Tue 12-08 2-7 AM CST, one ff + one drained full down/up).
+- **Line:** ONE GLOBAL line, `SYNDICATE_LAYER2_ONE_MODEL_NUMBER=on`, in `~/syndicate-prod/local_production.env`.
+  Global so that whichever role builds cards uses one number. The code `d25f49964` is on main, absent = off.
+- **Kit:** `C:\tmp\w1208_onenum\kit_env_onenum.sh check|apply|restore <backup>`. It prints only this key and is
+  idempotent; `apply` backs the file up first.
+  - Self-test `kit_selftest_onenum.sh` PASSED 11-24 11:2x AM CST on a dummy file: apply appends, a repeat is
+    idempotent, mode 600 kept, restore exact, real file untouched.
+  - A read-only `check` on the real file: key ABSENT in the file and in all three role envs.
+- **Droppable:** a failed step restores its own backup and drops this change only, never the batch.
+- **Betting change: yes** (classed conservatively; see above). Register it at the load with
+  `betting_change.py add --kind yes --loaded-at <role pickup UTC>`.
+- **Reader:** `C:\tmp\w1208_onenum\read_after_load.py`, read-only. Exit codes: 0 = MET, 1 = violated, 2 = blind,
+  3 = NOT LOADED (no card stamped `model_probability_basis=model_edge`).
+  - BEFORE reading, 2026-11-24 17:29:22Z on the 16:53:59Z build: 3,906 pregame cards; Win%-vs-edge misses 1,678;
+    opposite sides 46; stated board numbers != Win% 0 of 583; stamped 0, so NOT LOADED (rc 3).
+    Saved: `C:\tmp\w1208_onenum\reading_before_1124.json`.
+  - Predicted after the load: stamped > 0; P1 (stamped) = P2 = P3 = 0. Unstamped misses only on rows railed at 0/1.
+- **Reading owner:** lane `surface-consistency-oversight`, or whoever runs the batch, on the first board build after
+  the up.
+
 **Post-window `plan_vs_orders`** (15:54Z, for lane `live-ev-floor-off`; not judged here):
 - 11 live orders today, none of their position keys in the current 19-position plan.
 - 9 join a board row, and 1 of the 9 is Suggested NOW. Today's orders include ones placed before the 08:30Z up,
