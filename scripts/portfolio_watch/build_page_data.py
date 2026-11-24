@@ -123,6 +123,8 @@ def _align_fields(r: dict) -> dict:
     for v, x in (al.get("venues") or {}).items():
         out[f"al_{v}_listed"] = x.get("suggested_listed")
         out[f"al_{v}_listed_positions"] = x.get("suggested_positions")
+        # The fleet's own placeable verdict on those positions (11-24, H-S2); None on readings before it existed.
+        out[f"al_{v}_listed_placeable"] = x.get("suggested_placeable")
         out[f"al_{v}_live_positions"] = x.get("live_positions")
         out[f"al_{v}_live_suggested"] = x.get("live_positions_suggested")
     return out

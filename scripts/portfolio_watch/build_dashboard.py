@@ -295,7 +295,7 @@ td.num { text-align:right; white-space:nowrap; }
     if (last.al_suggested == null) { at("Alignment", "—", "no alignment reading yet"); return; }
     at("Board picks bought", of(last.al_suggested_bought, last.al_suggested),
       "Suggested rows bought today; " + v(last.al_suggested_planned) + " in a live plan now",
-      "Kalshi lists " + v(last.al_kalshi_listed) + ", " + v(last.al_kalshi_listed_positions) + " clear its price · Polymarket lists " + v(last.al_polymarket_listed) + ", " + v(last.al_polymarket_listed_positions) + " clear");
+      "Kalshi lists " + v(last.al_kalshi_listed) + ", " + v(last.al_kalshi_listed_positions) + " clear its price, " + v(last.al_kalshi_listed_placeable) + " placeable live · Polymarket lists " + v(last.al_polymarket_listed) + ", " + v(last.al_polymarket_listed_positions) + " clear, " + v(last.al_polymarket_listed_placeable) + " placeable live");
     at("Today's orders on the board", last.al_board_read === false ? "—" : of(last.al_same_row, last.al_orders_today),
       "same row now: " + v(last.al_same_row_suggested) + " Suggested, board EV > 0 on " + v(last.al_same_row_ev_pos) + ", model edge > 0 on " + v(last.al_same_row_me_pos),
       "other side only " + v(last.al_other_side) + " · other line " + v(last.al_other_line) + " · off board " + v(last.al_off_board));
