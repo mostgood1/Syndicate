@@ -2108,6 +2108,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - GOAL VERDICT 2026-11-23 7:10 PM CST. Goal (verbatim): "scripts/_base_url.admin_token never returns wsl.exe's error text as the fleet token: a non-zero wsl rc or a token that is not printable ASCII reads as '' after one retry, a failure is not cached, and portfolio_monitor_probe.py reports a single TOKEN anomaly and exits non-zero instead of eight ENDPOINT anomalies with rc 0" -- GOAL: MET. Readings: tests/test_base_url.py 33 passed, the probe and Portfolio Watch tests 32 passed (65 together). A forced WSL failure (no such distro) through the real probe gave rc 3 in 3.5 s with one TOKEN anomaly. The real token gave rc 0 and 8 of 8 endpoints. The scheduled 7:04 PM run, the first on the new code, logged probe rc 0, 8 of 8 endpoints and the page-data suffix 'probe-failed readings left out 1'. Lead H-T3 (the :04 runs' token read takes ~25-30 s) moved to lane portfolio-monitor; each reading now records `token_read`.
 
+### nfl-level-refit-load — OPEN — opened 2026-11-24 — session 0cf600c8-378a-4942-aaba-a7e90777f5ac
+- Goal: 11-24 window batch: load the NFL profile nfl-813-refit-v3h0.03-t0.925 (touchdown multiplier 0.825 -> 0.925, branch refit/nfl-level-t0.925 12034bf24) and the #834 NBA live total anchor env key (LIVE_ODDS_WORKER__SYNDICATE_NBA_LIVE_TOTAL_ANCHOR=on) and the #842 look-ahead env keys (REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_LANE_WAIT=on, REFRESH_WORKER__SYNDICATE_LOOK_AHEAD_48H_ENABLED=false) and the #844 grid key (SYNDICATE_BOOK_GRID_NEWEST_BY_TIME=on, global) and the #851 slate key (LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND=1) and the #853 web shared board copy key (WEB__SYNDICATE_COMBINED_BOARD_SHARED_COPY=1) and the #854 college orientation key (SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION=on, global) and the #856 hold-value exit shadow key (LIVE_ODDS_WORKER__SYNDICATE_EXIT_HOLD_VALUE=shadow) on the fleet with one claimed ff and one drained full down/up (users: Yes, that window / Yes, in 11-24 / merge the two into one down/up / Fix day 1, retire day 2 / Yes, add it, 2026-11-18 / Queue for 11-24, 2026-11-19 / Ride along next restart, 2026-11-19 / Queue for 11-24, 2026-11-20 / Yes, ride 11-24, 2026-11-20); verified by a fresh process reading the new NFL version, the keys in live-odds-worker's, refresh-worker's and web's environ, every role booting after the ff, and 0 tracebacks
+- Files: data/calibration/nfl_profile.json, tests/test_nfl_calibration_profile_artifact.py
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: see the goal; one deploys.md entry with betting change yes, one register row per loaded change, inside the window
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
