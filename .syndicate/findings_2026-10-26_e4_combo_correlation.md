@@ -510,3 +510,4 @@ found after the run, from the run's own per-combo file.
   - Then a new pre-registered amendment that takes each combo's last print before its earliest leg's start.
   - That changes a fleet job, so it was not done in this lane.
 - **(e) TAKEN 2026-10-30** (user: "Yes, all four"): Amendment A5 in the pre-registration (`41cb8aba`) re-reads Stage 2 on the last pregame print per side; the capture's shaped trade read is `8a0a83dc` (lane `e4-pregame-prints`, `#740` (e)).
+- **(e) A5 READ 2026-11-24** (scheduled task `e4-a5-pregame-print-read-1124`): NO_EDGE_SHOWN at the last pregame print. YES NO EDGE in soccer GL (-14.7% [-25.0, -4.5], 805 combos / 169 games) and NBA SP-nested (-6.1% [-21.2, +9.0], 246 / 106); NO INSUFFICIENT everywhere; MLB 0 combos; no extension owed. See `findings_2026-11-24_e4_a5_pregame_prints.md`.
