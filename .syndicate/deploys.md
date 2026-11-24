@@ -63225,3 +63225,25 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - **Harm:** web.log since the reload: 0 Tracebacks, 0 WORKER TIMEOUT (read 15:44:22Z).
 - **verify:** the 10:03 AM CST tick rewrites the data-root copy, and `/rail-watch`'s "updated" stamp then reads 10:0x AM CST.
 - **Revert:** `git revert 2b191302f` on main, then a claimed ff + reload-web.
+
+## 2026-11-24 15:57:59Z (9:57:59 AM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): web GC tuning REVERTED to CPython's own by default `76a006f45` (lane `web-silent-worker-kills`, user "Yes, revert it") -- **LOADED on web; MET**
+- betting change: **no** (BC-072). Revert / risk reduction: only which garbage collections run inside web's worker processes; web places, sizes, holds and exits no bets.
+- **What:** `SYNDICATE_WEB_GC_AUTO_FULL` now defaults ON (absent / 1 / on = CPython's automatic full collections). Only 0 / false / off / no applies the 11-23 tuning (`05a2ce65e`, BC-058). The key is in no fleet env layer (`local_production.env`, `fleet_env/web.json`, `fleet_role_spec.json`: 0 lines, read 15:55Z), so the code default decides.
+- **Why:** reading 2 of the 14:17:09Z 11-23 entry. The tuning removed every full collection, but stalls of 5 s or more stayed 3 against 3. A tuned worker 5 min old reached ~9.7 GB and was killed by the kernel OOM killer at 1:28:53 PM CST 11-23, the only SIGKILL without a `WORKER TIMEOUT` since 11-01. Not attributed; the timing points at the tuning, and with full collections off only a recycle frees old cyclic garbage.
+- **Ride-alongs** (`2b191302f..76a006f45`, listed before the merge): `gunicorn.conf.py`, `tests/test_gunicorn_conf.py`, and ledger text only.
+- **Tests:** `tests/test_gunicorn_conf.py` 84 passed / 3 skipped (Windows). off != on over absent / "" / 1 / true / ON / yes / garbage against 0 / false / OFF / no; on the real collector a growing heap runs >= 1 full collection by default and 0 tuned.
+- **Locks:**
+  - Claim web 15:56:55Z (holder `web-silent-worker-kills`, ACQUIRED, rc 0).
+  - Baseline 15:57:36Z (scratchpad `wsk_revert_base.sh`): fleet head `2b191302f`, healthz 200. Since 14:00Z: 9 boots, 9 `WEB_GC_TUNED` applied true, 9 fast exits with 0 generation-2 collections, 0 generation-2 `WEB_GC_PAUSE`.
+  - Preflight `--service web --target-commit 76a006f45 --betting-change no`, from a worktree at origin/main, 4 expect / baseline pairs: **CLEAR 15:57:48Z**.
+- **ff + reload:** `git merge --ff-only 76a006f45` at **15:57:59Z** (`2b191302f230` -> `76a006f4550c`). `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "max_latency_s": 0.01, "state": "done"}`. Workers 1138107, 1138282 -> 1139177, 1139178.
+- **expect / measured:**
+  - fleet head `76a006f45`: **MET** (15:58:14Z).
+  - `WEB_GC_TUNED` applied false on every new worker: **MET**. 1139177 and 1139178 at 15:57:59Z: `"applied": false`, `"after": [700, 10, 10]`, `"reason": "SYNDICATE_WEB_GC_AUTO_FULL"`.
+  - Full collections run again: **MET**. The first generation-2 `WEB_GC_PAUSE` came at 15:58:34Z (+35 s, pid 1139177, 0.255 s), and 8 more by 15:58:50Z (0.26-0.98 s). The two retired tuned workers took the fast exit with `gc_collections` [291, 27, 0] and [1059, 96, 0]. Scratchpad `wsk_revert_watch.sh`.
+  - healthz 200: **MET**.
+- **verify (owed, next reading):**
+  - Kills per CST day, counting BOTH `WORKER TIMEOUT` kills and `was sent SIGKILL` with no timeout before it, against 11-23's 0 + 1.
+  - Generation-2 pause seconds per day back to the 11-20..11-22 range (1,910-3,039 s).
+  - This is one change on its own. The quiet-worker memory check (user 11-23 "Yes, after the reading") is built and loaded separately.
+- **Claim released** 16:00:00Z.

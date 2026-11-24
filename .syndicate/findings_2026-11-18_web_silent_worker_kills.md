@@ -637,3 +637,9 @@ Read-only at nice 19. Scratchpad: `wsk_gctune_overnight.sh`, `wsk_recycle_hourly
   - or both.
 
   Land and load nothing until the 11-24 window batch (08:15Z) has pushed its target and done its down/up.
+
+## 2026-11-24 10:05 AM CST (16:05Z) -- the GC tuning is reverted (user "Yes, revert it")
+
+- `76a006f45` makes CPython's automatic full collections the default again (`SYNDICATE_WEB_GC_AUTO_FULL` absent = on; 0 / off = the tuning). LOADED by reload-web at 9:57:59 AM CST, BC-072 no. Deploy entry: `deploys.md` `## 2026-11-24 15:57:59Z`.
+- Measured: both new workers logged `WEB_GC_TUNED` applied false with thresholds [700, 10, 10], and the first full collection ran 35 s after the load (9 generation-2 pauses of 0.26-0.98 s by +51 s).
+- Still owed: kills per CST day after the revert, counting both kinds (`WORKER TIMEOUT`, and `was sent SIGKILL` with no timeout before it). The quiet-worker memory check is the next change, loaded on its own.
