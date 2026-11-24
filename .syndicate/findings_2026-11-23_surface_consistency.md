@@ -596,6 +596,19 @@ assert updated: `test_cheat_sheet_section_rules_v2.py`, `SECTION_RULES == 4`. Th
 
 **How it loads.** The builder is a script: a fleet ff loads it at the next scheduled sheet build, and the blurbs reach web
 at a `reload-web` or a recycle. An ff ships ALL of main. When to load it is the user's call.
+- On main at `6ca19e36c`. The fleet is at `76a006f45`, 45 commits behind. An ff now would also ship other lanes' work:
+  `gunicorn.conf.py`; the ops dashboards blueprint, whose lane `ops-dashboards-hub` recorded the user's "wait for that
+  lane"; and `ncaaf/live_margin_anchor.py`. So this step does not ff the fleet itself.
+- **Ride-along class for whoever runs the next ff:** display only, betting change NO. Nothing that places or sizes money
+  reads a cheat sheet.
+- **Reader:** `C:\tmp\scc_oversight_d5aa\read_1c_after_load.py <day>`, read-only, the served sheets. It counts rows whose
+  verdict is "value" while their own `suggested` (stamped by the same build) is False, so it has no age confound.
+  Exit codes: 0 MET, 1 violated, 2 blind, 3 not loaded (no v4 sheet).
+  - BEFORE, 2026-11-24 20:34:13Z, sheets built 17:30-17:35Z, all rules 3: value-not-suggested 4 of 723 rows (NBA 2,
+    NCAAB 2; NHL, NCAAF and soccer 0; no NFL sheet on a Tuesday); suggested-not-value 0. rc 3.
+    Saved: `C:\tmp\scc_oversight_d5aa\reading_1c_before_1124.txt`.
+  - Predicted: on the first full day of v4 sheets, every sheet `section_rules` 4 and value-not-suggested 0. The load
+    day itself is mixed, because rows kept from earlier builds keep their v3 verdicts.
 
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
