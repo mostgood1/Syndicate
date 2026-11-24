@@ -63221,7 +63221,7 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - `rail_watch_status` 404 -> **200**: **MET**.
   - `rail_watch_content_type` text/html -> **text/html; charset=utf-8**, 285,011 B, 27 ms, `no-store`: **MET**.
   - The served page reads "updated Tue Nov 24, 1:44 AM CST", the newest tick in `C:\tmp\railmon\railwatch\tick.log` (07:44:23Z, n=47): **MET**.
-  - **LAN:** `http://10.0.0.199:10000/rail-watch` returned 200 from this PC. The path: Windows portproxy 10.0.0.199:10000 -> 127.0.0.1:10000 and the firewall rule "Syndicate local web (LAN)" (TCP 10000, LocalSubnet, Private; Wi-Fi is Private). Not tested from a second device. The route has no login, so any device on the local subnet can read it.
+  - **LAN:** `http://10.0.0.199:10000/rail-watch` returned 200 from this PC. The path: Windows portproxy 10.0.0.199:10000 -> 127.0.0.1:10000 and the firewall rule "Syndicate local web (LAN)" (TCP 10000, LocalSubnet, Private; Wi-Fi is Private). The user confirmed it from their side at ~9:54 AM CST 11-24: "it works". The route has no login, so any device on the local subnet can read it.
   - **Harm:** web.log since the reload: 0 Tracebacks, 0 WORKER TIMEOUT (read 15:44:22Z).
 - **verify:** the 10:03 AM CST tick rewrites the data-root copy, and `/rail-watch`'s "updated" stamp then reads 10:0x AM CST.
 - **Revert:** `git revert 2b191302f` on main, then a claimed ff + reload-web.
