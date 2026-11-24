@@ -1858,3 +1858,74 @@ takeover note, because two lanes claiming one file block every edit.
 3. The spreads k re-fit on anchored margins.
 
 **PUSHED 2026-11-24 10:35 AM CST** (user "Yes, push it"): rebased onto main and pushed as `cf12ae61f`, the same change as `c5fb62165`. None of the code it depends on had changed on main, and the anchor and #835 tests pass on the rebased tree (75 of 75). The switch is absent on every role, so the next fleet ff carries it inert: not a betting change until the switch loads in a window.
+
+## SPREADS-k RE-FIT ON ANCHORED MARGINS — PRE-REGISTRATION, written 2026-11-24 11:46 AM CST before any outcome was read
+
+The user said "Yes, re-fit it" (2026-11-24). **Nothing changes on the fleet.** The result is a value for the join's
+NCAAF spread tempering on ANCHORED lanes. Putting it in code, and loading it with the anchor, is the user's call.
+
+**Why.** `live_gameline_join` tempers NCAAF live full-game spread probabilities by k = 1.80 (#780,
+`Phi(Phi^-1(p) / k)`). That k was fitted on raw margins. The market anchor removes part of the over-confidence it
+absorbed (`model_engine_standard.md` 4.4), and an anchored NCAAF lane gets the same 1.80 today. The as-built read at
+the PREGAME line put the best k near 1.2 anchored against 1.5 raw. That read was post hoc and had no live lines.
+
+**Substrate: production, 2026-11-09..11-23, all of it.**
+- `live_evidence/ncaaf` ticks: every published lane, with its full margin histogram, state, `as_of` and sims.
+- The NCAAF live gameline ledger's full-game spreads and h2h states: the live line, the market's fair probability, and
+  the model's unscaled probability.
+- The join: the ledger row goes to its tick by join key and `live_state_as_of`, straight orientation only.
+- Finals come from ESPN (`live_totals_width_fit.finals_margin`), in the ledger's home orientation.
+- 11-15..11-22 are read: the blind window's verdict file exists (11-24 11:22 AM CST; it was not opened).
+
+**The anchor, replayed with its own code** (export of main `cf12ae61f`, `C:\tmp\t859s\code`):
+- `closing_home_margin_for` on the fleet's quote log.
+- E0 = `resim_live_game` at kickoff on that week's blend ratings (`_ncaaf_inseason_blend_index` + the generator's
+  `sp_league_means` / `sp_offense_defense_rating`, as the tick builds them). The week is the projections week that
+  lists the game.
+- Then `anchor_lane`. Spreads are re-priced with the join's own `price_distribution_market` and then its Agresti-Coull
+  point; moneylines with `agresti_coull_point`. k = 1 throughout.
+- **The engine is production's as it ran** (every `SYNDICATE_NCAAF_LIVE_*` switch absent). The anchor would load on the
+  12-08 engine (#852 damping + #859 end game); its ticks do not exist yet.
+
+**Instrument (gated; read before this was written, no outcome read):**
+- Joined: 32,349 ledger states (25,753 spreads, 6,596 h2h) over 136 games, with nothing dropped.
+- The raw re-price equals the ledger's probability: `INSTRUMENT spreads: 25753 of 25753`; `INSTRUMENT h2h: 6596 of 6596` (v7: the unscaled Agresti-Coull point; v6 spreads:
+  the raw share).
+- Anchor inputs: `154 of 158 game-days anchored; none: {'no_week': 4}`; `offset (close - E0): mean +3.32, mean |.| 4.07`. The engine's kickoff margin sits a mean 3.3 points BELOW the market's home margin.
+- Re-anchored: 31,895 joined states.
+
+**Fit (#780's method, `live_totals_width_fit`):** the log-loss probit k on [0.70, 3.00] over every graded anchored
+spreads state (push excluded). Walk-forward by ledger date from the 3rd date: fit on the earlier dates, score the next,
+and take the Brier change against k = 1, game-clustered.
+
+**RULE (gated, #780's own):**
+- The anchored NCAAF spreads k = the fitted k (2 dp) when the walk-forward gain is <= -0.003 Brier AND model - market
+  Brier at the fitted k is not worse than at k = 1.
+- Otherwise k = 1.00 (anchored lanes untempered).
+- The value would land as an NCAAF entry in `_SPREADS_PROB_SCALE_ANCHORED_BY_SPORT`, which touches only anchored lanes
+  (they exist only with the switch on), as NBA's 1.57 did.
+
+**Reported, not gated:**
+- The RAW k on the same states, as a substrate check against 1.80.
+- Anchored at the picked k minus today's raw at 1.80, on the same states (in-sample).
+- The anchored MONEYLINE against raw and against the market on these production ticks, overall and by the share of
+  regulation left. This is the first read of the anchor on production's own ticks; its gate was on the CFBD replay.
+
+**Predictions (not gates):**
+- P1: the raw k on this window is in [1.5, 2.1].
+- P2: the anchored k is below the raw k, in [1.0, 1.5].
+- P3: the rule passes.
+- P4: the anchored moneyline beats raw on these ticks (point estimate < 0).
+
+**Pins** (sha256, first 16 characters; full list in `C:\tmp\t859s\pins.sha256`; checked before the run):
+
+| file | sha256 |
+|---|---|
+| `s_replay.py` | `aad05c1b8f27b1a7` |
+| `code/syndicate/features/ncaaf/live_margin_anchor.py` | `09f85c0a08056fb2` |
+| `code/syndicate/features/shared/live_gameline_join.py` | `eafca9127518b871` |
+| `code/syndicate/features/ncaaf/live_resim.py` | `2bd483adcc80c0a2` |
+| `code/scripts/live_totals_width_fit.py` | `09c40c044bce58cb` |
+| `code/scripts/live_totals_grade.py` | `ab6c3fc85ef06647` |
+| `code/scripts/run_refresh_worker.py` | `8b44fcde43a475b7` |
+| `code/scripts/generate_smartsim2_ncaaf_projections.py` | `68217bfe5a87947c` |
