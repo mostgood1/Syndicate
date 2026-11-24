@@ -5,8 +5,25 @@ Todo #780, candidate fix 2 (user 2026-11-13 "Fit it now"). Findings: .syndicate/
 
 The transform: P_k(over) = Phi(Phi^-1(P) / k). Widening a normal predictive distribution by k around its own mean
 divides every line's z by k, so this is the width fix with the mean left alone (an estimator, model_engine_standard
-4.4; it adds no mechanism). k = 1 is today's probability. P is the ledger's `model_home_win_prob` (P(over) on a
-totals row, the Agresti-Coull point the join priced).
+4.4; it adds no mechanism). k = 1 is the engine's probability. P is the ENGINE's number (`fit_prob`, P_SOURCE below):
+P(over) on a totals row, the Agresti-Coull point the join priced, before any transform the join applied after it.
+
+P_SOURCE (lane width-fit-engine-prob, user 2026-11-24 "Yes, land it"). Since the #780 scales loaded (totals 17:55:57Z
+11-13, spreads 20:18:40Z 11-13), `model_home_win_prob` on every row of a tempered market that reached the pricer is the
+TEMPERED number, so reading it fits k on numbers k has already tempered. Measured on NCAAF spreads through 11-21: the
+old read returns exactly the shipped 1.800 where the engine's number gives 1.894 -- a false confirmation
+(`.syndicate/findings_2026-11-24_ncaaf_raw_spreads_k_refit.md`).
+  engine    (default) `model_home_win_prob_unscaled` (before #780's k) where present, else
+            `model_home_win_prob_uncalibrated` (before #816's college totals calibration, on a row k left at 1), else the
+            recorded number. A row that says it was transformed (`prob_scale` != 1, or `total_cal`) with no engine
+            number beside it is dropped and counted (`no_engine_probability`). Identical to the recorded read on every
+            row written before the 11-13 loads, so the shipped fits reproduce exactly.
+  ac        as engine, and a row refused BEFORE the point estimator (no market price: it holds the raw share k/n) is
+            replaced by the join's own `agresti_coull_point(share, sims_run)`: the number the pricer would temper.
+  recorded  `model_home_win_prob` as recorded (this script before 2026-11-24).
+Not recoverable from the ledger: #847's per-cell live calibration (`SYNDICATE_CELL_CALIBRATION_LIVE_PROB`, absent =
+off; absent on every fleet layer 2026-11-24) keeps its uncalibrated number on the verdict only, not in the ledger. If it
+loads, rows it touched carry the calibrated number under every source here.
 
 Population: the fleet's live gameline ledgers, totals / full rows with a model probability and a line (priced or
 not: this is the model's calibration, not the board's), one row per (event_id, live_state_as_of, line), matched to the
@@ -26,7 +43,8 @@ mean is `model_margin_mean`, and progress is points scored over the model's own 
 Run on the fleet host (nice 19):
     wsl -d Ubuntu-24.04 -- nice -n 19 python3 /mnt/c/<repo>/scripts/live_totals_width_fit.py </dev/null
     env: SPORTS=ncaab,nba (default ncaab,wncaab,nba,ncaaf), UNTIL=<ledger date, inclusive> (default 2026-11-12), FROM=<ledger date, inclusive>,
-         MARKET=totals|spreads|h2h (default totals), ESPN_CACHE=<dir> (default /mnt/c/tmp/livegrade/espn)
+         MARKET=totals|spreads|h2h (default totals), ESPN_CACHE=<dir> (default /mnt/c/tmp/livegrade/espn),
+         P_SOURCE=engine|ac|recorded (default engine; above)
 """
 import glob
 import json
@@ -47,6 +65,10 @@ FROM = os.environ.get("FROM") or "0000-00-00"
 MARKET = (os.environ.get("MARKET") or "totals").strip().lower()
 if MARKET not in ("totals", "spreads", "h2h"):
     raise SystemExit(f"MARKET must be totals, spreads or h2h, not {MARKET!r}")
+P_SOURCES = ("engine", "ac", "recorded")
+P_SOURCE = (os.environ.get("P_SOURCE") or "engine").strip().lower()
+if P_SOURCE not in P_SOURCES:
+    raise SystemExit(f"P_SOURCE must be one of {', '.join(P_SOURCES)}, not {P_SOURCE!r}")
 BUCKETS = (("<0.40", 0.0, 0.40), ("0.40-0.75", 0.40, 0.75), (">=0.75", 0.75, 99.0))
 K_LO, K_HI = 0.70, 3.00
 SQ2 = math.sqrt(2.0)
@@ -132,6 +154,41 @@ def finals_margin(sport, d):
     return out
 
 
+_AC_POINT = []
+
+
+def _agresti_coull_point(p, sims):
+    """The join's own estimator (`live_gameline_join.agresti_coull_point`), imported on first use: only P_SOURCE=ac
+    needs the app package on the path."""
+    if not _AC_POINT:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from syndicate.features.shared.live_gameline_join import agresti_coull_point
+        _AC_POINT.append(agresti_coull_point)
+    return _AC_POINT[0](p, sims)
+
+
+def fit_prob(r, source=None):
+    """The probability a k is fitted on for one ledger row (P_SOURCE in the module docstring), or None when the row
+    has no usable one: transformed with no engine number recorded beside it, or (ac) no sim count."""
+    source = source or P_SOURCE
+    if r.get("model_home_win_prob") is None:
+        return None
+    if source == "recorded":
+        return float(r["model_home_win_prob"])
+    if r.get("model_home_win_prob_unscaled") is not None:
+        return float(r["model_home_win_prob_unscaled"])
+    if r.get("prob_scale") not in (None, 1, 1.0):
+        return None
+    if r.get("model_home_win_prob_uncalibrated") is not None:
+        return float(r["model_home_win_prob_uncalibrated"])
+    if r.get("total_cal") is not None:
+        return None
+    p = float(r["model_home_win_prob"])
+    if source == "ac" and r.get("point_estimator") != "agresti_coull":
+        return _agresti_coull_point(p, r.get("sims_run"))
+    return p
+
+
 def ledger_home_margin(r, entry):
     """Final margin in the LEDGER's home orientation, or None when the orientation is ambiguous
     (live_gameline_age_grade.ledger_home_margin)."""
@@ -205,7 +262,10 @@ def load(sport):
         if F == ln:
             drop["push"] += 1
             continue
-        p = float(r["model_home_win_prob"])
+        p = fit_prob(r)
+        if p is None:
+            drop["no_engine_probability"] += 1
+            continue
         mt = r.get("model_total_mean")
         mean = r.get("model_margin_mean") if margin else mt
         pf = r.get("market_fair_prob")
@@ -259,7 +319,7 @@ def report(sport):
         print(f"\n## {sport}: no graded states on ledger dates <= {UNTIL}")
         return
     dates = sorted({x["date"] for x in rows})
-    print(f"\n## {sport} {MARKET}: ledger dates {dates[0]}..{dates[-1]} ({len(dates)}), states {n_states}, graded {len(rows)} / "
+    print(f"\n## {sport} {MARKET} [P_SOURCE={P_SOURCE}]: ledger dates {dates[0]}..{dates[-1]} ({len(dates)}), states {n_states}, graded {len(rows)} / "
           f"{len({x['g'] for x in rows})} games (priced {sum(x['priced'] for x in rows)}); dropped {dict(drop)}")
 
     print("   progress   states games  final-mean  err sd  implied sd  ratio   k(in-sample)   (final-line) = a + b(mean-line), resid sd")
