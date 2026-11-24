@@ -166,6 +166,71 @@ def skill_note(model_skill: Mapping[str, Any] | None) -> str | None:
     return None
 
 
+# ----------------------------------------------------------------------------- the board's own judgement (rules v4)
+# One pick, one fee and one model number per line (todo #861 step 1c, lane surface-consistency-oversight, user "Yes,
+# do 1c" 2026-11-24). Measured 2026-11-24 20:11Z on the 1,081 pregame board rows a sheet builds from, run through this
+# file at the same instant: the fair is the board's own `quote.fair_probability`, and the net EV equals the board's
+# `score_v2.ev_net_pct` on 1,081 of 1,081. What differed was the LABEL. "Value" (net EV >= 2) sat on 12 rows the board
+# refused to suggest: 6 with a stale quote and 6 whose fair came from one book. So from rules v4, a row the board judged
+# is "value" only when the board suggests it, and the sheet's fee and model number are the board's.
+BOARD_REFUSAL_WORDS = {
+    "suspect_stale_quote": "the quote looks stale",
+    "single_book_fair": "its fair price comes from one book only",
+    "books_quoting_unknown": "the number of books quoting it is unknown",
+    "implausible_book": "the book's prices do not add up",
+    "not_opportunity_lane": "it is outside the board's opportunity lane",
+    "other_side_suggested": "the board suggests the other side of this line",
+    "no_fair_method": "it has no fair-price method",
+    "one_sided_fair": "it is a one-sided market",
+    "no_market_ev": "it has no market EV",
+    "ev_below_min": "its EV is below the board's minimum",
+    "ev_net_of_fee_below_min": "its EV after the fee is below the board's minimum",
+}
+
+
+def board_judgement(row: Mapping[str, Any]) -> tuple[bool, list[str]] | None:
+    """(suggested, reasons) as the Layer 2 board stamped them (`layer2_board._stamp_suggested`), or None for a row the
+    board never judged: one the builder rebuilt from the quote logs for a game that started before any sheet priced it
+    (`build_cheat_sheets.quote_rows`, `rebuilt`). Those keep the price rule."""
+    reasons = row.get("suggested_reasons")
+    if not isinstance(reasons, list) or "suggested" not in row:
+        return None
+    return bool(row.get("suggested")), [str(r) for r in reasons]
+
+
+def board_refusal_text(reasons: Sequence[str]) -> str:
+    words = [BOARD_REFUSAL_WORDS.get(r, r.replace("_", " ")) for r in reasons]
+    return "; ".join(words) if words else "no reason given"
+
+
+def board_fee(row: Mapping[str, Any], book: Any, price: Any) -> float:
+    """The fee the board's net EV was taken at (`score_v2.fee_per_contract`), so the sheet's EV is the board's. A row
+    without it (a rebuilt row) uses the same lookup through `taker_fee`."""
+    v2 = row.get("score_v2")
+    if isinstance(v2, Mapping):
+        fee = v2.get("fee_per_contract")
+        if isinstance(fee, (int, float)) and not isinstance(fee, bool) and fee >= 0:
+            return float(fee)
+    return taker_fee(row, book, price)
+
+
+def board_model_number(row: Mapping[str, Any]) -> float | None:
+    """The model probability the board's card shows for this row's side (`layer2_row_context.board_model_probability`,
+    Win%, which follows `SYNDICATE_LAYER2_ONE_MODEL_NUMBER`), so a sheet row and its card never show two numbers. A
+    rebuilt row carries no projection and gets None either way."""
+    from syndicate.features.shared.layer2_row_context import board_model_probability
+
+    p = board_model_probability(row)
+    return float(p) if isinstance(p, (int, float)) and not isinstance(p, bool) else None
+
+
+def _board_value(ev_m: float | None, judged: tuple[bool, list[str]] | None) -> bool:
+    """Rules v4: the board's pick where the board judged the row; the price rule (net EV >= VALUE_EV_PCT) otherwise."""
+    if judged is not None:
+        return judged[0]
+    return ev_m is not None and ev_m >= VALUE_EV_PCT
+
+
 @dataclass
 class PriceCheck:
     p_market: float | None
@@ -197,20 +262,28 @@ def price_check(row: Mapping[str, Any], form_values: Sequence[float] | None) -> 
     price = quote.get("price")
     p_market = quote.get("fair_probability")
     p_market = float(p_market) if isinstance(p_market, (int, float)) else None
-    p_model = side_prob(proj.get("model_prob_over"), side)
+    # The model number is the one the board's card shows (rules v4); a rebuilt row has no projection. Where the card
+    # shows NONE, the sheet keeps the projection's own number: measured 2026-11-24 20:27Z, the card is blank on 104 of
+    # 1,586 pregame props, every one a one-sided "yes" (NFL anytime TD 73, soccer scorers 31) that
+    # `layer2_board._model_prob_for_side` cannot place against a projection framed "over". A blank is not a second number.
+    p_model = board_model_number(row) if proj else None
+    if p_model is None:
+        p_model = side_prob(proj.get("model_prob_over"), side)
     form5 = form_record(form_values, line, side, 5)
     form10 = form_record(form_values, line, side, 10)
     p_post = consistency_posterior(p_market, form10["hits"], form10["games"])
     # Every EV here is NET of the venue's taker fee: the exchanges (Kalshi, Polymarket, ...) dominate the best prices,
-    # and the board's own Suggested rule is fee-net -- a gross EV would sell the fee as edge.
-    fee = taker_fee(row, quote.get("bookmaker"), price)
+    # and the board's own Suggested rule is fee-net -- a gross EV would sell the fee as edge. The fee is the board's.
+    fee = board_fee(row, quote.get("bookmaker"), price)
     ev_m, ev_mod, ev_post = ev_pct(p_market, price, fee), ev_pct(p_model, price, fee), ev_pct(p_post, price, fee)
+    judged = board_judgement(row)
     reasons: list[str] = []
     if fee:
         reasons.append(f"after the {quote.get('bookmaker')} fee ({100 * fee:.1f}c a contract)")
     streak = form5["games"] >= STREAK_MIN_GAMES and (form5["rate"] or 0) >= STREAK_RATE
     one_sided = (str(quote.get("fair_method") or "") in ONE_SIDED_FAIR_METHODS
                  or quote.get("assumed_hold_pct") is not None)
+    priced_in = ev_m is not None and ev_m >= VALUE_EV_PCT
     if one_sided:
         # A one-sided market (yes-only scorer / over-only shots) has no de-viggable pair: its "fair" assumes a hold and
         # was measured 8.5 pts overstated (findings_2026-09-21_layer2_score_outcomes.md). Never value; say why.
@@ -219,9 +292,13 @@ def price_check(row: Mapping[str, Any], form_values: Sequence[float] | None) -> 
     elif ev_m is not None and ev_m > SUSPECT_EV_PCT:
         verdict = "suspect_price"
         reasons.append(f"best price beats the fair by {ev_m:+.1f}% -- too big to trust: check the price is still up")
-    elif ev_m is not None and ev_m >= VALUE_EV_PCT:
+    elif _board_value(ev_m, judged):
         verdict = "value"
-        reasons.append(f"best price beats the fair by {ev_m:+.1f}%")
+        reasons.append(f"best price beats the fair by {ev_m:+.1f}%" if ev_m is not None else "the board suggests it")
+    elif priced_in and judged is not None and "suspect_stale_quote" in judged[1]:
+        verdict = "suspect_price"
+        reasons.append(f"best price beats the fair by {ev_m:+.1f}%, but the board flags the quote as stale: check the "
+                       "price is still up")
     elif streak and ev_post is not None and ev_post >= 0:
         verdict = "streak_with_room"
         reasons.append(streak_room_reason(form5["hits"], form5["games"], ev_post))
@@ -232,6 +309,9 @@ def price_check(row: Mapping[str, Any], form_values: Sequence[float] | None) -> 
                        f"{imp:.0%}" if imp else "streak, but no usable price")
     else:
         verdict = "neutral"
+    if priced_in and judged is not None and not judged[0] and verdict not in ("suspect_price", "one_sided_fair"):
+        reasons.append(f"best price beats the fair by {ev_m:+.1f}%, but the board does not suggest it: "
+                       f"{board_refusal_text(judged[1])}")
     if p_model is not None and p_market is not None and abs(p_model - p_market) * 100 >= MODEL_LEAN_PP:
         lean = "above" if p_model > p_market else "below"
         reasons.append(f"model {p_model:.0%} vs market {p_market:.0%} ({lean})")
@@ -298,30 +378,44 @@ GAME_MARKETS = ("spreads", "h2h", "totals")
 def game_line_check(row: Mapping[str, Any]) -> dict[str, Any]:
     """The price check for a spread / moneyline / total: best price vs the no-vig fair, net of the venue fee.
 
-    The model probability is the board's own calibrated number for THIS side (`model_probability_cal`, else raw); it
-    is shown, never the reason -- the game models were measured to trail the close (findings_2026-10-1[34]_*)."""
+    The model probability is the one the board's card shows for THIS side (`board_model_number`, rules v4; it was
+    `model_probability_cal` until then, which differed from the card's Win% by > 0.5 pp on 305 of 614 game lines
+    2026-11-24; where the card shows none, the row's own `model_probability_cal`, else raw); it is shown, never the
+    reason -- the game models were measured to trail the close
+    (findings_2026-10-1[34]_*). "Value" is the board's Suggested pick where the board judged the row (rules v4)."""
     quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
     price, book = quote.get("price"), quote.get("bookmaker")
     p_market = quote.get("fair_probability")
     p_market = float(p_market) if isinstance(p_market, (int, float)) else None
-    p_model = row.get("model_probability_cal")
-    if not isinstance(p_model, (int, float)):
-        p_model = row.get("model_probability_raw")
-    p_model = float(p_model) if isinstance(p_model, (int, float)) else None
-    fee = taker_fee(row, book, price)
+    p_model = board_model_number(row)
+    if p_model is None:                     # the card shows none: keep the row's own number (as for props above)
+        p_model = row.get("model_probability_cal")
+        if not isinstance(p_model, (int, float)):
+            p_model = row.get("model_probability_raw")
+        p_model = float(p_model) if isinstance(p_model, (int, float)) else None
+    fee = board_fee(row, book, price)
     ev_m, ev_mod = ev_pct(p_market, price, fee), ev_pct(p_model, price, fee)
     one_sided = str(quote.get("fair_method") or "") in ONE_SIDED_FAIR_METHODS or quote.get("assumed_hold_pct") is not None
+    judged = board_judgement(row)
+    priced_in = ev_m is not None and ev_m >= VALUE_EV_PCT
     reasons: list[str] = []
     if one_sided:
         verdict = "one_sided_fair"
     elif ev_m is not None and ev_m > SUSPECT_EV_PCT:
         verdict = "suspect_price"
         reasons.append(f"best price beats the fair by {ev_m:+.1f}% -- too big to trust: check the price is still up")
-    elif ev_m is not None and ev_m >= VALUE_EV_PCT:
+    elif _board_value(ev_m, judged):
         verdict = "value"
-        reasons.append(f"best price beats the fair by {ev_m:+.1f}%")
+        reasons.append(f"best price beats the fair by {ev_m:+.1f}%" if ev_m is not None else "the board suggests it")
+    elif priced_in and judged is not None and "suspect_stale_quote" in judged[1]:
+        verdict = "suspect_price"
+        reasons.append(f"best price beats the fair by {ev_m:+.1f}%, but the board flags the quote as stale: check the "
+                       "price is still up")
     else:
         verdict = "neutral"
+        if priced_in and judged is not None:
+            reasons.append(f"best price beats the fair by {ev_m:+.1f}%, but the board does not suggest it: "
+                           f"{board_refusal_text(judged[1])}")
     if fee:
         reasons.append(f"after the {book} fee ({100 * fee:.1f}c a contract)")
     if p_model is not None and p_market is not None and abs(p_model - p_market) * 100 >= MODEL_LEAN_PP:
@@ -390,7 +484,12 @@ def featurable(row: Mapping[str, Any]) -> bool:
 # game, biggest edges first. A player's picks move together: replay 10-15..11-12, NBA, a 2nd pick hit 73.1% when the 1st
 # won vs 33.9% when it lost. A player's 3rd+ pick returned +0.9% [-16.6, +18.7] (205 bets) against +8.3% / +10.0% for the
 # 1st / 2nd. Top 25 a day: no cap +7.6%, max 2 +9.6%, max 1 +7.2% (all within noise; the cap is for concentration).
-SECTION_RULES = 3
+# Version 4 (todo #861 step 1c, user "Yes, do 1c" 2026-11-24): a row's "value" verdict is the Layer 2 board's Suggested
+# pick wherever the board judged the row (`board_judgement`), so Value and "Game lines: value" can no longer feature a
+# line the board refused. The verdict is stored on each row at build time, so a past sheet keeps its own; the stamp
+# only marks where the series changes. Measured at the change: 12 of 1,081 pregame board rows lost "value" (6 stale
+# quotes -> "Check price", 6 one-book fairs). Every EV and fair is unchanged: they were already the board's.
+SECTION_RULES = 4
 SIM_EDGE_MIN = 0.05
 SIM_EDGE_PER_PLAYER = 2
 RETIRED_SECTIONS = {"hot_form": "2026-11-13"}

@@ -532,6 +532,71 @@ venue, where 3 of 30 venue-listed picks cleared +2% gross at 20:15Z (`portfolio-
 purchaser should be expected to buy very few rows after the load. That is a decision about what a pick is priced
 against, and it is the user's.
 
+## Step 1c -- the cheat sheet takes its pick, fee and model number from the board `[built 2026-11-24, user "Yes, do 1c"; display only; NOT LOADED]`
+
+**Measured first** (fleet, read-only, same instant). Rows: the 20:10:58Z all-sport board read (1,081 pregame rows a
+sheet builds from) and a 20:26:41-20:27:02Z per-sport read made the way the builder reads (2,761). Each row was run
+through the sheet's own `price_check` / `game_line_check`. Probes: `C:\tmp\scc_oversight_d5aa\probe_1c_sheet_vs_board.py`,
+`probe_1c_b.py`.
+- **Fair:** the board's own `quote.fair_probability` on every row.
+- **Net EV:** the sheet's equals the board's `score_v2.ev_net_pct` on 1,081 of 1,081. The board's EV COLUMN is gross
+  (`ev_pct`), so 359 exchange rows (Kalshi 181, Novig 83, Polymarket 53, ProphetX 42) show two EVs under one label.
+  That is the board's display, not the sheet's maths (D4; left for step 1e).
+- **So Reading 1's "same book, same price, different EV" was age plus the fee, not a second fair.** The sheets read at
+  20:11Z were built at 17:30-17:35Z.
+- **The pick label differed.** The sheet's own "value" (net EV >= 2, not one-sided, not above 10) fell on rows the board
+  refused to suggest:
+  - 20:11Z: 12 (6 `suspect_stale_quote`, 6 `single_book_fair`);
+  - 20:27Z: 14 (5 stale, 9 one-book).
+  Every Suggested row read "value". The sheet's `suggested` field is already a copy of the board's at build time.
+- **Model number:** props showed the card's Win% except on blank cards. Game lines showed `model_probability_cal`, which
+  differed from the card's Win% by > 0.5 pp on 305 of 614 lines (20:11Z).
+
+**The change** (`syndicate/features/shared/cheat_sheets.py`, rules v4; loans from lanes `cheat-sheets` and
+`cheat-sheet-section-optimization`, both owners gone):
+- `price_check` / `game_line_check`:
+  - "value" is the board's Suggested pick wherever the board judged the row (`board_judgement`).
+  - A refused row that clears the price says why: "... but the board does not suggest it: its fair price comes from one
+    book only". A stale quote reads "Check price" (`suspect_price`): "... the board flags the quote as stale".
+  - One-sided and above-10% still win over the board.
+- Rows the board never judged keep the price rule. These are the builder's `rebuilt` rows for games that started first.
+- **Fee:** the board's `score_v2.fee_per_contract`; the sheet's own lookup only without it.
+- **Model number:** the card's (`layer2_row_context.board_model_probability`), so the sheet follows the 12-08
+  one-number switch with the card.
+  - Where the card is blank, the sheet keeps its own number. Measured 20:27Z: the card is blank on 104 one-sided "yes"
+    props (NFL anytime TD 73, soccer scorers 31), because `_model_prob_for_side` cannot place "yes" against a projection
+    framed "over".
+- `SECTION_RULES` 3 -> 4 marks the series. Verdicts are stored per row, so past sheets keep theirs. The load day is mixed:
+  rows kept from earlier builds carry v3 verdicts under a v4 stamp, as on 11-13.
+- The page's Value and game-line Value blurbs say what v4 means (`cheat_sheets.html`).
+- Play cards and SGP legs that read "value" inherit it. Nothing that places or sizes money reads a sheet (checked by
+  `git grep`).
+
+**Pre-registered hypothesis** (lanes.md, before building): value-not-Suggested 0, Suggested-not-value 0, every EV
+unchanged on a judged row. **FALSIFIED AS WRITTEN on one clause**, replay `C:\tmp\scc_oversight_d5aa\replay_1c.py`
+(old = origin/main's module):
+
+| read | rows | value-not-Suggested old -> new | Suggested-not-value | EV changed | fair changed |
+|---|---|---|---|---|---|
+| 20:11Z | 1,081 | 12 -> 0 | 0 -> 0 | 1 | 0 |
+| 20:27Z | 2,761 | 14 -> 0 | 0 -> 0 | 1 | 0 |
+
+- The one EV is an NFL receptions line at Kalshi -144: old -0.46, new -0.47. The board's own net EV is -0.465, so both
+  are roundings of it. The board publishes its fee to 6 decimals, and that tips the second decimal. No verdict moves.
+- Model number at 20:27Z:
+  - props: 1,569 of 1,586 within 0.5 pp, 17 none either way, 0 lost;
+  - game lines: 379 moved > 0.5 pp to the card's Win%, 22 gained a number, 128 none either way.
+
+**Tests.** `tests/test_cheat_sheet_board_judgement.py`, 17 new, including reachability: the model number moves with the
+one-number switch, off != on. 249 pass across the 21 cheat-sheet, play-card, one-number and instrument suites. One old
+assert updated: `test_cheat_sheet_section_rules_v2.py`, `SECTION_RULES == 4`. The page script passes `node --check`.
+
+**Lead (not followed):** the board card shows no Win% on one-sided "yes" props (104 at 20:27Z), though
+`model_prob_over` is P(yes) there. That is `layer2_board._model_prob_for_side`, the board owner's file.
+
+**How it loads.** The builder is a script: a fleet ff loads it at the next scheduled sheet build, and the blurbs reach web
+at a `reload-web` or a recycle. An ff ships ALL of main. When to load it is the user's call.
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:

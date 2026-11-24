@@ -555,6 +555,10 @@ function sgpRecap(d, sgps) {
 // Section rules are versioned per sheet (`section_rules`, 2026-11-13): a past sheet reads under the rules it was built with.
 const rulesOf = d => (d && d.section_rules) || 1;
 const VALUE_V2 = "The best available price beats the no-vig fair price by 2% or more AND SmartSim projects this side at least 5% beyond the line. Measured Oct 15 - Nov 12, a price edge alone hit 4 points below its own fair over 871 bets, so Value now needs the sim to agree.";
+// Rules v4 (todo #861 step 1c, 2026-11-24): "value" is the board's own Suggested pick, so the sheet never features a line
+// the board refused (a stale quote, a fair price from one book).
+const VALUE_V4 = "The board suggests this bet: its best price beats the no-vig fair price by 2% or more after any exchange fee, the quote is fresh and the fair price comes from at least two books. SmartSim must also project this side at least 5% beyond the line. Measured Oct 15 - Nov 12, a price edge alone hit 4 points below its own fair over 871 bets, so Value needs the sim to agree.";
+const LINES_VALUE_V4 = "Spreads, moneylines and totals the board suggests: the best price beats the no-vig fair by 2% or more after any exchange fee, on a fresh quote with a fair price from at least two books. Pick a game for its full line card.";
 const SECTIONS = [
   ["value", "Value at the best price", "The best available price beats the no-vig fair price by 2% or more."],
   ["hot_streaks", "Hot streaks: already in the price", "Cleared this line in at least 4 of the last 5. We tested streaks like these across NFL, NBA and MLB: they hit about 2.6 points less often than the no-vig price says. A streak alone is not a bet; the EV shown is the price against the fair. Dots: the last 10 games on this line, newest first -- green cleared it, grey did not."],
@@ -810,6 +814,7 @@ function render() {
   html += SECTIONS.map(([key, title, blurb]) => {
     const ids = secs[key] || [];
     if (key === "value" && rulesOf(d) >= 2) blurb = VALUE_V2;
+    if (key === "value" && rulesOf(d) >= 4) blurb = VALUE_V4;
     if (!ids.length && key !== "value") return "";
     return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i], i)).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`
       + afterPost(after[key], later => `<div class="rowlist">${later.map(i => propRow(d.rows[i], i)).join("")}</div>`));
@@ -833,7 +838,7 @@ function render() {
   if (game) {
     if ((lineSecs.all || []).length) html += sectionShell("lines", "Game lines", "Spread, moneyline and total for this game: the best price against the no-vig fair, net of any exchange fee, with the model and the sim's projection as context.", `${lineSecs.all.length} lines`, linesWithAfter("all", false));
   } else {
-    if ((d.game_lines || []).length) html += sectionShell("lines_value", "Game lines: value at the best price", "Spreads, moneylines and totals where the best price beats the no-vig fair by 2% or more, net of exchange fees. Pick a game for its full line card.", `${(lineSecs.value || []).length} lines`, linesWithAfter("value", true));
+    if ((d.game_lines || []).length) html += sectionShell("lines_value", "Game lines: value at the best price", (rulesOf(d) >= 4 ? LINES_VALUE_V4 : "Spreads, moneylines and totals where the best price beats the no-vig fair by 2% or more, net of exchange fees. Pick a game for its full line card."), `${(lineSecs.value || []).length} lines`, linesWithAfter("value", true));
     if ((lineSecs.shop || []).length) html += sectionShell("lines_shop", "Game lines: shop the number", "Same game line, same side: the books disagree by 2 points or more of implied probability.", `${lineSecs.shop.length} lines`, linesWithAfter("shop", true));
   }
   if (!game) html += sectionShell("every", "Every prop on the sheet", "Every prop priced on this sheet. Click any column to sort -- L5 / L10 rank by hit rate, and a short sample sorts below a full one.", `${(secs.every_prop || []).length} props`, withAfter("every_prop", ids => everyTable(d, ids)));
