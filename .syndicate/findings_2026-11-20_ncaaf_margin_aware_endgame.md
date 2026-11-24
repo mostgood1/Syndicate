@@ -1601,3 +1601,128 @@ call).**
   to the market's pregame spread as the college basketball boards do. It would be fitted on this replay and checked on
   another season.
 - **Live spreads price the same margin, so a fix moves them too.** The paper spreads read +8.9% (se 10.5), not resolved.
+
+## IN-PLAY TEAM-STRENGTH RE-FIT — PRE-REGISTRATION, written 2026-11-23 7:49 PM CST before any arm was run on its states
+
+The user said "Yes, pre-register it" (2026-11-23), answering "Pre-register a re-fit of the live re-sim's team-strength
+gap?". **It changes nothing on the fleet.** A candidate that passes is a betting change: it would be built default-off
+and loaded in a window, and that is the user's call.
+
+**Two things in the diagnosis this design corrects:**
+- **The ratings.** The diagnosis ran on the season-end SP+ table, but production's live tick does not use it from week
+  4 on. `_run_ncaaf_live_resim_tick` swaps in the pregame generator's in-season blend for the game's week
+  (`_ncaaf_inseason_blend_index`, todo #678). That blend is stored per week on the fleet disk
+  (`ncaaf_source/historical_truth/sp_ratings_inseason_blend_2026.json`, weeks 4-13). It is shrunk toward last season
+  and the league, so the season table may spread teams further apart than production's ratings do. The diagnosis's
+  "production is likely worse" is therefore NOT safe: hindsight knows more, but it may also be more spread out. Every
+  arm here runs on the blend, and G0 re-reads the diagnosis on it.
+- **The lean.** `x_mean.py` picked the favourite from the ODD draws but averaged ALL draws, so half of its mean shared
+  that choice's Monte Carlo noise, and its +2.18 may be partly that noise. These runs keep every draw, and the lean is
+  re-measured on the EVEN draws only (reported, not gated).
+
+**Ratings, both seasons:** production's in-season blend for the game's week, through the generator's
+`sp_league_means` + `sp_offense_defense_rating` over that week's index, as the tick does.
+- **2026, the hold-out:** the entries production STORED for weeks 4-10, copied from the fleet disk (entries 11-13
+  were not copied).
+- **2025, the fit:** rebuilt (`r_blend.py`) with the generator's own `inseason_blend_index` from t859h's pinned
+  export. Inputs: prior SP+ 2024; CFBD `/ppa/games` 2025 weeks 1-9, on the generator's own query; the completed regular
+  games of weeks < N.
+- **The rebuild checked against production:** rebuilt the same way, 2026 matches the stored entries. The PPA row
+  counts are equal in all 7 weeks, and the per-team difference has a median of 0.017-0.031 raw SP+ points (max
+  0.40-1.83, with 2 to 7 teams a week over 0.05).
+- **Weeks 1-3 are left out:** production used an in-season SP+ then, and no copy of it exists.
+- **CFBD:** 25 calls for this (18 PPA weeks, 7 weeks of 2025 lines).
+
+**States:** `resume.build_tasks` unchanged, at t859w's six checkpoints; FBS-FBS regular season, weeks 4-10.
+- **2025:** 351 games and 2,088 states, from the primary tree's CFBD mirror (read only).
+- **2026:** 396 games and 2,376 states, from t859h's private truth, all before the 11-15..11-22 blind window. These
+  are games the diagnosis also used (its weeks 4-10). The ratings are different and the gain is fitted on 2025, but
+  the hypothesis came from these games.
+- Every game has both blend teams and a CFBD pregame line, the median of the providers' `spread` (median 3 books in
+  2025, 2 in 2026). Only counts were read.
+
+**Arms** (120 sims a state, resume's paired seed blocks):
+- `off`: production today (2026 only, for G0).
+- `h_eg`: the queued 12-08 engine, and the base of every candidate.
+- `h_eg_g<G>`, G in {0.55, 0.70, 0.85, 1.15}: a rating-DIFFERENCE gain on `h_eg`. Per component (offense, defense),
+  the two teams' level is kept and their difference is multiplied by G, after production's level shrink (0.3). This is
+  `total_level.shrink_rating_level`'s arithmetic turned on the difference. G = 1 is `h_eg`, run without the wrapper.
+- **ANCHOR:** `h_eg`'s draws, shifted by NCAAB's shipped live margin anchor (`ncaab/live_resim`, "margin anchor", user
+  2026-11-03).
+  - The shift is the game's pregame gap times the share of regulation still to play. The gap is the market's home
+    margin minus the live engine's own kickoff mean margin (arm `kick`: 0-0, Q1 15:00, both sides at their own 25,
+    as E0).
+  - At kickoff the anchored margin is the market's. There are no new sims and nothing to fit.
+
+**Instrument** (`r_verify.py`, `verify.txt`). On each season's blend ratings, the harness at production's seeds 1..120
+gives the BUILT live path's `home_win_prob` and total draws exactly:
+- `INSTRUMENT 2025 off: 48 states, 48 identical, 0 differ (home_win_prob and total draws)`; `INSTRUMENT 2025 h_eg: 48 states, 48 identical, 0 differ (home_win_prob and total draws)`;
+- `INSTRUMENT 2026 off: 48 states, 48 identical, 0 differ (home_win_prob and total draws)`; `INSTRUMENT 2026 h_eg: 48 states, 48 identical, 0 differ (home_win_prob and total draws)`.
+- The gain arithmetic: `GAIN ARITHMETIC 2025: 351 games x 5 gains, 0 failures`, and the same for 2026.
+
+**Reachability** (smoke, simulated quantities only):
+- Every gain arm changes the draws: in 2025 all four on 18 of 18 smoke states, and in 2026 (only the smoke's G* ran)
+  on 17 of 18. Each moves the sim's mean |margin| the expected way: in 2025, G 0.55 gives 12.82 and G 1.15 gives
+  14.98, against `h_eg`'s 14.36.
+- The anchor's shift is non-zero on every state.
+
+**Fit** (`r_fit.py`, 2025, base `h_eg`): G* is the G in {0.55, 0.70, 0.85, 1.00, 1.15} with the lowest full-state
+Brier of p_home (all draws, every state). If G* = 1.00, there is no gain candidate.
+
+**Hold-out** (`r_score.py`, 2026):
+- **G0, gated:** `off`'s favourites at [0.60, 0.90) are binned by the odd draws and scored by the even draws. The rule
+  is t859w's: OVER-CONFIDENT at diff <= -2 SE, UNDER-CONFIDENT at >= +2 SE, else CALIBRATED. This re-reads the
+  diagnosis on production's own ratings.
+- **G1, gated:** each candidate (the gain at G*, and ANCHOR) is compared with `h_eg` on the same states and seeds. It
+  PASSES only when all three hold:
+  - **(a)** full-state Brier of p_home, candidate - `h_eg`, paired: <= -2 SE (better);
+  - **(b)** the candidate's own headline diff: > -2 SE (not over-confident);
+  - **(c)** Brier of P(home covers the pregame line), candidate - `h_eg`, paired: < +2 SE. Live spreads price these
+    same margins, so a moneyline fix must not break them.
+- **RECOMMEND:** if both pass, the one with the lower 2025 Brier; if one passes, that one; if none, no re-fit.
+- **Reported, not gated:** band x phase tables, the clean (even-draw) lean, and the total's bias, for every arm.
+
+**Blind smoke:** the full script ran on 3 games a season into `C:\tmp\t859r\smoke`, and only line counts were read:
+`RUN_DONE=10 FIT_DONE lines=170 tracebacks=0 end=1 gstar_written=yes SCORE_DONE lines=99 tracebacks=0 end=1`. The smoke's own G* is visible in an output file name (3 games of the fit season); it gates nothing.
+
+**Predictions** (not gates):
+- **P1:** G0 reads OVER-CONFIDENT on production's ratings too, but by less than the diagnosis's -0.074.
+- **P2:** G* is 0.70 or 0.85.
+- **P3:** ANCHOR passes, and it beats the gain on the 2025 Brier. The market's pregame line beats every rating the
+  generator has tried (`football/pick_gate.py`: the blend is still +0.93 MAE behind the close).
+
+**What follows (each the user's call; nothing changes on the fleet now):**
+- **A PASS** is a betting change, built default-off and loaded in a window. It moves live spreads too. 12-08 already
+  holds the end game, and the next window is 12-22. Either way, a re-fit would first meet bowl games, which are a
+  different phase from the regular season it was fitted on.
+- **G0 CALIBRATED:** production's in-play moneyline is sound on its own ratings. The paper loss is then an execution
+  effect, or it comes from weeks 1-3.
+- **Nothing passes:** no re-fit, and the paper loss is still to be traced.
+
+**Pins** (sha256, first 16 characters; full list in `C:\tmp\t859r\pins.sha256`; `run_r.sh` checks them before the
+2025 runs, before the fit's 2026 runs and before the scorer):
+
+| file | sha256 |
+|---|---|
+| `r_arms.py` | `4974cabe5cf20d6f` |
+| `r_lib.py` | `bfdfb8712a45f0b0` |
+| `r_fit.py` | `4d4f24279d95d4f7` |
+| `r_score.py` | `35e2ba9cc7e4184e` |
+| `r_run.py` | `a5d31a95e19a7f72` |
+| `r_verify.py` | `dc5310267f28bdbf` |
+| `r_build.py` | `e89de818b8a4dc4e` |
+| `r_blend.py` | `19c9a7239b6822eb` |
+| `r_pull.py` | `033fa187c3ae4350` |
+| `r_reach.py` | `c51f14d31a0d8cc7` |
+| `run_r.sh` | `15ef46faef9e11bf` |
+| `verify.txt` | `f69be9ce38eaf163` |
+| `tasks_2025r.json` | `be969f4835f276cb` |
+| `tasks_2026r.json` | `332f12da9b7c5b90` |
+| `blend_2025.json` | `eebea94d020a00f8` |
+| `blend_2026_stored.json` | `d9d5ec364198c4aa` |
+| `smoke/summary.txt` | `ac844ae833f93d46` |
+| `/c/tmp/t859h/h_arms.py` | `aa41e98e905c307c` |
+| `/c/tmp/t852/resume.py` | `ef89b077310a777c` |
+| `/c/tmp/t859h/code/syndicate/features/ncaaf/live_resim.py` | `2bd483adcc80c0a2` |
+| `/c/tmp/t859h/code/scripts/generate_smartsim2_ncaaf_projections.py` | `68217bfe5a87947c` |
+| `/c/tmp/w1208_ncaaf/kit_env_ncaaf.sh` | `4f31d0ac2b4888b5` |
