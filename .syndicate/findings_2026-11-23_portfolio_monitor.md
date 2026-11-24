@@ -270,3 +270,49 @@ it parsed sets it. Traced, read-only:
 **Verdict: no unguarded path.** If anyone edits the key, the place is `fleet_env/refresh-worker.json`, followed by a
 drained full down/up (or a role-scoped `REFRESH_WORKER__` line in `local_production.env`, which wins over the
 snapshot).
+
+## The 6:04 PM reading's token failure -- HYPOTHESIS (written 2026-11-23 6:29 PM CST, before testing)
+
+Flag from the fleet-watcher (session local_379fd729): in the 6:04 PM reading (`20261124T000432Z`) all 8 endpoint reads
+failed with `ValueError: Invalid header value b'A\x00 \x00c\x00o\x00n...'`, the reading counted 8 anomalies, and
+`run.log` still logged `probe: rc 0`.
+
+- **H-T1.** `scripts/_base_url._read_fleet_token` returns `wsl.exe`'s own error text as the token. It keeps `stdout`
+  whatever the return code, and validates nothing. When WSL fails to connect, `wsl.exe` writes its error message to
+  stdout in UTF-16, and `text=True` decodes that as cp1252: every other character is a NUL. The probe then sends that as
+  the `X-Admin-Token` header, and urllib refuses it. The failure was transient: the same run's log and alignment reads
+  through WSL succeeded.
+- **H-T2.** The probe never checks the token, and `main()` returns 0 unconditionally, so `run.log`'s `rc` cannot show a
+  failed reading.
+- **Falsified if** `wsl.exe` with an unreachable target exits 0, or does not write a NUL-laden message to stdout. Then
+  the garbage came from somewhere else, for example the env file itself.
+
+### RESULT (2026-11-23 6:34 PM CST): H-T1 and H-T2 hold; fixed (lane `fleet-token-read-guard`)
+
+**Reproduced the failure class without the real token.** The token reader's exact argv was run against a distro that
+does not exist: `wsl.exe` returned rc 4294967295 and a 482-character stdout full of NULs, with stderr empty. The old
+reader returned that text. The same run's log and alignment reads through WSL succeeded, so the failure was transient
+and hit only the first WSL call.
+
+**The fix:**
+- `scripts/_base_url._read_fleet_token`:
+  - A non-zero `wsl.exe` rc, or output that is not printable ASCII without whitespace (`_plausible_token`), reads as
+    `""`.
+  - It retries once after 3 s.
+  - A failure is no longer cached, so a long-running caller recovers. A success is still read once per process.
+  - The real token passes the shape check (checked with booleans only).
+- `scripts/portfolio_monitor_probe.py`: with no token, it reads nothing. It writes ONE `TOKEN` anomaly and a
+  `probe_failed: token` reading, and exits 3, so `run.log` shows `probe: rc 3`.
+- `scripts/portfolio_watch/build_page_data.py`: a `probe_failed` reading stays out of the charts and the performance
+  table; its anomaly shows only while it is the newest reading. Installed in `C:\SyndicateProd\portfolio_watch`.
+- The 6:04 PM reading is tagged `probe_failed: token` in `readings.jsonl`, with a backup
+  `readings.jsonl.before_tag_0604`. The day's anomaly count no longer carries its 8 ENDPOINT lines.
+
+**Measured:**
+- Tests: `tests/test_base_url.py` 32 passed; `tests/test_portfolio_monitor_probe.py` + `tests/test_portfolio_watch.py`
+  32 passed.
+- Forced failure (`SYNDICATE_FLEET_WSL_DISTRO=NoSuchDistro-xyz`) through the real probe: rc 3 in 3.5 s, one anomaly,
+  one reading.
+- Real token: rc 0, 8 of 8 endpoints 200, and the one standing GATE anomaly.
+- The scheduled 6:34 PM reading (still the old code) was clean: rc 0, 8 of 8, the GATE anomaly only.
+- The fix reaches the scheduled task at the primary tree's next fast-forward.

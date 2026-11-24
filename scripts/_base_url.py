@@ -50,10 +50,10 @@ in `scripts/`.
 
 from __future__ import annotations
 
-import functools
 import os
 import subprocess
 import sys
+import time
 import urllib.parse
 from collections.abc import Iterable
 from pathlib import Path
@@ -165,24 +165,70 @@ def fleet_admin_token() -> str:
     return _read_fleet_token(env_file, distro, sys.platform == "win32")
 
 
-@functools.lru_cache(maxsize=4)
+_WSL_TOKEN_ATTEMPTS = 2
+_WSL_RETRY_DELAY_S = 3.0
+_FLEET_TOKENS: dict[tuple[str, str, bool], str] = {}
+
+
+def _plausible_token(value: str) -> bool:
+    """A token is printable ASCII with no whitespace. `wsl.exe`'s own error text is not: it
+    is UTF-16, so decoded as text every other character is a NUL."""
+    return bool(value) and all(0x21 <= ord(c) <= 0x7E for c in value)
+
+
 def _read_fleet_token(env_file: str, distro: str, through_wsl: bool) -> str:
-    """One read per (file, distro) per process: `wsl.exe` costs ~1 s to start."""
-    if not through_wsl:
-        return _env_file_value(Path(os.path.expanduser(env_file)), "ADMIN_TOKEN")
+    """One SUCCESSFUL read per (file, distro) per process: `wsl.exe` costs ~1 s to start.
+
+    A failed read ("") is not cached, so a long-running caller recovers at its next call.
+    """
+    key = (env_file, distro, through_wsl)
+    if _FLEET_TOKENS.get(key):
+        return _FLEET_TOKENS[key]
+    if through_wsl:
+        value = _read_fleet_token_through_wsl(env_file, distro)
+    else:
+        value = _env_file_value(Path(os.path.expanduser(env_file)), "ADMIN_TOKEN")
+    if value:
+        _FLEET_TOKENS[key] = value
+    return value
+
+
+_read_fleet_token.cache_clear = _FLEET_TOKENS.clear  # type: ignore[attr-defined]  # the reset tests call
+
+
+def _read_fleet_token_through_wsl(env_file: str, distro: str) -> str:
+    """The token through `wsl.exe`, or "". Retried once after a failed `wsl.exe`.
+
+    A non-zero `wsl.exe` return code, or output that is not a plausible token, reads as "".
+    Measured 2026-11-23 6:04 PM CST: one WSL connection attempt failed. `wsl.exe` wrote its
+    error message to STDOUT in UTF-16, and this reader returned that message as the token.
+    Portfolio Watch sent it as `X-Admin-Token`, and urllib refused all 8 requests.
+    Reproduced with a distro that does not exist: rc 4294967295, a 482-character stdout
+    full of NULs, and an empty stderr.
+    """
     # Only the one line crosses the boundary. `~` is expanded by the shell, so it
     # stays outside the quotes; the rest of the path is passed as an argument.
     rest = env_file[2:] if env_file.startswith("~/") else env_file
     prefix = '"$HOME"/' if env_file.startswith("~/") else ""
     command = f"grep -m1 '^ADMIN_TOKEN=' {prefix}\"$1\" | cut -d= -f2-"
-    try:
-        out = subprocess.run(
-            ["wsl.exe", "-d", distro, "-e", "sh", "-c", command, "sh", rest],
-            capture_output=True, text=True, timeout=90,
-        ).stdout
-    except (OSError, subprocess.SubprocessError):
-        return ""
-    return _unquote(out or "")
+    for attempt in range(_WSL_TOKEN_ATTEMPTS):
+        if attempt:
+            time.sleep(_WSL_RETRY_DELAY_S)
+        try:
+            proc = subprocess.run(
+                ["wsl.exe", "-d", distro, "-e", "sh", "-c", command, "sh", rest],
+                capture_output=True, text=True, timeout=90,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if proc.returncode != 0:
+            continue
+        value = _unquote(proc.stdout or "")
+        if not value:
+            return ""  # WSL answered and the file has no ADMIN_TOKEN line: a retry reads the same
+        if _plausible_token(value):
+            return value
+    return ""
 
 
 def admin_token(

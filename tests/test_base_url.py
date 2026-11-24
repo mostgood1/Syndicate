@@ -113,6 +113,7 @@ def test_fleet_target_reads_through_wsl_on_windows(clean_env):
     calls = []
 
     class Done:
+        returncode = 0
         stdout = '"fleet-tok"\n'
 
     def fake_run(argv, **kwargs):
@@ -129,6 +130,61 @@ def test_fleet_target_reads_through_wsl_on_windows(clean_env):
     assert argv[:4] == ["wsl.exe", "-d", "Ubuntu-24.04", "-e"]
     assert argv[-1] == "syndicate-prod/local_production.env"
     assert "ADMIN_TOKEN" in argv[-3]
+
+
+# wsl.exe's own error, as `text=True` decodes it: UTF-16, so every other character is a NUL
+# (the 6:04 PM 2026-11-23 Portfolio Watch reading sent exactly this shape as X-Admin-Token).
+WSL_ERROR_TEXT = "A connection attempt failed".encode("utf-16-le").decode("latin-1")
+
+
+def _scripted_wsl(monkeypatch, results):
+    """Fake `wsl.exe` runs, returning (returncode, stdout) from `results` in order."""
+    calls = []
+
+    class Proc:
+        def __init__(self, rc, out):
+            self.returncode, self.stdout = rc, out
+
+    def fake_run(argv, **kwargs):
+        calls.append(argv)
+        return Proc(*results[len(calls) - 1])
+
+    monkeypatch.setattr(_base_url.sys, "platform", "win32")
+    monkeypatch.setattr(_base_url.subprocess, "run", fake_run)
+    monkeypatch.setattr(_base_url, "_WSL_RETRY_DELAY_S", 0.0)
+    monkeypatch.setenv("SYNDICATE_FLEET_ENV_FILE", "~/syndicate-prod/local_production.env")
+    return calls
+
+
+def test_a_failed_wsl_read_is_empty_not_the_error_text_and_is_not_cached(clean_env):
+    calls = _scripted_wsl(clean_env, [(4294967295, WSL_ERROR_TEXT)] * 2 + [(0, "fleet-tok\n")])
+    assert admin_token(FLEET_BASE_URL) == ""
+    assert len(calls) == 2, "retried once"
+    assert admin_token(FLEET_BASE_URL) == "fleet-tok", "a failure is not cached: the next call reads again"
+    assert admin_token(FLEET_BASE_URL) == "fleet-tok" and len(calls) == 3, "a success is cached"
+
+
+def test_a_transient_wsl_failure_recovers_on_the_retry(clean_env):
+    calls = _scripted_wsl(clean_env, [(1, WSL_ERROR_TEXT), (0, "'fleet-tok'\n")])
+    assert admin_token(FLEET_BASE_URL) == "fleet-tok"
+    assert len(calls) == 2
+
+
+def test_nul_laden_output_is_refused_even_with_rc_0(clean_env):
+    _scripted_wsl(clean_env, [(0, WSL_ERROR_TEXT)] * 2)
+    assert admin_token(FLEET_BASE_URL) == ""
+
+
+def test_no_admin_token_line_is_empty_without_a_retry(clean_env):
+    calls = _scripted_wsl(clean_env, [(0, "")])
+    assert admin_token(FLEET_BASE_URL) == ""
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("value, ok", [("abcDEF012_-.~=+/", True), ("", False), ("has space", False),
+                                       ("tab\tin", False), ("A\x00 \x00c", False), ("café", False)])
+def test_plausible_token(value, ok):
+    assert _base_url._plausible_token(value) is ok
 
 
 def test_fleet_target_never_falls_back_to_the_repo_env(clean_env, tmp_path):

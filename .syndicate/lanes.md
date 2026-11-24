@@ -2096,6 +2096,15 @@ death, never life — do not invert it.
 - Verification: /mnt/c/tmp/w1124_floor/kit_after_up_floor.sh <up UTC> after the first plan writes: live_ev_floor_on_lines=0 and each venue's rows_in at the Suggested scope (tens) vs 514/463 before; kit_role_env.py SYNDICATE_LIVE_EV_FLOOR ABSENT; the next day's live orders carry no floor tag
 - Blocked by: none
 
+### fleet-token-read-guard — OPEN — opened 2026-11-23 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: scripts/_base_url.admin_token never returns wsl.exe's error text as the fleet token: a non-zero wsl rc or a token that is not printable ASCII reads as '' after one retry, a failure is not cached, and portfolio_monitor_probe.py reports a single TOKEN anomaly and exits non-zero instead of eight ENDPOINT anomalies with rc 0
+- Files: scripts/_base_url.py (_read_fleet_token and a new token-shape helper ONLY), tests/test_base_url.py (the WSL token-read tests and the clean_env fixture ONLY)
+- Hypothesis: The 6:04 PM 11-23 Portfolio Watch reading sent wsl.exe's UTF-16 error message as X-Admin-Token: _read_fleet_token keeps stdout whatever wsl.exe's rc, and validates nothing (findings_2026-11-23_portfolio_monitor.md, 'The 6:04 PM reading's token failure')
+- Falsification test: wsl.exe with an unreachable target exits 0 or writes no NUL-laden text to stdout
+- Verification: targeted tests green (tests/test_base_url.py, tests/test_portfolio_monitor_probe.py); the real token still reads (booleans only); a forced WSL failure gives '' and probe rc 3; the next Portfolio Watch readings log probe rc 0 with 8/8 endpoints 200
+- Blocked by: none
+- Status 2026-11-23 6:34 PM CST: GOAL: NOT MET. Code and tests are done: tests/test_base_url.py 32 passed; the probe and Portfolio Watch tests 32 passed. A forced failure gave probe rc 3 with one TOKEN anomaly; the real token gave rc 0 and 8 of 8 endpoints. Left: the scheduled task's first readings on the new code after the primary-tree ff. Evidence: findings_2026-11-23_portfolio_monitor.md, 'The 6:04 PM reading's token failure'.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

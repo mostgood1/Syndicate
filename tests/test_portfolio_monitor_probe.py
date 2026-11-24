@@ -365,3 +365,23 @@ def test_alignment_without_a_board_says_so_and_renders_the_error():
     assert "board not read (no shortlist for 2026-11-17)" in "\n".join(pm.render_alignment(al))
     assert pm.render_alignment({"error": "reader rc 1: boom"}) == ["  ALIGNMENT error: reader rc 1: boom"]
     assert pm.render_alignment({}) == []
+
+
+def test_no_admin_token_is_one_token_anomaly_and_a_non_zero_exit(monkeypatch, tmp_path, capsys):
+    """6:04 PM 2026-11-23: a failed WSL token read became 8 ENDPOINT anomalies and `probe: rc 0`."""
+    import json
+
+    import _base_url
+
+    monkeypatch.setattr(_base_url, "admin_token", lambda *_a, **_k: "")
+
+    def no_fetch(*_a, **_k):
+        raise AssertionError("no endpoint may be read without a token")
+
+    monkeypatch.setattr(pm, "fetch", no_fetch)
+    assert pm.main(["--out-dir", str(tmp_path)]) == pm.TOKEN_FAILED_RC != 0
+    lines = (tmp_path / "readings.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    reading = json.loads(lines[0])
+    assert reading["probe_failed"] == "token" and reading["anomalies"] == [pm.TOKEN_ANOMALY]
+    assert pm.TOKEN_ANOMALY in capsys.readouterr().err

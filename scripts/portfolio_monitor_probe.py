@@ -1051,6 +1051,29 @@ def render(r: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+TOKEN_FAILED_RC = 3
+TOKEN_ANOMALY = ("TOKEN the fleet admin token could not be read (WSL read failed or empty, after one retry); "
+                 "no endpoint or log was read, so this reading measures nothing")
+
+
+def token_failure(out_dir: Path, rdir: Path, now: dt.datetime, log_minutes: int) -> int:
+    """Record ONE anomaly for a reading taken without a token, and exit non-zero.
+
+    The 6:04 PM 2026-11-23 reading had no usable token: `wsl.exe`'s error text was sent as the header. It reported 8
+    ENDPOINT anomalies and `run.log` said rc 0. This reports a single TOKEN anomaly instead, and returns
+    `TOKEN_FAILED_RC` so the runner's rc shows it. `probe_failed` keeps the reading out of the page's charts.
+    """
+    reading = {"at": now.isoformat(timespec="seconds").replace("+00:00", "Z"), "label": ct_label(now),
+               "log_minutes": log_minutes, "probe_failed": "token", "endpoints": {}, "never_read": list(NEVER_READ),
+               "anomalies": [TOKEN_ANOMALY]}
+    (rdir / "reading.json").write_text(json.dumps(reading, indent=1), encoding="utf-8")
+    with (out_dir / "readings.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(reading) + "\n")
+    print(f"{reading['label']}\n  ANOMALIES:\n    - {TOKEN_ANOMALY}", flush=True)
+    print(TOKEN_ANOMALY, file=sys.stderr, flush=True)
+    return TOKEN_FAILED_RC
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--base-url", default=FLEET_BASE_URL)
@@ -1072,6 +1095,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
     rdir = out_dir / stamp
     rdir.mkdir(parents=True, exist_ok=True)
+    if not token:
+        return token_failure(out_dir, rdir, now, args.log_minutes)
 
     endpoints: dict[str, dict[str, Any]] = {}
     bodies: dict[str, Any] = {}

@@ -156,7 +156,10 @@ def _tonight(r: dict) -> dict:
 
 readings = [json.loads(line) for line in (paths.READINGS / "readings.jsonl").read_text(encoding="utf-8").splitlines()
             if line.strip()]
-rows = [row(r) for r in readings]
+# A reading the probe could not take (`probe_failed`, e.g. no admin token: the 6:04 PM 2026-11-23 reading) measured
+# nothing. It stays out of the charts and the performance table; its anomaly shows only while it is the newest reading.
+good = [r for r in readings if not r.get("probe_failed")]
+rows = [row(r) for r in good]
 code = Path(__file__).read_text(encoding="utf-8")
 (OUT / "readings.json").write_text(json.dumps({"rows": rows, "meta": [
     {"label": "Probe", "value": "scripts/portfolio_monitor_probe.py (fleet 127.0.0.1:10000, read-only)"},
@@ -165,10 +168,11 @@ code = Path(__file__).read_text(encoding="utf-8")
 ]}, indent=1), encoding="utf-8")
 
 registry = json.loads(paths.REGISTRY.read_text(encoding="utf-8"))
-latest = readings[-1] if readings else {}
+newest = readings[-1] if readings else {}
+latest = good[-1] if good else {}
 anoms = [{"id": f"A{i + 1}", "kind": "anomaly", "title": a, "status": "open (latest reading)",
-          "owner": "", "first_seen": latest.get("label", ""), "evidence": f"reading {latest.get('at', '')}"}
-         for i, a in enumerate(latest.get("anomalies") or [])]
+          "owner": "", "first_seen": newest.get("label", ""), "evidence": f"reading {newest.get('at', '')}"}
+         for i, a in enumerate(newest.get("anomalies") or [])]
 perf = latest.get("performance") or {}
 signals = [{"id": f"S{i + 1}", "kind": "performance signal", "title": s, "status": "open (latest reading, 30 days)",
             "owner": "portfolio-monitor (evidence for per-line fixes only)", "first_seen": latest.get("label", ""),
@@ -197,5 +201,6 @@ for i, row_ in enumerate(perf_rows):
 (OUT / "findings.json").write_text(json.dumps({"rows": registry + anoms + signals, "meta": [
     {"label": "Register", "value": ".syndicate/findings_<date>_portfolio_monitor.md (lane portfolio-monitor)"},
 ]}, indent=1), encoding="utf-8")
+failed = len(readings) - len(good)
 print(f"readings {len(rows)}, findings {len(registry)} + anomalies {len(anoms)} + signals {len(signals)}, "
-      f"performance rows {len(perf_rows)}")
+      f"performance rows {len(perf_rows)}" + (f", probe-failed readings left out {failed}" if failed else ""))
