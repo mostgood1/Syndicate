@@ -486,8 +486,8 @@ def score_stream(snapshots: Sequence[Mapping[str, Any]], trades: Sequence[Mappin
     off until the next snapshot; at most MAX_FILLS_PER_SIDE_DAY fills per side per CST day."""
     target, df = float(market["target"]), float(market.get("df") or 0.5)
     usd = float(market.get("usd_day_pool") or 0.0)
-    trade_times = sorted(((parse_ts(t.get("created_time")) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)).timestamp(), t)
-                         for t in trades)
+    trade_times = sorted([((parse_ts(t.get("created_time")) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)).timestamp(), t)
+                          for t in trades], key=lambda x: x[0])  # ties: input order (a dict is not orderable)
     reward, fills, j = 0.0, [], 0
     fills_today: dict[tuple[str, str], int] = {}
     prev = None

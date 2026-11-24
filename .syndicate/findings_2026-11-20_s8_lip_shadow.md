@@ -149,3 +149,30 @@ The help page's terms:
 - 2026-11-20 ~10:20 AM CST: **the scorer was pushed (c7dbc576e) BEFORE any collected data was read**
   (`s8_lip_shadow.py score [--final]`, 16 tests). It implements the table above. M2 and the 1 h / 24 h markouts are
   named in its output as not computed. Look 1 and look 2 are run by the daily task `portfolio-learning-review`.
+- **2026-11-24 1:52 AM CST (07:52:29Z): LOOK 1 READ, verdict PASS.** Run by the daily learning review, on its first
+  run after 11-23 9:00 AM CST.
+  - **Command:** `py -3 scripts/s8_lip_shadow.py score --out C:\tmp\pfmon\s8`; output in
+    `C:\tmp\pfmon\s8\look1_score.txt`.
+  - **The first attempt crashed before scoring anything.**
+    - The error: `TypeError: '<' not supported between instances of 'dict' and 'dict'` in `score_stream`. Two public
+      trades in one market shared a `created_time`, so `sorted()` fell through to comparing the trade dicts.
+    - **The fix is to the tie-break only:** sort on the timestamp key, and ties keep their input order
+      (`key=lambda x: x[0]`). The reward, fill and markout rules are unchanged. 16 of 16 tests pass.
+    - The fix came after the data existed, but it changes no statistic; it only lets the sort finish. The verdict
+      below comes from the one run that completed.
+  - **Result:** 3.719 days collected; 169 markets / 71 events; 189,725 snapshots; 9,272 trades; 484 M1 fills, 196
+    settled and 22 unpriced. Reward $127.6/day, fill P&L $48.4/day, **net $176.0/day, 95% [$81.8, $288.2]**
+    (event-clustered bootstrap).
+  - **Verdict as registered: PASS** (point >= $25/day and lower bound > 0).
+  - **Caveats, read with it:**
+    - Fill P&L is POSITIVE under M1, the deliberately pessimistic front-of-queue model. But only 196 of 484 fills are
+      settled; the rest are marked at the last mid.
+    - M2 (FIFO) and the 1 h / 24 h markouts were not computed.
+    - Competitor reaction and the queue effects of a real order cannot be measured here.
+  - **Nothing changes live.** Per the pre-registration, a PASS leads only to the user's decisions:
+    1. whether Kalshi reward credits can be withdrawn as cash (still unconfirmed);
+    2. the program's term past 2027-01-01;
+    3. then a capped $500 pilot in a betting-change window, only on the user's explicit yes.
+  - The collector keeps running. The scheduled task still runs look 2 after 11-25 18:12Z, then disables
+    `SyndicateS8Collector`. Look 1 is already a terminal PASS under the two-look rule, so look 2 is a confirmation
+    read.

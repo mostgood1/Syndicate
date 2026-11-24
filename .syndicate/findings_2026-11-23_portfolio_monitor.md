@@ -348,3 +348,79 @@ needed the new retry. The instrument: each reading records `token_read` (seconds
   So a :04 run is not slow by itself, and the 6:04/7:04 slowness was a passing spell (2 of the 8 :04 runs from 1 PM to 8 PM
   ran ~30 s). Unanswered: whether 7:04's ~25 s included a retry, since it ran before the instrument. Left open with the
   instrument running. A `token_read` over 10 s, or more than one attempt, in a later reading answers it.
+
+## DAILY SUMMARY — Mon 11-23 (Central), written Tue 11-24 1:58 AM CST by the daily learning review
+
+Sources: `daily_rollup.json` and `performance.json` built from the 1:34 AM CST 11-24 watch reading (ledger saved
+07:34:02Z), and the 49 watch readings dated 11-23 CST. Every 11-23 game is graded: 0 started and unsettled, 0 late.
+
+**Performance.**
+- **11-23: 33 graded bets / 13 games, ROI +5.84% [-28.7, +40.4].** Won 54.5% against a 62.5% breakeven (excess
+  -2.6 wins, z -0.96); before fees +9.23%. A small day; noise.
+- **7 d: 364 bets / 194 games, -0.94% [-10.5, +8.6]** (11-22: -1.90%); before fees +2.43%.
+- **30 d: 1,703 bets / 759 games, -5.09% [-10.5, +0.34]** (11-22: -4.75%). The range has included 0 for three days.
+  All-time: 2,360 bets / 1,273 games, -10.41% [-17.3, -3.5].
+- **Fee-net CLV:** 30 d -0.49 pp (646 bets / 440 games with a priced close; gross +1.24, beat close 61.8%, se 0.21);
+  7 d -1.18 pp (178 / 130; gross +0.66, beat close 56.7%, se 0.37); 11-23 alone -3.37 pp on 9.
+- **Fees: 3.38% of stake on 11-23 and over 7 d, 3.99% over 30 d.** 30 d before fees -1.10%, so fees are ~78% of the
+  30 d loss.
+- **Gate: 121 of 800 events**, clock BC-053 since 11-19 17:00Z (11:00 AM CST): 198 bets, ROI -1.52% (lower -14.2),
+  excess wins -15.6. 2 deploys.md loads still unclassified (the GATE anomaly on 48 of 49 readings).
+
+**30-day slices beyond noise (95% range excludes 0):**
+- price 0.30-0.45 -12.24% [-24.1, -0.39] (260 bets / 176 games), beyond noise every day since 11-17.
+- Passing TDs -66.3% [-112, -20.6] on 10 bets / 10 games: too few to read.
+- At the edge: EV band 2-5 -7.55% [-15.2, +0.04] against a predicted +4.13% (1,074 / 585); totals -11.04%
+  [-22.5, +0.43] (395 / 313). Noise: Kalshi -3.44%, Polymarket -10.66% [-23.1, +1.8], h2h +5.97%, spreads +0.87%.
+- Stake quartiles as on 11-22: Q1 (5.9% of $) -8.48%, Q2 (8.8%) -8.70%, Q3 (21.9%) -6.11%, Q4 (63.4%) -3.92%; all
+  ranges include 0.
+
+**Operations (49 readings).** Anomaly kinds, by readings flagged:
+- GATE 48.
+- LEDGER grade_conflicts 17 (12:04-8:04 AM). Gone after NOP@OKC was acknowledged at 8:26 AM; lane
+  `kalshi-no-grade-check` MET.
+- CAP: Polymarket dollars at 90-105% of the day cap, 15 readings (8:04 AM-11:34 PM).
+- ENDPOINT: 9 lines in 2 readings. One is the 6:04 PM token failure (8 of 8 endpoints, fixed under lane
+  `fleet-token-read-guard`); the other is 1 slow read.
+
+Endpoint reads over 2 s: 4, of which 1 over 3 s (9:04 AM live_today 3.5 s). Plan age: median 2.8 min, max 43 min
+(12:04 AM, the overnight tail; 1 reading > 15 min). Orders 11-23: 50, of which 48 filled, 2 were maker posts that
+expired unfilled, and 0 failed or were rejected by error.
+
+**Studies.**
+- **S8 LOOK 1 READ: PASS.** Net $176.0/day, 95% [$81.8, $288.2], over 3.72 days: 169 markets / 71 events, 484 M1
+  fills (196 settled, 22 unpriced). The scorer first crashed on a sort tie; I fixed the tie-break only (see the S8
+  file). Recorded in `findings_2026-11-20_s8_lip_shadow.md`. Nothing goes live: the next step is the user's decision.
+  Heartbeat 07:52:57Z (cycle 5,273, 0 errors), fresh.
+- S5 forward: 234 bets / 133 events with selected_date >= 11-19 (need 150), counted from the 1:34 AM `live_all.json`
+  with the tool's own loader; not run.
+- S6: read 11-23 (NO-GO); nothing owed.
+- Not yet due at 1:58 AM: the 11-24 window ledger-field check (after 7:00 AM), and the 12:00 PM CHANGE N / CHANGE P
+  checks. F27: lane `kalshi-join-sport-scope` has no `LOADED` line yet, so nothing is written.
+
+### What the data teaches (11-23)
+- The 30 d book has held at about -5% for three days (-4.92, -4.75, -5.09; 759-782 games), up from -7 to -9% through
+  11-20. The 7 d has included 0 every day since 11-09. Fees (3.99% of stake) are ~78% of the 30 d loss: before fees
+  the 30 d book is -1.10%.
+- **The close-beat is shrinking.** 7 d gross CLV is +0.66 pp against +1.24 over 30 d, and beat-close 56.7% against
+  61.8%. Fee-net 7 d CLV went -0.99 pp (11-22) → -1.18 pp (11-23, se 0.37). The 7 d ROI is better than the 30 d while
+  its CLV is worse, so the recent ROI gain is probably variance, not skill.
+- **The 0.30-0.45 band's loss is in stake weighting, not in hits.** It wins 44.2% against a 44.9% breakeven, -1.8
+  excess wins on 176 games, yet loses -12.2% of stake. So within the band the bigger stakes lose. Totals are the
+  opposite: 44.1% against 49.0%, -19.7 excess wins on 313 games, a real hit-rate deficit.
+- **Market type splits about 17 pp:** h2h +5.97% (64.9% vs 62.6% breakeven, +5.5 excess wins, 207 games) against
+  totals -11.04%. Both ranges include 0; the gap between them is the clearest contrast in the slices.
+- Stake quartiles held their 11-22 order (Q4 best -3.9%, Q1/Q2 -8.5/-8.7%) for a second day. The 11-22 min-stake
+  lead stands as written; it is not repeated here.
+
+**One optimization lead (pre-registrable, offline, changes nothing live).**
+- *Hypothesis:* our fair probability is over-confident on totals (game and alternate totals) and calibrated on h2h.
+  If so, the totals hit-rate deficit (-19.7 excess wins on 313 games) is a fair-price error, not bad luck at the venue.
+- *Data:* 30 d graded totals and totals_alt bets in `live_all.json`, against h2h as the control. Per game, compare
+  the stake-weighted fair probability at submit (fill price + model edge) with the realised win rate,
+  event-clustered. Then a forward copy on bets with selected_date >= 11-24 once totals reach 150 games, scored the
+  same way.
+- *Decision rule:* GO (name a totals fair-shrink toward the market as a calibration challenger for a later window)
+  iff realised − fair on totals has a 95% upper bound < 0 on BOTH the 30 d and forward sets, AND the same statistic on
+  h2h has a range that includes 0. Otherwise KILL. Report the shrink weight that the 30 d set fits, frozen before the
+  forward read.
