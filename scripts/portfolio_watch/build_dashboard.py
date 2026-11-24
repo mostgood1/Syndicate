@@ -143,8 +143,10 @@ td.num { text-align:right; white-space:nowrap; }
   </div>
   <section id="alignment"><h2>Purchaser vs Layer 2 board and rail</h2>
     <p class="muted">What the purchaser buys, against what the board recommends and the rail shows. Suggested rows are
-      the board's picks; a live plan buys any row that clears the venue's fee at the venue's own price, Suggested or
-      not, and stakes follow price until a model is shown to beat the market. Today's orders are matched to the board
+      the board's picks. Since 2:30 AM CST on 11-24, when the 0% live floor went off, a live plan buys only Suggested
+      rows, and only those that clear the venue's fee at the venue's own price and contract ("placeable live"); while
+      the floor was on it also bought rows outside Suggested. Stakes follow price until a model is shown to beat the
+      market. Today's orders are matched to the board
       as it is now, so a row that moved after the purchase reads as another line or off the board. Informational:
       no anomaly is raised from this panel.</p>
     <div class="tiles" id="align-tiles"></div>
