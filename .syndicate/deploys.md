@@ -63266,3 +63266,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Seen before it, kept priced (user rule 11-16):** modelled foul-outs SBU Zach Philipkoski (NCAAB, 17:04-17:09Z) and COPP Karen Nimo (WNCAAB, 17:45-17:52Z), `reason=foul_out`, refused_games=0 on every tick.
 - **Not measured:** the lift (watcher still running); her live props; a priced WNCAAB game being withdrawn.
 - verify: live-odds-worker.log + refresh-worker.log 18:02-18:09Z (`C:/tmp/lpeg/w1124/utm.sh`); ledger/grid counts 18:10:31Z (`utm_led.sh`); ExitHold probe 18:09:21Z; plan read 18:09:21Z (`kpo_1124.py`).
+
+## 2026-11-24 20:21:51Z (2:21 PM CST) -- READING (no deploy): second WNCAAB `off_floor` key exit read LIVE through every layer -- COLG Maryan Eniafe (lane `live-player-exit-gate`, #814)
+- betting change: no -- a reading; nothing loaded.
+- **The exit:** Siena @ Colgate (WNCAAB), event 401918037. ESPN pbp: Eniafe (COLG starter) off `since=2026-11-24T19:21:00Z` (1:21 PM CST). The cause is not known from the feed.
+- **Detected:** `[wncaab_live_resim] PLAYER_OUT event=401918037 team=COLG player='Maryan Eniafe' reason=off_floor key=True source=pbp` at 20:21:51Z; tick `live_games=6 key_players_out=1 refused_games=1` at 20:22:06Z. The 20:19:46Z tick read 0.
+- **Board:** this game was NEVER priced live. 0 of 863 lines in `live_gameline_ledger_2026-11-24.jsonl` name it. The ledger uses full team names, and only 3 WNCAAB games were priced live all day (Davidson @ Notre Dame 431 lines, La Salle @ Villanova 283, Michigan St @ Virginia Tech 149). 0 in-play grid rows (mtime 14:22:07 CST). The board's wncaab full_games 0 -> 1 at 20:22:07Z is a different game.
+- **Entry hold:** probed 20:22:28Z (`lpeg_holdprobe_soc.sh wncaab`): Siena Saints @ Colgate Raiders -> `{'verdict': 'fail', 'reason': 'key_player_out', 'players': ['COLG:Maryan Eniafe:off_floor'], 'snapshot_at': '2026-11-24T14:22:06-06:00'}`.
+- **Portfolio plan:** 14:18:06 CST (before) and 14:27:34 CST (first after) both carry no `key_player_out`; the after plan has rows_in 25 and live positions 0. Expected, since no live row for the game existed.
+- **What this adds:** CHANGE I fires on a second game, with the same path (detect -> tick refusal -> hold). Both WNCAAB exits so far were in games the board never priced live, so a priced WNCAAB withdrawal is still unmeasured.
+- verify: `C:/tmp/lpeg/w1124/exit_read.sh wncaab 401918037 Colgate` 20:22:43Z; `led_names.sh` (ledger game counts); hold probe 20:22:28Z; plan reads 20:22:29Z and 20:28:29Z (`kpo_1124.py`).
