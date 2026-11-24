@@ -310,6 +310,55 @@ BEFORE, 2026-11-24 01:18:36Z (7:18 PM CST 11-23), snapshot 23:50:44Z:
 Falsified if OLD > 0, or new wording is 0, on a build stamped after the up. The slate will differ, so judge the
 shares, not the counts.
 
+**LOADED.** The 11-24 window batch loaded it at 08:30:10Z (2:30 AM CST), in one claimed ff `d845fe345..672a18e87`
+and one drained full down/up. Its deploys.md entry names `2010b06ca` as a ride-along. The fleet HEAD was
+`2b191302f` at 15:53Z and contains it (`merge-base --is-ancestor`).
+
+**AFTER reading `[2026-11-24 15:53:48Z, 9:53 AM CST; snapshot 15:46:35Z, after the up]` -- PREDICTION MET.**
+- 5,624 cards, of them 3,814 pregame "Our sim" cards.
+- 655 NBA over/under cards with a sim-market gap: OLD 0, SIM 655, other 0 (before: 34 / 0 / 110 of 144).
+- New wording on 1,999 cards: 'no weight' NBA 802, NCAAB 437, WNCAAB 5; 'weighted' NBA 576; 'calibrated' NCAAB 164,
+  WNCAAB 15.
+- Saved: `C:\tmp\scc_oversight_d5aa\read_1b_after_1124.json`. Exit 0.
+- `surface_consistency_check.py` at 15:54Z: `sim_attribution:ask_cards` 0 of 17 OK; both `ask_headline` OK.
+
+Served examples (15:5xZ):
+- "Our sim has Alex Sarr over 7.5 rebounds assists at 56.2%, weighted 5% against the market for a board probability
+  of 53.1%; the no-vig market across 2 books says 54.6%."
+- "Our sim has the under 133.5 at 31.5%, calibrated to 58.4% for this market; ..." This is Hampton @ Old Dominion,
+  re-derived from the row:
+  - `p_model_raw` 0.685 is P(over), so the sim's under is 31.5%; the sim projects 141.3 points.
+  - `book_blend` is `total_calibration` (#816): served P(over) 0.4159, so under is 58.4%.
+  - The market's under is 54.8%. The side mapping is right; the calibration pulls under the close by design.
+
+### Step 1b follow-up -- the "board probability" it names is not the board's final number `[2026-11-24 ~10:00 AM CST, fleet, read-only]`
+
+The partial-blend clause ("weighted W% against the market for a board probability of X") and the calibration clause
+("calibrated to X") state X = the projection's served probability for the side. The board then applies its own
+per-sport pricing calibration: `layer2_board.py` ~2797-2840, `probability_calibration.calibrate`. That stamps
+`model_probability_cal`, and `model_edge_pct` is differenced from it. Measured on the 15:5xZ shortlist, of the
+sentences that state a board number, X differs from the row's `model_probability_cal` by more than 0.5 pp in:
+- NBA 'weighted': 219 of 305 (max 3.7 pp);
+- NCAAB 'calibrated': 61 of 105 (max 5.3 pp);
+- WNCAAB: 0 of 1.
+
+So 280 of 411 name an intermediate number as the board's. Example: Desmond Bane over 2.5 assists. The sim is 48.6%,
+blended to 53.8%, and the board's `model_probability_cal` is 54.9% (= the market fair).
+
+Also measured: the board's `ev_pct` is reproduced best by the market fair on 1,402 of 1,710 pregame rows, and by
+`model_probability_cal` on 308. EV is price-shopping EV, as found under step 1a. The fix candidate is display
+only, in `_pregame_model_sentence`: name `model_probability_cal` as the board's number when the row carries it.
+The user's call. Probe: `C:\tmp\scc_oversight_d5aa\probe_clause.py`.
+
+**Post-window `plan_vs_orders`** (15:54Z, for lane `live-ev-floor-off`; not judged here):
+- 11 live orders today, none of their position keys in the current 19-position plan.
+- 9 join a board row, and 1 of the 9 is Suggested NOW. Today's orders include ones placed before the 08:30Z up,
+  under the floor.
+- `side_picked_by` is `price_shopping` on all 11.
+- `venue_price_hidden`: 5 of 9.
+- This crude join cannot say whether each order was Suggested when placed. That reading is CHANGE P's, with
+  `kit_after_up_floor.sh`.
+
 ### Reading 4 -- the peer's report on Suggested vs the purchaser, re-measured `[20:15:43Z-20:19:41Z, fleet, read-only]`
 
 `portfolio-monitor` (session 69d80317) messaged at 19:46Z. It said explicitly that it was not asking for a change.
