@@ -1007,3 +1007,50 @@ User: "Yes, diagnose it" (11-24, answering "Diagnose the NBA live totals harm be
     11-14, so those carry a different confound.
   - the POST harm by segment, market (totals / totals_alt) and clock bucket;
   - the POST harm with each expert's weight zeroed in turn.
+
+
+### POST-READ DIAGNOSIS RESULTS (2026-11-24 2:39 PM CST; registered 2:13 PM, `882812442`)
+
+Run 2:16-2:38 PM CST on the fleet at nice 19, with the pinned code and registered arguments
+(`C:\tmp\elp\m2diag\m2diag.py`, log `m2diag.log`, `m2diag_result.json`). Host memory never fell below 2,022 MB
+available, and there was no fleet change. **It gates nothing; the FAIL stands.**
+
+- **P0 MET (exact).** nba|totals|live|a<=60: games 60, d_ll +0.024058, ci95 [0.013761, 0.034215]. The fit is unchanged
+  too (1,341 params, 564,088 train examples, 799 games).
+- **Arms.** PRE (11-15, 11-16) has 17 games; POST (11-17..11-22) has 43. Every row of the stratum is an OVER row.
+- **T1, primary: INCONCLUSIVE.**
+  - POST d_ll +0.0290, ci95 [+0.0180, +0.0410].
+  - PRE +0.0094, ci95 [-0.0030, +0.0263].
+  - POST - PRE +0.0196, ci95 [-0.0008, +0.0378]. The low end misses 0 by 0.0008, so it does not meet SUPPORTED. PRE's
+    ci95 includes 0, so it is not FALSIFIED either.
+- **T2, mechanism: AS PREDICTED.** The live_resim expert's delta-logit toward over:
+  - train +0.113 [+0.025, +0.202]; PRE +0.046 [-0.070, +0.161]; POST +0.359 [+0.278, +0.444];
+  - POST - train +0.246 [+0.129, +0.363]; PRE - train -0.067 [-0.224, +0.080].
+- **T3, where the loss is: AS PREDICTED.**
+  - In POST, p_decision(over) minus the realised over rate is +0.089 [+0.012, +0.162]. The prior's own gap is +0.071
+    [-0.002, +0.143].
+  - The learner's move toward over is +0.095 [+0.071, +0.121] in POST against +0.011 [-0.019, +0.042] in PRE.
+- **Descriptive (no prediction):**
+  - **The harm is the live_resim weight.** POST with live_resim zeroed: d_ll +0.0009 [-0.0001, +0.0022], i.e. gone. POST
+    with live_segment zeroed: +0.0281, unchanged.
+  - **By clock bucket (POST):** 25-50% +0.098 [+0.058, +0.141], where the applied weights are +1.41 (full totals, n 201
+    in train) and +0.84 (alt). 75-95% +0.020 [+0.007, +0.035]. 0-25%, 50-75% and 95-100% are about 0, being cells
+    whose weights were not applied.
+  - **By segment (POST):** full +0.036, h2 +0.024, h1 +0.008, quarters about 0. **By market:** totals +0.050, alt
+    +0.020.
+  - **By date:** 11-15 +0.011, 11-16 +0.008, 11-17 +0.013, 11-18 +0.021, 11-19 +0.004, 11-20 +0.029, 11-21 +0.064,
+    11-22 +0.034.
+  - **Placebos:** spreads and h2h live show no PRE/POST difference: +0.001 [-0.011, +0.014] and +0.003
+    [-0.033, +0.043].
+- **Reading.**
+  - The learner's NBA live totals harm is the live re-sim's weight, applied at about face value or more in two clock
+    buckets, while the re-sim's over-lean tripled after `#821` F1 and overs under-ran the market that week.
+  - H1's mechanism held (T2, T3). Its timing test (T1) narrowly missed. PRE's 17 games also lean harmful (+0.009, CI
+    includes 0), so F1 is the likely main cause, not a proven sole one.
+  - A second factor sits beside it: the largest applied weight (+1.41) is on a thin training cell (n 201).
+- **For a fresh M2 (the user's call):**
+  - fit on a single re-sim level. `#834`, the NBA total anchor, loaded 11-24 2:30 AM CST and changes this exact input
+    again.
+  - data-file and env switches must void or split the window. The version timeline sees code only (correction
+    `89ff009f2`).
+  - weights above 1 on thin cells need a cap or a minimum cell size, written before any data.
