@@ -1856,3 +1856,5 @@ takeover note, because two lanes claiming one file block every edit.
 2. The load is a betting change for a window. 12-08 already holds the pair and the end game, and the anchor was
    tested only on top of them; 12-22 is the next window. Either way its first games are Army-Navy and the bowls.
 3. The spreads k re-fit on anchored margins.
+
+**PUSHED 2026-11-24 10:35 AM CST** (user "Yes, push it"): rebased onto main and pushed as `cf12ae61f`, the same change as `c5fb62165`. None of the code it depends on had changed on main, and the anchor and #835 tests pass on the rebased tree (75 of 75). The switch is absent on every role, so the next fleet ff carries it inert: not a betting change until the switch loads in a window.
