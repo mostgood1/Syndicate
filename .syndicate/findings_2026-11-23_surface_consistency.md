@@ -350,6 +350,27 @@ Also measured: the board's `ev_pct` is reproduced best by the market fair on 1,4
 only, in `_pregame_model_sentence`: name `model_probability_cal` as the board's number when the row carries it.
 The user's call. Probe: `C:\tmp\scc_oversight_d5aa\probe_clause.py`.
 
+**HELD `[2026-11-24 ~10:30 AM CST]`: the premise was incomplete -- the BOARD shows two model numbers.** The user
+answered "Yes, fix it" to 'Fix the "board probability" number so it quotes the board's final model probability?'.
+Before editing, I read which number each consumer uses:
+- **Win% cell and stake sizing use the served number:** card `model_probability` = `confidence` =
+  `_model_prob_for_side` (`layer2_board._layer2_board_columns`). `bankroll_manager.compute_bet_size` reads card
+  `model_probability` (`bankroll_manager.py:193`, called via `intelligence_state.py:6944` `compute_board_stake`).
+- **The model edge uses the pricing calibration:** `model_edge_pct` = `model_probability_cal` - fair
+  (`layer2_board.py` ~2797-2840).
+
+Measured on the served cards at ~16:25Z: 3,567 pregame cards carry Win%, a model edge and a fair.
+- On 1,594, Win% - fair differs from the model edge by more than 0.5 pp: NBA 980, NCAAB 204, NFL 150, NCAAF 117,
+  soccer 103, NHL 35, WNCAAB 5.
+- On 39, the two point to OPPOSITE sides of the market (each > 0.5 pp; NBA 33). None is Suggested.
+- Example: Alex Sarr over 7.5 rebounds+assists shows Win% 53.1% against a fair of 54.6%, beside a model edge of
+  +0.16.
+
+So the sentence's "board probability" already matches the Win% cell beside it. Naming `model_probability_cal` would
+make it disagree with Win% on those cards instead. The root fix is ONE model number per card for Win%, model edge
+and stake. It changes stake sizing's input, so it is a betting change: window only, the user's call. No code was
+changed; put back to the user. Probes: `C:\tmp\scc_oversight_d5aa\probe_win.py`, `probe_contra.py`.
+
 **Post-window `plan_vs_orders`** (15:54Z, for lane `live-ev-floor-off`; not judged here):
 - 11 live orders today, none of their position keys in the current 19-position plan.
 - 9 join a board row, and 1 of the 9 is Suggested NOW. Today's orders include ones placed before the 08:30Z up,
