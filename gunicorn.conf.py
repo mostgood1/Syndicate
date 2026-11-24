@@ -34,6 +34,9 @@ TWO LEVERS, each with a proof line and an env switch.
    the stagger holds one back. Switch: `SYNDICATE_WEB_WORKER_ANON_LIMIT_MB` (default 650, sized for overshoot;
    <= 0 disables).
 
+3. MEMORY WATCH (`post_worker_init`, 2026-11-24). The guard in 2 reads memory only after every 5th request; a
+   thread applies it on a timer as well, and aborts a worker at a hard ceiling. See `memory_watch_tick`. Default OFF.
+
 Hooks never raise: a broken guard must not take a worker down.
 """
 
@@ -43,6 +46,7 @@ import json
 import os
 import random
 import sys
+import threading
 import time
 
 RECYCLE_STAMP_PATH = os.environ.get("SYNDICATE_WEB_WORKER_RECYCLE_STAMP") or "/tmp/syndicate_web_worker_recycle.stamp"
@@ -479,6 +483,11 @@ def post_worker_init(worker) -> None:
                                              "gc_pause_log_s": gc_pause_log_seconds()})
     except Exception as exc:  # never take the worker down
         _log("WEB_LOOP_STALL_DUMP_ERROR", {"hook": "stall_instruments", "error": f"{type(exc).__name__}: {exc}"})
+    try:
+        _log("WEB_MEMORY_WATCH_ARMED", {"pid": os.getpid(), "memory_watch": install_memory_watch(worker),
+                                        "interval_s": memory_watch_seconds(), "abort_mb": memory_abort_mb()})
+    except Exception as exc:  # never take the worker down
+        _log("WEB_MEMORY_GUARD_ERROR", {"hook": "memory_watch_install", "error": f"{type(exc).__name__}: {exc}"})
 
 
 # EXIT WITHOUT CPYTHON'S SHUTDOWN (lane `web-silent-worker-kills`, 2026-11-21).
@@ -551,37 +560,158 @@ def decide_recycle(worker, *, now: float, anon_mb_reader, stamp_path: str) -> st
     # A worker holding back a HARD recycle checks on every request until it goes.
     if count % CHECK_EVERY_REQUESTS and not getattr(worker, "_syndicate_hard_pending", False):
         return "skipped"
-    anon = anon_mb_reader()
-    if anon is None or anon < limit:
-        # A dip ends any hold: a later hard crossing is a NEW hold, logged and timed from its own start.
-        worker._syndicate_hard_pending = False
-        worker._syndicate_hard_deferred_at = None
-        return "below_limit"
-    age = now - float(getattr(worker, "_syndicate_born", now))
-    if age < min_age_seconds():
-        return "too_young"
-    hard = anon >= limit + hard_margin_mb()
-    emergency = anon >= limit + hard_margin_mb() + emergency_margin_mb()
-    other = _recent_recycle_age(now, stamp_path)
-    payload = {"pid": os.getpid(), "anon_mb": round(anon, 1), "limit_mb": round(limit, 1), "hard": hard,
-               "emergency": emergency, "requests": count, "age_s": round(age, 1),
-               "last_recycle_age_s": None if other is None else round(other, 1)}
-    if not hard and other is not None and other < recycle_spacing_seconds():
-        if not getattr(worker, "_syndicate_deferred_logged", False):
-            worker._syndicate_deferred_logged = True
-            _log("WEB_WORKER_MEMORY_RECYCLE_DEFERRED", payload)
-        return "deferred"
-    hard_spacing = hard_recycle_spacing_seconds()
-    if hard and not emergency and hard_spacing > 0 and other is not None and other < hard_spacing:
-        worker._syndicate_hard_pending = True
-        if getattr(worker, "_syndicate_hard_deferred_at", None) is None:
-            worker._syndicate_hard_deferred_at = now
-            _log("WEB_WORKER_MEMORY_RECYCLE_DEFERRED", {**payload, "hard_spacing_s": hard_spacing})
-        return "deferred_hard"
-    held_since = getattr(worker, "_syndicate_hard_deferred_at", None)
-    if held_since is not None:
-        payload["hard_deferred_s"] = round(now - held_since, 1)
-    _touch(stamp_path)
-    worker.alive = False
-    _log("WEB_WORKER_MEMORY_RECYCLE", payload)
-    return "recycled"
+    return _recycle_if_over(worker, now=now, anon=anon_mb_reader(), limit=limit, stamp_path=stamp_path)
+
+
+# The request path (4 threads) and the memory watch's thread share one worker's guard state.
+_GUARD_LOCK = threading.Lock()
+
+
+def _recycle_if_over(worker, *, now: float, anon: float | None, limit: float, stamp_path: str,
+                     source: str | None = None) -> str:
+    """The guard's decision on one reading, shared by `decide_recycle` (after requests) and `memory_watch_tick`
+    (on a timer, `source="timer"`). Returns below_limit / too_young / deferred / deferred_hard / recycled / skipped."""
+    with _GUARD_LOCK:
+        if not getattr(worker, "alive", True):
+            return "skipped"
+        if anon is None or anon < limit:
+            # A dip ends any hold: a later hard crossing is a NEW hold, logged and timed from its own start.
+            worker._syndicate_hard_pending = False
+            worker._syndicate_hard_deferred_at = None
+            return "below_limit"
+        age = now - float(getattr(worker, "_syndicate_born", now))
+        if age < min_age_seconds():
+            return "too_young"
+        hard = anon >= limit + hard_margin_mb()
+        emergency = anon >= limit + hard_margin_mb() + emergency_margin_mb()
+        other = _recent_recycle_age(now, stamp_path)
+        payload = {"pid": os.getpid(), "anon_mb": round(anon, 1), "limit_mb": round(limit, 1), "hard": hard,
+                   "emergency": emergency, "requests": int(getattr(worker, "_syndicate_requests", 0)),
+                   "age_s": round(age, 1), "last_recycle_age_s": None if other is None else round(other, 1)}
+        if source:
+            payload["source"] = source
+        if not hard and other is not None and other < recycle_spacing_seconds():
+            if not getattr(worker, "_syndicate_deferred_logged", False):
+                worker._syndicate_deferred_logged = True
+                _log("WEB_WORKER_MEMORY_RECYCLE_DEFERRED", payload)
+            return "deferred"
+        hard_spacing = hard_recycle_spacing_seconds()
+        if hard and not emergency and hard_spacing > 0 and other is not None and other < hard_spacing:
+            worker._syndicate_hard_pending = True
+            if getattr(worker, "_syndicate_hard_deferred_at", None) is None:
+                worker._syndicate_hard_deferred_at = now
+                _log("WEB_WORKER_MEMORY_RECYCLE_DEFERRED", {**payload, "hard_spacing_s": hard_spacing})
+            return "deferred_hard"
+        held_since = getattr(worker, "_syndicate_hard_deferred_at", None)
+        if held_since is not None:
+            payload["hard_deferred_s"] = round(now - held_since, 1)
+        _touch(stamp_path)
+        worker.alive = False
+        _log("WEB_WORKER_MEMORY_RECYCLE", payload)
+        return "recycled"
+
+
+# THE QUIET-WORKER MEMORY WATCH -- lane `web-silent-worker-kills` `[2026-11-24]`, user 11-23 "Yes, after the reading".
+# The guard above reads memory only after every 5th request, so a worker that grows between requests (the board
+# warmer, a long request) has no bound short of the kernel. Measured: worker 352017 (11-23, then GC-tuned) reached
+# ~9.7 GB (7,429 MB resident + ~2,260 MB swapped) 5 min 12 s after booting, swap ran out, its main loop stalled
+# 50.33 s, and the kernel OOM killer took it at 1:28:53 PM CST -- the only kill without a WORKER TIMEOUT since 11-01.
+# A daemon thread reads `/proc/self/status` every `memory_watch_seconds()` and:
+#   1. applies the SAME guard on that reading (limit, min age, stagger; `"source": "timer"` on its lines), so a quiet
+#      worker over its limit recycles gracefully: it stops accepting and drains what it holds;
+#   2. ABORTS at `memory_abort_mb()` of anon + swap, at any age and even while draining: a graceful recycle waits
+#      for the request that holds the drain, and that request may be the one growing. The abort logs
+#      `WEB_WORKER_MEMORY_ABORT`, touches the stagger stamp and leaves with `os._exit(MEMORY_ABORT_EXIT_CODE)`, so its
+#      in-flight requests fail. Sizing: the largest of 5,664 `WEB_WORKER_MEMORY_RECYCLE` readings 10-31..11-24 was
+#      1,447 MB and none reached 2,000 MB, so 2,500 MB never fires on a worker the guard would have recycled anyway.
+# It starts only in a worker `post_fork` armed, never in a process that merely calls the hook (a test).
+# Switches: `SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS` (default 0 = OFF until it is loaded on its own, after the
+# GC revert's kill reading; 5 is the intended value), `SYNDICATE_WEB_WORKER_MEMORY_ABORT_MB` (default 2,500; <= 0
+# disables only the abort). Proof lines: `WEB_MEMORY_WATCH_ARMED` per worker, then the recycle / abort lines.
+MEMORY_ABORT_EXIT_CODE = 70  # not gunicorn's 3 / 4, which halt the arbiter: it logs "exited with code 70" and replaces it
+
+
+def memory_watch_seconds() -> float:
+    return _float_env("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", 0.0)
+
+
+def memory_abort_mb() -> int:
+    return _env_int("SYNDICATE_WEB_WORKER_MEMORY_ABORT_MB", 2500)
+
+
+def rss_anon_swap_mb(status_path: str = "/proc/self/status") -> tuple[float | None, float | None]:
+    """(RssAnon, VmSwap) in MB, or (None, None) where /proc is unavailable. Under memory pressure RssAnon alone
+    shrinks as pages swap out, so the abort reads both."""
+    anon = swap = None
+    try:
+        with open(status_path, "r", encoding="ascii", errors="replace") as handle:
+            for line in handle:
+                if line.startswith("RssAnon:"):
+                    anon = int(line.split()[1]) / 1024.0
+                elif line.startswith("VmSwap:"):
+                    swap = int(line.split()[1]) / 1024.0
+    except (OSError, ValueError, IndexError):
+        return None, None
+    return anon, swap
+
+
+def memory_watch_tick(worker, *, now: float, reader, stamp_path: str, exit_now=None, streams=None) -> str:
+    """One timed reading. Returns no_reading / aborted / draining / skipped / below_limit / too_young / deferred /
+    deferred_hard / recycled. On the abort path it does not return (unless `exit_now` is a stub)."""
+    anon, swap = reader()
+    if anon is None:
+        return "no_reading"
+    alive = bool(getattr(worker, "alive", True))
+    ceiling = memory_abort_mb()
+    if ceiling > 0 and anon + (swap or 0.0) >= ceiling:
+        _touch(stamp_path)
+        _log("WEB_WORKER_MEMORY_ABORT", {
+            "pid": os.getpid(), "anon_mb": round(anon, 1), "swap_mb": round(swap or 0.0, 1), "abort_mb": ceiling,
+            "alive": alive, "requests": int(getattr(worker, "_syndicate_requests", 0)),
+            "age_s": round(now - float(getattr(worker, "_syndicate_born", now)), 1),
+            "exit_code": MEMORY_ABORT_EXIT_CODE})
+        for stream in (streams if streams is not None else (sys.stdout, sys.stderr, sys.__stdout__, sys.__stderr__)):
+            try:
+                stream.flush()
+            except Exception:  # a closed stream must not keep a runaway worker alive
+                pass
+        (exit_now or os._exit)(MEMORY_ABORT_EXIT_CODE)
+        return "aborted"
+    if not alive:
+        return "draining"
+    limit = float(getattr(worker, "_syndicate_limit_mb", 0.0) or 0.0)
+    if limit <= 0:
+        return "skipped"
+    return _recycle_if_over(worker, now=now, anon=anon, limit=limit, stamp_path=stamp_path, source="timer")
+
+
+def install_memory_watch(worker, *, interval: float | None = None, clock=time.time, reader=None,
+                         stamp_path: str | None = None, exit_now=None, start: bool = True) -> str:
+    """Start the watch thread. Returns armed / disabled / not_armed (no `post_fork` guard state on this worker)."""
+    seconds = memory_watch_seconds() if interval is None else float(interval)
+    if seconds <= 0:
+        return "disabled"
+    if getattr(worker, "_syndicate_born", None) is None:
+        return "not_armed"
+    if float(getattr(worker, "_syndicate_limit_mb", 0.0) or 0.0) <= 0 and memory_abort_mb() <= 0:
+        return "disabled"
+    stop = threading.Event()
+    read = reader or rss_anon_swap_mb
+    stamp = stamp_path or RECYCLE_STAMP_PATH
+
+    def run() -> None:
+        errors = 0
+        while not stop.wait(seconds):
+            try:
+                memory_watch_tick(worker, now=clock(), reader=read, stamp_path=stamp, exit_now=exit_now)
+            except Exception as exc:  # never take the worker down; say so a few times, then stay quiet
+                errors += 1
+                if errors <= 3:
+                    _log("WEB_MEMORY_GUARD_ERROR", {"hook": "memory_watch", "error": f"{type(exc).__name__}: {exc}"})
+
+    thread = threading.Thread(target=run, name="syndicate-memory-watch", daemon=True)
+    worker._syndicate_memory_watch_stop = stop
+    worker._syndicate_memory_watch_thread = thread
+    if start:
+        thread.start()
+    return "armed"

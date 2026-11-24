@@ -751,3 +751,161 @@ def test_gunicorn_itself_accepts_the_worker_exit_hook():
     exec(compile(_SRC.read_text(encoding="utf-8"), str(_SRC), "exec"), namespace)
     cfg.set("worker_exit", namespace["worker_exit"])
     assert cfg.settings["worker_exit"].get() is namespace["worker_exit"]
+
+
+# --------------------------------------------------------------------------------------------
+# The quiet-worker memory watch (2026-11-24, user 11-23 "Yes, after the reading"). Worker 352017 reached ~9.7 GB
+# 5 min after booting and the kernel OOM killer took it on 11-23: the guard reads memory only after every 5th
+# request. These pin: off != on (default OFF until loaded alone); the timer reaches a quiet worker the request path
+# cannot, under the guard's own rules; the abort fires on anon + swap at any age and while draining, and its
+# switch turns it off; a real thread does it; and nothing raises into gunicorn or starts outside a guarded worker.
+# --------------------------------------------------------------------------------------------
+
+
+def _quiet_worker(limit=650.0, born=0.0):
+    return _worker(limit=limit, born=born, requests=0)
+
+
+def test_off_is_not_on_the_memory_watch_is_off_by_default_and_starts_only_when_switched_on(monkeypatch):
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", raising=False)
+    worker = _quiet_worker()
+    assert conf.memory_watch_seconds() == 0.0
+    assert conf.install_memory_watch(worker) == "disabled" and not hasattr(worker, "_syndicate_memory_watch_thread")
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", "5")
+    assert conf.install_memory_watch(worker, start=False) == "armed"
+    assert worker._syndicate_memory_watch_thread.daemon is True
+
+
+def test_the_memory_watch_never_starts_outside_a_worker_post_fork_armed(monkeypatch):
+    """A test (or any stray call) that runs `post_worker_init` in its own process must not get a thread that can
+    `os._exit` that process at the abort ceiling."""
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", "5")
+    assert conf.install_memory_watch(types.SimpleNamespace(alive=True)) == "not_armed"
+
+
+def test_a_quiet_worker_over_its_limit_recycles_on_the_timer_where_the_request_path_cannot(tmp_path, capsys):
+    """Reachability: the request path, between its 5-request checks, does not read memory at all."""
+    by_request, by_timer = _quiet_worker(), _quiet_worker()
+    stamp = str(tmp_path / "stamp")
+    assert conf.decide_recycle(by_request, now=1000.0, anon_mb_reader=lambda: 1300.0, stamp_path=stamp) == "skipped"
+    assert by_request.alive is True
+    tick = conf.memory_watch_tick(by_timer, now=1000.0, reader=lambda: (1300.0, 0.0), stamp_path=stamp,
+                                  exit_now=lambda code: pytest.fail("aborted below the ceiling"))
+    assert tick == "recycled" and by_timer.alive is False
+    [line] = _lines(capsys, "WEB_WORKER_MEMORY_RECYCLE")
+    assert line["source"] == "timer" and line["requests"] == 0 and line["anon_mb"] == 1300.0
+
+
+def test_the_timer_keeps_the_guards_rules(tmp_path):
+    import time as _time
+
+    stamp = str(tmp_path / "stamp")
+    no_exit = {"exit_now": lambda code: pytest.fail("aborted below the ceiling")}
+    assert conf.memory_watch_tick(_quiet_worker(), now=1000.0, reader=lambda: (600.0, 0.0), stamp_path=stamp,
+                                  **no_exit) == "below_limit"
+    assert conf.memory_watch_tick(_quiet_worker(born=990.0), now=1000.0, reader=lambda: (900.0, 0.0),
+                                  stamp_path=stamp, **no_exit) == "too_young"
+    conf._touch(stamp)  # another worker just recycled
+    assert conf.memory_watch_tick(_quiet_worker(), now=_time.time(), reader=lambda: (660.0, 0.0),
+                                  stamp_path=stamp, **no_exit) == "deferred"
+    assert conf.memory_watch_tick(_quiet_worker(limit=0.0), now=1000.0, reader=lambda: (2000.0, 0.0),
+                                  stamp_path=stamp, **no_exit) == "skipped"
+    assert conf.memory_watch_tick(_quiet_worker(), now=1000.0, reader=lambda: (None, None), stamp_path=stamp,
+                                  **no_exit) == "no_reading"
+
+
+def test_the_abort_fires_on_anon_plus_swap_at_any_age_and_while_draining(tmp_path, capsys, monkeypatch):
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_MEMORY_ABORT_MB", raising=False)
+    exits = []
+    draining_and_young = _worker(born=995.0, requests=3)
+    draining_and_young.alive = False
+    stamp = tmp_path / "stamp"
+    tick = conf.memory_watch_tick(draining_and_young, now=1000.0, reader=lambda: (2000.0, 600.0),
+                                  stamp_path=str(stamp), exit_now=exits.append, streams=[])
+    assert tick == "aborted" and exits == [conf.MEMORY_ABORT_EXIT_CODE] and stamp.exists()
+    [line] = _lines(capsys, "WEB_WORKER_MEMORY_ABORT")
+    assert line == {"pid": os.getpid(), "anon_mb": 2000.0, "swap_mb": 600.0, "abort_mb": 2500, "alive": False,
+                    "requests": 3, "age_s": 5.0, "exit_code": 70}
+    # Resident memory alone under the ceiling, nothing swapped: no abort.
+    assert conf.memory_watch_tick(_worker(born=995.0), now=1000.0, reader=lambda: (2400.0, 0.0),
+                                  stamp_path=str(stamp), exit_now=exits.append, streams=[]) == "too_young"
+    assert exits == [70]
+
+
+def test_off_is_not_on_the_abort_switch(tmp_path, monkeypatch):
+    exits = []
+    draining = _worker()
+    draining.alive = False
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_MEMORY_ABORT_MB", "0")
+    assert conf.memory_watch_tick(draining, now=1000.0, reader=lambda: (9000.0, 900.0), stamp_path=str(tmp_path / "s"),
+                                  exit_now=exits.append, streams=[]) == "draining"
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_MEMORY_ABORT_MB", "2500")
+    assert conf.memory_watch_tick(draining, now=1000.0, reader=lambda: (9000.0, 900.0), stamp_path=str(tmp_path / "s"),
+                                  exit_now=exits.append, streams=[]) == "aborted"
+    assert exits == [70]
+
+
+def test_the_abort_exit_code_does_not_halt_gunicorn():
+    arbiter = pytest.importorskip("gunicorn.arbiter")
+    assert conf.MEMORY_ABORT_EXIT_CODE not in (arbiter.Arbiter.WORKER_BOOT_ERROR, arbiter.Arbiter.APP_LOAD_ERROR)
+
+
+def test_a_real_watch_thread_recycles_a_quiet_worker(tmp_path, capsys):
+    import time as _time
+
+    worker = _quiet_worker()
+    assert conf.install_memory_watch(worker, interval=0.01, reader=lambda: (700.0, 0.0),
+                                     stamp_path=str(tmp_path / "stamp"),
+                                     exit_now=lambda code: pytest.fail("aborted below the ceiling")) == "armed"
+    try:
+        deadline = _time.monotonic() + 5.0
+        while worker.alive and _time.monotonic() < deadline:
+            _time.sleep(0.01)
+    finally:
+        worker._syndicate_memory_watch_stop.set()
+        worker._syndicate_memory_watch_thread.join(2.0)
+    assert worker.alive is False
+    assert _lines(capsys, "WEB_WORKER_MEMORY_RECYCLE")[0]["source"] == "timer"
+
+
+def test_the_watch_thread_never_raises_and_stays_quiet_after_three_errors(tmp_path, capsys):
+    import time as _time
+
+    calls = []
+
+    def broken():
+        calls.append(1)
+        raise OSError("no /proc")
+
+    worker = _quiet_worker()
+    conf.install_memory_watch(worker, interval=0.005, reader=broken, stamp_path=str(tmp_path / "stamp"))
+    try:
+        deadline = _time.monotonic() + 5.0
+        while len(calls) < 6 and _time.monotonic() < deadline:
+            _time.sleep(0.01)
+        assert worker._syndicate_memory_watch_thread.is_alive(), "an error must not end the watch"
+    finally:
+        worker._syndicate_memory_watch_stop.set()
+        worker._syndicate_memory_watch_thread.join(2.0)
+    errors = _lines(capsys, "WEB_MEMORY_GUARD_ERROR")
+    assert len(calls) >= 6 and len(errors) == 3 and {e["hook"] for e in errors} == {"memory_watch"}
+
+
+def test_rss_anon_swap_mb_reads_both_fields(tmp_path):
+    status = tmp_path / "status"
+    status.write_text("Name:\tpython\nRssAnon:\t 2097152 kB\nVmSwap:\t  524288 kB\n", encoding="ascii")
+    assert conf.rss_anon_swap_mb(str(status)) == (2048.0, 512.0)
+    assert conf.rss_anon_swap_mb(str(tmp_path / "missing")) == (None, None)
+
+
+@pytest.mark.skipif(not os.path.exists("/proc/self/status"), reason="needs Linux /proc")
+def test_rss_anon_swap_mb_reads_this_process():
+    anon, swap = conf.rss_anon_swap_mb()
+    assert anon is not None and anon > 0 and swap is not None and swap >= 0
+
+
+def test_post_worker_init_logs_the_memory_watch_state(monkeypatch, capsys):
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", raising=False)
+    conf.post_worker_init(types.SimpleNamespace())
+    [armed] = _lines(capsys, "WEB_MEMORY_WATCH_ARMED")
+    assert armed["memory_watch"] == "disabled" and armed["interval_s"] == 0.0 and armed["abort_mb"] == 2500
