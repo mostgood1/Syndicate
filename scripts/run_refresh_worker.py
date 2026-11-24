@@ -2904,6 +2904,14 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
 
     total_calibration = calibrate_snapshot_totals(snapshot, ratings=ratings, date_str=now_utc.date().isoformat())
 
+    # THE LIVE MARGIN ANCHOR (todo #859, lane ncaaf-margin-aware-endgame): each live re-sim lane's margin and win
+    # probability moved by (closing consensus home margin - the engine's own kickoff margin) x the share of regulation
+    # left, on the ratings this tick just ran on. `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR` absent = off: returns None and
+    # touches nothing, so the snapshot and this tick's status stay byte-identical (`ncaaf/live_margin_anchor.py`).
+    from syndicate.features.ncaaf.live_margin_anchor import anchor_snapshot_margins
+
+    margin_anchor = anchor_snapshot_margins(snapshot, ratings=ratings, date_str=now_utc.date().isoformat())
+
     written = False
     valid, reason = validate_live_lens_snapshot(snapshot)
     if valid:
@@ -2933,6 +2941,8 @@ def _run_ncaaf_live_resim_tick() -> dict[str, Any] | None:
     }
     if total_calibration is not None:  # only when on, so the status is byte-identical when off
         result["total_calibration"] = total_calibration
+    if margin_anchor is not None:  # only when on, as above
+        result["margin_anchor"] = margin_anchor
     # CAPTURED PREGAME LINES OUTLIVE THE TICK, bounded: a line is only needed
     # until its game is final, so anything captured more than two days ago goes.
     cutoff = now_utc - timedelta(days=2)
