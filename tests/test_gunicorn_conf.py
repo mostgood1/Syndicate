@@ -204,9 +204,9 @@ def test_post_fork_respects_both_switches(monkeypatch, capsys):
     assert armed["arena_cap_applied"] is None
 
 
-# No automatic full collections in a web worker (lane `web-silent-worker-kills`, 2026-11-23): the longest main-loop
-# stall of 11-21, 18.57 s, was one full collection that freed nothing.
-def test_post_fork_stops_automatic_full_collections_and_says_so(monkeypatch, capsys):
+# The GC tuning (lane `web-silent-worker-kills`, 2026-11-23: no automatic full collections in a web worker) is OFF by
+# default since 2026-11-24: on its first day a tuned worker reached ~9.7 GB and the kernel OOM killer took it.
+def test_post_fork_leaves_cpython_full_collections_by_default_and_says_so(monkeypatch, capsys):
     import syndicate.features.shared.memory_observability as mo
 
     monkeypatch.setattr(mo, "configure_malloc_arenas", lambda n: True)
@@ -214,23 +214,40 @@ def test_post_fork_stops_automatic_full_collections_and_says_so(monkeypatch, cap
     gc.set_threshold(700, 10, 10)
     worker = types.SimpleNamespace(alive=True)
     conf.post_fork(None, worker)
+    assert gc.get_threshold() == (700, 10, 10)
+    [tuned] = _lines(capsys, "WEB_GC_TUNED")
+    assert tuned == {"pid": os.getpid(), "applied": False, "reason": "SYNDICATE_WEB_GC_AUTO_FULL",
+                     "before": [700, 10, 10], "after": [700, 10, 10]}
+    assert len(worker._syndicate_gc_at_fork) == 3, "the fast exit still counts collections from here"
+
+
+def test_post_fork_applies_the_tuning_only_when_switched_off(monkeypatch, capsys):
+    import syndicate.features.shared.memory_observability as mo
+
+    monkeypatch.setattr(mo, "configure_malloc_arenas", lambda n: True)
+    monkeypatch.setenv("SYNDICATE_WEB_GC_AUTO_FULL", "0")
+    gc.set_threshold(700, 10, 10)
+    conf.post_fork(None, types.SimpleNamespace(alive=True))
     assert gc.get_threshold() == (700, 10, conf.GC_FULL_THRESHOLD_OFF)
     [tuned] = _lines(capsys, "WEB_GC_TUNED")
     assert tuned == {"pid": os.getpid(), "applied": True, "before": [700, 10, 10], "after": [700, 10, 2**31 - 1]}
-    assert len(worker._syndicate_gc_at_fork) == 3, "the fast exit counts collections from here"
 
 
-@pytest.mark.parametrize("on", ["1", "true", "ON", "yes"])
-def test_off_is_not_on_for_the_gc_tuning(monkeypatch, on):
+@pytest.mark.parametrize("on", [None, "", "1", "true", "ON", "yes", "garbage"])
+@pytest.mark.parametrize("off", ["0", "false", "OFF", "no"])
+def test_off_is_not_on_for_the_gc_tuning(monkeypatch, on, off):
     gc.set_threshold(700, 10, 10)
-    monkeypatch.setenv("SYNDICATE_WEB_GC_AUTO_FULL", on)
+    if on is None:
+        monkeypatch.delenv("SYNDICATE_WEB_GC_AUTO_FULL", raising=False)
+    else:
+        monkeypatch.setenv("SYNDICATE_WEB_GC_AUTO_FULL", on)
     assert conf.tune_gc()["applied"] is False and gc.get_threshold() == (700, 10, 10)
-    monkeypatch.setenv("SYNDICATE_WEB_GC_AUTO_FULL", "0")
+    monkeypatch.setenv("SYNDICATE_WEB_GC_AUTO_FULL", off)
     assert conf.tune_gc()["applied"] is True and gc.get_threshold() == (700, 10, conf.GC_FULL_THRESHOLD_OFF)
 
 
-def test_a_growing_heap_gets_no_automatic_full_collection_once_tuned(monkeypatch):
-    """Reachability on the real collector: the same growth runs full collections stock and none tuned."""
+def test_a_growing_heap_gets_full_collections_by_default_and_none_once_tuned(monkeypatch):
+    """Reachability on the real collector: the same growth runs full collections by default and none tuned."""
     monkeypatch.delenv("SYNDICATE_WEB_GC_AUTO_FULL", raising=False)
 
     def full_collections_while_the_heap_grows() -> int:
@@ -243,14 +260,18 @@ def test_a_growing_heap_gets_no_automatic_full_collection_once_tuned(monkeypatch
 
     gc.set_threshold(700, 10, 10)
     stock = full_collections_while_the_heap_grows()
+    conf.tune_gc()  # the default: leaves CPython's own
+    default = full_collections_while_the_heap_grows()
+    monkeypatch.setenv("SYNDICATE_WEB_GC_AUTO_FULL", "0")
     conf.tune_gc()
     tuned = full_collections_while_the_heap_grows()
     assert stock >= 1, "the stock collector must run a full collection here, or this test proves nothing"
+    assert default >= 1, "the default must keep CPython's full collections"
     assert tuned == 0
 
 
 def test_young_collections_still_free_cycles_once_tuned(monkeypatch):
-    monkeypatch.delenv("SYNDICATE_WEB_GC_AUTO_FULL", raising=False)
+    monkeypatch.setenv("SYNDICATE_WEB_GC_AUTO_FULL", "0")
     conf.tune_gc()
     young_before = gc.get_stats()[0]["collected"] + gc.get_stats()[1]["collected"]
     for _ in range(5_000):

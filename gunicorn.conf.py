@@ -183,20 +183,26 @@ def _touch(stamp_path: str) -> None:
 #   * they were 4 of the 7 main-loop stalls >= 5 s in the 22 h after 11-21 20:14Z, and the longest, 18.57 s: worker
 #     2641469 at 1,199 MB (6:22 PM CST 11-21). The pause grows with the heap, and the memory guard only checks
 #     on requests, so a quiet worker's heap is not bounded (that one had served 10 requests in 79 min);
-#   * they free almost nothing: 7,079 objects in all, over 11,989 logged full collections 11-20 17:03Z..11-23 14:03Z.
+#   * 7,079 objects in all over 11,989 logged full collections 11-20 17:03Z..11-23 14:03Z. That counts OBJECTS, not
+#     bytes: one cyclic container can hold a 36 MB decoded state, so it never showed they free nothing.
 # CPython 3.11 (the fleet's) runs one whenever the survivors since the last exceed a quarter of the long-lived
 # count, and the board warmer's rebuilds keep that true about once a minute per worker.
-# So a web worker keeps the young collections (generations 0 and 1, which catch nearly every cycle) and never
-# starts a full one on its own. Cost: a cycle that reaches the old generation stays until the worker recycles,
-# which the memory guard does anyway. An explicit `gc.collect()` still runs a full collection.
-# Switch: `SYNDICATE_WEB_GC_AUTO_FULL` -- absent / 0 / off = no automatic full collections; 1 / true / on restores
-# CPython's own. Proof line: `WEB_GC_TUNED` per worker; `WEB_WORKER_FAST_EXIT` carries the collections per generation
-# since the fork, so a full collection that still ran is counted, not merely absent from the pause log.
+# The tuning keeps the young collections (generations 0 and 1) and never starts a full one on its own. Cost: a cycle
+# that reaches the old generation stays until the worker recycles. An explicit `gc.collect()` still runs one.
+# REVERTED TO CPYTHON'S OWN BY DEFAULT 2026-11-24 (user "Yes, revert it"). On its first day (loaded 14:17Z 11-23) it
+# removed every full collection, but stalls >= 5 s stayed 3 against 3, and a tuned worker 5 min old reached ~9.7 GB
+# and was killed by the kernel OOM killer (1:28:53 PM CST 11-23): the only kill without a WORKER TIMEOUT since 11-01.
+# The memory guard checks only every 5th request, so nothing bounded it. One event does not prove the tuning caused
+# it, but with full collections off only a recycle frees old cyclic garbage.
+# Switch: `SYNDICATE_WEB_GC_AUTO_FULL` -- absent / 1 / on = CPython's own (default); 0 / false / off / no = the tuning.
+# Proof line: `WEB_GC_TUNED` per worker (`applied` false by default); `WEB_WORKER_FAST_EXIT` carries the collections
+# per generation since the fork, so a full collection is counted, not merely inferred from the pause log.
 GC_FULL_THRESHOLD_OFF = 2**31 - 1
 
 
 def gc_auto_full_enabled() -> bool:
-    return str(os.environ.get("SYNDICATE_WEB_GC_AUTO_FULL") or "").strip().lower() in {"1", "true", "on", "yes"}
+    """CPython's automatic full collections stay ON unless the switch says off. Absent = on (since 2026-11-24)."""
+    return str(os.environ.get("SYNDICATE_WEB_GC_AUTO_FULL") or "").strip().lower() not in {"0", "false", "off", "no"}
 
 
 def _gc_collections(gc_module) -> list[int]:
@@ -204,7 +210,8 @@ def _gc_collections(gc_module) -> list[int]:
 
 
 def tune_gc(worker=None, *, gc_module=None) -> dict:
-    """Stop automatic full collections in this process (unless switched back on). Returns the `WEB_GC_TUNED` payload."""
+    """Stop automatic full collections in this process only when `SYNDICATE_WEB_GC_AUTO_FULL` is off (default: leave
+    CPython's own). Returns the `WEB_GC_TUNED` payload either way."""
     import gc
 
     g = gc_module or gc
