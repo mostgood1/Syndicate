@@ -63056,3 +63056,150 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **verify:** the next `surface_consistency_check.py` run reads `ask_headline:nba` OK, and the "best bets" headline rows all carry `suggested: true`. The instrument's `ask_headline` check still counts "losing model" rows as bad. That is the old failure shape: board picks are picked on price, and the sim's verdict is shown beside them as information. The check is being changed to fail on non-picks and off-sport rows instead.
 - **Revert:** `git revert a5637a517 80dbb08f3` on main, then ff + reload-web.
 - **Effect on the 11-24 batch:** its STEP 4 range now starts at `d845fe345`. This display-only change is no longer a ride-along there.
+
+## 2026-11-24 08:30:10Z (2:30 AM CST) -- DEPLOY (11-24 window batch: claimed ff d845fe345..672a18e87 + #834 env key + ONE drained full down/up): NFL profile t0.925 (lane nfl-level-refit-load) + NBA live total anchor (todo #834, lane nba-live-resim-total-anchor) + look-ahead lane wait on / day 2 retired (todo #842, lane lookahead-day2-phase-lock) + book grid newest stamp by time (todo #844, lane ncaab-total-overprojection) + Polymarket slate off the odds loop (todo #851, lane polymarket-slate-off-odds-loop) + web shared board copy (todo #853, lane board-read-cold-share; not a betting change) + college orientation join (todo #854, lane college-neutral-site-live-join) + hold-value exit shadow (todo #856, lane hold-value-exits; not a betting change) + basketball off-floor exit (todo #814, lane live-player-exit-gate) + board-split parent self-recycle and recurring-jobs margin (todo #850, lane board-split-memory-guard) + NHL live goalie-change fix (todo #814, lane live-player-exit-gate) + Kalshi same-sport order join (F27, lane kalshi-join-sport-scope) + NHL St. Louis live join through the team-alias fallback (todo #860, lane nhl-live-join-stl-alias) + Polymarket stale-cancel shadow (lane polymarket-stale-cancel; not a betting change) + soccer quote shard by the Central kickoff day (lane evening-utc-date-split) + 0% live EV floor OFF (lane live-ev-floor-off) -- **ALL 16 LOADED; every load-time check MET; live readings OWED**
+- betting change: **yes**. 13 register rows are A, B, C, D, E, G, I, J, K, L, M, O and P. F (#853), H (#856 shadow) and N (Polymarket stale-cancel shadow) are NOT betting changes and are not registered. Run by scheduled task `nfl-level-refit-load-1120` inside the 2026-11-24 window (`betting_change.py window` 08:16Z: "IN WINDOW 2026-11-24 08:00Z..13:00Z"). No `--outside-window`.
+- **User decisions (verbatim, as carried by the task prompt):**
+  - A: "After Friday's reading", then "batch the betting changes into rare windows", then "Yes, that window".
+  - B: "Yes, push it", then "Yes, in 11-24".
+  - Batch: "merge the two into one down/up".
+  - C: "Fix day 1, retire day 2", then "Keep it in the batch".
+  - D: "get 844 landed default off for 11-24", then "Yes, add it".
+  - E: "Yes, build it", then "Queue for 11-24".
+  - F: "Ride along next restart".
+  - G: "Queue for 11-24".
+  - H: "Yes, start it", then "Yes, ride 11-24".
+  - I: "Build an injury signal", then "Yes, 11-24 window".
+  - J: "Yes, build it".
+  - K: "In the 11-24 window".
+  - L: "Yes, build it", then "Yes, queue 11-24".
+  - M: "Yes, build it", then "yes, have the rail monitor add J to the batch" (relayed), then "Yes, add it".
+  - N: "load the polymarket stale cancel in shadow before 12-08".
+  - O: "11-24 window".
+  - P: "Yes, add it tonight".
+  - The (a2) rule: "Yes, change the rule".
+  - 2010b06ca: "Ride tonight's window".
+  - 80dbb08f3: "Yes, add that line". It was already on the fleet at d845fe345, so it was not in range.
+- **Step 0/1:** no lane or todo carried a newer decision cancelling or deferring any change, and none said one had already loaded. TNF 11-19 verdicts:
+  - `nfl-live-possession-map`: CLOSED, GOAL MET (23 of 32 live ticks carried ESPN's real drive).
+  - `nfl-live-resim-event-seeds`: GOAL NOT MET, INCONCLUSIVE (the TNF probe never ran).
+  - `nfl-live-card-situation`: GOAL NOT MET, INCONCLUSIVE (same probe).
+- **Batch commits on main:**
+  - A: `04d199abe`, the cherry-pick of `12034bf24` (`data/calibration/nfl_profile.json` + its pin test).
+  - K: `672a18e87`, the cherry-pick of `dadf23fac`. Both applied without conflict.
+  - Tests at Idle priority, all green: the A/B set 136 passed; the C-O sets 414 passed and 1 skipped; K's set 63 passed.
+  - Pushed `b7454664b..672a18e87` = TARGET.
+- **Ride-alongs** (`d845fe345..672a18e87`, 21 commits). Runtime files besides the batch's own:
+  - `2010b06ca` (#861 step 1b, lane `surface-consistency-oversight`): display-only `layer2_row_context.py` (the explainer `detail` text). Named in STEP 4 as (a).
+  - Tooling (a), all Windows-side scripts that no role imports (grepped against local_production.py, fleet_role_spec.json, pipeline/ and syndicate/):
+    - `46e0deed8` and `1eaa09bac`: `scripts/_base_url.py`, `portfolio_monitor_probe.py`, `portfolio_watch/build_page_data.py`. The only importer is `scripts/run_weekly_backtests.py`, a Windows cron runner.
+    - `a37defa97`: `portfolio_watch/panel_shot.py`.
+    - `5a7d0217d`: `surface_consistency_check.py`.
+    - `f41762fd4`: `s8_lip_shadow.py`.
+  - Report output `6e04ca3e8` (`reports/live_gameline_accuracy/history.jsonl`, nightly append; roles name it only in comments).
+  - The rest is ledger.
+  - 0 (a2), 0 (b), 0 (c).
+- **Gates:**
+  - Claims on web / refresh-worker / live-odds-worker, holder `nfl-level-refit-load`, target 672a18e87, TTL 2,700 s. Acquired ~08:23:39Z, rc 0 each.
+  - Env: 14 kit applies in order 08:23:56-08:23:59Z, each printing its success markers.
+    - EARLIEST backup: `/home/amyn/syndicate-prod/local_production.env.bak-totalanchor-20261124T082356Z`.
+    - Per-change backups: `.bak-lookahead-20261124T082356.520665171Z-751734`, `.bak-grid844-...082356.609470481Z-751748`, `.bak-slate851-...082356.823161109Z-751771`, `.bak-shared853-...082357.044653602Z-751793`, `.bak-orient854-...082357.257251974Z-751815`, `.bak-hv856-...082357.481938181Z-751837`, `.bak-offfloor814-...082357.711921527Z-751860`, `.bak-bmg850w-...082357.930808209Z-751882`, `.bak-kscope-...082358.356493457Z-751919`, `.bak-nhlstl-...082358.569153339Z-751941`, `.bak-pmstale-...082358.789214897Z-751963`, `.bak-eud-...082359.022591955Z-751987`, `.bak-floor-...082359.247800970Z-752009`.
+    - N was applied with `apply shadow` only (`lines_pmstale_on=0`). H printed `lines_hv856_on=0`.
+    - P printed `removed REFRESH_WORKER__SYNDICATE_LIVE_EV_FLOOR=0`, `lines_any_floor_key=0`.
+  - Env snapshot BEFORE the down (`/home/amyn/syndicate-prod/run/env_before_window_1124.json`): web 160 / refresh-worker 267 / live-odds-worker 236 keys.
+  - Baselines read 08:24:14Z:
+    - fleet HEAD d845fe345; NFL profile on disk `nfl-808-v3h0.03-t0.825` (TD multiplier 0.825); refresh-worker pid 4109821.
+    - Every batch key ABSENT in both workers, and F's and D's keys ABSENT on the web master and workers. The exception: refresh-worker `SYNDICATE_LIVE_EV_FLOOR=0`.
+    - K: `nhl_k_players_out 0`, refusal None.
+    - L replay at 08:24Z: 11-24 off/report/on matched 822/822/822; 11-25 454/454/454; `report_pairs_equal_off=True`; all four `_by_on_` 0.
+    - N over 24 h: 0 would_cancel / cancel_stale / cancel_sent; 28 Polymarket orders with state lines; 0 untouched >= 15 min.
+    - O: HOU @ SJ 433 rows in grid 2026-11-25 [utc-day] and 9 in 2026-11-24 [CENTRAL]; MIA @ CLB 158 and VAN @ RSL 172 in 2026-11-28; STL @ LAFC 102 and DAL @ POR 163 in 2026-11-29.
+    - P over 3 h: 37 `LIVE_EV_FLOOR` lines, 37 plan writes each; Kalshi rows_in 768 / 5 positions, Polymarket 722 / 8; 6 live orders.
+  - Drain (`kit_drain.sh drain`, under refresh-worker's environ): CLEAR ~08:28:1xZ after the in-flight board build. A soccer live odds job (`run_refresh_odds_job.py` -> `refresh_odds_sources.py --sports soccer`) then started at ~08:28:10Z under the drain, and refresh-worker's first preflight read HOLD (3 jobs). The odds-job drain does not stop new short odds jobs; the preflight is the gate (memory "RW-only drain"). The check loop read CLEAR at 08:29:49Z.
+  - Preflight from this worktree at origin/main, `--target fleet --betting-change yes --target-commit 672a18e87021...`, baseline read 08:24:14Z:
+    - refresh-worker: 13 expect/baseline pairs (head, fresh_process_profile, pid=new, and the C/D/G/J/L/M/O/P keys).
+    - live-odds-worker: 5 (B/E/H/N/O).
+    - web: 2 (D/F).
+    - **JOINT CLEAR ~08:29:5xZ**, rc 0 x3.
+- **Load:**
+  - `kit_ff_down.sh d845fe345... 672a18e87...`: dirty overlap 0; ff at 08:30:10.140Z, head_now 672a18e87; watchdog marker set; `down` 08:30:10Z -> 08:30:27Z, rc 0.
+  - `Start-ScheduledTask SyndicateLocalProduction` 08:30:34Z. Supervisor 753682 since 08:30:37Z.
+  - healthz 200 at 08:30:37Z.
+  - Pids: web master 753703 (workers 753704 / 753717); refresh-worker 753771 (`[refresh_worker] BOOTED` 08:30:37.458Z; board child 753816); live-odds-worker 753772 (started 08:30:36Z).
+  - Watchdog marker removed; the new refresh-worker undrained (`DRAIN_CLEARED`).
+- **expect -> measured** (read 08:31:33-08:36:21Z):
+  - **Code and boot:**
+    - `fleet_checkout_head` -> 672a18e87: **MET**. Every role shows `code=672a18e8` and `up`, restarts 0. The supervisor start lines read `money: LIVE -- real orders can be placed`.
+    - `fresh_process_profile` -> `nfl-813-refit-v3h0.03-t0.925`: **MET**. A fresh process under refresh-worker's environ printed `NFL_CALIBRATION_PROFILE_METADATA` version `nfl-813-refit-v3h0.03-t0.925`. The multiplier is in the profile file, measured 0.925 by the cherry-picked pin test; the metadata dict does not carry it.
+    - `refresh_worker_pid` -> new: **MET**. 4109821 -> 753771, started 08:30:36Z, after HEAD moved at 08:30:10Z (`rw_commit.py`: loaded=True). A `[refresh_worker] BOOTED` line and an `[intelligence_state] LOOP_ITERATION` line (08:30:39.545Z) appeared since the down.
+  - **The batch's keys in each role's environ**, all **MET** (from /proc; web read with `kit_web_env.py`):
+    - B: live-odds-worker `SYNDICATE_NBA_LIVE_TOTAL_ANCHOR=on`; refresh-worker ABSENT.
+    - C: refresh-worker `LOOK_AHEAD_LANE_WAIT=on`, `LOOK_AHEAD_48H_ENABLED=false`; live-odds-worker ABSENT.
+    - D: `BOOK_GRID_NEWEST_BY_TIME=on` on refresh-worker, live-odds-worker, the web master and both web workers.
+    - E: live-odds-worker `POLYMARKET_SLATE_MAIN_LOOP_BACKGROUND=1`; refresh-worker ABSENT.
+    - F: `COMBINED_BOARD_SHARED_COPY=1` on the web master and both workers.
+    - G, I, L, M, O: `on` in both workers (global lines).
+    - H: live-odds-worker `EXIT_HOLD_VALUE=shadow`; refresh-worker ABSENT.
+    - J: refresh-worker 1500 / 400; live-odds-worker ABSENT.
+    - N: live-odds-worker `POLYMARKET_STALE_CANCEL=shadow`; refresh-worker ABSENT; web ABSENT; `lines_pmstale_on=0`.
+    - P: `SYNDICATE_LIVE_EV_FLOOR` ABSENT on every role.
+  - **Env compare** (`--expect-added` x15 `--expect-removed SYNDICATE_LIVE_EV_FLOOR`): rc 3, `UNEXPECTED=['~PATH']` on all three roles. Every added and removed key was exactly the batch's, and per role:
+    - web added D, F, G, I, L, M, O;
+    - refresh-worker added C, D, G, I, J, L, M, O and removed the floor;
+    - live-odds-worker added B, D, E, G, H, I, L, M, N, O;
+    - besides that, only SYNDICATE_GIT_COMMIT, INSTANCE_ID, WSL_INTEROP and PATH changed.
+    - **PATH is the one unexpected change.** The new PATH has 31 entries: 10 Linux and 21 `/mnt/` Windows-interop entries, 6 of them Python-named. The Linux part was not compared entry by entry; the old processes are gone and the snapshot holds hashes only. Likely cause, not proven: WSL appends the Windows PATH at launch, and Windows Python was reinstalled 11-20/11-21 (memory "Windows py -3 went bare") after the last up on 11-19. Roles run the venv python by absolute path. Recorded, not acted on.
+  - **E #851:** **MET** (load-time).
+    - `POLYMARKET_SLATE_MAIN_LOOP mode=background` lines: 2 by 08:36Z.
+    - `POLYMARKET_US_SLATE_WRITE` lines: 2.
+    - `POLYMARKET_SLATE_BACKGROUND_FAILED`: 0.
+  - **F #853:** **MET**.
+    - Two read-only `/intelligence` loads: 200 in 4.55 s, then 200 in 0.10 s.
+    - `COMBINED_BOARD_SHARED_ARMED` pid 753704 at 08:33:21Z; `PUBLISHED rows=4500 mb=23.9` at 08:33:22Z; BUILD 1.
+    - OFF 0, PUBLISH_FAILED 0, READ_FAILED 0.
+  - **G #854:** **MET**. 0 `mode=shadow` and 0 `mode=off` lines; 0 `mode=on` lines, as expected with no live college game.
+  - **H #856:** **MET**.
+    - The first `EXIT_TICK status=ok` (08:31:19Z) read `live=31` and `hold_value={'mode': 'shadow', 'rows': 31, 'assessed': 224, ... 'by_source': {'venue_mid': 224}}`.
+    - Its reasons hold no `hold_value_hold`. `EXIT_TICK_FAILED` 0.
+    - `shadow_2026-11-24.jsonl` exists (24,007 B).
+  - **I #814:** **MET**. `on` in both workers; 0 Tracebacks.
+  - **J #850:** **MET**.
+    - `BOARD_PROCESS_PARENT_RECYCLE_ARMED pid=753771 threshold_mb=1500 window_utc=09-12 min_uptime_s=21600 boot_head=672a18e87021` at 08:30:38.965Z (exactly one).
+    - `BOARD_PROCESS_CHILD_SWITCHES ... jobs_margin_mb=400`.
+    - 0 `BOARD_PROCESS_PARENT_RECYCLE pid=` lines.
+  - **K #814 NHL:** **MET**.
+    - The fleet log carries the commit (count 1).
+    - `kit_nhl_k.sh`: `nhl_k_players_out 2`, `NSH J. Annunen` and `NSH J. Saros goalie_change key=True boxscore`, `nhl_k_gameline_refusal key_player_out`.
+    - live-odds-worker started after the ff.
+  - **L F27:** **MET**.
+    - refresh-worker `SPORT_SCOPE mode=on would_change=0` lines from 08:31:28Z on; live-odds-worker report 0 / off 0.
+    - Same-inputs replay on `/home/amyn/Syndicate` at 08:33:51Z, 11-24: off/report/on matched 829/829/829, `report_pairs_equal_off=True`, `lost_by_on_own_sport=0`, `gained_by_on_other_sport=0`.
+  - **M #860:** **MET** (env). The key is `on` in refresh-worker and web. The rail check printed `no live NHL moneyline / puck-line rows on the rail right now`, which is expected.
+  - **N shadow:** **MET**. Since the up: `cancel_stale=0`, `cancel_sent=0`, `hook_failed=0`, would_cancel 0.
+  - **O:** env **MET** (`on` in all three roles). P-E1 **MET** at 08:42:55Z: HOU @ SJ (kickoff 2026-11-25T03:00Z, central_day 2026-11-24) had `grid 2026-11-24 [CENTRAL] rows=432 post_load_rows=432 newest_update=08:40:39Z` and `grid 2026-11-25 [utc-day] post_load_rows=0`. At 08:36Z and 08:40Z no soccer fetch had written yet.
+  - **P:** P-F1 **MET** (ABSENT on every role, `lines_any_floor_key=0`, compare shows `removed=['SYNDICATE_LIVE_EV_FLOOR']` on refresh-worker). P-F2 **MET**: 0 `LIVE_EV_FLOOR` lines since the up, against 37 in the 3 h before. The first plan writes read Kalshi rows_in 9 / 1 position (08:35:58Z) and Polymarket 12 / 0 (08:36:02Z), against 768 / 722 before.
+  - **Harm:** 0 Traceback lines (timestamped) since the down in web, refresh-worker and live-odds-worker, read 08:36:18Z.
+- **OWED:**
+  - **A, NFL:** the next NFL projection CSV on the new profile; the first live NFL game on it; the #780 width re-fit after a few post-load games.
+  - **B, #834:** the first live NBA ticks with `total_anchored=` (task `nba-total-anchor-verify-1124`, 9:30 PM CST tonight).
+  - **C, #842:** option-(b) Pb readings (task `lookahead-b-reading-1125`).
+  - **D, #844:** P1-P4 on the first evening NCAAB slate.
+  - **E, #851:** P1-P5 (the rail monitor, 00-05Z 11-25).
+  - **F, #853:** P1-P6, 5-11 PM CST.
+  - **G, #854:** P1-P4 at the first reversed NCAAB game.
+  - **H, #856:** the 12-07 grade.
+  - **I, #814:** the first `reason=off_floor`.
+  - **J, #850:** P1-P5 (task `board-parent-recycle-reading-1126`; the first parent self-recycle is possible from 11-25 09Z).
+  - **K, #814 NHL:** the first live NHL goalie-change refusal.
+  - **L, F27:** P1-P3 at +24 h / +7 d (task `kalshi-sport-scope-reading-1125`).
+  - **M, #860:** the first live St. Louis Blues game.
+  - **N:** S1-S3 at +3 d (task `pm-stale-shadow-reading-1127`).
+  - **O:** P-E1..P-E4, P-E3 at HOU @ SJ 9:00 PM CST tonight.
+  - **P:** P-F3 over the next CST day.
+- **Revert paths** (each is allowed outside a window):
+  - B, C, D, E, F, G, H, I, J, L, M, N, O: remove that change's env line(s) + a drained full down/up.
+  - P: `kit_env_floor.sh restore /home/amyn/syndicate-prod/local_production.env.bak-floor-20261124T082359.247800970Z-752009` + a drained full down/up. Re-enabling the floor is itself a betting change, so it needs the user's yes.
+  - K: `git revert 672a18e87` + claimed ff + a live-odds-worker TERM, with check_deploy_safety first.
+  - A: `git revert 04d199abe` + claimed ff + a drained refresh-worker TERM.
+  - Whole env: restore the EARLIEST backup above.
+- **Claims:** released after this entry and the register rows were pushed.
