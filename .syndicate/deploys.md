@@ -63276,3 +63276,23 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Portfolio plan:** 14:18:06 CST (before) and 14:27:34 CST (first after) both carry no `key_player_out`; the after plan has rows_in 25 and live positions 0. Expected, since no live row for the game existed.
 - **What this adds:** CHANGE I fires on a second game, with the same path (detect -> tick refusal -> hold). Both WNCAAB exits so far were in games the board never priced live, so a priced WNCAAB withdrawal is still unmeasured.
 - verify: `C:/tmp/lpeg/w1124/exit_read.sh wncaab 401918037 Colgate` 20:22:43Z; `led_names.sh` (ledger game counts); hold probe 20:22:28Z; plan reads 20:22:29Z and 20:28:29Z (`kpo_1124.py`).
+
+## 2026-11-24 20:31:36Z (2:31 PM CST) -- READING (no deploy): FIRST NCAAB unmodelled key exit read LIVE through every layer, on a game the board WAS pricing live -- ORST Daniel Freitag, `off_floor` (lane `live-player-exit-gate`, #814)
+- betting change: no -- a reading; nothing loaded.
+- **The exit:** San Francisco @ Oregon State (ESPN event 401917676; odds event `805ca96e9d27ffe645d7a7f11348756f`, which the odds feed orients as Oregon St @ San Francisco). ESPN pbp: Freitag (ORST starter) off `since=2026-11-24T19:49:26Z` (1:49 PM CST). The cause is not known from the feed.
+- **Detected:** `[ncaab_live_resim] PLAYER_OUT event=401917676 team=ORST player='Daniel Freitag' reason=off_floor key=True source=pbp` at 20:31:36Z; tick `live_games=8 key_players_out=1 refused_games=1` at 20:31:55Z.
+- **Board (the withdrawal is measured, unlike the two WNCAAB exits):**
+  - book_grid ncaab `LIVE_GAMELINE_BUILD date=2026-11-24`: index 8 -> 7 and full_games 8 -> 7 at 20:32:29Z (still 7 at 20:33:45Z).
+  - `live_gameline_ledger_2026-11-24.jsonl`: the game had 588 full-game rows from 19:08:36Z, 156 of them priceable, last at 20:31:31Z. There were 0 full-game rows after the refusal.
+  - The only later rows are h2 at 20:33:44Z: `priceable=false`, `withheld_reason=segment_pricing_disabled`, all model fields null.
+  - The same orientation mismatch as Hayes and Traore (feed away/home vs ESPN) did not stop the match.
+- **Still listed:** `book_grid_inplay_2026-11-24.json` (written 20:34:53Z) still lists 15 cards for the game: 11 full totals, 1 spread, 1 h2h and 2 h2 totals.
+  - All are `market_state=live`, `fair_method=consensus`, `model_edge_pct=None`, `pregame_on_live=True`, `ev_pct` -3.01..0.0, and 0 in `rows_inplay` / `opportunities`.
+  - These are the consensus-fair in-play cards every live game gets (a non-ORST card reads the same way). They carry no model price. Whether a consensus card counts as "pricing that game's live gamelines" under the goal is an OPEN QUESTION for the user, not a defect claimed here.
+- **Entry hold:** probed 20:33:57Z (`lpeg_holdprobe_soc.sh ncaab`): San Francisco Dons @ Oregon St Beavers -> `{'verdict': 'fail', 'reason': 'key_player_out', 'players': ['ORST:Daniel Freitag:off_floor'], 'snapshot_at': '2026-11-24T14:31:55-06:00'}`.
+- **Portfolio plan:**
+  - Plans at 14:27:34 CST (before) and 14:39:52 CST (first after) both carry no `key_player_out`.
+  - The after plan has rows_in 29, live positions 0, 0 mentions of Oregon St or San Francisco, and ncaab refusals `in_play_market_fair` 4 only.
+  - No row of the game reached the plan, so the backstop was not exercised.
+- **Not measured:** the lift; his live props; the detection lag against the moment the 8-min 2nd-half rule tripped.
+- verify: `C:/tmp/lpeg/w1124/exit_read.sh ncaab 401917676 "Oregon St"` 20:33:54Z; `orst_rows.sh` / `orst_rows2.sh` (ledger rows per build, priceable counts); `orst_cards.sh` / `orst_cards2.sh` (in-play cards); hold probe 20:33:57Z; plan reads 20:33:58Z and 20:40:54Z.
