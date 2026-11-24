@@ -2198,6 +2198,14 @@ death, never life — do not invert it.
 - Verification: Pre-registration committed before any outcome is read; the pinned run on the fleet host at nice 19 prints the instrument check (v7 unscaled == AC(raw, sims) and tempered == scale(unscaled, 1.8)), then the fit, walk-forward and #780's rule; verdict recorded in the findings, todo #780 and this lane
 - Blocked by: none
 
+### width-fit-engine-prob — OPEN — opened 2026-11-24 — session 6bcf0cef-56b5-4859-9cd4-14c4f0896a9c
+- Goal: scripts/live_totals_width_fit.py fits k on the ENGINE's number by default (model_home_win_prob_unscaled before #780's k, model_home_win_prob_uncalibrated before #816's calibration; a row tempered with no engine number beside it is dropped and counted), with P_SOURCE=ac (the Agresti-Coull point the pricer tempers) and P_SOURCE=recorded (the old read); output unchanged on the shipped fits' windows; on main (user 'Yes, land it', 11-24). Not a betting change: no fleet role runs it
+- Files: scripts/live_totals_width_fit.py (fit_prob + P_SOURCE + the probability read in load() only), tests/test_live_totals_width_fit_source.py (NEW), .syndicate/findings_2026-11-24_ncaaf_raw_spreads_k_refit.md, docs/ai_context/todo.md (the NCAAF raw spreads-k re-fit bullet in #780 only)
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: tests: off != on through load() (recorded vs engine on a tempered row), each source on v5/v6/v7 rows, a tempered row with no engine number dropped; on the fleet ledger at nice 19: default on <= 11-12 reproduces 1.797 exactly; through 11-21 default = the kit's S2 1.894, P_SOURCE=ac = the kit's 1.872, P_SOURCE=recorded = the TRAP's 1.800
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
