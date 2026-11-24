@@ -58,7 +58,7 @@
   - Measured first: the sheet's fair and net EV were already the board's (1,081 of 1,081 rows, same instant). The board's EV column is gross, and that is why exchange rows read differently (step 1e).
   - Replay 20:27Z, 2,761 rows: value-but-not-Suggested 14 -> 0 (5 stale quotes now "Check price", 9 one-book fairs); Suggested-but-not-value 0; EV moved on 1 row by 0.01 (rounding of the board's own -0.465). Game-line model number = the card's Win% (379 moved > 0.5 pp).
   - 17 new tests; 249 pass across 21 suites. Loads with the next fleet ff (an ff ships all of main): the user's call. Findings "Step 1c".
-  - On main `6ca19e36c`; ride-along class display only, betting change NO. Reader `C:\tmp\scc_oversight_d5aa\read_1c_after_load.py`: BEFORE 20:34Z 4 of 723 value-not-suggested on the served v3 sheets; predicted 0 on the first full v4 day.
+  - **RIDES THE NEXT FF** (user "Ride the next ff", 11-24 ~3:25 PM CST); at the latest the 12-08 window's ff, whose STEP 4 must name it. On main `6ca19e36c`; ride-along class display only, betting change NO. Reader `C:\tmp\scc_oversight_d5aa\read_1c_after_load.py`: BEFORE 20:34Z 4 of 723 value-not-suggested on the served v3 sheets; predicted 0 on the first full v4 day.
   - Lead: the board card shows no Win% on 104 one-sided "yes" props (NFL anytime TD, soccer scorers); `_model_prob_for_side` cannot place "yes" against "over".
 - **Lead (not followed):** 1,100 of 1,128 NBA lines were `suspect_stale_quote` at 1:30 PM CT on game day, so the board could pick no NBA bet.
 - **Decision owed (user):** which pick is canonical. One option is what the live book buys (venue price net of fee, 0% floor); the other is the board's Suggested (sportsbook price). Today money follows the first and every display shows the second.
