@@ -236,3 +236,5 @@ result is no better anywhere non-mechanical.
   - The stage-2 run needs a `--start/--end` window on `fit`'s TEST dates.
   - Today `fit` scores every date that has training, so the stage-1 window must be excluded from the read: filter the report's rows to commence ≥ 10-26 08:00Z, or add the flag in a reviewed commit that leaves the scored logic unchanged.
 - **The shadow-wiring decision** (§7.1) is for the program session / `decision-record-shadow`.
+
+- **STAGE-2 READ `[2026-11-24 ~10:57 AM CST]`:** `.syndicate/findings_2026-11-24_syndicate_fair_v1_stage2.md`. Arm A: 8 of 13 PASS (NBA, NCAAF, NFL, NHL and soccer game lines; NBA, NFL and NHL props, outcome unmeasured), NCAAF props FAIL, MLB/WNBA UNDERPOWERED. Arm B: the same verdicts, no lead. The gains are mostly mechanical (Pinnacle vs its own close); `p_fair_v1` stays out of EV.
