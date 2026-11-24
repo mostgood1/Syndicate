@@ -233,7 +233,7 @@ Measured on the served payload:
   - Of today's 5 headline picks, 3 carry a "loses" sim verdict and 2 are unmeasured. That is information about the
     sim, not about the price edge the pick rests on.
 
-## Step 1b -- "Our sim has X at Y%" quotes the sim `[built 2026-11-23, user "Yes, do the Our sim wording next"; NOT DEPLOYED]`
+## Step 1b -- "Our sim has X at Y%" quotes the sim `[built 2026-11-23, user "Yes, do the Our sim wording next"; LOADS in the 11-24 window batch, user "Ride tonight's window"]`
 
 `layer2_row_context.row_explainer` wrote "Our sim has {subject} at {model}", where `model` is the SERVED probability
 (`_model_prob_for_side`). Where the board does not trust the sim yet, that number is the market's.
@@ -261,6 +261,54 @@ and its "; the no-vig market ... says Z%." close, so `intelligence_state`'s live
 **Where it runs.** `layer2_board.py:4360`, in the board build on refresh-worker. The text reaches the board cards, Ask
 cards and cheat-sheet picks, all from that one `detail`. It is display only: no score, floor, plan or stake reads
 `detail`. Tests: `tests/test_layer2_explainer_sim_attribution.py`, 9 new; 43 pass with the explainer suites.
+
+**Load decision `[2026-11-23 ~7:10 PM CST]`.** The user was asked 'Load the "Our sim" fix in tonight's 2:15 AM
+window restart, or fast-forward the fleet now?' and answered "Ride tonight's window". Main carries it as `2010b06ca`;
+the fleet checkout is at `d845fe345`, so the 11-24 batch's ff carries it and its drained down/up loads it.
+
+- **The batch would have STOPPED on it.** STEP 4 of the batch prompt (`nfl-level-refit-load-1120`) makes any
+  `syndicate/features/` commit class (c) unless the prompt names it, and the `80dbb08f3` line covers no later commit
+  of this lane. Added a line naming `2010b06ca` as a DISPLAY-ONLY ride-along, quoting the user's answer. It was
+  added right after the `80dbb08f3` line, additions only. Script
+  `C:\Users\TEMPAD~1\AppData\Local\Temp\claude\00d03ca7053346b9\d5aa3287-9736-4080-bbac-59f9767838aa\scratchpad\add_1b_ridealong.py`.
+  It was sha-guarded, `b2b92c6ad5836a08` -> `ea470e747d7ef969` (113,662 -> 115,082 B). The dry run on a copy was
+  byte-identical to the real result. The pre-edit copy is `SKILL.before_1b.md` in the same scratchpad. The
+  schedule is unchanged: fireAt 2026-11-24T08:15Z, enabled.
+- **The rest of the range `d845fe345..cabd9284d`, at 7:15 PM CST.** Five runtime commits. Apart from
+  `2010b06ca`, all four are `scripts/` that no role imports (`git grep` on the basenames over
+  `local_production.py`, `fleet_role_spec.json`, `pipeline` and `syndicate` finds substrings only, e.g.
+  `web_base_url`):
+  - `5a7d0217d` (this lane's check);
+  - `a37defa97` (`portfolio_watch/panel_shot.py`);
+  - `1eaa09bac` and `46e0deed8` (`_base_url.py` and the portfolio probe, "Tooling only, not a betting change").
+- **What reads `detail`** (re-checked by `git grep` on origin/main): the board, Ask and cheat-sheet text
+  (`cheat_sheets.ask_points`), and `intelligence_state`'s live-strip regex. Nothing in `portfolio_commit`, no
+  score, no Suggested flag, floor, plan, stake or exit. `row_explainer` has no try/except at `layer2_board.py:4360`,
+  so an exception there would fail the build. The replay ran the new code over all 1,765 pregame rows with none.
+
+**Reader and BEFORE reading.** `C:\tmp\scc_oversight_d5aa\read_1b_explainers.py` is read-only. It takes the
+board query's cards (`response.ranked_all`, which carry `detail`). On each pregame over/under card whose
+`sim_ladder_raw_over` (= `p_model_raw`, stamped on blended rows) differs from `quote.fair_probability` by more than
+5 pp, it classes the "Our sim has ... at X%" number. Exit codes: 0 OK, 1 OLD > 0, 2 blind.
+- **OLD:** X is the market fair (within 0.5 pp).
+- **SIM:** X is the sim's (within 0.5 pp).
+- **other:** neither, e.g. a partial blend.
+- It also counts cards carrying the new clauses.
+
+BEFORE, 2026-11-24 01:18:36Z (7:18 PM CST 11-23), snapshot 23:50:44Z:
+- 6,405 cards, of them 3,552 pregame "Our sim" cards.
+- 144 over/under cards with a sim-market gap, all NBA: OLD 34, SIM 0, other 110.
+- New wording: 0 cards.
+- Example: De'Aaron Fox threes quoted 39.8% = fair 39.8%, sim 21.8%.
+- Saved: `C:\tmp\scc_oversight_d5aa\read_1b_before_1123.json`.
+
+**Prediction, registered before the load:** after the batch's down/up and the first board build after it,
+- OLD = 0;
+- SIM = (nearly) all of the gap population; "other" only where the card's fair moved after the build;
+- new-wording cards > 0.
+
+Falsified if OLD > 0, or new wording is 0, on a build stamped after the up. The slate will differ, so judge the
+shares, not the counts.
 
 ### Reading 4 -- the peer's report on Suggested vs the purchaser, re-measured `[20:15:43Z-20:19:41Z, fleet, read-only]`
 
