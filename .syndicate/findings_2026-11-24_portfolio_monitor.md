@@ -52,3 +52,8 @@ So after CHANGE P every Kalshi live position is a Suggested row, as designed. Th
 - Polymarket's paper2 sizes 2 Suggested rows at its own price, but its live plan holds 0.
 - Its live refusals include `aggregator_priced` 8: `placeable_refusal` drops a row whose price is not the venue's own.
 - Not yet checked whether those 2 are among the 8.
+
+**Verified on the scheduled watch (11:04 AM CST reading, 17:04:04Z, from the primary tree at `2fd5e87b8`).**
+- Kalshi: 2 positions, 2 Suggested on the board, 0 from the floor.
+- Polymarket: 0 positions.
+- The probe returned rc 0 in 9.5 s, and every step after it returned rc 0.
