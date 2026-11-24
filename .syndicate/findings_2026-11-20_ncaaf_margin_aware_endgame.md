@@ -1929,3 +1929,61 @@ and take the Brier change against k = 1, game-clustered.
 | `code/scripts/live_totals_grade.py` | `ab6c3fc85ef06647` |
 | `code/scripts/run_refresh_worker.py` | `8b44fcde43a475b7` |
 | `code/scripts/generate_smartsim2_ncaaf_projections.py` | `68217bfe5a87947c` |
+
+### SPREADS-k RE-FIT RESULTS, read 2026-11-24 11:54 AM CST
+
+The pinned run (`C:\tmp\t859s\out\full.txt`; `PINS_OK`, `INSTRUMENT PASS`, `FULL_END`) changed nothing on the
+fleet. ESPN finals matched 131 of 136 games, leaving 30,781 graded anchored states. The ranges below are
+game-clustered 95% intervals (`live_totals_grade.fmt`).
+
+**RULE (gated): PASS. The anchored NCAAF spreads k is 2.37.**
+- Over 24,316 spreads states (127 games, 11 dates), the anchored fit is k 2.366. Its walk-forward gain against k = 1 is
+  -0.008 +- 0.005 over 9 dates, and model - market goes from +0.005 +- 0.008 at k = 1 to -0.003 +- 0.004 at the
+  fitted k.
+- Its walk-forward k is stable: 2.31 / 2.25 / 2.41 / 2.34 over the last four dates.
+- At today's 1.80, anchored reads -0.002 +- 0.005 against the market.
+
+**Predictions:**
+- **P1 FAILED.** The raw k on this window is 2.314, not [1.5, 2.1]. Its walk-forward k climbed 1.73 / 1.77 / 1.93 /
+  2.44 as 11-21 entered. Its gain is -0.008 +- 0.008, and model - market goes from +0.005 +- 0.014 to -0.005 +- 0.007
+  (k 1.80: -0.004 +- 0.008).
+- **P2 FAILED.** The anchored k is NOT below the raw k: it is 2.366 against 2.314. The pregame-line read (1.2 anchored
+  against 1.5 raw) does not carry to live lines. There the k corrects the model's distance from the LIVE line, which
+  the anchor (a pregame gap, shrinking with the clock) barely touches.
+- **P3 HELD.**
+- **P4 held only as a point estimate** (next section).
+
+**The anchored moneyline on production's own ticks** (reported, gates nothing), 6,298 states in 127 games:
+
+| share of regulation left | anchored - raw Brier | model - market, raw -> anchored |
+|---|---|---|
+| all | -0.002 +- 0.009 | +0.010 +- 0.011 -> +0.008 +- 0.006 |
+| first half (> 0.50) | -0.002 +- 0.012 | +0.011 +- 0.014 -> +0.010 +- 0.007 |
+| Q3 (0.25-0.50) | -0.004 +- 0.009 | +0.011 +- 0.012 -> +0.008 +- 0.008 |
+| Q4 (< 0.25) | -0.001 +- 0.003 | +0.004 +- 0.009 -> +0.003 +- 0.008 |
+
+- **This does NOT confirm the replay's gain at its size** (-0.0068, 2.9 SE on the CFBD 2026 hold-out). The point is in
+  the same direction, its interval spans zero, and the anchored model still trails the market.
+- The populations differ:
+  - **Engine.** These ticks ran production's engine (no damping or end game); the replay ran the 12-08 engine. The
+    replay found the two equal on the win probability (+0.00105, se 0.00095).
+  - **Weeks.** These are weeks 11-12; the replay's were 4-10. The blend has more games behind it by now.
+  - **State mix.** These are every published tick; the replay's were six checkpoints a game.
+- Which of those explains the smaller effect is NOT known.
+- The engine's kickoff margin sits a mean 3.3 points below the market's home margin here (mean |offset| 4.1). That is
+  a level gap, not a spread gap.
+
+**What the value means for the load:**
+- The anchored k from #780's rule is **2.37**, against today's 1.80 for every NCAAF lane.
+- If the anchor loads WITHOUT it, anchored spreads get 1.80, below this window's fit for anchored and raw alike.
+- **On the same states, anchored at 2.37 minus today's raw at 1.80 is +0.001 +- 0.007 (in-sample).** Anchoring plus
+  the re-fit k prices spreads no better or worse than today. The anchor's case rests on the moneyline.
+
+**Lead (not this lane's to act on):** the RAW NCAAF spreads k fits 2.31 on 11-09..11-23 against the shipped 1.80 (#780,
+fitted through 11-12). Its walk-forward k rises with the newest dates. A raw re-fit belongs to #780's owner.
+
+**What follows (each the user's call; nothing changes on the fleet):**
+- (a) Code: an NCAAF entry of 2.37 in `live_gameline_join._SPREADS_PROB_SCALE_ANCHORED_BY_SPORT`. It touches only
+  anchored lanes, which exist only with the anchor's switch on.
+- (b) Whether the anchor is worth loading, given the production-tick moneyline read. A read on the 12-08 engine's own
+  ticks after the 12-08 load is the clean test.
