@@ -221,5 +221,31 @@ nice 19 and changed nothing on the fleet. The ranges below are game-clustered 95
 - **#780's re-fit script has a defect (the user's call):** `scripts/live_totals_width_fit.py` reads
   `model_home_win_prob`, which on every post-load row of a tempered market (NBA / NCAAF totals, NBA / NCAAF / NCAAB
   spreads) is the tempered number. Any re-fit owed under #780 must read `model_home_win_prob_unscaled`. The kit's
-  `psrc` is the fix, and it is not on main.
+  `psrc` is the fix. (It landed on main later the same day; see the last section.)
 - **Re-fit again:** after the 12-08 engine loads, or after a few more Saturdays (each adds about 10-14k states).
+
+## THE SCRIPT FIX, LANDED — 2026-11-24 3:20 PM CST (user "Yes, land it"; lane `width-fit-engine-prob`)
+
+- **On main `6656aca80`.** `scripts/live_totals_width_fit.py` now fits k on the ENGINE's number (`fit_prob`; env
+  `P_SOURCE`):
+  - **engine (default):** reads `model_home_win_prob_unscaled` (before #780's k), else
+    `model_home_win_prob_uncalibrated` (before #816's calibration), else the recorded number. A row that was
+    transformed with no engine number beside it is dropped and counted (`no_engine_probability`).
+  - **`ac`:** the same, and a raw share is replaced by the join's `agresti_coull_point(share, sims_run)`. This is the
+    kit's I-AC.
+  - **`recorded`:** the old read.
+- **Not a betting change:** no fleet role runs the script.
+- **Verified on the fleet ledger** at nice 19 (NCAAF spreads; `C:\tmp\t780k_ncaaf\verify_repo.sh` -> `out\verify_*.txt`;
+  script sha256 `f4732d4f203fac76`):
+
+  | run | window | k | matches |
+  |---|---|---|---|
+  | default | <= 11-12 | 1.797 | the shipped fit's output, line for line (only the new `[P_SOURCE=...]` header token differs) |
+  | engine | through 11-21 | 1.894 | the kit's S2 |
+  | `ac` | through 11-21 | 1.872 | the kit's PRIMARY |
+  | `recorded` | through 11-21 | 1.800 | the kit's TRAP |
+
+- **Tests:** `tests/test_live_totals_width_fit_source.py`, 12, including off != on through `load()`. 3 source
+  mutations are caught: the old read in `load()`, the unscaled branch removed, and the AC branch removed.
+- **Still not recoverable from the ledger:** #847's per-cell live calibration. It keeps its uncalibrated number on the
+  verdict only. It is off: its key is absent on every fleet layer and in both workers' environ, 2026-11-24.

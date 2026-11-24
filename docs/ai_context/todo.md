@@ -1651,7 +1651,9 @@ On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL 
   - **The "rising k" is noise.** t859s's 2.31 and the 11-10..11-21 window here (2.58) are carried by two Saturdays and a handful of one-game weeknights. Single Saturdays ranged 1.30-3.00 before the load (10-24 was 3.00), and 11-21 read 2.81. Without 11-21, all dates read 1.815.
   - **TRAP, for every #780 re-fit:** `live_totals_width_fit.py` reads `model_home_win_prob`, which is the TEMPERED number on every post-load row of a tempered market. Re-run unchanged on NCAAF spreads, it returns exactly 1.800, a false confirmation.
     - A re-fit must read `model_home_win_prob_unscaled`. Rows with no market price hold the raw share; the AC point of that share is what the pricer would temper.
-    - The fix is the kit's `psrc`; it is NOT on main (the user's call). Owed re-fits: NBA / NCAAB spreads, NBA / NCAAF totals.
+    - **FIXED ON MAIN `6656aca80`** (user "Yes, land it", lane `width-fit-engine-prob`): the script now fits on the engine's number by default (`P_SOURCE=engine`: unscaled, else #816's uncalibrated). `P_SOURCE=ac` is the AC point; `P_SOURCE=recorded` is the old read.
+      - Verified on the fleet ledger: <= 11-12 prints the shipped fit line for line (1.797). Through 11-21: engine 1.894, ac 1.872, recorded 1.800. 12 tests.
+      - Not a betting change. Owed re-fits: NBA / NCAAB spreads, NBA / NCAAF totals.
   - **Lead:** the per-progress k (early 2.91 / mid 1.74 / late 1.46) dwarfs any change of the single k. Re-fit the raw k after the 12-08 engine loads.
 - **Detail:** `.syndicate/findings_2026-11-10_live_totals_grade.md`. Re-run on the fleet host (nice 19): `scripts/live_totals_grade.py` (totals, engine read) and `scripts/live_gameline_age_grade.py` (every market, by quote age).
 
