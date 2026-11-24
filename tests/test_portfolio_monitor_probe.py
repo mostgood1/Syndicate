@@ -374,6 +374,7 @@ def test_no_admin_token_is_one_token_anomaly_and_a_non_zero_exit(monkeypatch, tm
     import _base_url
 
     monkeypatch.setattr(_base_url, "admin_token", lambda *_a, **_k: "")
+    monkeypatch.setattr(_base_url, "LAST_WSL_TOKEN_READ", {})
 
     def no_fetch(*_a, **_k):
         raise AssertionError("no endpoint may be read without a token")
@@ -384,4 +385,5 @@ def test_no_admin_token_is_one_token_anomaly_and_a_non_zero_exit(monkeypatch, tm
     assert len(lines) == 1
     reading = json.loads(lines[0])
     assert reading["probe_failed"] == "token" and reading["anomalies"] == [pm.TOKEN_ANOMALY]
+    assert isinstance(reading["token_read"]["seconds"], float) and reading["token_read"]["attempts"] == []
     assert pm.TOKEN_ANOMALY in capsys.readouterr().err

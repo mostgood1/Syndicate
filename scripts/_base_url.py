@@ -168,6 +168,10 @@ def fleet_admin_token() -> str:
 _WSL_TOKEN_ATTEMPTS = 2
 _WSL_RETRY_DELAY_S = 3.0
 _FLEET_TOKENS: dict[tuple[str, str, bool], str] = {}
+# The newest WSL token read in this process: {"attempts": [{"result": ..., "s": ...}, ...]}. Results are
+# "ok", "rc=N", "error <Exception>", "no_line" or "not_a_token". It never holds the token or wsl.exe's output.
+# Empty when no WSL read ran (a cached token, a named token, or not Windows). Portfolio Watch records it per reading.
+LAST_WSL_TOKEN_READ: dict[str, object] = {}
 
 
 def _plausible_token(value: str) -> bool:
@@ -211,23 +215,33 @@ def _read_fleet_token_through_wsl(env_file: str, distro: str) -> str:
     rest = env_file[2:] if env_file.startswith("~/") else env_file
     prefix = '"$HOME"/' if env_file.startswith("~/") else ""
     command = f"grep -m1 '^ADMIN_TOKEN=' {prefix}\"$1\" | cut -d= -f2-"
+    attempts: list[dict[str, object]] = []
+    LAST_WSL_TOKEN_READ.clear()
+    LAST_WSL_TOKEN_READ["attempts"] = attempts
     for attempt in range(_WSL_TOKEN_ATTEMPTS):
         if attempt:
             time.sleep(_WSL_RETRY_DELAY_S)
+        t0 = time.monotonic()
         try:
             proc = subprocess.run(
                 ["wsl.exe", "-d", distro, "-e", "sh", "-c", command, "sh", rest],
                 capture_output=True, text=True, timeout=90,
             )
-        except (OSError, subprocess.SubprocessError):
+        except (OSError, subprocess.SubprocessError) as exc:
+            attempts.append({"result": f"error {type(exc).__name__}", "s": round(time.monotonic() - t0, 2)})
             continue
+        took = round(time.monotonic() - t0, 2)
         if proc.returncode != 0:
+            attempts.append({"result": f"rc={proc.returncode}", "s": took})
             continue
         value = _unquote(proc.stdout or "")
         if not value:
+            attempts.append({"result": "no_line", "s": took})
             return ""  # WSL answered and the file has no ADMIN_TOKEN line: a retry reads the same
         if _plausible_token(value):
+            attempts.append({"result": "ok", "s": took})
             return value
+        attempts.append({"result": "not_a_token", "s": took})
     return ""
 
 

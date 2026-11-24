@@ -964,6 +964,10 @@ def render_alignment(al: Mapping[str, Any]) -> list[str]:
 
 def render(r: Mapping[str, Any]) -> str:
     lines = [f"PORTFOLIO READING {r['label']} ({r['at']}), log window {r['log_minutes']} min"]
+    tr = r.get("token_read") or {}
+    if tr:
+        lines.append(f"  token read {tr.get('seconds')}s, attempts: "
+                     + (", ".join(f"{a.get('result')} {a.get('s')}s" for a in tr.get("attempts") or []) or "none (cached)"))
     for name, ep in r["endpoints"].items():
         lines.append(f"  {name:10s} {str(ep.get('status')):>4}  {ep.get('seconds', 0):6.2f}s / {ep['budget_s']}s"
                      f"  {ep.get('kb', 0):8.1f} KB {ep.get('error') or ''}")
@@ -1056,7 +1060,8 @@ TOKEN_ANOMALY = ("TOKEN the fleet admin token could not be read (WSL read failed
                  "no endpoint or log was read, so this reading measures nothing")
 
 
-def token_failure(out_dir: Path, rdir: Path, now: dt.datetime, log_minutes: int) -> int:
+def token_failure(out_dir: Path, rdir: Path, now: dt.datetime, log_minutes: int,
+                  token_read: dict[str, Any] | None = None) -> int:
     """Record ONE anomaly for a reading taken without a token, and exit non-zero.
 
     The 6:04 PM 2026-11-23 reading had no usable token: `wsl.exe`'s error text was sent as the header. It reported 8
@@ -1064,8 +1069,8 @@ def token_failure(out_dir: Path, rdir: Path, now: dt.datetime, log_minutes: int)
     `TOKEN_FAILED_RC` so the runner's rc shows it. `probe_failed` keeps the reading out of the page's charts.
     """
     reading = {"at": now.isoformat(timespec="seconds").replace("+00:00", "Z"), "label": ct_label(now),
-               "log_minutes": log_minutes, "probe_failed": "token", "endpoints": {}, "never_read": list(NEVER_READ),
-               "anomalies": [TOKEN_ANOMALY]}
+               "log_minutes": log_minutes, "probe_failed": "token", "token_read": token_read or {}, "endpoints": {},
+               "never_read": list(NEVER_READ), "anomalies": [TOKEN_ANOMALY]}
     (rdir / "reading.json").write_text(json.dumps(reading, indent=1), encoding="utf-8")
     with (out_dir / "readings.jsonl").open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(reading) + "\n")
@@ -1086,17 +1091,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"refused: {args.base_url} is not the fleet (loopback only)", file=sys.stderr)
         return 2
     sys.path.insert(0, str(HERE))
+    import _base_url
     from _base_url import admin_token
 
     base = args.base_url.rstrip("/")
+    t_token = time.monotonic()
     token = admin_token(base)
+    # How long the token read took, and each WSL attempt's result (never the token). 6:04 and 7:04 PM 2026-11-23
+    # spent ~25-30 s here: one failed, one did not, and nothing said whether the retry saved it.
+    token_read = {"seconds": round(time.monotonic() - t_token, 2),
+                  "attempts": list(getattr(_base_url, "LAST_WSL_TOKEN_READ", {}).get("attempts") or [])}
     now = utcnow()
     out_dir = Path(args.out_dir)
     stamp = now.strftime("%Y%m%dT%H%M%SZ")
     rdir = out_dir / stamp
     rdir.mkdir(parents=True, exist_ok=True)
     if not token:
-        return token_failure(out_dir, rdir, now, args.log_minutes)
+        return token_failure(out_dir, rdir, now, args.log_minutes, token_read)
 
     endpoints: dict[str, dict[str, Any]] = {}
     bodies: dict[str, Any] = {}
@@ -1123,6 +1134,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "at": now.isoformat(timespec="seconds").replace("+00:00", "Z"),
         "label": ct_label(now),
         "log_minutes": args.log_minutes,
+        "token_read": token_read,
         "endpoints": endpoints,
         "never_read": list(NEVER_READ),
         "banner": banner(live_today) if live_today else {},

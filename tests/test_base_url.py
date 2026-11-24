@@ -168,6 +168,17 @@ def test_a_transient_wsl_failure_recovers_on_the_retry(clean_env):
     calls = _scripted_wsl(clean_env, [(1, WSL_ERROR_TEXT), (0, "'fleet-tok'\n")])
     assert admin_token(FLEET_BASE_URL) == "fleet-tok"
     assert len(calls) == 2
+    results = [a["result"] for a in _base_url.LAST_WSL_TOKEN_READ["attempts"]]
+    assert results == ["rc=1", "ok"], "the retry is visible to a caller"
+    assert "fleet-tok" not in repr(_base_url.LAST_WSL_TOKEN_READ), "the record never holds the token"
+
+
+def test_the_attempt_record_names_each_failure_without_its_output(clean_env):
+    _scripted_wsl(clean_env, [(4294967295, WSL_ERROR_TEXT), (0, WSL_ERROR_TEXT)])
+    assert admin_token(FLEET_BASE_URL) == ""
+    record = _base_url.LAST_WSL_TOKEN_READ
+    assert [a["result"] for a in record["attempts"]] == ["rc=4294967295", "not_a_token"]
+    assert "\x00" not in repr(record) and all(isinstance(a["s"], float) for a in record["attempts"])
 
 
 def test_nul_laden_output_is_refused_even_with_rc_0(clean_env):

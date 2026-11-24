@@ -316,3 +316,25 @@ and hit only the first WSL call.
 - Real token: rc 0, 8 of 8 endpoints 200, and the one standing GATE anomaly.
 - The scheduled 6:34 PM reading (still the old code) was clean: rc 0, 8 of 8, the GATE anomaly only.
 - The fix reaches the scheduled task at the primary tree's next fast-forward.
+
+### Lead found while verifying (2026-11-23 7:06 PM CST): the :04 runs' token read is slow
+
+**The 7:04 PM reading, the first on the new code:** probe rc 0, 8 of 8 endpoints 200, only the GATE anomaly, and
+`page data` printed the new suffix (`probe-failed readings left out 1`). The lane's verification reading holds.
+
+**But that probe took 31.7 s.** Its reading is stamped `01:04:28Z`, and the stamp is taken after the token read, so
+the token read took about 25 s. The failed 6:04 PM run had the same shape: 32.6 s, stamped `00:04:32Z`.
+
+Probe durations on 11-23 from 1 PM:
+
+| runs | probe duration |
+|---|---|
+| :34 runs | 3.5-13.6 s, most 4-6 s |
+| :04 runs | 6.6-14.8 s |
+| 6:04 PM run | 32.6 s |
+| 7:04 PM run | 31.7 s |
+
+**H-T3 (written before instrumenting).** At :04 the first `wsl.exe` call contends with other work that starts at the
+top of the hour, so it is slow. At 6:04 it slowed into a failed connection. Nothing yet says whether the 7:04 read
+needed the new retry. The instrument: each reading records `token_read` (seconds, attempts, and each attempt's result:
+`ok` / `rc=N` / `error` / `not_a_token` / `no_line`). It is a diagnostic only, and not an anomaly.
