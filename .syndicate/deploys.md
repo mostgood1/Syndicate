@@ -62961,6 +62961,57 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Kills per day stay 0, and they are still the lane's measure.
   - The reading must land BEFORE the 11-24 window batch's drained down/up (task `nfl-level-refit-load-1120`, 08:15Z 11-24). That batch changes web's env (CHANGE F, the shared board copy), which confounds any later comparison.
 - **Claim released** 14:48:54Z.
+- **Reading 2, overnight: 07:45Z 11-24 (1:45 AM CST), 17.45 h after the load.** Scratchpad `wsk_gctune_overnight.sh`, `wsk_recycle_hourly_cst.sh`, `wsk_load_days.sh`, `wsk_oom_block.sh`, `wsk_oom_roles.sh`.
+  - Summary:
+    - The GC side is MET.
+    - Recycles are above the 11-20..11-22 range in count, but load explains them.
+    - **1 web worker was killed by the kernel's OOM killer.** That is not a gunicorn timeout, so the kill count missed it.
+  - **Full collections:**
+    - 164 of 164 boots since the load logged `WEB_GC_TUNED` applied.
+    - 161 fast exits counted 0 generation-2 collections.
+    - 0 generation-2 `WEB_GC_PAUSE` lines came from tuned workers. In the 17.45 h before there were 2,731, totalling 1,435 s, max 9.95 s.
+    - 11-23's 198 full-collection lines all fall before 8:17 AM CST.
+  - **Stalls of 5 s or more:** 3, against 3 in the 17.45 h before. The max was 50.33 s, against 10.00 s before. None was GC: cpu/wall was 0.17-0.26.
+  - **Recycles per CST day:**
+
+    | | 11-23 | 11-20..11-22 |
+    |---|---|---|
+    | Recycles | 163 | 85-102 |
+    | Median age at recycle | 434 s | 1,083-1,435 s |
+    | Recycled under 300 s | 69 | 7-28 |
+    | Requests served | 3,034 | 1,232-1,799 |
+    | Requests per recycle | 18.6 | 14.5-17.6 |
+    | MB per request at recycle | 53 | 56-80 |
+
+    The rise is load, not memory per request. 11-18, on stock GC, served 3,057 requests and recycled 174.
+  - **OOM kill, 1:28:53 PM CST 11-23:**
+    - Worker 352017 had booted at 1:23:41 PM, tuned. gunicorn logged `was sent SIGKILL! Perhaps out of memory?`, with no `WORKER TIMEOUT` before it.
+    - The kernel made one OOM kill in the window, of a python process:
+      - 7,429 MB resident, plus 578,210 swapped pages (about 2,260 MB);
+      - total-vm 10,586 MB;
+      - swap free 0 kB.
+
+      dmesg's clock reads 175 s earlier than the gunicorn line.
+    - The killed process is the web worker:
+      - The refresh-worker main (~1.1 GB) and its board child (~3.8-4.0 GB) appear in the same task list, and both lived on.
+      - No other role logged a death.
+    - It reached about 9.7 GB in 5 min 12 s.
+      - Its main loop stalled 5.55 s, then 50.33 s. The cpu/wall of 0.26 means it was waiting on its own swapped pages.
+      - A `GET /api/board/live-rail` took 57,966 ms. The 40 s stall dump never fired.
+    - The refresh-worker logged no gap over 2.9 s across 19:20-19:35Z.
+    - The memory guard checks only every 5th request, so nothing recycled the worker.
+    - **It is the only SIGKILL without a timeout in web.log since 11-01.** Over 11-01..11-22, every one of 11 SIGKILLs followed a `WORKER TIMEOUT` for the same pid (scratchpad `wsk_sigkill_days2.sh`).
+    - So the first one came on the first tuned day. Load does not separate the two: 11-17 and 11-18 had similar request counts and no such kill.
+    - **One event does not prove the tuning caused it, but it points there.** With full collections off, only a recycle frees cyclic garbage.
+  - **Other readings:**
+    - Kills (`WORKER TIMEOUT`): 0 since the load. Dumps 0, Tracebacks 0.
+    - Fleet head at the reading: `d845fe345`, after later ffs.
+    - The 20:08:51Z reload-web (`3983309ce`) retired 2 workers. Both took the fast exit with 0 full collections, and they count as neither recycles nor kills.
+  - **verify:**
+    - Every worker tuned, with 0 full collections: MET.
+    - Stalls of 5 s or more fall toward the young-collection ones: NOT MET in count (3 against 3). The 50 s one is memory, not GC.
+    - Recycles stay within 81-102 a day: NOT MET in count. The requests table explains it.
+    - Kills stay 0: MET for timeouts. 1 kernel OOM kill is now counted separately.
 
 ## 2026-11-23 20:08:51Z (2:08:51 PM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): the rail keeps every chip on a canonical key and chooses on start, `3983309ce` (lane `evening-utc-date-split`, user "Yes, deploy now" to "Deploy the rail fix to web now, before the 7 PM CST kickoff?") -- **LOADED on web; MET**
 - betting change: no (display-only template change; the ride-alongs are tooling or default-OFF, below)

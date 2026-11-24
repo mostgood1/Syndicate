@@ -588,3 +588,52 @@ Read-only readings at nice 19. Scratchpad scripts: `wsk_gctune_base.sh`, `wsk_gc
   - recycles per hour and median age at recycle (the cost of old cycles that are no longer collected);
   - kills and dumps.
   The batch changes web's env (CHANGE F, the shared board copy), so later readings are confounded.
+
+## 2026-11-24 1:55 AM CST (07:55Z) -- overnight GC reading: full collections gone, recycles track load, and one web worker killed by the kernel OOM killer
+
+Read-only at nice 19. Scratchpad: `wsk_gctune_overnight.sh`, `wsk_recycle_hourly_cst.sh`, `wsk_load_days.sh`, `wsk_oom_block.sh`, `wsk_oom_roles.sh`, `wsk_thrash_gaps.sh`. Deploy entry: `deploys.md` `## 2026-11-23 14:17:09Z`, reading 2.
+
+- **Kills per CST day (`WORKER TIMEOUT`):** 0 x5 (11-12..16), 5 (11-17), 0, 0, 1 (11-20, the instrument), 0, 0, **0 (11-23)**.
+- **Kernel OOM kills of a web worker, newly counted:**
+  - **1 on 11-23, and 0 in the 22 days 11-01..11-22.** All 11 SIGKILLs in those 22 days followed a `WORKER TIMEOUT` for the same pid (scratchpad `wsk_sigkill_days2.sh`).
+  - The kill-count instrument read only `WORKER TIMEOUT`. A worker can also die from a `was sent SIGKILL` with no timeout line before it. From now on that counts as a kill.
+- **GC tuning, 17.45 h after the load:**
+  - 164 of 164 boots tuned. 161 exits counted 0 full collections, and 0 full-GC pauses were logged. The 17.45 h before had 2,731 pauses, 1,435 s.
+  - Stalls of 5 s or more: 3, against 3 before. None was GC (cpu/wall 0.17-0.26).
+- **Recycles: 163 on 11-23, against 85-102.** Median age at recycle was 434 s, against 1,083-1,435 s.
+  - This is **load, not memory per request**:
+
+    | | 11-23 | 11-20..11-22 |
+    |---|---|---|
+    | Requests | 3,034 | 1,232-1,799 |
+    | Requests per recycle | 18.6 | 14.5-17.6 |
+    | MB per request at recycle | 53 | 56-80 |
+
+  - 11-18, on stock GC, had 3,057 requests and 174 recycles.
+  - Hour by hour, 11-23's busiest hours (1 PM and 2 PM CST: 26 and 21 recycles) line up with the bursts at the same hours on 11-20 (14, 13) and 11-22 (5, 12).
+- **The OOM kill, 1:28:53 PM CST 11-23:**
+  - Worker 352017 was tuned and 5 min 12 s old. The kernel killed a python process at:
+    - 7,429 MB resident;
+    - plus about 2,260 MB swapped;
+    - total-vm 10,586 MB.
+
+    Swap was free 0 kB. dmesg's clock reads 175 s early.
+  - Attribution to the web worker:
+    - The refresh-worker main (~1.1 GB) and its board child (~3.8-4.0 GB) are in the same task list and both lived.
+    - No role logged a death. gunicorn logged SIGKILL with no timeout.
+  - Its main loop stalled 5.55 s, then 50.33 s, while waiting on its own swapped pages (cpu/wall 0.26). A live-rail request took 58 s.
+  - The 40 s stall dump never fired. **That is a blind spot of the instrument:** a process thrashing on its own pages does not get its faulthandler watchdog run on time.
+  - The refresh-worker logged no gap over 2.9 s, so the host thrash stayed inside the web worker.
+  - **The memory guard checks only every 5th request.** A worker that grows between checks has no bound short of the kernel. This is the "second lever" named on 11-21, now with a kill behind it.
+  - **Cause of the ~9.7 GB:** what grew is not attributed.
+    - The timing points at the tuning: the first such kill in 23 days came on its first day.
+    - Load does not explain it: 11-17 and 11-18 carried similar request counts without one.
+    - With full collections off, only a recycle frees cyclic garbage.
+    - One event is not proof. The growth (~31 MB/s) looks like a burst inside a request or a warmer.
+- **Lesson (belief overturned):** "full collections free 7,079 objects, so they free nothing" measured objects, not bytes. The object count says nothing about how much memory a collection releases, because one cyclic container can hold a 36 MB decoded state.
+- **Decision owed to the user:**
+  - revert the tuning;
+  - keep it and build the quiet-worker memory check (a timed check that recycles a worker at its limit whatever its request count; queued on the user's 11-23 "Yes, after the reading");
+  - or both.
+
+  Land and load nothing until the 11-24 window batch (08:15Z) has pushed its target and done its down/up.
