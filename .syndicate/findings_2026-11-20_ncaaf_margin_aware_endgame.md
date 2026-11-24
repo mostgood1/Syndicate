@@ -1987,3 +1987,20 @@ fitted through 11-12). Its walk-forward k rises with the newest dates. A raw re-
   anchored lanes, which exist only with the anchor's switch on.
 - (b) Whether the anchor is worth loading, given the production-tick moneyline read. A read on the 12-08 engine's own
   ticks after the 12-08 load is the clean test.
+
+**THE ANCHORED k IN CODE, 2026-11-24 2:35 PM CST** (user "Yes, add it", answering "Add the anchored spread factor 2.37 to the code,
+behind the anchor's switch?"):
+- `d8d0af0b7` on branch `ncaaf-anchored-spreads-k`, NOT pushed. `live_gameline_join._SPREADS_PROB_SCALE_ANCHORED_BY_SPORT` gains
+  `"ncaaf": 2.37`, with its measurement in the comment. Nothing else in the join changed (the lane claims that one
+  section, `a97378f62`).
+- It reaches only anchored lanes. A lane is anchored only with `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR` on, which is absent
+  on every role, so nothing priced today changes. A lane the anchor refuses carries no `marginAnchor` and keeps 1.80.
+  An explicit `SYNDICATE_LIVE_SPREADS_PROB_SCALE_NCAAF` still wins over both tables, so a raw re-fit shipped as that
+  env value would also set the anchored lanes' k.
+- Tests (`tests/test_ncaaf_live_margin_anchor.py`, 34), through the real tick and the real join: switch absent gives
+  1.80; on and anchored gives 2.37; on but refused (no close) gives 1.80; the env switches still win.
+- 45 neighbouring files: 1,109 pass. 12 fail, all in `tests/test_live_gameline_team_alias.py`, and they are
+  order-dependent and NOT this change: that file passes alone (18 of 18), and fails the same 12 with only
+  `tests/test_ncaaf_live_resim_wiring.py` run ahead of it (alias resolution returns None, as if an empty team
+  registry were cached). A lead for the alias test's owner.
+- Pushing it is the user's call. Pushed, it is inert until the anchor itself loads in a window.
