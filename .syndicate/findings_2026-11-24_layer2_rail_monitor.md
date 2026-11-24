@@ -36,3 +36,26 @@ The user said, 11-19 ~1:00 AM CST: "this should just be an always on monitor mov
   - **11-24 to 2:25 PM:** 11 of 11.
   - **2:25 PM:** Pittsburgh @ Oklahoma (11 of 11 rows) and Oregon St @ San Francisco (9 of 9) carried the model.
   - The nightly close counts the full evening.
+
+## Fleet-watcher flag: WNCAAB Winthrop @ James Madison "resimmed_no_row_model" at R19 / R20 (4:03 / 4:23 PM CST), and NCAAB Providence @ Arizona at R20; read-only
+
+- **Verdict: no join defect, and not a change G regression.**
+  - The rows carry the right keys (`winthrop` / `james madison`) and the re-sim matched them directly.
+  - The dashboard reads only the probe's first live-rail read (`liverail_0`). Each time, that read fell in a moment when the model was legitimately absent. My helper's read about a minute later had it: Winthrop 1 of 3 priced rows at R19 and 4 of 7 at R20, Providence 5 of 5 at R20.
+- **Winthrop, R19** (read 22:03:10Z, overlay written 22:02:49Z): the WNCAAB re-sim tick at 22:00:44Z listed 2 live games instead of 3, and the next at 22:02:56Z listed 4.
+  - The builds at 22:00:47, 22:02:00 and 22:02:37 carried one game with only its pregame lane (`index_why`: `skipped_no_accepted_lane` 1, `sources_seen` `pregame_only` 1). Its rows were withheld as `no_live_gameline_projection` (7-8).
+  - Winthrop's rows had no `live_total` in that overlay. The 22:03:44 build indexed 4 of 4.
+  - **Likely cause, untested:** halftime. The game tipped at 21:00Z, so 22:00Z is about an hour in.
+- **Winthrop, R20** (read 22:23:08Z, overlay 22:22:41Z): the lane had joined, so every totals row carried `live_total` 119.73. The build withheld every row: 32 on the 120 s quote-age ceiling and 11 on the WNCAAB quote-older-than-the-state rule (30 s).
+  - The second read 10 s later (22:23:12 build) priced the 120.5 line (0.44 / 0.56; quotes 26 s and 59 s old). It left the 117.5 / 118.5 / 119.5 / 121.5 lines, whose quotes were 101-215 s old.
+  - **By design.** The order rule is the user's 11-06 "Yes, do it here". WNCAAB keeps the strict state-fetch basis, and NCAAB moved to score-change on 11-08 (#762; `live_gameline_join.py`).
+  - **Volume:** across the 38 WNCAAB builds from 21:55 to 22:25Z, the ceiling withheld 1,479 row-builds and the order rule 119.
+- **Providence @ Arizona:** the scheduled tip was 22:05Z (4:05 PM).
+  - At R19 (4:03 PM), `no_plays` was right: the game had not started.
+  - Every NCAAB build from 22:05:42 to 22:23:11Z carried one game pregame-only (`no_live_gameline_projection` 9-13 rows). The 22:25:11 build indexed 6 of 6, and the helper's read at 22:24:14Z had Providence 5 of 5 modelled.
+  - **So it had no live lane for about 19 minutes after its scheduled tip.** That fits a run of `no_plays`. Not checked: when ESPN's first play actually landed.
+- **Monitor fix (`C:\tmp\railmon\dash\dash_update.py`, not the repo):** a re-simmed game with priced rows but none modelled now gets one of three labels.
+  - `resimmed_model_by_helper_read`: the helper's later read had the model, so the gap is timing between the two reads.
+  - `resimmed_lane_joined_rows_withheld`: `live_total` is on the rows but no probability, so the per-line gates withheld them.
+  - `resimmed_no_row_model` (the join-defect flag) / `resimmed_few_priced_rows`: neither of the above.
+  - **Re-run on R19 / R20 into a throwaway day file:** both games read `resimmed_model_by_helper_read`. With the helper's Winthrop count zeroed, Winthrop R20 read `resimmed_lane_joined_rows_withheld` (live_total on 5). Today's `rows_2026-11-24.jsonl` was not written. Ticks from 4:43 PM carry it.
