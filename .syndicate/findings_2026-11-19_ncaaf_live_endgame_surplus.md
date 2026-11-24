@@ -411,3 +411,40 @@ prefix `997e220ff44eb273`** (full `997e220ff44eb273f959c281dbf0b34758194b00c361e
   - Numbers unchanged from the unpinned clean run: the pick + #835 against production + #835, -0.0176 (se 0.0095);
     slope 0.76 -> 0.88.
 - **Unchanged:** usage `<date> <week> [every]`, the summary file `check852_<date>.txt` and the last-line wording.
+
+## Hold-out check, 2026-11-21 slate (scheduled task engine-ncaaf-checks-1124, 2:31 PM CST)
+
+- Runner `C:\tmp\t852\check_slate_852.sh` sha256 prefix `997e220ff44eb273`. That differs from the task's 11-20
+  expectation `4d0e07ba90c0918d`, and it MATCHES this file's "NOTE 2026-11-20 12:50 PM CST" (re-pinned runner, full
+  sha `997e220f...8a5bdb`, pinned commit `44184da1e`). `code/COMMIT` reads `44184da1eb1b3597bd5c8649eaa50ee335d97f4f`,
+  as the note says. Interpreter: the runner pins `py -3.11` (3.11.9); `PY_PYTHON3=3.11` was also set. No third argument
+  (every state). Run 14:17-14:30 CST, rc 0.
+- Result lines, verbatim from `C:\tmp\t852\check852_2026-11-21.txt`:
+
+```
+== 2026-11-21 (week 12, every 1) Tue Nov 24 14:17:11 CST 2026 code 44184da1eb1b3597bd5c8649eaa50ee335d97f4f python Python 3.11.9
+states 508 games 43; E0 reproduction vs t835 (to its 3-decimal rounding): 508 match, 0 differ
+arm            subset lines(g)    ll      d_ll vs books   d_ll vs prod+835 (se)   slope    pace c/actual   mean F-c (se)
+prod           all     547( 43)  0.6772  -0.0080 (0.0397)   +0.0443 (0.0236)        0.43    1.182/1.369    +1.59 (1.27)
+prod+835       all     547( 43)  0.6330  -0.0523 (0.0208)   +0.0000 (0.0000)        0.78    1.157/1.369    +1.80 (1.24)
+d1.0_t17+835   all     547( 43)  0.6316  -0.0537 (0.0203)   -0.0014 (0.0050)        0.81    1.131/1.369    +2.02 (1.23)
+prod           <=16    382( 32)  0.6865  -0.0012 (0.0533)   +0.0421 (0.0292)        0.41    1.222/1.452    +1.92 (1.69)
+prod+835       <=16    382( 32)  0.6444  -0.0433 (0.0293)   +0.0000 (0.0000)        0.71    1.177/1.452    +2.29 (1.68)
+d1.0_t17+835   <=16    382( 32)  0.6441  -0.0436 (0.0298)   -0.0003 (0.0020)        0.70    1.187/1.452    +2.21 (1.68)
+prod           17+     207( 20)  0.6597  -0.0211 (0.0500)   +0.0484 (0.0303)        0.49    1.109/1.219    +0.97 (1.62)
+prod+835       17+     207( 20)  0.6113  -0.0695 (0.0281)   +0.0000 (0.0000)        0.97    1.121/1.219    +0.86 (1.51)
+d1.0_t17+835   17+     207( 20)  0.6077  -0.0731 (0.0207)   -0.0036 (0.0143)        1.05    1.031/1.219    +1.66 (1.44)
+CHECK VALID: E0 reproduces production's on every state
+```
+
+- **CHECK VALID** (508 match, 0 differ), so the expectations are judged:
+- **Log loss of the pick + #835 below production + #835 (75-95%): PASS, within noise.** -0.0014 (se 0.0050) over 43
+  games / 547 lines; 11-14 read -0.0176 (se 0.0095).
+- **Slope at least production + #835's: PASS.** 0.81 vs 0.78.
+- **The 17+ bucket's mean F - c closer to 0: FAIL.** +1.66 (se 1.44) vs production + #835's +0.86 (se 1.51). On 11-21
+  the 17+ games finished ABOVE the centre already (actual pace 1.219 vs the centre's 1.121), and the damping lowered
+  the centre (1.031), so F - c grew.
+- **#835's late k (1.6) on top of the damping: NOT MEASURED** (the output does not carry it).
+- **For 12-08:** two of three expectations pass, but the 17+ gain that is the fix's mechanism did not show on 11-21
+  (log loss -0.0036, se 0.0143, there); one Saturday of 20 blowout games is noise-sized, so 11-28 decides whether
+  #852 goes to the user for the window alongside #835.

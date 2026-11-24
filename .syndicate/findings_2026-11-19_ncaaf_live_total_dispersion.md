@@ -205,3 +205,42 @@ agrees.
   raw draws.
 - **NCAAF spreads:** the same per-game level noise likely affects the margin. There is no NCAAF margin anchor
   (`marginAnchored` False). Not measured here.
+
+## Hold-out check, 2026-11-21 slate (scheduled task engine-ncaaf-checks-1124, 2:31 PM CST)
+
+- Runner `C:\tmp\t835\check_slate.sh` sha256 prefix `a7ad67ceaa0aadeb` (as expected). Interpreter: `PY_PYTHON3=3.11`
+  (`py -3` -> 3.11.9, psutil + numpy import). M2's verdict file existed at 14:01 CST (only its existence was checked).
+  Run 14:02-14:17 CST, rc 0. Written by the scheduled task; nothing on the fleet was loaded, switched or restarted.
+- The engine read's OUTCOME instrument was skipped: its inputs (the learner re-run's opinions for 11-21) do not exist
+  at 2 PM (`outcome rows 0`). Item 2 is judged on the ledger's finals only, as the task specifies.
+- Result lines, verbatim from `C:\tmp\t835\check_2026-11-21.txt` (the fix = `shipped_anchor_k1.2-1.6` on the ladder,
+  `calibrated, join k 1.0` on the finals; production = `k1.0_none` / `production raw P` / `production as priced`):
+
+```
+2026-11-21 evidence games 64 with a close 58 missing [('ucf', 'iowa state'), ('duke', 'clemson'), ('toledo', 'bowling green'), ('michigan state', 'oregon'), ('air force', 'utep'), ('wyoming', 'new mexico')]
+2026-11-21 wk12 (blend wk12) games 58 close 58 e0 54 final 58
+2026-11-21: ladder rows 1686, outcome rows 0 (missing {'no_engine_read_inputs': "[Errno 2] No such file or directory: 'C:\\\\tmp\\\\elp\\\\kprior\\\\kbefore\\\\opinions_2026-11-21.jsonl'"}), closes 58, E0 60
+k1.0_none                    sd 0.86 0.83 0.84 0.70 | probit 0.86 0.84 0.85 0.80 | med|gap| 4.4 3.6 2.6 2.5 | mean gap +1.2 -0.2 +0.7 +1.8 | slow R +0.057 b +0.036 (Kalshi +0.022)
+shipped_anchor_k1.2-1.6      sd 1.03 0.99 1.05 0.96 | probit 1.03 1.00 1.09 1.16 | med|gap| 1.3 1.4 1.4 1.7 | mean gap -0.6 -0.4 +0.5 +1.5 | slow R +0.030 b -0.013 (Kalshi +0.022)
+production as priced: raw P tempered by k 2.48   log loss 0.6458 (se 0.0140)  slope 1.45  a +0.12
+production raw P (k 1)                           log loss 0.6631 (se 0.0390)  slope 0.55  a +0.13
+calibrated, join k 1.0                           log loss 0.6192 (se 0.0125)  slope 1.05  a +0.13
+paired: calibrated at join k 1 minus production as priced: -0.0265 (se 0.0154); best join k 1.0
+```
+
+- **Item 1 (fix sd ratio): PASS.** 1.03 / 0.99 / 1.05 / 0.96: 4 of 4 inside [0.95, 1.05] (1.05 on the edge), all 4
+  inside [0.90, 1.10].
+- **Item 2 (slope >= 0.8 on the ledger's finals): PASS.** 1.05 at join k 1.0 (expected 0.85-1.05; 49 games, 1,474
+  lines). On the engine read's line-instants: NOT MEASURED (inputs absent).
+- **Item 3 (median |centre - Kalshi's| below production's in every bucket 0-95%): PASS.** 1.3 / 1.4 / 1.4 / 1.7 vs
+  production 4.4 / 3.6 / 2.6 / 2.5.
+- **Item 4 (priced log loss, fix at join k 1 minus production at k 2.48, <= 0): PASS.** -0.0265 (se 0.0154); expected
+  -0.02 +- 0.01.
+- **Item 5 (production reads as before: sd 0.75-0.90, slope 0.35-0.6): FAIL on one bucket.** Production sd 0.86 /
+  0.83 / 0.84 / **0.70** (the 75-95% bucket is below 0.75; it read 0.75 on 11-14). Slope 0.55 on the ledger's finals
+  (inside the range; the engine read's slope NOT MEASURED).
+- Coverage: 58 games with a close (6 evidence games lack one), E0 for 54 of them; the finals instrument rests on 49
+  games / 1,474 lines, one Saturday.
+- **For 12-08:** items 1 and 2 both pass, so the pre-registration's no-go rule is not triggered on 11-21; the 11-28
+  check still has to agree before #835 can go to the user for the window, and item 5's single-bucket miss is noise
+  under the pre-registration's own rule until 11-28 says otherwise.
