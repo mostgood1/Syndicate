@@ -966,3 +966,44 @@ read with it. The full timeline, and how each load was found: `.syndicate/findin
 The note missed one change. **F1 of todo `#821`** (`feed_game_model` with the outs penalties off, in the NBA processed root's `nba_sim_total_inputs.json`) was switched on 2026-11-17 at 11:35 AM CST (`deploys.md` 17:34:59Z). It is a data-file switch, not code, so the version timeline cannot see it. It moves the NBA pregame sim's totals, which the NBA live re-sim starts from. Lane `nba-live-total-anchor` measured 11-18's 12 NBA pregame totals at +6.78 (se 1.04) above the closing line (`.syndicate/findings_2026-11-18_nba_live_total_anchor.md`). So the NBA test nights from 11-17 on start from a pregame total level unlike any
 training night's. Env and data-file switches are outside M3 Addendum 5's timeline; `deploys.md` is where they are
 recorded.
+
+
+## POST-READ DIAGNOSIS: THE NBA LIVE TOTALS HARM (PRE-REGISTERED 2026-11-24 2:13 PM CST, before any diagnostic number was computed)
+
+User: "Yes, diagnose it" (11-24, answering "Diagnose the NBA live totals harm before re-registering M2?").
+
+- **It gates nothing.** The M2 verdict (FAIL, `50319e3d3`) stands whatever this finds. The diagnosis only informs how a
+  fresh M2 would be registered, which is the user's call.
+- **H1.** The harm comes from `#821` F1, the data-file switch flipped 2026-11-17 at 11:35 AM CST (`deploys.md`
+  17:34:59Z; correction above, `89ff009f2`).
+  - NBA test nights from 11-17 start from pregame totals about +6.8 above the close. No training night (11-09..11-14)
+    did.
+  - The registered fit applied live-expert weights of +0.66 to +1.41 on NBA live totals cells, all fitted before F1
+    (e.g. `live_resim nba/totals/totals/full/live/25-50/a<=60` w +1.411 se 0.508; `totals_alt 25-50` +0.838; `totals_alt
+    75-95` +0.659).
+  - So the learner carried the re-sim's new over-lean into p_decision.
+- **Population.** The registered read's own examples, rebuilt by its pinned code: main `981ef14f6`, sha256
+  `e59d7d6f94c5` (scripts/engine_learner.py) and `b9d5db099b91` (the module).
+  - Registered arguments: truth outcome, dates 11-09..11-22, test from 11-15, tau 0.5, chips from the fleet.
+  - Opinions are the read's own `train/` and `test/` files in `C:\tmp\elp\m2gate_kit`.
+  - The stratum is cell sport `nba`, family `totals`, phase `live`, prior age `a<=60`.
+  - Run at nice 19, read-only on the fleet. Output goes to `C:\tmp\elp\m2diag\`.
+- **P0, the reproduction gate.** The rebuilt `ON_BY_AGE nba|totals|live|a<=60` must give games 60, d_ll +0.024058 and
+  ci95 [0.013761, 0.034215]. If it is not exact, no diagnostic number is reported.
+- **Arms by game date.** PRE = 11-15 and 11-16 (before F1). POST = 11-17..11-22.
+- **T1, primary.** d_ll(POST) - d_ll(PRE), each arm bootstrapped over its own games (1000 draws, seed 736), 95% CI.
+  - SUPPORTED: the difference's low end > 0, AND PRE's own ci95 includes 0 or lies below it.
+  - FALSIFIED: PRE's own ci95 lies above 0 (the harm was there before F1), OR the difference's high end < 0.
+  - Otherwise INCONCLUSIVE. This is a stated risk: PRE has two nights only.
+- **T2, mechanism.** The live_resim expert's weighted mean delta-logit toward OVER (sign flipped on under rows) on the
+  stratum's rows, for train vs PRE vs POST, with game-bootstrap CIs.
+  - H1 predicts POST - train > 0 with its CI above 0, and PRE - train's CI includes 0.
+- **T3, where the loss is.** In POST, the weighted mean of p_decision(over) minus the realised over rate, with a
+  game-bootstrap CI.
+  - H1 predicts > 0 with its CI above 0: the learner priced overs too high.
+  - H1 also predicts the learner's own move toward over (logit p_decision - logit p_prior) is > 0.
+- **Descriptive only, no prediction:**
+  - the same PRE/POST split for `nba|spreads|live|a<=60` and `nba|h2h|live|a<=60`. The NBA margin anchor loaded
+    11-14, so those carry a different confound.
+  - the POST harm by segment, market (totals / totals_alt) and clock bucket;
+  - the POST harm with each expert's weight zeroed in turn.
