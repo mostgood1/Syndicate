@@ -37,6 +37,12 @@
   - **LOADED 08:30:10Z 11-24 (batch down/up); AFTER reading 15:53Z MET:** 655 NBA gap cards, OLD 0, SIM 655, other 0; new wording on 1,999 cards.
   - **Follow-up found (display only, the user's call):** where the sentence names a board number ("weighted ... for a board probability of X", "calibrated to X"), X is the projection's served number, not the board's final `model_probability_cal` (the per-sport pricing calibration that `model_edge_pct` uses). It differs by >0.5 pp on 280 of 411 (NBA 219/305, max 3.7 pp; NCAAB 61/105, max 5.3 pp). Findings "Step 1b follow-up".
   - **HELD 11-24 ~10:30 AM CST (user had said "Yes, fix it"):** the board itself shows two model numbers per card. Win% and stake sizing use the served number (card `model_probability`, read by `bankroll_manager.compute_bet_size`); `model_edge_pct` uses `model_probability_cal`. They differ >0.5 pp on 1,594 of 3,567 pregame cards, and on 39 they point to opposite sides of the market. The sentence already matches Win%. The root fix is one number for Win%, edge and stake, a betting change (window only). Put back to the user.
+  - **BUILT, DEFAULT OFF (user "Build one number, off", 11-24 ~10:50 AM CST):** `SYNDICATE_LAYER2_ONE_MODEL_NUMBER`.
+    - ON: a pregame card's Win% / `model_probability` is `model_probability_cal`, the number the model edge and the live sizer use, and the sentence names it.
+    - That number is the current fair plus the model's edge vs its own market reading: `identity` on every pregame row, no curve.
+    - Replay over 1,725 fleet rows: Win%-vs-edge misses 1,004 -> 2 (both railed at 1.0); opposite-side cards 9 -> 0; sentence != Win% 0.
+    - Accuracy: W vs E Brier +0.00001 [-0.00016, +0.00018] on 53,474 graded rows (448 games, 11-10..11-23); both lose to the market fair by +0.0033.
+    - Classed a betting change for the load (the evaluation ledger's field changes basis). NOT queued for any window: 12-08 at the earliest, the user's call. Findings "One model number per card".
   - `row_explainer` now quotes the sim's own `p_model_raw` under "Our sim has". It names the board's number as the market's (blend weight 0), as weighted, or as calibrated.
   - Replay over the fleet's 21:00Z shortlist: 1,088 of 1,765 pregame explainers (62%; NBA 1,047) had put another number under the sim's name.
   - Runs in the board build on refresh-worker; display only. Findings "Step 1b".

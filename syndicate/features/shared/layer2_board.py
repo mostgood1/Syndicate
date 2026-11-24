@@ -5452,6 +5452,19 @@ def _layer2_board_columns(
     # not the projection's framing -- every AWAY and every DRAW -- and two
     # surfaces read it as if it were right. See that function for the repro.
     model_prob = _model_prob_for_side(row)
+    # ONE MODEL NUMBER (todo #861, lane surface-consistency-oversight; user "Build one number, off", 2026-11-24).
+    # With `SYNDICATE_LAYER2_ONE_MODEL_NUMBER` on, a pregame card's model probability (and so Win%) is the number
+    # its model edge and the live sizer already use, `model_probability_cal`. The served number it replaces rides
+    # beside it, by name. Absent = off: these lines change nothing. Imported here, not at the top: circular
+    # (`layer2_row_context` imports from this module).
+    from syndicate.features.shared.layer2_row_context import board_model_probability, one_model_number_enabled
+
+    if one_model_number_enabled():
+        one = board_model_probability(row)
+        if one is not None and model_prob is not None and one != model_prob:
+            columns["model_probability_projection"] = model_prob
+            columns["model_probability_basis"] = "model_edge"
+            model_prob = one
     if model_prob is not None:
         columns["model_probability"] = model_prob
 

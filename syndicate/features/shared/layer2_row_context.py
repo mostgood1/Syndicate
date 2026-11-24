@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 from datetime import date as _date
 from pathlib import Path
@@ -393,8 +394,55 @@ def _sim_raw_for_side(row: Mapping[str, Any], projection: Mapping[str, Any]) -> 
     return _model_prob_for_side({**row, "projection": {**projection, "model_prob_over": raw_over}})
 
 
+ONE_MODEL_NUMBER_ENV = "SYNDICATE_LAYER2_ONE_MODEL_NUMBER"
+
+
+def one_model_number_enabled() -> bool:
+    """`SYNDICATE_LAYER2_ONE_MODEL_NUMBER` (todo #861, lane surface-consistency-oversight). Absent = OFF = today."""
+    return str(os.environ.get(ONE_MODEL_NUMBER_ENV) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _row_is_live(row: Mapping[str, Any]) -> bool:
+    projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+    return (
+        row.get("is_live") is True
+        or str(row.get("market_state") or "").strip().lower() == "live"
+        or str(projection.get("basis") or "").strip().lower() == "live_resim"
+        or projection.get("live_prob_over") is not None
+    )
+
+
+def board_model_probability(row: Mapping[str, Any]) -> float | None:
+    """The card's ONE model probability for its side (todo #861; user "Build one number, off", 2026-11-24).
+
+    A pregame card carried TWO model probabilities:
+    - **Win% and `model_probability`** were the projection's served number, `_model_prob_for_side`.
+    - **`model_edge_pct`** is `model_probability_cal - fair` (`layer2_board._model_edge_for` and the pricing seam).
+      The live purchaser sizes on that same number, recovered as `fair + model_edge_pct / 100`
+      (`portfolio_commit.sizing_inputs_with_provenance`).
+
+    On every pregame row on 2026-11-24, `calibration_method` was `identity`. So `model_probability_cal` is the
+    CURRENT no-vig fair plus the model's edge against the market reading its projection was built on. Win% instead
+    showed that older reading. Measured on the served board at ~16:25Z, 3,567 pregame cards:
+    - Win% minus the fair missed the model edge by more than 0.5 pp on 1,594 of them;
+    - on 39, the two pointed to opposite sides of the market.
+
+    OFF (absent, the default): the served number, exactly as before. ON: `model_probability_cal`, on a pregame row
+    that carries it together with a model edge. Live rows keep their own number (the live re-sim's; the page blanks a
+    pregame number in play). A row without the pair keeps the served number.
+    """
+    served = _model_prob_for_side(row)
+    if not one_model_number_enabled() or _row_is_live(row):
+        return served
+    cal = _as_float(row.get("model_probability_cal"))
+    if cal is None or not 0.0 < cal < 1.0 or _as_float(row.get("model_edge_pct")) is None:
+        return served
+    return cal
+
+
 def _pregame_model_sentence(
-    projection: Mapping[str, Any], subject: str, model: float, raw: float | None, fair: float, across: str
+    projection: Mapping[str, Any], subject: str, model: float, raw: float | None, fair: float, across: str,
+    board: float | None = None,
 ) -> str:
     """"Our sim has X at Y%": Y must BE the sim's number (todo #861, lane surface-consistency-oversight).
 
@@ -411,8 +459,31 @@ def _pregame_model_sentence(
     market ... says Z%.") are KEPT. `intelligence_state` strips this sentence
     from cards that turn live with exactly that regex, and the cheat sheet skips
     it by its first words.
+
+    `board` is `board_model_probability(row)`, passed only with the one-number switch ON. When it differs from
+    `model`, the board re-based the number on the current market, and the sentence names the board's own number
+    (the one Win% and the model edge show) instead of the served one. With the switch off, or no difference, the
+    sentence is exactly what it was.
     """
     tail = f"; the no-vig market{across} says {fair:.1%}."
+    if board is not None and abs(board - model) < _SIM_ATTRIBUTION_GAP:
+        # Not re-based to the print precision, but the sentence still prints the CARD'S number: 0.5146 served and
+        # 0.5143 on the card read "51.5%" beside Win% 51.4% (3 rows of 1,725 in the 2026-11-24 replay).
+        model = board
+    if board is not None and abs(board - model) >= _SIM_ATTRIBUTION_GAP:
+        sim = raw if raw is not None else model
+        weight = _as_float(projection.get("book_blend_w"))
+        blended = str(projection.get("book_blend") or "") == "applied" and weight is not None
+        if blended and weight <= 0.0:
+            return (
+                f"Our sim has {subject} at {sim:.1%}, but it carries no weight in this market yet, "
+                f"so the board uses the market's number{tail}"
+            )
+        how = []
+        if raw is not None and abs(raw - model) >= _SIM_ATTRIBUTION_GAP:
+            how.append(f"weighted {weight:.0%} against the market" if blended and weight < 1.0 else "calibrated for this market")
+        how.append("re-based on the current market")
+        return f"Our sim has {subject} at {sim:.1%}, {' and '.join(how)} for a board probability of {board:.1%}{tail}"
     if raw is None or abs(raw - model) < _SIM_ATTRIBUTION_GAP:
         return f"Our sim has {subject} at {model:.1%}{tail}"
     weight = _as_float(projection.get("book_blend_w"))
@@ -453,7 +524,8 @@ def row_explainer(
         if live:
             parts.append(f"The live re-sim has {subject} at {model:.1%}; the no-vig market{across} says {fair:.1%}.")
         else:
-            parts.append(_pregame_model_sentence(projection, subject, model, raw, fair, across))
+            board = board_model_probability(row) if one_model_number_enabled() else None
+            parts.append(_pregame_model_sentence(projection, subject, model, raw, fair, across, board))
     else:
         price = _fmt_american(quote.get("price"))
         book = str(quote.get("bookmaker") or "").strip().upper()

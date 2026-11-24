@@ -371,6 +371,81 @@ make it disagree with Win% on those cards instead. The root fix is ONE model num
 and stake. It changes stake sizing's input, so it is a betting change: window only, the user's call. No code was
 changed; put back to the user. Probes: `C:\tmp\scc_oversight_d5aa\probe_win.py`, `probe_contra.py`.
 
+### One model number per card -- BUILT, DEFAULT OFF, pre-registered `[2026-11-24 ~11:45 AM CST; user "Build one number, off"]`
+
+The user was asked "Which fix for the board's two model numbers?" and answered "Build one number, off".
+
+**Correction to the paragraphs above.** `model_probability_cal` is NOT a calibration curve on any pregame row today.
+`calibration_method` is `identity` on every one (1,730 rows, 15:5xZ). On all 1,002 rows where it differs from Win%
+by more than 0.5 pp, it equals the quote fair plus `model_edge_pct_raw`/100, i.e. the model's edge against the
+market reading its projection was built on, re-based onto the current fair. Win% shows that older reading. For a
+row whose sim has no weight, that is a stale market number presented as the model's. Desmond Bane: Win% 53.8%,
+current fair 54.9%. Probe: `C:\tmp\scc_oversight_d5aa\probe_anchor.py`.
+
+**Who reads which number.**
+- **The live purchaser** sizes on `fair + model_edge_pct/100` (`portfolio_commit.sizing_inputs_with_provenance`,
+  ~line 806) from the SHORTLIST row. It never reads the card's `model_probability` / `confidence`
+  (`sizing_candidate` builds its own mapping).
+- **The card's number** feeds Win%, the sim tags (`intelligence.html`), Ask, the explainer, the Layer 1
+  `_attach_board_stakes` display stake, and the evaluation ledger's `model_probability` for `layer2_shortlist`
+  records.
+
+**Which number grades better** (a read-only subagent, verified here against its `out_900.txt`).
+- Data: 53,474 graded pregame Layer 2 rows, 448 games, 14 dates (2026-11-10..11-23), from the fleet's
+  `reports/intelligence/evaluation_ledger_chunks/` (W, result) joined to `decision_records/*.pregame_lines.jsonl.gz`
+  (F, E). Same build, within 900 s.
+- Brier W 0.2135 / E 0.2135 / F 0.2101. W-E +0.00001 [-0.00016, +0.00018], game-clustered bootstrap, 2,000
+  resamples. Log loss W-E -0.0002 [-0.0010, +0.0005].
+- **No accuracy difference; the choice is consistency.** E is what the model edge and the live sizer use.
+- Both lose to the market fair: W-F +0.0033 [+0.0020, +0.0048] overall; NCAAF +0.0115, NHL +0.0047; NBA +0.0002
+  [-0.0002, +0.0006].
+- Scratch: `C:\tmp\scc_oversight_d5aa\grade\`.
+
+**The build.**
+- **Switch:** `SYNDICATE_LAYER2_ONE_MODEL_NUMBER`. Absent, or any value outside 1/true/yes/on, is OFF = today byte
+  for byte (tested).
+- **ON, the card:** `layer2_row_context.board_model_probability` returns `model_probability_cal` on a pregame row
+  carrying it with a numeric `model_edge_pct`, strictly inside (0, 1). `layer2_board._layer2_board_columns` uses it
+  for `model_probability` and `confidence` (Win%). The replaced served number rides beside it as
+  `model_probability_projection`, with `model_probability_basis: "model_edge"`.
+- **ON, the sentence** names the same number: "... weighted 5% against the market and re-based on the current
+  market for a board probability of 54.7%; ...". Unblended sims read "... re-based on the current market for a
+  board probability of X".
+- **Unchanged under ON:** live rows, and rows without the pair, keep the served number. Lane
+  `cell-calibration-847`'s (b) display stamp takes the new number as its input (its own switch, untouched).
+- **Tests:** `tests/test_layer2_one_model_number.py`, 24, covering off == absent and on != off (reachability).
+  Existing suites touching the card or sentence: 360 pass. The 8 failures in
+  `test_nba_prop_side_face_current_roster.py` fail identically on the unchanged code (roster data absent in the
+  worktree).
+
+**Replay** through the new code over the fleet's 1,725 pregame shortlist rows (11-24 ~17:20Z), 0 exceptions:
+
+| reading | OFF | ON |
+|---|---|---|
+| Win% - fair misses the model edge by > 0.5 pp | 1,004 | 2 |
+| Win% and edge on opposite sides of the market | 9 | 0 |
+| sentence's board number != Win% | 0 of 295 | 0 of 855 |
+
+- The 2 left are NCAAF moneylines with `model_probability_cal` = 1.0, refused as a certainty, so they keep the
+  served number.
+- A first ON pass printed the served number on 3 sentences where the two were < 0.05 pp apart. Fixed and tested.
+- Replay script: `C:\tmp\scc_oversight_d5aa\replay_one_number.py`.
+
+**Prediction for a load** (on the served board, first build after the load):
+- **P1:** Win% - fair misses `model_edge_pct` by > 0.5 pp on 0 pregame cards, apart from rows whose
+  `model_probability_cal` is 0 or 1.
+- **P2:** 0 cards with Win% and the edge on opposite sides.
+- **P3:** 0 sentences stating a board number different from Win%.
+- **P4:** the live purchaser's inputs are unchanged (it does not read the card).
+- **P5:** no measurable accuracy change (W-E above).
+- Falsified by any P1-P3 count above 0 on rows with a cal strictly inside (0, 1).
+
+**Classed a BETTING change for the load, conservatively.** The live sizer does not read the card, but the
+evaluation ledger's `layer2_shortlist` `model_probability` switches from W to E at the load. Scorecard and
+optimizer readings of that field see E from then on: a break in the series, expected near zero because W and E
+grade the same. So it loads only in a window. It is NOT in any window's queue: queuing it (12-08 at the
+earliest) is the user's call.
+
 **Post-window `plan_vs_orders`** (15:54Z, for lane `live-ev-floor-off`; not judged here):
 - 11 live orders today, none of their position keys in the current 19-position plan.
 - 9 join a board row, and 1 of the 9 is Suggested NOW. Today's orders include ones placed before the 08:30Z up,
