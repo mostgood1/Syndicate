@@ -381,6 +381,50 @@ def test_a_live_position_is_suggested_by_the_board_row_not_by_a_flag_it_never_ca
         pm.render_alignment(al))
 
 
+def test_paper2_positions_count_as_placeable_live_only_by_the_fleets_own_verdict():
+    # 2026-11-24 (H-S2): Polymarket's paper2 held 2 Suggested positions for 3.5 h, both aggregator-priced, and the
+    # panel read "2 positions at its price" as if live could take them.
+    fleet = {
+        "board": {"rows": [_row("e1", "h2h", "home", suggested=True), _row("e2", "h2h", "away", suggested=True)]},
+        "plans": {
+            "paper2_polymarket": {"rows_in": 3, "positions": [
+                {**_row("e1", "h2h", "home"), "placeable": False, "placeable_refusal": "aggregator_priced"},
+                {**_row("e2", "h2h", "away"), "placeable": False, "placeable_refusal": "aggregator_priced"},
+            ]},
+            "paper2_kalshi": {"rows_in": 2, "positions": [
+                {**_row("e1", "h2h", "home"), "placeable": True},
+                {**_row("e2", "h2h", "away"), "placeable": False, "placeable_refusal": "no_venue_contract"},
+            ]},
+        },
+    }
+    venues = pm.alignment(fleet, [], {}, "2026-11-24", NOW)["venues"]
+    pmk, ks = venues["polymarket"], venues["kalshi"]
+    assert (pmk["suggested_positions"], pmk["suggested_placeable"]) == (2, 0)
+    assert pmk["suggested_unplaceable"] == {"aggregator_priced": 2}
+    assert (ks["suggested_placeable"], ks["suggested_unplaceable"]) == (1, {"no_venue_contract": 1})
+    text = "\n".join(pm.render_alignment(pm.alignment(fleet, [], {}, "2026-11-24", NOW)))
+    assert "2 positions at its price (0 placeable live, not: {'aggregator_priced': 2})" in text
+    # A reader that could not judge (no predicate on the fleet) is unknown, never "placeable".
+    fleet["plans"]["paper2_kalshi"]["positions"].append(_row("e3", "h2h", "home"))
+    assert pm.alignment(fleet, [], {}, "2026-11-24", NOW)["venues"]["kalshi"]["suggested_placeable"] is None
+
+
+def test_the_reader_stamps_the_live_plans_own_placeable_predicate():
+    import portfolio_alignment_reader as reader
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from pipeline.portfolio_commit import placeable_refusal
+
+    venue = {"price_source": "venue_feed", "venue_ticker": "T-1"}
+    for position, verdict in ((venue, (True, None)),
+                              ({**venue, "price_source": "oddsapi"}, (False, "aggregator_priced")),
+                              ({**venue, "venue_ticker": " "}, (False, "no_venue_contract"))):
+        out = reader.with_placeable(reader.compact(position), position, placeable_refusal)
+        assert (out["placeable"], out.get("placeable_refusal")) == verdict
+        assert "venue_ticker" not in out
+    assert "placeable" not in reader.with_placeable({}, venue, None)
+
+
 def test_alignment_without_a_board_says_so_and_renders_the_error():
     al = pm.alignment({"board": {"error": "no shortlist for 2026-11-17"}, "plans": {}}, [_order()], {}, "2026-11-17", NOW)
     assert al["orders_today"]["board_read"] is False

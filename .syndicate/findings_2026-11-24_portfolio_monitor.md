@@ -100,3 +100,12 @@ The fleet's own self-check (`paper2_placeable`, computed by `placeable_refusal` 
 **Leads, not followed:**
 - `aggregator_priced` is 4-8 of Polymarket's ~20 scoped rows in every build. That is a venue-feed coverage gap, whose owner was not checked.
 - The panel could show paper2's placeable count next to its positions. This needs `venue_ticker` in the reader's compact row; tooling only.
+
+### The panel now shows paper2's placeable-live count (2:11 PM CST)
+
+User 11-24: "Yes, add it". Tooling only, lane portfolio-monitor.
+- `scripts/portfolio_alignment_reader.py` stamps the fleet's own `placeable_refusal` verdict on each plan position (`placeable`, plus `placeable_refusal` when refused). It calls the live plan's predicate instead of copying the ticker, so the count cannot disagree with the LIVE_PLAN_WRITTEN self-check.
+- `scripts/portfolio_monitor_probe.py`: `suggested_placeable` (None when any position went unjudged) and `suggested_unplaceable` by reason. The rendered line reads "N positions at its price (M placeable live, not: {reason: n})".
+- The Portfolio Watch page data carries `al_<venue>_listed_placeable`, and the "Board picks bought" tile reads "... clear its price, M placeable live".
+- Tests: two new ones, one against the real `placeable_refusal`; 28 of 28 pass.
+- Scratch reading at 2:10 PM CST (20:10Z): both paper plans held 0 positions, so it read "0 positions at its price (0 placeable live)" at both venues. A non-zero reading is still owed, at the first scheduled reading where paper2 holds a position.

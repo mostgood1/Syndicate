@@ -43,6 +43,22 @@ def compact(row: dict, rank: int | None = None) -> dict:
     return out
 
 
+def with_placeable(out: dict, position: dict, refusal_fn) -> dict:
+    """Stamp the fleet's OWN `placeable_refusal` verdict on a plan position: the same predicate the live plan runs on
+    paper2's scoped rows and its LIVE_PLAN_WRITTEN self-check counts as `paper2_placeable`. Copying the ticker and
+    re-deriving the test here could disagree with it; calling it cannot. Absent when the predicate is unavailable.
+
+    11-24 (findings_2026-11-24_portfolio_monitor.md, H-S2): Polymarket's paper2 held 2 Suggested positions for 3.5 h,
+    none placeable (aggregator-priced), and the panel's "N positions at its price" could not tell them from buyable."""
+    if refusal_fn is None:
+        return out
+    reason = refusal_fn(position)
+    out["placeable"] = reason is None
+    if reason is not None:
+        out["placeable_refusal"] = reason
+    return out
+
+
 def main() -> int:
     t0 = time.monotonic()
     pid, date = sys.argv[1], sys.argv[2]
@@ -55,6 +71,10 @@ def main() -> int:
     sys.path.insert(0, os.getcwd())
     from pipeline.intelligence_state import read_layer2_shortlist
     from pipeline.portfolio_commit import live_portfolio_plan_path_for_venue, portfolio_plan_path_for_venue
+    try:
+        from pipeline.portfolio_commit import placeable_refusal
+    except ImportError:  # a fleet checkout older than the live plan's own predicate: report unknown, not placeable
+        placeable_refusal = None
     from syndicate.features.shared.refresh_state_store import read_json_file
 
     out: dict = {"date": date}
@@ -80,7 +100,7 @@ def main() -> int:
                 "rows_in": doc.get("rows_in"),
                 "refusals": doc.get("refusals") or {},
                 "scope_refusals": doc.get("venue_scope_refusals") or {},
-                "positions": [compact(p) for p in positions],
+                "positions": [with_placeable(compact(p), p, placeable_refusal) for p in positions],
             }
     out["plans"] = plans
     out["seconds"] = round(time.monotonic() - t0, 2)

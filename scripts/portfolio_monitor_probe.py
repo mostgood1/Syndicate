@@ -869,6 +869,8 @@ def alignment(fleet: Mapping[str, Any], orders: Sequence[Mapping[str, Any]], rai
     for v in ALIGN_VENUES:
         lp, p2 = plans.get(f"live_{v}") or {}, plans.get(f"paper2_{v}") or {}
         pos = [p for p in lp.get("positions") or [] if isinstance(p, Mapping)]
+        p2_pos = [p for p in p2.get("positions") or [] if isinstance(p, Mapping)]
+        judged = [p for p in p2_pos if "placeable" in p]
         venues[v] = {
             "live_plan_at": lp.get("generated_at"), "live_plan_absent": bool(lp.get("absent")) or not lp,
             "live_rows_in": lp.get("rows_in"), "live_positions": len(pos),
@@ -883,6 +885,12 @@ def alignment(fleet: Mapping[str, Any], orders: Sequence[Mapping[str, Any]], rai
             "suggested_listed": p2.get("rows_in"),
             "suggested_not_listed": (p2.get("scope_refusals") or {}).get("venue_not_quoting"),
             "suggested_positions": len(p2.get("positions") or []),
+            # The fleet's own `placeable_refusal`, stamped by the reader: paper2 prices a Suggested row at any quote the
+            # board has, an aggregator's included, and live can only take one at the venue's own price and contract.
+            # None when the reader could not judge (11-24, H-S2: Polymarket's 2 positions were placeable 0 of 2).
+            "suggested_placeable": sum(p.get("placeable") is True for p in judged) if len(judged) == len(p2_pos) else None,
+            "suggested_unplaceable": dict(collections.Counter(
+                str(p.get("placeable_refusal")) for p in judged if p.get("placeable") is False).most_common()),
             "suggested_refusals": dict(p2.get("refusals") or {}),
         }
     out["venues"] = venues
@@ -938,8 +946,11 @@ def render_alignment(al: Mapping[str, Any]) -> list[str]:
              f"{b.get('suggested_by_sport')}; Suggested bought today {rate(b.get('suggested_bought_today') or 0, n_sugg)},"
              f" in a live plan now {rate(b.get('suggested_in_live_plan') or 0, n_sugg)}"]
     for v, x in (al.get("venues") or {}).items():
+        unpl = x.get("suggested_unplaceable") or {}
         lines.append(f"    {v}: lists {x.get('suggested_listed')} of the Suggested rows -> {x.get('suggested_positions')}"
-                     f" positions at its price {x.get('suggested_refusals')}; live plan {x.get('live_positions')}"
+                     f" positions at its price ({x.get('suggested_placeable')} placeable live"
+                     + (f", not: {unpl}" if unpl else "") + f") {x.get('suggested_refusals')};"
+                     f" live plan {x.get('live_positions')}"
                      f" positions ({x.get('live_positions_suggested')} Suggested on the board now,"
                      f" {x.get('live_positions_floor')} from the 0% floor) from {x.get('live_rows_in')} rows,"
                      f" top refusals {x.get('live_refusals_top')}")
