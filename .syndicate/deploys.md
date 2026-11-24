@@ -63247,3 +63247,11 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Generation-2 pause seconds per day back to the 11-20..11-22 range (1,910-3,039 s).
   - This is one change on its own. The quiet-worker memory check (user 11-23 "Yes, after the reading") is built and loaded separately.
 - **Claim released** 16:00:00Z.
+
+## 2026-11-24 16:05Z (10:05 AM CST) -- READING (no deploy): the PRE-REGISTERED #816 7-day grade of the college totals calibration (lane `ncaab-total-overprojection`, scheduled task `college-total-cal-grade-816`, user 11-17 "run the #816 7-day grade") -- **VERDICT FLIP TO SPREAD ONLY (T3); NOT LOADED, user decision owed**
+- betting change: no (a reading; nothing loaded).
+- **Read:** `scripts/grade_college_total_calibration.py --league ncaab --from 2026-11-17 --to 2026-11-23` (blob cf1ef20b44a2, the registered `47d504ea2` script), run ONCE from worktree `college-total-cal-grade-816` under refresh-worker's environ (pid 753771; values never printed), nice 19, rc 0, 10:04:26-10:05:13 AM CST. Output `C:\tmp\college_total_cal_grade\result.json`.
+- **Preconditions:** all 7 slate ledgers and fits as_of 11-16..11-22 present on the fleet; no slate excluded. Loads in the window touching the calibration path (#824 `3dbe53df0`, I-17 `923869cf3`/`d78a448c4`, the gate fallback `36a9f5501`, #836 shadow, #847 off) did not move the served LIVE NCAAB total probability; the window is not split.
+- **Measured (284 live games, 7 nights):** T1 served − market +0.00149 [−0.00192, +0.00490]: neither PASS nor FAIL. T2 served − raw −0.00351: PASS. **T3 served − spread only +0.00484 [+0.00230, +0.00737], night-clustered +0.00424: RECOMMENDS THE FLIP.** T4: over flags +16.4 pp [+12.3, +20.4] (235 g), under +3.4 pp [−0.3, +7.0] (276 g): no side fails. T5 pregame (316 g) +0.00481 [+0.00173, +0.00790]: FAIL (11-18 on, every pregame fit failed its gate and served the market).
+- **verify:** the verdict follows from the registered rules with no change to tests, thresholds or dates; full table in findings § "#816 7-day grade — RESULTS".
+- **Owed:** the user's decision on the flip (`FIT_LEVEL = False` on main, drained claimed refresh-worker restart, refit with `scripts/fit_college_total_calibration.py`); a betting change, so the 12-08 window unless classed as risk reduction.

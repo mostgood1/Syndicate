@@ -192,3 +192,96 @@ known (calibrated under flags 23-40, rail monitor) and is reported DESCRIPTIVELY
   - **TURN THE CALIBRATION OFF** only if T2 fails (served worse than the engine's own number).
   - Anything else: **INCONCLUSIVE** -- keep as is and extend by 7 slates under the same rules.
 - Any load that changes the served live total probability inside the window splits it at the load time.
+
+## #816 7-day grade — RESULTS (Tue 2026-11-24, run 10:04:26-10:05:13 AM CST; scheduled task `college-total-cal-grade-816`; read-only)
+
+**VERDICT by the registered rules: FLIP TO SPREAD ONLY** (T3 recommends it). Not loaded; the user decides. Nothing on
+the fleet, in `FIT_LEVEL` or in `SYNDICATE_COLLEGE_TOTAL_CALIBRATION` was changed.
+
+- **How it ran (as registered):** `scripts/grade_college_total_calibration.py --league ncaab --from 2026-11-17 --to
+  2026-11-23 --json /mnt/c/tmp/college_total_cal_grade/result.json`, ONCE, from worktree
+  `C:\tmp\syndicate-sessions\college-total-cal-grade-816` at origin/main `7cf6d12a5` (`git ls-tree HEAD` blob
+  **cf1ef20b44a2** = the registered script from `47d504ea2`), fleet python `/usr/bin/python3.11` under refresh-worker's
+  environ (pid 753771, 276 keys passed through `env -i`, no value printed), `nice -n 19`, rc 0. Output:
+  `C:\tmp\college_total_cal_grade\result.json` / `.txt`.
+- **Preconditions:**
+  - (a) all 7 slate ledgers present on the fleet (`ncaab_source/data/live_gameline_ledger/live_gameline_ledger_<d>.jsonl`,
+    11-17 .. 11-23: 24,161 / 36,050 / 17,793 / 31,260 / 24,121 / 17,484 / 20,093 lines). **No date excluded.**
+  - (b) fit files as_of 20261116 .. 20261122 all present (each written ~5:0x AM CST the following day).
+  - (c) loads 11-17..11-24 touching `total_prob_calibration.py` / the live join's totals step / `_served`:
+    - `3dbe53df0` #824 (18:03:56Z 11-17): refuses contradiction rows; it does not move a priced row's probability, and
+      it loaded BEFORE this pre-registration was written (18:55Z). No split.
+    - `923869cf3` I-17 (08:02:54Z 11-18) and `d78a448c4` (04:58:14Z 11-19): the displayed calibrated TOTAL only
+      (deploys.md: "No served probability, flag, rank or stake reads either"). No split.
+    - `36a9f5501` gate fallback (14:42:44Z 11-18): a FAILED phase serves the market instead of raw. NCAAB live passed
+      its gate on every fit in the window, so the live served probability did not change (deploys.md: "NCAAB live is
+      unchanged"). It DID change pregame: from the 11-18 slate every pregame fit failed and serves the market
+      (a = c = 0, `fallback: market`). The script reads `calibration_for` with this rule, which matches what was served
+      from the load on. No live split; noted for T5.
+    - `52e68382a` #836 (absent = shadow) and `75a787964`/`8acee817d` #847 (default off; 0 `SYNDICATE_CELL_CALIBRATION_*`
+      keys on the fleet, deploys.md 2026-11-19 04:58:14Z): no served-probability change. The 11-24 08:30Z batch is after
+      the window (no live college game at its load) and does not touch these files.
+    - **Window NOT split.**
+  - (d) blob cf1ef20b44a2 confirmed.
+- **Population:** LIVE 284 NCAAB games over 7 nights (every live full-game total row, each game weighing 1); PREGAME 316
+  games at the close. WNCAAB not graded (registered as descriptive only on calibrated slates; the task ran NCAAB only).
+
+### Tests
+
+| test | reading | rule | result |
+|---|---|---|---|
+| **T1** served − market (live Brier) | **+0.00149**, 90% game CI [−0.00192, +0.00490] (se 0.00207); night-clustered +0.00057 (se 0.00313, 7 nights) | PASS if <= 0; FAIL if > 0 with CI above 0 | **NOT PASS, NOT FAIL** (> 0, CI spans 0) |
+| **T2** served − raw | **−0.00351**, CI [−0.00934, +0.00231]; night-clustered −0.00302 (se 0.00395) | PASS if < 0 | **PASS** |
+| **T3** served − spread only | **+0.00484**, CI **[+0.00230, +0.00737]** (se 0.00154); night-clustered **+0.00424** (se 0.00261) | FLIP if > 0, CI above 0 AND night mean > 0 | **RECOMMENDS THE FLIP** |
+| **T4** flags by lean (|served − market| >= 3 pp), hit − fair | OVER 235 games: 0.702 vs 0.538, **+16.4 pp [+12.3, +20.4]**; UNDER 276 games: 0.548 vs 0.514, **+3.4 pp [−0.3, +7.0]** | a side FAILS if its CI is entirely below 0 | **no side fails** |
+| **T5** pregame at the close, served − market (0.25) | served 0.25481 vs 0.25 (raw 0.26128): **+0.00481**, CI [+0.00173, +0.00790], 316 games | PASS if <= 0 | **FAIL** (not a verdict input) |
+
+Pooled live Brier: market 0.23805, raw 0.24305, served 0.23954, spread only **0.23470**.
+
+**Verdict walk:** KEEP needs T1 PASS (it did not) and T3 not recommending (it does). FLIP TO SPREAD ONLY: T3
+recommends it -> **FLIP**. TURN OFF only if T2 fails (it passes).
+
+### By night (live, NCAAB)
+
+| slate | games | market | served | spread only | fit in force (live a / c; as_of) |
+|---|---|---|---|---|---|
+| 11-17 | 53 | 0.2387 | **0.2539** | 0.2359 | −0.2884 / 0.226 (11-16) |
+| 11-18 | 59 | 0.2353 | 0.2344 | 0.2314 | −0.1594 / 0.2497 (11-17) |
+| 11-19 | 25 | 0.2361 | 0.2423 | 0.2336 | −0.1179 / 0.2735 (11-18) |
+| 11-20 | 48 | 0.2350 | 0.2314 | 0.2298 | −0.0698 / 0.2812 (11-19) |
+| 11-21 | 47 | 0.2469 | 0.2467 | 0.2468 | −0.0421 / 0.3049 (11-20) |
+| 11-22 | 23 | 0.2399 | 0.2286 | 0.2284 | −0.0424 / 0.2883 (11-21) |
+| 11-23 | 29 | 0.2333 | 0.2320 | 0.2336 | −0.0403 / 0.3137 (11-22) |
+
+Spread only beat served on 6 of 7 nights (11-23 the exception, by 0.0016). Spread-only c per slate: 0.261, 0.268,
+0.287, 0.290, 0.311, 0.294, 0.319.
+
+### Fits in force per slate (a, c)
+
+- **Live:** see the table; every slate `level: fitted`, `fallback: null`; games 232 -> 487. **The daily refit's own level
+  shrank from −0.288 to −0.040 across the window**: by 11-21 the served fit was already close to spread only, which is
+  why the last three nights are near-ties and the gap is carried by 11-17..11-19.
+- **Pregame:** 11-17 slate a −0.3174 / c 0 (as_of 11-16, passed its gate); **11-18 .. 11-23 every fit FAILED its gate ->
+  `fallback: market`** (a 0, c 0). So from 11-18 the served pregame probability IS the market, and T5's +0.00481 is
+  carried by the 11-17 slate (inference from the fits: a = c = 0 gives served = market exactly on those slates; the
+  script does not print T5 per slate and was run once, so the 11-17 share is not separately measured).
+
+### 11-16 (DESCRIPTIVE, outside the window, known before registering)
+
+`--from 2026-11-16 --to 2026-11-16`, same environ, rc 0 (`night_1116.json`). Fit in force as_of 11-15 (live a −0.3583 /
+c 0.2294). 21 live games: market 0.2319, raw 0.2454, served **0.2558**, spread only 0.2322; served − market +0.0239
+[+0.0024, +0.0454]; flags: over 5 games 1.000 vs 0.579, under 21 games 0.415 vs 0.504 (−8.9 pp [−21.3, +3.4]). Pregame
+22 games: served 0.2673 vs 0.25. It matches the pre-registration's smoke run (served 0.2558, spread only 0.2322, market
+0.2319).
+
+### Reading (not part of the verdict)
+
+- The level hurt most when it was large (11-16 and 11-17, a ≈ −0.3) and was close to harmless once the refit had walked
+  it to ≈ −0.04. Spread only would have beaten it over the window by 0.0048 Brier per game, and it is the version that
+  beats the market (0.2347 vs 0.2381); served does not (+0.0015, inside noise).
+- Under flags no longer lose (+3.4 pp, CI touching 0); over flags are strong (+16.4 pp). The 11-18 "under flags 0.426"
+  worry (rail monitor, 48 games) did not persist over 276 games.
+- FLIP means: `FIT_LEVEL = False` on main, a drained, claimed refresh-worker restart, then rewriting the in-force fit
+  file with `scripts/fit_college_total_calibration.py`. It is a **betting change** (it moves live NCAAB total flags), so
+  it loads in a betting-change window (next: Tue 2026-12-08 2-7 AM CST; it is already on the 12-08 candidate list) unless
+  the user classes it as a risk reduction.
