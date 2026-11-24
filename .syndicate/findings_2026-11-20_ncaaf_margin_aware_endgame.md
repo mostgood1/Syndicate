@@ -1726,3 +1726,57 @@ Brier of p_home (all draws, every state). If G* = 1.00, there is no gain candida
 | `/c/tmp/t859h/code/syndicate/features/ncaaf/live_resim.py` | `2bd483adcc80c0a2` |
 | `/c/tmp/t859h/code/scripts/generate_smartsim2_ncaaf_projections.py` | `68217bfe5a87947c` |
 | `/c/tmp/w1208_ncaaf/kit_env_ncaaf.sh` | `4f31d0ac2b4888b5` |
+
+### IN-PLAY TEAM-STRENGTH RE-FIT RESULTS, read 2026-11-23 10:40 PM CST
+
+The pinned script ran 7:50-10:38 PM CST 11-23 (`C:\tmp\t859r\run.log`): all 10 arms (`RUN_DONE` x 10), `FIT_DONE
+lines=215 tracebacks=0 end=1`, `SCORE_DONE lines=150 tracebacks=0 end=1`. The pins held at all three checks and
+still match (22 of 22). Nothing changed on the fleet. Outputs: `fit.txt`, `score.txt`.
+
+**G0 (gated): OVER-CONFIDENT. The diagnosis stands on production's own ratings.** On the blend entries production
+stored, `off`'s favourites at 0.60-0.90 won 0.695 against a predicted 0.751: diff -0.0555 (se 0.0207), 945 states in
+337 games. That is a little smaller than the -0.074 the diagnosis read on the season table. **P1 held.** The 12-08
+engine (`h_eg`) reads the same, -0.0564 (se 0.0204), and its full-state Brier minus `off` is +0.00105 (se 0.00095):
+the queued load neither helps nor hurts the win probability.
+
+**Fit (2025): G* = 0.70. P2 held.**
+- Brier by G: 0.55 0.12909; 0.70 0.12780; 0.85 0.12785; 1.00 0.12896; 1.15 0.12977.
+- 0.70 and 0.85 nearly tie, and on 2025 neither beats 1.00 by 2 SE (-0.00116, se 0.00158; -0.00112, se 0.00092).
+- The anchor on 2025 (nothing fitted): Brier 0.12572, minus `h_eg` -0.00324 (se 0.00231). Its headline is -0.0428
+  (se 0.0222), CALIBRATED but only 0.07 SE short of OVER-CONFIDENT. Its cover-the-line Brier is -0.00812 (se 0.00333).
+
+**G1 (gated), the 2026 hold-out, each against `h_eg` on the same states and seeds:**
+
+| candidate | (a) Brier - h_eg | (b) own headline diff | (c) cover Brier - h_eg | verdict |
+|---|---|---|---|---|
+| GAIN G 0.70 | -0.00230 (se 0.00155), 1.5 SE: **NO** | -0.0292 (se 0.0190): yes | -0.00396 (se 0.00231): yes | **FAIL** |
+| ANCHOR | -0.00683 (se 0.00236), 2.9 SE: yes | -0.0283 (se 0.0197): yes | -0.01313 (se 0.00328): yes | **PASS** |
+
+**RECOMMEND: ANCHOR**, the only pass. **P3 held:** it passed, and its 2025 Brier (0.12572) beats the gain's (0.12780).
+
+**Reported, not gated:**
+- **The clean lean** (even draws only), favourites at 0.60-0.90, 2026: `off` +1.11 (se 0.53), `h_eg` +1.24
+  (se 0.52), ANCHOR +0.50 (se 0.50), gain -0.03 (se 0.51). The diagnosis's +2.18 was about half Monte Carlo noise.
+  The real lean is about +1.1 points toward the favourite.
+- **What the anchor leaves.** Its headline still reads -0.028: inside 2 SE, but on the over-confident side. By band
+  over all phases: 0.60-0.70 -0.048 (se 0.029), 0.70-0.80 -0.017 (se 0.030), 0.80-0.90 -0.020 (se 0.026). At Q3 7:30,
+  0.50-0.60 reads -0.129 (se 0.072, 47 games). That cell is as bad in `h_eg` (-0.160) and the gain (-0.137), so it is
+  not the anchor's.
+- **Totals:** the anchor moves margins only, so its total bias is `h_eg`'s, +0.63 (se 0.45); `off` reads -0.52
+  (se 0.45).
+- **The 2026 games are the diagnosis's games.** The anchor has nothing fitted, but the idea to test it came from those
+  games. On 2025 it points the same way, but its Brier gain there is 1.4 SE, not 2.
+- **The anchor was tested only on top of `h_eg`**, the 12-08 set (the pair and the end game). Without that set it is
+  untested.
+
+**What follows (each the user's call; nothing changes on the fleet):**
+- **The anchor is a betting change.** It moves the live moneyline and spread probabilities. It would be built
+  default-off and loaded in a window.
+- **A build needs two inputs per game:** the market's pregame home margin, and the live engine's own kickoff mean
+  margin. The replay ran one kickoff state a game at 120 sims; NCAAB's shipped anchor uses the pregame sim margin
+  instead, which here is not the same number.
+- **Timing.** 12-08 already holds the NCAAF pair and the end game. After 12-08 the regular season is over, so in
+  either window (12-08 or 12-22) the anchor first meets Army-Navy and the bowls, not the regular season it was tested
+  on.
+- **This tested probability accuracy, not ROI.** Live money has barely touched in-play NCAAF sides (2 of 32 carried a
+  sim edge). In paper, the sim's in-play moneyline edges lost -24.4% (se 9.7), most of it on 0.50-0.75 favourites.
