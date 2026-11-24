@@ -338,3 +338,13 @@ Probe durations on 11-23 from 1 PM:
 top of the hour, so it is slow. At 6:04 it slowed into a failed connection. Nothing yet says whether the 7:04 read
 needed the new retry. The instrument: each reading records `token_read` (seconds, attempts, and each attempt's result:
 `ok` / `rc=N` / `error` / `not_a_token` / `no_line`). It is a diagnostic only, and not an anomaly.
+- **H-T3, first readings with the instrument:**
+
+  | reading | token read | attempts | probe | endpoints |
+  |---|---|---|---|---|
+  | 7:34 PM | 0.25 s | 1, `ok` | 7.3 s | 8 of 8 |
+  | 8:04 PM | 0.36 s | 1, `ok` | 10.2 s | 8 of 8 |
+
+  So a :04 run is not slow by itself, and the 6:04/7:04 slowness was a passing spell (2 of the 8 :04 runs from 1 PM to 8 PM
+  ran ~30 s). Unanswered: whether 7:04's ~25 s included a retry, since it ran before the instrument. Left open with the
+  instrument running. A `token_read` over 10 s, or more than one attempt, in a later reading answers it.
