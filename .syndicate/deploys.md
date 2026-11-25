@@ -63371,3 +63371,28 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - **Month:** the fleet's own projection read 4.79M for 30 days at 04:59Z (window 77 h). It was already 4.70M at 17:29Z 11-22, before the load. 1,707,745 of 5M remain.
 - **Abnormal:** none. 0 background failures, 0 stale refusals, 0 slow slate iterations.
 - verify: PREDICTED on all six (the reading above). Lane `polymarket-slate-off-odds-loop` closed and todo #851 updated on it.
+
+## 2026-11-25 05:20Z (11:20 PM CST 11-24) -- READING (no deploy): #853 web shared board copy, first live evening 5-11 PM CST 11-24 (lane `board-read-cold-share`, read by lane `layer2-rail-monitor`, R-G, user 11-20 "Rail monitor takes it"; read-only) -- **LOAD CHECK MET; P1-P4 PREDICTED, P5 FALSIFIED, P6 WATCH (confounded)**
+- betting change: no
+- **Load:** CHANGE F of the 2026-11-24 08:30:10Z window batch (F MET at load).
+- **Reader:** the registered `p853_readout.py` (copy `C:\tmp\railmon\p853\`), baseline 11-23 23:00Z-11-24 05:00Z, after 11-24 23:00Z-11-25 05:00Z. Run at 05:20Z, nice 19, rc 0. Output `C:\tmp\railmon\p853\readout_1124.txt`. The table is in `.syndicate/findings_2026-11-19_board_read_cold_share.md` (READING 2026-11-24).
+- **LOAD CHECK: MET.** ARMED 157, PUBLISHED 530, OFF 0, PUBLISH_FAILED 0, READ_FAILED 0, ADOPTED 275, SERVED_STALE 482.
+- **CONFOUNDED: no**, by the registered rule.
+- **Grades:**
+  - **P1 cold share:** 15.8% (16.9%). PREDICTED.
+  - **P2 new-worker first-read share:** 9.6% (14.4%). PREDICTED.
+  - **P3 fresh-worker penalty:** 1,128 ms adopted (2,626 ms cold on 11-23). PREDICTED.
+  - **P4 adopt load p50:** 0.66 s. PREDICTED.
+  - **P5 builds an hour:** 89.3 vs 77.7 (x1.15). FALSIFIED.
+  - **P6 recycles an hour:** 26.5 vs 11.2 (x2.37), anon at recycle 1,022 vs 933 MB (x1.10). WATCH, not ROLL BACK.
+- **What carries:**
+  - P3/P4 are the fix's own test.
+  - P1/P2 were already under the thresholds on the 11-23 baseline (60% / 55% on 11-18), so they show no regression and are not evidence.
+  - P5's after count includes every route's builds, the baseline's does not. The fix still did not cut builds.
+- **P6 confound outside the registered rule:** web's GC tuning was reverted at 15:57:59Z 11-24, between the windows.
+  - Baseline: 67 boots = 67 memory recycles, all `WEB_GC_TUNED` applied true.
+  - After: 159 = 159, all applied false. 0 `WORKER TIMEOUT` and 0 SIGKILL in either window.
+  - 26.5/h is inside #857's pre-tuning evening range (14-29/h). Not attributable to F.
+  - `/rail-watch` (15:43:16Z) also loaded between the windows.
+- **Action:** none on F. #857 (`WEB__SYNDICATE_WEB_WORKER_ANON_LIMIT_MB=1500`, user 11-20 "Yes, after #853") is unblocked for the next drained full down/up.
+- verify: the reading above; findings READING section and todo #853 updated.

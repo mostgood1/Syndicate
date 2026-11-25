@@ -261,6 +261,55 @@ copy, minus the total p50 of warm queries that touched no shared-copy marker, bo
 - P1, P2 and P4-P6 are unchanged.
 - The batch prompt's abbreviated P1-P6 list is superseded by this file and the reader.
 
+## READING 2026-11-24 ~11:25 PM CST: the first live evening after the load (lane `layer2-rail-monitor`, R-G; read-only)
+
+- **Load:** CHANGE F of the 11-24 window batch (deploys.md 2026-11-24 08:30:10Z entry, F MET at load time):
+  `COMBINED_BOARD_SHARED_COPY=1` on the web master and both workers.
+- **Command**, run at 05:20Z 11-25 (after the AFTER window closed), nice 19, rc 0. The reader is the registered
+  `p853_readout.py` (copy `C:\tmp\railmon\p853\`), and the output is `C:\tmp\railmon\p853\readout_1124.txt`:
+
+      cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p853/p853_readout.py \
+          2026-11-23T23:00:00 2026-11-24T05:00:00 2026-11-24T23:00:00 2026-11-25T05:00:00
+
+- **LOAD CHECK: MET.** ARMED 157, PUBLISHED 530, OFF 0, PUBLISH_FAILED 0, READ_FAILED 0, SERVED_STALE 482, ADOPTED 275.
+- **CONFOUNDED: no**, by the registered rule (>= 30 queries both windows; no gunicorn master start in AFTER).
+
+| # | metric | baseline (11-23 5-11 PM) | after (11-24 5-11 PM) | verdict |
+|---|---|---|---|---|
+| P1 | cold share | 16.9% (20/118) | 15.8% (59/374) | PREDICTED |
+| P2 | new-worker first-read share | 14.4% | 9.6% | PREDICTED |
+| P3 | fresh-worker penalty ms (same evening) | 2626 (cold) | 1128 (adopted, n 85) | PREDICTED |
+| P4 | adopt load_s p50 | n/a | 0.66 (n 275) | PREDICTED |
+| P5 | builds per hour | 77.7 | 89.3 (x1.15) | FALSIFIED |
+| P6 | SAFETY recycles/h, anon p50 at recycle | 11.2/h, 933 MB | 26.5/h (x2.37), 1022 MB (x1.10) | WATCH |
+| EXPLORATORY | query p50 / p90 ms, whole evening | 3729 / 5743 | 3738 / 5591 (x1.00 / x0.97) | not graded |
+
+- **What the verdicts carry:**
+  - **P3 and P4 are the fix's own test, and both are PREDICTED.**
+    - A fresh worker that adopted a copy paid 1.1 s over a warm query. Without the fix, a fresh worker's cold read
+      paid 2.6 s on 11-23 and 3.0-5.3 s on 11-17..11-19.
+    - An adopt loaded in 0.66 s p50 over 275 adopts.
+  - **P1 and P2 are PREDICTED, but the baseline already met them.** The 11-23 evening was 16.9% cold and 14.4%
+    first-read, against 60.0% / 55.2% on 11-18. So they show no regression; they are not evidence for the fix.
+  - **P5 is FALSIFIED as registered: builds rose x1.15, where <= 0.75x was predicted.** The reader's own note says
+    AFTER counts every route's `COMBINED_BOARD_SHARED_BUILD` and the baseline does not, so the comparison leans
+    against the fix. Even so, the mechanism did not cut builds.
+  - **P6 reads WATCH, not ROLL BACK.** Recycles per hour are above 1.3x, and anon at recycle (x1.095) is under 1.1x.
+- **P6 is confounded by a web change the registered rule does not see.** Lane `web-silent-worker-kills` reverted web's
+  GC tuning at 15:57:59Z 11-24 (deploys.md), between the two windows. The registered rule only looks for a gunicorn
+  master start inside AFTER.
+  - **Baseline:** every worker booted tuned: 67 boots, 67 `WEB_WORKER_MEMORY_RECYCLE`, 67 `WEB_GC_TUNED` applied true.
+  - **After:** every worker booted untuned: 159 boots, 159 recycles, 159 applied false.
+  - Neither window had a `WORKER TIMEOUT` or a `was sent SIGKILL`. Every worker exit was the memory recycle
+    (`limit_mb` 630, anon ~1,050 MB, age ~4 min at the newest line, 05:18:53Z).
+  - Before the GC tuning, #857 measured 14-29 recycles an hour on evenings. The after evening's 26.5/h sits inside
+    that range, and the tuned 11-23 baseline (11.2/h) sits below it. So the x2.37 cannot be attributed to F.
+  - The `/rail-watch` web route also loaded between the windows (15:43:16Z, lane `rail-watch-fleet-page`).
+  - Script: `C:\tmp\railmon\p853\p853_confound_1124.sh`.
+- **Action:** none on F. ROLL BACK did not trigger. #857 (the 1,500 MB recycle limit, user 11-20 "Yes, after #853")
+  is now unblocked and rides the next drained full down/up. It is predicted to cut recycles to <= 2/h, which also ends
+  P6's WATCH.
+
 ## Leads (not followed)
 
 - A daytime TTL miss (32% of 11-19 morning's cold reads) could be served stale-while-revalidate: serve the

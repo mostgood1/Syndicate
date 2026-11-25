@@ -215,6 +215,12 @@ On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL 
 
 ### `#853` — **THE LAYER 2 BOARD QUERY'S COLD `board_read` IS A NEW WEB WORKER BUILDING A BOARD THE OTHER WORKER ALREADY HOLDS: 69 of 75 cold reads on 11-18 5-11 PM CST (92%; 151 of 198 = 76% on 11-17) were a freshly recycled worker's FIRST board read. The cache is per process, and the memory guard recycles a worker that has built the board (anon p50 980 MB vs a ~634 MB limit). TTL expiry is 3-12% of cold reads on evenings and 32% on the quiet 11-19 morning; overlay expiry is 5-12%. The published board's version is never read. Fix on main `9931a787b` DEFAULT-OFF behind `SYNDICATE_COMBINED_BOARD_SHARED_COPY`: a worker adopts another worker's copy (fresh by its own TTL and overlay rules), or serves it while another worker rebuilds. Not a betting change. LOAD = the user's decision (an env change: a drained full down/up)** `[2026-11-19, lane board-read-cold-share, session eb973f38; rail monitor I-28; findings `.syndicate/findings_2026-11-19_board_read_cold_share.md`]`
 - **LOADED 2026-11-24 08:30:37Z (2:30 AM CST) in the 11-24 window batch** (deploys.md 2026-11-24 08:30:10Z (the 11-24 window batch DEPLOY entry); not a betting change): web master + workers SYNDICATE_COMBINED_BOARD_SHARED_COPY=1; ARMED + PUBLISHED, 0 OFF / PUBLISH_FAILED / READ_FAILED. P1-P6 owed on the first live evening.
+- **READ 2026-11-24 11:20 PM CST, the first live evening (lane `layer2-rail-monitor`, R-G; deploys.md 2026-11-25 05:20Z READING entry; findings READING 2026-11-24): LOAD CHECK MET; P1-P4 PREDICTED, P5 FALSIFIED, P6 WATCH.**
+  - P3: a fresh worker that adopted a copy paid 1.1 s, against 2.6 s cold on 11-23. P4: adopt 0.66 s p50 over 275 adopts.
+  - P1/P2 were already under their thresholds on the 11-23 baseline.
+  - P5: builds rose x1.15.
+  - P6: recycles 26.5/h vs 11.2/h, confounded by the 15:57Z GC-tuning revert between the windows, and inside #857's pre-tuning 14-29/h. Not a roll back.
+  - #857 is unblocked for the next drained full down/up.
 
 - **Measured** (`scripts/rail_monitor/coldread_attrib.py`, fleet web log, read-only; per-request rows in `C:\tmp\coldread\rows_*.txt`):
 
