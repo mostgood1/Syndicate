@@ -37,6 +37,10 @@ def newest_live_all() -> Path | None:
     return None
 
 
+def today_ct() -> str:
+    return dt.datetime.now(dt.timezone.utc).astimezone(CT).date().isoformat()
+
+
 def keep(s: dict | None, prefix: str) -> dict:
     s = s or {}
     return {f"{prefix}bets": s.get("bets"), f"{prefix}events": s.get("events"), f"{prefix}roi_pct": s.get("roi_pct"),
@@ -110,6 +114,7 @@ def main() -> int:
     for o in orders:
         order_days[str(o.get("selected_date") or "")][str(o.get("status") or "")] += 1
     ops = ops_by_day()
+    today = today_ct()
     rows = []
     d = first
     while d <= last:
@@ -121,7 +126,12 @@ def main() -> int:
         clv_day = rb.clv_summary(rb.window_bets(bets, ds, ds)).get(rb.SCOPE_SAME_BOOK) or {}
         clv30 = rb.clv_summary(w30_bets).get(rb.SCOPE_SAME_BOOK) or {}
         oc = order_days.get(ds, collections.Counter())
-        row = {"date": ds, **keep(day, ""),
+        # PARTIAL while the day is still today (CST): its bets are still being placed and graded, and its rolling
+        # windows have dropped a full old day for only part of this one. 11-24 8:04 PM: the newest row's 30-day ROI
+        # went from -5.09% to -6.18% (range wholly below 0) when 2 bets graded, because 10-25 (70 bets, +14.3%) left
+        # the window (findings_2026-11-24_portfolio_monitor.md, H-R1). A reader wanting a settled number reads the
+        # newest row that is not partial.
+        row = {"date": ds, "partial": ds >= today, **keep(day, ""),
                "win_pct": (day or {}).get("win_pct"), "breakeven_pct": (day or {}).get("breakeven_win_pct"),
                "fee_pct": (day or {}).get("fee_pct_of_stake"),
                "roi_before_fees_pct": (day or {}).get("roi_before_fees_pct"),

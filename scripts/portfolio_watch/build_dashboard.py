@@ -328,7 +328,7 @@ td.num { text-align:right; white-space:nowrap; }
     t.append(tb);
   }
   table("hist-table", [
-    { h: "Day", k: "date" }, { h: "Bets / events", num: 1, f: r => r.bets + " / " + r.events },
+    { h: "Day", f: r => r.partial ? r.date + " (partial)" : r.date }, { h: "Bets / events", num: 1, f: r => r.bets + " / " + r.events },
     { h: "Day ROI", num: 1, f: r => pct(r.roi_pct), cls: r => cls(r.roi_lo95, r.roi_hi95) },
     { h: "Won vs breakeven", num: 1, f: r => num(r.win_pct) + "% / " + num(r.breakeven_pct) + "%" },
     { h: "Fees", num: 1, f: r => num(r.fee_pct) + "%" }, { h: "CLV net", num: 1, f: r => r.clv_net_pp == null ? "—" : num(r.clv_net_pp, 2) + " pp" },

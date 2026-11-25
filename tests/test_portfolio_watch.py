@@ -100,3 +100,22 @@ def test_the_fleet_target_is_the_wsl_share_not_a_folder_on_c():
         # No backslash literals here (a heredoc mangled them once): compare the UNC drive in forward-slash form.
         assert paths.FLEET_PAGE.drive.replace(chr(92), "/").lower().startswith("//wsl.localhost/"), paths.FLEET_PAGE
     assert paths.FLEET_PAGE.as_posix().endswith("syndicate-prod/data/reports/portfolio_watch/index.html")
+
+
+def test_todays_rollup_row_is_partial_and_earlier_days_are_not(tmp_path, monkeypatch):
+    # 11-24 8:04 PM (findings H-R1): the newest row's 30-day ROI fell below noise when 2 bets graded today and a
+    # full old day left the window. A reader must be able to tell that row from a settled day.
+    from test_live_book_edge_readout import _order
+
+    ledger = tmp_path / "readings" / "20261125T020404Z"
+    ledger.mkdir(parents=True)
+    orders = [_order(i, date="2026-11-23" if i < 4 else "2026-11-24", outcome="won" if i % 2 else "lost")
+              for i in range(8)]
+    (ledger / "live_all.json").write_text(json.dumps({"orders": orders}, indent=2), encoding="utf-8")
+    monkeypatch.setattr(build_history, "READINGS", tmp_path / "readings")
+    monkeypatch.setattr(build_history, "HISTORY", tmp_path / "history")
+    monkeypatch.setattr(build_history, "OUT", tmp_path / "history" / "daily_rollup.json")
+    monkeypatch.setattr(build_history, "today_ct", lambda: "2026-11-24")
+    assert build_history.main() == 0
+    rows = json.loads((tmp_path / "history" / "daily_rollup.json").read_text(encoding="utf-8"))["rows"]
+    assert [(r["date"], r["partial"], r["bets"]) for r in rows] == [("2026-11-23", False, 4), ("2026-11-24", True, 4)]
