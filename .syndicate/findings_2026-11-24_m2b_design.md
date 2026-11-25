@@ -69,3 +69,24 @@ unjudged.
 4. **The live prior.** M2b keeps the books' fair, as M2 did, unless slice 5 (Kalshi's in-play mid,
    `engine-live-prior`, built and not on main) reaches main before the pin. Tonight's 6 PM Kalshi-prior re-run
    (`engine-learner-kalshi-prior-rerun-1124`) is the input to that choice.
+
+
+## HELD 2026-11-25 10:10 AM CST (user "Hold M2b")
+
+The user's words: "Hold M2b", answering "Hold M2b, or register it as drafted?". The recommendation put to the user was
+to hold, for the reason below.
+
+- **Why.** The Kalshi re-run (`c757b68cc`, 11-24 6:22 PM CST) found that against Kalshi's in-play entry price only 3 NBA
+  `live_resim` cells applied, and neither held out (NBA h2h +0.0021 [-0.0038, +0.0080], spreads +0.0032
+  [-0.0007, +0.0069]). Kalshi's price beat the books' fair by 0.01 to 0.08 nats in most sports. M2b as drafted judges the
+  learner against the books' fair, while M3 trades at Kalshi's price, where on this evidence the learner adds nothing.
+  So an M2b PASS would say little about M3.
+- **Caveat.** Every NBA test night in the re-run was on the `#821` F1 level, before `#834` (loaded 11-24 2:30 AM; live
+  check MET 9:34 PM, `4df200017`).
+- **What holding means.**
+  - Nothing is registered, and `engine_learner/2` is neither built nor pushed.
+  - No 12-01 or 12-08 task exists.
+  - Decisions 2-4 lapse with it.
+  - The draft stays as written. Resuming it needs a registration before its train build, with new dates inside one
+    re-sim version.
+  - This lane has read no slate from 11-24 on.
