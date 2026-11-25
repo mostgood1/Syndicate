@@ -29,6 +29,95 @@ def newest_dir(probe):
     return base, stamp
 
 
+def classify_ours(rdir, rail, chips, split_resim=True):
+    """I-17: college full-game total flags on live rail cards, and the card's OURS against the side the model favours.
+
+    A flag (p > 0.5) whose OURS sits across the line from the flagged side has three outcomes:
+    - skew_consistent (11-22 R27, Rice @ Lamar u167.5 p=0.69, ours 167.7): OURS is the flagged row's OWN live_total, so
+      p and the mean come from one distribution and a skewed end game puts them on opposite sides of the line.
+    - resim_tick (11-25 R20, the fleet-watcher's flag, Liberty @ Princeton o134.5 p=0.59, ours 134.3): OURS is the
+      chip's live re-sim final total (an uncalibrated total's OURS is the card's PROJ box, intelligence.html
+      liveRailSummary), the flagged row's own live_total is on the flagged side, and the two differ. They are two TICKS of
+      one re-sim, not two models: on that game the row equalled the chip at R17 (144.495 / 144.5) and R19 (145.98 /
+      146.0). At R20 the grid built at 22:22:25Z had joined the previous re-sim (137.74, so p 0.59), and the chip carried
+      the re-sim stamped 22:22:28Z (134.3). A display mismatch on the card (LEAD 2, 11-20 R32), not a model fault.
+    - contradiction: anything else, e.g. 11-18's real defect (OURS taken from ANOTHER row, 152-249 s older). Counted in
+      ours_contradictions, as before. split_resim=False reproduces the pre-11-25 rule (tests only).
+    """
+    pts = {}
+    resim_final = {}
+    for c in chips.get("chips") or []:
+        try:
+            pts[str(c.get("game_key"))] = float(c["away"]["score"]) + float(c["home"]["score"])
+        except Exception:
+            pass
+        iv = c.get("intervals") or {}
+        try:
+            if iv.get("source") == "live_resim" and (iv.get("final") or {}).get("total") is not None:
+                resim_final[str(c.get("game_key"))] = (float(iv["final"]["total"]), str(iv.get("as_of") or ""))
+        except (TypeError, ValueError):
+            pass
+    i17 = below = college_flags = 0
+    i17_list = []
+    own_total = {}
+    _lr = os.path.join(rdir, "liverail_0.json")
+    if os.path.exists(_lr):
+        for r in (json.load(open(_lr, encoding="utf-8")).get("rows") or []):
+            if (r.get("market") == "totals" and str(r.get("segment") or "full") == "full" and not r.get("player_name")
+                    and r.get("live_total") is not None and r.get("line") is not None):
+                try:
+                    own_total[(r.get("sport"), r.get("matchup"), str(r.get("side"))[:1], float(r["line"]))] = (
+                        float(r["live_total"]), str(r.get("price_grid_generated_at") or ""))
+                except (TypeError, ValueError):
+                    pass
+    skew_consistent = 0
+    skew_list = []
+    resim_tick = 0
+    resim_list = []
+    for card in rail.get("cards") or []:
+        if card.get("sport") not in COLLEGE or not card.get("live"):
+            continue
+        gk = str((card.get("chip") or {}).get("game_key"))
+        for mk in card.get("markets") or []:
+            e = mk.get("edge")
+            if mk.get("key") != "totals" or mk.get("segment") != "full" or not isinstance(e, dict):
+                continue
+            college_flags += 1
+            side = str(e.get("side") or "")
+            mline = re.match(r"([ou])([0-9.]+)", side)
+            try:
+                ours = float(str(e.get("ours") or mk.get("ours")))
+            except ValueError:
+                ours = None
+            if mline and ours is not None and (e.get("model") or 0) > 0.5:
+                o_u, line = mline.group(1), float(mline.group(2))
+                across = (o_u == "o" and ours < line) or (o_u == "u" and ours > line)
+                own_t = own_total.get((card.get("sport"), card.get("matchup"), o_u, line))
+                own, grid_at = own_t if own_t else (None, "")
+                rs = resim_final.get(gk)
+                if across and own is not None and abs(own - ours) <= 0.051:
+                    skew_consistent += 1
+                    if len(skew_list) < 5:
+                        skew_list.append(f"{card.get('sport')} {card.get('matchup')} {side} p={e.get('model')} ours {ours} "
+                                         f"own {own}")
+                elif (across and split_resim and own is not None and rs is not None and abs(rs[0] - ours) <= 0.051
+                        and ((o_u == "o" and own > line) or (o_u == "u" and own < line))):
+                    resim_tick += 1
+                    if len(resim_list) < 5:
+                        resim_list.append(f"{card.get('sport')} {card.get('matchup')} {side} p={e.get('model')} ours {ours} "
+                                          f"(chip re-sim {rs[1][11:19]}Z) own {own} (grid {grid_at[11:19]}Z)")
+                elif across:
+                    i17 += 1
+                    # Name it (11-20 8:50 PM: the fleet-watcher could not tell which game). A late tie, where an
+                    # extra-period branch pulls the mean above an under the model favours, still lands here.
+                    if len(i17_list) < 5:
+                        i17_list.append(f"{card.get('sport')} {card.get('matchup')} {side} p={e.get('model')} ours {ours}")
+            if ours is not None and gk in pts and ours < pts[gk]:
+                below += 1
+    return {"pts": pts, "i17": i17, "i17_list": i17_list, "skew_consistent": skew_consistent, "skew_list": skew_list,
+            "resim_tick": resim_tick, "resim_list": resim_list, "below": below, "college_flags": college_flags}
+
+
 def row(args):
     p = json.load(open(args.probe, encoding="utf-8"))
     m = json.load(open(args.metrics, encoding="utf-8"))
@@ -47,66 +136,11 @@ def row(args):
     # I-17 contradictions and #824 from the rail cards + chips
     rail = json.load(open(os.path.join(rdir, "rail.json"), encoding="utf-8"))
     chips = json.load(open(os.path.join(rdir, "chips.json"), encoding="utf-8"))
-    pts = {}
-    for c in chips.get("chips") or []:
-        try:
-            pts[str(c.get("game_key"))] = float(c["away"]["score"]) + float(c["home"]["score"])
-        except Exception:
-            pass
-    i17 = below = college_flags = 0
-    i17_list = []
-    # 11-22 R27 (the fleet-watcher's flag, Rice @ Lamar u167.5 p=0.69, ours 167.7): a mean across the line from a
-    # side the model favours is NOT a contradiction when OURS is the flagged row's OWN live_total. Then the probability and
-    # the mean come from one distribution, and a skewed end game (an extra-period branch, discrete free-throw endings)
-    # puts them on opposite sides of the line: that row read P(over 165.5) 0.72, P(over 166.5) 0.68, P(over 167.5) 0.31
-    # around one mean of 167.69. The real defect this counter exists for (11-18: the card's OURS taken from ANOTHER row,
-    # 152-249 s older) shows as OURS != the flagged row's own total, and still counts. p vs 0.5 cannot replace it: every
-    # counted flag already has p > 0.5. No median is published on the card or the row.
-    own_total = {}
-    _lr = os.path.join(rdir, "liverail_0.json")
-    if os.path.exists(_lr):
-        for r in (json.load(open(_lr, encoding="utf-8")).get("rows") or []):
-            if (r.get("market") == "totals" and str(r.get("segment") or "full") == "full" and not r.get("player_name")
-                    and r.get("live_total") is not None and r.get("line") is not None):
-                try:
-                    own_total[(r.get("sport"), r.get("matchup"), str(r.get("side"))[:1], float(r["line"]))] = float(r["live_total"])
-                except (TypeError, ValueError):
-                    pass
-    skew_consistent = 0
-    skew_list = []
-    for card in rail.get("cards") or []:
-        if card.get("sport") not in COLLEGE or not card.get("live"):
-            continue
-        for mk in card.get("markets") or []:
-            e = mk.get("edge")
-            if mk.get("key") != "totals" or mk.get("segment") != "full" or not isinstance(e, dict):
-                continue
-            college_flags += 1
-            side = str(e.get("side") or "")
-            mline = re.match(r"([ou])([0-9.]+)", side)
-            try:
-                ours = float(str(e.get("ours") or mk.get("ours")))
-            except ValueError:
-                ours = None
-            if mline and ours is not None and (e.get("model") or 0) > 0.5:
-                line = float(mline.group(2))
-                own = own_total.get((card.get("sport"), card.get("matchup"), mline.group(1), line))
-                if ((mline.group(1) == "o" and ours < line) or (mline.group(1) == "u" and ours > line)) \
-                        and own is not None and abs(own - ours) <= 0.051:
-                    skew_consistent += 1
-                    if len(skew_list) < 5:
-                        skew_list.append(f"{card.get('sport')} {card.get('matchup')} {side} p={e.get('model')} ours {ours} "
-                                         f"own {own}")
-                elif (mline.group(1) == "o" and ours < line) or (mline.group(1) == "u" and ours > line):
-                    i17 += 1
-                    # Name it (11-20 8:50 PM: the fleet-watcher could not tell which game). Two known non-defects
-                    # trip this: the chip's re-sim lagging the flagged row by one build (OURS is the chip's final),
-                    # and a late tie, where an extra-period branch pulls the mean above an under the model favours.
-                    if len(i17_list) < 5:
-                        i17_list.append(f"{card.get('sport')} {card.get('matchup')} {side} p={e.get('model')} ours {ours}")
-            gk = str((card.get("chip") or {}).get("game_key"))
-            if ours is not None and gk in pts and ours < pts[gk]:
-                below += 1
+    c17 = classify_ours(rdir, rail, chips)
+    pts = c17["pts"]
+    i17, i17_list, below, college_flags = c17["i17"], c17["i17_list"], c17["below"], c17["college_flags"]
+    skew_consistent, skew_list = c17["skew_consistent"], c17["skew_list"]
+    resim_tick, resim_list = c17["resim_tick"], c17["resim_list"]
 
     # I-17 score floor (d78a448c4, handed over 11-19): calibrated college full-game total rows on the live rail
     # whose live_total is below the points already scored on the chip. Expected 0 once the parent has it.
@@ -166,16 +200,24 @@ def row(args):
             # full-game moneylines carried the model (5 of 5 rows at R9). NFL counts its full-game moneyline only.
             if not counts_as_priced(r.get("sport"), r.get("market")):
                 continue
-            g = by_game.setdefault(f"{r.get('sport')} {r.get('matchup')}", [0, 0])
+            g = by_game.setdefault(f"{r.get('sport')} {r.get('matchup')}", [0, 0, 0])
             g[0] += 1
             if r.get("live_model_probability") is not None:
                 g[1] += 1
-    games_no_model = sorted(k for k, (n, m) in by_game.items() if n and not m)
+            # 11-24 R19/R20 (the fleet-watcher's flag, Winthrop @ James Madison): `live_total` is set on a totals row
+            # once the game's live lane joined, priced or not. Joined with no probability = the join's per-line gates
+            # (quote-age ceiling, quote-older-than-state), not a name / orientation miss. Unjoined = no live_total.
+            if r.get("live_total") is not None:
+                g[2] += 1
+    games_no_model = sorted(k for k, (n, m, _lt) in by_game.items() if n and not m)
 
     # 11-21 (the fleet-watcher's ask): WHY each no-model game has none, from p29_orient.py's per-game lines (the
     # sport's re-sim snapshot). Values: the snapshot's own refusal reason (key_player_out, game_final, no_margin_anchor,
     # in_intermission, ...); "orientation_reversed" (I-29: the snapshot has the teams the other way round);
-    # "resimmed_no_row_model" (re-simmed, yet the priced rows carry no model: a join defect, flag it);
+    # "resimmed_no_row_model" (re-simmed, yet the priced rows carry no model and no live_total, and the helper's own
+    # later read had none modelled either: a join defect, flag it); 11-24: "resimmed_model_by_helper_read" (the helper's
+    # read had the model: timing between the two reads) and "resimmed_lane_joined_rows_withheld" (live_total on the
+    # rows, no probability: the per-line gates);
     # "not_in_resim" (no snapshot entry matched, possibly this helper's name miss: check); "sport_absent_from_helper_read"
     # (the helper's own live-rail GET, made a few minutes after the probe's, held no game of this sport; NOT a missing
     # snapshot. Renamed 11-21 from "no_snapshot_for_sport", which read as an NHL snapshot miss at R26; the helper's
@@ -203,9 +245,20 @@ def row(args):
         elif o.get("reason") == "resimmed":
             # 1-2 priced rows: the join's per-line withholds (stale quote, no distribution for that line, stoppage
             # time) explain it -- 11-21: Wake Forest @ GT, Lyon @ Lille, Philadelphia @ NE at 90'+6'. 3+: a join defect.
-            n_priced = by_game.get(k, [0, 0])[0]
-            reasons[k] = "resimmed_few_priced_rows" if n_priced <= 2 else "resimmed_no_row_model"
-            details[k] = f"{n_priced} priced full-game rows, none with a model"
+            n_priced, _m, n_lt = by_game.get(k, [0, 0, 0])
+            if o.get("priced_with_model"):
+                # 11-24 R19/R20: the helper's own live-rail GET (a minute after the probe's) already had the model on
+                # these rows -- Winthrop @ JMU 1 of 3 and 4 of 7, Providence @ Arizona 5 of 5. Two reads, two moments.
+                reasons[k] = "resimmed_model_by_helper_read"
+                details[k] = (f"probe read: {n_priced} priced full-game rows, none with a model; the helper's later read: "
+                              f"{o.get('priced_with_model')} of {o.get('priced')} modelled")
+            elif n_lt:
+                reasons[k] = "resimmed_lane_joined_rows_withheld"
+                details[k] = (f"{n_priced} priced full-game rows, the lane joined (live_total on {n_lt}), none priced: "
+                              f"the join's per-line gates (quote age / order)")
+            else:
+                reasons[k] = "resimmed_few_priced_rows" if n_priced <= 2 else "resimmed_no_row_model"
+                details[k] = f"{n_priced} priced full-game rows, none with a model"
         else:
             reasons[k] = o.get("reason") or "unknown"
         if o and o.get("detail") and k not in details:
@@ -267,6 +320,8 @@ def row(args):
         "ours_contradictions_list": i17_list,
         "ours_skew_consistent": skew_consistent,
         "ours_skew_consistent_list": skew_list,
+        "ours_resim_tick": resim_tick,
+        "ours_resim_tick_list": resim_list,
         "ours_below_points": below,
         "floor_calibrated_rows": floor_rows,
         "floor_violations": floor_viol,
@@ -328,17 +383,18 @@ def build(_args):
     print("readings.json rows", len(uniq))
 
 
-ap = argparse.ArgumentParser()
-sub = ap.add_subparsers(dest="cmd", required=True)
-a = sub.add_parser("row")
-a.add_argument("--n", type=int, required=True)
-a.add_argument("--probe", required=True)
-a.add_argument("--metrics", required=True)
-a.add_argument("--dir")
-a.add_argument("--note")
-a.add_argument("--orient", help="p29_orient.py output for this tick (per-game re-sim state and refusal reason)")
-a.add_argument("--day", help="slate date YYYY-MM-DD; selects rows_<day>.jsonl")
-b = sub.add_parser("build")
-b.add_argument("--day", help="slate date YYYY-MM-DD; selects rows_<day>.jsonl")
-args = ap.parse_args()
-(row if args.cmd == "row" else build)(args)
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    a = sub.add_parser("row")
+    a.add_argument("--n", type=int, required=True)
+    a.add_argument("--probe", required=True)
+    a.add_argument("--metrics", required=True)
+    a.add_argument("--dir")
+    a.add_argument("--note")
+    a.add_argument("--orient", help="p29_orient.py output for this tick (per-game re-sim state and refusal reason)")
+    a.add_argument("--day", help="slate date YYYY-MM-DD; selects rows_<day>.jsonl")
+    b = sub.add_parser("build")
+    b.add_argument("--day", help="slate date YYYY-MM-DD; selects rows_<day>.jsonl")
+    args = ap.parse_args()
+    (row if args.cmd == "row" else build)(args)

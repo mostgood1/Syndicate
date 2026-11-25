@@ -8,7 +8,7 @@ import collections, datetime as dt, glob, json, os, re, statistics as st, subpro
 S = sys.argv[1]
 TODAY = sys.argv[2] if len(sys.argv) > 2 else dt.datetime.utcnow().strftime("%Y-%m-%d")
 E = sys.argv[3] if len(sys.argv) > 3 else "9999"
-LOGS = os.path.expanduser("~/syndicate-prod/logs")
+LOGS = os.path.expanduser(os.environ.get("D4_LOGS") or "~/syndicate-prod/logs")  # D4_LOGS: tests only
 out = {"start": S}
 
 
@@ -114,8 +114,35 @@ out["deferred_slow_ticks"] = deferred
 # sport AND date, so gaps are keyed on both (keying on sport alone interleaved the two files' lines). The max gap now
 # names its date, and overlay_offdate_inplay lists any sport@date OTHER than the slate day that published rows in play:
 # the live rail reads only the slate day's overlay, so those rows never reach it.
+# 11-25 R8 (the fleet-watcher's flag): wncaab read a 1,009 s gap (18:04:49 -> 18:21:38Z) that was NOT a stall. The last
+# morning games (Navy @ Iowa, Texas Southern @ Vermont, ~16:03Z tips) went final ~18:05Z and the next one (Stetson @ Robert
+# Morris) tipped 18:21Z. The overlay prints NO line at all when a build has no fresh in-play rows and its previous publish
+# had no cards (`_write_inplay_overlay_best_effort`, book_grid_artifact.py: `if not rows and key not in
+# _INPLAY_PUBLISHED_NONEMPTY: return`), so no rows_inplay=0 line marked the idle. The grid kept building wncaab in the gap
+# (LIVE_GAMELINE_BUILD at 18:05:35, 18:16:58, 18:19:18, each considered=0). So: a gap after a line with cards=0 is QUIET,
+# counted with the idle gaps and in overlay_quiet_over_360_by_sport, when the grid built that sport/date at least once
+# inside it and every one of those builds considered 0 live rows. No build inside it, or a build with live rows and no
+# overlay line, is still a stall.
+lgb = collections.defaultdict(list)
+for l in rw:
+    m = re.search(r"LIVE_GAMELINE_BUILD sport=(\w+) date=(\S+)", l)
+    if not m:
+        continue
+    t = ts(l)
+    c = re.search(r"\bconsidered=(\d+)", l)
+    if t is not None and c is not None:
+        lgb[(m.group(1), m.group(2))].append((t, int(c.group(1))))
+
+
+def quiet_between(key, a, b):
+    """True when the grid built `key` inside (a, b) and no such build considered a live row."""
+    inside = [c for (t, c) in lgb.get(key, []) if a < t < b]
+    return bool(inside) and all(c == 0 for c in inside)
+
+
 last, gmax, over = {}, collections.defaultdict(float), collections.Counter()
 idle_max = collections.defaultdict(float)
+quiet_over = collections.Counter()
 offdate = {}
 for l in rw:
     m = re.search(r"INPLAY_OVERLAY sport=(\w+)(?: date=(\S+))?", l)
@@ -127,19 +154,27 @@ for l in rw:
     key = (sp, m.group(2) or "")
     ri = re.search(r"rows_inplay=(\d+)", l)
     empty = ri is not None and int(ri.group(1)) == 0
+    cm = re.search(r"\bcards=(\d+)", l)
+    cards = int(cm.group(1)) if cm else None
+    em = re.search(r"\belapsed_ms=(\d+)", l)
+    # This line's own build started before the overlay ran: keep its LIVE_GAMELINE_BUILD out of the gap.
+    build_t = t - dt.timedelta(seconds=(int(em.group(1)) / 1000.0 if em else 0.0) + 1.0)
     if key[1] and key[1] != TODAY and ri is not None and int(ri.group(1)) > 0:
         tag = f"{sp}@{key[1]}"
         offdate[tag] = max(offdate.get(tag, 0), int(ri.group(1)))
     if key in last:
-        prev_t, prev_empty = last[key]
+        prev_t, prev_empty, prev_cards = last[key]
         g = (t - prev_t).total_seconds()
         if prev_empty:
             idle_max[key] = max(idle_max[key], g)
+        elif g > 360 and prev_cards == 0 and key[1] and quiet_between(key, prev_t, build_t):
+            idle_max[key] = max(idle_max[key], g)
+            quiet_over[sp] += 1
         else:
             gmax[key] = max(gmax[key], g)
             if g > 360:
                 over[sp] += 1
-    last[key] = (t, empty)
+    last[key] = (t, empty, cards)
 _imax = max(idle_max, key=idle_max.get) if idle_max else None
 _gmax = max(gmax, key=gmax.get) if gmax else None
 out["overlay_idle_gap_max_s"] = round(idle_max[_imax], 1) if _imax else None
@@ -149,6 +184,7 @@ out["overlay_gap_max_sport"] = _gmax[0] if _gmax else None
 out["overlay_gap_max_date"] = (_gmax[1] or None) if _gmax else None
 out["overlay_gaps_over_360"] = sum(over.values())
 out["overlay_over_360_by_sport"] = dict(over)
+out["overlay_quiet_over_360_by_sport"] = dict(quiet_over)
 out["overlay_offdate_inplay"] = offdate
 
 # web merges
