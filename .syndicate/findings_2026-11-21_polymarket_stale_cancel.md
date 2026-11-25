@@ -181,3 +181,6 @@ User, typed in this session, 11-23 about 8:00 AM CST: **"load the polymarket sta
   - The 43 tests pass (17 s).
   - The +3 d task and the daily-review items are scheduled.
   - Nothing is loaded: the fleet is at `b07e808823`, which lacks `7bc613347`.
+- 2026-11-24 CST (shadow day 1, from SHADOW LOADED 08:30:36Z to 11-25 06:00:00Z; read 11-25 2:05 AM CST = 08:05Z by the
+  daily learning review): would_cancel 0, distinct orders 0; S2 outcomes none, mismatch_refusals 0; S3 later states
+  none; untouched_15m_orders 0 of 19 polymarket_orders_with_state_lines; covered yes; cancel_stale 0, cancel_sent 0.

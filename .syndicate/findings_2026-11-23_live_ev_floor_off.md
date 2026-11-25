@@ -87,3 +87,9 @@ Re-enabling is itself a BETTING CHANGE, so it goes in a later window on the user
   prompt (below).
 - 2026-11-23 2:22 PM CST: CHANGE P installed in `nfl-level-refit-load-1120` (sha 773c2fc22179384b -> 57a40bb886a54f1f). The first real run REFUSED on its hash guard: session 1f9c9a40 had added a STEP 4 line for `80dbb08f3` minutes earlier. Re-read, re-dry-run, then applied; the peer's line is intact, and N and O are intact. P reaches the description, the intro (sixteen / thirteen betting), the decision line, THE BATCH, RULES, THE KIT, STEP 0, 4, 4b, 6 (apply + baseline), 7 (refresh-worker expect), 8, a STEP 9 verify line, OWED, STEP 10 (heading, revert, BC register, lane line, todo) and THEN. The daily portfolio-learning-review gained the P-F2/P-F3 item.
 - 2026-11-23 2:59 PM CST: user "show me the panel after tomorrow's batch loads". One-time READ-ONLY task `portfolio-panel-after-batch-1124` fires 2026-11-24 7:40 AM CST, after the 7:34 Portfolio Watch reading. It reads the batch outcome and the LOADED line, then runs `kit_after_up_floor.sh <LOADED UTC>` (P-F2), and sends the user a screenshot of the alignment panel (`scripts/portfolio_watch/panel_shot.py`; installed copy `C:\SyndicateProd\portfolio_watch	ools\`). The daily review item is the backstop if it misses.
+- 2026-11-24 CST (from LOADED 08:30:37Z to 11-25 06:00Z; read 11-25 2:05 AM CST = 08:05Z by the daily learning
+  review): live_ev_floor_on_lines 0 (28 in 06:00-08:30Z, before the load). Live orders after the load: pregame 8
+  (Kalshi 6, Polymarket 2), in-play 3 (Kalshi 3, Polymarket 0). The 7-day pre-load means a day: pregame 29.3 / 19.3,
+  in-play 8.3 / 2.1 (Kalshi / Polymarket). Newest live-plan rows_in: Kalshi 9, Polymarket 8 (05:57Z). Pregame 8 is
+  above the expected 0-2 a day; there are no floor lines, so it is not a defect, but which rows those 8 were is worth a
+  look.
