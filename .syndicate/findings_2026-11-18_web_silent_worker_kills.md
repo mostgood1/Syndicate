@@ -643,3 +643,11 @@ Read-only at nice 19. Scratchpad: `wsk_gctune_overnight.sh`, `wsk_recycle_hourly
 - `76a006f45` makes CPython's automatic full collections the default again (`SYNDICATE_WEB_GC_AUTO_FULL` absent = on; 0 / off = the tuning). LOADED by reload-web at 9:57:59 AM CST, BC-072 no. Deploy entry: `deploys.md` `## 2026-11-24 15:57:59Z`.
 - Measured: both new workers logged `WEB_GC_TUNED` applied false with thresholds [700, 10, 10], and the first full collection ran 35 s after the load (9 generation-2 pauses of 0.26-0.98 s by +51 s).
 - Still owed: kills per CST day after the revert, counting both kinds (`WORKER TIMEOUT`, and `was sent SIGKILL` with no timeout before it). The quiet-worker memory check is the next change, loaded on its own.
+
+## 2026-11-25 7:49 AM CST (13:49Z) -- after-revert reading: 0 kills in 21.8 h, full collections back in range
+
+- Read 13:45Z 11-25 (7:45 AM CST), 21.8 h after `76a006f45` loaded (scratchpad `wsk_revert_reading.sh`).
+- Kills: 0 `WORKER TIMEOUT` kills and 0 lone SIGKILLs (the kernel kind) on 11-24 and on 11-25 to 7:45 AM; dmesg still holds only the 11-23 OOM kill. Kills fell on 7 of the 23 CST days 11-01..11-23 (12 kills), so one day with none says nothing yet about the revert's effect on kills.
+- Full collections are back: 11-24 had 2,878 s of generation-2 pauses (about 14 untuned hours), inside 11-20..11-22's 1,910-3,039 s a day; 325 of 325 boots untuned. Stalls >= 5 s: 1 (5.26 s).
+- 11-24 was the heaviest day since 11-17 (4,906 requests); requests and MB per recycle stayed in their 11-16..11-23 ranges.
+- Next, per the user's 11-24 "Yes, after the reading": the quiet-worker memory watch loads on its own (default `SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS` 0 -> 5 s).

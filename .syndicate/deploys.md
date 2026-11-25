@@ -63248,6 +63248,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Generation-2 pause seconds per day back to the 11-20..11-22 range (1,910-3,039 s).
   - This is one change on its own. The quiet-worker memory check (user 11-23 "Yes, after the reading") is built and loaded separately.
 - **Claim released** 16:00:00Z.
+- **Reading 13:45:00Z 11-25 (7:45 AM CST), 21.8 h after the load** (scratchpad `wsk_revert_reading.sh`, nice 19; fleet head `76a006f4550c`, healthz 200):
+  - Kills, both kinds: **0** `WORKER TIMEOUT` + SIGKILL and **0** `was sent SIGKILL` with no timeout before it (0 SIGTERM) on 11-24 and on 11-25 to 7:45 AM CST, against 11-23's 0 + 1. dmesg's ring (uptime 7.0 d) still holds 1 OOM kill, the 11-23 one. Base rate 11-01..11-23: kills on 7 of 23 CST days (12 kills), so a day with none is the usual day and is NOT evidence that the revert helped.
+  - Full collections back in range: **MET**. 6,190 generation-2 `WEB_GC_PAUSE` lines since the load; 11-24 CST 2,878 s (about 14 of its hours untuned) against 1,910-3,039 s a day on 11-20..11-22; 11-25 to 7:45 AM 127 s. Exiting workers ran 16-74 generation-2 collections each (12 sampled).
+  - All untuned: 325 `WEB_GC_TUNED` applied false, 0 true; 324 boots, 325 recycles, 327 fast exits.
+  - Main-loop stalls >= 5 s: 1 (5.26 s, 11-25) against 2 / 9 / 2 on 11-20..11-22 and 5 (max 50.33 s) on tuned 11-23.
+  - Load: 11-24 was the heaviest day since 11-17 (4,906 requests vs 5,786 on 11-17, when 5 workers were killed): 303 recycles, 16.2 requests per recycle and 62.8 MB per request at recycle (11-16..11-23: 14.5-20.4 and 46.8-80.5).
+  - Verdict: the revert is MET as a revert (full collections back; nothing worse on a heavy day). Kills per day after it are not yet distinguishable from before. The quiet-worker memory watch loads next, on its own.
 
 ## 2026-11-24 16:05Z (10:05 AM CST) -- READING (no deploy): the PRE-REGISTERED #816 7-day grade of the college totals calibration (lane `ncaab-total-overprojection`, scheduled task `college-total-cal-grade-816`, user 11-17 "run the #816 7-day grade") -- **VERDICT FLIP TO SPREAD ONLY (T3); NOT LOADED, user decision owed**
 - betting change: no (a reading; nothing loaded).
