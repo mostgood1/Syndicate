@@ -63460,3 +63460,18 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - Freshness: engine 8:15 AM, portfolio 8:04 AM, rail 1:44 AM CST (Rail Watch runs 10 AM-2 AM): each within its builder's cadence.
 - Not measured: web RSS (a file read; the 13:54Z entry's worker readings cover the reload). The missing-file panel is covered by tests only; no production file was deleted.
 - verify: re-run the fleet-watcher's verify_ops_dashboards.py -- hub 200 with 3 tabs, three frames 200, signed-out 302.
+
+## 2026-11-25 16:04:54Z (10:04 AM CST) -- READING (look-ahead option (b), first day after the 11-24 load): lane lookahead-day2-phase-lock, todo #842
+- betting change: no -- a reading; nothing loaded. CHANGE C loaded in the 11-24 window batch (entry 2026-11-24 08:30:10Z, register BC-061).
+- Window: L = 2026-11-24 08:30:36Z (2:30 AM CST; refresh-worker pid 753771 started then and is still the running process) .. 2026-11-25 16:01:56Z (10:01 AM CST) = 31.52 h; 3,044 MLB_SIM_TICK lines, 2,170 idle ticks, 23 idle hours. Retained logs reach back to 11-20, so the window is complete.
+- Pb0 **HOLDS**: refresh-worker /proc environ SYNDICATE_LOOK_AHEAD_LANE_WAIT=on, SYNDICATE_LOOK_AHEAD_48H_ENABLED=false (local_production.env: 1 line each); day-2 reasons `disabled` 3,021 + `day1_launched_this_tick` 23 = 3,044 of 3,044 ticks.
+- Pb1 **HOLDS**: day-2 launches 0, day-2 refusals 0 (baseline 4 and 74 in 120 h).
+- Pb2 **HOLDS**: REFRESH_LAUNCH_REFUSED lines 0 of any reason in 31.5 h (Central 11-24: 0; 11-25 to 10:01 AM: 0); baseline 15.8/day.
+- Pb3 **HOLDS so far**: day-1 refusals 0 in 31.5 h (so markerRewound 0 needed, 0 seen); day-1 lane_busy_wait 4 ticks in 3 streaks to launch, p50 81 s / p90 98 s / max 98 s vs <= 900 s at p90. The <= 1 per 7 days part is judged 12-01.
+- Pb4 **NOT YET READABLE** (judged 12-01 over 11-25..11-30): so far 23 day-1 launches / 23 idle hours = 1.00 (11-24: 14/12 h; 11-25 to 10:01 AM: 9/11 h); baseline 0.986.
+- Pb5 (context): SOCCER_UNIT_LAUNCHED 290 (11-24: 195; 11-25 to 10:01 AM: 95).
+- Pb6 **HOLDS**: projected_30d_credits 4,596,163 < 5,000,000 (credits_per_hour 6,383.6 over a 316,909 s window). Up from 3,639,008 on 11-18; headroom 0.40M. Not day 2 (retired, 0 launches); worth its own look.
+- Pb7 **HOLDS so far**: 0 NCAAB/WNCAAB book_quotes files for 2026-11-27 at 10:03 AM CST, while 11-27 is today+2 and its NCAAB scoreboard lists 37 games. Control: ncaab book_quotes 2026-11-26.jsonl was created 11-25 00:02:18 CST, the minute 11-26 became today+1.
+- Tracebacks in refresh-worker since L: 2 (11-24 23:46:04Z, 11-25 11:46:07Z), both `prop_evidence/soccer.py scan_boxes -> load_json` JSON decode; 0 mention live_refresh_loop or look_ahead.
+- Verdict: change C is live and no prediction fails. The 12-01 reading (task lookahead-b-reading-1201) judges Pb3 and Pb4 over a full week.
+- verify: `lookahead_b_reading.py --window post=2026-11-24T08:30:36Z..now` (day-2 reasons only disabled/day1_launched_this_tick, 0 refusals, wait p90) + `kit_role_env.py` for both keys + `quota_projection.py` + the 11-27 NCAAB book_quotes find (scripts C:\tmp\la2_f905\r1125_reading*.sh).
