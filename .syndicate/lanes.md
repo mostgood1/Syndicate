@@ -1542,7 +1542,7 @@ death, never life — do not invert it.
 - Verification: Read-only fleet reading of live_resim_history (~/syndicate-prod/data), games and draws counted; nothing on the fleet changed
 - Blocked by: none
 
-### nba-live-resim-total-anchor — OPEN — opened 2026-11-18 — session 7a9aef07-117a-4dfa-96b8-b401885c91ed
+### nba-live-resim-total-anchor — CLOSED 2026-11-24 — opened 2026-11-18 — session 7a9aef07-117a-4dfa-96b8-b401885c91ed
 - **ON MAIN `88193c0a7` 2026-11-18 ~12:35 PM CST** (user "Yes, push it"; cherry-pick of `7dfa1f7fa`; 160 NBA/WNBA live re-sim tests passed). **Default off, NOT LOADED.**
   - The lane stays open for the load, which is the user's call (betting change: yes).
   - **ONE DOWN/UP (user "merge the two into one down/up", ~1:10 PM CST 11-18).** Batch task `nfl-level-refit-load-1120` (2:15 AM CST 11-24) loads the NFL profile + this key with one ff and one drained full down/up, and writes LOADED here.
@@ -1575,6 +1575,7 @@ death, never life — do not invert it.
 - Blocked by: none
 - LOADED 2026-11-24 08:30:37Z (2:30 AM CST) in the 11-24 window batch (deploys.md 2026-11-24 08:30:10Z, the 11-24 window batch DEPLOY entry); register BC-060; live verification owed tonight (task nba-total-anchor-verify-1124).
 - 2026-11-24 3:46 AM CST: fallback run started (task nba-total-anchor-load-1124). DECIDE branch 1, #834 already LOADED by the batch: deploys.md 2026-11-24 08:30:10Z + register BC-060; re-read 3:48 AM CST by kit_role_env.py: live-odds-worker pid 753772 SYNDICATE_NBA_LIVE_TOTAL_ANCHOR=on, refresh-worker ABSENT; all claims free. No fleet change by the fallback. Live tick check still owed tonight (task nba-total-anchor-verify-1124, 9:30 PM CST).
+- **CLOSED 2026-11-24 9:30 PM CST: GOAL MET live** (task nba-total-anchor-verify-1124; deploys.md READING 2026-11-25 03:30Z). 86 of 86 fresh NBA ticks since the load anchored every fresh lane (`total_anchored` = `resimmed`), 0 `total_anchor_missing`; 121 of 121 live_resim history rows (DET @ ORL, BOS @ WAS, DAL @ DEN) carry `total_anchor`, 0 refusals; offsets = close - pregame total_mean to 0.01 on 121 of 121 (recomputed from origin/main 70e0f01d7); `total - total_raw` = `appliedOffset` within 0.05 on 121 of 121; first row per game anchored - close mean -0.23 vs raw - close +6.59 (n = 3).
 
 ### live-resim-endgame-staleness — CLOSED 2026-11-18 1:02 PM CST GOAL MET (#836 traced and re-measured; the end-game refusal is on main in shadow: 3a04f43b0 / 18d036bef / 52e68382a; nothing loaded; follow-ups on todo #836) — opened 2026-11-18 — session e2f5878d-b673-4035-81c4-f227cff8263b
 - **CLOSED 2026-11-18 1:02 PM CST** (user "Close the lane", this session). Verification ran (see the GOAL VERDICT below). Both loans returned (notes in engine-live-prior's and live-player-exit-gate's blocks). The three owed steps (first shadow reading after a fleet ff carries `52e68382a`; the pinned-experts JOIN / PRIOR repro check with the gate on; `on` only in a betting-change window, earliest 2026-12-08, with the user's yes) now live on todo `#836`, unowned until a session takes them.

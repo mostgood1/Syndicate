@@ -63182,6 +63182,7 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **OWED:**
   - **A, NFL:** the next NFL projection CSV on the new profile; the first live NFL game on it; the #780 width re-fit after a few post-load games.
   - **B, #834:** the first live NBA ticks with `total_anchored=` (task `nba-total-anchor-verify-1124`, 9:30 PM CST tonight).
+    - **READ 2026-11-25 03:30Z (9:30 PM CST 11-24): MET.** 86 of 86 fresh NBA ticks anchored every fresh lane, 0 `total_anchor_missing`; 121 of 121 history rows carry `total_anchor` with offsets matching close - pregame to 0.01. The READING entry 2026-11-25 03:30Z has the counts.
   - **C, #842:** option-(b) Pb readings (task `lookahead-b-reading-1125`).
   - **D, #844:** P1-P4 on the first evening NCAAB slate.
   - **E, #851:** P1-P5 (the rail monitor, 00-05Z 11-25).
@@ -63316,3 +63317,20 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Not measured:** the lift (a goalie change does not reverse); goalie props.
 - **Design note, not a defect:** K flags BOTH goalies of the changing team, so the hold lists two players for one event.
 - verify: `C:/tmp/lpeg/w1124/nhl_read.sh` 02:46:27Z (producer, board, ledger); hold probe 02:46:27Z; plan read 02:47:41Z.
+
+## 2026-11-25 03:30Z (9:30 PM CST 11-24) -- READING (no deploy): #834 NBA live total anchor, first live slate (lane `nba-live-resim-total-anchor`, scheduled task `nba-total-anchor-verify-1124`, read-only) -- **MET**
+- betting change: no (a reading; nothing loaded)
+- **Load:** the 2026-11-24 08:30:10Z window batch DEPLOY entry (CHANGE B, register BC-060), live-odds-worker up 08:30:36Z. live-odds-worker self-recycled twice since (supervisor `exited code=0 after 23265s` / `22750s`, the normal recycle); the current pid 1412822 (up 03:11:32Z) still reads `SYNDICATE_NBA_LIVE_TOTAL_ANCHOR=on` from /proc.
+- **Ticks** (`live-odds-worker.log.1` + `.log`, timestamped `^<ts>Z NBA_LIVE_RESIM_TICK ` lines, from 08:30:37Z to 03:30:15Z):
+  - 557 ticks since the load; 86 with fresh lanes (`resimmed>0`), the first at 00:12:55Z (6:12 PM CST).
+  - 53 ticks `resimmed=1 total_anchored=1`, 33 ticks `resimmed=2 total_anchored=2`: **total_anchored = resimmed on 86 of 86**, `total_anchor_missing=-` on all 86, `refusals={}`, `carried=0`.
+  - 471 ticks resimmed 0 (426 no game live, 45 `prior_skip=slate_final`).
+- **History** (`nba_source/data/processed/live_resim_history/2026-11-24.jsonl`; no 11-25 file yet): 121 `live_resim` rows over 3 games, **121 with `total_anchor`, 0 `total_anchor_refusal`**.
+  - Recomputed from origin/main `70e0f01d7` (a `git archive` in WSL `/tmp/t834v`, data root `~/syndicate-prod/data`, nice 19; script `C:\tmp\v834_verify_1124.py`) with `prior_calibration.closing_totals` + `live_resim.closing_market_total` and `pregame_sim_total`:
+    - DET @ ORL (401909314): close 210.5 (10 books), pregame 221.88, expected offset -11.38; logged -11.38 on all 53 rows.
+    - BOS @ WAS (401909315): close 218.5 (10), pregame 224.43, expected -5.93; logged -5.93 on all 60.
+    - DAL @ DEN (401909316): close 234.5 (10), pregame 238.01, expected -3.51; logged -3.51 on all 8 (game in progress).
+  - **Offset mismatches (> 0.01): 0 of 121. `total - total_raw` vs `appliedOffset` mismatches (> 0.05): 0 of 121.**
+  - **First row per game:** DET @ ORL P1 11:18 (rf 0.985) anchored - close -3.92, raw - close +7.29; BOS @ WAS P1 10:35 (rf 0.971) +0.80 / +6.55; DAL @ DEN P1 12:00 (rf 1.0) +2.42 / +5.93. **Mean anchored - close -0.23, mean raw - close +6.59 (n = 3 games).** The first rows were read after the tip, so the score already in moves each one; three games is a small sample.
+- **Abnormal:** none. 0 refusals, 0 missing anchors, 0 offset mismatches.
+- verify: MET -- the reading above; todo #834 and the lane closed on it.
