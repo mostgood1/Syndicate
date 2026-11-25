@@ -887,3 +887,25 @@ pytest step 3,830.8 / 4,133.1 / 3,475.9 s (rc 1 each night, the baseline gate).
 - A CLIMB line in a chunk that never wrote its SUMMARY = a killed run, with its test named: record it whatever P-T3 says.
 - Owed: this reading. Thursday's `board-parent-recycle-reading-1126` reads it only if the fleet carries the file by then
   (likely NOT YET); otherwise it is owed at the first run after the next fleet ff that carries it.
+
+## 20. The 11-24 evening, 5-10 PM CST: the rail monitor's R-F reading, the first qualifying evening since the batch (written 1:07 AM CST 11-25 (07:07Z))
+
+The rail monitor's owed R-F reading (§5 thresholds). The owner session local_d0f83044 is archived, so it goes here.
+
+- **The qualifier is met:** 38 core games (NCAAB, NBA, NHL, NFL) were live at the 7:03 PM reading, and 42 at 7:23 PM. The threshold is 33. Counted from the `state == "live"` chips in `C:\tmp\railmon\readings\20261125T010302Z` and `...T012302Z`.
+- **No refresh-worker restart, drain or deploy happened in 5-10 PM.** The parent was pid 753771 at every reading, booted by the window batch at 08:30:36Z 11-24.
+- **A caveat on what this evening is.** It is not a repeat evening on the 11-19 code. It is the first evening of change J (#850, the parent self-recycle and the 400 MB recurring-jobs margin) on a parent that started fresh at 2:30 AM. Read the verdicts as J's first evening.
+
+| # | threshold (§5) | 11-24, 23:00Z-04:00Z | verdict |
+|---|---|---|---|
+| P1 | `MEMORY_GUARD_ABORT` at `stage=pre_source_state_fingerprint`: <= 1 an hour and <= 3 total (falsified > 2 an hour or > 6 total) | **0** (all stages: 2, both in the 02Z hour; `post_collect_candidates_with_fallback_merge` 1, `post_build_overview` 1) | **PREDICTED** |
+| P2 | <= 2 exits, all rc 75 (falsified on any rc -6 or `Fatal Python error`) | **0 exits**, 0 `RECYCLE_EXIT`, 0 Fatal | **PREDICTED** |
+| P3 | longest `BOARD_BUILD_TIMING` gap <= 900 s (falsified > 1,200 s) | 59 builds; longest gaps 536 s (02:59:55Z), 428 s, 372 s; 0 over 900 s | **PREDICTED** |
+
+- **Exploratory:**
+  - `POST_BUILD_CHECK` by held reason: `{}`. `BOARD_PROCESS_RECYCLE` by reason: `{}`, so no `post_build_headroom` recycle fired.
+  - **Parent RSS 8-10 PM p50: 1,756 MB** (n 7, 1,682-1,824, rising every reading). For comparison: 1,994 MB on 11-23 and 1,974 MB on 11-22, both on a 4:17 AM reset.
+  - **Board child RSS 8-10 PM p50: 4,118 MB** (n 7, 3,922-4,203). On 11-23 it was 4,000 MB and on 11-22 3,977 MB.
+  - Board publication cadence, 5:30-10:30 PM (`p2_boardpub.py`): 57 publications, median 314 s, max 536 s, 0 over 600 s. 11-23: median 384 s, max 901 s.
+- **What comes next:** the parent was at 1,824 MB at 10:03 PM, above J's 1,500 MB threshold. So J's first parent self-recycle is due in the 09-12Z window on 11-25 (3-6 AM CST), its 21,600 s minimum uptime having long passed. Task `board-parent-recycle-reading-1126` owns that reading. This section only reads the evening.
+- **Commands (read-only, nice 19):** `p7count.py 2026-11-24T23:00:00 2026-11-25T04:00:00` (output `C:\tmp\railmon\p7count_1124.txt`); parent and child RSS from the `ps` lines in `C:\tmp\railmon\railwatch\extra_2026-11-24.jsonl`.

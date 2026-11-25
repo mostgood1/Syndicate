@@ -103,3 +103,34 @@ Script `C:\tmp\ncal816\stale_books.py`, output `C:\tmp\ncal816\stale_books_ncaab
   - **P3:** the NBA and NHL grids are unchanged.
   - **P4:** NCAAB/WNCAAB `stale_quote` refusals per build fall, and priceable rows per build rise.
 - **Load:** proposed for the Tue 11-24 betting-change window (2:00-7:00 AM CST) through the window package. Loading needs the user's yes.
+
+## READING 2026-11-25 ~1:10 AM CST: the first evening after the 11-24 load (CHANGE D), rail monitor R-B; INTERIM, P2/P3 owed
+
+CHANGE D loaded in the 11-24 window batch: `BOOK_GRID_NEWEST_BY_TIME=on` on refresh-worker, live-odds-worker, the web master and both web workers (deploys.md `2026-11-24 08:30:10Z`). Read-only, nice 19.
+
+**Why only one sample.** The runbook planned the #844 grid sampler at every reading of the first evening. In lean mode the Windows task takes the readings, and it never ran the sampler, so the 11-24 evening has no samples. I took one at 06:58:57Z, with 2 NCAAB games still live. The grid it read was built at 06:02:44Z: after midnight the slate rolled, and the 11-24 grid stopped rebuilding. From 11-25 the tick runs the sampler at every reading, for the 11-25 and 11-26 slates (`C:\tmp\railmon\railwatch\tick.py`, appending to `C:\tmp\railmon\p844_<day>.jsonl`).
+
+| # | prediction | 11-19 baseline (22 NCAAB samples with h2h rows, 19:36Z-06:19Z) | 11-24 | verdict |
+|---|---|---|---|---|
+| P1 | venue rows with a sportsbook-spelled `updated_at` > 0 | 22 of 1,213 venue rows (1.8%) | **7 of 9** (1 sample) | **PREDICTED** (one sample) |
+| P2 | h2h rows fresh by row age >= 70% over the evening, near fresh-by-cell | 44 of 141 (31.2%) vs 113 of 141 by cell (80.1%); 304 mismatch rows | 3 of 3, cell 3 of 3, mismatch 0 of 34 rows (1 sample) | **OWED** (11-25 evening) |
+| P3 | NBA / NHL grids unchanged | NBA mismatch 0 (306 rows) | NBA 0 in-play rows at the sample | **OWED** (11-25 evening) |
+| P4 | NCAAB / WNCAAB stale-quote withholds per build fall; priceable per build rises | see below | see below | **NEITHER** |
+
+**P4, from the `LIVE_GAMELINE_BUILD` lines of `refresh-worker.log*`.** Window 5:30-10:30 PM CST each night. The stale-quote reason is `quote_older_than_live_pricing_ceiling`. Reader: `C:\tmp\railmon\p844_p4.py <lo> <hi>`; output in `C:\tmp\railmon\p844_p4_1124.txt`.
+
+| | NCAAB 11-19 | NCAAB 11-24 | WNCAAB 11-19 | WNCAAB 11-24 |
+|---|---|---|---|---|
+| builds | 389 | 432 | 383 | 343 |
+| rows considered per build | 394 | 861 | 69 | 69 |
+| stale-quote withholds per build | 147.7 | 318.2 | 51.5 | 30.7 |
+| stale share of rows considered | 37.4% | **37.0%** | 74.2% | **44.6%** |
+| priceable per build | 17.5 | 55.8 | 9.2 | 1.6 |
+| priceable share of rows considered | 4.4% | **6.5%** | 13.2% | **2.3%** |
+
+- **NCAAB:** the raw count rose because the slate was twice the size (861 rows a build against 394). The stale share is flat (37.4% to 37.0%). The priceable share rose from 4.4% to 6.5%.
+- **WNCAAB:** the stale share fell sharply (74% to 45%). But the priceable share fell too (13% to 2%), because `no_live_gameline_projection` went from 1,248 to 9,272. Those games had no live model at all; on the rail that is mostly `no_margin_anchor` (no closing full-game spread in the quote log), which is not #844's doing.
+- So P4 reads NEITHER. Its two halves split by sport, and both nights' slates differ in size and in model coverage.
+- **What #844 changes, and so what P4 can show.** #844 changes the row's age stamp, picking the newest by time. The join's quote-age ceiling is per quote, so a fall in NCAAB stale withholds was never guaranteed. P1 and P2 are #844's own test.
+
+**Owed:** the 11-25 close grades P2 and P3 from `p844_2026-11-25.jsonl` (every tick while NCAAB is live), then writes the deploys.md READING entry and the todo #844 verdict.
