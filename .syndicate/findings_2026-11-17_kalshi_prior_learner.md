@@ -99,3 +99,70 @@ learner is built to. The Normal-priority fix (`c0d9cf9b8`) records from 11-19 on
 
 The note missed one change. **F1 of todo `#821`** (`feed_game_model` with the outs penalties off, in the NBA processed root's `nba_sim_total_inputs.json`) was switched on 2026-11-17 at 11:35 AM CST (`deploys.md` 17:34:59Z). It is a data-file switch, not code, so the version timeline cannot see it. It moves the NBA pregame sim's totals, which the NBA live re-sim starts from. Lane `nba-live-total-anchor` measured 11-18's 12 NBA pregame totals at +6.78 (se 1.04) above the closing line (`.syndicate/findings_2026-11-18_nba_live_total_anchor.md`). So of the NBA training nights only 11-17 starts from that level, and every test
 night does.
+
+## Re-run on 11-09..11-22 (train to 11-17, test 11-18..11-22)
+
+Run 2026-11-24 6:01-6:22 PM CST by the one-time task `engine-learner-kalshi-prior-rerun-1124`, after M2's read was
+finished (`m2gate_kit\out\progress.txt` DONE, `m2_verdict.txt` 11:22 AM). Pins checked before launch:
+`make_opinions.py` 4a31034b6e0fd2a7..., `run.sh` 6e9eea0ca1987529... Kit `C:\tmp\elp\kprior2`, nice 19, every
+`rc=0`. Frozen learner `981ef14f6`, tau 0.5, outcome truth, the same line-instants in all three arms.
+
+- **Data:** 188,193 examples on 12,320 lines; train 83,956 (180 games, before 11-18), test 104,237 (139 games, each
+  held out whole). Test games: NBA 38, NCAAF 59-60, NHL 31, NFL 10. 11-12 has no recorder file. 11-15's 587 NCAAF
+  opinions found no Kalshi market (the old poll loop); NCAAF's train now rests mostly on 11-14 (9,875 kept).
+- **Line-instants kept per date** (`make.txt`, opinions with both Kalshi quotes):
+  - NBA train 11-09 14,673, 11-10 12,867, 11-11 5,018, 11-13 6,547, 11-14 3,224, 11-15 9,294, 11-16 11,484, 11-17
+    6,369; test 11-18 20,593, 11-19 8,893, 11-20 19,619, 11-21 12,865, 11-22 16,183.
+  - NCAAF train 11-10 169, 11-11 45, 11-13 238, 11-14 9,875, 11-15 0, 11-17 223; test 11-18 664, 11-19 542, 11-20
+    2,375, 11-21 18,206.
+  - NHL train 123 / 208 / 413 / 170 / 603 / 709 / 322 / 613; test 484 / 1,702 / - / 1,549 / 717.
+  - NFL train 11-15 1,099, 11-16 104; test 11-19 106, 11-22 1,464 (none before 11-15: no Kalshi market placed).
+
+| test, prior log loss | books | Kalshi P1 (`kbefore`) | Kalshi P2 (`kentry`) |
+|---|---|---|---|
+| NBA h2h | 0.4896 | 0.4780 | 0.4758 |
+| NBA spreads | 0.4588 | 0.4350 | 0.4313 |
+| NBA totals | 0.4897 | 0.4720 | 0.4681 |
+| NCAAF h2h | 0.5128 | 0.5122 | 0.5127 |
+| NCAAF spreads | 0.6842 | 0.6109 | 0.6039 |
+| NCAAF totals | 0.6924 | 0.6230 | 0.6198 |
+| NFL h2h | 0.1696 | 0.1450 | 0.1450 |
+| NFL spreads | 0.6575 | 0.6260 | 0.6216 |
+| NFL totals | 0.7066 | 0.7183 | 0.7139 |
+| NHL h2h | 0.6122 | 0.5901 | 0.5836 |
+| NHL spreads | 0.5388 | 0.4719 | 0.4658 |
+
+**Applied cells per arm** (`REACH`):
+- `book`: 92 of 184 cells, 38,750 of 104,237 test examples move. Every applied cell is `live_resim`, w +0.47 to +1.19,
+  in NBA, NCAAF and NHL. Held-out ON: NHL spreads d_ll -0.0387 [-0.0653, -0.0131] (31 games; the a180-900 bucket
+  -0.0822); NCAAF spreads -0.0147 [-0.0397, +0.0128]; NBA h2h / spreads / totals +0.0046 / +0.0049 / +0.0035, all CIs
+  across 0; NFL totals +0.0164 [+0.0017, +0.0355].
+- `kbefore`: 3 of 142 cells, 13,842 examples move: `live_resim` NBA h2h 50-75 a<=60 (w +0.55), NBA spreads_alt 50-75
+  a<=60 (+0.68), NCAAF spreads 25-50 a<=60 (+0.84).
+- `kentry`: 3 of 182 cells, 10,989 examples move, all `live_resim`, all NBA, clock 50-75, a<=60: h2h w +0.558 (se
+  0.276, n 654), spreads +0.608 (se 0.349, n 1,332), spreads_alt +0.690 (se 0.271, n 9,173). No `books` cell is
+  applied; its weights against `kentry` are negative in every cell (-0.03 to -1.42).
+
+**The held-out lines that decide THE RULE** (`kentry`, live, HELD_OUT ON; ON_BY_AGE a<=60 is the same):
+
+| sport, family | games | d_ll | 95% CI |
+|---|---|---|---|
+| NBA h2h | 38 | +0.0021 | [-0.0038, +0.0080] |
+| NBA spreads | 38 | +0.0032 | [-0.0007, +0.0069] |
+| every other sport, family | - | 0 (no cell applied) | [0, 0] |
+
+**Verdict: slice 5 (Kalshi as the live prior) is NOT worth rebuilding for any sport|family.** Only NBA h2h and NBA
+spreads have a cell applied against `kentry`, and neither held-out CI is below 0; both point estimates are worse than
+Kalshi's own price.
+
+Reading (not part of the rule):
+- Kalshi's price again out-forecasts the books' fair, by 0.01 to 0.08 nats, in every sport and family but NFL totals
+  and NCAAF h2h.
+- Against the books' prior the live re-sim does carry weight, and on NHL spreads it holds out. That is the books' fair
+  being stale, not information Kalshi lacks: against Kalshi the same expert keeps 3 NBA cells, and they do not hold out.
+- `HELD_OUT RAW` (unshrunk, applied or not) against `kentry` has NBA totals at -0.0112 [-0.0161, -0.0058] and NFL h2h
+  at -0.0082 [-0.0111, -0.0040] (10 games). No NBA totals cell passes the applied test, so this is not a result under
+  the rule. The `books` weights there are about -1 at 0-50% of the clock, so the raw gain would come from moving away
+  from the books, not from the re-sim.
+- Read with the context notes above: every NBA test night starts from the `#821` F1 level, and M2's 11-24 FAIL was
+  HARM on NBA totals live against the books' prior.
