@@ -35,7 +35,8 @@ TWO LEVERS, each with a proof line and an env switch.
    <= 0 disables).
 
 3. MEMORY WATCH (`post_worker_init`, 2026-11-24). The guard in 2 reads memory only after every 5th request; a
-   thread applies it on a timer as well, and aborts a worker at a hard ceiling. See `memory_watch_tick`. Default OFF.
+   thread applies it on a timer as well, and aborts a worker at a hard ceiling. See `memory_watch_tick`. ON (every
+   5 s) since 2026-11-25; `SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS=0` turns it off.
 
 Hooks never raise: a broken guard must not take a worker down.
 """
@@ -625,14 +626,15 @@ def _recycle_if_over(worker, *, now: float, anon: float | None, limit: float, st
 #      in-flight requests fail. Sizing: the largest of 5,664 `WEB_WORKER_MEMORY_RECYCLE` readings 10-31..11-24 was
 #      1,447 MB and none reached 2,000 MB, so 2,500 MB never fires on a worker the guard would have recycled anyway.
 # It starts only in a worker `post_fork` armed, never in a process that merely calls the hook (a test).
-# Switches: `SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS` (default 0 = OFF until it is loaded on its own, after the
-# GC revert's kill reading; 5 is the intended value), `SYNDICATE_WEB_WORKER_MEMORY_ABORT_MB` (default 2,500; <= 0
+# Switches: `SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS` (default 5 since 2026-11-25, loaded on its own after the GC
+# revert's kill reading, user 11-24 "Yes, after the reading"; <= 0 turns the watch off, abort included; it shipped
+# at default 0 in `322094343`), `SYNDICATE_WEB_WORKER_MEMORY_ABORT_MB` (default 2,500; <= 0
 # disables only the abort). Proof lines: `WEB_MEMORY_WATCH_ARMED` per worker, then the recycle / abort lines.
 MEMORY_ABORT_EXIT_CODE = 70  # not gunicorn's 3 / 4, which halt the arbiter: it logs "exited with code 70" and replaces it
 
 
 def memory_watch_seconds() -> float:
-    return _float_env("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", 0.0)
+    return _float_env("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", 5.0)
 
 
 def memory_abort_mb() -> int:

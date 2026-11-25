@@ -766,14 +766,17 @@ def _quiet_worker(limit=650.0, born=0.0):
     return _worker(limit=limit, born=born, requests=0)
 
 
-def test_off_is_not_on_the_memory_watch_is_off_by_default_and_starts_only_when_switched_on(monkeypatch):
+@pytest.mark.parametrize("off", ["0", "0.0", "-1"])
+def test_off_is_not_on_the_memory_watch_is_on_by_default_and_its_switch_turns_it_off(monkeypatch, off):
     monkeypatch.delenv("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", raising=False)
     worker = _quiet_worker()
-    assert conf.memory_watch_seconds() == 0.0
-    assert conf.install_memory_watch(worker) == "disabled" and not hasattr(worker, "_syndicate_memory_watch_thread")
-    monkeypatch.setenv("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", "5")
+    assert conf.memory_watch_seconds() == 5.0
     assert conf.install_memory_watch(worker, start=False) == "armed"
     assert worker._syndicate_memory_watch_thread.daemon is True
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", off)
+    switched_off = _quiet_worker()
+    assert conf.install_memory_watch(switched_off) == "disabled"
+    assert not hasattr(switched_off, "_syndicate_memory_watch_thread")
 
 
 def test_the_memory_watch_never_starts_outside_a_worker_post_fork_armed(monkeypatch):
@@ -905,7 +908,10 @@ def test_rss_anon_swap_mb_reads_this_process():
 
 
 def test_post_worker_init_logs_the_memory_watch_state(monkeypatch, capsys):
+    """On by default, yet this process (no `post_fork` guard state) gets no thread that could `os._exit` it."""
     monkeypatch.delenv("SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS", raising=False)
-    conf.post_worker_init(types.SimpleNamespace())
+    worker = types.SimpleNamespace()
+    conf.post_worker_init(worker)
     [armed] = _lines(capsys, "WEB_MEMORY_WATCH_ARMED")
-    assert armed["memory_watch"] == "disabled" and armed["interval_s"] == 0.0 and armed["abort_mb"] == 2500
+    assert armed["memory_watch"] == "not_armed" and armed["interval_s"] == 5.0 and armed["abort_mb"] == 2500
+    assert not hasattr(worker, "_syndicate_memory_watch_thread")
