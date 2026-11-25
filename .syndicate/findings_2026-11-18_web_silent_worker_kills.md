@@ -658,3 +658,4 @@ Read-only at nice 19. Scratchpad: `wsk_gctune_overnight.sh`, `wsk_recycle_hourly
 - Measured at +25 s: 2 of 2 new workers logged `WEB_MEMORY_WATCH_ARMED` armed (interval 5 s, abort 2,500 MB); 0 guard errors, 0 aborts, healthz 200.
 - Not loaded alone: the ff also carried the `/ops/dashboards` hub, cheat-sheet rules v4 (display), and the Layer 2 one-number switch at off. None changes betting.
 - Owed: kills per CST day of both kinds for several days, and how often the timer recycles or aborts a worker.
+- +1 h (8:55 AM CST): 6 recycles, all from the timer (0 from the request path). One worker was at 708 MB 2 min after booting and was recycled at the 120 s minimum age. 7 of 7 boots armed; 0 aborts, 0 errors, 0 kills. Recycles per request against before need a whole day.

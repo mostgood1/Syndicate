@@ -63446,6 +63446,11 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - What the watch does: `"source": "timer"` recycles per day, and any `WEB_WORKER_MEMORY_ABORT` with its anon / swap reading.
   - `WEB_MEMORY_GUARD_ERROR` stays 0.
 - **Claim released** 13:55:53Z.
+- **+1 h reading 14:55:33Z (8:55 AM CST)** (`wsk_watch_verify.sh 2026-11-25T13:54`): fleet head `e37a9697f`, healthz 200, `/ops/dashboards` 302.
+  - 7 boots, 7 of 7 `WEB_MEMORY_WATCH_ARMED` armed, 0 not_armed / disabled.
+  - 6 recycles, **all 6 `"source": "timer"`**, 0 from the request path. anon 644-757 MB at limits 622-644 MB; 19-49 requests each. One worker reached 708 MB 120.7 s after booting and was recycled at the guard's 120 s minimum age. One timer recycle was deferred 15 s after the other worker's (the 90 s spacing) and recycled 90 s later. The guard's rules hold on the timer path.
+  - 0 aborts, 0 exit-70s, 0 `WEB_MEMORY_GUARD_ERROR`, 0 tracebacks, 0 timeouts, 0 SIGKILLs.
+  - Not read: recycles per request against before. That needs a whole CST day and its request count (11-16..11-24: 14.5-20.4 requests per recycle).
 
 ## 2026-11-25 14:27Z (8:27 AM CST) -- READING (no deploy): `/ops/dashboards` hub, loaded as a ride-along of the 13:54:07Z web reload (`4b25ed8e1` inside `76a006f45..e37a9697f`; lane `ops-dashboards-hub`, user 11-24 'yes, build it and load it' then 'a, wait for that lane') -- **MET** (lane Verification), one cosmetic note
 - betting change: no (display only; no new load of my own -- this entry records the verification).
