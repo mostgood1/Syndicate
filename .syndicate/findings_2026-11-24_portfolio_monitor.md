@@ -109,3 +109,40 @@ User 11-24: "Yes, add it". Tooling only, lane portfolio-monitor.
 - The Portfolio Watch page data carries `al_<venue>_listed_placeable`, and the "Board picks bought" tile reads "... clear its price, M placeable live".
 - Tests: two new ones, one against the real `placeable_refusal`; 28 of 28 pass.
 - Scratch reading at 2:10 PM CST (20:10Z): both paper plans held 0 positions, so it read "0 positions at its price (0 placeable live)" at both venues. A non-zero reading is still owed, at the first scheduled reading where paper2 holds a position.
+
+## r30_negative back at 8:04 PM CST: the window rolled out a good day -- HYPOTHESIS (8:27 PM CST)
+
+The fleet-watcher flagged this (dash_chk, under the user's 11-20 delegation). The 30-day ROI read -6.18% [-11.71, -0.65] on the 8:04 PM page, and earlier today it read -5.09% [-10.52, +0.37]. It asked whether the window rolled out a good day, or whether today's post-CHANGE P bets moved it.
+
+**Read first:** dash_chk reads `r30_*` from the LAST row of `history/daily_rollup.json`, not from the page's 30-day tile. The rollup's row for day D covers bets by `selected_date` over D-29..D. Its last row is the newest date with a graded bet. The page tile (`performance()`) instead covers today-30..yesterday, so it held at -5.09% [-10.52, +0.34] all day, through 8:04 PM.
+
+**Hypothesis H-R1.** The first graded bet selected on 11-24 added a rollup row for 11-24. That moved the window from 10-25..11-23 to 10-26..11-24:
+- it dropped all of 10-25;
+- it added only the part of 11-24 graded so far.
+
+So the move comes from 10-25 leaving, not from today's bets.
+
+**Falsification.** H-R1 is wrong if any of these holds:
+- 10-25 was not a winning day;
+- (11-23 row's bets) - (10-25 bets) + (11-24 graded bets) != the 11-24 row's bets;
+- today's graded bets were negative, or were placed after P.
+
+### RESULT (8:29 PM CST): H-R1 CONFIRMED. Dropping 10-25 moved it; no bet placed after P has graded yet
+
+| rollup row | window | bets | events | 30-day ROI [95%] |
+|---|---|---|---|---|
+| 11-23 | 10-25..11-23 | 1,703 | 759 | -5.09% [-10.52, +0.34] |
+| 11-24 | 10-26..11-24 | 1,635 | 730 | -6.18% [-11.71, -0.65] |
+
+- **Out:** 10-25 had 70 bets on 33 events, ROI +14.3%, won 55.7% against a breakeven of 51.1%.
+- **In:** 11-24 has 2 graded bets on 1 event, ROI +47.6%. Both are NCAAB h2h, one at each venue. They were submitted at 2:24 and 2:25 AM CST, before P loaded at 2:30:37 AM (BC-071).
+- **Reconciles:** 1,703 - 70 + 2 = 1,635. Events: 759 - 33 + 1 = 727 against 730, because an event can carry bets on more than one date.
+- **Today's bets:** 14 orders selected 11-24 (12 filled). 8 were submitted before P and 6 after. **None of the post-P bets has graded**, so P has not moved any ROI number yet.
+- **Data:** the saved fleet ledger from the 8:04 PM reading (`readings/20261125T020404Z/live_all.json`), read through `live_book_edge_readout.bets_from_orders`.
+
+**Reading.**
+- The flag is a real reading, not an artifact. Over 10-26..11-24 the book loses beyond noise: 1,635 bets, 730 events. The good late-October days were holding the 30-day band above 0.
+- The next ones out are 10-26 (52 bets, +16.8%), which leaves at the first graded 11-25 bet, and then the days after it.
+- So the band can stay below 0 even if new days break even.
+
+**Lead, not followed:** dash_chk's r30 on the newest rollup row drops a full old day for a partial new one, so it flips at the first grading of each day. The page tile ends at yesterday. Both are correct, but they show two different 30-day numbers on the same page. The rollup could mark today's row `partial`, or dash_chk could read the last complete day. dash_chk belongs to the fleet-watcher; the rollup is this lane's.
