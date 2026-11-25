@@ -610,6 +610,78 @@ at a `reload-web` or a recycle. An ff ships ALL of main. When to load it is the 
   - Predicted: on the first full day of v4 sheets, every sheet `section_rules` 4 and value-not-suggested 0. The load
     day itself is mixed, because rows kept from earlier builds keep their v3 verdicts.
 
+## Step 1d -- the NHL and soccer pages lead with the board's pick; the sim is a labelled view `[built 2026-11-25, user "Yes, do 1d"; display only; NOT LOADED]`
+
+**Measured first** (fleet, read-only, 16:10:55-16:15:21Z, back to back; `C:\tmp\scc_oversight_d5aa\probe_1d_fetch.py`,
+saved `probe_1d\`). Board build 16:06:33Z.
+- Board: NHL pregame 645 rows, 39 Suggested, all props (assists 15, points 12, SOG 12), over 13 games; 0 game lines.
+  Soccer pregame 190 rows, 6 Suggested (corners totals 5, h2h 1) over 5 games.
+- `/nhl/picks`: 12 raw-sim game lines from `recommendations_sim_2026-11-25.csv` at 3.1-10.9% "EV"; 0 Suggested.
+- `/nhl/cards` "Player props pulse / Top moving edges": 12 props at EV +85% to +328% (goals over 1.5 at +3000..+9000,
+  one book); 0 Suggested; the 7 the board carries read EV -4.86 to +1.99 there (`single_book_fair`, `one_sided_fair`).
+  Each game card also led with the sim's "Top pick" and "Official card: Top game edge" (e.g. "ML PIT | EV -12.1%").
+- `/nhl/api/cards` "Best playable angles" and `/soccer/cards` "Best 1X2 edge": the sim's; no tile named the board.
+
+**The change** (display only; web routes, so the worker's chip contexts are untouched):
+- `syndicate/features/shared/board_game_picks.py` (NEW): the board's pregame rows for one sport and Central day, read with
+  `read_layer2_shortlist` (the plain read Ask and the board API make). Only a compact copy is kept, 60 s per process.
+  - Picks are the board's `suggested` rows, ordered by the board's own score, then EV: Ask's `_board_pick_rank_key`.
+  - A page's game is found by its exact pair, else by ONE side when exactly one board game that day fits. 3 of 13
+    soccer games missed on the pair ("Slavia Prague" / "Slavia Praha", "Sporting CP" / "Sporting Lisbon",
+    "Internazionale" / "Inter Milan"); with the fallback, 13 of 13 resolve.
+  - One verdict sentence per line, in the cheat sheet's refusal words (`cheat_sheets.board_refusal_text`). The EV is
+    net of fee where the board has it, and says so. An absent line names the shortlist's floor ("lists lines at EV -2%
+    or better at the best price").
+- `/nhl/picks` and `/nhl/api/picks`:
+  - `rank_cards` (the headline, which the home page's NHL betting card also reads) are the board's picks;
+  - `card_sections` add the sim's snapshot, each card badged "Sim EV", with the board's verdict on the same line.
+- `/nhl/cards`:
+  - a "The board's NHL picks" strip;
+  - a Board pick tile and callout on every game;
+  - the props pulse is now "Raw sim: not the board's picks", with "Sim EV" and the board's verdict on each card;
+  - "Official"/"Top pick"/"Top game edge" now read "Sim card"/"Sim's top pick"/"Sim's top game edge";
+  - `_prop_reason_summary` now reads "Sim's case ... Sim win rate ... Sim EV".
+- `/nhl/api/cards`, `/nhl/cards?client=board` and the four soccer cards routes: a "Board pick" tile first
+  (`attach_board_picks`). Soccer's own tiles say "Sim ·"; the NHL panel is "Sim angles: not the board's picks".
+
+**Pre-registered hypothesis** (lanes.md, before building): every headlined pick is a board Suggested row or carries a
+"sim" label; unlabelled non-board picks 0. **HELD** on the replay of the 16:10Z reads (`C:\tmp\scc_oversight_d5aa\replay_1d.py`):
+
+| surface | result |
+|---|---|
+| `/nhl/picks` | headline 12 of 12 Suggested (of 39); sim 12 of 12 labelled, each with a verdict (absent 11, refused 1) |
+| props pulse | 12 of 12 carry the board's verdict; 0 Suggested (7 refused, 5 absent) |
+| NHL bundle | 14 of 14 page games resolved; 13 carry a board pick |
+| `/nhl/api/cards` | Board pick tile first on 14 of 14; all 39 picks shown across games |
+| `/soccer/api/cards` | Board pick tile first on 13 of 13; all 3 picks for the day shown |
+
+Rendered in a local harness (the worktree's code serving the saved fleet reads; `C:\tmp\scc_oversight_d5aa\harness_1d.py`):
+- `/nhl/cards`: 103 EV figures, 51 inside a board element, 52 labelled "sim EV", 0 neither. 0 console errors.
+- `/nhl/picks`: 12 board cards first, then 12 sim cards, all "Sim EV" with a verdict.
+- Soccer was not rendered (no local soccer data): covered by the replay and the tests.
+
+**Tests.** `tests/test_board_game_picks.py`, 21 new. They include reachability: the same sim rows with and without a board
+pick give a different headline. 112 pass across the touched suites; `test_archives -k "nhl or soccer"` 55 pass. One assert
+updated: `test_soccer_board_mlb_parity.py`, prop tile label "Sim · Best prop edge". `test_soccer_cards.py::test_directory_hit...`
+fails in this worktree only: its branding CSV is under `data/`, which the worktree leaves out. The page script passes `node --check`.
+
+**Seen, not changed (leads):**
+- Board picks can carry a Board win% below the fair, e.g. Nichushkin over 0.5 assists: fair 28.4%, win% 27.3%,
+  Suggested at +5.0% EV. The board bets the price. That is the open "model loses to the market fair" decision, not a
+  display defect.
+- `/nhl/cards` on the fleet shows "PUCK DROP 11/24, 6:00 PM CST" on 11-25 games. It looks like a bare date read as UTC
+  midnight; not traced.
+
+**How it loads.** Web only: an ff of `~/Syndicate`, then `reload-web` (or a recycle). The soccer tile labels and
+`_prop_reason_summary` also run on refresh-worker, inside chip and home builds, as labels only. Betting change NO: nothing
+that places or sizes money reads these pages.
+- **Reader:** `C:\tmp\scc_oversight_d5aa\read_1d_after_load.py <day>`, read-only. rc 0 MET, 1 violated, 2 blind, 3 not loaded.
+  - BEFORE, 2026-11-25 16:36:54Z: rc 3. None of the 1d fields are served; soccer sim tiles unlabelled 20.
+    Saved: `C:\tmp\scc_oversight_d5aa\reading_1d_before_1125.txt`.
+  - Predicted after the load: rc 0. The NHL picks headline is all board; sim cards are labelled with verdicts; every props
+    card has a verdict; the bundle board is ok; the Board pick tile is first on every NHL and soccer game; soccer sim tiles
+    are unlabelled 0.
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:
