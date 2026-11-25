@@ -63448,7 +63448,7 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Claim released** 13:55:53Z.
 - **+1 h reading 14:55:33Z (8:55 AM CST)** (`wsk_watch_verify.sh 2026-11-25T13:54`): fleet head `e37a9697f`, healthz 200, `/ops/dashboards` 302.
   - 7 boots, 7 of 7 `WEB_MEMORY_WATCH_ARMED` armed, 0 not_armed / disabled.
-  - 6 recycles, **all 6 `"source": "timer"`**, 0 from the request path. anon 644-757 MB at limits 622-644 MB; 19-49 requests each. One worker reached 708 MB 120.7 s after booting and was recycled at the guard's 120 s minimum age. One timer recycle was deferred 15 s after the other worker's (the 90 s spacing) and recycled 90 s later. The guard's rules hold on the timer path.
+  - 5 recycles and 1 deferral, **all `"source": "timer"`**, 0 from the request path (corrected 15:00Z: the first count, 6 recycles, counted the deferral line as a recycle; 7 boots = 2 from the reload + 5). anon 644-757 MB at limits 622-644 MB; 19-49 requests each. One worker reached 708 MB 120.7 s after booting and was recycled at the guard's 120 s minimum age. One timer recycle was deferred 15 s after the other worker's (the 90 s spacing) and recycled 90 s later. The guard's rules hold on the timer path.
   - 0 aborts, 0 exit-70s, 0 `WEB_MEMORY_GUARD_ERROR`, 0 tracebacks, 0 timeouts, 0 SIGKILLs.
   - Not read: recycles per request against before. That needs a whole CST day and its request count (11-16..11-24: 14.5-20.4 requests per recycle).
 
