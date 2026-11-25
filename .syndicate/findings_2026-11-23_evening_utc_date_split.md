@@ -131,3 +131,14 @@ The 2-10 rows in other grids are Kalshi rows or forward captures.
 - O is droppable and never stops A-N. If the batch does not load it, O waits for 12-08.
 - The batch's step 9 reads P-E1 on HOU @ SJ (Central day 11-24) within 45 min of the up. P-E3 is owed at its kickoff,
   11-24 9:00 PM CST (11-25 03:00Z).
+
+## Readings after the load (11-25 07:10Z)
+
+- P-E3 (live model) at HOU @ SJ, read 11-25 07:00Z from refresh-worker.log: every soccer LIVE_GAMELINE_BUILD for date=2026-11-24 from 03:19Z on reads index=1, `games_in_snapshot` 1, `indexed` 1, considered 10-21 (mean 12.7 / 13.0 / 12.8 for 03 / 04 / 05Z) and written > 0 (216 / 293 / 140 per hour). On 11-22, RSL read considered=2.
+  - The `considered >= 100` threshold was MIS-SPECIFIED: it took the match's grid rows (473) for per-build considered rows. Daytime soccer on 11-24 reads 10-25 considered per indexed match (19-21Z), and HOU @ SJ reads 13, so it is in that range. The falsifier (`considered < 10`) did not fire.
+  - Why rows are withheld at 03:55Z: prob_interval_swamps_edge 6, segment_is_not_full_game 5, quote_older_than_live_pricing_ceiling 2. These are model gates, not the date.
+  - `overlay_offdate_inplay` is `{}` in all 8 Rail Watch metrics files C:/tmp/railmon/dash/m_auto_1124_33..40.json (mtimes 03:04-05:24Z). I re-read them myself; the rail monitor's R-K reading said the same. Overlay gaps were 73-141 s, against 711-877 s for LAFC on 11-23.
+  - The rail card had 2-5 live rows across 7 readings (rail monitor). Not traced.
+- P-E1 still holds at 07:08Z (`kit_after_up_eud.sh 2026-11-24T08:30:10Z`): every soccer match has its post-load rows only in its CENTRAL grid (HOU @ SJ 434/434; Miami @ Columbus, Vancouver @ RSL, STL @ LAFC and Dallas @ Portland all Central). The UTC-day grids hold 0 post-load rows.
+- P-E2 (ghost) PARTIAL: MOVED_KICKOFF sport=soccer date=2026-11-25 reads events_moved=1 from 14:40:53Z, 6 h 10 m after the load. But at 07:00Z the 11-25 UTC-day grid still holds 433 pre-switch HOU @ SJ rows (newest 11-24 08:03Z), now that the kickoff has passed. The drop is scoped to kickoffs still ahead, as designed. Whether a board reader shows those finished-match rows on 11-25 was NOT checked. It runs out when the pre-load quotes age out.
+- P-E4: partly read. Daytime soccer 11-24 kept its cadence (59-67 builds an hour at 20-21Z) with considered 10-25 per indexed match. Other sports' shards were not read.
