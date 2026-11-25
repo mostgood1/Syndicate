@@ -168,6 +168,6 @@ At the grade, two NCAAB games were still live: Gonzaga @ Kansas St and Colorado 
 
 ### Open user decisions
 
-- **#857** (web's worker recycle limit to 1,500 MB): unblocked by R-G. The user said "Yes, after #853" on 11-20; when its drained restart runs is their call (asked 11:20 PM 11-24).
+- **#857** (web's worker recycle limit to 1,500 MB): unblocked by R-G. The user said "Yes, after #853" on 11-20, and on 11-25 ~10:10 AM CST answered "Next scheduled restart". **Answered:** no restart is scheduled before the window, so it rides the 12-08 window's drained down/up (2-7 AM CST), unless an unplanned drained down/up runs first.
 - **R-H at 7:07 PM 11-25:** on MET, whether to close lane `nhl-live-join-stl-alias` is the user's call.
 - The next betting-change window is 12-08.
