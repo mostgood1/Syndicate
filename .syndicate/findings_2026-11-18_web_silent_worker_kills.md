@@ -651,3 +651,10 @@ Read-only at nice 19. Scratchpad: `wsk_gctune_overnight.sh`, `wsk_recycle_hourly
 - Full collections are back: 11-24 had 2,878 s of generation-2 pauses (about 14 untuned hours), inside 11-20..11-22's 1,910-3,039 s a day; 325 of 325 boots untuned. Stalls >= 5 s: 1 (5.26 s).
 - 11-24 was the heaviest day since 11-17 (4,906 requests); requests and MB per recycle stayed in their 11-16..11-23 ranges.
 - Next, per the user's 11-24 "Yes, after the reading": the quiet-worker memory watch loads on its own (default `SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS` 0 -> 5 s).
+
+## 2026-11-25 8:00 AM CST (14:00Z) -- the quiet-worker memory watch is LOADED (user 11-24 "Yes, after the reading")
+
+- `e37a9697f` turns the watch on by default (every 5 s; abort at 2,500 MB anon + swap). LOADED by an ff from `76a006f45` and reload-web at 7:54:07 AM CST, BC-073 no. Deploy entry: `deploys.md` `## 2026-11-25 13:54:07Z`.
+- Measured at +25 s: 2 of 2 new workers logged `WEB_MEMORY_WATCH_ARMED` armed (interval 5 s, abort 2,500 MB); 0 guard errors, 0 aborts, healthz 200.
+- Not loaded alone: the ff also carried the `/ops/dashboards` hub, cheat-sheet rules v4 (display), and the Layer 2 one-number switch at off. None changes betting.
+- Owed: kills per CST day of both kinds for several days, and how often the timer recycles or aborts a worker.

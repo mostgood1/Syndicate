@@ -63417,3 +63417,32 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - P-E4: partly read. Daytime soccer 11-24 kept its cadence (59-67 builds an hour at 20-21Z) with considered 10-25 per indexed match. Other sports' shards were not read.
 - **Residual checked 11-25 ~1:20 AM CST:** the 433 stale rows reach NO surface read. /api/intelligence/query (top edges today, timing all) returns 10,030 rows, 0 of them HOU @ SJ. The rail monitor's 4 readings 06:03-07:03Z (railDate 2026-11-25) have no HOU @ SJ card, and the 03:00Z chip reads final. /api/board/book-grid itself was not read.
 - verify: MET -- HOU @ SJ got its live model on its Central date (index=1, written>0 on every build), and `overlay_offdate_inplay` stayed empty in all 8 windows.
+
+## 2026-11-25 13:54:07Z (7:54:07 AM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): web quiet-worker memory watch ON by default `e37a9697f` (lane `web-silent-worker-kills`, user 11-24 "Yes, after the reading") -- **LOADED on web; MET**
+- betting change: **no** (BC-073). A thread inside each web worker reads that worker's own memory; web places, sizes, holds and exits no bets. Not a revert, and not a risk reduction to the betting path.
+- **What:** `SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS` defaults to 5 (it shipped at 0 in `322094343`). Each worker that `post_fork` armed starts a daemon thread. Every 5 s it reads `/proc/self/status` and applies the memory guard's own rules to a quiet worker (`"source": "timer"` on its `WEB_WORKER_MEMORY_RECYCLE` lines). It aborts a worker at 2,500 MB of RssAnon + VmSwap, at any age and while draining (`WEB_WORKER_MEMORY_ABORT`, then `os._exit(70)`). The four keys this load reads (`SYNDICATE_WEB_WORKER_MEMORY_WATCH_SECONDS`, `_ABORT_MB`, `SYNDICATE_LAYER2_ONE_MODEL_NUMBER`, `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR`) are in no env layer (`local_production.env`, `fleet_env/{web,refresh-worker,live-odds-worker}.json`, `fleet_role_spec.json`: 0 lines each) and absent from the running web master and both workers' environ (read 13:53:31Z), so the code defaults decide.
+- **Why:** the memory guard reads memory only after every 5th request, so a worker that grows between requests has no bound short of the kernel. On 11-23 the kernel OOM killer took a web worker that had reached ~9.7 GB 5 min after booting. The GC revert's kill reading came first (13:45Z, in the 2026-11-24 15:57:59Z entry): 0 kills of either kind in 21.8 h.
+- **Ride-alongs** (`76a006f45..e37a9697f`, 76 commits, listed before the merge; the dirty fleet files are 6 runtime-written data/report files, none in the range):
+  - Web code, loaded by this reload, all betting change no:
+    - `4b25ed8e1` the `/ops/dashboards` hub (lane `ops-dashboards-hub`), which was waiting to load right after this watch. It loaded with it instead: no ff can reach `e37a9697f` without it.
+    - `6ca19e36c` cheat-sheet rules v4, display only (user 11-24 "Ride the next ff").
+    - `d25f49964` the `SYNDICATE_LAYER2_ONE_MODEL_NUMBER` switch, absent = off = today. Its turn-on is queued for 12-08.
+  - Worker code, on disk only until the next worker restart: `cf12ae61f` NCAAF live margin anchor, absent = off, plus a `run_refresh_worker.py` hook.
+  - Tooling no role runs: `scripts/live_totals_width_fit.py` (a research fit; nothing on the fleet invokes it), `scripts/portfolio_*`. The rest is ledger.
+- **Tests:** `tests/test_gunicorn_conf.py` + `tests/test_web_draining_worker.py` Windows 98 passed / 10 skipped; `tests/test_gunicorn_conf.py` on the fleet-host Linux venv 101 passed. off != on over 0 / 0.0 / -1 against absent; a process with no `post_fork` state gets no thread (not_armed).
+- **Locks:**
+  - Claim web 13:52:54Z (holder `web-silent-worker-kills`, ACQUIRED, rc 0).
+  - Baseline 13:53:17Z (scratchpad `wsk_watch_base.sh`): fleet head `76a006f4550c`, healthz 200, `/ops/dashboards` 404. Since the revert load: 0 `WEB_MEMORY_WATCH_ARMED` lines, 0 timeouts, 0 SIGKILLs.
+  - Preflight `--service web --target-commit e37a9697f --betting-change no`, from the worktree at origin/main `e37a9697f`, with 4 expect / baseline pairs: **CLEAR 13:53:57Z**.
+- **ff + reload:** `git merge --ff-only e37a9697f` at **13:54:07Z** (`76a006f4550c` -> `e37a9697f677`). `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "max_latency_s": 0.0, "state": "done"}`. Workers 1630882, 1634211 -> 1640528, 1640529.
+- **expect / measured** (scratchpad `wsk_watch_verify.sh`, 13:54:32Z):
+  - fleet head `e37a9697f`: **MET**.
+  - watch armed on every new worker: **MET**, 2 of 2. 1640528 and 1640529 at 13:54:08.993Z: `{"abort_mb": 2500, "interval_s": 5.0, "memory_watch": "armed"}`. 0 not_armed / disabled lines.
+  - healthz 200: **MET**.
+  - `/ops/dashboards` 404 -> 302 (signed out, to the portfolio login): **MET**.
+  - Since the load: 0 `WEB_MEMORY_GUARD_ERROR`, 0 aborts, 0 exit-70s, 0 tracebacks, 0 timeouts, 0 SIGKILLs. New workers at 95-96 MB anon, 0 swap.
+- **verify (owed, next readings):**
+  - Kills per CST day, counting both kinds (`WORKER TIMEOUT`, and `was sent SIGKILL` with no timeout before it), over several days against 11-01..11-23 (kills on 7 of 23 days, 12 kills). This is the lane's goal measurement.
+  - What the watch does: `"source": "timer"` recycles per day, and any `WEB_WORKER_MEMORY_ABORT` with its anon / swap reading.
+  - `WEB_MEMORY_GUARD_ERROR` stays 0.
+- **Claim released** 13:55:53Z.
