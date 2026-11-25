@@ -63334,3 +63334,40 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - **First row per game:** DET @ ORL P1 11:18 (rf 0.985) anchored - close -3.92, raw - close +7.29; BOS @ WAS P1 10:35 (rf 0.971) +0.80 / +6.55; DAL @ DEN P1 12:00 (rf 1.0) +2.42 / +5.93. **Mean anchored - close -0.23, mean raw - close +6.59 (n = 3 games).** The first rows were read after the tip, so the score already in moves each one; three games is a small sample.
 - **Abnormal:** none. 0 refusals, 0 missing anchors, 0 offset mismatches.
 - verify: MET -- the reading above; todo #834 and the lane closed on it.
+
+## 2026-11-25 05:00Z (11:00 PM CST 11-24) -- READING (no deploy): #851 Polymarket slate off the live-odds main loop, first live window 00-05Z 11-25 (lane `polymarket-slate-off-odds-loop`, read by lane `layer2-rail-monitor`, runbook R-D, read-only) -- **P1-P6 ALL PREDICTED; lane closed**
+- betting change: no (a reading; nothing loaded)
+- **Load:** the 2026-11-24 08:30:10Z window batch DEPLOY entry (CHANGE E, register BC-063). `POLYMARKET_SLATE_MAIN_LOOP mode=background` lines run through the window (03:07:58Z, 03:14:04Z, 03:16:35Z, ...). 0 `POLYMARKET_SLATE_BACKGROUND_FAILED` in 00-05Z.
+- **Restart in the window: one.** live-odds-worker's normal self-recycle at ~03:11Z (supervisor `exited code=0 after 22750s`, new pid 1412822, same env). The background-mode line is back at 03:14:04Z. Web workers rebooted 04:53-05:00Z; that is web, not this loop.
+- **Reader:** `C:\tmp\railmon\p851_loopstages.py 2026-11-25` (the lane's `loopstages.py`, window from argv), run on the fleet at 05:00:16Z, nice 19, so the window's last iteration may be cut.
+  - Baselines: the registered 11-16..11-19 numbers (482 iterations, `C:\tmp\railmon\p851_baseline_1116_1119.txt`), and the same reader on the 11-21 evening (00-05Z 11-22). The 11-20 evening is rotated out of the logs (events start 11-21 08:53Z).
+  - Outputs: `C:\tmp\railmon\p851_stages_2026-11-25.txt` and `p851_stages_2026-11-22.txt`.
+
+  | | prediction | 11-16..11-19 | 11-21 evening | tonight | verdict |
+  |---|---|---|---|---|---|
+  | P1 iteration p90 | <= 200 s | 299 s | 264 s | **123 s** | PREDICTED |
+  | P1 iterations over 180 s | <= 12% | 29% | 25% (32 of 130) | **0% (0 of 203)** | PREDICTED |
+  | P2 odds-sweep attempt gap p90 | <= 200 s | 299 s (NCAAB) | 277 s all, 265 s NCAAB | **134 s all, 130 s NCAAB** | PREDICTED |
+  | P3 slate write gap p50 | 139-208 s | 173 s | 164 s | **155 s** (116 writes) | PREDICTED |
+  | P4 `POLYMARKET_ARTIFACT_STALE` | 0 | - | 0 | **0** | PREDICTED |
+  | P5 slow iterations (post > 120 s) with the slate the larger part | 0 | 117 | 24 | **0** (no post > 120 s at all) | PREDICTED |
+  | P6 OddsAPI credits an hour, 00-05Z | <= +30% | - | ~9,300 (estimate) | **10,022** | PREDICTED |
+
+  - **P2 by sport, tonight:** p90 128-138 s for nba, ncaab, ncaaf, nhl, soccer and wncaab. NFL is p90 1,581 s on 15 gaps, against 1,608 s on 11-21. Its cadence does not follow the loop.
+  - **The main loop never waited on a slate:** `post.slate_s` is nonzero in 0 of 203 iterations. 23 background writes fell inside a post span by timing only.
+  - **The execution tick is now the largest part of `post`:** p90 49 s, max 77 s. It is the larger part of all 12 longest iterations (130-161 s). With slate and execution both subtracted, p90 is 84 s.
+  - `ODDS_SWEEP_REFUSED lane_busy`: 74 tonight on 201 launches, 70 on 11-21 on 130.
+  - P4 was 0 on the baseline too, so it is a no-harm check, not an improvement.
+- **P6 credits** (`py -3 C:\tmp\railmon\p851_quota.py <label>`, `quota.latest.used`, `C:\tmp\railmon\p851_quota.jsonl`):
+  - **Tonight:** 3,242,113 at 23:59:28Z to 3,292,255 at 04:59:39Z: 50,142 in 5.003 h = **10,022 an hour**.
+  - **11-20 evening (measured):** 2,568,438 at 23:59:22Z to 2,632,771 at 05:00:11Z: 64,333 in 5.014 h = **12,831 an hour**.
+  - **11-21 evening (ESTIMATE):** it has no 05Z read; that one-shot read ran at 17:29Z 11-22. Over 23:58:50Z 11-21 to 17:29:03Z 11-22 the counter moved 114,254 in 17.50 h. The endpoint's cumulative `by_hour_utc` profile (since 10-01) puts 40.7% of that span in 00-05Z, which gives ~46,500 credits, **~9,300 an hour**.
+  - **Against 11-20 alone: -21.9%. Against the mean with the estimate (~11,070): -9.4%.** For P6 to fail, the 11-21 evening would need under 2,590 an hour, below 40% of its own 17.5 h average (6,527), while evening hours run above the day's average in that profile.
+  - **Credits per lane sweep** (account-wide credits / `ODDS_SWEEP_LAUNCHED` lines; credits include refresh-worker, props and off-fleet use, so this is a rough normaliser):
+    - tonight 201 launches (~1,069 sport sweeps): ~249 a launch, ~47 a sport sweep;
+    - 11-21 evening 130 launches (~737), credits estimated: ~358 a launch, ~63 a sport sweep;
+    - 11-20 evening: credits measured, launches not (logs rotated).
+  - Tonight ran 55% more launches than the 11-21 evening at a lower hourly credit rate. The build's cost estimate (+24% evening sweeps, upper bound +0.24-0.4M a month) did not appear as credits on this night. Tuesday's slate is not Friday's, so this is one night, not a rate.
+  - **Month:** the fleet's own projection read 4.79M for 30 days at 04:59Z (window 77 h). It was already 4.70M at 17:29Z 11-22, before the load. 1,707,745 of 5M remain.
+- **Abnormal:** none. 0 background failures, 0 stale refusals, 0 slow slate iterations.
+- verify: PREDICTED on all six (the reading above). Lane `polymarket-slate-off-odds-loop` closed and todo #851 updated on it.
