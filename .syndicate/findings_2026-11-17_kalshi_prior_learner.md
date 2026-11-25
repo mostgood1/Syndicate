@@ -166,3 +166,173 @@ Reading (not part of the rule):
   from the books, not from the re-sim.
 - Read with the context notes above: every NBA test night starts from the `#821` F1 level, and M2's 11-24 FAIL was
   HARM on NBA totals live against the books' prior.
+
+
+## POST-#834 RE-CHECK: registered 2026-11-25 10:59 AM CST, before its data
+
+**User:** "Yes, schedule it", answering "Schedule a 12-01 re-check of the re-sim against Kalshi's price on post-#834
+NBA nights?". Lane `engine-learner`, todo `#736`. Read-only on the fleet. It gates nothing by itself.
+
+**Why.** The 11-24 re-run above tested NBA only on nights 11-18..11-22. Those were all on `#821` F1's level, before
+`#834` (the NBA total anchor: loaded 11-24 2:30 AM CST, live check MET 9:34 PM, `4df200017`). M2b was held on 11-25
+(`214617a25`) on the re-run's answer. This asks the same question on the post-`#834` version.
+
+### Data and split
+
+- Central slates 2026-11-24..2026-11-30, **NBA only** (see "Why NBA only").
+- Train 11-24..11-27; test 11-28..11-30 (`--test-from 2026-11-28`). Each game is held out whole.
+- No slate from 11-24 on has been read for this lane. The smoke run below used 11-21/11-22, which the 11-24 re-run
+  had already read.
+- If M2b is ever resumed, it cannot treat 11-24..11-30 as unseen.
+
+### Method (as the 11-24 re-run, except dates, paths and NBA only)
+
+1. A settings/data snapshot (`vsnap.py`). It uses M3 Addendum 5b's own readers and stores hashes only.
+2. The pinned experts write `ops/opinions_<date>.jsonl` for NBA: the M2 kit's code, an export of `981ef14f6`
+   (`launch.py experts --sports nba`).
+3. `make_opinions.py` re-prices each line-instant to the in-play recorder's Kalshi quotes. It is the re-run's script
+   with only its dates, paths, sports and reader changed. The diff against `kprior2/make_opinions.py` is:
+   - the docstring, `OUT`, `OPS` (replacing `TRAIN` / `TEST`), `DATES` and `SPORTS` (from `KP3_SPORTS`, here `nba`);
+   - the one read of `OPS`, now `read_live_gameline_ops`, which applies `main()`'s own tests while reading (smoke 4:
+     output byte-identical).
+4. The pinned learner runs on book / kbefore / kentry: outcome truth, tau 0.5, `--min-print-n 100`.
+
+### Why NBA only
+
+- **Memory.** On the fleet, the four-sport build of an already-read Saturday (11-21) peaked at 4,838 MB of this job's
+  own memory. Host MemAvailable fell to 1,823 MB, and to 1,212 MB in the first smoke. The fleet trades live money on
+  this host. Most of the peak is the four-sport opinion file: 420,688 opinions, about 2 GB once read. 11-27 and 11-28
+  are heavy college nights.
+- **Scope.** The rule judges NBA only. `#834` changed only NBA, and the other sports were descriptive in this design.
+- **What it changes.** The learner has a root weight per expert shared across sports (`node_path`: `*` -> sport ->
+  ...). So an NBA-only fit is not the 11-24 four-sport fit restricted to NBA: NBA's cells shrink toward an NBA-only root.
+  That is the cleaner fit for an NBA-only question, but its numbers are not directly comparable cell by cell with
+  11-24's.
+
+Everything runs on the fleet at nice 19, attached, under a memory guard:
+- it kills the run's process group if host MemAvailable falls under 1,200 MB;
+- before each heavy step it waits up to 10 minutes for 3,000 MB available;
+- it logs this job's own memory per step (`mem.log`, summary in `guard.log`).
+
+### THE RULE
+
+This is the 11-17 Kalshi-prior rule, applied to NBA on the post-`#834` version. It is computed by `verdict.py` from
+`learner_kentry.json`, never from the text output, which hides cells below `--min-print-n`; see the correction below.
+
+For each NBA family f in h2h, spreads, totals, against Kalshi's entry quote (`kentry`):
+
+- **ADDS:** a `live_resim` weight in a cell `nba/f/...` is applied, AND HELD_OUT ON `nba|f|live` has a ci95 upper
+  bound below 0, on at least 15 test games.
+- **NOTHING:** at least 15 test games, and not ADDS.
+- **UNDERPOWERED:** fewer than 15 test games.
+
+Summary: ADDS if any family ADDS; NOTHING if all three are NOTHING; otherwise UNDERPOWERED.
+
+### Validity
+
+Any failure below makes it `KCHECK_VERDICT INVALID`, with no family verdict.
+
+- **V1.** Every step returns rc=0, and the run ends with `KPRIOR3_ALL_DONE`.
+- **V2. One NBA re-sim version over 2026-11-24T08:31:00Z..2026-12-01T08:00:00Z.** Any of these breaks it:
+  - a `betting_changes.md` `yes` load in the span whose text names NBA, basketball or live (other `yes` loads are
+    listed as notes);
+  - an Engine Watch re-sim version row for NBA of kind `switch` starting in the span (code rows are notes);
+  - any change between the snapshot taken at registration (`vsnap_base.json`) and the one taken at run start, in:
+    the NBA re-sim setting hashes per role, the NBA keys in `local_production.env`, or the `nba_source` settings
+    files' content;
+  - an `nba_source` settings file written in the span;
+  - a role missing from either snapshot.
+- **V4.** At most 5% of NBA line-instants are not final.
+
+**Gap check at registration (11-24 08:31Z to the baseline, 11-25 16:59Z):** nothing changed.
+- No `local_production.env` backup is stamped after 08:23:56Z, which is the window batch's own edit before the load.
+- The three `nba_source` settings files were last written 11-17 17:35:08Z (F1's `nba_sim_total_inputs.json`) or
+  earlier.
+- Engine Watch has no NBA version row after `nba-E14` (the 11-24 load).
+
+### Descriptive (no rule)
+
+- Prior log loss per sport and family: books, Kalshi before, Kalshi entry.
+- HELD_OUT RAW for the NBA families.
+- Reach.
+- **The re-sim's over-lean on NBA full-game totals.** This is `live_resim`'s mean delta toward over, per game, with a
+  game bootstrap. It is computed against both priors, for this run and for the re-run's 11-18..11-22. It shows whether
+  `#834` removed F1's lean.
+
+### Expected size, stated before the data
+
+- At the re-run's rate (38 NBA test games over 5 nights), the 3 test nights give about 20-23 NBA games. NBA's
+  Thanksgiving slate, if any, is light.
+- Train is 4 slates against the re-run's 9, so fewer cells can pass the applied test. A NOTHING here is weaker evidence
+  than 11-24's.
+
+### What each result means (the user's call either way)
+
+- **ADDS:** the anchored re-sim carries information beyond Kalshi's price on that family. That reopens an M2b judged
+  against Kalshi's price.
+- **NOTHING:** no evidence the re-sim adds anything beyond Kalshi's price. M2b stays held.
+- **UNDERPOWERED / INVALID:** reported with the reason. A re-run would be a new decision.
+
+### Schedule
+
+- One-time task `engine-learner-kalshi-recheck-1201`, Tue 2026-12-01 10:00 AM CST.
+- It runs once, into `C:\tmp\elp\kprior3\run`, and stops if that folder already exists. It writes the verdict and
+  pushes the result with `push_result.py`, mechanically, additions only. It updates Engine Watch and reports to the user.
+- No fleet change, no betting change.
+- If the task never runs, Engine Watch's `kalshi_recheck` gate goes overdue on 12-03 and the fleet-watcher flags it.
+
+### Smoke (11-21/11-22, nights already read; plumbing only, not a result)
+
+All four smokes ran on 11-21/11-22 (nights the 11-24 re-run had already read). Every step returned rc 0.
+
+1. **Four sports.** Plumbing clean; the verdict is UNDERPOWERED (7 test games), as it should be. Host MemAvailable
+   fell to 1,212 MB.
+2. **Four sports, with this job's memory logged.** The re-pricing step peaked at 4,838 MB (host down to 1,823 MB). The
+   other steps stayed at or under 1,136 MB.
+3. **NBA only.**
+   - The re-pricing step still peaked at 3,382 MB, because it read an NBA night's 250-300 MB opinion file (mostly
+     props) whole. Host minimum 2,898 MB.
+   - The NBA rows are identical to the 11-24 re-run's, for both nights and both priors (12,865 / 16,183 book rows).
+   - The over-lean line reproduces 11-24's to 4 decimals.
+4. **The re-pricing step filters while reading** (`read_live_gameline_ops`, the same tests `main()` applies). Peak
+   739 MB, and the output is byte-identical to smoke 3's for all three priors and both nights.
+
+Peaks of this job in the final configuration: experts at or under 783 MB, re-pricing 739 MB, learner at or under
+648 MB.
+
+### Pins (sha256)
+
+```
+d81a58ab2f57d4ef7e9fb2ea19d911ac657607bea8f1f2d72f85480901d7e3ba */c/tmp/elp/kprior3/run.sh
+3c16c694e5cc974de126fcbd905d2960cddc6f9d84783c2c2eadbcde96a4c4bf */c/tmp/elp/kprior3/run_fg.sh
+20823e15a0e382044dfbacb9d51ed17e684b7a0a3a7bdc93ad11e82ef72a87bd */c/tmp/elp/kprior3/vsnap.py
+406488593d4e9ae713aa8cb978a5b7a8e64b55026bf712c0aa0f0651f82b2061 */c/tmp/elp/kprior3/make_opinions.py
+0e52e318358a832611745836d4ae8eed31e7fc56e0bdf98cd4b8cb35adf095d9 */c/tmp/elp/kprior3/verdict.py
+e630a76928c8acb20ecfb7e2164cf428723bf9f3f724fab79d7beb09ce4a71f0 */c/tmp/elp/kprior3/push_result.py
+03d40874fdf29f6b6bb3434b46aedfe62c9967f665e43124ee86722798852ac4 */c/tmp/elp/kprior3/task_prompt.md
+5d136ff45cd2237d7b43cde494773096b9fdad99fb8336d98ee2e0309ba3fa94 */c/tmp/elp/kprior3/vsnap_base.json
+3a1a38c208192eaa147e23be07b2e43bd638ad74640411f764f14a7c24105116 */c/tmp/elp/m2gate_kit/launch.py
+8170a5112905ec406d4060f6232a7df867181d0a2a9425b610a20597542f4058 */c/tmp/elp/m2gate_kit/code/PINNED_SHA
+e59d7d6f94c537ed1e0b8c79b6d129649f835ca6bdcb11f5a82f626e280bf9b7 */c/tmp/elp/m2gate_kit/code/scripts/engine_learner.py
+b9d5db099b9131df95544ddf78e7082b9bdfb9497cba443c2cc3806eea088fd9 */c/tmp/elp/m2gate_kit/code/syndicate/features/shared/engine_learner.py
+ede517b2bf0059b5c020a38d882cc577ee1502adb8430a6f35b23ded6d1e274b */c/tmp/elp/m2gate_kit/code/scripts/engine_experts.py
+812e4e8a8c504efbb7c73296491d16f9e6cbce5c8b52ef25744a2fabce08e461 */c/tmp/elp/m2gate_kit/code/syndicate/features/shared/engine_experts.py
+d445c67b2fde08663fb322365edf68205c7cf33cdb16e22fc34fc45469063d70 */c/tmp/elp/m3_kit/code/scripts/engine_paper_m3.py
+ffba9bb4f424f556750f3558a2e9d28f4b45e4023c1bae1ba27810886e7ef325 */c/tmp/elp/m3_kit/code/syndicate/features/shared/engine_paper_m3.py
+50d42599553b16c6377601b6d42ea21af7881fb342bcfa76ab4c4ed7d3b1dbf3 */c/tmp/elp/m3_kit/epochs/m3_epochs.py
+```
+
+### CORRECTION to the 11-24 re-run's applied cells (2026-11-25)
+
+- **The `kentry` arm's 3 applied cells are:**
+  - NBA h2h 50-75 a<=60 (w +0.558, se 0.276, n 654);
+  - NBA spreads_alt 50-75 a<=60 (+0.690, se 0.271, n 9,173);
+  - **NCAAF spreads 0-25 a60-180** (+0.668, se 0.335, n 30).
+- **Not NBA spreads 50-75 a<=60.** That cell (w +0.608, se 0.349, n 1,332) is `applied=False`, with a lower bound of
+  -0.076.
+- **Why it was missed.** The text output prints only cells with n >= 100, which hid the NCAAF cell, and the write-up
+  was read from the text. `learner_kentry.json` is authoritative.
+- **The verdict is unchanged.** NCAAF spreads' HELD_OUT ON is d_ll 0, CI [0, 0], so it is still "not worth rebuilding
+  for any sport|family".
+- **What was wrong:** "all NBA" and "no other sport|family has a cell applied". The 11-25 M2b hold note's "only 3 NBA
+  `live_resim` cells" carries the same slip; its conclusion (no weight holds out against Kalshi) stands.
