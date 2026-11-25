@@ -440,9 +440,12 @@ def _game_from_row(row: dict[str, str], *, idx: int, selected_date: str) -> dict
                 ],
             },
             {
-                "eyebrow": "Top edges",
-                "title": "Best playable angles",
-                "body": "Positive-EV sides are lifted directly from the saved prediction row instead of recomputing anything inside Syndicate.",
+                # #861 step 1d: the sim's own EV at its own price, not the board's pick (the web routes put the board's
+                # pick first, `board_game_picks.attach_board_picks`). It read "Best playable angles" while the board
+                # suggested none of them (fleet 2026-11-25).
+                "eyebrow": "Raw sim",
+                "title": "Sim angles: not the board's picks",
+                "body": "The sim's highest-EV sides from its saved prediction row, each at the sim's own price. The board's pick for this game is the first tile.",
                 "items": best_edges,
             },
             {
@@ -830,11 +833,13 @@ def _prop_reason_summary(row: dict[str, Any]) -> str:
     price_text = format_price(row.get("price"))
     prob_value = _safe_float(row.get("chosen_prob") or row.get("prob"))
     ev_value = _safe_float(row.get("ev"))
-    bits = [f"Sportsbook case: {side} {line_text} {market_text} at {price_text}."]
+    # #861 step 1d: the sim's own case at the sim's price, said as the sim's (it read "EV 327.6%" unlabelled on a
+    # prop the board refused, fleet 2026-11-25). The board's verdict on the same line rides beside it.
+    bits = [f"Sim's case: {side} {line_text} {market_text} at {price_text}."]
     if prob_value is not None:
-        bits.append(f"Model win rate {prob_value * 100:.1f}%.")
+        bits.append(f"Sim win rate {prob_value * 100:.1f}%.")
     if ev_value is not None:
-        bits.append(f"EV {ev_value * 100:.1f}%.")
+        bits.append(f"Sim EV {ev_value * 100:.1f}%.")
     return " ".join(bits)
 
 

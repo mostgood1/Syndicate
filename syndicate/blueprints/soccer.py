@@ -28,6 +28,7 @@ from syndicate.features.soccer.team import build_roster_api_payload
 from syndicate.features.soccer.team import build_roster_page_context
 from syndicate.features.soccer.team import build_team_schedule_api_payload
 from syndicate.features.soccer.team import build_team_schedule_page_context
+from syndicate.features.shared import board_game_picks
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.rank_board import build_rank_api_payload
@@ -151,15 +152,14 @@ def root():
 
 @soccer_bp.get("/cards")
 def all_league_cards():
-    return render_template(
-        "shared/game_cards_board.html",
-        **build_date_cards_page_context(_selected_date()),
-    )
+    # #861 step 1d: the board's pick leads each card; the sim's tiles follow, labelled (web route only).
+    context = board_game_picks.attach_board_picks(build_date_cards_page_context(_selected_date()), "soccer")
+    return render_template("shared/game_cards_board.html", **context)
 
 
 @soccer_bp.get("/api/cards")
 def api_all_league_cards():
-    context = build_date_cards_page_context(_selected_date())
+    context = board_game_picks.attach_board_picks(build_date_cards_page_context(_selected_date()), "soccer")
     return jsonify(build_game_board_api_payload(context))
 
 
@@ -173,7 +173,7 @@ def cards(league: str):
     league = normalize_league(league)
     season = _selected_season(league)
     week = _selected_week(league, season)
-    context = build_cards_page_context(league, week, season)
+    context = board_game_picks.attach_board_picks(build_cards_page_context(league, week, season), "soccer")
     return render_template("shared/game_cards_board.html", **context)
 
 
@@ -182,7 +182,7 @@ def api_cards(league: str):
     league = normalize_league(league)
     season = _selected_season(league)
     week = _selected_week(league, season)
-    context = build_cards_page_context(league, week, season)
+    context = board_game_picks.attach_board_picks(build_cards_page_context(league, week, season), "soccer")
     return jsonify(build_game_board_api_payload(context))
 
 

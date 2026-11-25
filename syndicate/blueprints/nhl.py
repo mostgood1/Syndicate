@@ -7,6 +7,7 @@ from datetime import timedelta
 from syndicate.blueprints.layer1_page import render_layer1_board
 from flask import Blueprint, jsonify, redirect, render_template, request
 
+from syndicate.features.shared import board_game_picks
 from syndicate.features.shared.asset_version import cards_source_asset_version
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.hub_summary import build_hub_bettor_summary
@@ -246,6 +247,7 @@ def cards():
     context = build_cards_page_context(_selected_date())
     client = (request.args.get("client") or "").strip().lower()
     if client == "board":
+        board_game_picks.attach_board_picks(context, "nhl")
         return render_template("shared/game_cards_board.html", **context)
     return render_template("nhl/cards_source.html", initial_date=context["date"], asset_version=_cards_source_asset_version())
 
@@ -253,6 +255,8 @@ def cards():
 @nhl_bp.get("/api/cards")
 def api_cards():
     context = build_cards_page_context(_selected_date())
+    # #861 step 1d: the board's pick leads each game card (web route only; the worker's chip build is untouched).
+    board_game_picks.attach_board_picks(context, "nhl")
     return jsonify(build_game_board_api_payload(context))
 
 
@@ -282,7 +286,26 @@ def api_cards_dates():
 
 @nhl_bp.get("/api/cards/bundle")
 def api_cards_bundle():
-    return jsonify(build_source_bundle_payload(request.args.get("date")))
+    payload = build_source_bundle_payload(request.args.get("date"))
+    _attach_board_to_bundle(payload)
+    return jsonify(payload)
+
+
+def _attach_board_to_bundle(payload: dict) -> None:
+    """#861 step 1d: the board's NHL picks for the bundle's slate, each game keyed by the PAGE's own team names
+    (`board_game_picks.game_key` of the prediction row), so the cards page leads with the board and the script needs no
+    alias logic. Web route only."""
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else None
+    if data is None:
+        return
+    rows = (((data.get("games") or {}).get("predictions") or {}).get("rows")) or []
+    page_games = [
+        (str(row.get("away") or ""), str(row.get("home") or ""))
+        for row in rows
+        if isinstance(row, dict) and row.get("away") and row.get("home")
+    ]
+    view = board_game_picks.sport_view("nhl", str(payload.get("date") or "") or None)
+    data["board"] = view.as_payload(limit=12, page_games=page_games)
 
 
 @nhl_bp.get("/api/cards/sim-boxscores")
@@ -436,7 +459,24 @@ def api_season_betting_card(season: int):
 
 @nhl_bp.get("/api/cards/props")
 def api_cards_props():
-    return jsonify(build_props_cards_payload(request.args.get("date"), top=request.args.get("top", 12)))
+    payload = build_props_cards_payload(request.args.get("date"), top=request.args.get("top", 12))
+    _attach_board_to_props(payload)
+    return jsonify(payload)
+
+
+def _attach_board_to_props(payload: dict) -> None:
+    """#861 step 1d: each sim prop card says what the board makes of the same line. Measured 2026-11-25: the pulse
+    led with goals over 1.5 at +3000..+9000 and "EV +85% to +328%"; the board suggested 0 of 12, and read the 7 it
+    carries at EV -4.86 to +1.99 (one book, one-sided market). Web route only."""
+    cards = payload.get("cards") if isinstance(payload.get("cards"), list) else []
+    view = board_game_picks.sport_view("nhl", str(payload.get("date") or "") or None)
+    payload["board"] = {"ok": view.ok, "written_at": view.written_at, "picks_total": len(view.picks)}
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+        line = view.find_prop(card.get("player"), card.get("market"), card.get("side"), card.get("line")) if view.ok else None
+        card["board_pick"] = bool(line is not None and line.suggested)
+        card["board_verdict"] = view.verdict(line) if view.ok else "Board: no saved shortlist for this date."
 
 
 @nhl_bp.get("/game/<game_pk>")

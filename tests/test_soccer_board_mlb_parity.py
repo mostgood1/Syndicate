@@ -338,7 +338,8 @@ class PropRowTests(unittest.TestCase):
             },
         )
         self.assertIn("Best Edge", tiles[3]["title"])
-        self.assertEqual(tiles[3]["label"], "Best prop edge")
+        # "Sim · " since #861 step 1d: the tile is the sim's read, and the web routes put the board's pick first.
+        self.assertEqual(tiles[3]["label"], "Sim · Best prop edge")
 
 
 # Two real rows from `player_props` in

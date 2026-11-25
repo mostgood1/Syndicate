@@ -256,28 +256,39 @@
           <h2>{{ source_date_display or date }}</h2>
           <p class="season-day-meta">{{ source_title }}</p>
 
-          {% if rank_cards %}
-            <section class="season-card-grid">
-              {% for card in rank_cards %}
-                <article class="season-game-card">
-                  <div class="season-card-eyebrow">{{ card.eyebrow }}</div>
-                  <h3>{{ card.title }}</h3>
-                  <div class="season-card-meta">{{ card.meta }}</div>
-                  <div class="season-card-metrics">
-                    {% for metric in card.metrics or [] %}
-                      <div>
-                        <div class="season-card-eyebrow">{{ metric.label }}</div>
-                        <strong>{{ metric.value }}</strong>
-                      </div>
+          {#- #861 step 1d: the board's picks lead, the raw sim follows as a labelled section. `card_sections` is
+              absent only on a context built before that change; `rank_cards` alone is the old single grid. -#}
+          {% set sections = card_sections if card_sections else ([{"key": "picks", "title": "", "note": "", "cards": rank_cards}] if rank_cards else []) %}
+          {% if sections and not empty_state %}
+            {% for section in sections %}
+              <section class="season-picks-section" data-section="{{ section.key }}">
+                {% if section.title %}<div class="season-kicker">{{ section.title }}</div>{% endif %}
+                {% if section.note %}<p class="season-day-meta">{{ section.note }}</p>{% endif %}
+                {% if section.cards %}
+                  <section class="season-card-grid">
+                    {% for card in section.cards %}
+                      <article class="season-game-card" data-source="{{ card.source or '' }}">
+                        <div class="season-card-eyebrow">{{ card.eyebrow }}{% if card.badge %} · <strong>{{ card.badge }}</strong>{% endif %}</div>
+                        <h3>{{ card.title }}</h3>
+                        <div class="season-card-meta">{{ card.meta }}</div>
+                        <div class="season-card-metrics">
+                          {% for metric in card.metrics or [] %}
+                            <div>
+                              <div class="season-card-eyebrow">{{ metric.label }}</div>
+                              <strong>{{ metric.value }}</strong>
+                            </div>
+                          {% endfor %}
+                        </div>
+                        <div class="season-card-summary">{{ card.summary }}</div>
+                        {% if card.list_items %}
+                          <div class="season-reason-list">{% for item in card.list_items %}<div class="season-list-item">{{ item }}</div>{% endfor %}</div>
+                        {% endif %}
+                      </article>
                     {% endfor %}
-                  </div>
-                  <div class="season-card-summary">{{ card.summary }}</div>
-                  {% if card.list_items %}
-                    <div class="season-reason-list">{% for item in card.list_items %}<div class="season-list-item">{{ item }}</div>{% endfor %}</div>
-                  {% endif %}
-                </article>
-              {% endfor %}
-            </section>
+                  </section>
+                {% endif %}
+              </section>
+            {% endfor %}
           {% elif empty_state %}
             <section class="season-breakdown-card">
               <div class="season-card-eyebrow">{{ empty_state.eyebrow }}</div>

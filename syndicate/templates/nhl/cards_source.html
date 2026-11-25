@@ -2321,7 +2321,10 @@
       <section id="scoreboardStrip" class="scoreboard-strip cards-scoreboard" aria-label="Games">
         <div class="cards-loading-strip">Loading scoreboard…</div>
       </section>
-      <section class="cards-hr-targets" aria-label="Player props pulse">
+      <section class="cards-hr-targets" aria-label="The board's NHL picks">
+      <div id="boardPicksStrip" class="props-strip"></div>
+      </section>
+      <section class="cards-hr-targets" aria-label="Sim prop edges">
       <div id="propsStripLabel" class="muted props-strip-label" hidden></div>
       <div id="propsStrip" class="props-strip">
         <div class="cards-loading-state">Loading props pulse…</div>
@@ -3508,7 +3511,7 @@
         sourceMetaPill(`${counts.upcomingCount} upcoming`, 'soft'),
         sourceMetaPill(`${counts.liveCount} live`, counts.liveCount ? 'live' : 'soft'),
         sourceMetaPill(`${counts.finalCount} final`, 'soft'),
-        sourceMetaPill(`${counts.officialCount} official cards`, 'soft'),
+        sourceMetaPill(`${counts.officialCount} sim cards`, 'soft'),
         sourceMetaPill(`${counts.propsCount} props boards`, 'soft'),
       ];
       if (nSims !== null && nSims !== undefined && isFinite(Number(nSims))) pills.splice(1, 0, sourceMetaPill(`${Number(nSims)} sims / game`, 'soft'));
@@ -3519,7 +3522,7 @@
       const counts = slateCounts(cards);
       return [
         { key: 'all', label: `All ${cards.length}` },
-        { key: 'official', label: `Official ${counts.officialCount}` },
+        { key: 'official', label: `Sim card ${counts.officialCount}` },
         { key: 'props', label: `Props ${counts.propsCount}` },
         { key: 'live', label: `Live ${counts.liveCount}` },
         { key: 'final', label: `Final ${counts.finalCount}` },
@@ -3693,8 +3696,8 @@
         const prob = Number(rec.prob);
         const ev = Number(rec.ev);
         const bits = [`${sideLabel} ${lineLabel} ${info.label.toLowerCase()} at ${priceLabel}`];
-        if (isFinite(prob)) bits.push(`model win rate ${pct(prob)}`);
-        if (isFinite(ev)) bits.push(`EV ${(100 * ev).toFixed(1)}%`);
+        if (isFinite(prob)) bits.push(`sim win rate ${pct(prob)}`);
+        if (isFinite(ev)) bits.push(`sim EV ${(100 * ev).toFixed(1)}%`);
         return bits.join(' | ');
       } catch (e) {
         return '';
@@ -3741,7 +3744,7 @@
       }
       if (!out.length) {
         const context = propRecoContextText(rec);
-        if (context) out.push(`The recommendation is supported by the current model and price context: ${context}.`);
+        if (context) out.push(`The sim's case at its own price: ${context}.`);
       }
       return out;
     }
@@ -3751,7 +3754,7 @@
         const seeded = String(rec && (rec.reasonSummary || rec.reason_summary) || '').trim();
         if (seeded) return seeded;
         const context = propRecoContextText(rec);
-        return context ? `Sportsbook case: ${context}.` : '';
+        return context ? `Sim's case: ${context}.` : '';
       } catch (e) {
         return '';
       }
@@ -4036,9 +4039,9 @@
         : `${awayAbbr} ${fmt(pred.proj_away_goals, 2)} - ${homeAbbr} ${fmt(pred.proj_home_goals, 2)}`;
       const gamePickLines = [];
       if (hasLiveScore) gamePickLines.push(`Score ${awayAbbr} ${liveGame.score.away} - ${homeAbbr} ${liveGame.score.home}`);
-      if (mlRec) gamePickLines.push(`ML ${String(mlRec.side || '').toUpperCase()} ${fmtAmerican(mlRec.price)}${isFinite(Number(mlRec.ev)) ? ` | EV ${(100 * Number(mlRec.ev)).toFixed(1)}%` : ''}`);
-      if (totalRec) gamePickLines.push(`Total ${String(totalRec.side || '').toUpperCase()} ${fmt(totalRec.line, 1)} ${fmtAmerican(totalRec.price)}`);
-      if (puckRec) gamePickLines.push(`Puck line ${String(puckRec.side || '').toUpperCase()} ${fmt(puckRec.line, 1)} ${fmtAmerican(puckRec.price)}`);
+      if (mlRec) gamePickLines.push(`Sim ML ${String(mlRec.side || '').toUpperCase()} ${fmtAmerican(mlRec.price)}${isFinite(Number(mlRec.ev)) ? ` | sim EV ${(100 * Number(mlRec.ev)).toFixed(1)}%` : ''}`);
+      if (totalRec) gamePickLines.push(`Sim total ${String(totalRec.side || '').toUpperCase()} ${fmt(totalRec.line, 1)} ${fmtAmerican(totalRec.price)}`);
+      if (puckRec) gamePickLines.push(`Sim puck line ${String(puckRec.side || '').toUpperCase()} ${fmt(puckRec.line, 1)} ${fmtAmerican(puckRec.price)}`);
 
       const cards = [
         renderGameLensCard(
@@ -4306,6 +4309,79 @@
       return null;
     }
 
+    // #861 step 1d: the Layer 2 board's picks lead the page; everything the sim computes below is labelled as the
+    // sim's. `BOARD_VIEW` is the bundle's `data.board` (web route `_attach_board_to_bundle`), each game keyed by the
+    // prediction row's own team names, folded exactly as `board_game_picks.team_key` folds them.
+    let BOARD_VIEW = null;
+
+    function boardTeamKey(name) {
+      return String(name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function boardGameFor(pred) {
+      if (!BOARD_VIEW || !BOARD_VIEW.games) return null;
+      return BOARD_VIEW.games[`${boardTeamKey(pred && pred.away)}|${boardTeamKey(pred && pred.home)}`] || null;
+    }
+
+    function boardTileText(pred) {
+      if (!BOARD_VIEW || !BOARD_VIEW.ok) return { main: 'Board unavailable', sub: 'No saved board shortlist for this date' };
+      const game = boardGameFor(pred);
+      const picks = (game && Array.isArray(game.picks)) ? game.picks : [];
+      if (picks.length) {
+        const top = picks[0];
+        const more = picks.length > 1 ? ` | +${picks.length - 1} more` : '';
+        return { main: String(top.side_label || ''), sub: `${String(top.ev_label || '')} at ${String(top.price_text || '')}${more}` };
+      }
+      if (game && Number(game.lines) > 0) {
+        return { main: 'No board pick', sub: `The board suggests no bet on this game (${Number(game.lines)} pregame lines judged)` };
+      }
+      return { main: 'No board pick', sub: 'No pregame line on the board for this game' };
+    }
+
+    function renderBoardPicksStrip(board) {
+      const strip = $('boardPicksStrip');
+      if (!strip) return;
+      if (!board || !board.ok) {
+        strip.innerHTML = `<div class="cards-hr-targets-card"><div class="cards-hr-targets-head"><div class="cards-hr-targets-copy"><div class="cards-hr-targets-kicker">Board picks</div><div class="cards-table-title">The board's NHL picks</div><div class="cards-mini-copy">No saved board shortlist for this date, so the board has no picks to show.</div></div></div></div>`;
+        return;
+      }
+      const picks = Array.isArray(board.picks) ? board.picks : [];
+      const total = Number(board.picks_total) || picks.length;
+      const built = board.written_at ? String(board.written_at).replace('T', ' ').replace('Z', ' UTC') : '';
+      const copy = picks.length
+        ? `${total} pregame ${total === 1 ? 'pick' : 'picks'} on the Layer 2 board${total > picks.length ? `, top ${picks.length} shown` : ''}. Price, fair and EV are the board's.${built ? ` Built ${built}.` : ''}`
+        : `The board suggests no NHL bet on this slate (${Number(board.pregame_lines) || 0} pregame lines judged).${built ? ` Built ${built}.` : ''}`;
+      const items = picks.map((p) => `
+            <article class="cards-hr-target-chip p-item" data-source="board">
+              <div class="p-head">
+                <div style="min-width:0;">
+                  <div class="p-name">${escHtml(String(p.side_label || ''))}</div>
+                  <div class="p-sub p-subline"><span>${escHtml(String(p.away || ''))} at ${escHtml(String(p.home || ''))}</span></div>
+                </div>
+                <span class="pill">${escHtml(String(p.ev_label || ''))}</span>
+              </div>
+              <div class="p-line">${escHtml(String(p.market_label || ''))} <span class="muted">@ ${escHtml(String(p.price_text || ''))}</span></div>
+              <div class="p-meta-grid">
+                <div class="p-meta-card"><span>Fair</span><strong>${(p.fair !== null && p.fair !== undefined && isFinite(Number(p.fair))) ? escHtml(pct(p.fair)) : '—'}</strong></div>
+                <div class="p-meta-card"><span>Board win%</span><strong>${(p.model_prob !== null && p.model_prob !== undefined && isFinite(Number(p.model_prob))) ? escHtml(pct(p.model_prob)) : '—'}</strong></div>
+              </div>
+            </article>`);
+      strip.innerHTML = `
+        <div class="cards-hr-targets-card">
+          <div class="cards-hr-targets-head">
+            <div class="cards-hr-targets-copy">
+              <div class="cards-hr-targets-kicker">Board picks</div>
+              <div class="cards-table-title">The board's NHL picks</div>
+              <div class="cards-mini-copy">${escHtml(copy)}</div>
+            </div>
+            <div class="cards-hr-targets-actions">
+              <a class="cards-source-meta-pill is-soft" href="/intelligence">Open the board</a>
+            </div>
+          </div>
+          ${items.length ? `<div class="cards-hr-targets-grid">${items.join('')}</div>` : ''}
+        </div>`;
+    }
+
     function renderCard(pred, recsForGame, simForGame, propsAway=null, propsHome=null, simMeta=null) {
       const match = keyForGame(pred);
       pred.__propsAway = Array.isArray(propsAway) ? propsAway.slice() : [];
@@ -4399,19 +4475,26 @@
         ? `${propsCount} team props edges ready`
         : 'Props board waiting for playable edges';
       const officialCardChip = top.length || propsCount
-        ? `${top.length ? `${top.length} plays` : '0 plays'}${propsCount ? ` · ${propsCount} props` : ''}`
+        ? `${top.length ? `${top.length} sim plays` : '0 sim plays'}${propsCount ? ` · ${propsCount} sim props` : ''}`
         : 'Off card';
       const topPickText = topPick
-        ? `${String(topPick.market || '')} ${String(topPick.side || '')}${topPick.ev !== null && topPick.ev !== undefined && isFinite(Number(topPick.ev)) ? ` | EV ${(100 * Number(topPick.ev)).toFixed(1)}%` : ''}`
+        ? `${String(topPick.market || '')} ${String(topPick.side || '')}${topPick.ev !== null && topPick.ev !== undefined && isFinite(Number(topPick.ev)) ? ` | sim EV ${(100 * Number(topPick.ev)).toFixed(1)}%` : ''}`
         : '';
+      const boardTile = boardTileText(pred);
       const leadPropText = leadProp
         ? `${String(leadProp.player || 'Player')} ${String(leadProp.market || 'Prop')} ${String(leadProp.side || '')}${leadProp.line !== null && leadProp.line !== undefined && String(leadProp.line).trim() !== '' ? ` ${String(leadProp.line)}` : ''}${leadProp.price !== null && leadProp.price !== undefined && String(leadProp.price).trim() !== '' ? ` | ${String(leadProp.price)}` : ''}`
         : '';
       const officialCallouts = [];
+      officialCallouts.push(`
+          <li class="cards-callout" data-source="board">
+            <strong>Board pick</strong>
+            <span class="cards-callout-copy">${escHtml(boardTile.main)}${boardTile.sub ? ` · ${escHtml(boardTile.sub)}` : ''}</span>
+          </li>
+        `);
       if (topPickText) {
         officialCallouts.push(`
           <li class="cards-callout">
-            <strong>Top game edge</strong>
+            <strong>Sim's top game edge</strong>
             <span class="cards-callout-copy">${escHtml(topPickText)}</span>
           </li>
         `);
@@ -4419,7 +4502,7 @@
       if (leadPropText) {
         officialCallouts.push(`
           <li class="cards-callout">
-            <strong>Top prop</strong>
+            <strong>Sim's top prop</strong>
             <span class="cards-callout-copy">${escHtml(leadPropText)}</span>
           </li>
         `);
@@ -4515,6 +4598,11 @@
         </div>
 
         <div class="cards-market-row">
+          <div class="cards-market-tile" data-source="board">
+            <div class="cards-market-label">Board pick</div>
+            <div class="cards-market-main">${escHtml(boardTile.main)}</div>
+            <div class="cards-subcopy">${escHtml(boardTile.sub)}</div>
+          </div>
           <div class="cards-market-tile">
             <div class="cards-market-label">Moneyline</div>
             <div class="cards-market-main">Away ${pct(mlAway)} · Home ${pct(mlHome)}</div>
@@ -4535,7 +4623,7 @@
           <div class="cards-market-tile">
             <div class="cards-market-label">Sim detail</div>
             <div class="cards-market-main">${escHtml(simHeadline)}</div>
-            <div class="cards-subcopy">${escHtml(propsSummary)}${topPick ? ` · Top pick ${escHtml(String(topPick.market || ''))} ${escHtml(String(topPick.side || ''))}` : ''}</div>
+            <div class="cards-subcopy">${escHtml(propsSummary)}${topPick ? ` · Sim's top pick ${escHtml(String(topPick.market || ''))} ${escHtml(String(topPick.side || ''))}` : ''}</div>
           </div>
         </div>
 
@@ -4567,8 +4655,8 @@
             <div class="cards-panel-card">
               <div class="cards-box-head">
                 <div>
-                  <div class="cards-table-title"><strong>Official card</strong></div>
-                  <div class="cards-lens-main">${top.length || propsCount ? 'Top saved edges' : 'No saved game edges'}</div>
+                  <div class="cards-table-title"><strong>Board pick and sim card</strong></div>
+                  <div class="cards-lens-main">${top.length || propsCount ? "The board's pick, then the sim's saved edges" : "The board's pick; the sim saved no game edges"}</div>
                 </div>
                 <span class="cards-chip is-official">${escHtml(officialCardChip)}</span>
               </div>
@@ -4804,7 +4892,8 @@
             : ((c && c.line !== undefined && c.line !== null && String(c.line).trim() !== '') ? String(c.line).trim() : '—');
           const pr = (c && c.price !== undefined && c.price !== null && isFinite(Number(c.price))) ? fmtAmerican(c.price)
             : ((c && c.price !== undefined && c.price !== null && String(c.price).trim() !== '') ? String(c.price).trim() : '—');
-          const evTxt = (c && isFinite(Number(c.ev))) ? ('EV ' + (100 * Number(c.ev)).toFixed(1) + '%') : 'EV —';
+          const evTxt = (c && isFinite(Number(c.ev))) ? ('Sim EV ' + (100 * Number(c.ev)).toFixed(1) + '%') : 'Sim EV —';
+          const boardVerdict = String(c && c.board_verdict || '').trim();
 
           const headshot = String(c && c.headshot_url || '').trim();
           const teamLogo = String(c && c.team_logo || '').trim();
@@ -4854,6 +4943,7 @@
               <div class="p-meta-card"><span>Current snap</span><strong>${escHtml(`L ${curLineTxt} | P ${curPriceTxt}`)}</strong></div>
               <div class="p-meta-card"><span>Open / prev</span><strong>${escHtml(`L ${openLineTxt}/${prevLineTxt} | P ${openPriceTxt}/${prevPriceTxt}`)}</strong></div>
             </div>
+            ${boardVerdict ? `<div class="p-note" data-source="board">${escHtml(boardVerdict)}</div>` : ''}
             ${(reasonSummary || reasonList.length) ? `<div class="p-reasons">${reasonSummary ? `<div class="p-reason">${escHtml(reasonSummary)}</div>` : ''}${reasonList.map((text) => `<div class="p-reason">${escHtml(text)}</div>`).join('')}</div>` : ''}
             ${mvLine || mvLineSummary ? `<div class="p-move">Line ${escHtml(mvLine)}${mvLineSummary ? ` · ${escHtml(mvLineSummary)}` : ''}</div>` : ''}
             ${mvPrice || mvPriceSummary ? `<div class="p-move">Price ${escHtml(mvPrice)}${mvPriceSummary ? ` · ${escHtml(mvPriceSummary)}` : ''}</div>` : ''}
@@ -4870,9 +4960,9 @@
         <div class="cards-hr-targets-card">
           <div class="cards-hr-targets-head">
             <div class="cards-hr-targets-copy">
-              <div class="cards-hr-targets-kicker">Player props pulse</div>
-              <div class="cards-table-title">Top moving edges</div>
-              <div class="cards-mini-copy">${escHtml(String(entries.length))} playable prop edges surfaced for this slate.${trackedCards ? ` ${trackedCards} tracked in snapshots` : ''}${movingCards ? ` | ${movingCards} with active movement` : ''}${asOfLabel ? ` | Current snapshot ${asOfLabel}` : ''}</div>
+              <div class="cards-hr-targets-kicker">Raw sim: not the board's picks</div>
+              <div class="cards-table-title">Sim prop edges</div>
+              <div class="cards-mini-copy">${escHtml(String(entries.length))} prop edges from the sim, each at the sim's own price, with the board's verdict on the same line.${trackedCards ? ` ${trackedCards} tracked in snapshots` : ''}${movingCards ? ` | ${movingCards} with active movement` : ''}${asOfLabel ? ` | Current snapshot ${asOfLabel}` : ''}</div>
             </div>
             <div class="cards-hr-targets-actions">
               <span class="cards-source-meta-pill is-soft">Top ${escHtml(String(entries.length))}</span>
@@ -4984,7 +5074,7 @@
         aEl.dataset.gameKey = k;
         const info = currentSlateInfoByKey.get(normKey(k));
         const metaBits = [];
-        if (info && info.hasOfficial) metaBits.push('Official');
+        if (info && info.hasOfficial) metaBits.push('Sim card');
         if (info && info.hasProps) metaBits.push('Props');
         aEl.dataset.hasOfficial = info && info.hasOfficial ? '1' : '0';
         aEl.dataset.hasProps = info && info.hasProps ? '1' : '0';
@@ -7198,6 +7288,8 @@
         return;
       }
 
+      BOARD_VIEW = (b.data && b.data.board) ? b.data.board : null;
+      try { renderBoardPicksStrip(BOARD_VIEW); } catch (e) {}
       const preds = (((b.data||{}).games||{}).predictions||{}).rows || [];
       const recs = (((b.data||{}).games||{}).recommendations||{}).rows || [];
       const propsRecs = (((b.data||{}).props||{}).recommendations||{}).rows || [];
@@ -7241,7 +7333,7 @@
       try {
         const officialCount = recs.filter((row) => row && String(row.market || '').trim()).length;
         const metaBits = [`${preds.length} games on the slate`];
-        if (officialCount > 0) metaBits.push(`${officialCount} with official plays`);
+        if (officialCount > 0) metaBits.push(`${officialCount} sim plays`);
         else if (nSims !== null && nSims !== undefined && isFinite(Number(nSims))) metaBits.push(`${Number(nSims)} sims per game`);
         if (b.lookahead_applied && b.requested_date && b.date && b.requested_date !== b.date) {
           metaBits.push(`Showing ${b.date} for requested ${b.requested_date}`);

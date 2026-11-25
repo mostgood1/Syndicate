@@ -1386,13 +1386,27 @@ def _market_tiles(
             corners_sub = f"{home_abbr} {home_c:.1f} | {away_abbr} {away_c:.1f} | model mean, no market"
         tiles_extra.append(tile("Corners", f"{total_c:.1f} total", corners_sub))
 
+    # #861 step 1d: every tile here is the raw sim's read ("Model x% | Market y%"), and "Best 1X2 edge" read as a
+    # recommendation while the board suggested none of them. The web routes put the board's own pick first
+    # (`board_game_picks.attach_board_picks`); these say whose they are.
     return [
-        tile(ml_label, ml_title, ml_sub),
-        tile(total_label, total_title, total_sub),
-        tile(spread_label, spread_title, spread_sub),
-        tile(prop_label, prop_title, prop_sub),
-        *tiles_extra,
+        {**t, "label": _sim_tile_label(t["label"])}
+        for t in (
+            tile(ml_label, ml_title, ml_sub),
+            tile(total_label, total_title, total_sub),
+            tile(spread_label, spread_title, spread_sub),
+            tile(prop_label, prop_title, prop_sub),
+            *tiles_extra,
+        )
     ]
+
+
+def _sim_tile_label(label: Any) -> str:
+    """"Best 1X2 edge" -> "Sim · Best 1X2 edge"; "LIVE Best 1X2 edge" -> "LIVE sim · Best 1X2 edge"."""
+    text = str(label or "").strip()
+    if text.startswith("LIVE "):
+        return f"LIVE sim · {text[5:]}"
+    return f"Sim · {text}" if text else "Sim"
 
 
 def _compact_pregame_facts(
