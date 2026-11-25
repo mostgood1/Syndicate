@@ -63446,3 +63446,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - What the watch does: `"source": "timer"` recycles per day, and any `WEB_WORKER_MEMORY_ABORT` with its anon / swap reading.
   - `WEB_MEMORY_GUARD_ERROR` stays 0.
 - **Claim released** 13:55:53Z.
+
+## 2026-11-25 14:27Z (8:27 AM CST) -- READING (no deploy): `/ops/dashboards` hub, loaded as a ride-along of the 13:54:07Z web reload (`4b25ed8e1` inside `76a006f45..e37a9697f`; lane `ops-dashboards-hub`, user 11-24 'yes, build it and load it' then 'a, wait for that lane') -- **MET** (lane Verification), one cosmetic note
+- betting change: no (display only; no new load of my own -- this entry records the verification).
+- Signed out: `GET /ops/dashboards` and `GET /ops/dashboards/portfolio` -> **302** to `/portfolio/login?next=...` (curl, no redirect follow).
+- With the admin token (read via `scripts/_base_url.fleet_admin_token`, never printed): hub **200**, 3 of 3 tabs; `/ops/dashboards/engine`, `/portfolio`, `/rail` each 200; `/ops/dashboards/secrets` 404.
+- Content vs `data/reports/<name>/index.html`: engine **sha256 identical** (104,813 B). portfolio 673,458 B served vs 673,745 on disk, rail 316,287 vs 316,307: each gap equals the file's carriage-return count (287 and 20), so `read_text` universal newlines drops the CRs and nothing else. Renders the same; `/rail-watch` reads the same way. Not worth its own reload; a `read_bytes` fix can ride a later one.
+- Freshness: engine 8:15 AM, portfolio 8:04 AM, rail 1:44 AM CST (Rail Watch runs 10 AM-2 AM): each within its builder's cadence.
+- Not measured: web RSS (a file read; the 13:54Z entry's worker readings cover the reload). The missing-file panel is covered by tests only; no production file was deleted.
+- verify: re-run the fleet-watcher's verify_ops_dashboards.py -- hub 200 with 3 tabs, three frames 200, signed-out 302.
