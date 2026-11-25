@@ -63296,3 +63296,23 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - No row of the game reached the plan, so the backstop was not exercised.
 - **Not measured:** the lift; his live props; the detection lag against the moment the 8-min 2nd-half rule tripped.
 - verify: `C:/tmp/lpeg/w1124/exit_read.sh ncaab 401917676 "Oregon St"` 20:33:54Z; `orst_rows.sh` / `orst_rows2.sh` (ledger rows per build, priceable counts); `orst_cards.sh` / `orst_cards2.sh` (in-play cards); hold probe 20:33:57Z; plan reads 20:33:58Z and 20:40:54Z.
+
+## 2026-11-25 02:45:34Z (8:45 PM CST 11-24) -- READING (no deploy): FIRST NHL key exit refused live through every layer, on a PRICED game -- VGK goalie change Hill -> Hart; CHANGE K measured (lane `live-player-exit-gate`, #814)
+- betting change: no -- a reading; nothing loaded. CHANGE K (`672a18e87`) loaded in the 11-24 window batch (entry 2026-11-24 08:30:10Z).
+- **The exit:** Vegas Golden Knights @ Edmonton Oilers, NHL game 2026020385. Vegas changed goalies (A. Hill -> C. Hart). Both now appear in the live boxscore, which K reads without `starter` flags (live boxes carry `starter: null`; the blind case was PIT @ NSH 11-21, deploys.md 2026-11-21 23:26:13Z).
+- **Detected and refused:**
+  - `[nhl_live_resim] KEY_PLAYER_OUT_REFUSED game=2026020385 Vegas Golden Knights @ Edmonton Oilers players=['VGK:A. Hill:goalie_change', 'VGK:C. Hart:goalie_change']` at 02:45:34.979Z.
+  - Tick `enabled=True read=1 players_out=2 key_players_out=2 refused_games=1`. Every tick from 02:32:32Z to 02:43:54Z read 0.
+  - `since=None`: the box carries no change time, so the detection lag is unmeasured.
+- **Board:**
+  - book_grid nhl `LIVE_GAMELINE_BUILD date=2026-11-24`: index=1 full_games=1 through 02:44:59Z, then **index=0 full_games=0 at 02:46:12Z**.
+  - Ledger: 164 full-game rows for the game, 17 priceable; last priceable 02:43:42Z, last row 02:44:13Z, 0 rows after the refusal.
+  - So the withdrawal removed a game that was priced live (priceable 1 at 02:43:42Z).
+- **Entry hold:** probed 02:46:27Z (`lpeg_holdprobe_soc.sh nhl`): Vegas Golden Knights @ Edmonton Oilers -> `{'verdict': 'fail', 'reason': 'key_player_out', 'players': ['VGK:A. Hill:goalie_change', 'VGK:C. Hart:goalie_change'], 'snapshot_at': '2026-11-24T20:45:34-06:00'}`.
+- **Portfolio plan:** 20:46:33 CST (first after the exit), read 02:47:41Z.
+  - No `key_player_out`; rows_in 70, live positions 0.
+  - 0 mentions of Edmonton or Vegas, and no NHL refusals.
+  - No row of the game reached the plan, so the backstop was not exercised.
+- **Not measured:** the lift (a goalie change does not reverse); goalie props.
+- **Design note, not a defect:** K flags BOTH goalies of the changing team, so the hold lists two players for one event.
+- verify: `C:/tmp/lpeg/w1124/nhl_read.sh` 02:46:27Z (producer, board, ledger); hold probe 02:46:27Z; plan read 02:47:41Z.
