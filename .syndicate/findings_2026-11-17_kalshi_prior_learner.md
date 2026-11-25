@@ -336,3 +336,16 @@ ffba9bb4f424f556750f3558a2e9d28f4b45e4023c1bae1ba27810886e7ef325 */c/tmp/elp/m3_
   for any sport|family".
 - **What was wrong:** "all NBA" and "no other sport|family has a cell applied". The 11-25 M2b hold note's "only 3 NBA
   `live_resim` cells" carries the same slip; its conclusion (no weight holds out against Kalshi) stands.
+
+
+### Addendum 2026-11-25: the task, and an early-run stop (11:01 AM CST, before any re-check data)
+
+- **The task exists.** One-time task `engine-learner-kalshi-recheck-1201` fires Tue 2026-12-01 10:00 AM CST. Its stored
+  body equals `C:\tmp\elp\kprior3\task_prompt.md` byte for byte.
+- **Its step 1 gained one stop.** If the clock reads earlier than 2026-12-01 10:00 AM CST, for example after a manual
+  "Run now", it runs nothing, writes nothing and reports. An early run would test on incomplete slates and use up the
+  one run. Nothing else changed.
+- **Pin:** `task_prompt.md` is re-pinned from `03d40874fdf29f6b...` to
+  `6803721ec6fcf62b0eea1acf8955b1345887cbbccf3ca2768f0560d782b0ab1c`. All 17 pins in `pins.sha256` verify.
+- **Permission mode.** The task did not keep this session's permission mode (it was created in a turn not typed in the
+  desktop app), so a run may pause for approvals. The user can set a mode by editing the task in the app.
