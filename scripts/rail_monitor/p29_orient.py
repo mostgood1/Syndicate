@@ -12,7 +12,7 @@ Game line fields: sport, matchup, rows, with_model (non-player rail rows, and th
 11-21: extended from NCAAB/WNCAAB to every sport with a per-game snapshot, and the reason added, so the dashboard
 row can say why a game has no model (the fleet-watcher's ask: skip deliberate fail-closed refusals).
 """
-import json, subprocess, urllib.request
+import json, subprocess, sys, unicodedata, urllib.request
 
 PFX = "syndicate:refresh-state:/home/amyn/syndicate-prod/data/live/"
 SNAP = {  # sport -> keyvalue file. NCAAF and NHL keep their per-game refusals in the live lens, not a _live_resim file.
@@ -45,8 +45,25 @@ def counts_as_priced(sport, market):
     return m in _PRICED
 
 
+# Letters NFKD leaves whole. 11-24: the rail's "LASK @ Bodø/Glimt" missed the lens's "LASK Linz @ Bodo/Glimt" on the
+# ø alone and read not_in_resim, though the lens held the match (ESPN 401915380).
+_FOLD = str.maketrans({"ø": "o", "æ": "ae", "œ": "oe", "ß": "ss", "đ": "d", "ł": "l", "ı": "i", "þ": "th",
+                       "’": "'", "‘": "'"})
+# Native city names the soccer lens (ESPN) uses where the rail (the books) uses the English one, folded word by word on
+# BOTH sides, so the map cannot split a pair that already matched. 11-26 R13/R14 (the fleet-watcher's flag): the rail's
+# "FC Copenhagen @ Inter Club d'Escaldes" missed the lens's "F.C. København @ Inter D'Escaldes" (ESPN 401915738, uecl,
+# momentum.reason competition_not_modelled) on Copenhagen / København alone and read not_in_resim. The home side already
+# matched by the word-subset rule; the apostrophe was not the cause.
+_EXONYM = {"kobenhavn": "copenhagen", "munchen": "munich", "koln": "cologne", "praha": "prague", "beograd": "belgrade",
+           "bucuresti": "bucharest", "warszawa": "warsaw", "kiev": "kyiv", "athina": "athens", "wien": "vienna",
+           "moskva": "moscow", "lisboa": "lisbon", "geneve": "geneva", "sevilla": "seville", "milano": "milan",
+           "torino": "turin", "napoli": "naples", "roma": "rome", "firenze": "florence", "genova": "genoa"}
+
+
 def norm(s):
-    return " ".join(str(s or "").lower().replace(".", "").split())
+    s = unicodedata.normalize("NFKD", str(s or "").lower().translate(_FOLD))
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return " ".join(_EXONYM.get(w, w) for w in s.replace(".", "").split())
 
 
 def names(g):
@@ -71,10 +88,16 @@ def lens_reason(g):
             return "resimmed", None
     if not lens and g.get("projection"):  # soccer live lens
         return "resimmed", None
+    # 11-24 R7/R8 (the fleet-watcher's flag): a UEFA match in play is served on purpose with projection null and
+    # momentum.reason "competition_not_modelled" (poll_soccer_live_state._scoreboard_only_game; the #699 NO-GO gate,
+    # state_soccer.md). Read as no reason, it showed "unknown" (Aston Villa @ Galatasaray, R7). It is a deliberate refusal.
+    mom = g.get("momentum") if isinstance(g.get("momentum"), dict) else {}
+    if not lens and g.get("projection") is None and mom.get("reason") == "competition_not_modelled":
+        return "competition_not_modelled", f"{g.get('league') or 'this competition'}: no in-play projection by design (#699 NO-GO gate)"
     return None, None
 
 
-def find(index, away, home):
+def find(index, away, home, sport=""):
     a, h = norm(away), norm(home)
     hit = [g for pairs, g in index if (a, h) in pairs]
     if hit:
@@ -88,7 +111,35 @@ def find(index, away, home):
     ta, th = set(a.split()), set(h.split())
     sub = lambda x, y: bool(x) and bool(y) and (x <= y or y <= x)
     hit = [g for pairs, g in index if any(sub(ta, set(pa.split())) and sub(th, set(ph.split())) for pa, ph in pairs)]
-    return hit[0] if len(hit) == 1 else None
+    if len(hit) == 1:
+        return hit[0]
+    # 11-24 R4: the WNCAAB re-sim names a game missing from the board's odds file by ESPN ("Alcorn State Lady Braves @
+    # UT Martin Skyhawks", nameSource espn_display) while the rail says "Alcorn St Braves @ Tenn-Martin Skyhawks". The
+    # fleet's own alias fold (team_aliases.chip_join_key, what the margin anchor keys on) maps both to one pair.
+    # Unique match only; any import or lookup failure leaves the answer None, as before.
+    ka, kh = alias_key(sport, away), alias_key(sport, home)
+    if ka and kh:
+        hit = [g for pairs, g in index if any(alias_key(sport, pa) == ka and alias_key(sport, ph) == kh for pa, ph in pairs)]
+        if len(hit) == 1:
+            return hit[0]
+    return None
+
+
+_ALIAS = {}
+
+
+def alias_key(sport, name):
+    """team_aliases.chip_join_key from the fleet checkout, cached; None when it cannot resolve."""
+    k = (sport, name)
+    if k not in _ALIAS:
+        try:
+            if "/home/amyn/Syndicate" not in sys.path:
+                sys.path.insert(0, "/home/amyn/Syndicate")
+            from syndicate.features.shared.team_aliases import chip_join_key
+            _ALIAS[k] = chip_join_key(str(sport), str(name or "")) or None
+        except Exception:
+            _ALIAS[k] = None
+    return _ALIAS[k]
 
 
 rail = json.load(urllib.request.urlopen("http://127.0.0.1:10000/api/board/live-rail", timeout=30))
@@ -125,10 +176,10 @@ for sport in sorted({s for s, _ in matchups if s in SNAP}):  # soccer etc.: no p
         if snap is None:
             state, g = "no_snapshot", None
         else:
-            g = find(index, away, home)
+            g = find(index, away, home, sport)
             state = "direct"
             if g is None:
-                g = find(index, home, away)
+                g = find(index, home, away, sport)
                 state = "REVERSED" if g is not None else "not_in_resim"
         reason, detail = lens_reason(g) if g else (None, None)
         if state == "not_in_resim":  # say how old the snapshot is: a game that kicked off after it is not a defect
