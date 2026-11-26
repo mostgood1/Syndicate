@@ -63492,3 +63492,23 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - 01:11:31Z, 1:12 into P2: the moneyline quote was over the 120 s pricing ceiling (`quote_older_than_live_pricing_ceiling`). It was fresh (6.2 s) by 01:11:50Z.
 - **Action:** none. Closing the lane is the user's call; asked.
 - verify: the kit line `St Louis Blues @ New York Islanders h2h/puck rows 2, with a live model 2` at read_at 2026-11-26T01:12:00Z.
+
+## 2026-11-25 20:32:48Z (2:32 PM CST 11-25) -- READING (no deploy, read 11-26 from the logs): FIRST LIFT outside NCAAF -- an NCAAB refusal lifted on the player's return, and the board priced the game again in 24 s -- Saint Peter's Jonathan Noudjihidi, off_floor (lane `live-player-exit-gate`, #814)
+- betting change: no -- a reading; nothing loaded.
+- **The exit:** Saint Peter's Peacocks @ Columbia Lions, NCAAB, ESPN event 401924705. Noudjihidi, a starter, was subbed out at 19:21:14Z and still off 8 minutes into the second half: CHANGE I's off_floor rule.
+- **Refused:** first `[ncaab_live_resim] PLAYER_OUT event=401924705 team=SPU player='Jonathan Noudjihidi' reason=off_floor key=True source=pbp` at 20:17:14.837Z (7 lines, the last at 20:30:09.241Z). Ticks of the ~10-game stream read `refused_games=1` from 20:17:28Z to 20:30:25Z.
+- **Lifted:** the tick at 20:32:48.697Z read `refused_games=0`, with no PLAYER_OUT for him. off_floor lifts the moment a play names him again, so he was back on the floor. ESPN shows play to 21:01:41Z, so this was not the game ending. Refused for ~15.5 min (20:17:14Z to 20:32:48Z).
+- **Board (live_gameline_ledger, full game):**
+  - Priceable rows through 20:17:02Z.
+  - No full-game rows from 20:17:36Z to 20:33Z.
+  - **Priceable again at 20:33:12Z**, 24 s after the lift tick, and through 20:56Z.
+  - book_grid ncaab full_games went 9 -> 7 at 20:17:36Z; another game may share that step.
+- **Not measured:** the hold verdict and the plan during the refusal (the readings are not recoverable after the fact); props (no NCAAB live props are joined: `_LIVE_PROP_SPORTS` is mlb, wnba, soccer, plus nba while it prices live).
+- **The rest of 11-25's candidates** (`C:/tmp/lpeg/w1126/lift_scan.py` | `lift_triage.py`, ESPN last-play wallclock vs the last PLAYER_OUT):
+  - 17 key players stopped being flagged; 11 were the game ending.
+  - 2 were real returns in unpriced WNCAAB games: MTSU Whitfield, TNST Sparks.
+  - 2 were real returns in priced games that ended 4-8 min later with no new priced row: Texas @ SE Louisiana (Huff, WNCAAB), App State @ Akron (Banks, NCAAB).
+  - NBA: Brown (PHI, injury), Edey (MEM, off_floor) and Brooks (PHX, ejection) were each still flagged at the final, so those refusals held to the end.
+- **Seen, not investigated:** ncaab exit ticks come in two interleaved streams (live_games ~6 and ~10-11). The ~6 stream kept `refused_games=1` after 20:32Z, so it is not this game's stream.
+- **Soccer props, for the record:** the 11-25 red cards (Falchener VFK, Tielemans MAN, 21:51Z / 21:53Z) were refused at the game level with `props_refused=0`. Either the player had no live prop rows or the prop sim already had him off (`on_pitch`); which is not recoverable.
+- verify: `C:/tmp/lpeg/w1126/spu_exact.sh` read 11-26 17:2xZ (producer, ticks, board, ledger); triage output in this session.
