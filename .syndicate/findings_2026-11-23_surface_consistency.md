@@ -610,7 +610,11 @@ at a `reload-web` or a recycle. An ff ships ALL of main. When to load it is the 
   - Predicted: on the first full day of v4 sheets, every sheet `section_rules` 4 and value-not-suggested 0. The load
     day itself is mixed, because rows kept from earlier builds keep their v3 verdicts.
 
-## Step 1d -- the NHL and soccer pages lead with the board's pick; the sim is a labelled view `[built 2026-11-25, user "Yes, do 1d"; display only; NOT LOADED]`
+## Step 1d -- the NHL and soccer pages lead with the board's pick; the sim is a labelled view `[built 2026-11-25, user "Yes, do 1d"; display only; DEPLOYED to web 2026-11-26 17:28:02Z, MET]`
+
+**Loaded and measured** (deploys.md 2026-11-26 17:28:02Z): rc 0 at 17:28:18Z. Board pick tile not first: NHL 15 -> 0, soccer
+36 -> 0. Props without a verdict 12 -> 0. Live pages showed 0 unlabelled non-board EV, 0 console errors, and 0 web-log
+errors. Not yet exercised live: a picks headline made of board picks (no NHL pick on 11-26 / 11-27).
 
 **Measured first** (fleet, read-only, 16:10:55-16:15:21Z, back to back; `C:\tmp\scc_oversight_d5aa\probe_1d_fetch.py`,
 saved `probe_1d\`). Board build 16:06:33Z.

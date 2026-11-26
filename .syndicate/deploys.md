@@ -63512,3 +63512,37 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Seen, not investigated:** ncaab exit ticks come in two interleaved streams (live_games ~6 and ~10-11). The ~6 stream kept `refused_games=1` after 20:32Z, so it is not this game's stream.
 - **Soccer props, for the record:** the 11-25 red cards (Falchener VFK, Tielemans MAN, 21:51Z / 21:53Z) were refused at the game level with `props_refused=0`. Either the player had no live prop rows or the prop sim already had him off (`on_pitch`); which is not recoverable.
 - verify: `C:/tmp/lpeg/w1126/spu_exact.sh` read 11-26 17:2xZ (producer, ticks, board, ledger); triage output in this session.
+
+## 2026-11-26 17:28:02Z (11:28:02 AM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): the NHL and soccer pages lead with the board's pick; the raw sim is a labelled view, `75624d138` (lane `surface-consistency-oversight`, todo #861 step 1d, user "Deploy to web now") -- **LOADED on web; MET**
+- betting change: no (display only; nothing that places or sizes money reads these pages)
+- **Why:** measured 11-25 16:10Z.
+  - `/nhl/picks` headlined 12 raw-sim game lines; the board suggested 0 of them.
+  - The `/nhl/cards` props pulse showed 12 props at EV +85% to +328%, 0 Suggested.
+  - The soccer and NHL tiles named only the sim. Findings "Step 1d".
+- **Ride-alongs `e37a9697f..75624d138`**, 26 commits, listed in their own call before the merge. Runtime code:
+  - This change only: `c641cc10d` (`board_game_picks.py` NEW, `blueprints/nhl.py`, `blueprints/soccer.py`, `nhl/cards.py`, `nhl/picks.py`, `soccer/cards.py`, `templates/nhl/cards_source.html`, `templates/nhl/picks.html`).
+  - Otherwise `scripts/portfolio_watch/*` and `scripts/rail_monitor/*`, which run as Windows tasks; no role imports them. The rest is tests and ledger.
+  - Overlap with the fleet checkout's 14 locally modified files: none (35 files in the ff).
+  - The soccer `_market_tiles` labels ("Sim ·") and `nhl/cards._prop_reason_summary` also run inside refresh-worker's chip and home builds. They are labels only, and they load there at that role's next restart.
+- **Preflight** `--betting-change no`, 3 expect / baseline pairs (baseline read 17:27:03Z): **CLEAR 17:27:32Z**. Claim acquired 17:26:57Z.
+- **ff + reload:**
+  - `git merge --ff-only 75624d138` at **17:27:53Z** (`e37a9697f` -> `75624d138`, ancestor checked first).
+  - `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "state": "done"}` at 17:28:02Z.
+  - Workers 7122 / 7409 -> **7412 / 7413**; master 413 unchanged.
+- **expect / measured** (served, 17:28:18Z; `C:\tmp\scc_oversight_d5aa\read_1d_after_load.py 2026-11-26`, rc 0 MET; saved `reading_1d_after_1126.txt`):
+  - `nhl_cards_board_tile_not_first` 15 -> 0: **MET**.
+  - `soccer_cards_board_tile_not_first` 36 -> 0: **MET**.
+  - `props_cards_no_verdict` 12 -> 0: **MET**.
+  - Also served: `/nhl/api/picks` `card_sections`; the bundle's `data.board` is ok, with 15 of 15 page games on the board and 0 board picks. The board suggests no NHL bet on the 11-27 slate (71 pregame lines judged).
+  - `/nhl/api/picks?date=2026-11-27`, the next NHL slate (11-26 has none): the board section shows 0 picks with that note. The sim section shows 12 of 12 cards labelled "Sim EV", each with a verdict (10 refused, 2 absent). Example: the sim's Under at Sim EV 15.6% reads "Board: not a pick (its EV is below the board's minimum); EV -3.4% at betonlineag -116."
+  - Live pages in the built-in browser, about 17:29-17:30Z:
+    - `/nhl/cards`: the board strip, and a Board pick tile on 15 of 15 games; 12 of 12 pulse verdicts; 66 EV figures = 54 sim-labelled + 12 board + 0 neither; 0 "official"; 0 console errors.
+    - `/soccer/cards`: the Board pick tile first on 36 of 36 games; 1 board pick ("PFC CSKA Sofia +0.5 | EV +3.9% at betonlineag +121"); 140 sim-labelled tiles; 0 console errors.
+  - Web log 17:28:00-17:31:38Z: UNHANDLED_500 0, `board_game_picks` READ_FAILED 0, Traceback 0, WORKER TIMEOUT 0.
+- **Thin population, said plainly:** 11-26 (Thanksgiving) has no NHL games, and the board has no NHL pick for 11-27. So a picks headline made of board picks was exercised only in the replay of 11-25 (12 of 12 Suggested), not on the served page.
+- **verify:** on the next NHL slate with board picks, `read_1d_after_load.py <day>` reads rc 0 with `picks.headline` > 0. Every `rank_cards` entry is `source: board`, and a pregame Suggested row on the same build.
+- **For lane `web-silent-worker-kills`:** this reload is a deploy event in its watch window (workers 7122 / 7409 retired at 17:28:02Z). The NHL and soccer pages now parse the board shortlist at most once a minute per web worker (`board_game_picks`, 60 s cache). That is the read Ask and the board API already make.
+- **Revert:** `git revert c641cc10d` on main, then ff + reload-web.
+- **Also read (no deploy), step 1c** (cheat-sheet rules v4, loaded by the 11-25 13:54:07Z ff), 11-26 17:31:53Z, `read_1c_after_load.py 2026-11-26`: **rc 0 MET**.
+  - 4 sheets: NFL 481 rows, NCAAF 45, NCAAB 40, soccer 36. All are `section_rules` 4; value-not-suggested is 0 of 602 rows (BEFORE 11-24: 4 of 723).
+  - NBA and NHL return 404 `not_published` (no games on Thanksgiving).
