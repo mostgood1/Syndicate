@@ -115,3 +115,15 @@ The record's last four successful saves (`KEYVALUE_WRITE_LARGE`, caller chain), 
 - **Correction to the 10:18 AM section.** "No live exit can be sent while over the cap" holds for the slow tick, not for dispatch ticks, which start from the smaller saved record. "Sent but forgotten cannot happen" was wrong at the margin, and it happened at 7:27 PM.
 
 What option A changes here: with rows unseen for 24 h archived (~3.4 MB), neither the slow tick nor a dispatch tick comes near the cap, so the save after a send cannot be the one that fails.
+
+### It cleared at the midnight-CST prune (12:06 AM CST 11-26)
+
+A read-only watcher read the record every 10 minutes from 9:15 PM CST.
+- The record was unchanged from 7:27 PM through 11:55 PM: `updated_at` stayed 7:26:12 PM, and the 7:27 PM sell stayed `submitted` with no order id on every read (18 reads).
+- **The first slow tick after midnight saved, at 06:04:06Z (12:04 AM CST).** The prune took the record to 7,500,779 B (89.4% of the cap). That tick's reconcile found the 7:27 PM sell on the venue by its `client_order_id` and marked it `filled`, with its order id.
+- Unreconciled live exits on disk: **0**. Live exits by status: filled 60, dead 13 (73 rows; the exits prune moved older ones out). So new live exits are unblocked, about 4 h 37 min after the 7:27 PM sell (7:27 PM to 12:04 AM CST).
+- What it cost: 4 triggered live exits were not sent (7:59, 8:15, 8:42, 8:50 PM).
+
+**Today's headroom.** 887,829 B left at 06:04Z, against 787,855 B at the same hour on 11-25, which crossed at 22:31Z.
+- At 11-25's pace it crosses around 6-7 PM CST today, during the evening slate.
+- Of the 7,682 watch rows, 6,424 (84%, 4.48 MB) were last seen over a day ago. Option A would archive those.
