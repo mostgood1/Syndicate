@@ -63636,3 +63636,17 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - `lift_triage.py` now requires a play naming the player after the first flag (verdict `NO_RETURN` otherwise).
   - Saint Peter's Noudjihidi stays REAL. MTSU Whitfield and TNST Sparks stay real returns in unpriced games.
 - verify: `C:/tmp/lpeg/w1126/cin_exact.sh` 17:38:43Z, hold probe 17:38:28Z, `kpo_1126.py` 17:42:20Z, `pbp_name.py 401929281 Allenspach` 18:25Z, `soc_propkeys.sh` 18:12Z.
+
+## 2026-11-26 20:22:28Z READING lane live-player-exit-gate (#814): FIRST BACKSTOP OUTSIDE NBA -- WNCAAB off_floor, Davidson's Ines Garcia Monje @ Florida, read live through producer, board, hold and plan
+- betting change: no (reading only; no code, env or role touched)
+- **Player:** Davidson starter Ines Garcia Monje (DAV, ESPN event 401921023). 1 minute, 0-2 FG. Subbed out at Q1 8:57 (19:05:00Z, 1:05 PM CST). No play names her after that (ESPN pbp read 20:23Z).
+- **Producer:** the first `[wncaab_live_resim] PLAYER_OUT ... reason=off_floor key=True source=pbp since=2026-11-26T19:05:00Z` came at 20:22:27.808Z. The tick at 20:22:28.223Z read `key_players_out=2 refused_games=1`.
+  - The 77-minute lag is the rule as written: wncaab `_OFF_FLOOR_RULES` (600 s x 4, n_min None, k_min 8). A first-half exit fires at half + 8:00 = Q3 2:00. ESPN had Q3 0:50 at 20:23Z.
+  - So the game was priced the whole time she was off before that. 24 full-game priceable ledger rows in the 30 min before the flag; last priceable rows 20:21:50Z.
+- **Hold:** `ExitHold.check` probed at 20:22:48Z gave `fail key_player_out DAV:Ines Garcia Monje:off_floor`. Georgia @ Colorado in the same snapshot (Howard foul_out only) gave `pass`.
+- **Board:** book_grid wncaab `LIVE_GAMELINE_BUILD` full_games 2 -> 1 (index 2 -> 1, priceable 6 -> 1) at 20:22:50.581Z, 22 s after the refusal tick. Still 1 at 20:23:22Z. No Davidson ledger row after 20:21:50Z (read 20:23:36Z).
+- **Plan:** generated 14:22:32 CST (20:22:32Z, 4 s after the refusal tick, BEFORE the board withdrew the game). `refusals.key_player_out = 1`, `refusals_by_sport {"wncaab": 1}`, `refusals_by_market {"h2h": 1}`, 0 positions name Davidson or Florida. The only wncaab game with a key exit was Davidson, so the refused h2h row is that game's.
+  - **This is the first `key_player_out` plan refusal outside NBA.** Until now the board always withdrew the game before a row reached the plan (Cincinnati 11-26: 0 mentions). Here the plan read the board's 20:21:50Z rows in the 22 s gap and the backstop caught one.
+- **Orders:** no Davidson order line in any fleet log from 19:00Z (VENUE_REPRICE_KEYS only).
+- **Expected next:** the flag drops at 35:00 elapsed (Q4 5:00, the last-5-minute window) without a return unless she plays. The watcher's NO_RETURN check will classify it.
+- verify: `C:/tmp/lpeg/w1126/dav.sh` 20:23Z, hold probe 20:22:48Z, ledger read 20:23:36Z, `kpo_dav.py` 20:24Z, `pbp_name_w.py 401921023 "Garcia Monje"` 20:23Z, `dav_orders.sh` 20:24:22Z.
