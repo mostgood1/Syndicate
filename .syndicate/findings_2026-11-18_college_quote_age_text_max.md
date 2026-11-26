@@ -134,3 +134,18 @@ CHANGE D loaded in the 11-24 window batch: `BOOK_GRID_NEWEST_BY_TIME=on` on refr
 - **What #844 changes, and so what P4 can show.** #844 changes the row's age stamp, picking the newest by time. The join's quote-age ceiling is per quote, so a fall in NCAAB stale withholds was never guaranteed. P1 and P2 are #844's own test.
 
 **Owed:** the 11-25 close grades P2 and P3 from `p844_2026-11-25.jsonl` (every tick while NCAAB is live), then writes the deploys.md READING entry and the todo #844 verdict.
+
+## READING 2026-11-26 11:35 AM CST: the 11-25 evening, rail monitor R-B; FINAL (P2, P3 graded)
+
+Reader: `C:\tmp\railmon\p844_2026-11-25.jsonl`, written by `p844.sh` at every Windows-task tick, 48 NCAAB and 48 NBA samples, 16:04Z 11-25 to 07:44Z 11-26. After midnight the 11-25 NCAAB grid stopped rebuilding at 06:02Z, so the last 6 samples read one grid: the NCAAB sums below count each distinct grid once (43 of 48). Read-only.
+
+| # | prediction | 11-19 baseline | 11-25 | verdict |
+|---|---|---|---|---|
+| P1 | venue rows with a sportsbook-spelled `updated_at` > 0 | 22 of 1,213 (1.8%) | 1,053 of 2,696 venue rows, > 0 in 42 of 48 samples | **PREDICTED** |
+| P2 | h2h rows fresh by row age >= 70% over the evening, near fresh-by-cell | 44 of 141 (31.2%) vs 80.1% by cell; 304 mismatch rows | **274 of 352 (77.8%)**, cell 274 of 352 (77.8%), **0 mismatch** rows over 43 grids | **PREDICTED** |
+| P3 | NBA / NHL grids unchanged | NBA mismatch 0 | NBA mismatch 0 over 48 samples (22 with rows, 63 h2h rows) | **PREDICTED** (NBA; NHL is not sampled) |
+| P4 | NCAAB / WNCAAB stale-quote withholds per build fall | -- | 11-24 (interim above) | **NEITHER** |
+
+- **#844 does what it was built for.** The row's age now reads the newest stamp by time: fresh by row and fresh by cell agree on every row (0 mismatches), against 304 mismatches on 11-19.
+- P4 was never #844's own test (the join's ceiling is per quote), and its two halves split by sport.
+- Recorded in deploys.md 2026-11-26 17:35Z (betting change: no) and todo #844.

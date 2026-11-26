@@ -63546,3 +63546,14 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Also read (no deploy), step 1c** (cheat-sheet rules v4, loaded by the 11-25 13:54:07Z ff), 11-26 17:31:53Z, `read_1c_after_load.py 2026-11-26`: **rc 0 MET**.
   - 4 sheets: NFL 481 rows, NCAAF 45, NCAAB 40, soccer 36. All are `section_rules` 4; value-not-suggested is 0 of 602 rows (BEFORE 11-24: 4 of 723).
   - NBA and NHL return 404 `not_published` (no games on Thanksgiving).
+
+## 2026-11-26 17:35Z (11:35 AM CST) -- READING (no deploy): #844 book-grid newest stamp by time, the 11-25 evening (CHANGE D of the 11-24 window batch; lane `ncaab-total-overprojection`, read by lane `layer2-rail-monitor`, R-B; read-only) -- **P1-P3 PREDICTED, P4 NEITHER; FINAL**
+- betting change: no
+- **Load:** CHANGE D of the 2026-11-24 08:30:10Z window batch (register BC-062), `SYNDICATE_BOOK_GRID_NEWEST_BY_TIME=on`.
+- **Reader:** `C:\tmp\railmon\p844_2026-11-25.jsonl` (`p844.sh` at every Windows-task tick; 48 NCAAB + 48 NBA samples, 16:04Z 11-25 to 07:44Z 11-26). NCAAB sums count each distinct grid once (43 of 48; the 11-25 grid stopped rebuilding at 06:02Z after the midnight roll).
+- **P1:** 1,053 of 2,696 venue rows carry a sportsbook-spelled stamp, > 0 in 42 of 48 samples (11-19: 22 of 1,213). PREDICTED.
+- **P2:** NCAAB moneyline rows fresh by row age 274 of 352 (77.8%), fresh by cell 274 of 352 (77.8%), 0 mismatch rows (11-19: 31.2% vs 80.1%, 304 mismatches over 22 samples). PREDICTED.
+- **P3:** NBA mismatch 0 over 48 samples (22 with rows). PREDICTED. NHL is not sampled.
+- **P4:** NEITHER (the 11-25 1:10 AM interim, in the findings).
+- **Action:** none. Closing #844 belongs to lane `ncaab-total-overprojection`.
+- verify: `p844_2026-11-25.jsonl`, NCAAB `h2h_row_fresh` 274 = `h2h_cell_fresh` 274 of `h2h` 352 and `mismatch` 0 over 43 distinct `grid_generated_at`.
