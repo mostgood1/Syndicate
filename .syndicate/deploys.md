@@ -63475,3 +63475,20 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - Tracebacks in refresh-worker since L: 2 (11-24 23:46:04Z, 11-25 11:46:07Z), both `prop_evidence/soccer.py scan_boxes -> load_json` JSON decode; 0 mention live_refresh_loop or look_ahead.
 - Verdict: change C is live and no prediction fails. The 12-01 reading (task lookahead-b-reading-1201) judges Pb3 and Pb4 over a full week.
 - verify: `lookahead_b_reading.py --window post=2026-11-24T08:30:36Z..now` (day-2 reasons only disabled/day1_launched_this_tick, 0 refusals, wait p90) + `kit_role_env.py` for both keys + `quota_projection.py` + the 11-27 NCAAB book_quotes find (scripts C:\tmp\la2_f905\r1125_reading*.sh).
+
+## 2026-11-26 01:12Z (7:12 PM CST 11-25) -- READING (no deploy): #860 NHL St. Louis live join, first live Blues game STL @ NYI (CHANGE M of the 11-24 window batch; lane `nhl-live-join-stl-alias`, read by lane `layer2-rail-monitor`, R-H; read-only, nice 19) -- **MET**
+- betting change: no
+- **Load:** CHANGE M of the 2026-11-24 08:30:10Z window batch (register BC-069). `SYNDICATE_LIVE_GAMELINE_NHL_TEAM_ALIASES=on` in refresh-worker and web, re-read 01:07:15Z and 01:12:00Z.
+- **Readers:** the registered kit `C:\tmp\w1124_stl\kit_after_up_stl.sh` (the served rail), plus `grid_1125_rh.py` (the full NHL book grid per market, since the rail is a capped selection). Outputs `watch_1125_rh.out` and `watch2_1125_rh.out` in the same folder.
+- **Kit at read_at 2026-11-26T01:12:00Z:**
+  - New York Rangers @ Buffalo Sabres: h2h/puck rows 3, with a live model 3
+  - **St Louis Blues @ New York Islanders: h2h/puck rows 2, with a live model 2**
+  - Vancouver Canucks @ Detroit Red Wings: h2h/puck rows 1, with a live model 1
+  - Winnipeg Jets @ Boston Bruins: h2h/puck rows 1, with a live model 1
+- **Grid at 01:11:50Z:** each of the 10 live games carries `live_gameline` on its full-game rows, with the moneyline priced by the live lane and the puck line `live_margin_published_for_display_only`. St. Louis matches: 2 rows, 2 joined, moneyline p 0.490 vs market 0.5256, 200 sims, as of 01:10:42Z.
+- **Before the fix (11-21 6:43 PM CST):** St. Louis 0 of 1, every other game all.
+- **Not join misses:**
+  - 01:07Z: first intermission (`P1 0:00`). The rail showed only an STL total, which NHL refuses by design.
+  - 01:11:31Z, 1:12 into P2: the moneyline quote was over the 120 s pricing ceiling (`quote_older_than_live_pricing_ceiling`). It was fresh (6.2 s) by 01:11:50Z.
+- **Action:** none. Closing the lane is the user's call; asked.
+- verify: the kit line `St Louis Blues @ New York Islanders h2h/puck rows 2, with a live model 2` at read_at 2026-11-26T01:12:00Z.

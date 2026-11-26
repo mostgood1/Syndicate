@@ -27,3 +27,12 @@ The user said, 11-19 ~1:00 AM CST: "this should just be an always on monitor mov
   - The split moves **11 of 1,483 college full-game total flags (0.7%) in 10 readings, 11-15..11-25**, and nothing else. Over all readings the totals are 20 contradictions (mostly before the 11-18 fix), 74 skew-consistent and 11 re-sim tick. The chip is newer than the grid in 9 of the 11.
   - Re-running R20's row through the script to a scratch day file changes only `ours_contradictions` 1 -> 0 and `ours_resim_tick` -> 1. R20's recorded row is unchanged. Backup `dash\dash_update.py.bak_1125b`.
 - **Still owed (the card, not the monitor):** the rail card still pairs p from one re-sim tick with OURS from the next, on about 0.7% of college total flags. A display-only fix would make a flagged total's OURS the flagged row's own `live_total`, at the cost of OURS leading or trailing the PROJ box by one tick. That is the user's call: it is a web change and a reload.
+
+## R-H: #860 St. Louis live join at STL @ NYI (7:12 PM CST); read-only, nice 19 -- MET
+
+- **MET.** The kit (`C:\tmp\w1124_stl\kit_after_up_stl.sh`, read_at 2026-11-26T01:12:00Z) read `St Louis Blues @ New York Islanders h2h/puck rows 2, with a live model 2`, like every other game on the rail (NYR @ BUF 3 of 3, VAN @ DET 1 of 1, WPG @ BOS 1 of 1). On 11-21, before the fix, St. Louis read 0 of 1. The key is `on` in refresh-worker and web.
+- **The full grid agrees (01:11:50Z, `grid_1125_rh.py`).** Each of the 10 live NHL games joins its live lane on its full-game rows: the moneyline is priced by the lane and the puck line is display-only. St. Louis is the same: moneyline p 0.490 vs market 0.5256, 200 sims, as of 01:10:42Z.
+- **Two reads earlier were not join misses.**
+  - 01:07Z: STL @ NYI was in the first intermission (`P1 0:00`), and the rail showed only an STL total, which NHL refuses by design.
+  - 01:11:31Z, 1:12 into P2: both STL rows had joined (live display lane `live`), but the moneyline quote was over the 120 s pricing ceiling (`quote_older_than_live_pricing_ceiling`). It was fresh (6.2 s) by 01:11:50Z.
+- Recorded in lane `nhl-live-join-stl-alias`, todo `#860` and deploys.md 2026-11-26 01:12Z. Closing the lane is the user's call.
