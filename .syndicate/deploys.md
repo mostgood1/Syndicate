@@ -63601,3 +63601,18 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Archive `watch_2026-11.jsonl` 14,704 -> 21,672 lines (+6,968 = the 6,967 rows moved at the first tick plus 1 at a later one), 11,027,602 -> 16,294,826 B. Unreconciled live exits 0.
 - verify: the first post-load `KEYVALUE_WRITE_LARGE` for `execution_exits.json` reads `size_bytes=2547921` at 17:41:22.636Z, and the record reads `watch_rows=831` at 17:51:05Z.
 - **revert:** `git revert 82bfc6bbd`, ff, claimed live-odds-worker TERM. The moved rows stay in the archive, which every reader already merges.
+
+## 2026-11-26 17:10:07Z (11:10 AM CST) -- UNPLANNED LOAD (no deploy): Windows restarted by hand from the Start menu; the fleet came back by its task at 17:12Z and refresh-worker loaded `672a18e87..e37a9697f` -- **not a betting change; recorded after the fact by lane `portfolio-monitor`**
+- betting change: no. Every runtime change refresh-worker picked up is a classified "no" ride-along of BC-072/BC-073. The two worker switches in the range are unset on refresh-worker: `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR` (`cf12ae61f`) and `SYNDICATE_LAYER2_ONE_MODEL_NUMBER` (`d25f49964`, "Betting change while OFF: no"). The rest is display only (`6ca19e36c`), web gunicorn only, web pages and scripts.
+- **What happened** (Windows event logs; `findings_2026-11-26_portfolio_monitor.md`):
+  - Wi-Fi dropped at 12:13:57 AM CST, WLAN 8003 "disconnected by the driver", and did not reconnect.
+  - The machine entered Modern Standby at 3:33:30 AM and woke at 11:09:26.
+  - At 11:10:07 a restart was started from the Start menu (`User32` 1074, "Other (Unplanned)"), followed by 6006 at 11:10:20, OS start at 11:10:47 and Wi-Fi back at 11:11:07.
+  - Then `SyndicateLocalProduction`'s `up`: refresh-worker pid 469 at 17:12:09Z, live-odds-worker pid 470 at 17:12:10Z, web healthz 200. No claim, preflight or drain: it was a reboot, so in-flight work was cut.
+- **Code per role before -> after:**
+  - refresh-worker `672a18e87` (booted 08:30:37Z 11-24) -> `e37a9697f`;
+  - live-odds-worker `e37a9697f` -> `e37a9697f` (it self-recycles about every 6.7 h, last at 16:16:33Z);
+  - web `e37a9697f` -> `e37a9697f` (then `75624d138` by lane `surface-consistency-oversight`'s 17:28Z reload-web).
+- **The outage it ended:** from 06:14Z to 17:10Z every outbound call on the fleet failed DNS (about 750 an hour in live-odds-worker, 200 an hour in refresh-worker). Each venue got 1 execution tick an hour, all `blocked reason=unreconciled_orders`. No live orders, settlement or balance reads ran, and no exit quotes. It was back to `status=ok` about 8 times per venue per hour after the boot.
+- **CORRECTION to the 17:40:07Z entry above:** its "Fleet context" bullet says "ESPN connection errors 10:36-11:05 AM CST". The network was in fact down from 12:13:57 AM to 11:11:07 AM CST; the ESPN tracebacks were a slice of that.
+- verify: WLAN-AutoConfig 8003 at 00:13:57 then 8001 at 11:11:07; live-odds-worker's first DNS failure 06:14:14Z and last 17:10:05Z; refresh-worker `MALLOC_ARENA_INIT` at 08:30:37Z 11-24, then 17:12:09Z 11-26.
