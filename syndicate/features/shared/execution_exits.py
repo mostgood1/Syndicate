@@ -114,6 +114,8 @@ _DEFAULT_LOOKBACK_DAYS = 3
 # A row older than the lookback can never be evaluated again (`open_positions`
 # drops it), so only the counterfactual reads it, and that reads the archive too.
 _STATE_RETENTION_PAD_DAYS = 2
+# Hours without a tick seeing a position before its watch row moves to the archive (`_prune_watch`).
+_WATCH_UNSEEN_ARCHIVE_HOURS = 24
 _MAX_TICKERS_PER_TICK = 400
 _QUOTE_CHUNK = 50
 # Polymarket books are one SIGNED read per market (5 s timeout each), so they are
@@ -1378,12 +1380,44 @@ def _retention_floor(today: str) -> str | None:
         return None
 
 
-def _prune_watch(state: dict[str, Any], today: str) -> int:
+def _unseen_too_long(row: Mapping[str, Any], cutoff: datetime | None) -> bool:
+    """True when no tick has seen this position since `cutoff`. A row with no readable `last_seen` stays."""
+    if cutoff is None:
+        return False
+    try:
+        seen = datetime.fromisoformat(str(row.get("last_seen") or "").replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=timezone.utc)
+    return seen < cutoff
+
+
+def _prune_watch(state: dict[str, Any], today: str, *, now: str | None = None) -> int:
+    """Move watch rows out of the document: past the retention floor, or unseen for `_WATCH_UNSEEN_ARCHIVE_HOURS`.
+
+    UNSEEN ROWS (2026-11-26, lane exit-watch-unseen-prune): a watch row is written for every open position a tick
+    sees, and stayed until its POSITION DATE left the floor -- 5 days, long after the position closed. Measured
+    11-25: 8,505 rows, 97% paper, 79-84% last seen over a day ago, and the document crossed the 8,388,608 B
+    keyvalue cap at 4:31 PM CST. A refused save after a live sell lost that sell's venue answer (7:27 PM), and the
+    `submitted` row it left blocked every new live exit until the midnight prune (findings_2026-11-25_portfolio_
+    monitor.md H-X1..H-X4). No exit rule reads a watch row: the fast loop copies three of its fields onto a PAPER
+    record, and the counterfactual report reads the archive too. A position seen again after it was moved gets a
+    new row, so only its first_seen / high-water mark restart.
+    """
     floor = _retention_floor(today)
     if floor is None:
         return 0
     watch = state.get("watch") or {}
-    stale = [k for k, row in watch.items() if _position_date(row) < floor]
+    cutoff = None
+    if now:
+        try:
+            cutoff = datetime.fromisoformat(str(now).replace("Z", "+00:00")) - timedelta(hours=_WATCH_UNSEEN_ARCHIVE_HOURS)
+        except ValueError:
+            cutoff = None
+        if cutoff is not None and cutoff.tzinfo is None:
+            cutoff = cutoff.replace(tzinfo=timezone.utc)
+    stale = [k for k, row in watch.items() if _position_date(row) < floor or _unseen_too_long(row, cutoff)]
     if not stale:
         return 0
     _archive([watch[k] for k in stale])  # moved, never dropped
@@ -1592,7 +1626,7 @@ def _run_exit_tick_unlocked(
             flush=True,
         )
 
-    pruned = _prune_watch(state, today)
+    pruned = _prune_watch(state, today, now=now_text)
     pruned_exits = _prune_exits(state, today)
     summary = {
         "status": "ok",
