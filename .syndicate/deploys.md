@@ -63451,6 +63451,29 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - 5 recycles and 1 deferral, **all `"source": "timer"`**, 0 from the request path (corrected 15:00Z: the first count, 6 recycles, counted the deferral line as a recycle; 7 boots = 2 from the reload + 5). anon 644-757 MB at limits 622-644 MB; 19-49 requests each. One worker reached 708 MB 120.7 s after booting and was recycled at the guard's 120 s minimum age. One timer recycle was deferred 15 s after the other worker's (the 90 s spacing) and recycled 90 s later. The guard's rules hold on the timer path.
   - 0 aborts, 0 exit-70s, 0 `WEB_MEMORY_GUARD_ERROR`, 0 tracebacks, 0 timeouts, 0 SIGKILLs.
   - Not read: recycles per request against before. That needs a whole CST day and its request count (11-16..11-24: 14.5-20.4 requests per recycle).
+- **Reading 11-26 17:27-17:35Z (11:27-11:35 AM CST): the watch's first whole CST day (11-25)** (scratchpad `wsk_full_days.sh`, `wsk_exit_paths.sh`, `wsk_gap_kind.sh`, reading `web.log.1` + `web.log` in order). It replaces the scheduled 13:45:45Z reading (`wsk_day_reading.sh`). That reading read `web.log` alone, which rotated at 200 MB at 01:09:35Z 11-26 (7:09 PM CST 11-25), so its "11-25" rows held only 7:09 PM to midnight.
+  - **Kills on 11-25 CST: 0.** 0 `WORKER TIMEOUT`, 0 SIGKILLs of either kind, 0 SIGTERMs. dmesg holds 0 OOM kills now: the 11-23 one has left the ring.
+  - **Kill on 11-26 at 8:42:42 AM CST** (14:42:42Z, pid 2523196): a `WORKER TIMEOUT`, then the master's SIGABRT (`handle_abort` -> `sys.exit(1)`, no SIGKILL). A recycle came first, so it is NOT the silent kind this lane names. The chain:
+    1. 14:41:35.6Z: the watch recycled it (`"source": "timer"`, 627.8 MB against a 625.3 MB limit, soft, age 1,291 s).
+    2. 14:41:41.6Z: `WEB_WORKER_DRAINED` after 5.0 s, 1 request still in flight.
+    3. 14:42:11.6Z: `Worker exiting` (gunicorn's 30 s graceful wait ran out), then `WEB_WORKER_STOCK_EXIT {"reason": "request_running", "running": 1}`. By design, the fast exit hands a worker that still has a request running to CPython's shutdown.
+    4. The stall dump. The main thread was in `threading._shutdown` -> `concurrent.futures` `_python_exit` -> `join`. The request thread was in `GET /api/board/game-chips` -> `build_game_chips` -> NCAAF `_attach_live_state` -> `poll_ncaaf_live_state._fetch_scoreboard` -> `urlopen` -> `getaddrinfo`.
+    5. 14:42:42.1Z: the master's 60 s timeout. The replacement booted 0.8 s later.
+  - **The request.** A `Python-urllib/3.12` client asked `/api/board/game-chips` for 26 past dates (10-16..11-25): 37 requests, 8:19-8:59 AM CST, 30 of them over 30 s (61-113 s each). Each NCAAF chip build fetched ESPN live state in the request path: 115 `compute in request path (operation=ncaaf_espn_game_state_fetch)` lines that hour, about 10 s apart. Game-chips requests over 30 s per CST day: 0-2 on 11-16..11-25, 47 on 11-26. No OPEN lane owns `game_chip_scoreboard.py`; its last two lanes are CLOSED.
+  - **The exit path before today.**
+    - 5 kills 11-01..11-11 also followed a recycle whose drain left a request. All were before the 11-21 fast exit, and they died in the heap teardown.
+    - 11-22..11-25: 1,077 of 1,077 drains fast-exited. 7 of them had a request in flight when the drain ended, and each of those requests finished inside the 30 s graceful wait.
+    - Today's exit is the first stock exit since the fast exit loaded.
+  - **Recycles on 11-25 CST: 495**, against 303 on 11-24: +63% on +13% requests (5,564 against 4,906). 11.2 requests per recycle (11-17..11-24: 14.5-20.4).
+    - By trigger: 52 from the request path, 443 from the timer. 132 deferrals; 0 aborts, 0 `WEB_MEMORY_GUARD_ERROR`, 0 tracebacks.
+    - After the load (13:54Z on): 454 recycles, 364 of them hard (anon >= limit + 150 MB). **Median worker age 122 s**; 310 at age <= 150 s.
+    - 11-24 for comparison: 303 recycles, 288 hard, median age 205 s, 56 at <= 150 s.
+    - Reading: a warm worker passes its hard limit before the 120 s minimum age. The watch now recycles it at that age, where before it waited for the next 5th request.
+    - Peak: 41-55 recycles an hour, 6 PM to midnight. All 350 gaps under 90 s since 11-25 00:00Z were hard recycles, which the code spaces at 30 s (shortest gap 30.0 s).
+    - Anon at recycle: mean 900 MB (11-24: 987), max 1,290 (11-24: 1,403).
+  - Gen-2 pauses: 5,111 lines, 2,001 s (11-24: 5,819 lines, 2,879 s). Stalls >= 5 s: 2, the longest 5.26 s. 497 boots, 456 armed (every boot after the load), 0 not_armed.
+  - A web reload at 17:28:02Z 11-26 (lane `surface-consistency-oversight`, todo #861, ff to `75624d138`) changed no file this lane reads: `gunicorn.conf.py`, `game_chip_scoreboard.py`, `poll_ncaaf_live_state.py` and `ncaaf/live_game_state.py` are unchanged since `f7c2d2f7a`. Its 2 boots and drains will appear in the next reading.
+  - **Goal verdict: not yet.** Base rate 11-01..11-23: kills on 7 of 23 days (12 kills). Since the revert: 0 on 11-24, 0 on 11-25, and 1 on 11-26 to 11:29 AM CST (the recycle kind).
 
 ## 2026-11-25 14:27Z (8:27 AM CST) -- READING (no deploy): `/ops/dashboards` hub, loaded as a ride-along of the 13:54:07Z web reload (`4b25ed8e1` inside `76a006f45..e37a9697f`; lane `ops-dashboards-hub`, user 11-24 'yes, build it and load it' then 'a, wait for that lane') -- **MET** (lane Verification), one cosmetic note
 - betting change: no (display only; no new load of my own -- this entry records the verification).

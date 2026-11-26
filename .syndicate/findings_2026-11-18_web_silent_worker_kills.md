@@ -659,3 +659,13 @@ Read-only at nice 19. Scratchpad: `wsk_gctune_overnight.sh`, `wsk_recycle_hourly
 - Not loaded alone: the ff also carried the `/ops/dashboards` hub, cheat-sheet rules v4 (display), and the Layer 2 one-number switch at off. None changes betting.
 - Owed: kills per CST day of both kinds for several days, and how often the timer recycles or aborts a worker.
 - +1 h (8:55 AM CST): 5 recycles and 1 deferral, all from the timer (0 from the request path; first counted as 6 recycles, which took the deferral line for a recycle). One worker was at 708 MB 2 min after booting and was recycled at the 120 s minimum age. 7 of 7 boots armed; 0 aborts, 0 errors, 0 kills. Recycles per request against before need a whole day.
+
+## 2026-11-26 11:35 AM CST (17:35Z) -- the watch's first whole day: 0 kills on 11-25; one recycle-kind timeout on 11-26
+
+- The 7:45 AM reading saw only part of 11-25. `web.log` rotated at 7:09 PM CST 11-25. Re-read over `web.log.1` + `web.log`.
+- **11-25: 0 kills of either kind.** 495 recycles (443 from the timer, 52 from the request path) against 303 on 11-24: +63% on +13% requests. After the load, the median worker lived 122 s, against 205 s on 11-24. Warm workers pass their hard limit before the 120 s minimum age, so the watch recycles them right at it. 0 aborts, 0 guard errors.
+- **11-26 8:42:42 AM CST: one `WORKER TIMEOUT`, and a recycle came first, so it is not the silent kind.**
+  - The watch recycled a worker that held a 100 s `GET /api/board/game-chips` request. That request was blocked on an ESPN NCAAF fetch in the request path.
+  - The request outlived the 5 s drain and gunicorn's 30 s graceful wait. The fast exit, by design, then handed the worker to CPython's shutdown, which joins the request thread without heartbeating. The master killed it 60 s after the drain.
+  - The requests came from a `Python-urllib/3.12` client sweeping 26 past dates (8:19-8:59 AM CST, 30 of 37 over 30 s). Game-chips over 30 s: 0-2 a day 11-16..11-25, 47 on 11-26.
+- What this kill names: (a) the stock exit for a worker with a request still running after the graceful wait; (b) ESPN fetches in the game-chips request path, which no OPEN lane owns.
