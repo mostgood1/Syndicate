@@ -63616,3 +63616,23 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **The outage it ended:** from 06:14Z to 17:10Z every outbound call on the fleet failed DNS (about 750 an hour in live-odds-worker, 200 an hour in refresh-worker). Each venue got 1 execution tick an hour, all `blocked reason=unreconciled_orders`. No live orders, settlement or balance reads ran, and no exit quotes. It was back to `status=ok` about 8 times per venue per hour after the boot.
 - **CORRECTION to the 17:40:07Z entry above:** its "Fleet context" bullet says "ESPN connection errors 10:36-11:05 AM CST". The network was in fact down from 12:13:57 AM to 11:11:07 AM CST; the ESPN tracebacks were a slice of that.
 - verify: WLAN-AutoConfig 8003 at 00:13:57 then 8001 at 11:11:07; live-odds-worker's first DNS failure 06:14:14Z and last 17:10:05Z; refresh-worker `MALLOC_ARENA_INIT` at 08:30:37Z 11-24, then 17:12:09Z 11-26.
+
+## 2026-11-26 17:36:40Z (11:36 AM CST 11-26) -- READING (no deploy): NCAAB off_floor refusal read LIVE through every layer on a PRICED game, incl. the hold DURING the exit -- Cincinnati's Riley Allenspach; plus a soccer red card with no live props to read, and a CORRECTION to 2026-11-25 20:32:48Z (lane `live-player-exit-gate`, #814; user "Yes, watch tonight")
+- betting change: no -- a reading; nothing loaded.
+- **The exit:** Georgia Bulldogs @ Cincinnati Bearcats, NCAAB, ESPN 401929281. Allenspach, a starter, subbed out at 16:50:11Z (1st half, 2:52) and never re-entered (ESPN pbp, read 18:25Z).
+- **Refused:** first `[ncaab_live_resim] PLAYER_OUT event=401929281 team=CIN player='Riley Allenspach' reason=off_floor key=True source=pbp since=2026-11-26T16:50:11Z` at 17:36:16.572Z, then a tick with `refused_games=1` at 17:36:40Z. 22 lines; the last at 18:19:18.923Z.
+- **Board:**
+  - Ledger: full-game priceable rows through 17:35:41Z; 0 full-game rows for the game after 17:36.
+  - book_grid ncaab full_games went 3 -> 2 at 17:36:57Z, 17 s after the refusal tick.
+- **Entry hold, probed live during the exit (17:38:28Z, `lpeg_holdprobe_soc.sh ncaab`):** `{'verdict': 'fail', 'reason': 'key_player_out', 'players': ['CIN:Riley Allenspach:off_floor'], 'snapshot_at': '2026-11-26T11:36:40-06:00'}`. This is the first live hold read on an off_floor exit.
+- **Plan:** the first plan after the refusal, 11:41:51 CST (read 17:42:20Z), had 0 mentions of Cincinnati or Georgia, no NCAAB refusals and no `key_player_out`. The backstop was not exercised.
+- **No lift:** the flag dropped after 18:19:18Z because off_floor does not apply in the last 5 min of regulation, not because he returned (no play names him after 16:50:11Z). The game ended at 18:23:31Z, and it was never repriced.
+- **Soccer, 18:10:34Z (12:10 PM CST):**
+  - `KEY_PLAYER_OUT_REFUSED event=401915519 AFC Bournemouth @ Celta Vigo players=['BOU:Bafodé Diakité:red_card']`, 23rd minute.
+  - Props: 0 `live_player_props` rows in that game and in every one of the 17 games in `soccer_live_lens.json` (generated 12:10:36 CST); 0 grid rows name him.
+  - So soccer cannot measure the exiting player's own props while its live props are empty. Whether empty is by design was not checked.
+- **CORRECTION to 2026-11-25 20:32:48Z:** "2 were real returns in priced games that ended 4-8 min later" is WRONG.
+  - Texas @ SE Louisiana (Huff) and App State @ Akron (Banks) were NOT returns. No play names either player after the first flag; the flag dropped in the last-5-minute window.
+  - `lift_triage.py` now requires a play naming the player after the first flag (verdict `NO_RETURN` otherwise).
+  - Saint Peter's Noudjihidi stays REAL. MTSU Whitfield and TNST Sparks stay real returns in unpriced games.
+- verify: `C:/tmp/lpeg/w1126/cin_exact.sh` 17:38:43Z, hold probe 17:38:28Z, `kpo_1126.py` 17:42:20Z, `pbp_name.py 401929281 Allenspach` 18:25Z, `soc_propkeys.sh` 18:12Z.
