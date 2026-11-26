@@ -63659,3 +63659,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Board:** book_grid ncaab `LIVE_GAMELINE_BUILD` index 4 -> 3 at 23:25:56.216Z, 34 s after the refusal tick. Last USC ledger rows 23:24:50Z.
 - **Plan:** the 17:22:32 CST plan came before the exit. The 17:27:19 CST plan (the first one after it) had no `key_player_out` refusal and 0 mentions of USC Trojans or Utah State. The board withdrew the game before a row reached the plan, as with Cincinnati. The Davidson backstop at 20:22Z was a 22 s window this one did not hit.
 - verify: `C:/tmp/lpeg/w1126/usc.sh` 23:26:58Z, hold probe 23:27Z, `kpo_usc.py` 23:27Z and 23:28:25Z, `pbp_name.py 401921673 Cofie` 23:27Z.
+
+## 2026-11-26 23:29:46Z READING lane live-player-exit-gate (#814): A FULL CYCLE IN ONE NCAAB GAME -- USC's Jacob Cofie refused, then LIFTED on his return, then repriced (follows the 23:25:22Z entry)
+- betting change: no (reading only)
+- **Return:** ESPN pbp `23:28:43Z H2 10:58 Jacob Cofie subbing in for USC`, then `23:29:17Z Block`, then `23:32:34Z subbing out`. A real return: a play names him after the flag.
+- **Producer:** the last refused tick was 23:27:37.464Z (`key_players_out=1 refused_games=1`). The next ncaab tick, 23:29:46.625Z, read `key_players_out=0 refused_games=0`: **63 s after he checked in**.
+- **Board:** book_grid ncaab `LIVE_GAMELINE_BUILD` index 3 -> 4 at 23:30:03.041Z, **17 s after the lift tick**. The first priceable USC full-game ledger row after the lift was at 23:30:02Z. The ledger had no USC rows 23:24:50Z -> 23:30:02Z (5 min 12 s withdrawn, for 4 min 32 s of refusal).
+- **Hold:** the probe at 23:33:40Z shows no USC entry in playersOut, so nothing holds the game.
+- **Second exit:** he subbed out again at 23:32:34Z (H2 9:08). The ncaab rule (`n_min None`) does not re-flag a second-half exit, so no new refusal. That is the rule as written.
+- **Tally:** with Saint Peter's 11-25, this is the second lift read in NCAAB and the first read end to end on the board's own build line (out -> refused -> withdrawn -> lifted -> repriced) in a single game.
+- verify: `pbp_name.py 401921673 Cofie` 23:33Z, `usc.sh` 23:33Z, the tick and build greps 23:34Z, hold probe 23:33:40Z, `led_timeline.py ncaab ... "USC Trojans"` 23:33Z.
