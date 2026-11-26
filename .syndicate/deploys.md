@@ -63650,3 +63650,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Orders:** no Davidson order line in any fleet log from 19:00Z (VENUE_REPRICE_KEYS only).
 - **Expected next:** the flag drops at 35:00 elapsed (Q4 5:00, the last-5-minute window) without a return unless she plays. The watcher's NO_RETURN check will classify it.
 - verify: `C:/tmp/lpeg/w1126/dav.sh` 20:23Z, hold probe 20:22:48Z, ledger read 20:23:36Z, `kpo_dav.py` 20:24Z, `pbp_name_w.py 401921023 "Garcia Monje"` 20:23Z, `dav_orders.sh` 20:24:22Z.
+
+## 2026-11-26 23:25:22Z READING lane live-player-exit-gate (#814): NCAAB off_floor, USC's Jacob Cofie vs Utah State, read live (board withdrew before the plan; no backstop needed)
+- betting change: no (reading only)
+- **Player:** USC starter Jacob Cofie (ESPN event 401921673), subbed out at H1 3:32 (22:36:59Z, 4:36 PM CST). No play names him after that (ESPN pbp read 23:27Z).
+- **Producer:** `PLAYER_OUT ... reason=off_floor key=True source=pbp since=2026-11-26T22:36:59Z` came at 23:25:14.117Z, and the ncaab tick at 23:25:22.336Z read `key_players_out=1 refused_games=1`. The 48-minute lag is the ncaab rule: a first-half exit fires at half + 8:00. 70 priceable full-game ledger rows in the 30 min before the flag.
+- **Hold:** `fail key_player_out USC:Jacob Cofie:off_floor` (snapshot 17:25:22 CST).
+- **Board:** book_grid ncaab `LIVE_GAMELINE_BUILD` index 4 -> 3 at 23:25:56.216Z, 34 s after the refusal tick. Last USC ledger rows 23:24:50Z.
+- **Plan:** the 17:22:32 CST plan came before the exit. The 17:27:19 CST plan (the first one after it) had no `key_player_out` refusal and 0 mentions of USC Trojans or Utah State. The board withdrew the game before a row reached the plan, as with Cincinnati. The Davidson backstop at 20:22Z was a 22 s window this one did not hit.
+- verify: `C:/tmp/lpeg/w1126/usc.sh` 23:26:58Z, hold probe 23:27Z, `kpo_usc.py` 23:27Z and 23:28:25Z, `pbp_name.py 401921673 Cofie` 23:27Z.
