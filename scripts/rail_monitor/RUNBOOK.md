@@ -31,7 +31,7 @@ The user asked on 11-20 to "make this dashboard self contained so it doesnt use 
   - grade with output to a file, never through `| Select-Object -First N`. Cutting the pipe killed `grade_day.py` before it wrote its JSON (11-20: a 0-byte file);
   - the owned readings due that night (R-A..R-F);
   - a short summary in the findings file and a log line, then commit and push.
-  - No day page, no claude.ai uploads, no wakeups. Renew the cron before its 7-day expiry. **The current cron 02eeea6d was created 11-20 17:16Z and expires 11-27 17:16Z: re-create it (same prompt, `47 0 * * *`) at the 11-26 close (D = 11-25).**
+  - No day page, no claude.ai uploads, no wakeups. Renew the cron before its 7-day expiry. **The current cron is b0d262f9, re-created 11-26 ~11:38 AM CST at the 11-25 close (same prompt, `47 0 * * *`; 02eeea6d deleted). It now auto-expires after 30 days, ~12-26: re-create it at the close before then.** Its first run is 11-27 ~1:17 AM CST (the scheduler's per-job offset).
   - **#851 P6 sweep counts (night 2 on 11-21, then 11-24):** count on the exact quota-read window with `wsl -- bash -c "cd ~/syndicate-prod && nice -n 19 python3 /mnt/c/tmp/railmon/p851_sweepcount.py <lo> <hi>"`, where lo and hi are the two `read_at` values without the Z. Append to that night's findings file, as on 11-20.
   - **R-F's qualifier:** count the live chips by sport (`state == "live"`) in the ~7 PM reading dir's `chips.json`. The 11-20 evening was borderline (26 at 7:03 PM, 37 at 7:23 PM); its owner decides.
 - **Still Claude-driven one-shots:** R-D P6 quota reads (6 PM and 11 PM CST, 11-20, 11-21 and 11-24) and R-F's parent-floor read (9:04 AM 11-21).
