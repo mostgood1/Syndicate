@@ -230,6 +230,8 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
 - **Related decision, not the monitor's:** #857 (raise web's worker recycle limit to 1,500 MB, measured on main `e47f83987`), recommended to load after #853's first evening. It is the user's call.
   - **ANSWERED 11-25 ~10:10 AM CST:** "Next scheduled restart". It rides the 12-08 window's drained down/up (none is scheduled before it); fleet-watcher told; main 3c1890cec. Do not re-ask. Do not list it under Open user decisions.
 
+**R-L. At the 11-26 close (cron b0d262f9, ~1:17 AM CST 11-27, D = 2026-11-26): carry-overs.** (1) Loads for 11-26: web, ff 75624d138 + reload-web at 17:28:02Z (11:28 AM CST), todo #861 step 1d, lane `surface-consistency-oversight`, betting change no; add it to `dash\loads.json` and the summary. (2) The cost of the NCAAB after-midnight overlay gap (R46 on 11-25: 665 s on the D+1 file; no owner). For the readings whose `start` is after 06:00Z 11-27, read `overlay_offdate_inplay` and the NCAAB overlay gaps in `C:\tmp\railmon\dash\m_auto_1126_*.json`, count the NCAAB games still live, and note each one's rail card live row count from that reading's `rail.json`. Compare with the D file's rebuild cadence before midnight. Write the cost in the 11-26 summary. If it is real, it goes to the user as a decision: a fleet change, and read change O's `betting change:` line in deploys.md to say whether an NCAAB version of it would be one. (3) The p844 sampler stops after 11-26 by itself; R-B is graded, nothing owed.
+
 ## NIGHTLY CLOSE
 
 1. The probe shows 0 live games. **Fetch day D's finals by date:**
