@@ -2304,6 +2304,14 @@ death, never life — do not invert it.
 - Verification: deploys.md entry for the 12-08 load (betting change: no) + read_after_load_b.py output (rc 0 = MET) recorded in findings section 6; kit C:/tmp/w1208_cellcal_b/ (kit_env_b.sh self-test PASS 11-26)
 - Blocked by: the 12-08 window (2026-12-08T08:00Z..13:00Z) and its batch (not built on 11-26); and #861's one-number line loading on the same drained up (user 11-27: held with it)
 
+### game-chips-request-path-espn — OPEN — opened 2026-11-27 — session 313ab61c-88f9-4865-a552-d1fa053bf3cb
+- Goal: GET /api/board/game-chips makes no ESPN call inside a web request: NCAAF live state comes from the worker record or a disk archive of final dates, WNBA past dates answer from artifacts, measured on the fleet as 0 'compute in request path (operation=ncaaf_espn_game_state_fetch)' and 0 wnba_has_games_for_date_espn_fetch lines per CST day after the load, with past-date NCAAF finals still served to the 8:15 AM play-cards grader
+- Files: syndicate/features/ncaaf/live_game_state.py scripts/poll_ncaaf_live_state.py syndicate/features/shared/refresh_state_store.py syndicate/features/wnba/sources.py tests/test_ncaaf_live_state_request_path.py tests/test_wnba_has_games_request_path.py
+- Hypothesis: Past-date game-chips requests build inline; NCAAF keyvalue records expire after 10 days, so web fetches ESPN for every date of the week (6-10 serial GETs); on 11-26 the host network was down, so each GET stalled ~10 s in DNS and requests took 60-113 s
+- Falsification test: After the load, a past-date game-chips request still logs operation=ncaaf_espn_game_state_fetch, or NCAAF chips for a date older than 10 days lose their final scores
+- Verification: Fleet web.log per CST day after the load: 0 ncaaf and 0 wnba request-path fetch lines; the play-cards grader's past-date game-chips p99 vs 11-27's 7.1 s; NCAAF finals present for 10-16..11-16
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
