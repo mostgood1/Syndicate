@@ -489,3 +489,135 @@ The bootstrap draws 2,000 game resamples, seeded. The copy and output sit in tha
   - run `--use c` on the first board build, and `--use d` during the first live slate;
   - record both results here and in deploys.md (`- betting change: yes`, plus `betting_change.py add --kind yes --loaded-at <role pick-up>`);
   - P-c3 / P-d3 / P-d4 over the following slates.
+
+## 8. (d)'s three fixes BUILT on a branch, NOT pushed (written 2026-11-27 12:50 PM CST, before any load)
+
+**User decision:** session e32fef1a asked at about 12:15 PM CST 11-27: "Fix (d) before 12-08, and keep (c) queued as it is?" The user answered "Yes, fix (d) first" (relayed word for word by that session). This approves building and testing the three fixes only. **The push is NOT approved, and nothing loads.** If the fixes are on main and tested before 12-08, (d) loads then; otherwise it waits for 12-22. (c) stays queued as it is.
+
+- **Code:** branch `cell-calibration-847d-fixes`, commit `2f19ebde5` (local; pinned `refs/keep/cell-calibration-847d-fixes-2f19ebde5`), parent `15fd2b5d5`. Lane `cell-calibration-847d-fixes`.
+  - `syndicate/features/shared/optimizer_overlay.py` +122..136 (fix 1, in `factor_for_row`).
+  - `syndicate/features/shared/cell_calibration.py`:
+    - +281..306: the marker note, and the new `live_prob_stamp_of` (fix 1);
+    - +345..372: the new `ncaaf_live_total_owned_by_835` (fix 2);
+    - +380..381 and +395..396: the docstring line and the skip in `live_probability`;
+    - +439..442: the skip in `rank_stake_factor`.
+  - `syndicate/features/shared/live_gameline_ledger.py` +324..353 (`_cell_cal_fields`) and +556..557 (its one `build_records` entry). This is section-scoped beside `ncaab-total-overprojection`'s claim, and the invariant check reads the two sections as disjoint.
+  - `tests/test_cell_calibration_847d_fixes.py` (NEW, 19 tests).
+- **Tests:**
+  - The 19 new tests pass. They drive the real join, stake, rank and ledger with off != on per fix.
+  - The targeted suites pass, **121 of 121**: the new file, `test_cell_calibration`, `test_optimizer_overlay`, and `test_live_gameline_ledger` with its `_allowlist`, `_caps` and `_display_rows` files.
+- **Byte-identical to main with every key absent.** An A/B ran main's three modules and the branch's on the same inputs, in two processes. The inputs were 6 rows (4 distribution rows, 1 moneyline, 1 pregame) through the real `price_distribution_market` / `price_moneyline` and `_apply_verdict`. The outputs compared were the rows, `factor_for_row`, `_sizing_skill_factor`, `_sizing_model_edge`, the rank's `_apply_skill_reliability`, `build_records`, `rank_stake_factor` and `live_probability`.
+  - **Identical** with: all keys absent; (c) on alone; #835 on alone; (a)+(b) on.
+  - **Different, as intended, with (d) on:**
+    - stamped rows' overlay factor goes 0.5 -> 1.0, in rank, skill and edge;
+    - the records gain `cell_cal` and `model_home_win_prob_cell_uncalibrated`;
+    - with #835 on too, the NCAAF total row is left unstamped.
+
+### 8.1 The stake trace 7.4 left open: live-money in-play orders do NOT size through `portfolio_commit`
+
+- **Measured:** the fleet's `/api/portfolio/live` per `on` date, 10-30..11-27, had 1,666 live-money orders. 372 of them were submitted after their game's `commence_time`.
+  - **All 372 are the Kalshi in-game entries module's** (`inplay_entries_live`: `ingame:` position keys; sizing `inplay_order_dollars` 302, unset 70).
+  - That rule is market-only: the median no-vig fair of at least 3 fresh books, against the Kalshi ask. It reads no model number, so (d) cannot reach it.
+- **The code agrees.** Portfolio entries are refused at or after kickoff on both venues:
+  - Kalshi: `execute_portfolio.py:925`, `SYNDICATE_EXECUTION_KALSHI_PREGAME_ONLY` (absent = on). Only a `fair_source == "in_game"` position is exempt, and nothing sets one today.
+  - Polymarket: `polymarket_us_orders._refuse_after_commence`.
+  - Fleet live-odds-worker logs, 11-25 17:19Z .. 11-27 18:28Z: 7 `REFUSED_AFTER_COMMENCE` (all `game_started`, Kalshi: ncaab totals 2, nba totals_alt 4, 1 unlabelled) and 0 `AFTER_COMMENCE_IN_GAME_FAIR`. None of the 7 is in a cell (d) serves.
+  - No other live-money path reads the live model number. Checked: `execute_portfolio`, `inplay_entries_*`, the Polymarket and Kalshi order modules, `position_marks`, `live_player_exit_hold`.
+- **So (d)'s double shrink reaches the board's live RANK, the PAPER books' in-play stakes and the decision records, not live money.** Paper commits never pass the executor's commence refusal. The NCAAF end-game findings' "LIVE SIDE-MARKET CHECK" counted 683 of 695 paper in-play NCAAF side bets carrying a sim edge, against 2 of 32 live ones.
+  - Fix 1 was still built, in `factor_for_row`. That one function feeds rank and stake, so they stay one factor, the documented invariant. It governs those surfaces and any future in-game-fair entry.
+  - **Whether it is needed is the user's call at the push.**
+- **For the 12-08 plan:** by CLAUDE.md's definition ("changes which live bets are placed, sized, held or exited"), (d) changes no live-money order today. This entry does not reclassify it: (d) stays queued as a betting change, the way it was decided. If the user reclassifies it, (d) leaves the window rule. That is the user's call.
+
+### 8.2 What each fix does, and what it leaves
+
+1. **No second calibration shrink** (`factor_for_row` + `cell_calibration.live_prob_stamp_of`).
+   - A row whose projection carries (d)'s `live_cell_calibration` stamp takes neither `edge_shrink` nor (c)'s k.
+     - Its factor is `stake_scale` alone, floored at 0.5. The shortfall of the cell's published bets is other evidence, so it stays.
+     - A stamp counts only with a real-number k in [0.10, 1]. A missing, malformed or string k keeps the shrink (8 cases tested).
+   - Worked example, NCAAB live spreads (k 0.324): a raw +10 pp edge (0.60 against 0.50) becomes about +3.3 pp under (d).
+     - On main it is then sized at about 1.6 pp (x 0.5), or about 1.1 pp with (c) on (x 0.324).
+     - With the fix it is sized at about 3.3 pp: (d)'s shrink, once. All three are before the registry's skill term, which every case shares.
+2. **NCAAF live totals left to #835** (`cell_calibration.ncaaf_live_total_owned_by_835`).
+   - While `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION` is on (#835's own predicate, `live_total_dispersion.enabled`, all spellings), (d)'s `live_probability` and (c)'s `rank_stake_factor` skip `ncaaf|totals*|full|live`.
+   - **Full game only**, because #835 rewrites only the full-game `totalRunsDist`, never a `segments` block. NCAAF spreads live (k 0.519) stay (d)'s. The pregame NCAAF totals cells (k 0.10) stay (c)'s: #835 is live-only.
+   - With #835 off, both behave exactly as on main. #835's switch is never read while (c) and (d) are off (tested).
+   - **The skip assumes #835's key reaches every role that runs (c) or (d).** It does as queued: GLOBAL in `local_production.env` (`kit_env_ncaaf.sh`). A `ROLE__` scoping of it would break that.
+   - **Left, pre-existing (neither (c) nor (d) causes it):**
+     - with the skip, the cell's rank and stake keep the optimizer's own `edge_shrink`, 0.5 today;
+     - that 0.5 was fitted on pre-#835 numbers (the 11-27 table: post_mean −0.164, the edge anti-predicting there);
+     - it keeps acting on #835's calibrated totals until the 28-day window refits on them.
+     - Weigh it with the NCAAF pair.
+3. **The ledger marker** (`live_gameline_ledger._cell_cal_fields`).
+   - When (d) moved a row, the record carries `cell_cal` {cell, k, k_sd, version} and `model_home_win_prob_cell_uncalibrated` (the engine's number before (d)) beside the priced `model_home_win_prob`.
+   - The keys are ABSENT, not null, when (d) did not act. So `v` stays 7 and `record_key` / `_moved` are untouched: the key's presence is the marker. Filter on `"cell_cal" in record`, never on `v`.
+   - Refusal records never carry it: their observed number is the raw segment probability.
+   - **Every existing reader is unaffected by the new keys.** 50 modules and scripts reference the ledger, and a scan found none that iterates or compares a record's key set, or writes it with a fixed-field `DictWriter`.
+   - **Once (d) LOADS, two engine-number fitters read (d)'s number on its cells. They are not in this lane: follow-ups.**
+     - `scripts/live_totals_width_fit.engine_prob` (#780's scale fit) falls through to `model_home_win_prob` on a record whose `prob_scale` is 1 and that carries no #816 field. That is (d)'s number on a stamped totals row, for example soccer totals live (k 0.625).
+     - `college_basketball/total_prob_calibration` (#816's refit) is NOT affected: (d) skips college basketball totals.
+     - With the new field, each can read `model_home_win_prob_cell_uncalibrated` first.
+
+### 8.3 Item 4, traced (no fix): after (d) loads, the daily fit grades (d)'s own number, and k drifts toward 1
+
+- **The path:**
+  - The scorecard grades `p_model = fair_probability + model_edge_pct / 100` (`scripts/bucket_search.py:564-566`).
+  - It reads the opportunity recorder's `me` = the board row's `model_edge_pct` (`opportunity_population_ledger.py:199`).
+  - On a live row that is `projection.edge_vs_market_pct` (`layer2_board._model_edge_for`), set from the live verdict's `edge_pp` (`live_gameline_join._apply_verdict`), which is (d)'s calibrated edge when (d) is on.
+  - `daily_optimizer.accumulate` (d = p_model − p_market) feeds both the optimizer's w* and `cell_calibration.fit_table`. The recorder stores no (d) marker, so neither can tell which number it was fitted on.
+- **Consequence, first-order arithmetic, NOT measured.** A calibrated row's d is about k x its raw d, so the window's w* becomes
+  `w0 (1 − f + k f) / (1 − f + k² f)`
+  with f the window share graded on (d)'s number, and the CI widens as 1 / sqrt(Σd²).
+  - Over the 28-day window the served k rises, then reaches 1, and the cell leaves the table. (d) stops acting there, the raw number returns, and the next windows refit it back down: a cycle of about one window.
+  - From the 11-27 table's post_mean and post_sd, the served k at f = 0.25 / 0.50 / 0.75 / 1.00:
+
+    | cell | f = 0.25 | 0.50 | 0.75 | 1.00 |
+    |---|---|---|---|---|
+    | NCAAB spreads live | 0.36 | 0.41 | 0.53 | 1.00 |
+    | NCAAF spreads | 0.56 | 0.63 | 0.75 | 1.00 |
+    | soccer h2h | 0.22 | 0.30 | 0.46 | 1.00 |
+    | soccer spreads | 0.71 | 0.77 | 0.86 | 1.00 |
+    | soccer totals | 0.67 | 0.74 | 0.83 | 1.00 |
+    | WNCAAB spreads | 0.86 | 0.90 | 0.95 | 1.00 |
+
+    NCAAF live totals stay at the 0.10 floor (post_mean below 0).
+  - The optimizer's own `edge_shrink` on those cells drifts the same way. With fix 1 it no longer acts on stamped rows.
+- **Precedent and options, for the user (no fix here):**
+  - #816 handled its upstream calibration with a fit floor (`MARKET_FIT_FLOORS`) and a residual k. That works for #816 because its calibration is a separate fixed fit. For (d), the table IS the calibration, so a residual k served on the raw number undoes it.
+  - Options:
+    - (i) record the uncalibrated live edge on the board row, and let the recorder and the grader use it for the fit, as #816's refit reads the engine's number;
+    - (ii) compose: served k = k at the load x residual w, with a fit floor at the load date;
+    - (iii) exclude (d)-served live cells from the refit after the load, holding their k. Against the module's own rule that a dead cron degrades to raw, not to a frozen table.
+  - Each is code and a user decision. Until then, the drift starts at the first graded slate after the load.
+
+### 8.4 The predictions that change (7.3 restated; the rest of 7.3 stands)
+
+These hold only if the fixes' code is LOADED with (d). If (d) loads at 12-08 without them, 7.3 stands as written. With #835 also on, 7.2's double correction is live, and the reader reports it.
+
+- **(c)**, with the fixes loaded:
+  - **P-c-fix1:** with (d) loaded too, the cards of the (d)-served live cells leave (c)'s ELIGIBLE set. Today those are `ncaab|spreads|full|live`, `soccer|h2h|full|live`, and `ncaaf|totals|full|live` unless #835 is on.
+    - A stamped card's factor is `stake_scale` (>= 0.5); an unstamped one in the same cell is still (c)'s.
+    - Served cards carry no projection (0 of 6,307 cards 11-27), so the reader cannot tell them apart. It judges only the rails there (factor in [0.10, 1]) and reports below / at-or-above 0.5.
+    - 11-27: 33 such cards.
+  - **P-c-fix2:** with #835 on, `ncaaf|totals|full|live` leaves ELIGIBLE, and every card in it has a factor >= 0.5 (the optimizer's own). 11-27: 26 cards.
+  - **ELIGIBLE today** (board snapshot 17:55:53Z 11-27, read 18:45Z, table 11-27 11:30Z): 950 cards with both fixes active. Fix 1 set aside 33 cards in (d)-served live cells, some in cells (c) never served. Fix 2 set aside 26 NCAAF live-total cards. 7.3's 1,002 was an earlier board.
+  - P-c1, P-c2 and P-c-rule stand on the remaining eligible cards.
+- **(d)**, with the fixes loaded:
+  - **P-d-exact gains:** with #835 on, no `ncaaf|totals*|full|live` row is stamped (`P-d_ncaaf_total_not_skipped_under_835`). Those rows also leave ELIGIBLE (P-d-cov).
+  - **P-d-ledger (new):** stamped grid rows > 0 implies records carrying `cell_cal` > 0 in the same sports' ledger files for the date. Every such record is well formed: a cell, k in [0.10, 1], and `model_home_win_prob_cell_uncalibrated` in (0, 1).
+  - P-d1, P-d-cov, P-d2, P-d3 and P-d4 stand.
+- **Reader:** `C:\tmp\w1208_cellcal_cd\read_after_load_cd.py`, now sha256 `9cc79568409135a5`. The pre-fix version is kept as `read_after_load_cd.pre_fixes_352ac728.py`.
+  - It now REQUIRES `--fixes yes|no` and `--ncaaf-835 on|off`, and `--d-loaded yes|no` with `--use c`. An unknown is refused, rc 2, never assumed.
+  - Checked on the fleet 11-27: no flags gives rc 2; every flag combination gives rc 3, NOT LOADED (c: 0 cards below 0.5; d: 0 stamped of 10 eligible).
+- **Kit:** `kit_env_cd.sh` is unchanged. Its keys and its apply / restore do not depend on the fixes.
+
+### 8.5 Owed
+
+- **The push** of `2f19ebde5` to main: the user's own yes, through session e32fef1a.
+  - Before the push, re-run the targeted suites on a fresh rebase.
+  - After it, (d) still needs the 12-08 window's final yes, and the fixes must be LOADED with it: a fleet ff of the SHA that carries them, then the drained up.
+- **The user's calls:**
+  - whether fix 1 is needed (8.1);
+  - the NCAAF optimizer 0.5 under #835 (8.2, item 2);
+  - the fit feedback, options (i)-(iii) (8.3);
+  - the two engine-number fitters (8.2, item 3).
+- **After the load:** the reader with the flags stated, recorded here and in deploys.md.
