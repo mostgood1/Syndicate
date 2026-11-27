@@ -63669,3 +63669,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Second exit:** he subbed out again at 23:32:34Z (H2 9:08). The ncaab rule (`n_min None`) does not re-flag a second-half exit, so no new refusal. That is the rule as written.
 - **Tally:** with Saint Peter's 11-25, this is the second lift read in NCAAB and the first read end to end on the board's own build line (out -> refused -> withdrawn -> lifted -> repriced) in a single game.
 - verify: `pbp_name.py 401921673 Cofie` 23:33Z, `usc.sh` 23:33Z, the tick and build greps 23:34Z, hold probe 23:33:40Z, `led_timeline.py ncaab ... "USC Trojans"` 23:33Z.
+
+## 2026-11-27 00:42:41Z READING lane live-player-exit-gate (#814): NCAAB off_floor, TCU's Robbie Avila @ Creighton, read live (board withdrew before the plan)
+- betting change: no (reading only)
+- **Player:** TCU starter Robbie Avila (ESPN event 401920538), out 23:37:52Z, back in 23:47:08Z, out again at H1 3:56 (23:53:01Z, 5:53 PM CST). No play names him after that (ESPN pbp read 00:48Z).
+- **Producer:** `PLAYER_OUT ... off_floor key=True since=2026-11-26T23:53:01Z` at 00:42:34.976Z, then the tick at 00:42:41.556Z with `refused_games=1`. Still refused at the ticks of 00:44:45Z, 00:46:50Z and 00:48:48Z. 79 priceable full-game rows in the 30 min before the flag.
+- **Hold:** `fail key_player_out TCU:Robbie Avila:off_floor` (snapshot 18:42:41 CST).
+- **Board:** book_grid ncaab index 3 -> 2 at 00:42:45.457Z, 4 s after the refusal tick. The ledger has no TCU full-game row after 00:42:10Z; only `h2 segment_pricing_disabled` rows, at 00:42:45Z.
+- **Plan:** the first plan after the exit, 18:47:49 CST, had no `key_player_out` refusal and 0 mentions of TCU Horned Frogs or Creighton.
+- **Tally (11-26):** 4 priced off_floor exits read live (Cincinnati, Davidson, USC, TCU). The board withdrew the game within 4-34 s each time. The plan backstop fired once (Davidson, inside a 22 s gap); one lift so far (USC).
+- verify: `C:/tmp/lpeg/w1126/tcu.sh` 00:43:17Z, hold probe 00:43Z, `led_timeline.py` 00:44Z, `plan_wait.ps1` / `kpo_tcu.py` 00:48Z, `pbp_name.py 401920538 Avila` 00:48Z.
