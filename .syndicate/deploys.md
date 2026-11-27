@@ -63794,6 +63794,7 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **verify (owed):**
   - The first production `"abandoned_running"` line, with no `WORKER TIMEOUT` after it. That is the branch proof; it needs a recycle whose request outlives the graceful wait (1 since 11-22).
   - Kills per CST day, both kinds, against 11-01..11-23 (kills on 7 of 23 days, 12 kills): the lane goal.
+- **Claim released** 04:38:28Z (10:38:28 PM CST); lane `layer2-rail-monitor` was told it was free.
 
 ## 2026-11-27 04:39:59Z (10:39:59 PM CST 11-26) -- DEPLOY (claimed web, ff + reload-web, no env change): the rail card shows a flagged full-game total's OWN live total as OURS, `fe46fb249` (lane `layer2-rail-monitor`, user "Yes, fix it here" + "Yes, lend it") -- **LOADED on web; MET**
 - betting change: no (display only: `liveRailSummary`'s OURS string and its tooltip; the flag rule, `freshEdges` and every row are untouched, and nothing that places or sizes money reads the rail card)
@@ -63827,3 +63828,20 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **NFL (Thanksgiving, 3 games):** 10 distinct PLAYER_OUT players in DAL @ PHI and the KC game, all `key=False`. They include `PHI Saquon Barkley reason=injury key=False`. No refusal, so nothing to read. Whether a lead RB should be key is NOT examined here (a question for the NFL key-player set, not this lane).
 - **Not exercised:** live player props (NBA only this season; no NBA key exit in the window), and the backstop in NHL / soccer / NFL.
 - verify: `C:/tmp/lpeg/w1126/watch.log` (all verdicts), refresh-worker.log nfl PLAYER_OUT grep 07:02Z.
+
+## 2026-11-27 13:45:40Z (7:45 AM CST) -- READING (no deploy): web kills for 11-26 CST, and the first 9.2 h of the running-request exit fix `b709934b2` (lane `web-silent-worker-kills`; read-only, nice 19) -- **0 kills since the load; the new exit branch has not run yet**
+- betting change: no (reading only)
+- **Source:** scratchpad `wsk_day_reading2.sh` (web.log.1, rotated 01:09:35Z 11-26, then web.log, in order) at 13:45:40Z, and `wsk_exit_verify.sh 2026-11-27T04:35` at 13:46:39Z. Fleet head `fe46fb24908a` (lane `layer2-rail-monitor`'s 04:39:59Z load), the fix on disk, healthz 200.
+- **11-26 CST (full day):**
+  - 1 `WORKER TIMEOUT`, 14:42:42Z (8:42:42 AM CST), the recycle kind that `b709934b2` addresses: a timer recycle at 14:41:35.6Z, the drain left a request busy, the stock exit (`request_running`) at 14:42:11.6Z. The abort's traceback is `threading._shutdown` -> `concurrent/futures/thread.py _python_exit` -> `t.join()`, which is the join the fix skips. SIGABRT was enough: 0 SIGKILLs.
+  - 0 silent kills (no timeout without a recycle before it).
+  - 644 boots: 608 timer recycles, 26 request recycles, 135 deferrals, 0 aborts, 644 watch armings, 0 guard errors. Exits: 641 fast, 1 stock; 3 drains with a request still in flight. 8,257 access lines.
+- **11-27 CST to 7:45 AM:** 0 timeouts, 0 SIGKILLs. 19 boots (17 timer, 2 request), 19 fast exits, 0 stock exits, 0 drains busy.
+- **Since the load (04:35:28Z -> 13:46:39Z, 9.2 h):** 59 recycles (59 boots, 59 drains, 59 fast exits). 0 drains with a request still in flight, 0 `abandoned_running`, 0 stock exits, 0 `WORKER TIMEOUT`, 0 SIGKILLs, 0 `WEB_MEMORY_GUARD_ERROR`, 0 tracebacks. None of the 59 recycles left a request behind, so the new branch had nothing to do. **The branch proof is still owed.**
+- **The web master restart, dated:** master pid 413 logged `Starting gunicorn 21.2.0` at **17:12:07Z 11-26** (11:12 AM CST). That is the 2026-11-26 17:10:07Z UNPLANNED LOAD (Windows restarted by hand; the fleet came back by its task at 17:12Z), not a web deploy. The 04:35:28Z entry's estimate from the pid's age (near 17:26Z) was 14 min late: `ps etimes` on WSL runs behind the log (at 13:46:39Z it reads 73,616 s, which gives 17:19:43Z). Date restarts by the log's start line.
+- **The rail monitor's reload** (04:39:59Z, `fe46fb249`, display only) retired workers 266330 / 266831 4.5 min after this lane's load; master 413 unchanged, the fix still on disk.
+- **Kills per CST day:**
+  - Base rate 11-01..11-23: kills on 7 of 23 days, 12 kills (11 timeouts, plus 1 SIGKILL with no timeout on 11-23).
+  - Since the GC revert: 11-24 0, 11-25 0, 11-26 1 (before the exit fix loaded), 11-27 0 to 7:45 AM.
+  - Too few days to judge. Against the base rate a day is kill-free with p = 16/23 = 0.696, so 3 kill-free days happen by chance 34% of the time.
+  - **Verdict rule (set here, before the data):** GOAL MET when the 9 CST days 11-27..12-05 have 0 kills (0.696^9 = 0.038 by chance). Any kill before then gets its kind read (recycle or silent) and its own diagnosis. The first reading that can close it is 7:45 AM CST 12-06.

@@ -676,3 +676,10 @@ Read-only at nice 19. Scratchpad: `wsk_gctune_overnight.sh`, `wsk_recycle_hourly
 - `b709934b2`: a recycled worker that still has a request running after the drain and the 30 s graceful wait now leaves through `os._exit(0)`. Its `WEB_WORKER_FAST_EXIT` line carries `abandoned_running`. Before, the stock exit joined the request thread with no heartbeat until the master's 60 s timeout (the 14:42:42Z 11-26 kill).
 - A real gunicorn reproduces the chain: `RunningRequestExitTests` (`f9b72e447`). On, the worker leaves and there is no timeout. Switch off, `WORKER TIMEOUT`.
 - Loaded on web 04:35:28Z 11-27; MET at +15 s (2026-11-27 04:35:28Z entry in deploys.md). The production proof is the first `abandoned_running` line.
+
+## 2026-11-27 13:45Z (7:45 AM CST) -- first reading after the exit fix
+
+- 11-26 CST: 1 kill, the 8:42:42 AM recycle kind, before the fix loaded. Its abort traceback ends in `_python_exit` -> `t.join()`: the stock exit's join of the request thread, which `b709934b2` skips.
+- 9.2 h since the load: 59 recycles, all fast exits, 0 kills. None left a request behind, so `abandoned_running` has not appeared yet.
+- The web master restart was the hand restart of Windows (master start 17:12:07Z 11-26), not a deploy. `ps etimes` on WSL ran 14 min behind the log's start line.
+- Verdict rule: 0 kills over the 9 CST days 11-27..12-05 (0.038 by chance against the 11-01..11-23 base rate). Details in the 2026-11-27 13:45:40Z entry in deploys.md.
