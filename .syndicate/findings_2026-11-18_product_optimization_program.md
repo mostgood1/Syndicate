@@ -728,7 +728,7 @@ Every "default-off" below was verified in the code on main at `388d77705`. This 
 | #852 + #835 (+ #859) NCAAF live totals | yes: `live_blowout_damping.py:33,49,57`; `live_total_dispersion.py:93-94`; `live_endgame.py:59-63` | NCAAF lanes. The user chose "Queue for 12-08 (Recommended)" (11-20 ~9:40 AM CST, an option label, conditional) and #859 "queue the end-game load set for the 12-08 window" (11-21 ~6:10 PM CST) | 11-21: 2 of 3 checks pass. The 11-28 slate decides | yes | NOT READY until the 11-30 check |
 | #845 Understat splice `SYNDICATE_SOCCER_UNDERSTAT_SPLICE` | yes: `build_soccer_artifacts.py:161,165-166` | todo #845; "queue the splice for the 12-08 window" (11-18 4:57 PM CST) | Understat still down. Real-gap worse +0.0084 [+0.0015, +0.0185]; the backtest favours it at 4+ rounds | yes | NOT READY until the 12-05/06 re-read is shown to the user (its own condition) |
 | L1 hold-value exits `on` `SYNDICATE_EXIT_HOLD_VALUE` | yes: `exit_hold_value.py:52-56,80-87`, only exactly `on` / `shadow` | `hold-value-exits`; "Yes, ride 11-24" (shadow only) | shadow loaded and logging (§12.4 L1); verdict 12-07 | yes | **NOT READY** (12-07) |
-| #861 one model number `SYNDICATE_LAYER2_ONE_MODEL_NUMBER` | yes: `layer2_row_context.py:400-402` | `surface-consistency-oversight`; "Queue for 12-08" (11-24 ~11:25 AM CST) | not assessed here | per its lane | queued by the user; not assessed |
+| #861 one model number `SYNDICATE_LAYER2_ONE_MODEL_NUMBER` | yes: `layer2_row_context.py:400-402` | `surface-consistency-oversight`; "Queue for 12-08" (11-24 ~11:25 AM CST) | not assessed here; #847 (b) rides with it (see below) | per its lane | queued by the user; not assessed |
 | Polymarket stale cancel `LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_STALE_CANCEL` | yes: `polymarket_stale_cancel.py:100-107` (off, shadow, on) | `polymarket-stale-cancel`; "yes, add the Polymarket stale cancel to the 12-08 queue" (relayed, 11-21); final yes owed | not assessed here | per its lane | queued; not assessed |
 | #857 web anon limit `WEB__SYNDICATE_WEB_WORKER_ANON_LIMIT_MB=1500` | env only, absent = today | `web-recycle-anon-limit`; "Next scheduled restart" (11-25 ~10:10 AM CST) | — | no | not a betting change |
 | #850 host overdraft | not verified here | "Yes, build it" covered the build only | — | — | proposal |
@@ -736,17 +736,29 @@ Every "default-off" below was verified in the code on main at `388d77705`. This 
 **READY for the 12-08 window: #847 (c) and (d) only.** Both are calibration loads. Their money predictions are "no
 detectable change"; they ship for honest rank, stake and live edges.
 
-**Outside the window, no betting change: #847 (b) display, `SYNDICATE_CELL_CALIBRATION_DISPLAY`.**
-- H-F graded exactly the probability (b) shows.
-- The code adds the calibrated columns beside the raw ones and says nothing ranks, admits or stakes on them
-  (`layer2_board.py:5503-5509`). The lane classified it "not a betting change". This run did not trace every reader
-  of those columns.
-- Loading it needs the user's OK, claims, a preflight and an env load.
+**#847 (b) display, `SYNDICATE_CELL_CALIBRATION_DISPLAY`: QUEUED for 12-08 by the user, not a betting change.**
+CORRECTED 11-26 ~10:35 PM CST, from lane `cell-calibration-847-b-load`'s message, verified on main. The first version
+of this paragraph said "the user's OK" was owed and "H-F graded exactly the probability (b) shows". Both were wrong.
+- **The user's decision:** "load (b) in the next window", typed ~10:12 PM CST 11-26 in session 77184c63, after the H-F
+  PASS. This was before this section was written; the run missed it. Recorded in
+  `findings_2026-11-18_cell_calibration.md` §6 (`5e468c155`, with kit and predictions P-b1..P-b6) and todo #847
+  (`1eefc2652`). The load is GLOBAL `=on`, `--betting-change no`.
+- **What H-F covers:** the scorecard grades `p_model = fair + model_edge_pct/100` (`model_scorecard.py:33`). (b)
+  calibrates the card's shown `model_prob` (`layer2_board.py:5509`) AFTER #861's substitution (`:5464-5469`).
+  - With #861 `SYNDICATE_LAYER2_ONE_MODEL_NUMBER` on, a pregame card shows the graded number.
+  - With #861 off, it shows the served projection. That differs from fair + model edge by more than 0.5 pp on 323 of
+    1,948 eligible cards (16.6%; served board 04:24Z 11-27, the #847 lane's reading, cell findings §6.1).
+  - **So (b) is graded only when it rides WITH #861.** It is queued to ride with it. If #861 is dropped, (b) goes back
+    to the user.
+- **Readers (the gap this run left):** the only reader of (b)'s four card fields (`model_probability_cal`, `cal_k`,
+  `cal_cell`, `model_ev_cal_pct`) is `intelligence.html`. `decision_record`, `cheat_sheets` and
+  `surface_consistency_check` read the same-named field on SHORTLIST rows, which is the pricing seam's fair + edge
+  (cell findings §6.2).
 
 ### 12.6 What is owed
 
 - **The user:**
-  - #847 (b) now, or not;
+  - ~~#847 (b) now, or not~~ DECIDED: "load (b) in the next window" (~10:12 PM CST 11-26), riding with #861 (§12.5);
   - #847 (c) / (d) for 12-08;
   - #816 needs a default-off build before it can be a candidate;
   - #836 `on` is the owner's ask, without an outcome grade.
