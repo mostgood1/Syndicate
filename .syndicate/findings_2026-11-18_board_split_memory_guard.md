@@ -1268,3 +1268,36 @@ Without both, nothing below is read.
 - **Queue entry:** the fleet-watcher's 12-08 queue (memory `project_betting_window_queue.md`), beside the #850
   host-headroom switch. It has a different key, and either loads alone.
 - **Revert:** kit `restore <backup>`, then a drained down/up (allowed outside a window).
+
+## 25. QUEUED FOR THE 12-08 WINDOW: the host-headroom switch too (2026-11-27 ~12:15 PM CST, user "Queue it too")
+
+- **The user's words.** The user typed "Queue it too" in session 644b05ff's chat, answering "Queue the host-headroom
+  switch (1024 MB) for 12-08 as well?".
+  - The message before it set out the evidence from §21 STEP 0b:
+    - at 1024 / reserve 2048, 43 of 44 matched refusals would be granted (an upper bound);
+    - J cut matched evening refusals from 30 to 5 and 9;
+    - the unexplained 1,120 MB host low at 6:13 PM CST 11-24.
+  - It said why they should share the window: one restart of the gate's count, and readings in different hours.
+  - **The LOAD yes on the day is still owed.**
+- **The line:** `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB=1024` (§18; code `9a9a0b207`; absent =
+  off; the reserve stays at its default 2048). It loads in the same drained down/up as §24's head-rule line, with
+  `--betting-change yes`.
+- **Re-checked 18:18Z (12:18 PM CST) 11-27, read-only:**
+  - kit `C:\tmp\w1208_hosthead\kit_env_hosthead.sh`, sha256 787198103fa165a3;
+  - `kit_selftest_hosthead.sh` PASS on a dummy file: apply, idempotent re-apply, 3 bad values refused, restore exact,
+    mode 600;
+  - the key is ABSENT: 0 lines in local_production.env, ABSENT on all 3 roles, 0 in refresh-worker's environ (pid
+    469);
+  - the fleet checkout has `9a9a0b207`.
+- **Correction to §24:** its `fleet_checkout_has_code=8e2149f0f NO` was true at 16:19Z. The fleet was ff'd to
+  `8455f25c0` at 10:29:54 AM CST (16:29:54Z) and to `c2fb7f49b` at 10:42:19 AM CST 11-27, both of which carry
+  `8e2149f0f`.
+  - The code is on disk and unloaded: the parent booted on `e37a9697f`.
+  - Any refresh-worker restart before 12-08 arms it as `head_rule=any`, today's rule.
+- **Reading the two together after the load:**
+  - The head rule acts 3-6 AM CST; this switch acts in the 5-10 PM CST evening.
+  - A morning parent recycle frees host memory, so the evening refusal count can fall for that reason alone.
+  - So P-H1..P-H5 (§18.1) are read with that day's recycle (yes or no) beside them, and a fall in refusals on a
+    recycle day is not credited to this switch.
+- **Revert:** kit `restore <backup>`, then a drained down/up (allowed outside a window). P-H4 / P-H5 (an OOM kill or
+  rc -9) mean revert.
