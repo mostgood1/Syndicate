@@ -24,7 +24,9 @@ Then it joins lines on (event_id, market, player, side, line, segment) and repor
 block per check:
 
   same_price_ev      pairs at the same book and price whose EVs differ by more than 0.5
-  pick_flag          lines where Layer 2 Suggested and the cheat sheet's flag disagree
+                     once the sheet is re-priced at the board's CURRENT fair (below)
+  pick_flag          cheat-sheet rows whose verdict is not the board's pick (the Layer 2
+                     Suggested flag the sheet copied when it was published)
   ask_headline       Ask headline rows that are not the board's picks, or not in
                      the asked sport (model-skill counts reported, not judged)
   sim_attribution    Ask card text "Our sim has ... at X%" where X is the market fair
@@ -34,6 +36,25 @@ block per check:
                      same line
   sport_card_bias    NHL sport-card win probability minus the Layer 1 consensus fair,
                      per side (mean signed pp)
+
+THE CHEAT SHEET IS A SNAPSHOT `[2026-11-27, findings Reading 5]`. A sheet is published a
+few times a day and frozen; the board rebuilds every few minutes. So a sheet row read
+beside the CURRENT board is hours older than it, and the first two checks used to count
+that age as disagreement. Measured 2026-11-27 15:29Z: of 25 same-price EV gaps, 10 were
+this check comparing the board's GROSS `ev_pct` with the sheet's NET `ev_market` (the
+board's own `ev_net_pct` matched), and 15 were a fair that moved after the 13:30Z sheets.
+The fair is a consensus over every book, so it moves at an unchanged price; the 11-23
+note "age cannot do that" was wrong. Now:
+  * EV is the number the board judges: `ev_net_pct` where the row carries one, else
+    `ev_pct`. The sheet's EV is moved to the board's current fair with the sheet's own
+    formula (`cheat_sheets.ev_pct`, the board's fee). A pair still more than 0.5 apart
+    disagrees on the RULE; one inside 0.5 only after that move is `fair_moved` (age),
+    reported and not counted.
+  * The sheet copies the board's flag at publish (`build_cheat_sheets`, "suggested") and
+    its v4 verdict is that pick, so the flag is checked inside the sheet: `suggested`
+    must equal verdict == "value". A board flag that changed since the sheet is
+    `changed_since_sheet`, reported and not counted; without the board build the sheet
+    read, a change cannot be told from an error.
 
 It writes nothing to the fleet. Exit codes: 0 every check within its limit, 1 one or
 more checks over, 2 a fetch failed (the reading is incomplete, so it is not a pass).
@@ -55,6 +76,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(1, str(Path(__file__).resolve().parents[1]))  # the repo root: the sheet's own EV formula
 
 MAX_IN_FLIGHT = 3
 EV_TOLERANCE_PTS = 0.5
@@ -125,6 +147,9 @@ def layer2_records(payload: dict) -> dict[tuple, dict]:
         k = line_key(r.get("event_id"), r.get("market"), r.get("player_name"), r.get("side"), r.get("line"), r.get("segment"))
         if not k[0]:
             continue
+        v2 = r.get("score_v2") if isinstance(r.get("score_v2"), dict) else {}
+        ev_net = v2.get("ev_net_pct", r.get("ev_net_pct"))
+        fee = v2.get("fee_per_contract", r.get("fee_per_contract"))
         out.setdefault(
             k,
             {
@@ -132,6 +157,9 @@ def layer2_records(payload: dict) -> dict[tuple, dict]:
                 "model": r.get("model_probability_cal"),
                 "sim_raw": sim_raw,
                 "ev": r.get("ev_pct"),
+                # the EV the Suggested flag judges (net of the venue's fee); gross where the row carries no net
+                "ev_judged": ev_net if ev_net is not None else r.get("ev_pct"),
+                "fee": fee if isinstance(fee, (int, float)) and not isinstance(fee, bool) and fee >= 0 else 0.0,
                 "book": q.get("bookmaker"),
                 "price": q.get("price"),
                 "suggested": bool(r.get("suggested")),
@@ -142,8 +170,17 @@ def layer2_records(payload: dict) -> dict[tuple, dict]:
     return out
 
 
+def _rebuilt_events(payload: dict) -> set:
+    """Games the builder rebuilt from the quote logs (started before any sheet priced them): the board never judged
+    their rows, so the sheet keeps its price rule there (`cheat_sheets.board_judgement` returns None)."""
+    games = payload.get("games") or []
+    games = games.values() if isinstance(games, dict) else games
+    return {g.get("event_id") for g in games if isinstance(g, dict) and g.get("rebuilt")}
+
+
 def cheat_records(payload: dict) -> dict[tuple, dict]:
     out: dict[tuple, dict] = {}
+    rebuilt = _rebuilt_events(payload)
     for r in (payload.get("rows") or []) + (payload.get("game_lines") or []):
         ck = r.get("check") or {}
         k = line_key(r.get("event_id"), r.get("market"), r.get("player"), r.get("side"), r.get("line"))
@@ -159,6 +196,8 @@ def cheat_records(payload: dict) -> dict[tuple, dict]:
                 "price": ck.get("price"),
                 "suggested": bool(r.get("suggested")),
                 "verdict": ck.get("verdict"),
+                "rebuilt": r.get("event_id") in rebuilt,
+                "generated_at": payload.get("generated_at"),
             },
         )
     return out
@@ -174,8 +213,21 @@ def _same_number(a: Any, b: Any) -> bool:
 # ---------------------------------------------------------------- checks
 
 
+def _fair_shift(a: dict, b: dict) -> float:
+    """How far the sheet's EV moves when its fair moves to the board's, at the same price and the board's fee --
+    the sheet's own formula, so a fair move is never read as a rule difference (or a rule difference as a move)."""
+    from syndicate.features.shared.cheat_sheets import ev_pct
+
+    if a.get("fair") is None or b.get("fair") is None:
+        return 0.0
+    now = ev_pct(float(a["fair"]), a.get("price"), float(a.get("fee") or 0.0))
+    then = ev_pct(float(b["fair"]), a.get("price"), float(a.get("fee") or 0.0))
+    return 0.0 if now is None or then is None else now - then
+
+
 def check_same_price_ev(l2: dict, other: dict, *, name: str, tolerance: float = EV_TOLERANCE_PTS) -> dict:
-    """Same line, same book, same price: the EVs must agree. Only the fair can differ."""
+    """Same line, same book, same price: once the other surface is moved to the board's current fair, the EVs must
+    agree. The board's side is the EV its Suggested flag judges (`ev_judged`: net of the fee where carried)."""
     pairs = []
     for k, a in l2.items():
         b = other.get(k)
@@ -183,35 +235,56 @@ def check_same_price_ev(l2: dict, other: dict, *, name: str, tolerance: float = 
             continue
         if not a.get("book") or a.get("book") != b.get("book") or not _same_number(a.get("price"), b.get("price")):
             continue
-        if a.get("ev") is None or b.get("ev") is None:
+        if a.get("ev_judged") is None or b.get("ev") is None:
             continue
-        pairs.append((k, float(a["ev"]), float(b["ev"]), a.get("book"), a.get("price")))
-    bad = [p for p in pairs if abs(p[1] - p[2]) > tolerance]
+        delta = float(a["ev_judged"]) - float(b["ev"])
+        pairs.append((k, float(a["ev_judged"]), float(b["ev"]), delta - _fair_shift(a, b), delta, a, b))
+    bad = [p for p in pairs if abs(p[3]) > tolerance]
+    moved = [p for p in pairs if abs(p[3]) <= tolerance and abs(p[4]) > tolerance]
+
+    def ex(p):
+        k, e1, e2, resid, _d, a, b = p
+        return {"line": "|".join(map(str, k)), "book": a.get("book"), "price": a.get("price"), "layer2_ev": round(e1, 2),
+                f"{name}_ev": round(e2, 2), "after_fair_move": round(resid, 2),
+                "fair": [None if b.get("fair") is None else round(float(b["fair"]), 4),
+                         None if a.get("fair") is None else round(float(a["fair"]), 4)]}
+
+    stamps = sorted({str(b.get("generated_at")) for *_, b in pairs if b.get("generated_at")})
     return {
         "check": f"same_price_ev:{name}",
         "n": len(pairs),
         "bad": len(bad),
         "limit": 0,
-        "examples": [
-            {"line": "|".join(map(str, k)), "book": bk, "price": pr, "layer2_ev": round(e1, 2), f"{name}_ev": round(e2, 2)}
-            for k, e1, e2, bk, pr in sorted(bad, key=lambda p: -abs(p[1] - p[2]))[:5]
-        ],
+        "fair_moved": len(moved),
+        "sheets_generated": [stamps[0], stamps[-1]] if stamps else None,
+        "examples": [ex(p) for p in sorted(bad, key=lambda p: -abs(p[3]))[:5]],
+        "moved_examples": [ex(p) for p in sorted(moved, key=lambda p: -abs(p[4]))[:3]],
     }
 
 
 def check_pick_flag(l2: dict, cheat: dict) -> dict:
+    """Inside the sheet: its verdict is "value" exactly where the board's flag (copied at publish) is Suggested.
+    A rebuilt game's rows were never judged by the board and keep the price rule, so they are not counted."""
+    judged = [(k, b) for k, b in cheat.items() if not b.get("rebuilt")]
+    bad = [(k, b) for k, b in judged if b["suggested"] != (b.get("verdict") == "value")]
     joined = [(k, l2[k], cheat[k]) for k in cheat if k in l2 and not l2[k].get("live")]
-    bad = [(k, a, b) for k, a, b in joined if a["suggested"] != b["suggested"]]
+    changed = [(k, a, b) for k, a, b in joined if a["suggested"] != b["suggested"]]
     return {
-        "check": "pick_flag:layer2_vs_cheat",
-        "n": len(joined),
+        "check": "pick_flag:cheat_vs_board",
+        "n": len(judged),
         "bad": len(bad),
         "limit": 0,
-        "cheat_flagged": sum(1 for _, _, b in joined if b["suggested"]),
-        "both_flagged": sum(1 for _, a, b in joined if a["suggested"] and b["suggested"]),
+        "cheat_flagged": sum(1 for _, b in judged if b["suggested"]),
+        "on_board_now": len(joined),
+        "changed_since_sheet": len(changed),
         "examples": [
-            {"line": "|".join(map(str, k)), "layer2": a["suggested"], "cheat": b["suggested"], "layer2_ev": a.get("ev"), "cheat_ev": b.get("ev")}
-            for k, a, b in bad[:5]
+            {"line": "|".join(map(str, k)), "board_flag_at_publish": b["suggested"], "verdict": b.get("verdict"), "cheat_ev": b.get("ev")}
+            for k, b in bad[:5]
+        ],
+        "changed_examples": [
+            {"line": "|".join(map(str, k)), "layer2_now": a["suggested"], "at_publish": b["suggested"],
+             "layer2_ev": a.get("ev_judged"), "cheat_ev": b.get("ev")}
+            for k, a, b in changed[:3]
         ],
     }
 
@@ -445,7 +518,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"surface consistency  date={day}  read {started} .. {finished}")
         for c in checks:
-            extra = {k: v for k, v in c.items() if k not in ("check", "n", "bad", "limit", "verdict", "examples")}
+            extra = {k: v for k, v in c.items() if k not in ("check", "n", "bad", "limit", "verdict") and not k.endswith("examples")}
             print(f"  {c['verdict']:4s} {c['check']:34s} bad {c['bad']:>4} of {c['n']:<5} {json.dumps(extra, default=str) if extra else ''}")
         if errors:
             print(f"  FETCH ERRORS (reading incomplete): {errors}")

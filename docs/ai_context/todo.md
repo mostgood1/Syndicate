@@ -1,6 +1,7 @@
 # Syndicate TODO — canonical cross-session list
 
 ### `#861` — **ONE DECISION RECORD PER LINE, READ BY EVERY SURFACE. Today every surface starts from the same Layer 2 rows, then re-derives fair, price, EV and the pick with its own rules. Per-sport pages run a parallel raw-sim producer. Measured on the fleet 2026-11-23 19:25-19:39Z: 8 of 8 cross-surface checks over their limit. OVERSIGHT LANE OPEN; the instrument is built; no surface changed yet** `[2026-11-23, lane surface-consistency-oversight, session d5aa3287; user "we need a session that has oversight over the entire Syndicate application", chose "Do it here"; findings `.syndicate/findings_2026-11-23_surface_consistency.md`]`
+- **Instrument FIXED 2026-11-27** (user "Fix the check"; findings Reading 6): it compares the board's after-fee EV, re-prices the sheet at the board's current fair, and checks the sheet's verdict against the board flag it copied. 16:22Z: cheat-sheet EV 0 of 225 (14 fair moves read as age), pick flag 0 of 873; still over: `plan_vs_orders` 2 of 3, `venue_price_hidden` 1 of 2 (live book, few orders).
 - **Instrument:** `scripts/surface_consistency_check.py` (read-only, 3 in flight, exit 0 / 1 over / 2 incomplete; 11 tests). It ran at 19:38Z:
   - `same_price_ev` (board vs cheat sheet): 35 of 235;
   - `pick_flag`: 42 of 296;

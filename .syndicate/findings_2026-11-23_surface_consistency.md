@@ -803,7 +803,7 @@ that places or sizes money reads these pages.
   0.3 pt (betrivers +112, board Suggested now, sheet not). The last is probably the flag's own age (Suggested also
   depends on rank and caps); not proven without the 13:30Z board.
 - **Owed in the instrument:** compare the board's `ev_net_pct` where it carries one, and report a pair whose fair or
-  best price moved since the sheet's `generated_at` as age, not as a disagreement.
+  best price moved since the sheet's `generated_at` as age, not as a disagreement. DONE 11-27, Reading 6.
 
 **`plan_vs_orders` is too small to read.** 11-27 to 15:29Z: 2 live orders (both Kalshi, both board Suggested), 1 not in
 the 11-position plan. 11-26 (read the same morning): 2 live orders, both not in the 10-position plan, 1 on the board, 0
@@ -812,6 +812,48 @@ on the few orders there are.
 
 **Not covered by the instrument:** the per-sport pages other than NHL (NBA, NCAAF, NFL, NCAAB; Reading 1 item 6), the
 rail (age-confounded, Reading 1 item 7), and Layer 1 beyond the NHL moneyline.
+
+## Reading 6 -- the instrument fixed `[2026-11-27 16:22:49Z-16:23:48Z, fleet, read-only; user "Fix the check"]`
+
+**The change** (`scripts/surface_consistency_check.py`, tooling only: no role runs it, nothing to deploy):
+- `same_price_ev` compares the EV the board's Suggested flag judges: `score_v2.ev_net_pct` where the row carries it,
+  else `ev_pct`. The sheet's EV is moved to the board's CURRENT fair with the sheet's own formula
+  (`cheat_sheets.ev_pct`, the board's `fee_per_contract`). A pair still more than 0.5 pt apart differs on the rule and
+  is counted; a pair inside 0.5 only after that move is `fair_moved`, reported and not counted.
+- `pick_flag` (renamed `pick_flag:cheat_vs_board`) checks inside the sheet. The builder copies the board's flag at
+  publish (`build_cheat_sheets`, `"suggested": bool(r.get("suggested"))`), and the v4 verdict is that pick. So the
+  sheet's `suggested` must equal verdict == "value", on every row of a game the board judged (rebuilt games keep the
+  price rule and are skipped). A board flag that changed since the sheet is `changed_since_sheet`, reported and not
+  counted: without the board build the sheet read, a change cannot be told from an error.
+- Measured before the change, 15:30Z: 41 + 1 of 42 sheet picks carry verdict "value", and 0 rows disagree.
+- Tests: 16 pass (`tests/test_surface_consistency_check.py`, 7 new: net vs gross, a moved fair read as age and a
+  rule gap as bad, the fee formula at Kalshi +9900, the sheet refusing the board's pick, a board change since the
+  sheet, a rebuilt game). Each has a case that must pass and one that must fail.
+
+**The reading, 16:22:49Z** (board written 16:21:51Z; sheets generated 13:30:23-13:35:36Z), exit 1:
+
+| check | result | note |
+|---|---|---|
+| `same_price_ev:cheat` | 0 of 225 | 14 fair moves; after the move all 14 agree within 0.01 pt |
+| `pick_flag:cheat_vs_board` | 0 of 873 | 42 picks; 292 rows on the board now, 37 changed since the sheet |
+| `ask_headline:all` | 0 of 5 | 1 losing model, 4 unmeasured (reported, not judged) |
+| `ask_headline:nba` | 0 of 0 | the board has 0 NBA Suggested rows now (below), so Ask's NBA headline is empty |
+| `sim_attribution:ask_cards` | 0 of 13 | |
+| `plan_vs_orders` | 2 of 3 | 13 plan positions; 3 live orders, all Kalshi, 2 on the board and Suggested |
+| `venue_price_hidden` | 1 of 2 | Kalshi +117 bought; the board's best is prophetx +114, and its grid has Kalshi at +108 |
+| `sport_card_bias:nhl_away_ml` | 0 of 15 | mean +0.85 pp |
+
+**What the 37 changes are** (16:23:48Z, the board's `suggested_reasons` on each): 31 NBA rows the board dropped since
+7:30 AM CST, plus 2 NHL dropped and 4 added (NCAAB 1, NFL 2, NCAAF 1). Reasons on the dropped rows:
+`suspect_stale_quote` 19, `single_book_fair` 12, `ev_below_min` 4. The board's NBA pregame board now has **0 Suggested
+of 627**, and 582 carry `suspect_stale_quote`. The NBA cheat sheet still shows its 7:30 AM picks: by design the
+sheet's picks are frozen, so a reader of the sheet sees NBA picks the board no longer makes. Whether the stale flag is
+right is the 11-23 lead (1,100 of 1,128 NBA lines stale at 1:30 PM CT on game day), not followed here.
+
+**The one order priced better than the board** is the 1e "not verified" item, now seen once. The live book paid
+Kalshi +117 where the board's grid holds Kalshi at +108 and its best is prophetx +114 (order EV +5.15, board +4.18).
+The live book quotes the venue's own feed, the board the grid. One order cannot say how often or how stale; the
+order's placement time was not read.
 
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 

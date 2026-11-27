@@ -78,10 +78,75 @@ def test_same_price_ev_ignores_a_different_price():
     assert scc.check_same_price_ev(l2, moved, name="cheat")["n"] == 0
 
 
-def test_pick_flag():
+def _ev(p, price, fee=0.0):
+    from syndicate.features.shared.cheat_sheets import ev_pct
+
+    return ev_pct(p, price, fee)
+
+
+def test_same_price_ev_compares_the_boards_net_ev_not_its_gross():
+    # 2026-11-27: 10 of 25 "gaps" were the board's GROSS ev_pct against the sheet's NET ev_market.
+    fee = 0.02
+    net = _ev(0.5, 110, fee)
+    row = _l2_row(ev_pct=_ev(0.5, 110), score_v2={"ev_net_pct": net, "fee_per_contract": fee},
+                  quote={"fair_probability": 0.5, "bookmaker": "kalshi", "price": 110})
+    l2 = scc.layer2_records({"rows": [row]})
+    sheet_net = scc.cheat_records({"rows": [_cheat_row(check={"p_market": 0.5, "ev_market": net, "book": "kalshi", "price": 110})]})
+    assert scc.check_same_price_ev(l2, sheet_net, name="cheat")["bad"] == 0
+    # a sheet that showed the GROSS number at a fee venue is a real disagreement
+    sheet_gross = scc.cheat_records({"rows": [_cheat_row(check={"p_market": 0.5, "ev_market": _ev(0.5, 110), "book": "kalshi", "price": 110})]})
+    assert scc.check_same_price_ev(l2, sheet_gross, name="cheat")["bad"] == 1
+    # a row without score_v2 still compares its ev_pct (a sportsbook: gross == net)
+    plain = scc.layer2_records({"rows": [_l2_row()]})
+    assert plain[next(iter(plain))]["ev_judged"] == 4.0
+
+
+def test_same_price_ev_reads_a_moved_fair_as_age_and_a_rule_gap_as_bad():
+    # the board's fair moved 0.50 -> 0.52 after the sheet was published; the price stayed +110
+    row = _l2_row(ev_pct=_ev(0.52, 110), quote={"fair_probability": 0.52, "bookmaker": "betmgm", "price": 110})
+    l2 = scc.layer2_records({"rows": [row]})
+    then = scc.cheat_records({"rows": [_cheat_row(check={"p_market": 0.5, "ev_market": _ev(0.5, 110), "book": "betmgm", "price": 110})]})
+    out = scc.check_same_price_ev(l2, then, name="cheat")
+    assert out["n"] == 1 and out["bad"] == 0 and out["fair_moved"] == 1
+    # the same move, but the sheet's EV is 2 pts off its own fair: the rule differs
+    off = scc.cheat_records({"rows": [_cheat_row(check={"p_market": 0.5, "ev_market": _ev(0.5, 110) - 2.0, "book": "betmgm", "price": 110})]})
+    out = scc.check_same_price_ev(l2, off, name="cheat")
+    assert out["bad"] == 1 and out["fair_moved"] == 0
+    assert abs(out["examples"][0]["after_fair_move"] - 2.0) < 0.02
+
+
+def test_same_price_ev_moved_fair_uses_the_fee_formula():
+    # Kalshi at +9900 (1c): a 0.01 pp fair move is about 1 pt of EV -- measured 2026-11-27, it read as a rule gap
+    fee = 0.0007
+    row = _l2_row(ev_pct=_ev(0.0097, 9900), score_v2={"ev_net_pct": _ev(0.0097, 9900, fee), "fee_per_contract": fee},
+                  quote={"fair_probability": 0.0097, "bookmaker": "kalshi", "price": 9900})
+    l2 = scc.layer2_records({"rows": [row]})
+    then = scc.cheat_records({"rows": [_cheat_row(check={"p_market": 0.0096, "ev_market": _ev(0.0096, 9900, fee), "book": "kalshi", "price": 9900})]})
+    out = scc.check_same_price_ev(l2, then, name="cheat")
+    assert out["bad"] == 0 and out["fair_moved"] == 1
+
+
+def test_pick_flag_checks_the_sheets_verdict_against_the_board_flag_it_copied():
     l2 = scc.layer2_records({"rows": [_l2_row()]})
     assert scc.check_pick_flag(l2, scc.cheat_records({"rows": [_cheat_row()]}))["bad"] == 0
+    # the board's pick, but the sheet's verdict is not "value": the sheet refused the board's pick
+    refused = _cheat_row(check={"p_market": 0.5, "ev_market": 4.0, "book": "betmgm", "price": 110, "verdict": "neutral"})
+    assert scc.check_pick_flag(l2, scc.cheat_records({"rows": [refused]}))["bad"] == 1
+    # "value" on a row the board did not suggest
     assert scc.check_pick_flag(l2, scc.cheat_records({"rows": [_cheat_row(suggested=False)]}))["bad"] == 1
+
+
+def test_pick_flag_reports_a_board_change_since_the_sheet_without_counting_it():
+    l2 = scc.layer2_records({"rows": [_l2_row(suggested=False)]})  # the board dropped it after the sheet was published
+    out = scc.check_pick_flag(l2, scc.cheat_records({"rows": [_cheat_row()]}))
+    assert out["bad"] == 0 and out["changed_since_sheet"] == 1 and out["on_board_now"] == 1
+
+
+def test_pick_flag_skips_a_rebuilt_game_the_board_never_judged():
+    # a rebuilt row keeps the price rule: "value" with no board flag is not a disagreement
+    payload = {"rows": [_cheat_row(suggested=False)], "games": [{"event_id": "e1", "rebuilt": True}]}
+    out = scc.check_pick_flag({}, scc.cheat_records(payload))
+    assert out["n"] == 0 and out["bad"] == 0
 
 
 def test_ask_headline_flags_non_picks_and_off_sport_rows_and_only_reports_model_skill():
