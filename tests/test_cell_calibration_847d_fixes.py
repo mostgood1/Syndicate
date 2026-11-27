@@ -225,6 +225,33 @@ def test_fix2_never_reads_835_while_c_and_d_are_off(monkeypatch):
     assert cc.rank_stake_factor("ncaaf|totals|full|live", table=table) is None
 
 
+@pytest.mark.parametrize("value", ["on", "1", "true", "yes"])
+def test_fix2_835_alone_changes_nothing_while_c_and_d_are_absent(tmp_path, monkeypatch, value):
+    """#835 may load on 12-08 without (c) or (d): with only its key on, every consumer of all three fixes returns
+    exactly what it returns with the key off (and the off build is main's: the A/B in findings §8)."""
+    from syndicate.features.shared.live_gameline_ledger import build_records
+
+    cell = "ncaaf|totals|full|live"
+    _write_table(tmp_path, {cell: 0.10, "ncaaf|spreads|full|live": 0.52})
+    _write_overlay(tmp_path, shrink={cell: 0.5})
+
+    def observe():
+        out = []
+        for market, side, line in (("totals", "over", 229.5), ("spreads", "home", 3.5)):
+            row, verdict = _priced_live_row(sport="ncaaf", market=market, side=side, line=line)
+            out.append((row, verdict, ov.factor_for_row(row),
+                        build_records([row], sport="ncaaf", date_str="2026-12-08", generated_at="t")))
+        out.append((cc.rank_stake_factor(cell), cc.live_probability("ncaaf", "totals", "full", 0.7, 0.5)))
+        return json.dumps(out, sort_keys=True, default=str)
+
+    before = observe()
+    monkeypatch.setenv(S835, value)
+    cc.reset_cache()
+    ov.reset_cache()
+    assert observe() == before
+    assert '"cell_cal":' not in before and '"live_cell_calibration": {' not in before
+
+
 # ===================================================================== fix 3: the ledger marker
 
 
