@@ -88,3 +88,17 @@ The Windows task took **46 readings**, every 20 min from 10:03 AM to 1:03 AM CST
 - **Late games vanish from the Today rail at midnight** (new, measured above): (a) keep a still-live game of the previous Central day on the rail (display only), and separately (b) file NCAAB quotes by the Central tip day (a betting change, 12-08 window at the earliest).
 - **Close lane `nhl-live-join-stl-alias` and todo #860** (asked 11-25 7:15 PM CST after R-H MET, unanswered).
 - The next betting-change window is 12-08.
+
+## Fix (a) design check: the page has nothing to show after midnight (9:40 AM CST 11-27; user "Yes fix it here")
+
+- **Correction to the close.** I called (a) "a web change plus reload-web" on the belief that the Today rail's date filter dropped data the page already held. It does not hold it. The saved 12:43 AM reading (`C:\tmp\railmon\readings\20261127T064300Z`, both games still live, refresh-worker `index=2` until 06:50Z):
+  - `/api/board/game-chips` (date = 11-27): 494 chips, 0 live, **0 NCAAB chips dated 11-26** (NFL keeps 11-25/11-26 finals, soccer keeps 5 earlier days).
+  - `/api/intelligence/query` (combined board, 46.8 MB): **0 rows** naming Gonzaga; the 108 "Texas Tech" hits are football opponent histories.
+  - `/api/board/live-rail`: 0 rows. The fast poll can only refresh rows for games the board already shows.
+- **Why the board drops them:** `select_shortlist`'s lower date bound (todo `#779`, user 2026-11-10) drops a row whose game starts before midnight Central of the board's own date, because the `portfolio_commit` plan is built from the shortlist. Putting 11-26's games on the 11-27 board would be a betting change. Not proposed.
+- **Where the data is:** the prior-date carryover (`[layer2-prior-date-carryover]`) kept 11-26 alive until both games ended. `LAYER2_CARRYOVER date=2026-11-26 decision=built` 06:09:14Z..07:06:12Z, every 6-7 min, `live_rows` 17-31, `chips_live` 2 (1 from 06:58Z, 0 at 07:06Z), then `skip reason=nothing_live_at_last_build` 07:11:31Z. `GAME_CHIPS_PUBLISHED date=2026-11-26 chips=377` every ~6.5 min to 07:03:25Z, alternating with 11-27.
+- **So (a) is still web-only and display-only, but bigger than a page filter.** The Today rail has to read 11-26's own artifacts while its carryover runs:
+  - (a1) scoreboard card: `/api/board/game-chips` for today also returns the prior date's LIVE chips from the worker's published 11-26 artifact (an artifact read, no inline build), and the page keeps a live prior-day chip on Today. The card comes back with its score and clock, count 0, no flags. Files: `syndicate/blueprints/intelligence.py` (unclaimed) and `syndicate/templates/intelligence.html` (claimed by `surface-consistency-oversight` and `ncaab-total-overprojection`).
+  - (a2) card with rows and flags: also put the prior date's live L2-A rows on web's combined board read (`read_combined_intelligence_response`, `pipeline/intelligence_state.py`, claimed by `paper-alongside-live`, `web-silent-worker-kills`, `board-read-cold-share`). That read costs 5-18 s cold and is single-flighted; adding a date adds a shortlist read while the carryover runs.
+- **Nothing built.** Both need files other lanes hold; put to the user 9:40 AM CST.
+- Reader: `C:\tmp\railmon\carry_1127.sh` (copied to `scripts/rail_monitor/`).
