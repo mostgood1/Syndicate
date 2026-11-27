@@ -63960,3 +63960,43 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **verify (owed):** (1) the 3:30 PM CST build's `CHEAT_SHEET nba date=2026-11-27` line: `matchup_spots` / `pvp_scorers` against 0 / 1. It may stay low, because most groups are locked. (2) The first 11-28 NBA build (the 11:30 run said "no 2026-11-28 games with pregame props" yet): `matchup_spots` > 0 and `pvp_scorers` > 1. Then each sheet's `vs_opponent` on most primary rows. (3) After the board child's next boot, an NBA prop row's board sentence carries a "Matchup:" clause. (4) Record: NBA Matchups under rules v4 in `reviews/latest.md` once 50+ graded.
 - **Revert:** `git revert 3231ee493 9e6a68f43` on main, then ff + reload-web. Nothing was written to disk by the deploy.
 - **Claim released** 20:43:30Z (status: web free).
+
+## 2026-11-27 22:32:52Z (4:32:52 PM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): the NFL props page and the NFL / NCAAF / NBA picks pages lead with the board's picks `d72d4d536` (lane `surface-consistency-oversight`, todo #861 step 1f, user "Deploy to web now") -- **LOADED on web; MET**
+- betting change: no (display only, web routes; nothing that places or sizes money reads these pages)
+- **Why** (findings Reading 8, measured 11-27 20:28-20:31Z):
+  - `/nfl/props` headlined 2,189 rate cards at up to +50.9% "edge", with the vig left in. None of the top 50 were board Suggested.
+  - The NFL, NCAAF and NBA picks pages headlined their own sim or price-shopping cards. None showed the board's picks.
+- **Ride-alongs `3231ee493..d72d4d536`:** 13 commits, read before the merge. Runtime code:
+  - **This change:** `d2ae632bf` (`board_game_picks.py`, `blueprints/nba.py`, `blueprints/ncaaf.py`, `blueprints/nfl.py`, `nfl/props.py`, `nhl/picks.py`, `templates/nba/picks.html`).
+  - **todo #847 (d) fixes,** `a15d94bbc` + `d381a806a` (`cell_calibration.py`, `live_gameline_ledger.py`, `optimizer_overlay.py`; lane `cell-calibration-847d-fixes`, pushed on the user's "yes, push it"):
+    - They are inert while the (c) and (d) keys are absent, whatever #835's key says (findings_2026-11-18_cell_calibration 8.6-8.7).
+    - Read from each running role's own environ about 22:30Z: `SYNDICATE_CELL_CALIBRATION_LIVE_PROB`, `_RANK_STAKE`, `_RAIL`, `_DISPLAY`, `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION` and `SYNDICATE_OPTIMIZER_OVERLAY` are absent on web, refresh-worker and live-odds-worker.
+    - So this load is not a betting change. The fixes reach the workers at their next restart, still inert.
+  - **Everything else:** tests and ledger. The 6 locally modified files in the fleet checkout overlap none of it. `vendor/` is empty, and `betting_change.py` has no pending `yes`.
+  - **Labels in refresh-worker:** `board_game_picks` also runs in refresh-worker's NHL and soccer chip and home builds. Its label change (`spreads_alt` / `totals_alt` read as spreads and totals; `player_*` loses the prefix) reaches that role at its next restart, and is labels only.
+  - **`nfl/props.py`:** the diff is inside `build_nfl_props_page_context`, plus the new `attach_board_verdicts`. The helpers other modules import from it are unchanged.
+- **Preflight** `--betting-change no` with 3 expect / baseline pairs (baseline read 22:31:42Z): **CLEAR 22:32:26Z**. Claim acquired 22:31:26Z.
+- **ff + reload:**
+  - `git merge --ff-only d72d4d536` at **22:32:44Z** (`3231ee493` -> `d72d4d536`, ancestor checked first).
+  - `RELOAD_WEB {"elapsed_s": 2.7, "failures": 0, "state": "done"}` at 22:32:52Z.
+  - Workers 997833 / 1003425 -> **1003870 / 1003871**; master 413 unchanged.
+- **expect / measured** (served, 22:33:00Z; `C:\tmp\scc_oversight_d5aa\read_1f_after_load.py 2026-11-27`, rc 0 MET; saved `reading_1f_after_1127.json`):
+  - The board was built 22:27:19Z, the same build before and after the pages.
+  - `pages_leading_with_board` 0 -> 4: **MET**.
+  - `read_1f_rc` 3 -> 0: **MET**.
+  - `nfl_props_rate_cards_no_verdict` 2211 -> 0: **MET**. All 2,211 rate cards carry the board's verdict and a "Rate edge" badge.
+  - **Headlines:**
+    - NFL props: 7 board prop picks, all Suggested on that build.
+    - NFL picks 8, NCAAF picks 10, NBA picks 12 of 167.
+    - No page headlines a card that is not a board pick.
+  - **NFL rate-card verdicts:** 7 board pick, 870 not a pick, 1,334 not on the board (line or game). Of the top 50 rate cards, 0 are board picks and 17 are on the board.
+  - **HTML:** `/nfl/props`, `/nfl/picks`, `/ncaaf/picks` and `/nba/picks?date=2026-11-27` return 200, each with the board heading.
+  - **Web log 22:32:50-22:34:51Z:** UNHANDLED_500 0, Traceback 0, `board_game_picks` READ_FAILED 0, WORKER TIMEOUT 0.
+- **Latency** (measured because `/ncaaf/picks` read 6-12 s after the load):
+  - Before the load, `/ncaaf/api/picks` took 4.2-8.7 s (web log, 20:29-22:32Z).
+  - On the fleet host, the page's own `build_smartsim_picks_page_context` took 4.0 s and 7.0 s over two runs. The step 1f board view took 0.10 s and 0.14 s on a 3,075-row saved board; the lead took 0.001 s.
+  - The NCAAF page was already slow, and step 1f is not the cause.
+  - The `/nfl/picks` HTML took 0.19 s and `/nba/picks` 0.07 s.
+- **verify:** `read_1f_after_load.py <day>` returns rc 0 on any day with board picks for these sports.
+- **Revert:** `git revert d2ae632bf` on main, then ff + reload-web.
+- **Claim released** 22:38:07Z (status: web free).

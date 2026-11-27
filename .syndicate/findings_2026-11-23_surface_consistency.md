@@ -1048,6 +1048,11 @@ without a verdict.
 **Not covered:** `/nba/props` (empty today: it renders only a saved top-by-game artifact), the NBA and NCAAF game
 cards, and the NFL betting-card route (a historical view of the stored snapshot).
 
+**LOADED on web 2026-11-27 22:32:52Z (4:32 PM CST), user "Deploy to web now"; reader rc 0 MET at 22:33:00Z** (deploys.md entry of that time):
+- All 4 pages lead with the board section, and no headline card is a non-board pick. The headlines were NFL props 7, NFL picks 8, NCAAF 10 and NBA 12 of 167.
+- All 2,211 NFL rate cards carry a verdict and a "Rate edge" badge.
+- The `/ncaaf/picks` page takes 4 to 12 s, but the page's own build is 4.0 to 7.0 s of that. The board view adds 0.1 s.
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:
