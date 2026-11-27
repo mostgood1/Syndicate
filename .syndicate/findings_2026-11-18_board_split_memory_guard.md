@@ -909,3 +909,203 @@ The rail monitor's owed R-F reading (§5 thresholds). The owner session local_d0
   - Board publication cadence, 5:30-10:30 PM (`p2_boardpub.py`): 57 publications, median 314 s, max 536 s, 0 over 600 s. 11-23: median 384 s, max 901 s.
 - **What comes next:** the parent was at 1,824 MB at 10:03 PM, above J's 1,500 MB threshold. So J's first parent self-recycle is due in the 09-12Z window on 11-25 (3-6 AM CST), its 21,600 s minimum uptime having long passed. Task `board-parent-recycle-reading-1126` owns that reading. This section only reads the evening.
 - **Commands (read-only, nice 19):** `p7count.py 2026-11-24T23:00:00 2026-11-25T04:00:00` (output `C:\tmp\railmon\p7count_1124.txt`); parent and child RSS from the `ps` lines in `C:\tmp\railmon\railwatch\extra_2026-11-24.jsonl`.
+
+## 21. READING -- CHANGE J's first two mornings and evenings, the ci-suite levers, and the host memory replay (written 2026-11-27 04:25Z = 10:25 PM CST 11-26)
+
+Re-run of scheduled task `board-parent-recycle-reading-1126` by session 644b05ff (started by session e32fef1a on the user's
+"no you do it", ~9:55 PM CST). The task's four attempts (7:39-8:37 AM CST) failed at the API with ENOTFOUND during the host's
+DNS outage, and the task disabled itself. Read-only, nice 19; nothing changed on the fleet.
+
+**How it was read.**
+- `refresh-worker.log` rotated at 7:07 PM CST 11-26. Re-measured spans:
+  - `.3`: 11-23T12:03Z..11-24T13:38Z, so it holds DOWN (08:30:10Z 11-24);
+  - `.2`: 11-24T13:38Z..11-25T15:44Z;
+  - `.1`: 11-25T15:44Z..11-27T01:07Z;
+  - `.log`: from 11-27T01:07Z.
+- `read_850j.py` opens only `.2`, `.1` and `.log`, and it keeps every line since DOWN in memory (about 450 MB of text on
+  the live host). So it was NOT run as-is. A streaming copy ran instead,
+  `C:\Users\TEMPAD~1\AppData\Local\Temp\claude\7fa9867aaa01e58b\644b05ff-8e16-489f-920a-326e5ade9a57\scratchpad\read_850j_stream.py`.
+  Its logic is the same; it keeps only the lines it matches and adds `.3`. It read 1,293,296 timestamped lines and 4,032
+  heartbeats, `--since 2026-11-24T08:30:10`.
+- The load checks therefore come from `.3`: the task prompt's own fallback, re-derived here.
+
+**Load checks: MET (the reading is not VOID).**
+- `2026-11-24T08:30:38.965Z [board_process] BOARD_PROCESS_PARENT_RECYCLE_ARMED pid=753771 threshold_mb=1500 window_utc=09-12 min_uptime_s=21600 boot_head=672a18e87021`
+  is the only ARMED line for that boot. A second one came at 17:12:11Z 11-26 (pid 469, `boot_head=e37a9697f677`), from the
+  unplanned Windows restart.
+- `BOARD_PROCESS_CHILD_SWITCHES ... jobs_margin_mb=400`: 25 of 25 child boots since DOWN.
+- The role env: the batch's DEPLOY entry read both keys in refresh-worker's /proc at 08:31-08:36Z ("J: refresh-worker 1500 /
+  400; live-odds-worker ABSENT"). Not re-read here.
+- refresh-worker `BOOTED` since DOWN: 08:30:37Z 11-24 and 17:12:09Z 11-26 only. `role_restarts.jsonl` holds only the
+  batch's own claimed `down` (08:30:10Z).
+
+| # | 11-19 (§7) | 11-20 (§9) | 11-24 / 11-25 mornings, 11-24 / 11-25 evenings | verdict |
+|---|---|---|---|---|
+| P1 parent self-recycle | -- | -- | **0 and 0** on two qualifying mornings: parent p50 08:30-09Z 1,665 MB (n 30) on 11-25 and 2,010 MB (n 30) on 11-26. 0 `BOARD_PROCESS_PARENT_RECYCLE`, 0 `RECYCLE_EXIT reason=board_parent_rss`, 0 outside 09-12Z | **NEITHER** both mornings: every hold was one §12 lists as legitimate (detail below) |
+| P2 cost of a self-recycle | -- | -- | nothing to measure (0 self-recycles) | **NEITHER** (not reached) |
+| P3 refusals at `pre_source_state_fingerprint`, 5-10 PM | 4 | 13 | **11-24: 0** (2 at other stages); **11-25: 6** (01Z 2, 02Z 2, 03Z 2) | **11-24 PREDICTED**; 11-25 NEITHER (> 3, not > 6) and CONFOUNDED |
+| P4 streak recycles `RECYCLE_EXIT heavy_build_refused` | 0 | 3 | **0 / 0** | **11-24 PREDICTED**; 11-25 within the prediction but CONFOUNDED |
+| P5 `BOARD_BUILD_TIMING` gaps | max 807 s (54 builds) | max 1,062 / p50 330 s (48) | **11-24: max 536 / p50 304 s**, 59 builds, 0 over 900; **11-25: max 628 / p50 350 s**, 45 builds, 0 over 900 | **11-24 PREDICTED**; 11-25 within the prediction but CONFOUNDED |
+
+**P1 in detail: why the parent never recycled.** A held check logs once per reason change, and the rules run in order:
+threshold, window, uptime, children, board building, drain, then the checkout HEAD.
+- **11-25, 09:00-11:59Z:** 80 `BOARD_PROCESS_PARENT_RECYCLE_CHECK` lines: `children_running` 36, `board_building` 40,
+  `code_on_disk_changed` 4.
+  - The 4 `code_on_disk_changed` lines came at 09:17:42, 09:21:42, 10:01:24 and 11:54:36Z. Each read `children: 0`,
+    `boot_head 672a18e87021`, `disk_head 76a006f4550c`, with the parent at 1,575-1,722 MB. At each of those moments every
+    other rule said recycle.
+  - **The binding hold was J's own HEAD rule, 4 times of 4.** The shared checkout `~/Syndicate` was ff'd for web-only
+    deploys after refresh-worker booted: `2b191302f` at 15:43:17Z and `76a006f45` at 15:57:59Z 11-24, then `e37a9697f`
+    at 13:54:07Z 11-25. §12 lists the hold as legitimate: by design, a self-recycle never loads code.
+- **11-26, 09:00-11:59Z:** 5 CHECK lines. `children_running` at 09:06:04Z, `board_building` at 09:41:19Z, `children_running`
+  at 09:49:49Z (it held for 1 h 53 min), `board_building` at 11:43:08Z, `children_running` at 11:51:22Z, then
+  `outside_window` at 12:02:18Z.
+  - The parent was never free in the window. Heartbeats with a non-board child: 128 of 180, against 76 of 180 on 11-25.
+    Mostly `run_refresh_odds_job.py` and `fetch_espn_live_status_for_date.py` (network fetches).
+  - The whole window sat inside the host's DNS outage (about 06:00-17:10Z). If the parent had been free, the HEAD rule would
+    have held it too (`e37a9697f` on disk, `672a18e87` at boot).
+- **What it means: as built, J's self-recycle can fire only on a morning with no fleet ff since refresh-worker last booted.**
+  - The fleet was ff'd 6 times in the 3 days after the 11-24 boot: 15:43Z and 15:57Z 11-24, 13:54Z 11-25, 17:28Z and 17:40Z
+    11-26, 03:56Z 11-27.
+  - The current parent (pid 469, booted 17:12:09Z 11-26 with `boot_head e37a9697f677`) is already held: the checkout has
+    moved 3 times since.
+  - So the parent's ratchet is uncovered again. It read 2,010 MB at 08:30-09Z 11-26 (up 48.6 h). The unplanned Windows
+    restart reset it at 17:12Z.
+  - The lever is not built. Any change to the HEAD rule is a betting change (the 12-08 window, the user's decision). One
+    option: hold only when the ff touched a file refresh-worker loads.
+
+**Comparability.**
+- **(a) The slate**, core live NCAAB + NBA + NHL + NFL at ~7 PM CST. Counted with `C:\tmp\railmon\rf_count.py` from the rail
+  monitor's saved `chips.json`; the 11-25 findings recorded no R-F count, so it was measured here.
+  - 11-24: 38 at 7:03 PM and 42 at 7:23 PM. This reproduces §20. **Comparable.**
+  - 11-25: **25** at 7:03 PM (54% of 46), 29 at 7:23 and 29 at 7:43 PM. **CONFOUNDED** for P3-P5, by §12's rule.
+- **(b) No restart or deploy in either evening window.** No refresh-worker `BOOTED`, no deploys.md load and no fleet ff
+  fell inside 23:00-04:00Z on 11-24 or 11-25.
+  - **The DNS outage** (host DNS failed about 06:00Z-17:10Z 11-26) is a confound for the 11-26 morning (P1). It is named
+    there.
+  - The 17:10Z 11-26 Windows restart came after both mornings and both evenings.
+- **(c) P3-P5 rest on the batch.** The same down/up loaded C, D, G and I, which run in refresh-worker or its child. P1-P2
+  are J's own.
+- **(d) §16.** The parent's 9 PM p50 was 1,753 MB (n 30) on 11-24, a first-day parent. On 11-25 it was **2,225 MB** (n 30):
+  at or above 1,800 MB, a second-day parent, since J never recycled it. That equals 11-20's 2,224 MB.
+
+**Safety.**
+- **Tree max:** 6,467 MB (11-24) and 6,784 MB (11-25), both under 6,936. MET.
+- **Child exits and fatal errors:** 23 child exits since DOWN, all `rc=75 reason=recycle`. 0 rc -6, 0 rc -9, 0 timestamped
+  `Fatal Python error`. 0 `RECYCLE_EXIT` of any reason.
+- **No job child killed by a self-recycle:** none ran.
+- **OOM:** `dmesg` holds 0 `Killed process` lines, but it starts at the 17:10Z 11-26 reboot, so it cannot see 11-24..11-26.
+  The role-side evidence (above) shows no kill.
+- **Host:** on the 11-24 evening the sampler read MemAvailable **1,120 MB at 00:13:04Z (6:13 PM CST)** and 1,261 MB at
+  00:09:03Z. That is 2 of 600 samples in 5-10 PM under §5's 1,500 MB line; swap free bottomed at 1,883 MB. The refresh-worker
+  tree that evening stayed at or under 6,467 MB, so the dip came from elsewhere on the host. Not chased (a lead).
+
+**Exploratory.**
+- **J's second key is doing visible work.**
+  - `held=transient_jobs` in the windows: 0 and 0 (11-20: 3). Since DOWN: 4, none in an evening window.
+  - Streak recycles: 0 and 0 (11-20: 3).
+  - In its place, on 11-25 the child recycled after a build **8 times** in the window, all `reason=post_build_headroom`
+    with basis `pair_plus_recurring_jobs`, all rc 75: 23:35:12, 00:11:27, 00:48:48, 01:22:01, 02:02:21, 02:36:51, 03:11:48 and
+    03:46:59Z. That is one every 32-40 min, each child 1,979-2,414 s old. There were 16 `held=min_uptime` checks in between.
+  - All 23 child recycles since DOWN are this kind.
+- **The 6 refusals on 11-25 came in pairs about 70 s apart** (01:51:57 / 01:53:05, 02:26:37 / 02:27:47, 03:31:50 /
+  03:32:58Z), with headroom 1,578.7-1,887.4 MB against the 1,900 floor.
+  - Each pair fell while the child was under its 1,800 s minimum uptime, so the post-build check could not recycle it yet.
+  - With a 2.2 GB parent, a fresh child reaches the margin's line within about one minimum uptime.
+- **Against 11-20, on a similar slate.** This comparison is not a verdict. 11-20 had 26 core live at 7:03 PM and a 2,224 MB
+  parent at 9 PM. 11-25 had 25 and 2,225 MB.
+  - Refusals 13 -> 6, streak recycles 3 -> 0, longest gap 1,062 -> 628 s, builds 48 -> 45.
+  - After 7:23 PM 11-25 was the lighter slate (29 vs 37), so this does not separate the margin from the slate.
+
+**What it says.**
+- The margin (J's second key) held both evenings with no streak recycle and no gap over 900 s. On the qualifying 11-24
+  evening P3-P5 are PREDICTED.
+- The parent self-recycle (J's first key) did not fire in two qualifying mornings. On 11-25 the only thing that stopped it,
+  4 times of 4, was its own rule that the checkout HEAD must equal the boot HEAD. On this fleet, web-only ffs move that HEAD
+  almost every day, so the switch as built cannot do its job between deliberate restarts.
+- Until that is decided, the parent's multi-day ratchet is covered only by restarts: claimed ones, or today's unplanned
+  reboot.
+
+**STEP 0: the ci-suite levers (§17).**
+- **The fleet carries `3be7fb2e6`:** rc 0 at HEAD `30b2be76e`. It first did at `3983309ce`, ff'd 20:08:50Z 11-23 (2:08 PM
+  CST, deploys.md "2026-11-23 20:08:51Z"); `05a2ce65e` before it does not carry it. The three 08:00Z runs since:
+  - **11-24, at `d845fe3457eb`:** `2026-11-24T08:01:13.693Z CI_SUITE_OOM_SCORE_ADJ switch=1000 pid=743117 read=1000`.
+    - 9 steps rc 0. Pytest chunks 1-3 collected 3,303 / 4,060 / 4,387, failing 1 / 0 / 1.
+    - The log ends inside chunk 4 of 8 (started 08:29:48Z), with no summary, 22 s before the batch's down at 08:30:10Z.
+      The down likely killed it; no other log confirms it.
+  - **11-25, at `76a006f4550c`:** `2026-11-25T08:01:27.966Z CI_SUITE_OOM_SCORE_ADJ switch=1000 pid=1545275 read=1000`.
+    - It ended 09:01:39Z.
+    - 9 of 10 steps rc 0; `pytest vs baseline` rc 1 in 3,579.9 s (30,997 collected, 13 failing, 13 new).
+  - **11-26, at `e37a9697f677`:** `2026-11-26T08:01:10.094Z CI_SUITE_OOM_SCORE_ADJ switch=1000 pid=2207915 read=1000`.
+    - It ended 10:15:11Z.
+    - The archive suite took 829.1 s (28.7 s the night before). `pytest vs baseline` TIMED OUT, rc 124 at 7,210 s, in chunk
+      4 of 8. This was inside the DNS outage.
+- **P-O1 PREDICTED:** 3 of 3 runs on a carrying HEAD read `switch=1000 ... read=1000`, the first (11-24) included.
+- **P-O2 PREDICTED:** 5 files in `wsl-crashes`. The newest is `wsl-crash-1795422460-4077505-_usr_bin_python3.11-6.dmp`
+  (08:27:40Z 11-23). 0 files are newer than epoch 1795422460, and 0 fall inside each of the three runs.
+  - The lifeline test sits in chunk 6 (the round-robin split, reproduced from each tree).
+  - Only the 11-25 run reached it (it passed: it is not among the 13 new failures). So 11-25 is the run that exercises lever
+    2. On 11-24 and 11-26 the zero says nothing about lever 2.
+- **P-O3 PREDICTED.** Read 04:02Z 11-27. All 14 processes read `oom_score_adj` 0:
+  - redis 170, the supervisor 310;
+  - the web master 413 and workers 248847 / 249389;
+  - refresh-worker 469 and its board child 535;
+  - live-odds-worker 178096 and its live_resim workers 178144 / 178145;
+  - jobs 245662, 245663, 249373 and 249452.
+
+**STEP 0b: the host memory replay (§18.2). A measurement, not a verdict.**
+- The sampler (pid 347935) has ended: `ps` prints nothing.
+- **2,516 samples, 11-23 22:00Z .. 11-26 04:59Z:** 838 / 839 / 839 per evening, 4-11 PM CST.
+
+| evening (replay day) | lowest MemAvailable | samples < 3,948 MB in 5-10 PM | refusals matched (of all in the day) | 1024 / reserve 2048 | 512 / 2048 | 2048 / 2048 | 1024 / reserve 1024 |
+|---|---|---|---|---|---|---|---|
+| 11-23 (before J) | 3,226 MB at 02:54:11Z (8:54 PM) | 48 of 599 | 30 | 30 granted | 30 granted | 30 granted | 30 granted |
+| 11-24 (J) | **1,120 MB at 00:13:04Z (6:13 PM)** | 53 of 600 | 5 | 5 granted | 5 granted | 5 granted | 5 granted |
+| 11-25 (J) | 2,681 MB at 02:34:37Z (8:34 PM) | 41 of 599 | 9 | 8 granted, 1 host_below_floor_plus_reserve | 7 granted, 1 host_below, 1 overdraft_exceeded | 8 granted, 1 host_below | 9 granted |
+
+- In all, 64 refusals at every stage since 11-23 22:00Z. 44 of 64 matched a host sample within 45 s; the other 20 fell
+  outside the sampling hours.
+- At 1024 / 2048: 43 of 44 granted, 1 of 44 `host_below_floor_plus_reserve`. "Granted" is an upper bound: a grant spends
+  memory the next gate sees, and the sample can be up to 45 s from the refusal.
+- **For §18's 12-08 load:**
+  - At nearly every refusal the host had the room, so the switch is the lever §18 says.
+  - But after J the matched refusals fell from 30 to 5 and 9 an evening.
+  - The 11-24 evening's host low (1,120 MB) shows the host can drop far under the 2,048 MB reserve for minutes.
+
+**STEP 0c: per-test memory lines (§19.1).**
+- The fleet carries `scripts/pytest_rss_watch.py` (rc 0). It first did at `2b191302f`, ff'd 15:43:17Z 11-24.
+- **The reading: the 11-25 run, the first on a carrying HEAD.**
+  - **P-T1 PREDICTED:** 8 of 8 chunks print `TEST_RSS_WATCH on ... hwm_reset=yes`.
+  - **P-T2 PREDICTED:**
+    - 30,997 collected (11-23: 30,705, +0.95%; the 11-24 run never finished);
+    - 0 failures in `test_pytest_rss_watch.py`;
+    - step 3,579.9 s, against the 4,550 s limit.
+  - **P-T3 PREDICTED, one file named.** In the 76a006f45 tree, `test_ncaaf_player_stats_refresh.py` is in chunk 4. The split
+    was reproduced from that tree's 2,088 files, which match the log's count and each chunk's first file. Chunk 4 read:
+    - `2026-11-25T08:40:32Z [pytest_rss_watch] TEST_RSS_SUMMARY tests=3876 jumps=3 climbs=0 start_mb=37 session_peak_mb=2546 end_mb=2236`
+    - `2026-11-25T08:40:32Z [pytest_rss_watch] TEST_RSS_TOP rank=1 nodeid=tests/test_ranking_records.py::test_chunk_over_the_old_64mb_ceiling_is_read_by_the_new_reader_only start_mb=2204 peak_mb=2546 end_mb=2237`
+      (+342 MB, under 1,000)
+    - `2026-11-25T08:40:32Z [pytest_rss_watch] TEST_RSS_FILE_GROWTH_TOP rank=1 file=tests/test_ops.py growth_mb=1827 peak_mb=2192 tests=125`
+      (at least 1,000)
+  - **What P-T3 names.** The file leaking is `tests/test_ops.py`. Its `OpsRefreshApiTests::test_build_refresh_plan_uses_*`
+    tests step the process 685 -> 787 -> 914 -> 1,066 -> 1,266 -> 1,477 -> 1,748 -> 2,069 MB and keep each step. The code
+    they test is `syndicate/features/shared/ops_refresh.py:959 build_refresh_plan`. Whether a live role keeps the same memory
+    is the next question, not chased. That chunk had 0 `TEST_RSS_CLIMB` lines.
+  - **Elsewhere that night:**
+    - chunk 1's `TEST_RSS_CLIMB` x2 for `tests/test_soccer_team_ratings_as_of.py::test_every_caller_passes_as_of`: 2,269 then
+      2,898 MB, from a 721 MB start, 28-38 s into the test. It is the night's session peak.
+    - chunk 7's FILE_GROWTH_TOP rank 1: `tests/test_football_sim_engine.py`, 1,504 MB.
+  - **P-T4 PREDICTED:** 0 new dumps; every role reads 0.
+- **11-26 (after the reading):** 4 of 4 chunks that started printed `TEST_RSS_WATCH on ... hwm_reset=yes`, peaking at 693,
+  747 and 460 MB (chunk 4 was killed before its summary, with 0 CLIMB lines).
+  - The run TIMED OUT at 7,210 s, so chunks 5-8 never ran. In that tree the heavy file is in chunk 8.
+  - By the letter P-T2 fails (step over 4,550 s, 4 chunks lost). But the archive step, which never loads the plugin, also ran
+    28.9x slower (829.1 vs 28.7 s) in the DNS outage. So the night is CONFOUNDED; it is not a plugin result.
+
+**Commands** (read-only, nice 19, scratchpad of session 644b05ff):
+- `step0.sh` (HEAD, ancestry, reflog, dumps, sampler, roles' `oom_score_adj`) and `spans.sh`;
+- `read_850j_stream.py 2026-11-25,2026-11-26 2026-11-24,2026-11-25 --since 2026-11-24T08:30:10`;
+- `holds.sh` (every parent-recycle, recycle and exit line since DOWN) and `detail.py` (refusals, morning children);
+- `/mnt/c/tmp/w1208_hosthead/hostmem_replay.py --since 2026-11-23T22:00:00Z`;
+- `job-ci-suite.log` from line 40961;
+- `C:\tmp\railmon\rf_count.py`.

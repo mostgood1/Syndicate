@@ -63696,3 +63696,34 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Board:** book_grid wncaab index 0 -> 1 at 03:27:10.849Z, **8 s after the lift tick**. The game's full-game ledger rows came back at 03:27:10Z and 03:28:37Z, withheld only for `prob_interval_swamps_edge` (an edge gate, not the exit). `first_priced_after=None` as of 03:29Z is therefore the model's own edge rule, not a held refusal. The game was off the board for 1 min 38 s (03:25:32Z -> 03:27:10Z).
 - **Tally (11-26):** 2 lifts read end to end in one day: USC Cofie (NCAAB, 63 s + 17 s) and Fernandez (WNCAAB, 63 s + 8 s). With Saint Peter's 11-25, lifts are now measured in NCAAF, NCAAB and WNCAAB.
 - verify: `pbp_name_w.py 401903571 "Marta Fernandez"` 03:29Z, `mfc.sh` / `mfc2.sh` 03:29:35Z.
+
+## 2026-11-27 04:25Z (10:25 PM CST 11-26) -- READING (no deploy): #850 CHANGE J and the ci-suite levers, J's first two mornings and evenings (lane `board-split-memory-guard`, re-run of scheduled task `board-parent-recycle-reading-1126` by session 644b05ff on the user's "no you do it"; read-only) -- **J's parent self-recycle fired 0 times in 2 qualifying mornings, held by its own HEAD rule; P3-P5 PREDICTED on 11-24, CONFOUNDED on 11-25; P-O1..P-O3 and P-T1..P-T4 PREDICTED**
+- betting change: no (a reading)
+- **Load checks MET** (re-derived from `refresh-worker.log.3`, where the 11-26 rotation put DOWN):
+  - `BOARD_PROCESS_PARENT_RECYCLE_ARMED pid=753771 threshold_mb=1500 window_utc=09-12 min_uptime_s=21600 boot_head=672a18e87021` at 08:30:38.965Z 11-24;
+  - `jobs_margin_mb=400` on 25 of 25 child boots.
+- **P1 NEITHER, both mornings:** 0 self-recycles. The parent read 1,665 MB (11-25) and 2,010 MB (11-26) at 08:30-09Z.
+  - 11-25: 4 of 4 moments that every other rule cleared were held `code_on_disk_changed`. The shared checkout had been ff'd for web after refresh-worker booted (boot `672a18e87`, disk `76a006f45`).
+  - 11-26: children or a build held it through 09-12Z (one `children_running` stretch of 1 h 53 min), inside the DNS outage.
+  - As built, J's self-recycle cannot fire after any fleet ff until a deliberate restart. There were 6 ffs since the 11-24 boot.
+- **P2 NEITHER:** nothing to measure.
+- **P3 / P4 / P5:**
+  - 11-24 (38 core live at 7:03 PM): 0 refusals, 0 streak recycles, gaps max 536 / p50 304 s. **PREDICTED** x3.
+  - 11-25 (25 core live): 6 refusals, 0 streak recycles, gaps max 628 / p50 350 s, with 8 post-build recycles (all rc 75). **CONFOUNDED.**
+- **Safety MET:**
+  - tree max 6,467 and 6,784 MB, against 6,936;
+  - 23 of 23 child exits since DOWN rc 75; 0 rc -6, 0 Fatal, 0 role restarts but the batch's own down;
+  - dmesg is blind before the 17:10Z 11-26 reboot.
+  - Host MemAvailable fell to 1,120 MB at 00:13Z 11-25 (6:13 PM CST 11-24). A lead, not chased.
+- **ci-suite levers:**
+  - P-O1 PREDICTED: `CI_SUITE_OOM_SCORE_ADJ switch=1000 ... read=1000` in 3 of 3 runs since the 20:08:50Z 11-23 ff.
+  - P-O2 PREDICTED: 0 `wsl-crash` dumps since 08:27:40Z 11-23. Only 11-25's run reached the lifeline test.
+  - P-O3 PREDICTED: 14 of 14 role processes read 0.
+- **Host replay (§18.2):**
+  - Evening lows 3,226 / 1,120 / 2,681 MB (11-23 / 11-24 / 11-25).
+  - At 1024 / 2048: 43 of 44 matched refusals granted (an upper bound), 1 `host_below_floor_plus_reserve`.
+- **Per-test lines (11-25, the first carrying run):**
+  - P-T1..P-T4 PREDICTED.
+  - The heavy chunk's file is `tests/test_ops.py`: FILE_GROWTH_TOP rank 1, growth 1,827 MB, from its `test_build_refresh_plan_uses_*` tests.
+  - The 11-26 run timed out (rc 124) in the DNS outage: CONFOUNDED.
+- verify: findings `findings_2026-11-18_board_split_memory_guard.md` section 21 (the reader output, the CHECK-line sequence, the run lines quoted whole).
