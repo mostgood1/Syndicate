@@ -669,3 +669,10 @@ Read-only at nice 19. Scratchpad: `wsk_gctune_overnight.sh`, `wsk_recycle_hourly
   - The request outlived the 5 s drain and gunicorn's 30 s graceful wait. The fast exit, by design, then handed the worker to CPython's shutdown, which joins the request thread without heartbeating. The master killed it 60 s after the drain.
   - The requests came from a `Python-urllib/3.12` client sweeping 26 past dates (8:19-8:59 AM CST, 30 of 37 over 30 s). Game-chips over 30 s: 0-2 a day 11-16..11-25, 47 on 11-26.
 - What this kill names: (a) the stock exit for a worker with a request still running after the graceful wait; (b) ESPN fetches in the game-chips request path, which no OPEN lane owns.
+
+## 2026-11-27 04:35Z (10:35 PM CST 11-26) -- the running-request exit fix is loaded
+
+- User 11-26: "Watch", then "Yes, fix the exit".
+- `b709934b2`: a recycled worker that still has a request running after the drain and the 30 s graceful wait now leaves through `os._exit(0)`. Its `WEB_WORKER_FAST_EXIT` line carries `abandoned_running`. Before, the stock exit joined the request thread with no heartbeat until the master's 60 s timeout (the 14:42:42Z 11-26 kill).
+- A real gunicorn reproduces the chain: `RunningRequestExitTests` (`f9b72e447`). On, the worker leaves and there is no timeout. Switch off, `WORKER TIMEOUT`.
+- Loaded on web 04:35:28Z 11-27; MET at +15 s (2026-11-27 04:35:28Z entry in deploys.md). The production proof is the first `abandoned_running` line.

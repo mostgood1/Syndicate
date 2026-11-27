@@ -63762,3 +63762,29 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Not verified:**
   - Web memory with +123 bytes per card (about 0.7 MB per list).
   - The live plan's own venue-feed quote (`portfolio_commit._venue_price_resolver`) against the board's grid price. Each venue line's tooltip says the plan may hold a fresher quote.
+
+## 2026-11-27 04:35:28Z (10:35:28 PM CST 11-26) -- DEPLOY (claimed web, ff + reload-web, no env change): a recycled web worker with a request still running after the grace wait leaves at once `b709934b2` (lane `web-silent-worker-kills`, user 11-26 "Yes, fix the exit") -- **LOADED on web; MET at +15 s; the production proof is the first `abandoned_running` line**
+- betting change: **no** (BC-074). It changes only how a web worker leaves after a recycle; web places, sizes, holds and exits no bets. Not a revert, and not a risk reduction to the betting path.
+- **What:** `gunicorn.conf.py` `worker_exit`. A worker whose loop returned used to take the stock exit when a request was still running after the drain and gunicorn's 30 s graceful wait. Now it takes the fast exit (`os._exit(0)` after flushing stdio) and logs `"abandoned_running": <n>` on its `WEB_WORKER_FAST_EXIT` line. Switch `SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING` (absent = on; 0 / false / off restores the stock exit for such a worker). `SYNDICATE_WEB_WORKER_FAST_EXIT=0` still restores the stock exit for every worker. Neither key is in any env layer (`local_production.env`, `fleet_env/*.json`, `fleet_role_spec.json`: 0 lines each) or in the web master's or workers' environ (read 04:34:55Z), so the code default decides.
+- **Why:** the 14:42:42Z 11-26 `WORKER TIMEOUT` (the 2026-11-25 13:54:07Z entry's 11-26 reading). After a timer recycle, a 100 s `/api/board/game-chips` request outlived the drain and the graceful wait. Both waits ran with no heartbeat. The stock exit's `_python_exit` then joined the request thread, and the master timed the worker out 60.5 s after its last heartbeat. The stock join buys a running request at most the ~30 s left before that kill. Over 11-22..11-25 it was never needed: 1,077 of 1,077 drains had nothing running after the graceful wait.
+- **Ride-alongs** (`30b2be76e..b709934b2`, 4 commits, listed at 03:59Z and again at 04:34:55Z before the merge; no dirty fleet file is in the range):
+  - `df47956d6` `scripts/portfolio_alignment_reader.py` (lane `portfolio-monitor`, stdout carries only its JSON): no fleet role runs it.
+  - `2ffd94d93`, `b271023fc`: ledger (lane `live-player-exit-gate`).
+  - Ff'd to exactly `b709934b2` so that `fe46fb249` (lane `layer2-rail-monitor`, intelligence.html), pushed after it, did not ride along; that lane loads it next with its own ff + reload.
+- **Tests:** `tests/test_gunicorn_conf.py` + `tests/test_web_draining_worker.py`, fleet-host Linux venv **115 passed** (Windows 103 passed / 10 skipped). The reachability test is `RunningRequestExitTests` (`f9b72e447`), a real gunicorn with `--max-requests 2 --graceful-timeout 2 --timeout 6` and a 30 s request. On: `"abandoned_running": 1`, no `WORKER TIMEOUT`, no stock exit. Switch off: `WEB_WORKER_STOCK_EXIT request_running`, then the master's `WORKER TIMEOUT`, the 11-26 chain in miniature.
+- **Locks:**
+  - The web claim was held by `surface-consistency-oversight` from ~03:55Z, and the deploy waited for it (a capped watcher; no force). It was free at 04:34:36Z.
+  - Claim web 04:34:46Z (holder `web-silent-worker-kills`, ACQUIRED, rc 0).
+  - Baseline 04:34:55Z (scratchpad `wsk_exit_base.sh`): fleet head `30b2be76e321`, healthz 200. Since 11-26 06:00Z: 1 `WORKER TIMEOUT`, 1 `WEB_WORKER_STOCK_EXIT`, 0 `abandoned_running`, 601 fast exits, 3 drains with a request still in flight.
+  - Preflight `--service web --target-commit b709934b2 --betting-change no`, from the worktree at origin/main `9bfeb25f9`, with 4 expect / baseline pairs: **CLEAR 04:35:19Z**.
+- **ff + reload:** `git merge --ff-only b709934b2` at **04:35:28Z** (`30b2be76e321` -> `b709934b242e`). `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "max_latency_s": 0.01, "state": "done"}`. Workers 264697, 265482 -> 265587, 265588.
+- **expect / measured** (scratchpad `wsk_exit_verify.sh 2026-11-27T04:35`, 04:35:43Z):
+  - fleet head `b709934b2`, and `def fast_exit_running_enabled` on disk: **MET**.
+  - healthz 200: **MET**.
+  - `WORKER TIMEOUT`s since 11-26 06:00Z still 1 (none new): **MET**.
+  - Stock exits since 11-26 06:00Z still 1: **MET**. The two old workers left fast (`WEB_WORKER_FAST_EXIT`, after_loop_s 0.005 and 0.0).
+  - Both new workers `WEB_MEMORY_WATCH_ARMED` armed at 04:35:29.6Z. 0 SIGKILLs, 0 tracebacks, 0 `WEB_MEMORY_GUARD_ERROR`.
+  - The web master (pid 413) is 40,130 s old at 04:35:43Z, so it started near 17:26Z 11-26. The 13:45Z reading's master was pid 753703. The 11-27 daily reading dates that restart.
+- **verify (owed):**
+  - The first production `"abandoned_running"` line, with no `WORKER TIMEOUT` after it. That is the branch proof; it needs a recycle whose request outlives the graceful wait (1 since 11-22).
+  - Kills per CST day, both kinds, against 11-01..11-23 (kills on 7 of 23 days, 12 kills): the lane goal.
