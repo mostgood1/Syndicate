@@ -75,8 +75,21 @@ with `team`/`opponent` stripped (the NBA shape) — 5 of 6 fail on the old code,
 basketball evidence tests pass. Display only: the MATCHUP layer feeds the sheet, the board's "Matchup:" sentence and
 Ask's text; no pricing, staking or placement path reads it (`git grep` 11-27).
 
-**Fleet replay, old vs fixed `_matchup` on served NBA sheets** (11-25, 11-24, 11-20, 11-10 primary rows, read-only,
-nice 19): RUNNING at 1:00 PM CST 11-27; its numbers are appended here when it finishes.
+**Fleet replay, old vs fixed `_matchup` on served NBA sheets** (primary rows of each sheet, evidence rebuilt today
+from the fleet's data root under each version; read-only, nice 19; finished ~1:20 PM CST 11-27):
+
+| NBA sheet | old: MATCHUP layer filled | fixed: filled | fixed: 3+ meetings | fixed: strong (3+, >= 2/3 on this line) |
+|---|---|---|---|---|
+| 11-25 | 2 of 158 | 158 | 106 | 36 |
+| 11-24 | 0 of 149 | 149 | 107 | 36 |
+| 11-20 | 0 of 163 | 162 | 126 | 39 |
+| 11-10 | 0 of 172 | 172 | 122 | 39 |
+
+The falsification bar (fixed 3+ meetings at least ~10x the old code's 2 on 11-25) is MET: 106 vs 2. "Strong" is the
+Matchups admission rule, so the section has ~36-39 candidates a sheet again (it shows the top 25). The 11-10 sheet as
+BUILT had 174 rows with a record because its day's sim found few players then; rebuilt today, the sim finds them all,
+so the old code now gives that sheet nothing either. The resolved opponent was one of the game's two teams on 641 of
+642 rows; the one exception (11-10) is traced below.
 
 ## 3. What did and did not persist after the 11-13 rule change (population, primary featurable rows)
 
