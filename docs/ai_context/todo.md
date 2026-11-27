@@ -342,6 +342,10 @@ On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL 
 - **QUEUED 2026-11-19 ~10:30 AM CST on the user's "Queue for 11-24" (to "Queue #851 for the 11-24 betting-change window?"): CHANGE E (droppable) of batch task `nfl-level-refit-load-1120` (Tue 11-24 2:15 AM CST, one claimed ff + one drained full down/up), prompt updated through the scheduled-tasks tool and read back identical (32,297 chars); kit `/mnt/c/tmp/w1124_851/kit_env_851.sh` self-tested on a dummy env file (append, idempotent, restore, real file untouched); reader for P1-P5 `/mnt/c/tmp/w1124_851/loopstages.py`. If the batch does not load E, it waits for 12-08.**
 
 ### `#850` — **SINCE THE 11-18 BOARD SPLIT THE MEMORY GUARD REFUSES THE BOARD 5 TIMES AN HOUR IN THE LIVE EVENING (26 refusals 5-10 PM CST vs 0 in-thread on 11-17), THE CHILD RECYCLES 4 TIMES AND EACH ONE ABORTS rc -6, AND THE BOARD GOES UP TO 26.3 MIN UNBUILT: the guard measures parent + child RSS against the declared 7,168 MB; the split added a second interpreter (parent calm p50 777 MB, n 476) and the parent's tick grows +1.1 GB 5-9 PM, which a child recycle cannot return. Four fixes on main DEFAULT-OFF; LOAD = the user's decision (a betting change by BC-042's rule)** `[2026-11-19, lane board-split-memory-guard]`
+- **11-26: J's checkout-HEAD hold is narrowed behind a switch, BUILT default-off, not loaded** (findings §22; `8e2149f0f`; user "Yes build it now").
+  - `SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_HEAD_RULE=loaded` holds the self-recycle only when the ff changed a module the parent loaded, or a non-Python runtime file.
+  - The 11-25 morning would have recycled.
+  - A betting change: earliest load the 12-08 window, on the user's own call. OWED after a load: P-HR1..P-HR4 (§22.1).
 - **11-26 READING of CHANGE J (findings §21, 10:25 PM CST): the parent self-recycle fired 0 times in 2 qualifying mornings (P1 NEITHER).**
   - On 11-25 its own HEAD rule held it, 4 times of 4: web-only ffs move the shared checkout. On 11-26 children held it, in the DNS outage.
   - The margin held both evenings: 0 streak recycles. 11-24 P3-P5 PREDICTED; 11-25 CONFOUNDED (25 core live).

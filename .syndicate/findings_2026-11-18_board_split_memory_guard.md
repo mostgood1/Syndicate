@@ -1109,3 +1109,110 @@ threshold, window, uptime, children, board building, drain, then the checkout HE
 - `/mnt/c/tmp/w1208_hosthead/hostmem_replay.py --since 2026-11-23T22:00:00Z`;
 - `job-ci-suite.log` from line 40961;
 - `C:\tmp\railmon\rf_count.py`.
+
+## 22. J's checkout-HEAD hold: narrowed behind a switch, built default-off; PRE-REGISTERED for its load (written 2026-11-27 05:25Z = 11:25 PM CST 11-26, before any load)
+
+User "Yes build it now" (~10:35 PM CST 11-26, typed in session e32fef1a and relayed word for word). It answered "Should
+the board session build the J checkout-rule fix, switched off, for 12-08?". It approves building, not loading: adding it
+to the 12-08 batch and loading it are the user's own calls in that window. Plan in the lane first (`51c2b7c9d`); code
+`8e2149f0f`.
+
+**Why J's rule held, and why a narrower one keeps its purpose.**
+- §21: on 11-25 every moment J's other rules cleared, 4 of 4, was held by `code_on_disk_changed`. The range on disk,
+  `672a18e87..76a006f45`, changed `gunicorn.conf.py`, `syndicate/app.py`, `syndicate/blueprints/rail_watch.py`,
+  `scripts/pytest_rss_watch.py`, `scripts/run_ci_suite.py` and ledger files.
+- No refresh-worker module imports `syndicate.app`. Only `syndicate.create_app()` does, lazily, and no worker calls it.
+- **The board child and every job child already run whatever is on disk at each spawn** (`python -m
+  pipeline.board_build_process --serve` with `cwd=REPO_ROOT`, a fresh interpreter). That is true by construction and
+  not separately measured. There were 23 child recycles since 11-24, so an ff reaches the board child within its next
+  recycle (about every 35 min on a 2.2 GB parent).
+- So the only code a parent restart newly loads is the PARENT's own loaded modules, plus any non-Python file it reads.
+
+**The switch:** `SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_HEAD_RULE` (`pipeline/board_build_process.py`,
+`parent_recycle_head_rule`, `head_change_holds`, `_loaded_repo_files`, `_changed_paths`; the decision gains `head_rule` /
+`head_diff`).
+- Absent, empty or anything but `loaded` = `any`: today's rule. The decision and its detail are unchanged; the only
+  difference is ` head_rule=any` at the end of the ARMED line.
+- `loaded`: a moved HEAD holds only when `git diff --no-renames --name-only <boot> <disk>` names:
+  - a `.py` file in the parent's `sys.modules` (`__main__` included; a relative `__file__` is tried against the repo
+    and the cwd); or
+  - a non-Python file outside the exempt paths.
+- **Exempt paths:** `.syndicate/`, `docs/`, `tests/`, `.claude/`, `.github/`; `.md` outside `data/` and `reports/`;
+  `reports/live_gameline_accuracy/history.jsonl` (committed nightly ~11:31 PM CST; only comments name it); and
+  `syndicate/templates/` and `syndicate/static/` while `syndicate/app.py` is not loaded.
+- **Each exemption is pinned by a source-scan test.** They run on `ast`, because Python 3.12 (`py -3` here, 3.12.10)
+  tokenizes f-strings differently from the fleet's 3.11:
+  - no path literal for `history.jsonl` in pipeline/, syndicate/ or the worker script;
+  - `register_blueprint` / `template_folder=` / `static_folder=` appear only in `syndicate/app.py`;
+  - the `.md` path literals in role code are only citations and seven generated outputs (MLB recaps, backfill recap,
+    scorecard, sim-gap and agreement reports).
+- **Fail closed:** a diff it cannot read, a reader that raises, or a loaded set it cannot read all hold
+  (`code_diff_unknown`). A failed diff is retried next cycle; a successful one is cached per (boot, disk).
+- **Lines:**
+  - `BOARD_PROCESS_PARENT_RECYCLE_ARMED ... head_rule=<any|loaded>`;
+  - a recycle on a moved HEAD carries `'head_rule': 'loaded'`, `boot_head`, `disk_head`, `changed_files` and
+    `changed_ignored`;
+  - a hold carries `changed_held_n` and up to 3 `changed_held` paths.
+
+**Tests** (`tests/test_board_split_memory_guard.py`, 124 in the file, 49 new for this switch):
+- Reachability first: the same moved HEAD and web-only diff through the real install / gather / recycler /
+  `worker_recycle.maybe_recycle`. Off holds without reading the diff; `loaded` exits with `RECYCLE_EXIT
+  reason=board_parent_rss`.
+- Then: the parent's own main script still holds; three fail-closed cases; the parse rules; 22 path cases; templates hold
+  once `syndicate/app.py` is loaded; the decision rules; the loaded-set reader (fake modules and this process); the git
+  reader and its cache; a real `git diff` on the checkout; the three source scans.
+- Results:
+  - Windows: 124 passed; the split's neighbours (`test_board_build_process_split`, `test_board_host_headroom`,
+    `test_worker_recycle`, `test_memory_observability{,_local_limit}`, `test_intelligence_overview_memory_guard`) 133
+    passed / 2 skipped.
+  - The fleet host's Linux (fleet venv, nice 19, scrubbed ci-shaped env, this worktree on /mnt/c): 258 passed / 1
+    skipped (git refuses a /mnt/c worktree owned by another user, so the real-checkout diff test skips there). 0 new
+    `wsl-crash` dumps (5 -> 5).
+
+**Replay on the real ranges** (`head_rule_replay.py` in session 644b05ff's scratchpad).
+- The loaded set is a PROXY: the 93 repo files imported when `scripts/run_refresh_worker.py` and
+  `pipeline.board_build_process` are imported. The live parent also imports lazily, so the proxy is a lower bound on
+  holds.
+
+| morning | boot -> disk | changed | held (proxy) | changed .py outside the proxy | expected under `loaded` |
+|---|---|---|---|---|---|
+| 11-25 | 672a18e87 -> 76a006f45 | 13 | 0 | `gunicorn.conf.py`, `syndicate/app.py`, `syndicate/blueprints/rail_watch.py` (web-only) | **recycle at 09:17:42Z** |
+| 11-26 | 672a18e87 -> e37a9697f | 58 | 1: `scripts/run_refresh_worker.py` (the parent's own script) | 8 | hold, correctly (children held it anyway, in the DNS outage) |
+| 11-27 so far | e37a9697f -> 30b2be76e | 46 | 0 | 8, e.g. `layer2_board.py`, `execution_exits.py`, `board_game_picks.py` | unknown: holds if the parent imported any of the 8 |
+
+**It is a betting change** (when the parent restarts moves the board's cadence, BC-053's rule). It is default-off on
+main, so any ff carries the code and loads nothing.
+- Earliest load: the 12-08 window, as ONE line `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_HEAD_RULE=loaded`
+  in that window's drained down/up, on the user's own call.
+- Revert: remove the line, then a drained down/up (allowed outside a window).
+
+### 22.1 PRE-REGISTERED (before any load)
+
+Window: 09:00-11:59Z (3:00-5:59 AM CST) of the first two mornings after the load on which:
+- the parent's p50 08:30-09Z is at least 1,500 MB;
+- the checkout HEAD differs from the parent's boot HEAD;
+- J's other rules clear at least once (a `code_on_disk_changed` or `code_diff_unknown` CHECK line, or a recycle, is
+  the evidence).
+
+Load checks first:
+- `BOARD_PROCESS_PARENT_RECYCLE_ARMED ... head_rule=loaded`;
+- refresh-worker's environ carries the key.
+
+Without both, nothing below is read.
+
+| # | quantity | PREDICTED | FALSIFIED |
+|---|---|---|---|
+| P-HR1 | the switch reaches the decision | the first cleared moment logs either `BOARD_PROCESS_PARENT_RECYCLE` with `'head_rule': 'loaded'`, or `held=code_on_disk_changed` with `'head_rule': 'loaded'` and `changed_held_n` | `held=code_on_disk_changed` without `head_rule` (the switch did not run), or `code_diff_unknown` while `git diff <boot> <disk>` reads fine on the fleet |
+| P-HR2 | the holds are right | every `changed_held` path is a `.py` file the parent runs (its own script or a module it imports) or a non-exempt non-Python file | a held path under an exempt prefix (a rule bug) |
+| P-HR3 | the recycle when nothing it loaded changed | on such a morning: exactly 1 self-recycle; `RECYCLE_EXIT reason=board_parent_rss`; a new ARMED line whose `boot_head` is the disk HEAD | 0 recycles with no hold other than `code_on_disk_changed`, or > 1 in a morning |
+| P-HR4 | cost and safety (J's P2) | the new parent < 1,300 MB 30 min later; board gap across it <= 900 s; `children: 0`; 0 rc -6 / `Fatal Python error` | gap > 1,200 s, a job child killed, or any rc -6 |
+
+- Recorded, not predicted: each `changed_held` list (it names which web/feature modules the parent really imports), and
+  how many mornings a month the rule unblocks.
+- **After a recycle on a moved HEAD,** `local_production.py role_code` reads refresh-worker's code as the disk HEAD (from
+  the reflog at its start).
+  - That is honest: every module it then runs is the disk version, byte-identical to the boot version for what it had
+    loaded.
+  - A reading records it in deploys.md as a self-recycle, not a deploy (betting change: no, by the rule's construction).
+- **Confound:** on a morning where children or a build hold the parent through the window (11-26), the rule is never
+  reached. That is NEITHER, not a pass.
