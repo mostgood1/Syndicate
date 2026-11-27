@@ -978,6 +978,76 @@ rate card carries the board's verdict and says its edge is against the vigged pr
 pages lead with the board's picks for the sport. Display only, web routes only; loads with an ff + `reload-web`;
 betting change no. The user's call.
 
+## Step 1f -- the NFL props page and the NFL / NCAAF / NBA picks pages lead with the board's picks `[built 2026-11-27, user "Yes, build 1f"; display only; NOT LOADED]`
+
+**What changed** (web routes only; nothing is recomputed, every number is the board's row):
+- `board_game_picks.py`:
+  - `upcoming_view(sport)`: every pregame line of the sport in today's shortlist, whatever day. The NFL and NCAAF
+    pages are weekly; the NFL board's rows were Sunday 11-29 and Monday 11-30.
+  - `find_prop(..., away=, home=)`: an index instead of a scan per card, market names folded, the card's own game only.
+  - `only_games(pairs, kind=)`.
+  - `board_pick_cards` (NHL's 1d card, now shared; a weekly view names the kickoff).
+  - `lead_with_board_picks(context, board, ..., off_slate=)`:
+    - the board's picks become `rank_cards` and the first section;
+    - the page's own cards follow under a label. Its own sections are kept as built, under a `page_label` divider;
+    - "Board picks" leads `header_stats`;
+    - a page whose week the board does not judge (a past week or season) shows no board picks and says why.
+  - Labels: `spreads_alt` / `totals_alt` read as spreads and totals (the replay showed "Home -14.5" with no team);
+    `player_rebounds` reads "Rebounds". Matching is unchanged.
+- `nfl/props.py`:
+  - each rate card is "Rate view · NFL Props" with a "Rate edge" badge, `source` "rate" and a `line_key`
+    (game, player, market, side; anytime TD "over" -> the board's "yes");
+  - `attach_board_verdicts` puts the board's verdict first on every card (`board_verdict`, `board_pick`);
+  - the page leads with the board's Suggested PROPS for the page's own games.
+- Routes:
+  - `/nfl/props`, `/nfl/api/props`, `/nfl/picks`, `/nfl/api/picks` (off-slate unless latest season and
+    `default_week`);
+  - `/ncaaf/picks`, `/ncaaf/api/picks` (off-slate for an explicit week other than `default_week()`);
+  - `/nba/picks`, `/nba/api/picks` (the day's view).
+
+  `nba/picks.html` renders `card_sections`, as `nhl/picks.html` does since 1d. NHL's `build_board_cards` delegates to
+  the shared card (its 21 tests pass unchanged).
+
+**Replay** (read-only on the fleet host: the worktree's code over the fleet's data roots, and the board saved from the
+fleet API at 21:12:59Z, built 21:11:02Z; `C:\tmp\scc_oversight_d5aa\replay_1f\`, rc 0 HELD):
+
+| page | served now | after |
+|---|---|---|
+| NFL props (2026 week 12) | 2,237 rate cards, top "+55.6% edge" | 10 board prop picks (+2.2 to +5.2 EV), then 2,237 rate cards labelled |
+| NFL picks | 12 SmartSim win-probability cards | 11 board picks, then the 12 under "SmartSim view: not the board's picks" |
+| NCAAF picks | 24 cards (12 price-shopping) | 8 board picks, then the 24 labelled |
+| NBA picks (11-27) | 0 cards (no saved slate) | 12 of the board's 167, then the empty slate's reason |
+
+- NFL rate verdicts: 10 board pick, 827 not a pick, 1,273 line not on the board, 127 game not on the board; 0 without a
+  verdict, 0 that disagree with the board row, 2,237 of 2,237 badges relabelled. Top 50: 0 board picks, 19 on the
+  board.
+- Cost: the NFL props build took 5.8 s; the board attach added 0.11 s.
+
+**Tests:**
+- `tests/test_board_picks_weekly_pages.py` (NEW, 19). Reachability: the headline changes with the board's picks, and
+  every route calls the helper.
+- 3 NFL picks tests in `tests/test_archives.py` were updated to the new layout:
+  - the page's sections are found after the board section and the divider;
+  - the card count is found by its label;
+  - a 2025 week has no board picks.
+- Against the primary tree's NFL data, 24 of the archive tests these pages touch pass, plus 153 in the other files.
+- The worktree has no `data/`, so the data-backed archive tests fail there without it. One WNBA hub-link test fails
+  for the same reason; it is unrelated.
+
+**Reader** `C:\tmp\scc_oversight_d5aa\read_1f_after_load.py`. It reads the board before and after the pages, so a
+build in between cannot count against them. It must:
+- MET (rc 0) on the replay's pages;
+- VIOLATED (rc 1) on a copy with one non-board headline card and one card without a verdict.
+
+The BEFORE reading on the served pages was at 21:21:52Z (3:21 PM CST): rc 3 NOT LOADED (NFL props headline 2,190,
+NFL picks 12, NCAAF picks 24, NBA picks 0). **Prediction after the load:** rc 0 on all four pages, and 0 NFL rate cards
+without a verdict.
+
+**Loads with:** an ff + `reload-web` (web only); betting change NO. The user's call.
+
+**Not covered:** `/nba/props` (empty today: it renders only a saved top-by-game artifact), the NBA and NCAAF game
+cards, and the NFL betting-card route (a historical view of the stored snapshot).
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:

@@ -79,6 +79,13 @@
   - Measured first (00:23:40Z 11-27 board, 1,929 pregame rows): EV gross on all; 305 fee rows judged net; 355 Kalshi / 241 Polymarket prices invisible on the page. 11 of 46 Suggested pregame rows carry a venue price, and none clears +2% net there (4 clear 0).
   - Replay HELD: shown EV == the gate's number 319 / 319 fee rows, == gross 1,681 / 1,681; venue entries == the purchaser function's 480 / 480. Reader `read_1e_after_load.py`: BEFORE rc 3 (353 exchange cards without net, 0 venue lines). Loads: web + the board child. Betting change NO. Findings "Step 1e".
 - **Step 1d DEPLOYED to web 2026-11-26 17:28:02Z, MET** (user "Deploy to web now"; ff `75624d138` + reload-web). Served 17:28:18Z: Board pick tile first on 15 of 15 NHL and 36 of 36 soccer games, 12 of 12 sim prop cards carry the board's verdict; 0 unlabelled non-board EV on the live pages. The picks headline with live board picks was read 2026-11-27 15:32:05Z (9:32 AM CST), rc 0: the board's 6 Suggested NHL picks lead the page, 0 are not the board's, and 12 sim cards follow, all labelled with a verdict. Nothing owed for 1d.
+- **Step 1f BUILT, NOT LOADED** (2026-11-27, user "Yes, build 1f"; display only; findings "Step 1f").
+  - `/nfl/props` leads with the board's prop picks for the page's own games. Every rate card says "Rate edge" (vig left in) and carries the board's verdict.
+  - `/nfl/picks`, `/ncaaf/picks` and `/nba/picks` lead with the board's picks. Each page's own cards follow, labelled. A past week shows no board picks and says why.
+  - Replay on fleet data (board 21:11Z): NFL props 10 board picks lead the 2,237 rate cards, with 0 cards missing a verdict and 0 verdicts that disagree with the board. NFL picks 11, NCAAF 8, NBA 12 of 167.
+  - Tests: 19 new; 3 archive tests updated to the layout.
+  - Reader `C:\tmp\scc_oversight_d5aa\read_1f_after_load.py`: BEFORE 21:21:52Z rc 3; predicted rc 0 after the load.
+  - Loads with an ff + `reload-web`; betting change NO. The user's call.
 - **Reading 8 2026-11-27 20:28-20:31Z: the per-sport pages other than NHL and soccer** (user "What's next"; findings Reading 8).
   - NFL props headlines 2,189 rate-model cards at up to +50.9% "edge", with the vig left in. 0 of the top 50 are board Suggested (27 are on the board, at EV -6.5 to +0.5), and the board's 7 Suggested NFL props sit at page ranks 205-1,664.
   - NFL picks (12 win-probability cards), NCAAF picks (24: 12 price-shopping, 12 win-probability) and NBA picks/props (empty: no saved slate) show none of the board's picks (NFL 7, NCAAF 12, NBA 165 at 19:00Z). NCAAB has no picks page.
