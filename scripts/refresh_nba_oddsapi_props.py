@@ -3370,6 +3370,107 @@ def _run_refresh_via_cli(
     return state
 
 
+# PREGAME AGE LIMIT ON REUSE (`#863`, lane surface-consistency-oversight, 2026-11-27; user "NBA stale quotes", then
+# "Age limit, off"). Both reuse checks below say "reusable" whenever the day's files EXIST: they take `input_hash` and
+# never read it, and nothing asks WHEN the snapshot was fetched. So the regular sweep re-serves one capture all day.
+# Measured 11-27: the sweep launched NBA 34 times by 16:32Z and fetched sportsbook quotes 0 times; only the scheduled
+# pulls (`nba_gameday_props_pull.py`, forced, 6:40 / 10:40 / 2:40 CST) refetched. Kalshi is polled every 30 s, so 2 h
+# after each pull `book_grid.py`'s dead-feed rule marked every sportsbook quote stale and the board picked 0 of 627
+# NBA rows. On the first board after the 10:40 pull: 113 of 881 picked, 3 stale. WNBA fixed the same defect as
+# `#345` / `#383`; this is `#383`'s age bound for NBA's pregame only.
+#
+# - OFF BY DEFAULT: absent or 0 `SYNDICATE_NBA_PREGAME_REUSE_MAX_AGE_SECONDS` = reuse exactly as before. It is a
+#   betting change (it changes which NBA rows the board can pick), so it is switched on in a betting-change window.
+#   About 4500 (75 min) is the value to switch on: the sweep steps ~30 min, so a snapshot is at most ~105 min old
+#   when refetched, under the grid's 2 h rule.
+# - ONLY BEFORE THE DAY'S GAMES START, and only inside `SYNDICATE_NBA_PREGAME_REUSE_WINDOW_HOURS` (absent = 12) of the
+#   next game still to start. Once a game is in play, the in-play lane rewrites the snapshot every minute and takes
+#   each not-started game every 30 min (`fetch_basketball_oddsapi_props_local.upcoming_events_due`), so the age here
+#   stays small and nothing extra is fetched. The window keeps an overnight sweep from refetching an evening slate.
+# - Declining reuse falls through to the same full run a forced scheduled pull makes (67 s on 11-27 10:40 CST), at
+#   about 55 OddsAPI credits a game.
+_NBA_PREGAME_REUSE_WINDOW_HOURS_DEFAULT = 12.0
+
+
+def _nba_pregame_reuse_max_age_seconds() -> float:
+    """The pregame reuse age limit in seconds; 0 = off (the default)."""
+    raw = str(os.environ.get("SYNDICATE_NBA_PREGAME_REUSE_MAX_AGE_SECONDS") or "").strip()
+    try:
+        value = float(raw) if raw else 0.0
+    except ValueError:
+        return 0.0
+    return value if value > 0 else 0.0
+
+
+def _nba_pregame_reuse_window_seconds() -> float:
+    raw = str(os.environ.get("SYNDICATE_NBA_PREGAME_REUSE_WINDOW_HOURS") or "").strip()
+    try:
+        hours = float(raw) if raw else _NBA_PREGAME_REUSE_WINDOW_HOURS_DEFAULT
+    except ValueError:
+        hours = _NBA_PREGAME_REUSE_WINDOW_HOURS_DEFAULT
+    return max(0.0, hours) * 3600.0
+
+
+def _snapshot_age_seconds(path: Path, now_epoch: float) -> float | None:
+    try:
+        return max(0.0, now_epoch - path.stat().st_mtime)
+    except OSError:
+        return None
+
+
+def _snapshot_next_start_seconds(path: Path, now_epoch: float) -> float | None:
+    """Seconds until the earliest game in the snapshot that has not started; None when none is left to start or the
+    snapshot carries no start times."""
+    starts: set[str] = set()
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            reader = csv.reader(fh)
+            header = next(reader, None) or []
+            if "commence_time" not in header:
+                return None
+            index = header.index("commence_time")
+            for row in reader:
+                if len(row) > index and row[index]:
+                    starts.add(row[index])
+    except (OSError, csv.Error, UnicodeDecodeError):
+        return None
+    leads = []
+    for text in starts:
+        try:
+            ts = dt.datetime.fromisoformat(text.strip().replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=dt.timezone.utc)
+        lead = ts.timestamp() - now_epoch
+        if lead > 0:
+            leads.append(lead)
+    return min(leads) if leads else None
+
+
+def _pregame_reuse_declined(snapshot_path: Path, *, date_str: str, branch: str, now_epoch: float | None = None) -> bool:
+    """True when the age limit (`#863`) refuses to reuse this snapshot, so the caller fetches instead."""
+    max_age = _nba_pregame_reuse_max_age_seconds()
+    if max_age <= 0:
+        return False
+    now_epoch = time.time() if now_epoch is None else float(now_epoch)
+    age = _snapshot_age_seconds(snapshot_path, now_epoch)
+    if age is None or age <= max_age:
+        return False
+    lead = _snapshot_next_start_seconds(snapshot_path, now_epoch)
+    if lead is None:
+        return False
+    window = _nba_pregame_reuse_window_seconds()
+    if lead > window:
+        return False
+    print(
+        f"[nba_refresh] PREGAME_REUSE_DECLINED date={date_str} branch={branch} snapshot_age_s={int(age)} "
+        f"max_age_s={int(max_age)} next_start_in_s={int(lead)} window_s={int(window)} path={snapshot_path}",
+        flush=True,
+    )
+    return True
+
+
 def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None) -> dict[str, object] | None:
     raw_root = source_root / "data" / "raw"
     processed_root = source_root / "data" / "processed"
@@ -3387,6 +3488,8 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     if do_export:
         required_paths.append(recs_path)
     if any(not _path_has_meaningful_content(path) for path in required_paths):
+        return None
+    if _pregame_reuse_declined(snapshot_path, date_str=date_str, branch="source_root"):
         return None
 
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
@@ -3445,6 +3548,10 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
     if do_export:
         required_paths.append(recs_path)
     if any(not _path_has_meaningful_content(path) for path in required_paths):
+        return None
+    # The same limit as the source_root branch: on the fleet both roots are one directory, so a limit in only one
+    # branch would hand the reuse straight to the other.
+    if _pregame_reuse_declined(snapshot_path, date_str=date_str, branch="artifact_bundle"):
         return None
 
     game_cards_path = processed_root / f"game_cards_{date_str}.csv"
