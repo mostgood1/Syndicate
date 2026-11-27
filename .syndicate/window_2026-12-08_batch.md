@@ -1,0 +1,281 @@
+# 2026-12-08 betting-change window batch: the item list, each item's conditions, and the user's load yeses
+
+Built 2026-11-27 by session 91b0c989 (lane `window-1208-batch`), started by session 898e5510.
+The window is Tue 2026-12-08, 2:00-7:00 AM CST (08:00-13:00Z), per `.syndicate/betting_change_windows.md`.
+
+- **Batch task:** `window-batch-load-1208`, firing 2026-12-08 2:15 AM CST (08:15Z).
+- **Backup task:** `window-batch-load-1208-backup`, firing 3:45 AM CST (09:45Z). It runs the batch only if the batch
+  never started, and it runs the same prompt, checked by sha256.
+- **Shape:** one claimed ff to an exact `origin/main` SHA and ONE drained full down/up, modelled on the 11-24 batch
+  (`nfl-level-refit-load-1120`, deploys.md 2026-11-24 08:30:10Z). Every item is lettered and droppable on its own.
+
+**Nothing in this file is an instruction to the batch.** The batch's instructions are its prompt, which the user
+reviewed; the prompt's sha256 is recorded in lane `window-1208-batch`. The batch reads this file only for the
+`LOAD YES` / `LOAD NO` lines below.
+
+## How the user's load yes is recorded
+
+The batch loads an item ONLY if this file, on `origin/main` when the batch runs, holds a valid `LOAD YES` line under
+that item's heading.
+
+- **Line form.** Add ONE line under the item's `#### <letter>` heading in the "LOAD yes lines" section at the end of
+  this file, in exactly this form:
+  `- LOAD YES <YYYY-MM-DD> <h:mm AM|PM> CST, session <first 8 hex of the session where the user answered>, to "<the question, verbatim>": "<the user's words, verbatim>"`
+- **Recorded by another session.** If a session other than the one where the user answered writes the line, append
+  `, relayed word for word by session <8 hex> from the user's own message`.
+- **When it counts.** It counts only if ALL of these hold:
+  - it is dated 2026-12-07 00:00 CST or later, and before the batch starts;
+  - it quotes the user's own words in the named session. A relayed claim, or a button label the recording session
+    offered that the user did not choose, never counts (learnings 2026-10-20 FORBIDDEN);
+  - the question it answers names THIS item (its letter or todo number) and its load in the 12-08 window;
+  - for an item with a gating record (H: the 11-28 hold-out; I: the timeouts reading; F: the `FIT FIX ON MAIN` line;
+    L: the 12-07 grade), it is dated after that record.
+- **Cancelling.** A later `- LOAD NO ...` or `- HOLD ...` line in the same form cancels a yes.
+- **Two exceptions** (STANDING load instructions; they need no 12-07 line):
+  - D: it loads exactly when C loads.
+  - M: it rides the batch's down/up whenever at least one betting item loads.
+  - ANSWERED at install: the user answered "Yes, install it" (2026-11-27 ~4:29 PM CST, session 91b0c989) to "Install
+    it as listed, or install with D and M also needing a 12-07 yes?". So D and M count on their standing words:
+    D "load (b) in the next window" (11-26 ~10:12 PM CST); M "Next scheduled restart" (11-25 ~10:10 AM CST).
+    A `- LOAD NO` or `- HOLD` line under `#### D` or `#### M`, dated after that answer, cancels either one.
+- **Additions only.** Never edit or remove another session's line. Commit through a temp index on a freshly fetched
+  `origin/main`.
+
+## The items (load order A..M; each droppable alone unless its block says otherwise)
+
+Every key below reads ABSENT on all three roles today, except J's and L's shadow lines. Every kit's dummy-file
+self-test PASSED 2026-11-27 21:01-21:09Z, the real env file stayed byte-identical (sha16 `290f86bd5493eb45`). The
+whole-batch rehearsal also PASSED: all 13 applies in this order on one dummy file, with no key twice, and the
+earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehearsal.sh`, output
+`C:\tmp\w1208_batch\selftests_1127.out`).
+
+### A — #850 J's narrowed checkout-HEAD hold (head rule)
+- Line: `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_HEAD_RULE=loaded`.
+  - Code is `8e2149f0f`, and the fleet carries it. Absent means `any`, today's rule (`pipeline/board_build_process.py:674-678`).
+  - BETTING CHANGE.
+- Lane `board-split-memory-guard` (session 644b05ff); findings_2026-11-18_board_split_memory_guard.md s22-s25.
+- Queue yes: "Queue it for 12-08", typed ~10 AM CST 11-27 in session 644b05ff. LOAD yes OWED.
+- Condition: CHANGE J (`..._PARENT_RECYCLE_MB=1500`) still reads 1500 in refresh-worker's environ at the baseline.
+  Without it, the line is inert.
+- Kit: `C:\tmp\w1208_headrule\kit_env_headrule.sh` (`check | apply | restore <b> | after_up <utc>`). The load check is
+  `after_up` printing `ARMED_HEAD_RULE=loaded`. Then P-HR1..P-HR4 run on the first two qualifying mornings.
+
+### B — #850 host-headroom switch
+- Line: `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB=1024`; the reserve stays at its default 2048.
+  - Code is `9a9a0b207`, absent = off. BETTING CHANGE.
+- Same lane and session as A; findings s18, s21, s25.
+- Queue yes: "Queue it too", typed ~12:15 PM CST 11-27 in session 644b05ff. LOAD yes OWED.
+- A and B load in the same down/up by plan, and either loads alone.
+- Kit: `C:\tmp\w1208_hosthead\kit_env_hosthead.sh` (`check | apply [n] | restore <b>`).
+- Load check: refresh-worker.log since the up shows the board child's
+  `BOARD_PROCESS_HOST_HEADROOM installed ... overdraft_mb=1024 reserve_mb=2048` and `host_overdraft_mb=1024
+  host_reserve_mb=2048` on the switches line.
+- P-H1..P-H5 follow (P-H4 / P-H5 = an OOM kill or a board child rc -9 means revert).
+
+### C — #861 one model number per Layer 2 card
+- Line: GLOBAL `SYNDICATE_LAYER2_ONE_MODEL_NUMBER=on`.
+  - Code is `d25f49964`, absent = off.
+  - BETTING CHANGE, classed conservatively: the evaluation ledger's `model_probability` switches basis.
+- Lane `surface-consistency-oversight` (session d5aa3287); findings_2026-11-23_surface_consistency.md "QUEUED FOR THE
+  12-08 WINDOW".
+- Queue yes: "Queue for 12-08", ~11:25 AM CST 11-24 in session d5aa3287. LOAD yes OWED.
+- Kit: `C:\tmp\w1208_onenum\kit_env_onenum.sh`.
+- Reader: `py -3 C:\tmp\w1208_onenum\read_after_load.py`, run on the first board build after the up (0 MET / 1
+  violated / 2 blind / 3 not loaded).
+
+### D — #847 (b) calibrated Sim / model EV display (rides with C)
+- Line: GLOBAL `SYNDICATE_CELL_CALIBRATION_DISPLAY=on`.
+  - Code is `75a787964`, absent = off. NOT a betting change.
+- Lane `cell-calibration-847-b-load`; findings_2026-11-18_cell_calibration.md s6.
+- Standing yes: "load (b) in the next window", typed ~10:12 PM CST 11-26 in session 77184c63.
+- Coupled: "Hold (b) with it", ~10:19 AM CST 11-27. D loads ONLY if C loads, and drops if C drops.
+- Kit: `C:\tmp\w1208_cellcal_b\kit_env_b.sh`.
+- Reader: `py -3 C:\tmp\w1208_cellcal_b\read_after_load_b.py`, on the first board build.
+- Needs a non-expired `reports/model_scorecard/model_cell_calibration.json` (72 h expiry; the kit prints `table_mtime`).
+
+### E — #847 (c) rank/stake below the 0.5 floor
+- Line: GLOBAL `SYNDICATE_CELL_CALIBRATION_RANK_STAKE=on`. BETTING CHANGE.
+  - Code `75a787964`, plus the fixes `a15d94bbc` + `d381a806a` (on main, NOT yet on the fleet). The batch's ff must
+    reach `d381a806a`.
+- Queue yes: "Queue both", ~10:19 AM CST 11-27 in session e32fef1a. LOAD yes OWED.
+- Kit: `C:\tmp\w1208_cellcal_cd\kit_env_cd.sh apply c`.
+- Reader, on the first board build: `py -3 C:\tmp\w1208_cellcal_cd\read_after_load_cd.py --use c --fixes yes
+  --ncaaf-835 <on if H loaded else off> --d-loaded <yes if F loaded else no>`.
+
+### F — #847 (d) per-cell live probability
+- Line: GLOBAL `SYNDICATE_CELL_CALIBRATION_LIVE_PROB=on`. BETTING CHANGE.
+  - Code is `8acee817d` + `a15d94bbc` + `d381a806a`.
+- Same queue yes as E. The user then said "Yes, both" (~2:25 PM CST 11-27, relayed by session e32fef1a), so (d) loads
+  12-08 ONLY IF the FIT FIX (findings s8.3 option (i), lane `cell-calibration-847d-fit-fix`) is on main and tested by
+  then. Otherwise it waits for 12-22.
+- **Mechanical condition.** Lane `cell-calibration-847d-fit-fix` on `origin/main` carries a dated line beginning
+  `FIT FIX ON MAIN <sha>` that names its test files. The batch checks that `<sha>` is an ancestor of `origin/main`, and
+  runs those test files at Idle priority in its worktree, all passing. Today the fit fix is uncommitted.
+- OPEN, the user's call at the load yes: the #835 skip covers NCAAF live TOTALS only. (d) still moves
+  `ncaaf|spreads|full|live` on top of H's damping and I's end game, if they load too.
+- Kit: `kit_env_cd.sh apply d`.
+- Reader, DURING the first live slate (it reads the book grids):
+  `read_after_load_cd.py --use d --fixes yes --ncaaf-835 <on|off>`.
+- Live money: in-play live orders come from the Kalshi in-game module and do not size through `portfolio_commit`. So
+  today (d) reaches rank, paper and decision records, not live in-play money.
+
+### G — #863 NBA pregame reuse age limit
+- Line: GLOBAL `SYNDICATE_NBA_PREGAME_REUSE_MAX_AGE_SECONDS=4500`. BETTING CHANGE.
+  - Code is `f69f7b6c8` + `cc516f4b0`, absent = off. Both workers' odds sweeps run the NBA step.
+- Lane `surface-consistency-oversight` (session d5aa3287).
+- Queue yes: "Age limit, off", 11-27 in session d5aa3287. The ledger has ~11 AM and ~1 PM CST. LOAD yes OWED.
+- Kit: `C:\tmp\w1208_nba863\kit_env_nba863.sh`.
+- Reader: `py -3 C:\tmp\w1208_nba863\read_after_load.py <day>`, on an NBA game day before the first tip and >= 110 min
+  after a scheduled pull. It is OWED after the load, not read at it. Cost: about +75k OddsAPI credits a month, an
+  upper bound.
+
+### H — NCAAF live totals pair, #835 + #852 (three lines, always together)
+- Lines, GLOBAL:
+  - `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION=on` and `SYNDICATE_LIVE_TOTALS_PROB_SCALE_NCAAF=1` (#835, `f29c53e91`,
+    `56e132d40`);
+  - `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING=on` (#852, `44184da1e`).
+  - BETTING CHANGE.
+- Keep #835's key GLOBAL: (c)/(d)'s NCAAF-totals skip (`cell_calibration.py` `ncaaf_live_total_owned_by_835`) reads
+  it in whichever role runs them.
+- Lanes `ncaaf-live-total-dispersion` and `ncaaf-live-endgame-surplus` (session 617b553b).
+- Queue yes: "Queue for 12-08 (Recommended)", ~9:40 AM CST 11-20 in session 617b553b. LOAD yes OWED in session
+  617b553b's chat.
+- **Condition:** the 11-28 hold-out read by task `engine-ncaaf-checks-1130` (Mon 11-30) must be recorded. That means:
+  - a `## Hold-out check, 2026-11-28 slate` section in both `.syndicate/findings_2026-11-19_ncaaf_live_total_dispersion.md`
+    and `.syndicate/findings_2026-11-19_ncaaf_live_endgame_surplus.md`;
+  - #835 items 1 AND 2 read PASS there. Its own no-go rule: items 1 or 2 FAIL on 11-21 or 11-28 means #835 does not go;
+  - #852's section reads `CHECK VALID`.
+- On 11-21 it was mixed: #835 items 1-4 PASS and item 5 FAIL on one bucket; #852 failed its 17+ mean F-c. The user
+  weighs that at the yes.
+- Kit: `C:\tmp\w1208_ncaaf\kit_env_ncaaf.sh apply pair`.
+- No NCAAF game falls between 12-08 and Army-Navy 12-12. So at the load only the env is read. The refresh-worker line
+  `NCAAF_LIVE_BLOWOUT_DAMPING on strength=1.0 lead_threshold=17.0 lead_span=14.0` (21.0 / 7.0 with I) and the tick's
+  `total_calibration.anchored > 0` are OWED at the next live NCAAF game.
+
+### I — #859 margin-aware end game (only on top of H)
+- Lines, GLOBAL: `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING_THRESHOLD=21`, `SYNDICATE_NCAAF_LIVE_BLOWOUT_DAMPING_SPAN=7`,
+  `SYNDICATE_NCAAF_LIVE_ENDGAME=on`.
+  - Code is `b2ff241ae`. BETTING CHANGE.
+- Lane `ncaaf-margin-aware-endgame` (session 617b553b).
+- Queue yes: "queue the end-game load set for the 12-08 window", ~6:10 PM CST 11-21. LOAD yes OWED, separately from H.
+- **Conditions:**
+  - H loads in this batch. The kit refuses the end game without the pair.
+  - The real-timeouts hold-out is MET 11-21.
+  - A dated ledger reading in lane `ncaaf-margin-aware-endgame` or todo #859 shows a live NCAAF scoreboard row carrying
+    `homeTimeouts`/`awayTimeouts`. It is NOT recorded today.
+- Kit: `kit_env_ncaaf.sh apply endgame`.
+- OWED at the next live game: `NCAAF_LIVE_ENDGAME on concede_deficit=25 ...` and live lanes with
+  `endgame.timeouts_fed=true`.
+- NOT in the batch: `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR` (`cf12ae61f`). The user has made no load decision and it has
+  no kit line.
+
+### J — Polymarket stale cancel, shadow -> on
+- Line: `LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_STALE_CANCEL=on`, promoted IN PLACE from the 11-24 shadow line.
+  - Code is `7bc613347`. BETTING CHANGE (a live venue write).
+- Lane `polymarket-stale-cancel` (session 69d80317); findings_2026-11-21_polymarket_stale_cancel.md.
+- Queue yes: "yes, add the Polymarket stale cancel to the 12-08 queue" (11-21, relayed by the fleet-watcher). LOAD yes
+  OWED, typed in session 69d80317's chat.
+- **Read before the yes:**
+  - The +3 d shadow reading (11-27) was quiet: 0 WOULD_CANCEL, and 0 of 26 orders untouched >= 15 min.
+  - So S2 (the client id and slug we send match the venue's) and S3 (no would-cancel order later fills) are UNTESTED,
+    with 0 samples.
+  - The first live cancel is the probe.
+- Kill rules after the load: P1-P5 (the first `CANCEL_STALE` must return `CANCEL_SENT`, and the order must read
+  cancelled within 2 passes; any exception to taker / >= 900 s / drift >= 0.01 means kill).
+- Kit: `C:\tmp\w1208_pmstale\kit_env_pmstale.sh apply on`. Revert: remove that one line (absent = off), then a
+  drained down/up.
+
+### K — #845 soccer Understat-outage splice
+- Line: GLOBAL `SYNDICATE_SOCCER_UNDERSTAT_SPLICE=1`.
+  - Code is `1ef73b910`, absent = off. BETTING CHANGE (every big-5 rating).
+- Owner: todo #845; lane `understat-fetch-failures` CLOSED 11-18.
+- Queue yes: "queue the splice for the 12-08 window", 11-18 4:57 PM CST. LOAD yes OWED. Show the user the real-gap
+  result first: on 69 outage matches at one round the splice is WORSE than frozen, +0.0084 [+0.0015, +0.0185]; the
+  1,818-match backtest favours it at 4+ rounds.
+- The SA-arm re-read through the 12-05/06 weekend is owed, and no task holds it.
+- **Condition:** `bash /mnt/c/tmp/w1208_batch/understat_status.sh` reads `understat_state=down` when the batch runs.
+  2026-11-27 21:07Z: `down` since 2026-11-18T19:22:04Z, `last_ok_at=None`.
+- Kit: `C:\tmp\w1208_batch\kit_env_845.sh`, built 11-27 by this lane; self-test 13/13 PASS.
+- Load check: `SOCCER_UNDERSTAT_SPLICE league=<big5> ... spliced_matches=N` with N > 0 in a worker log, at the next
+  soccer artifact build. OWED if no build runs in the window.
+
+### L — #856 hold-value exits, shadow -> on
+- Line: `LIVE_ODDS_WORKER__SYNDICATE_EXIT_HOLD_VALUE=on`, promoted IN PLACE from the 11-24 shadow line.
+  - Code is `ace2020d3`. BETTING CHANGE.
+- Lane `hold-value-exits` (owner session ffd41dea, archived); findings_2026-11-20_hold_value_exits.md.
+- No queue yes for `on` exists. It is a candidate that loads only on BOTH of:
+  - a SUPPORT verdict from the pre-registered 12-07 grade (task `hold-value-shadow-grade-1207`, 12:30 PM CST; backup
+    4:30 PM). The batch requires lane `hold-value-exits` to carry a `12-07 GRADE [...]: SUPPORT (STRONG)` or
+    `SUPPORT (WEAK: CI spans 0)` line;
+  - a LOAD YES here.
+- Kit: `C:\tmp\w1208_batch\kit_env_856on.sh`, built 11-27 by this lane. It promotes in place, never appends, and
+  refuses anything else (rc 5). Self-test 15/15 PASS.
+- Load check: the first `EXIT_TICK status=ok` after the up carries `hold_value={'mode': 'on'`, and 0 `EXIT_TICK_FAILED`.
+- P1-P6 (findings s5) are read over 12-08..12-21.
+- Revert: edit that one line back to `=shadow`, then a drained down/up. Never restore L's own backup after later
+  kits applied: it lacks M's line.
+
+### M — #857 web recycle limit (NOT a betting change)
+- Line: `WEB__SYNDICATE_WEB_WORKER_ANON_LIMIT_MB=1500` (absent = 650, `gunicorn.conf.py:114`).
+- Lane `web-recycle-anon-limit`.
+- Standing yes: "Yes, after #853" (11-20), then "Next scheduled restart" (~10:10 AM CST 11-25, rail monitor's chat).
+  It rides the first drained full down/up, and none has happened since 11-25. The 11-26 17:10Z reboot was not drained
+  and carried no key.
+- Kit: `C:\tmp\w857\kit_env_857.sh`. Load check: `kit_after_up_857.sh <up utc>`. P1-P9 are read the first evening,
+  5-11 PM CST.
+
+## Overlaps: what loading together confounds, and which readers still tell the changes apart
+
+- **One count restart.** Every betting item restarts the scale-up gate's count once, together.
+- **(d) and the NCAAF pair (F vs H/I).** They touch the same NCAAF live rows.
+  - TOTALS: with #835 on, (c) and (d) skip `ncaaf|totals*|full|live` in code. That needs the key GLOBAL.
+  - SPREADS: not skipped. (d) moves them on top of #852/#859.
+  - The cd reader cannot separate the two unless `--ncaaf-835` is stated correctly. The pair's own instrument is
+    `total_calibration.anchored` and `prob_scale`.
+- **C, D, E, F on cards.** Each changes a different field, so each reader stays clean:
+  - #861: `model_probability_basis=model_edge`;
+  - (b): `cal_cell`/`cal_k`, with Win% left raw;
+  - (c): `optimizer_factor` in `ranked_all`;
+  - (d): `live_cell_calibration` on the grids' `live_gameline` rows.
+  - With (c) and (d) both on, fix 1 stops (c)'s k on (d)-stamped rows, and the cards cannot show which rows were
+    stamped. Only the rails are judged there.
+- **G vs E.** #863 changes which NBA rows exist and are Suggested, so an NBA slice of (c)'s rank/stake reading is
+  confounded. #863's own reader (snapshot age, stale share) is separable.
+- **A vs B.** Same role. The head rule acts 3-6 AM CST and the host headroom 5-10 PM CST. A morning parent recycle
+  frees host memory, so read P-H1..P-H5 with that day's recycle (yes/no) beside them. P-H1 is attributable to B
+  only on no-recycle days.
+- **M vs A/B/G.** #857's P4 (sum of fleet RSS) overlaps the #850 memory readings and #863's extra NBA runs. P3 (web
+  workers only) stays separable.
+- **J vs L vs F/G (live-odds-worker).**
+  - J's P5 (re-place after a cancel) is confounded by any change in entries from F or G.
+  - L's P1/P5 (take-profit sales, entries) are confounded likewise. Read them per cell, or with F/G's days excluded.
+  - J's cancel counts (P1-P4) and L's `hold_value` rows are separable.
+- **K.** Soccer ratings only; no row collision found.
+
+## Not in the batch (no load yes, no kit line, or already loaded)
+
+- `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR` (#859 anchor, `cf12ae61f`): no load decision. The anchored spreads k
+  `d8d0af0b7` is HELD by the user ("Yes, hold it").
+- #816 spread-only: verdict flip T3 11-24, "NOT loaded, user decision owed". It has no switch (a code constant).
+- #836 end-of-game freshness `on`: no queue yes, and no outcome grade.
+- The staked-probability guard `..._STAKED_PROBABILITY_UNFITTED=market`: no queue yes.
+- #842, #844, #834, the Central soccer shard, #861 step 1c: already loaded (11-24 / 11-25).
+- The NCAAB Central-day quote shard (rail monitor 11-26): a candidate, with no lane and no decision.
+
+## LOAD yes lines
+
+(Additions only, under each item's letter, in the form above. The batch reads them from `origin/main`.)
+
+#### A
+#### B
+#### C
+#### D
+#### E
+#### F
+#### G
+#### H
+#### I
+#### J
+#### K
+#### L
+#### M

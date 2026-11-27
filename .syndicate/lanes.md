@@ -2384,6 +2384,21 @@ death, never life — do not invert it.
 - Verification: tests: off identical / shadow counts and prices / on refuses > 600 s and an untimed lane / fresh lane priced; R-N: re-run soccer_lane_age_1127.sh after Saturday 11-28 (fresh max must stay < 450 s); at the 12-08 load: LIVE_GAMELINE_JOIN soccer lane_age_max non-None, 0 fresh builds refused, stalled builds refused
 - Blocked by: none
 
+### window-1208-batch — OPEN — opened 2026-11-27 — session f6c01c37-e38b-4696-be15-2b1ed2d0e8d9
+- Goal: the one-time task window-batch-load-1208 (12-08 2:15 AM CST, backup 3:45 AM) loads into the 12-08 betting-change window exactly the items A-M whose load yes the user recorded, with one claimed ff and one drained full down/up, and records each item's after-load reading
+- Files: .syndicate/window_2026-12-08_batch.md
+- Hypothesis: n/a
+- Falsification test: n/a
+- Verification: one deploys.md entry for the 12-08 window with betting change yes, a betting_change.py register row per loaded betting item, each loaded item's after-load check recorded in its lane; or a RESULT line saying the window loads nothing
+- Blocked by: none
+- STATUS 2026-11-27 4:36 PM CST: INSTALLED, not yet run. GOAL: NOT MET (the run is 12-08). Built by session 91b0c989 (CLI f6c01c37), started by session 898e5510.
+- INSTALL YES: the user answered "Yes, install it" (2026-11-27 ~4:29 PM CST, session 91b0c989) to "Install it as listed, or install with D and M also needing a 12-07 yes?". So D (#847 (b)) and M (#857) load on their standing words. Every other item needs a 12-07 LOAD YES line in the window file.
+- TASK `window-batch-load-1208`: one-time, 2026-12-08 2:15 AM CST (08:15Z), enabled, saved in Bypass permissions mode. SKILL.md sha256 `8f95c503d144cfc309c38854f354d7937718c2e5663a3f0a8339d6318d48d16e`. Its body is byte-identical to `C:\tmp\w1208_batch\prompt_main.md` (sha256 `746e6fd368fbf9f57f5ff4a358fca6bb8cc497b3c3f0996dfb96cb8fafc5603a`).
+- TASK `window-batch-load-1208-backup`: one-time, 3:45 AM CST (09:45Z), enabled. SKILL.md sha256 `ef2b5e999549c4ccaaab83e99d96735c28e258d923090766e82a9521f15fe76b`. It runs the batch only if all four hold: the main SKILL.md hash still matches, this lane has no `RUN STARTED 2026-12-08` line, no claim is held by `window-1208-batch`, and it is before 12:00Z.
+- ITEMS: the item list, each item's conditions, the owed yeses and the LOAD YES line form are in `.syndicate/window_2026-12-08_batch.md`.
+- CHECKS 11-27 (nothing applied, no fleet change): all 12 kit self-tests PASS (`C:\tmp\w1208_batch\selftests_1127.out`; the real env file's sha is unchanged); the whole-batch dummy rehearsal A..M PASS (`C:\tmp\w1208_batch\batch_dummy_rehearsal.sh`); `fleet_role_env_reading.py` snapshot + compare reads COMPARE OK on the fleet. New kits: `C:\tmp\w1208_batch\kit_env_845.sh` (K) and `kit_env_856on.sh` (L).
+- PROMPT EDITS before 12-08: edit with update_scheduled_task, then record the new sha256 here AND put it in the backup's prompt. Otherwise the backup stands down.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
