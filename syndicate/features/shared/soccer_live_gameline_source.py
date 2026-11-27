@@ -56,9 +56,16 @@ def _f(value: Any) -> float | None:
 
 
 def soccer_live_games(
-    selected_date: str, *, data_root: Any = None, diagnostics: dict | None = None
+    selected_date: str, *, data_root: Any = None, diagnostics: dict | None = None,
+    stamp_snapshot_time: bool = False,
 ) -> list[dict[str, Any]]:
     """Every soccer match IN PLAY, from whichever store this service can reach.
+
+    `stamp_snapshot_time` (lane soccer-live-lane-age-ceiling, 2026-11-27): copy the snapshot's top-level
+    `generated_at` onto each match that has none of its own, so the gameline index's `as_of` is the lens time and
+    the join's soccer lane-age ceiling has something to judge. The poller writes `generated_at` only at the top
+    level, so without it every soccer lane carried no time. False (the default) returns exactly what it always did;
+    only `soccer_live_gameline_index` passes it, and only while `SYNDICATE_LIVE_GAMELINE_SOCCER_LANE_AGE` is not off.
 
     Returns the per-match dicts the poller builds (`projection`,
     `live_player_props`, teams, score, clock), each carrying `league` and
@@ -104,6 +111,8 @@ def soccer_live_games(
             if out:
                 diag["aggregate"] = "ok"
                 diag["artifact"] = "aggregate"
+                if stamp_snapshot_time:
+                    return [_with_snapshot_time(g, snapshot.get("generated_at")) for g in out]
                 return [dict(g) for g in out]
             # Readable, this date, and in play: nothing. That is a real answer,
             # but it must not shadow a per-league tree that has games.
@@ -144,8 +153,30 @@ def soccer_live_games(
         files_read += 1
         for event_id, game in games.items():
             if isinstance(game, Mapping):
-                out.append({"league": payload.get("league"), "event_id": event_id, **dict(game)})
+                entry = {"league": payload.get("league"), "event_id": event_id, **dict(game)}
+                if stamp_snapshot_time:
+                    entry = _with_snapshot_time(entry, payload.get("generated_at"))
+                out.append(entry)
     return _finish(out, files_read)
+
+
+def _with_snapshot_time(game: Mapping[str, Any], snapshot_generated_at: Any) -> dict[str, Any]:
+    """A copy of `game` whose `generated_at` is its own, else the snapshot's (None when neither has one: an untimed
+    lane, which the soccer lane-age gate refuses while it is on)."""
+    out = dict(game)
+    if not out.get("generated_at") and snapshot_generated_at:
+        out["generated_at"] = snapshot_generated_at
+    return out
+
+
+def _soccer_lane_time_wanted() -> bool:
+    """Is the join's soccer lane-age switch on or in shadow? Imported here, not at module top, so this module keeps no
+    import-time dependency on the join. Any failure reads as off: the stamp only ever ADDS a time."""
+    try:
+        from syndicate.features.shared.live_gameline_join import soccer_lane_age_mode
+    except Exception:
+        return False
+    return soccer_lane_age_mode() != "off"
 
 
 def _histograms_from_scorelines(scorelines: Any) -> tuple[dict[float, float], dict[float, float]]:
@@ -323,7 +354,8 @@ def soccer_live_gameline_index(
     the empty index read downstream as "no soccer match in play".
     """
     diag = diagnostics if isinstance(diagnostics, dict) else {}
-    games = soccer_live_games(selected_date, data_root=data_root, diagnostics=diag)
+    games = soccer_live_games(selected_date, data_root=data_root, diagnostics=diag,
+                              stamp_snapshot_time=_soccer_lane_time_wanted())
     skips = {"skipped_no_projection": 0, "skipped_no_probability": 0,
              "skipped_no_team_names": 0, "skipped_ambiguous": 0, "skipped_key_player_out": 0}
     index = _CanonicalMatchIndex()

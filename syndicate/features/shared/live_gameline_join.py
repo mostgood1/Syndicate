@@ -797,6 +797,55 @@ _MAX_LANE_AGE_SECONDS_BY_SPORT: dict[str, float] = {
     "nfl": 1800.0,
 }
 
+# SOCCER'S CEILING, BEHIND ITS OWN SWITCH (lane soccer-live-lane-age-ceiling; user 2026-11-27 "Yes, build it here",
+# queued for the 12-08 betting-change window).
+#
+# WHY. 2026-11-27 20:02-21:47Z the soccer live lens was not rewritten: its memory gate (`live_lens_loop`, 300 MB
+# headroom on the 3,072 MB live-odds-worker) skipped every soccer tick, 63 `LIVE_LENS_TICK_DIAG sport=soccer
+# reason=low_headroom` lines in 20-21Z. Soccer is not in the table above, so the six matches already in the 20:01:59Z
+# lens kept being priced, 14-38 rows per build, from a model that ended about 95 minutes old; two in-play paper orders
+# came from it (Bologna @ Venezia totals 1.5, edge 32 pp, lens 21 min old). The rail monitor's 11-27 findings.
+#
+# WHY SOCCER WAS LEFT OUT: its lanes carried NO time. `soccer_live_gameline_source` reads a per-match `generated_at`
+# the lens writes only at the top level, so `lane_age_max` was None on all 287 soccer LIVE_GAMELINE_JOIN lines 11-27.
+# The source now stamps the lens time onto each match, but only while this switch is not off.
+#
+# THE CEILING, MEASURED 2026-11-27 on the fleet's logs 11-23 12:05Z .. 11-27 22:34Z (146 soccer join builds with a
+# match in play; age = the build's time minus the last soccer lens write before it, so a few seconds to a minute LOW):
+#
+#     no gate skip since the last write    n 102   p50 45 s   p95 101 s   p99 137 s   max 195 s
+#     a gate skip since the last write     n  44   p50 488 s  p95 5,333 s             max 6,032 s
+#
+#   600 s refuses 20 builds (493 of 1,903 priceable rows), every one a gated stall, and 0 fresh builds. It is the
+#   basketball number, three times the fresh maximum. NOT YET MEASURED ON A SATURDAY SLATE (the retained logs start on
+#   a Monday): the rail monitor re-reads it after 11-28 (`scripts/rail_monitor/soccer_stale_1127/`) before the window.
+#
+# THE SWITCH (`soccer_lane_age_mode`): ABSENT = `off` = today's behaviour exactly -- no lane time stamped, no ceiling.
+# `shadow` = the time is stamped and the ceiling judged, nothing refused; what it would refuse is counted on
+# LIVE_GAMELINE_JOIN (`lane_age_would_refuse`, `lane_age_would_refuse_priced`). `on` = refused, as basketball is. Any
+# other explicit value reads as `on`: a typo must not leave a stale lane on the price. The global switch above still
+# rules over it (global `off` prices everything; global `shadow` caps soccer at shadow), and `MAX_LANE_AGE_ENV` moves
+# soccer's ceiling too while soccer is gated. Absent-is-off, unlike the global gate's absent-is-on, because the fleet
+# builds env only at a drained `up`: a code default would load at the next refresh-worker restart, outside a window.
+SOCCER_LANE_AGE_ENV = "SYNDICATE_LIVE_GAMELINE_SOCCER_LANE_AGE"
+SOCCER_MAX_LANE_AGE_SECONDS = 600.0
+_LANE_GATE_STRENGTH = {"off": 0, "shadow": 1, "on": 2}
+
+
+def soccer_lane_age_mode(env: Mapping[str, str] | None = None) -> str:
+    """`off` (absent, empty, or an explicit off), `shadow`, or `on` (`on` and anything else set). See the block above."""
+    raw = str((env if env is not None else os.environ).get(SOCCER_LANE_AGE_ENV) or "").strip().lower()
+    if raw in {"", "off", "0", "false", "no"}:
+        return "off"
+    if raw == "shadow":
+        return "shadow"
+    return "on"
+
+
+def _weaker_lane_gate(first: str, second: str) -> str:
+    """The less strict of two lane-gate modes (`off` < `shadow` < `on`)."""
+    return first if _LANE_GATE_STRENGTH.get(first, 2) <= _LANE_GATE_STRENGTH.get(second, 2) else second
+
 
 def lane_age_gate_mode(env: Mapping[str, str] | None = None) -> str:
     """`on` (absent or anything unrecognised), `shadow`, or `off`. Only an explicit `shadow` or `off` prices a stale
@@ -814,9 +863,12 @@ def max_lane_age_seconds(sport: Any = None) -> float | None:
 
     `SYNDICATE_LIVE_GAMELINE_MAX_LANE_AGE_SECONDS` overrides every GATED sport (an incident knob, as the quote one is);
     it never gates a sport the table leaves out, whose lanes carry no time to judge. A non-positive or unparseable
-    value falls back to the table rather than turning the gate off."""
+    value falls back to the table rather than turning the gate off. Soccer is gated only while its own switch
+    (`soccer_lane_age_mode`) is not off."""
     key = str(sport or "").strip().lower()
     ceiling = _MAX_LANE_AGE_SECONDS_BY_SPORT.get(key)
+    if ceiling is None and key == "soccer" and soccer_lane_age_mode() != "off":
+        ceiling = SOCCER_MAX_LANE_AGE_SECONDS
     if ceiling is None:
         return None
     raw = str(os.environ.get(MAX_LANE_AGE_ENV) or "").strip()
@@ -2642,6 +2694,8 @@ def attach_live_gamelines(
     build_now = now if now is not None else datetime.now(timezone.utc)
     # The lane-age gate's switch (`LANE_AGE_GATE_ENV`, default on) and, in shadow, what it would have refused.
     lane_gate = lane_age_gate_mode()
+    # Soccer's rows answer to the weaker of the global switch and soccer's own (`SOCCER_LANE_AGE_ENV`, absent = off).
+    soccer_lane_gate = _weaker_lane_gate(lane_gate, soccer_lane_age_mode())
     coverage["lane_age_gate"] = lane_gate
     coverage["lane_age_would_refuse"] = {}
     coverage["lane_age_would_refuse_priced"] = {}
@@ -2876,8 +2930,10 @@ def attach_live_gamelines(
         if lane_age is not None:
             seen = coverage.get("lane_age_max_s")
             coverage["lane_age_max_s"] = round(lane_age if seen is None else max(seen, lane_age), 1)
+        row_lane_gate = (soccer_lane_gate if str(hit.get("sport") or sport or "").strip().lower() == "soccer"
+                         else lane_gate)
         lane_verdict = (lane_age_verdict(hit.get("as_of"), build_now, sport=hit.get("sport") or sport)
-                        if lane_gate != "off" else None)
+                        if row_lane_gate != "off" else None)
         # #836: in the last 5% of regulation or overtime, a full-game lane whose state was read more than 30 s before this
         # build is not priced (`live_endgame_freshness` has the measurement: those lost to Kalshi by +0.174 nats). Judged
         # LAST, so every reason above counts exactly what it did, and only on full-game hits: a segment hit carries no
@@ -2892,7 +2948,7 @@ def attach_live_gamelines(
         stale = (quote_age_verdict(row.get("age_seconds"), sport=hit.get("sport"))
                  or quote_behind_score_verdict(row.get("updated_at"), hit.get("as_of"), sport=hit.get("sport"),
                                                score_changed_at=hit.get("score_changed_at"))
-                 or (lane_verdict if lane_gate == "on" else None)
+                 or (lane_verdict if row_lane_gate == "on" else None)
                  or (endgame_v if endgame_mode == endgame.MODE_ON else None))
         if stale is None and lane_verdict is not None:
             # SHADOW: priced exactly as before; tallied after the loop, once the row's own verdict is known.

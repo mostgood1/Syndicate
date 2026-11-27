@@ -120,3 +120,11 @@ The Windows task took **46 readings**, every 20 min from 10:03 AM to 1:03 AM CST
   - Orders on it: 32 soccer orders submitted 20:02-21:48Z, all PAPER; 2 in play, both Bologna @ Venezia totals 1.5 at 20:22Z (kalshi and polymarket ladders, edge 32.14 pp, the lens 21 min old). 0 live-money soccer orders (ledger archive shard + keyvalue document).
   - The memory gate itself: the live-odds-worker ran over its cap for most of the afternoon. MLB 112 and WNBA 118 low-headroom skips on 11-27 too.
 - **Readers:** `scripts/rail_monitor/soccer_stale_1127/` (gate counts, priced rows, orders, the R18 replay).
+
+## Soccer lane-age ceiling built (#865, 11-27; user "Yes, build it here")
+
+- **What:** `SYNDICATE_LIVE_GAMELINE_SOCCER_LANE_AGE` (absent = off = today; shadow; on) gives soccer live pricing a 600 s lane-age ceiling, and the soccer source stamps the lens time onto each match while the switch is not off (lane `soccer-live-lane-age-ceiling`, todo `#865`). Default off on main; queued for the 12-08 window.
+- **Why soccer lanes had no time:** the poller writes `generated_at` at the top of the lens only; `soccer_live_gameline_index` read `game.get("generated_at")`, so `as_of` was None and `lane_age_max=None` on all 287 soccer LIVE_GAMELINE_JOIN lines 11-27. A ceiling alone would have refused every soccer row as untimed.
+- **The ceiling, measured** (`soccer_lane_age_1127.sh`, fleet logs 11-23 12:05Z..11-27 22:34Z, 146 soccer builds with a match in play, age = build time minus the last soccer lens write): no gate skip since the write n 102, p50 45 s, p95 101 s, p99 137 s, max 195 s; a gate skip since it n 44, p50 488 s, p95 5,333 s, max 6,032 s. At 600 s: 20 builds refused (493 of 1,903 priceable rows), every one a stall, 0 fresh. The probe readings sample 11-21 (Saturday) held two readings at 501-581 s with 11 matches in the lens, and that day's logs have rotated, so a heavy Saturday's normal cadence is NOT measured: R-N.
+- **Proof:** tests 34 / 34; 780 regression; A/B with the switch absent 8 of 8 byte-identical to the pre-change modules (aggregate and per-league lens, h2h / totals / spreads, 60 / 700 / 6,063 s); control `on`: 700 s and 6,063 s price 0 of 12, 60 s 12 of 12; control `shadow`: 12 of 12 at every age.
+- **Owed:** R-N (Saturday re-measure after 11-28); the load-day yes; the after-load reading (`kit_after_up_soccer_lane_age.sh`).
