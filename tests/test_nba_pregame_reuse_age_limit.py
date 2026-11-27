@@ -79,10 +79,16 @@ def test_main_reaches_the_fetch_only_when_switched_on(monkeypatch, tmp_path, cap
     """Reachability: the sweep's real command (both roots one directory, as on the fleet) fetches only when on."""
     _bundle(tmp_path, starts_in_s=[3 * 3600], age_s=3 * 3600)
     assert _run_main(monkeypatch, tmp_path) == []            # off: today's reuse
+    off_out = capsys.readouterr().out
+    assert "PREGAME_REUSE_DECLINED" not in off_out and '"pregame_reuse_declined"' not in off_out
+    assert not (tmp_path / "job.log").exists()
     monkeypatch.setenv(KEY, "4500")
     assert _run_main(monkeypatch, tmp_path) == [DAY]          # on: the 3 h old capture is refetched
     out = capsys.readouterr().out
     assert "PREGAME_REUSE_DECLINED" in out and "branch=source_root" in out and "branch=artifact_bundle" in out
+    assert '"pregame_reuse_declined": 2' in out               # stamped on the printed state
+    log = (tmp_path / "job.log").read_text(encoding="utf-8")  # and written to the day's job log
+    assert log.count("PREGAME_REUSE_DECLINED") == 2
 
 
 @pytest.mark.parametrize("state", [_source_state, _bundle_state])

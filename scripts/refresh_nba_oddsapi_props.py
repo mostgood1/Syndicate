@@ -3390,6 +3390,9 @@ def _run_refresh_via_cli(
 # - Declining reuse falls through to the same full run a forced scheduled pull makes (67 s on 11-27 10:40 CST), at
 #   about 55 OddsAPI credits a game.
 _NBA_PREGAME_REUSE_WINDOW_HOURS_DEFAULT = 12.0
+# Each decline's line, so `main()` can also write it to the day's job log (`--log-file`): the orchestrator keeps only
+# a tail of this script's stdout, and the reuse path otherwise writes nothing there.
+_PREGAME_REUSE_DECLINES: list[str] = []
 
 
 def _nba_pregame_reuse_max_age_seconds() -> float:
@@ -3463,11 +3466,12 @@ def _pregame_reuse_declined(snapshot_path: Path, *, date_str: str, branch: str, 
     window = _nba_pregame_reuse_window_seconds()
     if lead > window:
         return False
-    print(
+    line = (
         f"[nba_refresh] PREGAME_REUSE_DECLINED date={date_str} branch={branch} snapshot_age_s={int(age)} "
-        f"max_age_s={int(max_age)} next_start_in_s={int(lead)} window_s={int(window)} path={snapshot_path}",
-        flush=True,
+        f"max_age_s={int(max_age)} next_start_in_s={int(lead)} window_s={int(window)} path={snapshot_path}"
     )
+    print(line, flush=True)
+    _PREGAME_REUSE_DECLINES.append(line)
     return True
 
 
@@ -4773,6 +4777,7 @@ def main() -> int:
             do_export=bool(args.do_export),
             artifact_root=artifact_root_path,
         )
+        declines_before = len(_PREGAME_REUSE_DECLINES)
         if source_root is not None and not bool(args.force_refresh):
             state = _existing_refresh_state(
                 source_root=source_root,
@@ -4791,6 +4796,9 @@ def main() -> int:
                 started_at=started_at,
                 input_hash=refresh_input_hash,
             )
+        declined_lines = _PREGAME_REUSE_DECLINES[declines_before:]
+        for declined_line in declined_lines:
+            _append_log(Path(args.log_file).resolve(), declined_line)
         if state is None:
             if source_root is None:
                 state = {
@@ -4814,6 +4822,8 @@ def main() -> int:
                 mode=str(args.mode or "full"),
                 in_play_only=bool(args.in_play_only),
             )
+        if declined_lines:
+            state["pregame_reuse_declined"] = len(declined_lines)
         if not fast_mode and artifact_root_path and source_root is not None and not state.get("reused_existing_artifact_bundle") and not state.get("error"):
             copied = _materialize_artifact_bundle(
                 state=state,
