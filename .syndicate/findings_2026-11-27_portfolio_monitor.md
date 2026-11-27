@@ -302,3 +302,55 @@ Results, 30 d, covered set. Each cell is pp with its 95% range:
   rewritten; for them the 30 d study above is the reading.
 - The readout half stays in this lane (`portfolio-monitor` holds `live_book_edge_readout.py`).
 - Building it, and any load, wait for the user's yes. A load restarts the role that settles, so the restart rules apply.
+
+### Lane `clv-fair-close` BUILT on its branch, not landed, not loaded -- 3:36 PM CST (user: "Yes, build it")
+- Commit `81b2b3a43` on local branch `session/clv-fair-close` (worktree `C:\tmp\syndicate-sessions\clv-fair-close`).
+  It is NOT on main and NOT pushed. Nothing on the fleet changed.
+- What it does:
+  - `clv_join`: the quote-log resolver also keeps, at the same book, the last pregame quote of every other selection of
+    the bet's market, in the SAME shard pass. A quote-log close carries `close_overround_pp`, `close_fair_prob`,
+    `close_fair_reason` and `close_other_age_seconds`.
+  - `order_clv`: the fill is also graded against the fair probability (`clv_fair_pct`, `clv_fair_net_pct`).
+  - `paper_settlement`: new marks carry these. `clv_fair_pct` is always present (None when there is no fair close).
+  - Which rows are the other side: the same line for a total or prop; the other team at the NEGATED line for a spread;
+    every selection for a moneyline, and a soccer moneyline needs its draw.
+  - Refused by name, never given a number: `close_other_side_absent`, `close_selection_set_unrecognized`,
+    `close_draw_absent`, `close_overround_implausible` (summed quotes outside [0.90, 1.25]),
+    `close_other_price_unreadable`. An odds-history close gets `close_not_from_quote_log` (learnings 2026-10-26).
+- Tests:
+  - `tests/test_clv_fair_close.py`, 16 tests, pass. They caught one bug before it shipped: matching "lay" as a substring
+    refused every PLAYER prop ("p-lay-er"); it is now matched as a word.
+  - 279 passed across the 13 CLV / settlement / tuner files (baseline 263, the same files before the change).
+  - The other 35 files that import these modules: 39 failed and 13 errors, the SAME set on unchanged main
+    (tests that write into the absent tracked `data/` mirror). 0 new failures.
+- REPLAY on the fleet's quote log, read-only, nice 19. The 1,151 decided, filled 10-28..11-26 live orders with a
+  resolved mark, graded opening-less with main's code and then with the lane's code:
+  - Quoted fields (`reason`, `close_price`, `close_book_scope`, `clv_pct`, `clv_net_pct`, `close_captured_at`,
+    `matched_bookmaker`, `close_source`): 0 mismatches over 1,151 orders.
+  - Fair close on same-book closes: Kalshi 294 of 426 (69.0%), Polymarket 125 of 145 (86.2%). By kind:
+    - Kalshi games 166 of 171 (spreads paired at the negated line), Kalshi props 128 of 255.
+    - Polymarket games 121 of 141, Polymarket props 4 of 4.
+  - Why the rest have none: Kalshi `close_other_side_absent` 125, `close_overround_implausible` 6, unrecognized 1.
+    Polymarket `close_other_side_absent` 18, `close_draw_absent` 1, unrecognized 1.
+  - Game-clustered, 419 bets / 316 games:
+    - CLV against the quoted close +0.56 [+0.16, +0.96];
+    - CLV against the fair close -0.27 [-0.62, +0.08];
+    - fair net of fees -2.04 [-2.39, -1.68];
+    - gap (quoted minus fair) +0.82 [+0.67, +0.98];
+    - overround +1.49 [+1.26, +1.73]. Kalshi +1.60 [+1.30, +1.90], Polymarket +1.25 [+0.90, +1.59].
+- Cost: the whole 30-date grade took 267.3 / 268.9 s with main's code and 280.5 / 289.2 s with the lane's, at
+    nice 19: +16.8 s, +6.3%, with no extra shard read (the other side comes from the same pass). Both trees gave
+    identical rows run to run (0 of 1,151 differ). On the worker, settlement grades only orders still missing a
+    mark, and today's not-started games open no shard, so the added cost there scales with that small set.
+- CORRECTION to the 1:02 PM result above (274f3e2bc). Its overround (+2.69) and fair CLV (-0.74 [-1.17, -0.31]) were
+  overstated, for two reasons:
+  - it summed sets far outside a plausible range: 17 of its 398 totals fell outside [0.90, 1.25], up to 1.50;
+  - it never found a spread's other side, because it looked at the same line.
+  With both fixed, the direction holds: against the fair close the bets do not beat it (range includes 0), and net of
+  fees they lose clearly. The gap is about 0.8 pp, not the 1.3 the lane's hypothesis predicted. The falsification
+  test (gap inside +-0.3 pp) is not met on this replay; the lane's own test is on NEW marks after a load.
+- Loading it: settlement runs in the intelligence-state loop, which `fleet_role_spec.json` enables on refresh-worker
+  only. A load is therefore a main landing, an ff of `~/Syndicate`, and a refresh-worker restart, under claim +
+  preflight and the restart rule. It is NOT a betting change (nothing that places, sizes, holds or exits reads these
+  fields; `min_ev_tuner._gross_clv` reads `close_price` / `close_book_scope` / `clv_pct`, unchanged on all 1,151).
+  Landing, any load, and the readout half (`live_book_edge_readout.py`, lane portfolio-monitor) wait for the user.
