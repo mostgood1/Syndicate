@@ -63601,6 +63601,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Archive `watch_2026-11.jsonl` 14,704 -> 21,672 lines (+6,968 = the 6,967 rows moved at the first tick plus 1 at a later one), 11,027,602 -> 16,294,826 B. Unreconciled live exits 0.
 - verify: the first post-load `KEYVALUE_WRITE_LARGE` for `execution_exits.json` reads `size_bytes=2547921` at 17:41:22.636Z, and the record reads `watch_rows=831` at 17:51:05Z.
 - **revert:** `git revert 82bfc6bbd`, ff, claimed live-odds-worker TERM. The moved rows stay in the archive, which every reader already merges.
+- **evening-slate reading `[read 2026-11-27 06:24:39Z, 12:24 AM CST]` (the half OWED above): MET.** A read-only watcher read live-odds-worker's role logs from the 17:40:33Z boot, every 30 min from 17:53Z to 06:24Z (26 readings):
+  - `KEYVALUE_WRITE_REJECTED` for `execution_exits.json`: **0**.
+  - `KEYVALUE_WRITE_LARGE` saves logged: **147**. The count rose at every reading, so no log rotation cut the window.
+  - Largest save **2,646,038 B** (31.5% of the 8,388,608 B cap), between 05:50Z and 06:22Z. Before the fix, the 11-25 evening save was refused 9 B over the cap.
+  - Last save 06:22:36Z **2,134,081 B**, 509,741 B below the 05:50Z save. That fits the 24 h age prune moving the 11-25 evening slate's rows; not separately checked.
+- verify (evening slate): the watcher's last line reads `rejected=0 saves=147 max_bytes=2646038` at 06:24:06Z (`scratchpad/exits/evening_watch.txt`, session 69d80317). Lane `exit-watch-unseen-prune` CLOSED, GOAL MET; the `execution_exits.py` loan is returned to `kalshi-exit-path`.
 
 ## 2026-11-26 17:10:07Z (11:10 AM CST) -- UNPLANNED LOAD (no deploy): Windows restarted by hand from the Start menu; the fleet came back by its task at 17:12Z and refresh-worker loaded `672a18e87..e37a9697f` -- **not a betting change; recorded after the fact by lane `portfolio-monitor`**
 - betting change: no. Every runtime change refresh-worker picked up is a classified "no" ride-along of BC-072/BC-073. The two worker switches in the range are unset on refresh-worker: `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR` (`cf12ae61f`) and `SYNDICATE_LAYER2_ONE_MODEL_NUMBER` (`d25f49964`, "Betting change while OFF: no"). The rest is display only (`6ca19e36c`), web gunicorn only, web pages and scripts.
