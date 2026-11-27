@@ -642,9 +642,10 @@ def test_post_worker_init_arms_both_instruments_on_a_real_heartbeat(monkeypatch,
 # --------------------------------------------------------------------------------------------
 # `worker_exit` fast exit (2026-11-21): the 17:04:54Z dump was an EXITING worker ~55 s inside CPython's
 # own shutdown (one thread, no Python frame). These pin: a worker whose loop returned with nothing in
-# flight leaves through os._exit(0) after flushing stdio; one that never returned (boot error, a raise),
-# still has a request running, or has the switch off takes the stock exit; the hook never raises into
-# gunicorn; and gunicorn itself accepts it as `worker_exit`.
+# flight leaves through os._exit(0) after flushing stdio; one that never returned (boot error, a raise)
+# or has the switch off takes the stock exit; the hook never raises into gunicorn; and gunicorn itself
+# accepts it as `worker_exit`. Since 2026-11-26 a request still running after the grace wait is
+# abandoned too (`abandoned_running`), unless `SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING` is off.
 # --------------------------------------------------------------------------------------------
 
 
@@ -705,14 +706,45 @@ def test_a_worker_that_never_left_its_loop_takes_the_stock_exit(monkeypatch):
     assert codes == []
 
 
-def test_a_request_still_running_takes_the_stock_exit_and_says_so(monkeypatch, capsys):
+def test_a_request_still_running_after_the_grace_wait_is_abandoned_and_counted(monkeypatch, capsys):
+    """2026-11-26 14:42:42Z: the stock exit joined a 100 s request thread with no heartbeat and the
+    master timed the worker out. Absent = on: leave now, and say how many requests were left."""
     monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT", raising=False)
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING", raising=False)
+    codes, streams = [], [_Stream()]
+    worker = _exiting_worker(futures=[_Future(True), _Future(False)])
+    assert conf.worker_exit(None, worker, exit_now=codes.append, streams=streams, clock=lambda: 130.0) == "exited"
+    assert codes == [0] and streams[0].flushed == 1
+    out = capsys.readouterr().out
+    assert "WEB_WORKER_STOCK_EXIT" not in out
+    [line] = [json.loads(row.split(" ", 1)[1]) for row in out.splitlines() if row.startswith("WEB_WORKER_FAST_EXIT ")]
+    assert line == {"pid": os.getpid(), "after_loop_s": 30.0, "abandoned_running": 1}
+
+
+@pytest.mark.parametrize("off", ["0", "false", "OFF", "no"])
+def test_off_is_not_on_for_abandoning_a_running_request(monkeypatch, capsys, off):
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT", raising=False)
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING", off)
     codes = []
     worker = _exiting_worker(futures=[_Future(True), _Future(False)])
     assert conf.worker_exit(None, worker, exit_now=codes.append, streams=[]) == "request_running"
     assert codes == []
     [line] = _lines(capsys, "WEB_WORKER_STOCK_EXIT")
     assert line["reason"] == "request_running" and line["running"] == 1
+    # The switch is about a running request only: an idle worker still leaves fast.
+    assert conf.worker_exit(None, _exiting_worker(futures=[_Future(True)]), exit_now=codes.append, streams=[]) == "exited"
+    assert codes == [0]
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING", "1")
+    assert conf.worker_exit(None, _exiting_worker(futures=[_Future(False)]), exit_now=codes.append, streams=[]) == "exited"
+    assert codes == [0, 0]
+
+
+def test_the_master_switch_still_restores_the_stock_exit_with_a_request_running(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_WEB_WORKER_FAST_EXIT", "0")
+    monkeypatch.delenv("SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING", raising=False)
+    codes = []
+    assert conf.worker_exit(None, _exiting_worker(futures=[_Future(False)]), exit_now=codes.append, streams=[]) == "disabled"
+    assert codes == []
 
 
 @pytest.mark.parametrize("off", ["0", "false", "OFF", "no"])

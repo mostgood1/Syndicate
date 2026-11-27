@@ -504,12 +504,34 @@ def post_worker_init(worker) -> None:
 #   * the drain is done and every request future has finished;
 #   * the only atexit work web registers releases flock()s, which the kernel drops with the fds;
 #   * the warmer thread is a daemon, which the stock shutdown never joins either.
-# So `worker_exit` flushes stdio and leaves with `os._exit(0)`, but only when the loop RETURNED with
-# nothing in flight. A worker that failed to boot, raised out of its loop or still has a request
-# running exits the stock way, so exit codes 3 / 4 still halt the arbiter.
+# So `worker_exit` flushes stdio and leaves with `os._exit(0)`, but only when the loop RETURNED.
+# A worker that failed to boot or raised out of its loop exits the stock way, so exit codes 3 / 4
+# still halt the arbiter.
 # Switch: `SYNDICATE_WEB_WORKER_FAST_EXIT` (0 / false / off restores the stock exit).
+#
+# A REQUEST STILL RUNNING AFTER THE GRACE WAIT IS ABANDONED (2026-11-26, user "Yes, fix the exit").
+# Until today such a worker took the stock exit, and it was the 14:42:42Z 11-26 kill:
+#   * a timer recycle at 14:41:35.6Z; the drain ended at 14:41:41.6Z with a 100 s
+#     `/api/board/game-chips` request still running (an ESPN fetch in the request path);
+#   * `DrainingThreadWorker.run` waited `graceful_timeout` (30 s) for it, with no heartbeat;
+#   * the stock exit's `threading._shutdown` -> `_python_exit` then joined the request thread,
+#     still without a heartbeat, and the master timed the worker out 60.5 s after the last one.
+# The stock join buys a running request at most the ~30 s left before that kill. Over 11-22..11-25
+# it was never needed: 1,077 of 1,077 drains had nothing running after the grace wait. And gunicorn
+# documents `graceful_timeout` as the point where a worker still busy is force-killed. So leaving at
+# once does what the master would do 30 s later: the client gets the same reset, but without the
+# WORKER TIMEOUT, the SIGABRT, or the half minute with the slot empty.
+# Switch: `SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING` (0 / false / off restores the stock exit for
+# a worker with a request running; absent = on).
+_OFF = {"0", "false", "off", "no"}
+
+
 def fast_exit_enabled() -> bool:
-    return str(os.environ.get("SYNDICATE_WEB_WORKER_FAST_EXIT") or "").strip().lower() not in {"0", "false", "off", "no"}
+    return str(os.environ.get("SYNDICATE_WEB_WORKER_FAST_EXIT") or "").strip().lower() not in _OFF
+
+
+def fast_exit_running_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING") or "").strip().lower() not in _OFF
 
 
 def worker_exit(server, worker, *, exit_now=None, streams=None, clock=time.monotonic, gc_module=None) -> str:  # noqa: ARG001
@@ -522,10 +544,12 @@ def worker_exit(server, worker, *, exit_now=None, streams=None, clock=time.monot
         if returned_at is None:
             return "loop_did_not_return"
         running = sum(1 for fut in list(getattr(worker, "futures", None) or ()) if not fut.done())
-        if running:
+        if running and not fast_exit_running_enabled():
             _log("WEB_WORKER_STOCK_EXIT", {"pid": os.getpid(), "reason": "request_running", "running": running})
             return "request_running"
         payload = {"pid": os.getpid(), "after_loop_s": round(clock() - float(returned_at), 3)}
+        if running:
+            payload["abandoned_running"] = running
         at_fork = getattr(worker, "_syndicate_gc_at_fork", None)
         if at_fork:
             try:
