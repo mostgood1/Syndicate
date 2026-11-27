@@ -855,6 +855,65 @@ Kalshi +117 where the board's grid holds Kalshi at +108 and its best is prophetx
 The live book quotes the venue's own feed, the board the grid. One order cannot say how often or how stale; the
 order's placement time was not read.
 
+## Reading 7 -- why the NBA board flags nearly every line stale `[2026-11-27 16:23Z-16:49Z, fleet, read-only; user "NBA stale quotes"]`
+
+**Answer: the quotes really are old. The flag is right; the capture is the defect.** Every NBA sportsbook quote on the
+fleet came from ONE capture, the scheduled 6:40 AM CST NBA pull (12:40:07Z). Only Kalshi was fresh (polled every 30 s).
+Hypotheses (lane line `b1407a54c`, written before the read): H1 EXONERATED as the cause (its branch fired on 1,256 of
+22,958 stale cells), H2 is the branch that fires, H3 is the cause.
+
+**The chain, earliest stage first:**
+1. **Capture (the defect).** The regular odds sweep launched NBA 34 times on 11-27 by 16:32Z, about every 30 min, and
+   fetched sportsbook quotes 0 times. `refresh_nba_oddsapi_props.py` `_existing_refresh_state` (:3373) and
+   `_existing_artifact_bundle_state` (:3431) accept `input_hash`, never read it, and carry no age bound, so once the
+   day's snapshot files exist every sweep reuses them. This is the defect `#345` (hash) and `#383` (age bound) fixed for
+   WNBA only (`refresh_wnba_oddsapi_props.py` :5156, :5328). The NBA copy got neither.
+   - `odds_nba_player_props_2026-11-27.csv` last written 12:40:07Z; the day's props job log last written 12:40:43Z (the
+     reuse path logs nothing). Newest `captured_at` in the NBA quote log: 12:40:07Z for all 10 sportsbooks, Kalshi
+     16:23:03Z.
+   - The only refetches are the forced pulls (`nba_gameday_props_pull.py`; Windows task SyndicateNbaGamedayProps at
+     6:40 AM, 10:40 AM and 2:40 PM CST on a game day, SyndicateNbaPreviewProps at 12:40 PM for the next day). They were
+     built 10-19 for the cheat-sheet builds, and the script's docstring names this same reuse defect.
+   - Instrument caveat (lead, not followed): `ODDS_SWEEP_OUTCOME wrote=True` read 3 times (06:02, 12:40, 16:10Z), but
+     the sidecar it watches (`book_quotes/<day>.state.json`) is also written by Kalshi's appends (mtime 16:23:03Z with no
+     sweep). So `wrote=True` cannot tell a sportsbook capture from a Kalshi append. Only 12:40Z was a sportsbook capture.
+2. **Grid** (`book_grid.py`, the 10-16 own-capture rule). A quote is stale when its book's whole feed is more than 2 h
+   (`_FEED_DEAD_PREGAME_SECONDS`) behind the latest look at the game. Kalshi looks every 30 s, so the sportsbooks' feed
+   lag was 13,375 s (3 h 43 m). Served grid 16:28Z (first 2,000 of 5,667 rows): 21,702 stale cells by the dead-feed
+   branch and 1,256 by own-capture lag; every sportsbook cell stale; best side `suspect_stale` on 2,481 of 2,557 prop
+   sides and 1,400 of 1,400 game sides. NHL at the same time: sportsbooks seen 1,630 s ago, feed lag 970-1,349 s, best
+   side stale on 62 of 3,407.
+3. **Board.** `layer2_board._suggested_reasons` refuses `suspect_stale_quote`: NBA pregame 0 Suggested of 627 (16:23Z).
+   The Kalshi-only sides that stay fresh are `single_book_fair`.
+4. **Surfaces.** Ask's NBA headline was empty, the NBA cheat sheet kept its 7:30 AM picks (31 of which the board had
+   dropped), and the plan held no NBA.
+
+**Tested on the 10:40 AM CST pull (a same-day natural experiment).** Predicted: once the board reads the new snapshot,
+NBA stale goes to near 0 and Suggested goes above 0. Snapshot rewritten 16:40:09Z (67 s, 11 of 11 games).
+- The board written 16:40:14Z was built from a grid generated 16:39:57Z, before the pull: still 0 Suggested of 654, 613
+  stale.
+- First board built after it (written 16:45:52Z, read 16:49:01Z): **NBA pregame 881 rows, 113 Suggested, 3 stale.** HELD.
+- The served `/api/board/book-grid` artifact was still the 16:39:57Z one at 16:49Z; the board builds its own grid.
+
+**When it bites.** Fresh for 2 h after each pull, then all-stale until the next. On 11-27 that is 8:40-10:40 AM,
+12:40-2:40 PM, and 4:40 PM CST to tip (11 games, tips in the 6, 7 and 8 PM CST hours). So the board can never pick an
+NBA pregame bet in the last hours before tip. 11-23's lead (1,100 of 1,128 stale at 1:30 PM CT) is the 12:40-2:40
+window. Pre-registered for today: all-stale again from about 18:40Z (12:40 PM CST) to the 20:40Z pull, and from about
+22:40Z (4:40 PM CST) to tip.
+
+**Cost of a fix.** The 10:40 pull cost 605 credits (24 calls) for 11 games, about 55 a game: NBA credits 659,353 at
+16:37:00Z, 659,958 at 16:44:31Z, unchanged at 16:49:02Z. OddsAPI's 30-day projection read 4,712,207 against the 5M cap
+(16:37Z), so the headroom is about 288k a month; NBA is 659,353 of 6,729,420 credits since 10-01 (9.8%). Estimates
+below take about 225 NBA games a month.
+- **Age bound** (WNBA's `#383` applied to NBA), set under the board's 2 h rule with room for the 30-min sweep step (about
+  75 min): about 7-8 pulls a game day instead of 3, so roughly +60k credits a month. No all-stale window.
+- **Two more scheduled pulls before tip** (4:40 and 5:40 PM CST): roughly +25k a month. The two midday windows stay
+  stale.
+- Either is a **betting change**: it changes which NBA rows can be Suggested, so the plan and the live book. It lands
+  default-off and loads in a betting-change window (12-08), or the user decides otherwise.
+- Whether NBA picks earn anything is not measured here (the 11-27 NBA lean forward read MISSED; nothing has cleared the
+  #738 bar). Some of the 113 are long-price alt spreads (fanatics +310, +430).
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:
