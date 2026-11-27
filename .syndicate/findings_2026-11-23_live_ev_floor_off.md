@@ -152,3 +152,8 @@ The user, 11-27, answering "Should I diagnose why pregame live orders run 6-19 a
 - Thanksgiving's football slate (post-load plan orders: NCAAF 14, NFL 8, NBA 8).
 
 **For the daily review.** Its line still compares against 0-2 and will keep reading "not holding". The measured baseline is about 5 plan orders a day from Suggested rows plus about 2 maker-pilot orders.
+- 2026-11-27 10:30 AM CST: **daily review's CHANGE P step updated** (user, 11-27, in session 69d80317: "Yes, update it", answering "Should I change the nightly review to expect about 5-9 pregame orders a day instead of 0-2?").
+  - Task `portfolio-learning-review`, set through the scheduled-tasks tool. SKILL.md sha256 went from `bc093609704405b1` to `b7fa10b5857e3ecf`, and the pre-edit copy is in the session scratchpad (`pf3/SKILL.before_pf3.md`).
+  - One line changed: the EV-floor step (b). Every other line and the frontmatter are identical by diff.
+  - Step (b) now splits pregame orders into PLAN (`sizing_basis=model_edge`, no execution style) and MAKER-PILOT. It expects about 5-9 plan orders a day plus about 2 maker-pilot orders, says the registered 0-2 was a wrong prediction and not a defect, and mentions a day's count only above 20 plan orders.
+  - Unchanged: the floor-on line check (non-zero = DEFECT), the daily Log line, and the 12-01 7-day summary.
