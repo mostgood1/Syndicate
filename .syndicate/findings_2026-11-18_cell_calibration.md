@@ -260,3 +260,74 @@ floors.
 - **P-d3, accuracy:** on graded live rows of those cells, Brier vs the raw live probability improves (H-S's sign,
   forward), and the rail flags in them hit within ±3 pp of the probability shown.
 - **P-d4, money:** live orders in those cells fall in count; no detectable P&L change in two weeks.
+
+## 5. H-F (forward grade of the frozen 11-18 table, read 2026-11-26 10:01 PM CST)
+
+Read ONCE, by the pre-registered rule of §1.3, with no refit and no other date range. **Result: H-F PASSES.**
+
+**Why it was read in the evening.** The scheduled task `cell-calibration-847-hf-grade-1126` tried four times (7:09-8:09 AM CST), and every attempt failed at the API with ENOTFOUND. The host had no DNS from about 12:00 AM to 11:05 AM CST. The task then disabled itself. The user said "no you do it" (about 9:55 PM CST), so a session started from the coordinating session (e32fef1a) ran the task's stored prompt as written. No attempt had got past the API: before this write, origin/main had no §5 and no H-F commit.
+
+**Substrate.** A read-only copy (`nice -n 19 cat`) of the fleet's
+`~/syndicate-prod/data/reports/model_scorecard/model_scorecard_optimizer_state.json`:
+- mtime 2026-11-26 05:39:40 CST, after the 05:30 bar, so the freshness check passed;
+- 61,915,207 B, the same size as the fleet file;
+- 2,872 games over 35 dates, 10-22..11-25.
+
+The table is `.syndicate/findings_2026-11-18_cell_calibration_frozen_table.json`: 41 cells, fit on 10-21..11-17 (1,711 games / 28 dates), committed in `9d6b96399` and unchanged since. The command:
+`py -3 scripts/fit_cell_calibration.py grade --state <copy> --table <frozen table> --from 2026-11-19 --to 2026-11-25 --json-out HF_grade.json`.
+The bootstrap draws 2,000 game resamples, seeded. The copy and output sit in that session's scratchpad (`state_20261126.json`, `HF_grade.json`).
+
+### 5.1 Coverage per date (games in the state; games and rows in a served cell)
+
+| date | games | by sport | served games | served rows |
+|---|---|---|---|---|
+| 11-19 | 66 | ncaab 29, wncaab 17, nhl 12, nba 4, soccer 2, ncaaf 1, nfl 1 | 52 | 2,873 |
+| 11-20 | 77 | ncaab 51, nba 9, wncaab 7, ncaaf 6, soccer 4 | 60 | 2,497 |
+| 11-21 | 184 | ncaaf 58, ncaab 51, soccer 49, nhl 14, nba 6, wncaab 6 | 168 | 17,189 |
+| 11-22 | 103 | ncaab 38, soccer 28, wncaab 14, nfl 11, nba 7, nhl 5 | 64 | 5,609 |
+| 11-23 | 74 | ncaab 34, wncaab 18, nba 10, nhl 7, soccer 4, nfl 1 | 41 | 2,205 |
+| 11-24 | 122 | ncaab 78, wncaab 20, soccer 18, nba 3, ncaaf 2, nhl 1 | 91 | 1,857 |
+| 11-25 | 27 | soccer 13, wncaab 14 | 10 | 142 |
+| **total** | **653** | | **486** | **32,372** |
+
+11-25 is not empty, but it is thin: 27 games, soccer and WNCAAB only. It is graded as it stands.
+
+### 5.2 The grade (the script's `served.pass`)
+
+- **ΔBrier per row, served p′ minus the raw model: −0.006815, 95% CI [−0.009606, −0.004426].** The CI upper is below 0.
+  - 32,372 rows / 486 games / 7 dates (11-19..11-25), out of 653 held-out games.
+- **Cells: 38 of 41 eligible cells have ΔBrier < 0.** The bar is two thirds, 27.3 of 41.
+  - All 41 served cells have held-out rows (`cells_with_held_out` 41).
+  - All 41 have at least 20 held-out games (`eligible_cells` 41). The smallest is `soccer|h2h|full|pregame`, with 28 games.
+- **PASS.** Both conditions hold.
+- **Compared with H-S** (§2.1, a table fit before 11-11 and graded on 11-11..11-17): −0.0062 [−0.0102, −0.0021], with 22 of 29 cells better. The forward read on the shipped table agrees in sign and size.
+- **Cells that got worse (3).** All three are NCAAF spreads pregame, at the pooled k 0.365 (τ² 0 in the group):
+  - `ncaaf|spreads|q1|pregame` +0.002592 per row (274 rows / 63 games);
+  - `ncaaf|spreads|h1|pregame` +0.001800 (410 rows / 63 games);
+  - `ncaaf|spreads|full|pregame` +0.001152 (284 rows / 52 games).
+
+  NCAAF spreads full pregame was also worse in H-S (+0.0065, 66 games). It is now worse in both held-out reads. Its live sibling `ncaaf|spreads|full|live`, worse in H-S (+0.0128), improved here (−0.013091, 768 rows / 61 games).
+- **Largest gains:**
+  - `ncaaf|totals|q3|pregame` −0.048217 (202 rows / 63 games);
+  - `ncaaf|rushing yards|full|pregame` −0.036487 (1,574 / 45);
+  - `ncaaf|totals|h1|pregame` −0.023038 (468 / 61);
+  - `ncaaf|totals|q1|pregame` −0.019946 (228 / 63);
+  - `ncaaf|totals|full|live` −0.019472 (1,636 / 63).
+
+  The highest-volume live cell, `ncaab|spreads|full|live` (k 0.345), gained little: −0.000885 (2,514 rows / 230 games).
+- **What the pass covers.** It grades the probability that (b) shows and (d) would use. It is not a money reading, and it says nothing about the rail test (a), which is H-R and failed on coverage (§2.2). Nothing is loaded:
+  - loading (b) (display, not a betting change) is the user's call;
+  - (c) and (d) are betting changes, so they wait for a betting-change window and the user's call.
+
+### 5.3 Readiness for the H-R re-run (step 4: not a grade, and `rail` was not run)
+
+`fit_cell_calibration.py fit --state <same copy> --today 2026-11-26` fits on 10-29..11-25 (2,152 games / 28 dates) and serves 43 cells.
+- **`nba|*|live`: none served.** Since the I-25 floor (games on or after 11-19), NBA live cells reach at most 39 games / 6 dates (eight player markets and `nba|totals|full|live`). `nba|spreads|full|live` has 37 and `nba|h2h|full|live` 3. All are under the 60-game floor.
+- **`ncaab|totals*`: 3 cells served, all PREGAME,** at the pooled k 0.272 (τ² 0):
+  - `ncaab|totals|full|pregame` 369 games / 8 dates;
+  - `ncaab|totals|h1|pregame` 383 games / 8 dates;
+  - `ncaab|totals|h2|pregame` 237 games / 8 dates.
+
+  No college-totals LIVE cell is served. `ncaab|totals|full|live` has 193 games / 8 dates since 11-17, which is past the sample floor, but this fit does not serve it.
+- **`wncaab|totals*`: none served.** `wncaab|totals|full|live` has 45 games / 3 dates.
+- **So H-R is NOT runnable to any new coverage yet.** The flags it lacked (NBA live 298, college full-game totals live 435 of 1,120) still fall in unserved cells. The re-run stays in todo #847 for the optimization program.
