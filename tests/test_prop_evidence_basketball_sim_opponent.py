@@ -102,3 +102,29 @@ def test_the_row_own_opponent_still_wins_over_the_game(monkeypatch):
 
     monkeypatch.setattr(basketball, "_find_player", renamed)
     assert _matchup(RIVERS_POINTS).facts["opponent"] == "ATL"
+
+
+def test_a_sim_row_from_another_game_does_not_lend_its_opponent(monkeypatch):
+    """`_find_player` also reads the tip's UTC-date file, which can hold the team's NEXT game: measured on the fleet
+    replay 2026-11-27, 11-10 Josh Hart (MIL @ NYK) was found in the 11-11 file vs CLE, and the game's tricodes would
+    have shown "vs CLE". A sim game that is not this prop's two teams is ignored, and the box path decides."""
+    real = basketball._find_player
+
+    def next_game(sport, subject):
+        found = real(sport, subject)
+        player = {k: v for k, v in found[0].items() if k not in ("team", "opponent")}
+        game = {**found[1], "home_tri": "CHI", "away_tri": "WAS"}      # a real WNBA pair, but not ATL vs CON
+        return (player, game, *found[2:])
+
+    monkeypatch.setattr(basketball, "_find_player", next_game)
+    facts = _matchup(RIVERS_POINTS).facts
+    assert facts["opponent"] == "ATL", facts                        # the box path's answer, as with no sim row at all
+
+
+def test_unknown_game_is_not_this_game():
+    class S:  # the three fields the check reads
+        sport, home_team, away_team = "nba", "Milwaukee Bucks", "New York Knicks"
+    assert basketball._sim_game_is_this_game(S, {"home_tri": "NYK", "away_tri": "MIL"}) is True
+    assert basketball._sim_game_is_this_game(S, {"home_tri": "NYK", "away_tri": "CLE"}) is False
+    assert basketball._sim_game_is_this_game(S, {"home_tri": "NYK"}) is False
+    assert basketball._sim_game_is_this_game(S, None) is False

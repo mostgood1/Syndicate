@@ -503,20 +503,25 @@ def _recent_form(subject: PropSubject, games: list[dict[str, Any]], box_path: Pa
 
 def _matchup(subject: PropSubject, found, games: list[dict[str, Any]], columns: tuple[str, ...] | None, label: str,
              advanced: dict[str, dict[str, float]]) -> LayerEvidence:
+    opponent = ""
     if found is not None:
         player, game, side = found[0], found[1], found[2]
+        opponent = _code(subject.sport, player.get("opponent"))
         # The NBA engine's sim rows carry no team or opponent (every NBA cards_sim_detail 10-03..11-27, read on the
         # fleet 2026-11-27; the WNBA engine's rows do, and so does this file's test fixture), so for an NBA player the
         # sim row alone resolved NO opponent and the whole layer went absent. Once the 11-10..11-14 name join found
         # most NBA players in the sim, NBA sheet rows with 3+ meetings fell 348 -> 14 and NBA Matchups and defender
-        # matchups lost their evidence (todo #862). The game holds both tricodes; `side` says which one is his.
-        mine, other = ("home_tri", "away_tri") if side == "home" else ("away_tri", "home_tri")
-        opponent = _code(subject.sport, player.get("opponent") or (game or {}).get(other))
-        if not player.get("team") and (game or {}).get(mine):
-            player = {**player, "team": game.get(mine)}
-    else:
-        # No sim row for this day: the opponent is the side of THIS game the player's
-        # newest team is not on (box rows are newest first). Unknown stays unknown.
+        # matchups lost their evidence (todo #862). The game holds both tricodes; `side` says which one is his -- but
+        # only when it IS this game: `_find_player` also reads the tip's UTC-date file, which can hold the team's NEXT
+        # game (11-10 Josh Hart, MIL @ NYK, found in the 11-11 file vs CLE). Otherwise the box path below decides.
+        if not opponent and _sim_game_is_this_game(subject, game):
+            mine, other = ("home_tri", "away_tri") if side == "home" else ("away_tri", "home_tri")
+            opponent = _code(subject.sport, game.get(other))
+            if not player.get("team") and game.get(mine):
+                player = {**player, "team": game.get(mine)}
+    if not opponent:
+        # No sim row for this game (or one that names no opponent): the opponent is the side of THIS game the
+        # player's newest team is not on (box rows are newest first). Unknown stays unknown.
         player = {"team": games[0].get("team")} if games else {}
         codes = {g.get("team") for g in games} | {g.get("opponent") for g in games} | set(advanced)
         opponent = _opponent_from_teams(subject, games[0].get("team"), codes) if games else ""
@@ -558,6 +563,21 @@ def _matchup(subject: PropSubject, found, games: list[dict[str, Any]], columns: 
     if not tables:
         return absent(Layer.MATCHUP, f"{ABSENT_NO_MATCH}:no meetings with {opponent or 'opponent'} and no team advanced stats row")
     return LayerEvidence(Layer.MATCHUP, tables=tables, facts=facts, source=f"{subject.sport}:boxscores_history+team_advanced_stats")
+
+
+def _sim_game_is_this_game(subject: PropSubject, game: Any) -> bool:
+    """True only when the sim game's two tricodes are this prop's two teams (by canonical name). Unknown is False: a
+    game we cannot place must not lend its opponent to a prop (todo #862)."""
+    if not isinstance(game, dict):
+        return False
+    try:
+        from syndicate.features.shared.team_aliases import canonical_team
+    except Exception:
+        return False
+    sport = subject.sport
+    sim = {canonical_team(sport, _code(sport, game.get("home_tri"))), canonical_team(sport, _code(sport, game.get("away_tri")))}
+    mine = {canonical_team(sport, subject.home_team), canonical_team(sport, subject.away_team)}
+    return None not in sim and None not in mine and len(sim) == 2 and sim == mine
 
 
 def _opponent_from_teams(subject: PropSubject, team_code: Any, codes: Any) -> str:
