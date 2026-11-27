@@ -2729,6 +2729,40 @@ def _model_edge_for(row: Mapping[str, Any], side: str, fair: Any = None,
     return -edge
 
 
+#: todo #847 (d) fit fix (lane cell-calibration-847d-fit-fix): the candidate field holding the model edge this side
+#: would have carried WITHOUT (d). Present only on a candidate whose grid row (d) moved; the recorder writes it as `mu`.
+MODEL_EDGE_CELL_UNCALIBRATED_KEY = "model_edge_pct_cell_uncalibrated"
+_NO_CELL_UNCALIBRATED = object()
+#: `live_gameline_join.PROJECTION_CELL_UNCALIBRATED_EDGE_KEY` / `_PROB_KEY`, spelled here so the per-candidate check
+#: costs one dict lookup and no import (a test pins that the spellings match).
+_PROJECTION_CELL_UNCALIBRATED_EDGE_KEY = "edge_vs_market_pct_cell_uncalibrated"
+_PROJECTION_CELL_UNCALIBRATED_PROB_KEY = "live_model_prob_cell_uncalibrated"
+
+
+def _cell_uncalibrated_model_edge(row: Mapping[str, Any], side: str, fair: Any = None) -> Any:
+    """The side's model edge from the number BEFORE (d), or `_NO_CELL_UNCALIBRATED` on a row (d) did not move.
+
+    THE SAME TWO FUNCTIONS THE SERVED EDGE GOES THROUGH, on the projection as it would read without (d):
+    `edge_vs_market_pct` holds the uncalibrated edge (None where that number would not have been priced), and on a
+    distribution row `live_model_prob_over` holds the uncalibrated probability, so the plausibility test judges the
+    number it judged before (d). So the refit reads what the recorder recorded before (d) loaded, side, sign,
+    refusals and the pricing seam included.
+    """
+    projection = row.get("projection")
+    if not isinstance(projection, Mapping) or _PROJECTION_CELL_UNCALIBRATED_EDGE_KEY not in projection:
+        return _NO_CELL_UNCALIBRATED
+    raw = dict(projection)
+    raw["edge_vs_market_pct"] = projection.get(_PROJECTION_CELL_UNCALIBRATED_EDGE_KEY)
+    if raw["edge_vs_market_pct"] is not None:
+        raw["edge_basis"] = "live"
+    if _PROJECTION_CELL_UNCALIBRATED_PROB_KEY in projection:
+        raw["live_model_prob_over"] = projection.get(_PROJECTION_CELL_UNCALIBRATED_PROB_KEY)
+    raw_row = {**row, "projection": raw}
+    edge = _model_edge_for(raw_row, side, fair)
+    edge, _stamps = _calibrate_model_edge(raw_row, side, fair, edge)
+    return edge
+
+
 #: Keys a SPORT's own producer stamps when it has already calibrated the
 #: probability it published. `basketball_props_edges` writes `model_prob_raw`
 #: and `_prob_calibrated` beside `model_prob`; `nfl_game_projections` writes
@@ -3557,6 +3591,9 @@ def build_layer2_rows(
             candidate["model_ev_pct"] = model_ev
             candidate["ev_basis"] = ev_basis
             candidate["model_edge_pct"] = model_edge
+            _cell_uncalibrated = _cell_uncalibrated_model_edge(row, side, fair)
+            if _cell_uncalibrated is not _NO_CELL_UNCALIBRATED:
+                candidate[MODEL_EDGE_CELL_UNCALIBRATED_KEY] = _cell_uncalibrated
             if calibration_stamps:
                 # `model_probability_raw` / `model_probability_cal` /
                 # `model_edge_pct_raw` / `calibration_version` /

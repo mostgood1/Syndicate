@@ -1683,9 +1683,11 @@ def price_distribution_market(
             out["calibrated_total"] = college_calibrated_total(
                 dist, sims=sims, prob_scale=float(prob_scale), calibration=total_calibration, line=line_value,
                 market_prob_over=market_p, points_scored=points_scored)
+    raw_std_err = std_err
     std_err, model_prob = _cell_calibrate(out, live_cell, float(model_prob), market_p, std_err)
     edge = _edge_pp(float(model_prob), market_p)
     out["edge_pp"] = round(edge, 2)
+    _keep_cell_uncalibrated_edge(out, market_p, raw_std_err, sigma, rounded=True, floor=0.0)
     # THE SAME BAR AS THE MONEYLINE, deliberately. A histogram answers "what is
     # P(over 8.5)"; it does not narrow the interval around that answer, which is
     # still set by the sim count. Releasing distribution-based edges at a looser
@@ -1901,6 +1903,54 @@ def _cell_calibrate(out: dict[str, Any], live_cell: Any, model_prob: float, mark
     return new_err, p_new
 
 
+#: todo #847 (d) fit fix (lane cell-calibration-847d-fit-fix): the edge the row would have served WITHOUT (d). Set only
+#: on a verdict (d) moved, so a row (d) did not touch carries no new key at all.
+CELL_UNCALIBRATED_EDGE_KEY = "edge_pp_cell_uncalibrated"
+#: ... and on that row's projection: the edge `edge_vs_market_pct` would hold without (d), and the live probability
+#: `live_model_prob_over` would hold (distribution rows only, where that one is published). `layer2_board` reads both.
+PROJECTION_CELL_UNCALIBRATED_EDGE_KEY = "edge_vs_market_pct_cell_uncalibrated"
+PROJECTION_CELL_UNCALIBRATED_PROB_KEY = "live_model_prob_cell_uncalibrated"
+
+
+def _certainty_refuses(value: Any) -> bool:
+    """Whether `refuse_published_certainty` will blank this projection's edges (its own predicate)."""
+    from syndicate.features.shared.probability_refusal import CERTAINTY_REFUSED
+
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    return float(value) in CERTAINTY_REFUSED
+
+
+def _keep_cell_uncalibrated_edge(out: dict[str, Any], market_prob: float, raw_std_err: Any, sigma: Any, *,
+                                 rounded: bool, floor: float) -> None:
+    """todo #847 (d) fit fix: beside (d)'s edge, the edge the uncalibrated number gives, or None where it would not
+    have been priced.
+
+    WHY. The daily refit grades the recorded edge, so once (d) loads it would fit k on (d)'s OWN number: k drifts to 1
+    in about one 28-day window and the cell leaves the table (findings section 8.3). Keeping the number from before (d)
+    lets the refit read what it read before (d) loaded.
+
+    EXACTLY THE PRE-(d) EDGE, per pricer. The distribution pricer rounds its edge to 2 places and the moneyline pricer
+    does not, so `rounded` follows the caller. And the raw number meets ITS OWN precision bar, with the error from
+    before (d) (`floor` is the moneyline's `min_edge_pp`, 0 for the distribution pricer): a row that would not have
+    been priced without (d) records None, so the refit's population is the one it had before (d) loaded, not a larger
+    or smaller one.
+    """
+    raw_prob = out.get("model_prob_cell_uncalibrated")
+    if raw_prob is None or not out.get("live_cell_calibration"):
+        return
+    try:
+        raw_edge = _edge_pp(float(raw_prob), float(market_prob))
+        bar = max(float(sigma) * float(raw_std_err) * 100.0, float(floor))
+    except (TypeError, ValueError):
+        out[CELL_UNCALIBRATED_EDGE_KEY] = None
+        return
+    if abs(raw_edge) < bar:
+        out[CELL_UNCALIBRATED_EDGE_KEY] = None
+        return
+    out[CELL_UNCALIBRATED_EDGE_KEY] = round(raw_edge, 2) if rounded else raw_edge
+
+
 def price_moneyline(
     *,
     model_prob: Any,
@@ -2003,9 +2053,11 @@ def price_moneyline(
         return out
     out["market_prob"] = q
 
+    raw_se = se
     se, p = _cell_calibrate(out, live_cell, p, q, se)
     edge = _edge_pp(p, q)
     out["edge_pp"] = edge
+    _keep_cell_uncalibrated_edge(out, q, raw_se, sigma, rounded=False, floor=min_edge_pp())
 
     # The gate. `se` is a probability, `edge` is in points -- convert once, here,
     # rather than letting a unit mismatch decide what gets published. The
@@ -3114,6 +3166,12 @@ def _apply_verdict(
         # todo #847 (d): the per-cell calibration's stamp, so the rail's (a) never calibrates this number twice.
         if verdict.get("live_cell_calibration"):
             updated["live_cell_calibration"] = verdict.get("live_cell_calibration")
+        # todo #847 (d) fit fix: the edge (and, where published, the probability) WITHOUT (d), for the refit only. Set
+        # whatever (d)'s own verdict decided, because the uncalibrated number met its own bar in the pricer.
+        if CELL_UNCALIBRATED_EDGE_KEY in verdict and verdict.get("live_cell_calibration"):
+            updated[PROJECTION_CELL_UNCALIBRATED_EDGE_KEY] = verdict.get(CELL_UNCALIBRATED_EDGE_KEY)
+            if live_projected is not None:
+                updated[PROJECTION_CELL_UNCALIBRATED_PROB_KEY] = verdict.get("model_prob_cell_uncalibrated")
         if verdict.get("priceable"):
             updated["edge_vs_market_pct"] = verdict.get("edge_pp")
             # **WHICH PROBABILITY THIS EDGE IS COMPUTED AGAINST.** On a
@@ -3184,6 +3242,11 @@ def _apply_verdict(
         else:
             updated["edge_vs_market_pct"] = None
             updated["edge_unavailable_reason"] = verdict.get("withheld_reason")
+        certainty_refused = (PROJECTION_CELL_UNCALIBRATED_EDGE_KEY in updated
+                             and _certainty_refuses(updated.get("model_prob_over")))
         row["projection"] = refuse_published_certainty(updated)
+        if certainty_refused:
+            # The certainty refusal blanks `edge_vs_market_pct`; before (d) it blanked this same edge.
+            updated[PROJECTION_CELL_UNCALIBRATED_EDGE_KEY] = None
 
     record(coverage, verdict, projected=True)

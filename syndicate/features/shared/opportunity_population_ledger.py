@@ -174,6 +174,12 @@ def _mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
+#: todo #847 (d) fit fix: the record field for `layer2_board.MODEL_EDGE_CELL_UNCALIBRATED_KEY` (spelled here so the
+#: recorder imports nothing new; a test pins that the two spellings match).
+MODEL_EDGE_CELL_UNCALIBRATED_FIELD = "mu"
+_CANDIDATE_CELL_UNCALIBRATED_KEY = "model_edge_pct_cell_uncalibrated"
+
+
 def population_record(row: Mapping[str, Any], key: str, captured_at: str, *, sport: Any) -> dict[str, Any]:
     quote = _mapping(row.get("quote"))
     projection = _mapping(row.get("projection"))
@@ -224,6 +230,12 @@ def population_record(row: Mapping[str, Any], key: str, captured_at: str, *, spo
         # the sim's >15-point gaps (H3). The same reader as the board's Win%, so it is None wherever the board serves
         # no probability (incl. live NFL/NCAAF rows, lane `live-winpct-blank`).
         "mp": _raw_model_probability(row),
+        # todo #847 (d) fit fix (lane cell-calibration-847d-fit-fix): `me` as it would read WITHOUT (d), on a row (d)
+        # moved, so the daily refit fits on the number it fitted on before (d) loaded (`daily_optimizer.wrap_grade`).
+        # ABSENT on every other row, so a record (d) never touched is byte-for-byte what it was; None where the number
+        # without (d) would not have been priced.
+        **({MODEL_EDGE_CELL_UNCALIBRATED_FIELD: _as_float(row.get(_CANDIDATE_CELL_UNCALIBRATED_KEY))}
+           if _CANDIDATE_CELL_UNCALIBRATED_KEY in row else {}),
     }
 
 

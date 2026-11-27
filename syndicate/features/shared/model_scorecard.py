@@ -129,11 +129,21 @@ def load_bucket_search() -> Any:
 KEEP_FIELDS_848 = ("bk",)
 
 
+#: todo #847 (d) fit fix (lane cell-calibration-847d-fit-fix): kept whenever PRESENT, None included. The recorder writes
+#: `mu` only on a row (d) moved, and a None `mu` says the number before (d) would not have been priced; dropping it
+#: would make `daily_optimizer.fit_records` read (d)'s own number for that row. Absent on every other record.
+KEEP_IF_PRESENT_FIELDS = ("mu",)
+
+
 def strip_record(record: Mapping[str, Any]) -> dict[str, Any]:
     from syndicate.features.shared.population_outcomes_soccer import grading_848_on
 
     fields = KEEP_FIELDS + KEEP_FIELDS_848 if grading_848_on() else KEEP_FIELDS
-    return {field: record.get(field) for field in fields if record.get(field) is not None}
+    out = {field: record.get(field) for field in fields if record.get(field) is not None}
+    for field in KEEP_IF_PRESENT_FIELDS:
+        if field in record:
+            out[field] = record.get(field)
+    return out
 
 
 def game_key(record: Mapping[str, Any]) -> str | None:

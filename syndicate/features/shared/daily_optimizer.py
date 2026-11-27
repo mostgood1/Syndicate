@@ -267,6 +267,7 @@ def model_basis(records: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]
 
 
 def accumulate(graded: Iterable[Mapping[str, Any]], model_graded: Iterable[Mapping[str, Any]] | None = None,
+               fit_graded: Iterable[Mapping[str, Any]] | None = None,
                ) -> tuple[dict[str, list[float]], dict[str, list[float]]]:
     """(calibration sums per cell, banded betting sums per cell|band) for one game's graded rows.
 
@@ -284,9 +285,27 @@ def accumulate(graded: Iterable[Mapping[str, Any]], model_graded: Iterable[Mappi
     because one-sided player props carry a recorded model edge (p_model 0.31-0.71x the
     book_margin_model fair) while the board ranked them on `market_fair` -- the column reported a
     promise the board never made.
+
+    `fit_graded` (todo #847 (d) fit fix, lane cell-calibration-847d-fit-fix): the same game graded on
+    each record's edge WITHOUT (d) (`fit_records`). When given, the calibration sums -- the only input
+    of `fit_calibration` (w*, `edge_shrink`) and of `cell_calibration.fit_table` (k) -- come from it,
+    so neither fits on (d)'s own number. The betting bands keep the SERVED p_model: they measure what
+    was promised and paid, not what is fitted. None (no record carries `mu`) is exactly the old path.
     """
     cal: dict[str, list[float]] = {}
     bands: dict[str, list[float]] = {}
+
+    def add_cal(row: Mapping[str, Any]) -> None:
+        cell = cell_of(row)
+        if cell is None:
+            return
+        p_model, p_market, y = row.get("p_model"), row.get("p_market"), row.get("y")
+        if p_model is not None and p_market is not None and y is not None:
+            d, r = float(p_model) - float(p_market), float(y) - float(p_market)
+            acc = cal.setdefault(cell, [0, 0.0, 0.0])
+            acc[0] += 1
+            acc[1] += d * d
+            acc[2] += d * r
 
     def priced(row: Mapping[str, Any]) -> tuple[str, float, float] | None:
         cell = cell_of(row)
@@ -310,13 +329,9 @@ def accumulate(graded: Iterable[Mapping[str, Any]], model_graded: Iterable[Mappi
         cell = cell_of(row)
         if cell is None:
             continue
-        p_model, p_market, y = row.get("p_model"), row.get("p_market"), row.get("y")
-        if p_model is not None and p_market is not None and y is not None:
-            d, r = float(p_model) - float(p_market), float(y) - float(p_market)
-            acc = cal.setdefault(cell, [0, 0.0, 0.0])
-            acc[0] += 1
-            acc[1] += d * d
-            acc[2] += d * r
+        y = row.get("y")
+        if fit_graded is None:
+            add_cal(row)
         hit = priced(row)
         if hit is None:
             continue
@@ -333,7 +348,27 @@ def accumulate(graded: Iterable[Mapping[str, Any]], model_graded: Iterable[Mappi
         hit = priced(row)
         if hit is not None:
             add_model(row, *hit)
+    for row in fit_graded or ():
+        add_cal(row)
     return cal, bands
+
+
+#: todo #847 (d) fit fix: the recorder's field for a record's edge without (d)
+#: (`opportunity_population_ledger.MODEL_EDGE_CELL_UNCALIBRATED_FIELD`).
+FIT_EDGE_FIELD = "mu"
+
+
+def fit_records(records: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]] | None:
+    """The records as the refit should grade them, or None when no record carries `mu` (nothing to change).
+
+    A record (d) moved is graded on `me` := `mu`, the edge without (d), so its p_model is the one the
+    grader produced before (d) loaded; every other record is passed through as the same object.
+    Grading picks its sighting by key and time only, never by `me`, so both passes grade the same rows.
+    """
+    if not any(FIT_EDGE_FIELD in record for record in records):
+        return None
+    return [{**record, "me": record.get(FIT_EDGE_FIELD)} if FIT_EDGE_FIELD in record else record
+            for record in records]
 
 
 def wrap_grade(grade: Callable[..., tuple[list[dict[str, Any]], dict[str, int]]], state: dict[str, Any], *,
@@ -357,7 +392,10 @@ def wrap_grade(grade: Callable[..., tuple[list[dict[str, Any]], dict[str, int]]]
                     chosen = model_basis(subset)
                     return grade(chosen, chips, ungraded_by_sport={}, **side)[0] if chosen else []
 
-                cal, pooled = accumulate(graded, graded_model(records))
+                for_fit = fit_records(records)
+                fit_graded = (grade(for_fit, chips, ungraded_by_sport={}, **side)[0]
+                              if for_fit is not None else None)
+                cal, pooled = accumulate(graded, graded_model(records), fit_graded)
                 entry: dict[str, Any] = {"sport": gk.split("|", 1)[0], "cal": cal, "pool": pooled,
                                          "rec": {}, "pub_known": False, "pub_rows": 0}
                 pub = state["pub"].get(gk)

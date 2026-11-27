@@ -14,16 +14,18 @@ TEMPERED number, so reading it fits k on numbers k has already tempered. Measure
 old read returns exactly the shipped 1.800 where the engine's number gives 1.894 -- a false confirmation
 (`.syndicate/findings_2026-11-24_ncaaf_raw_spreads_k_refit.md`).
   engine    (default) `model_home_win_prob_unscaled` (before #780's k) where present, else
-            `model_home_win_prob_uncalibrated` (before #816's college totals calibration, on a row k left at 1), else the
-            recorded number. A row that says it was transformed (`prob_scale` != 1, or `total_cal`) with no engine
-            number beside it is dropped and counted (`no_engine_probability`). Identical to the recorded read on every
-            row written before the 11-13 loads, so the shipped fits reproduce exactly.
+            `model_home_win_prob_uncalibrated` (before #816's college totals calibration, on a row k left at 1), else
+            `model_home_win_prob_cell_uncalibrated` (before #847's per-cell live calibration, on a row neither k nor
+            #816 moved), else the recorded number. A row that says it was transformed (`prob_scale` != 1, `total_cal`,
+            or `cell_cal`) with no engine number beside it is dropped and counted (`no_engine_probability`). Identical
+            to the recorded read on every row written before the 11-13 loads, so the shipped fits reproduce exactly.
   ac        as engine, and a row refused BEFORE the point estimator (no market price: it holds the raw share k/n) is
             replaced by the join's own `agresti_coull_point(share, sims_run)`: the number the pricer would temper.
   recorded  `model_home_win_prob` as recorded (this script before 2026-11-24).
-Not recoverable from the ledger: #847's per-cell live calibration (`SYNDICATE_CELL_CALIBRATION_LIVE_PROB`, absent =
-off; absent on every fleet layer 2026-11-24) keeps its uncalibrated number on the verdict only, not in the ledger. If it
-loads, rows it touched carry the calibrated number under every source here.
+#847's per-cell live calibration (`SYNDICATE_CELL_CALIBRATION_LIVE_PROB`, absent = off): since lane
+cell-calibration-847d-fixes the ledger records its stamp (`cell_cal`) and the number before it
+(`model_home_win_prob_cell_uncalibrated`) on every row it moved, and `engine` / `ac` read that number (lane
+cell-calibration-847d-fit-fix). `recorded` still reads the calibrated number, by definition.
 
 Population: the fleet's live gameline ledgers, totals / full rows with a model probability and a line (priced or
 not: this is the model's calibration, not the board's), one row per (event_id, live_state_as_of, line), matched to the
@@ -182,6 +184,13 @@ def fit_prob(r, source=None):
     if r.get("model_home_win_prob_uncalibrated") is not None:
         return float(r["model_home_win_prob_uncalibrated"])
     if r.get("total_cal") is not None:
+        return None
+    # #847 (d): the pricer applies k, then #816, then (d), so on a row k left at 1 and #816 did not touch, the number
+    # before (d) IS the engine's number. It is read after the two above, never first: it is after k, so on a tempered
+    # row it would fit k on numbers k already tempered (the 11-24 false confirmation).
+    if r.get("model_home_win_prob_cell_uncalibrated") is not None:
+        return float(r["model_home_win_prob_cell_uncalibrated"])
+    if r.get("cell_cal") is not None:
         return None
     p = float(r["model_home_win_prob"])
     if source == "ac" and r.get("point_estimator") != "agresti_coull":
