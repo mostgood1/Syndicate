@@ -244,3 +244,78 @@ Registered 2026-11-19, before any load. The load is a betting change: it adds li
     `game_not_in_progress`.
   - Scheduled: task `ncaaf-orientation-recheck-1207`, Mon 12-07 9:00 AM CST, over 11-20..12-06.
 
+
+## 8. First evenings after the load (11-24..11-26 CST; read 2026-11-27 9:30 AM CST)
+
+Read-only, scheduled task `college-orientation-join-reading-1127`. Load: CHANGE G of the 11-24 window batch,
+2026-11-24 08:30:37Z (2:30 AM CST); `SYNDICATE_COLLEGE_LIVE_JOIN_ORIENTATION=on` read from /proc on refresh-worker
+(pid 469, the 11-26 17:19Z restart) and live-odds-worker on 11-27, and 1 `=on` line in `local_production.env`.
+
+**P1 log lines** (`refresh-worker.log` + `.1`..`.5`, which cover 11-21 08:13Z .. 11-27 15:31Z; timestamped lines
+only, `ALL_PROCESS_MEMORY` excluded, de-duplicated). 4,233 lines since the load, ALL `mode=on`; 0 `shadow`, 0 `off`
+(2,921 shadow lines before the load).
+
+| sport | lines | first / last (UTC) | distinct `pairs` | max games | rows sum / max | joined sum / max | lines joined=0 |
+|---|---|---|---|---|---|---|---|
+| ncaab | 3,249 | 11-24 15:14Z / 11-27 05:13Z | 35 | 4 | 186,376 / 192 | 160,947 / 177 | 112 |
+| wncaab | 984 | 11-25 02:10Z / 11-27 01:19Z | 12 | 3 | 23,588 / 64 | 23,215 / 64 | 0 |
+
+- `error=none` on 4,233 of 4,233. `refused={}` on all 4,233: the one non-`{}` value was a log line with a
+  `MEMORY_WATCHDOG` line glued on (11-26 02:25:18Z), not a refusal. No `unclassified_field`: no code drift.
+- All 112 `joined=0` lines are one pair, Saint Louis @ Stanford (rows' order), 11-26 06:24Z..17:07Z: see the dark
+  games below.
+
+**P1/P3/P4 per game** (`scripts/college_neutral_site_history.py` from origin/main, ESPN scoreboard + slates + live
+gameline ledger, 11-24..11-26):
+
+| league | ESPN games | live with rows | neutral live | reversed live | dark while reversed | direct live dark / direct live |
+|---|---|---|---|---|---|---|
+| ncaab | 157 | 157 | 85 | **26** (10 / 7 / 9 by date) | 3 | 1 / 131 (0.8%) |
+| wncaab | 114 | 32 | 26 | **9** (1 / 6 / 2) | 0 | 0 / 23 |
+
+- Baseline 11-02..11-19: 24 of 24 reversed NCAAB games dark; direct dark 22 / 758 (2.9%).
+- **32 of 35 reversed games carried modelled full-game rows in the reversed order**, e.g. Oklahoma @ Pittsburgh
+  981 / 993, UCLA @ Saint Mary's 1,095 / 1,104, LSU @ SMU 1,204 / 1,229; WNCAAB Utah @ Miami 503 / 510.
+- Reversed NCAAB (ESPN order): 11-24 Wright St @ St. Bonaventure, Oklahoma @ Pittsburgh, San Francisco @ Oregon St,
+  New Haven @ Lindenwood, Kent St @ Wyoming, Robert Morris @ Lamar, Georgia Southern @ Bellarmine, Santa Clara @
+  Nevada, Duquesne @ High Point, Saint Louis @ Grand Canyon; 11-25 LSU @ Arizona St, Southern Utah @ Long Beach St,
+  Princeton @ Liberty, Texas A&M @ Xavier, Omaha @ UC Davis, Grand Canyon @ Colorado, Stanford @ Saint Louis; 11-26
+  UCLA @ Saint Mary's, Louisville @ St. John's, Alabama @ Kansas St, USC @ Utah St, LSU @ SMU, Maryland @ San Diego
+  St, Arizona St @ South Carolina, UC Davis @ Jacksonville St, Pacific @ Omaha.
+- Reversed WNCAAB: 11-24 Virginia @ UAB; 11-25 Vermont @ Texas Southern, Robert Morris @ Stetson, Arizona @ GW, Utah @
+  Miami, Middle Tennessee @ Montana St, SMU @ Memphis; 11-26 Minnesota @ Missouri St, North Dakota St @ Fairfield.
+- **The 3 "dark" reversed games are not P1 failures** (evidence `live_evidence/ncaab/<date>.jsonl` by ESPN id):
+  - Robert Morris @ Lamar (401925014, 11-24): 5 reversed SEGMENT rows, all at 23:43:15Z, 0 reversed full-game rows;
+    the lane's first row is 23:44:08Z (as_of 23:43:35Z). No lane existed to join. 487 of the game's 491 direct
+    full rows modelled.
+  - Santa Clara @ Nevada (401911458, 11-24): 12 reversed segment rows 00:16:26-00:17:33Z, 0 full; lane first at
+    00:20:39Z. Same shape; 552 of 561 direct full rows modelled.
+  - Stanford @ Saint Louis (401921672, 11-25; tip 06:08Z = 12:08 AM CST 11-26, Acrisure Arena; final 66-64): the lane
+    was refused `no_plays` at 05:11Z and 06:00Z, priced ONCE (as_of 06:12:39Z, 3-4, 1st half 1081 s), and never
+    updated again (the same as_of re-observed at 17:12Z). The join served it: `joined=16..23` at 06:13-06:18Z (3
+    lines); the ledger wrote no reversed full-game row in that window (10 NCAAB ledger rows in all of 06:05-06:40Z).
+    From 06:24Z `joined=0`: the lane was stale. The orientation join worked; the LANE froze after one tick, a
+    lane-side defect. Lead (unverified): the tip was after Central midnight on a game dated 11-25. The game's rows
+    also stayed on the board 11 h after FINAL (rows=12 to 17:07Z).
+- The rail monitor's 11-24 reading agrees: 9 of 10 reversed games modelled; the 10th, WNCAAB Arkansas @ High Point,
+  was refused `no_margin_anchor` (lane-side).
+- P4 (reported, not gated): direct-order dark 1 / 131 NCAAB, 0 / 23 WNCAAB, against 22 / 758 before.
+
+**P2 side mapping** (reversed full-game h2h ledger rows with `model_home_win_prob_raw`, matched to the evidence lane
+row whose `as_of` = the row's `live_state_as_of`):
+
+| game | checked | matched | mismatches |
+|---|---|---|---|
+| NCAAB Oklahoma @ Pittsburgh 11-24 | 116 | 116 | 0 |
+| NCAAB Grand Canyon @ Colorado 11-25 | 152 | 152 | 0 |
+| NCAAB UCLA @ Saint Mary's 11-26 | 132 | 132 | 0 |
+| NCAAB Louisville @ St. John's 11-26 | 146 | 146 | 0 |
+| WNCAAB Utah @ Miami 11-25 | 106 | 106 | 0 |
+
+- 652 of 652 rows: raw = 1 - `modelHomeWinProb` (1e-6), state scores swapped, `model_margin_mean` = -`proj.homeMargin`
+  (1e-6). Example: Oklahoma @ Pittsburgh 18:33:33Z, row 0.4575 vs lane 0.5425, row 2-0 = lane away 2 / home 0,
+  margin -0.81 vs +0.81. 0 ambiguous as_of, 0 unmatched.
+
+**Verdicts:** P1 **MET** (4,233 `mode=on` lines; every reversed game whose lane was priced joined; 0 errors, 0
+refusals). P2 **MET** (652 / 652). P3 **MET** (26 reversed NCAAB in 3 evenings, every evening). P4 **MET** (1 / 131
+direct dark, below the 2.9% baseline). Source: scratchpad of scheduled task `college-orientation-join-reading-1127` (raw: `coj.txt`, `hist_{ncaab,wncaab}.{txt,json}`, `p2.py`).

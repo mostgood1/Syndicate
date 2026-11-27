@@ -63188,6 +63188,7 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - **E, #851:** P1-P5 (the rail monitor, 00-05Z 11-25).
   - **F, #853:** P1-P6, 5-11 PM CST.
   - **G, #854:** P1-P4 at the first reversed NCAAB game.
+    - **READ 2026-11-27 15:36Z (9:36 AM CST): P1-P4 MET.** 11-24..11-26: 26 reversed NCAAB + 9 WNCAAB live games, 32 of 35 modelled in the reversed order (the 3 others: 2 had segment rows only before their lane existed, 1 lane froze after one tick); 4,233 `mode=on` lines, 0 errors / refusals; side mapping 652 / 652. The READING entry 2026-11-27 15:36Z has the counts.
   - **H, #856:** the 12-07 grade.
   - **I, #814:** the first `reason=off_floor`.
   - **J, #850:** P1-P5 (task `board-parent-recycle-reading-1126`; the first parent self-recycle is possible from 11-25 09Z).
@@ -63854,4 +63855,14 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - NBA: 36,608 groups / 96 games; lean -0.29 [-2.15, +1.59] -> +3.17 [+1.31, +5.05]; dLL +0.00210 [-0.00061, +0.00485]; `passes: false` -> **MISS**.
 - NFL (context only, no shift proposed): 11,088 groups / 30 games; lean -2.75 [-9.09, +3.47].
 - verify: holdout JSON `passes=false` for NBA; the bar (dLL CI entirely below 0) is not met, and the point estimate is a log-loss increase.
+- **betting change:** no (reading only). **Claims:** none.
+
+## 2026-11-27 15:36Z (9:36 AM CST) -- READING (no deploy): #854 CHANGE G college orientation join, first three evenings 11-24..11-26 (lane `college-neutral-site-live-join`, scheduled task `college-orientation-join-reading-1127`, read-only) -- **P1-P4 MET; lane CLOSED**
+- Loaded: 2026-11-24 08:30:37Z (2:30 AM CST) in the 11-24 window batch; `on` on refresh-worker (pid 469, restarted 11-26 17:19Z) and live-odds-worker on 11-27 (/proc).
+- **P1 MET:** 4,233 `COLLEGE_ORIENTATION_JOIN` lines since the load, all `mode=on` (ncaab 3,249: 35 pairs, max games 4, joined sum 160,947 of rows 186,376; wncaab 984: 12 pairs, joined 23,215 of 23,588). `error=none` 4,233 / 4,233, `refused={}` 4,233 / 4,233. 32 of 35 reversed games carried modelled full-game rows in the reversed order. The 3 others are lane-side: Robert Morris @ Lamar and Santa Clara @ Nevada (11-24) had only reversed segment rows in a 1-min window before their lane existed; Stanford @ Saint Louis (11-25, 12:08 AM CST tip) was joined at 06:13-06:18Z, then its lane froze at as_of 06:12:39Z (112 `joined=0` lines to 17:07Z).
+- **P2 MET:** 652 / 652 reversed full-game h2h rows across 5 games (4 NCAAB, 1 WNCAAB) matched their lane by state time: raw = 1 - lane prob, scores swapped, margin negated, 0 mismatches.
+- **P3 MET:** 26 reversed NCAAB games (10 / 7 / 9 by evening); baseline 24 of 24 dark 11-02..11-19.
+- **P4 MET:** direct-order dark 1 / 131 NCAAB, 0 / 23 WNCAAB (baseline 22 / 758).
+- verify: findings `.syndicate/findings_2026-11-19_college_neutral_site_live_join.md` section 8.
+- Lead: the Stanford @ Saint Louis lane stopped updating after one tick (tip after Central midnight on an 11-25 game); its rows stayed on the board 11 h after FINAL.
 - **betting change:** no (reading only). **Claims:** none.

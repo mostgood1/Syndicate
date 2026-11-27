@@ -793,6 +793,7 @@ death, never life — do not invert it.
 - Verification: per sport: a recorded mid-game exit produces a key_player_out refusal on the served board within one tick for that game's gamelines and the player's props, and the gate lifts when the player returns; off != on reachability test; 0 change to games with no exit
 - Blocked by: time -- needs a real mid-game key exit per sport on the fleet (MLB spring 2027, WNBA May 2027)
 - LOADED 2026-11-24 08:30:37Z (2:30 AM CST) in the 11-24 window batch (deploys.md 2026-11-24 08:30:10Z, the 11-24 window batch DEPLOY entry); register BC-065 (off-floor, SYNDICATE_LIVE_EXIT_OFF_FLOOR=on in both workers); first live `reason=off_floor` reading owed.
+- STATUS 2026-11-27 9:36 AM CST (scheduled task `college-orientation-join-reading-1127`): CLOSED, P1-P4 MET. P1: 4,233 `mode=on` lines, 0 errors / refusals; 32 of 35 reversed live games (26 NCAAB, 9 WNCAAB) modelled in the reversed order; the 3 others lane-side (Robert Morris @ Lamar and Santa Clara @ Nevada: segment rows only, before the lane existed; Stanford @ Saint Louis: lane froze after one tick at 06:12:39Z 11-26). P2: 652 / 652. P3: 26 reversed NCAAB (10/7/9). P4: direct dark 1 / 131 (baseline 22 / 758). NCAAF re-check still scheduled (`ncaaf-orientation-recheck-1207`). Findings section 8; deploys.md READING 2026-11-27 15:36Z.
 - NHL fix LOADED 2026-11-24 08:30:37Z (2:30 AM CST) in the 11-24 window batch (deploys.md 2026-11-24 08:30:10Z, the 11-24 window batch DEPLOY entry); register BC-067; commit 672a18e87 (cherry-pick of dadf23fac); kit_nhl_k.sh on the fleet checkout now reads players_out 2 (Annunen, Saros goalie_change key=True), refusal key_player_out; first live NHL goalie-change refusal owed.
 
 ### layer2-rail-monitor — OPEN — opened 2026-11-15 — session d58574cb-c55a-4f1f-aa9a-ab530a5f63e0
@@ -1989,7 +1990,7 @@ death, never life — do not invert it.
 - Blocked by: none
 - LOADED 2026-11-24 08:30:37Z (2:30 AM CST) in the 11-24 window batch (deploys.md 2026-11-24 08:30:10Z, the 11-24 window batch DEPLOY entry); not a betting change; web master + both workers read SYNDICATE_COMBINED_BOARD_SHARED_COPY=1; COMBINED_BOARD_SHARED_ARMED + PUBLISHED rows=4500 at 08:33:2xZ, OFF/PUBLISH_FAILED/READ_FAILED 0; #853 P1-P6 owed on the first live evening.
 
-### college-neutral-site-live-join — OPEN — opened 2026-11-19 — session 86eb6e0f-55ca-4ba0-9d8b-e4ffe69ead77
+### college-neutral-site-live-join — CLOSED 2026-11-27 9:36 AM CST (GOAL MET: P1-P4 MET on 11-24..11-26, 32 of 35 reversed games modelled, the 3 others lane-side; side mapping 652/652) — opened 2026-11-19 — session 86eb6e0f-55ca-4ba0-9d8b-e4ffe69ead77
 - SESSION ARCHIVED 2026-11-20 (user "archive this session"; session 86eb6e0f). Nothing uncommitted. The lane stays OPEN, and its follow-ups are owned by scheduled tasks:
   - `nfl-level-refit-load-1120` CHANGE G, the 11-24 load;
   - `college-orientation-join-reading-1127`, P1-P4, which closes the lane if MET;
