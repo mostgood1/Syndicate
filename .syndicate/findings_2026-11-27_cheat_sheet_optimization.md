@@ -91,6 +91,15 @@ BUILT had 174 rows with a record because its day's sim found few players then; r
 so the old code now gives that sheet nothing either. The resolved opponent was one of the game's two teams on 641 of
 642 rows; the one exception (11-10) is traced below.
 
+**The exception, traced:** 11-10 Josh Hart points, MIL @ NYK (7:40 PM ET), resolved opponent CLE. `_find_player` tries
+the board date, the tip's Eastern date, then the tip's UTC date (11-11). His game was not in the 11-10 sim file, so he
+was found in the 11-11 file, in the Knicks' NEXT game vs CLE. The old code ignored that row's (absent) opponent, so the
+wrong game never showed; the first fix would have printed "vs CLE" on a Bucks game. **Guard (second commit):** the sim
+game lends its tricodes only when its two teams are this prop's two teams by canonical name (`_sim_game_is_this_game`;
+an unplaceable game counts as NOT this game); otherwise the box-score path decides, as for a player with no sim row.
+Test `test_a_sim_row_from_another_game_does_not_lend_its_opponent`. The same fallback also hands such a prop the next
+game's projection, minutes and game sim in the other layers: recorded as a lead (`leads.md` 2026-11-27), not this lane's.
+
 ## 3. What did and did not persist after the 11-13 rule change (population, primary featurable rows)
 
 | reading | fit 10-15..11-12 | holdout 11-13..11-26 | persisted? |
@@ -123,7 +132,7 @@ so the old code now gives that sheet nothing either. The resolved opponent was o
 5. **For the fair owners, not this lane:** since 11-13 the NFL fair over-states the shown side (pool −11.8%), and NCAAF
    overs trail by 7.7 pts. Every NFL / NCAAF section inherits it; route to `fair-price-v2`.
 
-## 5. Changes built in this reading — HELD on local branch `cso-nba-matchup-fix-held` (`c66876e38`), not on main
+## 5. Changes built in this reading — HELD on local branch `cso-nba-matchup-fix-held` (2 commits: the fix + the same-game guard), not on main
 
 Not on main because an ff of the fleet ships all of main: the push is the user's decision. Both are display only
 (`--betting-change no`): the cheat-sheet builder and the review are scripts and load at their next scheduled run after
