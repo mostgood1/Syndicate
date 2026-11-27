@@ -51,7 +51,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-__all__ = ["clv_for_orders", "fee_net_clv_pct", "fee_pp_for_order", "order_clv_report_line"]
+__all__ = [
+    "clv_for_orders",
+    "fair_clv_fields",
+    "fee_net_clv_pct",
+    "fee_pp_for_order",
+    "order_clv_report_line",
+]
 
 REASON_RESOLVED = "resolved"
 REASON_UNKEYABLE = "unkeyable"
@@ -159,6 +165,56 @@ def fee_net_clv_pct(order: Mapping[str, Any], clv_pct: Any, *, entry: Any = None
     return round(clv - fee, 4)
 
 
+# CLV AGAINST THE FAIR CLOSE  [2026-11-27, lane clv-fair-close; user "Yes, build it"]
+#
+# `clv_pct` differences our fill against the close AS QUOTED, and a quoted close
+# carries the book's spread (a venue quote is an ask). So "we beat the close" can
+# be the spread rather than the market moving toward us. MEASURED 2026-11-27 by
+# replaying this code over the fleet's quote log, 419 30-day live same-book bets:
+# +0.56 pp [+0.16, +0.96] against the quoted close, -0.27 [-0.62, +0.08] against
+# the fair close, -2.04 net of fees (overround +1.49 pp). `clv_join` now
+# carries the close's overround and fair probability on a quote-log close
+# (`QUOTE_FAIR_FIELDS`); this grades our fill against that fair probability,
+# BESIDE `clv_pct`, which keeps its meaning and its value.
+#
+# None with a named `close_fair_reason` when there is no fair close -- never the
+# quoted figure under a fair name. A close from odds history gets none at all:
+# learnings 2026-10-26 forbids de-vigging anything but the per-book quote log.
+FAIR_FIELDS = (
+    "close_overround_pp",
+    "close_fair_prob",
+    "close_other_age_seconds",
+    "close_fair_reason",
+    "clv_fair_pct",
+    "clv_fair_net_pct",
+)
+
+
+def fair_clv_fields(order: Mapping[str, Any], entry: Any, close: Mapping[str, Any]) -> dict[str, Any]:
+    """`FAIR_FIELDS` for one order graded against one resolved close. Every key present."""
+    from syndicate.features.shared.clv_join import BOOK_QUOTES_CLOSE_SOURCE, clv_pct_from_prices
+
+    fair = _as_float(close.get("close_fair_prob"))
+    clv_fair = None
+    if entry is not None and fair is not None and 0.0 < fair < 1.0:
+        clv_fair = _as_float(clv_pct_from_prices(entry, fair))
+    reason = None
+    if clv_fair is None:
+        reason = close.get("close_fair_reason") or (
+            "close_fair_uncomputable"
+            if close.get("close_source") == BOOK_QUOTES_CLOSE_SOURCE
+            else "close_not_from_quote_log"
+        )
+    return {
+        "close_overround_pp": close.get("close_overround_pp"),
+        "close_fair_prob": fair,
+        "close_other_age_seconds": close.get("close_other_age_seconds"),
+        "close_fair_reason": reason,
+        "clv_fair_pct": clv_fair,
+        "clv_fair_net_pct": None if clv_fair is None else fee_net_clv_pct(order, clv_fair, entry=entry),
+    }
+
+
 def _scope_of(row: Mapping[str, Any]) -> str:
     """`close_book_scope` is absent on a genuine same-book pair -- it is only
     stamped when a FALLBACK was used. Absent therefore means same-book, and
@@ -252,6 +308,7 @@ def _quote_closes_for_orders(
     """id(order) -> a close row (as `compute_clv_for_date` shapes one) or `{"reason": ...}`."""
     from syndicate.features.shared.clv_join import (
         BOOK_QUOTES_CLOSE_SOURCE,
+        QUOTE_FAIR_FIELDS,
         _parse_ts,
         _quote_closes_for_openings,
     )
@@ -297,6 +354,8 @@ def _quote_closes_for_orders(
                 "bookmaker": opening["bookmaker"],
                 # No opening, so no opening CLV: None, never a stand-in.
                 "clv_pct": None,
+                # The close's own spread (`clv_join.QUOTE_FAIR_FIELDS`).
+                **{field: resolved[field] for field in QUOTE_FAIR_FIELDS if field in resolved},
             }
     return out
 
@@ -494,6 +553,8 @@ def clv_for_orders(
             # when the fee is unknown -- never the gross figure under a net name.
             fee_pp=fee_pp_for_order(order, entry),
             clv_net_pct=fee_net_clv_pct(order, clv, entry=entry),
+            # AGAINST THE FAIR CLOSE, beside the quoted one (see `fair_clv_fields`).
+            **fair_clv_fields(order, entry, row),
             # The opening's own CLV, carried alongside rather than replacing
             # ours. The gap between them is what our TIMING was worth, which is
             # a different question from whether the pick was right.

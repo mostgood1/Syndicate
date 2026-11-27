@@ -1093,6 +1093,13 @@ _CLOSE_FIELDS = (
     "opening_source",
     # The fee in CLV's probability points (`order_clv.fee_pp_for_order`).
     "fee_pp",
+    # The close's own spread and the fair close beside the quoted one
+    # (`order_clv.FAIR_FIELDS`, lane clv-fair-close). `clv_fair_pct` and
+    # `clv_fair_net_pct` are written below whatever their value.
+    "close_overround_pp",
+    "close_fair_prob",
+    "close_other_age_seconds",
+    "close_fair_reason",
 )
 
 
@@ -1193,6 +1200,13 @@ def stamp_closing_marks(
         # `order_clv.fee_net_clv_pct(order, clv)`, which reads the order's own
         # fee, rather than defaulting the absent key to the gross.
         mark["clv_net_pct"] = row.get("clv_net_pct")
+        # AGAINST THE FAIR CLOSE [2026-11-27, lane clv-fair-close]: always
+        # present on a mark stamped from now on, None when there is no fair close
+        # (`close_fair_reason` says why). Marks stamped before this carry no key
+        # and are not rewritten. `clv_pct`, `close_price` and `close_book_scope`
+        # are untouched -- `min_ev_tuner._gross_clv` reads those.
+        mark["clv_fair_pct"] = row.get("clv_fair_pct")
+        mark["clv_fair_net_pct"] = row.get("clv_fair_net_pct")
         order["closing_mark"] = mark
         stamped += 1
         if mark["clv_pct"] is not None:

@@ -683,6 +683,120 @@ def _row_quote_key(row: Mapping[str, Any]) -> tuple[str, str, str, str, str, flo
     )
 
 
+# ---------------------------------------------------------------------------
+# THE CLOSE'S OWN SPREAD, AND THE FAIR CLOSE BESIDE IT [2026-11-27, lane clv-fair-close]
+# ---------------------------------------------------------------------------
+#
+# A quoted close is not the market's probability. A venue quote is an ASK
+# (`kalshi_odds_refresh` stamps `yes_ask` as the price), and a sportsbook price
+# carries its vig, so the close we difference against sits above fair by about
+# half the book's overround. MEASURED 2026-11-27 by replaying this code over the
+# fleet's quote log for the 30-day decided live orders (lane clv-fair-close): 419
+# of 571 same-book closes could be de-vigged. Their overround was +1.49 pp
+# [+1.26, +1.73], and CLV read +0.56 [+0.16, +0.96] against the quoted close but
+# -0.27 [-0.62, +0.08] against the fair one (-2.04 net of fees), game-clustered.
+# So "beats the close" was the spread. (The first, unbounded reading, 274f3e2bc,
+# said +2.69 / -0.74: it summed sets far outside `_FAIR_TOTAL_RANGE` and missed
+# every spread's other side.)
+#
+# So the resolver also keeps, AT THE SAME BOOK, the last pregame quote of every
+# other selection of the bet's market. The close then carries its overround and
+# its fair probability BESIDE the quoted price, which it never replaces. Per
+# learnings 2026-10-26 the per-book close comes from this log (captured_at <
+# commence), never from `closing_lines`, which mixes books across one prop's sides.
+#
+# WHICH ROWS ARE THE OTHER SIDE. A total or a prop: the other selection at the SAME
+# line and player. A spread: the other team at the NEGATED line -- home -7.5 is the
+# complement of away +7.5, not of away -7.5. Measured on the fleet's log
+# 2026-11-27, the other side sat at the negated line for 66 of 73 Kalshi spread
+# bets. A moneyline: every selection, the draw included.
+_SPREAD_MARKET_TOKENS = ("spread", "handicap")
+_OTHER_TEAM = {"home": "away", "away": "home"}
+# Selection sets that make up a whole market. Any other set is not de-vigged.
+_COMPLETE_SELECTION_SETS = (
+    frozenset({"over", "under"}),
+    frozenset({"yes", "no"}),
+    frozenset({"home", "away"}),
+    frozenset({"home", "away", "draw"}),
+)
+# A home/away pair is a whole moneyline only where the game cannot be drawn.
+_DRAW_SPORTS = frozenset({"soccer"})
+# A lay price is not a back price, so lay markets (`h2h_lay`) are never summed.
+# Matched as a WORD of the market name: as a substring, "lay" is inside "player",
+# and refused every prop (caught by this lane's prop test before it shipped).
+_NO_FAIR_MARKET_WORDS = frozenset({"lay"})
+_MARKET_WORD_RE = re.compile(r"[^a-z0-9]+")
+# Outside this range the summed quotes are not one market at one instant (a
+# pulled or placeholder side), so no fair price is claimed. MEASURED on the
+# study's 398 covered closes: median 1.010, p05 0.990, p95 1.150; 17 of 398
+# (4.3%) fell outside [0.90, 1.25], from 0.80 to 1.50.
+_FAIR_TOTAL_RANGE = (0.90, 1.25)
+# What a quote-log close carries for this, and what `compute_clv_for_date` and
+# `order_clv` copy through. ONLY on quote-log closes, so a row resolved from odds
+# history is byte-identical to what it was before.
+QUOTE_FAIR_FIELDS = (
+    "close_overround_pp",
+    "close_fair_prob",
+    "close_fair_reason",
+    "close_other_age_seconds",
+)
+
+
+def _is_spread_market(market: str) -> bool:
+    return any(token in market for token in _SPREAD_MARKET_TOKENS)
+
+
+def _quote_market_group(key: tuple) -> tuple | None:
+    """The market one quote key belongs to: the same value for every selection in it.
+
+    None when this key's complement cannot be named -- a spread selection that is
+    not home/away, or a spread with no line.
+    """
+    event, market, segment, selection, player, line = key
+    if _is_spread_market(market):
+        if selection not in _OTHER_TEAM or line is None:
+            return None
+        home_line = line if selection == "home" else _quote_line(-line)
+        return (event, market, segment, player, home_line)
+    return (event, market, segment, player, line)
+
+
+def _fair_close(
+    selection: str,
+    close_price: Any,
+    others: Mapping[str, Any],
+    *,
+    market: str,
+    sport: str,
+) -> tuple[float | None, float | None, str | None]:
+    """(overround in pp, fair probability, reason) for one close and the same book's other selections.
+
+    The reason is None exactly when both numbers are present. Never raises.
+    """
+    from syndicate.features.prediction_ledger import _implied_from_price
+
+    if _NO_FAIR_MARKET_WORDS.intersection(_MARKET_WORD_RE.split(market)):
+        return None, None, "close_selection_set_unrecognized"
+    if not others:
+        return None, None, "close_other_side_absent"
+    selections = frozenset(others) | {selection}
+    if selections not in _COMPLETE_SELECTION_SETS:
+        return None, None, "close_selection_set_unrecognized"
+    if selections == frozenset({"home", "away"}) and not _is_spread_market(market) and (
+        sport in _DRAW_SPORTS or "3_way" in market
+    ):
+        return None, None, "close_draw_absent"
+    ours = _implied_from_price(close_price)
+    theirs = [_implied_from_price(price) for price in others.values()]
+    if ours is None or any(price is None for price in theirs):
+        return None, None, "close_other_price_unreadable"
+    total = ours + sum(theirs)
+    low, high = _FAIR_TOTAL_RANGE
+    if not low <= total <= high:
+        return None, None, "close_overround_implausible"
+    return round((total - 1.0) * 100.0, 4), round(ours / total, 6), None
+
+
 def _candidate_shard_dates(commence_time: Any) -> tuple[str, ...]:
     """The shards one kickoff's quotes can be in: its Central date, then its UTC date.
 
@@ -795,6 +909,8 @@ def _resolve_from_quotes(
     by_book: Mapping[str, tuple[datetime, float, datetime, str, str]] | None,
     *,
     seen: bool,
+    siblings: Mapping[str, Mapping[str, tuple[datetime, float]]] | None = None,
+    sport: str = "",
 ) -> dict[str, Any]:
     """The close for one opening out of the quote log, same-book first.
 
@@ -803,6 +919,11 @@ def _resolve_from_quotes(
     exhausted -- including our OWN price at another book we quoted
     (`book_prices`) -- before any other book's close is allowed in, and that one
     is labelled `different_book_close` so the headline never counts it.
+
+    `siblings` is book -> selection -> (last pregame stamp, price) for every
+    selection of this bet's market (see `_quote_market_group`), or None when the
+    complement cannot be named. From it the close also carries
+    `QUOTE_FAIR_FIELDS`, at the chosen book only; the quoted close is unchanged.
     """
     out: dict[str, Any] = {
         "close_price": None,
@@ -852,6 +973,28 @@ def _resolve_from_quotes(
     if override is not None:
         out["matched_bookmaker"] = chosen_book
         out["open_price_override"] = override
+    # THE CLOSE'S OWN SPREAD, at the book the close came from (see QUOTE_FAIR_FIELDS).
+    key = _opening_quote_key(opening)
+    if siblings is None:
+        overround, fair, fair_reason, oldest = None, None, "close_selection_set_unrecognized", None
+    else:
+        at_book = siblings.get(chosen_book) or {}
+        others = {sel: entry[1] for sel, entry in at_book.items() if sel != key[3]}
+        stamps = [entry[0] for sel, entry in at_book.items() if sel != key[3]]
+        oldest = min(stamps) if stamps else None
+        overround, fair, fair_reason = _fair_close(
+            key[3], price, others, market=key[1], sport=str(sport or "").strip().lower()
+        )
+    out.update(
+        close_overround_pp=overround,
+        close_fair_prob=fair,
+        close_fair_reason=fair_reason,
+        close_other_age_seconds=(
+            round((commence - oldest).total_seconds(), 1)
+            if fair is not None and oldest is not None
+            else None
+        ),
+    )
     # Internal: what `_confirm_unchanged_closes` needs to look this close up in
     # the sidecar. Never copied onto a report row.
     out["_quote_state_key"] = state_key
@@ -899,6 +1042,9 @@ def _quote_closes_for_openings(
     not_started: set[int] = set()
     in_play: set[int] = set()
     needed_by_date: dict[str, dict[tuple, datetime | None]] = {}
+    # The markets (`_quote_market_group`) those keys belong to, so the same pass
+    # also keeps every other selection's last pregame quote: no extra read.
+    groups_by_date: dict[str, dict[tuple, datetime | None]] = {}
     for position, opening in enumerate(pending):
         shards = _candidate_shard_dates(opening.get("commence_time"))
         shard_of.append(shards)
@@ -922,18 +1068,25 @@ def _quote_closes_for_openings(
             not_started.add(position)
             stats["not_started"] += 1
             continue
+        group = _quote_market_group(_opening_quote_key(opening))
         for candidate in shards:
             needed_by_date.setdefault(candidate, {})[_opening_quote_key(opening)] = _parse_ts(
                 opening.get("commence_time")
             )
+            if group is not None:
+                groups_by_date.setdefault(candidate, {})[group] = _parse_ts(opening.get("commence_time"))
 
     best: dict[tuple, dict[str, tuple[datetime, float, datetime, str, str]]] = {}
+    # group -> book -> selection -> (last pregame stamp, price), across shards.
+    siblings: dict[tuple, dict[str, dict[str, tuple[datetime, float]]]] = {}
     seen: set[tuple] = set()
     failed: set[str] = set()
     for shard in sorted(needed_by_date):
         needed = needed_by_date[shard]
+        groups = groups_by_date.get(shard) or {}
         events = frozenset(key[0] for key in needed if key[0])
         shard_best: dict[tuple, dict[str, tuple[datetime, float, datetime, str, str]]] = {}
+        shard_siblings: dict[tuple, dict[str, dict[str, tuple[datetime, float]]]] = {}
         shard_seen: set[tuple] = set()
         parsed = 0
         try:
@@ -946,17 +1099,29 @@ def _quote_closes_for_openings(
                 if not isinstance(row, Mapping):
                     continue
                 key = _row_quote_key(row)
-                if key not in needed:
+                wanted = key in needed
+                group = _quote_market_group(key) if groups else None
+                in_group = group is not None and group in groups
+                if not wanted and not in_group:
                     continue
                 book = str(row.get("bookmaker") or "").strip().lower()
                 price = _as_float(row.get("price"))
                 if not book or price is None:
                     continue
-                commence = _parse_ts(row.get("commence_time")) or needed[key]
+                commence = _parse_ts(row.get("commence_time")) or (
+                    needed[key] if wanted else groups[group]
+                )
                 # OUR clock, not the book's: a price we only saw after kickoff
                 # is not a close however early the book says it moved.
                 stamp = _parse_ts(row.get("captured_at")) or _parse_ts(row.get("snapshot_ts"))
                 if commence is None or stamp is None:
+                    continue
+                if in_group and stamp < commence:
+                    by_selection = shard_siblings.setdefault(group, {}).setdefault(book, {})
+                    held = by_selection.get(key[3])
+                    if held is None or stamp > held[0]:
+                        by_selection[key[3]] = (stamp, price)
+                if not wanted:
                     continue
                 shard_seen.add(key)
                 if stamp >= commence:
@@ -980,6 +1145,12 @@ def _quote_closes_for_openings(
             for book, entry in books.items():
                 if book not in slot or entry[0] > slot[book][0]:
                     slot[book] = entry
+        for group, books in shard_siblings.items():
+            for book, by_selection in books.items():
+                slot = siblings.setdefault(group, {}).setdefault(book, {})
+                for selection, entry in by_selection.items():
+                    if selection not in slot or entry[0] > slot[selection][0]:
+                        slot[selection] = entry
         seen.update(shard_seen)
 
     resolved_rows: list[dict[str, Any]] = []
@@ -997,7 +1168,14 @@ def _quote_closes_for_openings(
             resolved = {"close_price": None, "unresolved_reason": "quotes_shard_absent"}
         else:
             key = _opening_quote_key(opening)
-            resolved = _resolve_from_quotes(opening, best.get(key), seen=key in seen)
+            group = _quote_market_group(key)
+            resolved = _resolve_from_quotes(
+                opening,
+                best.get(key),
+                seen=key in seen,
+                siblings=None if group is None else siblings.get(group, {}),
+                sport=sport,
+            )
         resolved_rows.append(resolved)
 
     if state_reader is not None:
@@ -1437,6 +1615,11 @@ def compute_clv_for_date(
             row["close_bookmaker"] = resolved["close_bookmaker"]
         if resolved.get("close_confirmed_at"):
             row["close_confirmed_at"] = resolved["close_confirmed_at"]
+        # The close's own spread (QUOTE_FAIR_FIELDS): present, possibly None, on
+        # every quote-log row; absent on a history row, as above.
+        for field in QUOTE_FAIR_FIELDS:
+            if field in resolved:
+                row[field] = resolved[field]
         rows.append(row)
 
     resolved_count = len(rows)
