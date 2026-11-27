@@ -359,7 +359,7 @@ The bootstrap draws 2,000 game resamples, seeded. The copy and output sit in tha
   - **#861 off:** it is the served projection number, `_model_prob_for_side`.
   - **Live cards:** the served live number either way (#861 leaves live rows alone).
 - **Measured on the served board** (04:24Z 11-27, snapshot 03:44:46Z): 323 of 1,948 eligible cards with a model edge (16.6%) show a Win% more than 0.5 pp off fair + model edge. That is how often (b) with #861 off would calibrate a number H-F did not grade. #861's own 11-24 reading was 1,594 of 3,567 pregame cards.
-- **So (b) is queued to ride WITH #861** (`SYNDICATE_LAYER2_ONE_MODEL_NUMBER=on`, queued for 12-08 by the user on 11-24). Whether (b) still loads if #861 is dropped is the user's call, and it is not decided yet.
+- **So (b) is queued to ride WITH #861** (`SYNDICATE_LAYER2_ONE_MODEL_NUMBER=on`, queued for 12-08 by the user on 11-24). If #861 is dropped, (b) is HELD with it: the user decided 11-27 ~10:19 AM CST (§6.5).
 - **This corrects the re-rank's line** "H-F graded exactly the probability (b) shows" (`findings_2026-11-18_product_optimization_program.md` §12.5). That holds for pregame cards only with #861 on.
 - **(b) serves the DAILY table, not the frozen one.** The cells served on 12-08 are the 12-08 cron's fit. Cells that joined after the frozen 11-18 table rest only on their own window's validation, not on H-F. One example: `ncaab|totals|full|pregame`, `h1` and `h2` at k 0.272 (97 eligible cards in the BEFORE reading).
 
@@ -388,6 +388,13 @@ The bootstrap draws 2,000 game resamples, seeded. The copy and output sit in tha
 
 - Before the window:
   - the 12-08 batch (not built on 11-26) carries the kit;
-  - put #861's condition to the user if #861 is dropped.
+  - put #861's condition to the user if #861 is dropped. DONE 11-27 ~10:19 AM CST: held with #861 (§6.5).
 - After the up: run `read_after_load_b.py` on the first build (rc 0 = MET) and record the result here and in deploys.md.
 - A forward accuracy read of the SHOWN number: H-F's metric and pass rule on games 12-08..12-21, with the 12-08 table frozen at load, read 12-22. It is not scheduled; the user's call.
+
+### 6.5 Decision: (b) is held with #861 (written 2026-11-27 10:20 AM CST)
+
+- **User decision:** "Hold (b) with it", typed 11-27 ~10:19 AM CST in session 77184c63, answering "If #861 drops out of 12-08, should (b) wait for it?"
+- **So (b) loads only on a drained up that also loads `SYNDICATE_LAYER2_ONE_MODEL_NUMBER=on`.** If the 12-08 batch drops #861, it drops (b) too, and (b) waits for whichever window or drained up loads #861. (b) is not a betting change, so it does not itself need a window; #861 is one.
+- **Why:** H-F's evidence is for fair + model edge. Without #861, 323 of 1,948 eligible cards (16.6%, 04:24Z 11-27) would show a calibrated number H-F never graded, under a label that implies it was. (b) is display only, so waiting forgoes no bets.
+- **Not changed:** no fleet load, env, claim or scheduled task.
