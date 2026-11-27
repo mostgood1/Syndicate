@@ -3589,13 +3589,28 @@
           // the first calibrated row put "ours 156.0" (the 157.5 row, 152 s old) beside an UNDER 154.5 flag whose own row
           // said 153.4 -- a contradiction the rows themselves did not have. So OURS is the shown row's own (`main`: the
           // flagged row, else the main line), falling back to the FRESHEST calibrated row only when `main` has none.
+          //
+          // A FLAGGED uncalibrated total (rail monitor 11-25 R20; user 2026-11-26 "Yes, fix it here"): OURS is the
+          // flagged row's own `live_total`, the re-sim its probability came from, not the card's PROJ box
+          // (`final.total`), which can be one re-sim tick newer or older than the row. Liberty @ Princeton o134.5:
+          // the row's p 0.59 came from 137.7 while the box, 2.5 s newer, said 134.3 -- the other side of the line.
+          // Unflagged, OURS stays the PROJ box. FULL GAME ONLY: an interval's OURS is the box's period by the
+          // 2026-11-11 decision (INTERVALS, above), and every case measured was a full-game total.
           const calibrated = (row) => row && row.live_total_basis === "calibrated" && liveRailNum(row.live_total) !== null;
           const calibratedAge = (row) => liveRailNum(row.book_age_seconds) ?? Infinity;
+          const flaggedOwn = segment === "full" && best && !calibrated(main) ? liveRailNum(main.live_total) : null;
           const calibratedRow = calibrated(main) ? main
+            : flaggedOwn !== null ? null
             : marketRows.filter(calibrated).sort((a, b) => calibratedAge(a) - calibratedAge(b))[0];
+          const box = liveRailNum(final.total);
           const total = calibratedRow ? liveRailNum(calibratedRow.live_total)
-            : (liveRailNum(final.total) ?? marketRows.map((row) => liveRailNum(row.live_total)).find((v) => v !== null) ?? null);
+            : flaggedOwn !== null ? flaggedOwn
+            : (box ?? marketRows.map((row) => liveRailNum(row.live_total)).find((v) => v !== null) ?? null);
           ours = total === null ? null : total.toFixed(1);
+          if (flaggedOwn !== null && box !== null && box.toFixed(1) !== flaggedOwn.toFixed(1)) {
+            oursTip = `Live total ${flaggedOwn.toFixed(1)}: the re-sim this line's probability came from.`
+              + ` The PROJ box shows ${box.toFixed(1)}, from another re-sim tick`;
+          }
           if (calibratedRow && total !== null) {
             // The tooltip says which number this is and keeps the sim's own beside it (user 2026-11-18 "show the
             // calibrated total in the rail card tooltip too").

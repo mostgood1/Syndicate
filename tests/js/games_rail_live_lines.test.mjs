@@ -283,6 +283,44 @@ check('moneyline callout: sim vs book, no OURS repeat', /≠ Moneyline FLA: sim 
 const noFair = [{ ...base, market: 'totals', line: 150.5, side: 'over', odds: -110, live_model_probability: 0.6, book_age_seconds: 10, quote: { book_age_seconds: 10 } }];
 check('no no-vig fair on the row: no callout from the price\'s own (vig) probability', api.liveRailSummary(noFair, chip, response, NOW).hasFreshEdge, false);
 
+// ---------------------------------------------------------------- a flagged total's OURS is its own row's (rail monitor 11-25 R20)
+// Liberty @ Princeton o134.5, 11-25 22:22Z: the flagged row's p 0.59 came from its own live total 137.74, while the
+// chip's PROJ box carried the NEXT re-sim (134.3, 2.5 s newer). OURS read 134.3 beside an OVER 134.5 flag: the box
+// and the probability on opposite sides of the line, from two ticks of one re-sim (user 2026-11-26 "Yes, fix it here").
+const r20Chip = { ...chip, intervals: { source: 'live_resim', final: { total: 134.3, home_margin: -1.0 } } };
+const r20 = (extra = {}) => [
+  totals(134.5, 'over', 0.5, { live_total: 137.74, live_model_probability: 0.59, book_age_seconds: 37.5, ...extra }),
+  totals(134.5, 'under', 0.5, { live_total: 137.74, live_model_probability: 0.41, book_age_seconds: 37.5, ...extra }),
+].map((row) => ({ ...row, quote: { ...row.quote, book_age_seconds: row.book_age_seconds } }));
+const r20Total = api.liveRailSummary(r20(), r20Chip, response, NOW).markets.find((m) => m.key === 'totals');
+check('R20: the over 134.5 is flagged', r20Total.edge && r20Total.edge.side, 'o134.5');
+check('R20: OURS is the flagged row\'s own live total, not the PROJ box', r20Total.ours, '137.7');
+check('R20: the callout reads off it', /≠ Total o134\.5: ours 137\.7 · sim 59% vs book 50%/.test(text(api.renderLiveRailLines(
+  api.liveRailSummary(r20(), r20Chip, response, NOW)))), true);
+check('R20: the tooltip names the PROJ box\'s other tick', r20Total.oursTip,
+  'Live total 137.7: the re-sim this line\'s probability came from. The PROJ box shows 134.3, from another re-sim tick');
+check('R20: the OURS cell carries that tooltip', /game-mini-card__live-ours" title="Live total 137\.7: [^"]*PROJ box shows 134\.3/.test(
+  api.renderLiveRailLines(api.liveRailSummary(r20(), r20Chip, response, NOW))), true);
+// off != on: the same rows UNFLAGGED (a 200 s quote) keep the PROJ box, so the flagged branch is what moved OURS.
+const r20Stale = api.liveRailSummary(r20({ book_age_seconds: 200 }), r20Chip, response, NOW).markets.find((m) => m.key === 'totals');
+check('R20 unflagged (200 s quote): no flag', r20Stale.edge, null);
+check('R20 unflagged: OURS stays the PROJ box', `${r20Stale.ours}|${r20Stale.oursTip}`, '134.3|null');
+check('R20: flagged and unflagged OURS differ (the branch is reached)', r20Total.ours !== r20Stale.ours, true);
+// When the box and the row agree to the shown decimal there is nothing to explain: no tooltip.
+const r20Same = api.liveRailSummary(r20({ live_total: 134.32 }), r20Chip, response, NOW).markets.find((m) => m.key === 'totals');
+check('flagged, own = box to one decimal: OURS 134.3 and no tooltip', `${r20Same.ours}|${r20Same.oursTip}`, '134.3|null');
+// No re-sim box on the chip: the flagged row's own number, as before, with no tooltip.
+const r20NoBox = api.liveRailSummary(r20(), { ...chip, intervals: null }, response, NOW).markets.find((m) => m.key === 'totals');
+check('flagged, no PROJ box: OURS is the row\'s own, no tooltip', `${r20NoBox.ours}|${r20NoBox.oursTip}`, '137.7|null');
+// A flagged row with no live total of its own falls back to the box, as before.
+const r20NoOwn = api.liveRailSummary(r20({ live_total: undefined }), r20Chip, response, NOW).markets.find((m) => m.key === 'totals');
+check('flagged, no own live total: OURS falls back to the PROJ box', `${r20NoOwn.ours}|${r20NoOwn.oursTip}`, '134.3|null');
+// Full game only: a FLAGGED interval keeps the PROJ box's period (the 2026-11-11 INTERVALS decision).
+const r20H1 = { ...fresh()[8], live_total: 60.1 };
+const r20H1Box = withBox([{ key: 'h1', label: '1H', away: 30, home: 32.4, state: 'in_progress' }]);
+const r20H1Out = api.liveRailSummary([r20H1], r20H1Box, response, NOW).markets.find((m) => m.segment === 'h1');
+check('a flagged 1H total keeps the box\'s 1H (62.4), not its own 60.1', `${Boolean(r20H1Out.edge)}|${r20H1Out.ours}|${r20H1Out.oursTip}`, 'true|62.4|null');
+
 // ---------------------------------------------------------------- todo #803: the age NOW, counting between refreshes
 const liveHtml = api.renderLiveRailLines(live);
 check('the callout says how old its quote is now', /≠ Total u149: ours 145\.9 · sim 66% vs book 56% · 32s old/.test(text(liveHtml)), true);
