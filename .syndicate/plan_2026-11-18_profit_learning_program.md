@@ -177,6 +177,11 @@ No result guarantees future returns.
    - **Collector** (6e8c94369): started 11-20 8:12 AM CST at Idle priority on the host; data in `C:\tmp\pfmon\s8\`.
    - **A PASS is not a live order.** Before any pilot: confirm the credits can be withdrawn as cash and the program
      runs past 2027-01-01. Then a capped $500 pilot, only in a betting-change window and only with the user's yes.
+   - **RESULT: PASS at both looks; the study is finished** (`findings_2026-11-20_s8_lip_shadow.md`).
+     - Look 1, 11-24: net $176.0/day [$81.8, $288.2] over 3.72 days, 71 events.
+     - Look 2 (final), read 11-26 10:09 PM CST: net $161.8/day [$46.0, $317.3] over 5.15 days, 89 events, 368 of
+       713 M1 fills settled. The collector is disabled.
+     - Still the user's decisions: credits-to-cash, the program's term, then the capped pilot.
 
 ## Infrastructure that makes learning compound
 

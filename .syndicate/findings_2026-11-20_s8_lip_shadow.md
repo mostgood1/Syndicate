@@ -176,3 +176,21 @@ The help page's terms:
   - The collector keeps running. The scheduled task still runs look 2 after 11-25 18:12Z, then disables
     `SyndicateS8Collector`. Look 1 is already a terminal PASS under the two-look rule, so look 2 is a confirmation
     read.
+- **2026-11-25 12:12 PM CST (18:12:29Z): collection ended at its hour limit,** as registered (`s8.log`: "collect: stopped at the hour limit"). The last heartbeat was 18:11:35Z, cycle 7,329: 40 markets, 40 books ok, 0 errors.
+- **Look 2 was late.** The daily learning review should have run it on its first run after 18:12Z. That was 11-26 at 1:57 AM CST, during the 12:14-11:11 AM CST network outage (`findings_2026-11-26_portfolio_monitor.md`), and all four attempts (07:57, 08:06, 08:26, 09:03Z) failed with `ENOTFOUND`. The data was complete before the outage began, so the outage cost no collection.
+- **2026-11-26 10:09 PM CST (04:09:31Z 11-27): LOOK 2 (FINAL) READ, verdict PASS.** Run by the portfolio-monitor session at the user's request ("Run it now", answering "Should I run S8's final read now instead of waiting for 1:57 AM?").
+  - **Command:** `py -3 scripts/s8_lip_shadow.py score --final --out C:\tmp\pfmon\s8`, run once at Idle priority, rc 0, 60 s. The output is in `C:\tmp\pfmon\s8\look2_score.txt` and `score_20261127T040931Z.json`. The scorer is unchanged since look 1 (`f41762fd4`).
+  - **Result:** 5.15 days collected; 235 markets / 89 events; 234,941 snapshots; 13,255 trades; 713 M1 fills, 368 settled and 0 unpriced. Reward $123.7/day, fill P&L $38.1/day, **net $161.8/day, 95% [$46.0, $317.3]** (event-clustered bootstrap).
+  - **Verdict as registered: PASS** (point >= $25/day and lower bound > 0). It agrees with look 1 ($176.0/day [$81.8, $288.2] at 3.72 days).
+  - **What moved from look 1:** the point fell 8% and the lower bound fell from $81.8 to $46.0 as 66 markets / 18 events were added. The reward per day held (127.6 -> 123.7). Fill P&L fell (48.4 -> 38.1). Half of the fills (368 of 713) are now settled, against 196 of 484 at look 1.
+  - **Caveats, unchanged:**
+    - M1 is the pessimistic front-of-queue fill model, and its fill P&L is still positive.
+    - The other 345 fills are marked at the last mid.
+    - M2 (FIFO) and the 1 h / 24 h markouts were not computed.
+    - Competitor reaction and the queue effects of a real order cannot be measured from a shadow.
+  - **`SyndicateS8Collector` was disabled at 10:10 PM CST** (`Disable-ScheduledTask`; State Disabled). No collector process was running (pid 19300 gone).
+  - **`portfolio-learning-review` prompt updated** so tonight's 1:57 AM run marks looks 1 and 2 done and does not score again.
+  - **Nothing changes live.** The study is finished. The next steps are the user's decisions, in this order:
+    1. whether Kalshi reward credits can be withdrawn as cash. Leaning yes, not confirmed; the user's account Rewards page or Kalshi support settles it.
+    2. whether the incentive program runs past 2027-01-01.
+    3. then a capped $500 pilot (the quietest markets) in a betting-change window, only on the user's explicit yes. That pilot would be a betting change, and its own lane.
