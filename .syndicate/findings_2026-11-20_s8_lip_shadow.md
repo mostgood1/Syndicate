@@ -194,3 +194,4 @@ The help page's terms:
     1. whether Kalshi reward credits can be withdrawn as cash. Leaning yes, not confirmed; the user's account Rewards page or Kalshi support settles it.
     2. whether the incentive program runs past 2027-01-01.
     3. then a capped $500 pilot (the quietest markets) in a betting-change window, only on the user's explicit yes. That pilot would be a betting change, and its own lane.
+- **2026-11-26 10:13 PM CST, user: "Not now"** -- answering "Will you check whether Kalshi lets reward credits be withdrawn as cash?". The credits-to-cash check, and with it the pilot path, is deferred. Nothing is scheduled and nothing is owed until the user raises it.
