@@ -1216,3 +1216,30 @@ Without both, nothing below is read.
   - A reading records it in deploys.md as a self-recycle, not a deploy (betting change: no, by the rule's construction).
 - **Confound:** on a morning where children or a build hold the parent through the window (11-26), the rule is never
   reached. That is NEITHER, not a pass.
+
+## 23. J on the 11-27 morning: NEITHER, below threshold (read 2026-11-27 15:30Z = 9:30 AM CST, read-only)
+
+- refresh-worker restarted at 2026-11-26 17:12:11Z (11:12 AM CST), pid 469, `ARMED ... boot_head=e37a9697f677`.
+  The next J line is at 13:01:26Z 11-27 (`held=outside_window`, 1,567.3 MB).
+- **The window, 09:00-11:59Z (3:00-5:59 AM CST):**
+  - 0 J lines, from timestamped lines that are not `ALL_PROCESS_MEMORY` lines.
+  - Below the threshold is silent by design (`_PARENT_RECYCLE_QUIET_REASONS`).
+  - The parent's own `rss_mb` in the `ALL_PROCESS_MEMORY` samples stayed below the 1,500 MB threshold every hour:
+
+    | hour (UTC) | samples | min RSS | max RSS |
+    |---|---|---|---|
+    | 09Z | 288 | 1,244 MB | 1,345 MB |
+    | 10Z | 291 | 1,244 MB | 1,350 MB |
+    | 11Z | 285 | 1,237 MB | 1,351 MB |
+
+  - So J never reached its later rules: NEITHER, no recycle, correctly.
+  - The 16-hour-old parent had not ratcheted yet.
+- **After the window,** 13Z peaked at 2,963 MB. At 15:29Z: VmRSS 1,614 MB, VmHWM 3,145 MB, board child 3,218 MB, host
+  MemAvailable 5,929 of 16,124 MB.
+- **Expected from 11-28 under today's rule (`any`):**
+  - The parent will be at or above 1,500 MB.
+  - Its boot head `e37a9697f` differs from the checkout's `fe46fb249`.
+  - So any morning that clears J's other rules is held by `code_on_disk_changed`, as on 11-25, until refresh-worker
+    restarts or §22's `loaded` is loaded (12-08 at the earliest, on the user's call).
+- Seen, not chased: `RECYCLE_EXIT reason=heavy_build_refused` at 15:21:12Z, `consecutive_refusals: 3`, stage
+  `pre_source_state_fingerprint`, uptime 5,975 s. That is another process, not the parent, whose uptime was about 79,700 s.
