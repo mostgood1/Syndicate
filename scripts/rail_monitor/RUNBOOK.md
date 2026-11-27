@@ -239,9 +239,15 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
 4. MET: in every reading after the roll while `chips_live_now` > 0, each live D game is in `carried` and 0 carried games are in `live without card`. FALSIFIED: a live D game with no Today card while D's chip artifact is <= 900 s old. N = 0 (nothing live after midnight): carry R-M to the next close.
 5. Write the result in the lane and the day's findings; deploys.md 2026-11-27 16:29:54Z names the verify.
 
+**R-N. Soccer lane-age ceiling, Saturday re-measure (#865, lane soccer-live-lane-age-ceiling; code fabdd54f7 on main, default off, queued for 12-08).** At the 11-28 close (after Saturday's slate), once:
+1. `wsl -- nice -n 19 bash /mnt/c/tmp/railmon/soccer_lane_age_1127.sh` (read-only; every retained, rotated log; a few minutes). It prints the soccer join builds with a match in play, split by whether the memory gate skipped a tick since the last lens write.
+2. MET: the "no gate skip since the write" max stays under 450 s (11-23..11-27: 195 s), so 600 s refuses only stalls. FALSIFIED: a no-skip build over 450 s -- then the ceiling is too tight for a heavy slate: say so to the user and propose a new `SOCCER_MAX_LANE_AGE_SECONDS` before 12-08 (a code change in `live_gameline_join.py`, the lane's section).
+3. N = 0 (no soccer in play Saturday): carry to the 11-29 close.
+4. Write the result in lane `soccer-live-lane-age-ceiling`, todo `#865` and the day's findings; mark R-N DONE here.
+
 ## NIGHTLY CLOSE
 
-**Owed readings at every close:** do each `R-` item above that is not marked DONE (from 11-27: R-M, the after-midnight carry, and the OURS fix's `ours_resim_tick` count), and write each result in the lane and the day's findings.
+**Owed readings at every close:** do each `R-` item above that is not marked DONE (from 11-27: R-M, the after-midnight carry, and the OURS fix's `ours_resim_tick` count; from 11-28: R-N, the soccer lane-age Saturday re-measure), and write each result in the lane and the day's findings.
 
 1. The probe shows 0 live games. **Fetch day D's finals by date:**
    `curl -s "http://127.0.0.1:10000/api/board/game-chips?sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,wncaab,soccer&date=<D>" -o C:\tmp\railmon\final_<D>\chips.json`.
