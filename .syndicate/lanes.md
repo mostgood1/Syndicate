@@ -2337,6 +2337,14 @@ death, never life — do not invert it.
 - Verification: Fleet web.log per CST day after the load: 0 nfl_espn_* request-path lines; one past-date game-chips GET with sports=nfl before/after: same final chips with scores, ESPN fetches N -> 0; worker log shows NFL_GAME_STATE_RECORD writes and archive writes
 - Blocked by: none
 
+### cell-calibration-847d-fixes — OPEN — opened 2026-11-27 — session 77184c63-3fcd-478d-bb0c-d949d38eb183
+- Goal: Three default-off code fixes to #847 (d) before it loads, per the user's 'Yes, fix (d) first' (11-27 ~12:15 PM CST, session e32fef1a): (1) a row (d) calibrated does not take the optimizer's calibration shrink again in rank or stake; (2) with #835's SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION on, ncaaf full-game live totals are skipped by (c) and (d); (3) live_gameline_ledger records (d)'s stamp and the uncalibrated probability. Off != on tested per fix; every key absent = byte-identical to main; committed on branch, NOT pushed (the push needs the user's own yes)
+- Files: syndicate/features/shared/cell_calibration.py, syndicate/features/shared/optimizer_overlay.py, syndicate/features/shared/live_gameline_ledger.py (the #847 use-d cell-calibration fields helper and its one build_records entry ONLY), tests/test_cell_calibration_847d_fixes.py (NEW)
+- Hypothesis: n/a (build; the stake trace is recorded in the findings: live-money in-play orders do not size through portfolio_commit)
+- Falsification test: n/a
+- Verification: tests/test_cell_calibration_847d_fixes.py: per fix off != on, and all keys absent byte-identical to main's outputs; the targeted suites of the touched modules pass; findings section 8 restates the affected 7.3 predictions before any load
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
