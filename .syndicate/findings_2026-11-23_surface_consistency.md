@@ -468,6 +468,35 @@ batch (Tue 12-08 2-7 AM CST, one ff + one drained full down/up).
 - **Reading owner:** lane `surface-consistency-oversight`, or whoever runs the batch, on the first board build after
   the up.
 
+**#863 QUEUED FOR THE 12-08 WINDOW `[2026-11-27 ~1:00 PM CST]`.** The user was asked "Which NBA fix should I build
+for the 12-08 window: the age limit (switched off until then), or the two pre-tip pulls?" and answered "Age limit,
+off". Code `f69f7b6c8` + `cc516f4b0` on main, absent = off. Nothing loads it automatically.
+- **Line:** ONE GLOBAL `SYNDICATE_NBA_PREGAME_REUSE_MAX_AGE_SECONDS=4500` in `~/syndicate-prod/local_production.env`.
+  Both workers' odds sweeps run `refresh_nba_oddsapi_props.py` (NBA launches appear in both role logs); only that
+  script reads the key.
+  Env is built only at `up`, so it rides the window's drained full down/up.
+- **What it does:** both reuse checks refuse a snapshot older than 75 min while a game is to start within 12 h, so
+  the sweep refetches every ~90 min before the first tip (worst case ~105 min old, under the grid's 2 h rule). In
+  play the in-play lane already keeps the snapshot fresh (11-25: late games captured 1-32 min before their tips).
+- **Dry run on the fleet's real snapshot** (18:26Z 11-27, read-only, switch set in-process only): off reuses; on
+  4500 declines (age 6,351 s, first tip in 5.7 h).
+- **Kit:** `C:\tmp\w1208_nba863\kit_env_nba863.sh check|apply|restore <backup>`, prints only this key, idempotent,
+  backs up first. Self-test `kit_selftest_nba863.sh` PASSED 11-27 on a dummy file; `check` on the real file: key
+  ABSENT in the file and in all three role envs.
+- **Droppable:** a failed step restores its own backup and drops this change only.
+- **Betting change: yes** (it changes which NBA rows the board can pick). Register it at the load with
+  `betting_change.py add --kind yes --loaded-at <the later of the two workers' pickup UTC>`.
+- **Reader:** `C:\tmp\w1208_nba863\read_after_load.py <day>`, read-only, on an NBA game day before the first tip and
+  >= 110 min after a scheduled pull. Exit 0 = MET, 1 = violated, 2 = blind / too soon, 3 = NOT LOADED (no
+  `PREGAME_REUSE_DECLINED` in the day's job log).
+  - BEFORE (switch absent), read 19:00:18Z 11-27, 140 min after the 10:40 AM CST pull: reader rc 3 NOT LOADED (0 decline lines in the job log); snapshot 516 s old, because an injury-change re-sim refetched at 18:51Z (1 off-schedule capture); board (written 18:59:06Z) NBA pregame 4 stale of 1012, 165 Suggested.
+  - Predicted after the load: decline lines > 0; snapshot <= 6,600 s old at every discriminating read; NBA pregame
+    stale share < 20%. Falsified by a discriminating read with the snapshot > 6,600 s old and a game to start
+    within 12 h.
+- **Cost (estimate):** ~6 more full NBA runs a game day, ~+75k OddsAPI credits a month against ~288k headroom.
+- **Reading owner:** lane `surface-consistency-oversight`, or whoever runs the batch, on the first NBA game day
+  after the up.
+
 **Post-window `plan_vs_orders`** (15:54Z, for lane `live-ev-floor-off`; not judged here):
 - 11 live orders today, none of their position keys in the current 19-position plan.
 - 9 join a board row, and 1 of the 9 is Suggested NOW. Today's orders include ones placed before the 08:30Z up,
@@ -913,6 +942,10 @@ below take about 225 NBA games a month.
   default-off and loads in a betting-change window (12-08), or the user decides otherwise.
 - Whether NBA picks earn anything is not measured here (the 11-27 NBA lean forward read MISSED; nothing has cleared the
   #738 bar). Some of the 113 are long-price alt spreads (fanatics +310, +430).
+
+### Reading 7 addendum `[2026-11-27 19:00Z-19:10Z, fleet, read-only]`
+
+**CORRECTION `[2026-11-27 ~1:10 PM CST]`: a SECOND refetch path exists.** A lineup/injury-change re-sim (`LINEUP_INJURY_CHANGE_RESIM_TRIGGERED`, live-odds-worker's `live_refresh_loop`) forces an NBA live-phase run whose in-play-only fetch takes every not-started game as due (`upcoming_events_due`, IN_PLAY_PROPS pass=full) and then runs the full pipeline. It matched 5 of 5 off-schedule NBA captures: 11-25 18:20, 20:22, 21:24, 22:02Z and 11-27 18:51:34Z (job log). So the stale windows are the gaps between pulls with NO injury trigger, irregular by day: 11-27 8:40-10:40 AM CST was one (0 Suggested of 627 at 16:23Z); 11-25 had triggers all afternoon. Reading 7's "only the forced pulls refetch" was wrong for afternoons. The pre-registered 12:40 PM CST window lasted 11 min (18:40-18:51Z; no board built inside it was read): at 19:00Z the snapshot was 516 s old and the board (18:59:06Z) had 4 stale of 1,012 NBA pregame rows, 165 Suggested. The age limit still bounds every gap; on trigger-heavy days it fires less, so the cost estimate is an upper bound.
 
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
