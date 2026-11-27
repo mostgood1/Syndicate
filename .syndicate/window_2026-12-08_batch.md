@@ -127,6 +127,13 @@ earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehea
   - The reader now requires `--fit-fix yes` (sha16 `e2c5f370e16d1d27`). The installed prompt passes it.
   - Read-only fact (session 898e5510): `SYNDICATE_PRICING_CALIBRATION` is on in all three roles, but the only pricing
     profile is mlb_source's (2026-10-12). So the pricing seam recalibrates no in-season (d) cell.
+- UPDATE 2026-11-27 ~5:00 PM CST (session 91b0c989): F's mechanical condition is now MET on `origin/main`.
+  - Lane `cell-calibration-847d-fit-fix` has a line beginning `FIT FIX ON MAIN d3ec5b72ed4fb6bbe5c17983fce2a7f06685d2c1`
+    (dated 4:45 PM CST, session 77184c63, ledger `eb40bb5f9`). `d3ec5b72e` reads as an ancestor of `origin/main`.
+  - Its seven test files are all on main, and the batch reruns them at Idle: `test_cell_calibration_847d_fit`,
+    `test_daily_optimizer`, `test_model_scorecard`, `test_opportunity_population_ledger`,
+    `test_live_totals_width_fit_source`, `test_layer2_board`, `test_live_gameline_join`. There are no reader_args.
+  - F still needs the user's own LOAD YES under `#### F`, dated 12-07 or later.
 
 ### G — #863 NBA pregame reuse age limit
 - Line: GLOBAL `SYNDICATE_NBA_PREGAME_REUSE_MAX_AGE_SECONDS=4500`. BETTING CHANGE.
