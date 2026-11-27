@@ -100,6 +100,8 @@ an unplaceable game counts as NOT this game); otherwise the box-score path decid
 Test `test_a_sim_row_from_another_game_does_not_lend_its_opponent`. The same fallback also hands such a prop the next
 game's projection, minutes and game sim in the other layers: recorded as a lead (`leads.md` 2026-11-27), not this lane's.
 
+**Guarded replay** (same script, ~2:10 PM CST 11-27): 11-10 old 0 / fixed 172 of 172 filled, 3+ meetings 122, strong 39, wrong opponent **0** (Josh Hart now resolved by the box path); 11-25 old 2 / fixed 158 of 158, 106, 36, wrong opponent 0. The guard costs no coverage on either sheet.
+
 ## 3. What did and did not persist after the 11-13 rule change (population, primary featurable rows)
 
 | reading | fit 10-15..11-12 | holdout 11-13..11-26 | persisted? |
