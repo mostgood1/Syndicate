@@ -193,5 +193,73 @@ class FastExitTests(unittest.TestCase):
         self.assertGreaterEqual(len(marks), 3, output[-3000:])
 
 
+@unittest.skipUnless(POSIX, "gunicorn workers need POSIX")
+class RunningRequestExitTests(unittest.TestCase):
+    """2026-11-26 14:42:42Z in miniature. A worker recycles while a slow request runs; the drain and the
+    graceful wait end with it still running. Stock exit: CPython's shutdown joins the request thread with no
+    heartbeat and the master times the worker out (`WORKER TIMEOUT`). Since the fix the worker leaves at
+    once (`"abandoned_running": 1`). Off != on: `SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING=0` brings the
+    timeout back."""
+
+    def _recycle_with_a_slow_request(self, running_switch: str) -> str:
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "toyslow.py").write_text(textwrap.dedent("""
+                import time
+
+                def application(environ, start_response):
+                    if environ.get("PATH_INFO") == "/slow":
+                        time.sleep(30)
+                    start_response("200 OK", [("Content-Length", "2")])
+                    return [b"ok"]
+            """), encoding="utf-8")
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            env = dict(os.environ, PYTHONPATH=f"{REPO_ROOT}{os.pathsep}{tmp}",
+                       SYNDICATE_WEB_WORKER_FAST_EXIT="1", SYNDICATE_WEB_WORKER_FAST_EXIT_RUNNING=running_switch)
+            env.pop("GUNICORN_CMD_ARGS", None)
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "gunicorn", "-c", str(CONF), "toyslow:application",
+                 "--bind", f"127.0.0.1:{port}", "--workers", "1", "--threads", "2",
+                 "--max-requests", "2", "--max-requests-jitter", "0",
+                 "--graceful-timeout", "2", "--timeout", "6", "--log-level", "info"],
+                cwd=tmp, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            )
+            try:
+                deadline = time.time() + 30
+                while time.time() < deadline:  # request 1: proves the worker is up
+                    try:
+                        urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=5).read()
+                        break
+                    except OSError:
+                        time.sleep(0.2)
+
+                def slow() -> None:  # request 2: hits max-requests, so the worker stops while it runs
+                    try:
+                        urllib.request.urlopen(f"http://127.0.0.1:{port}/slow", timeout=40).read()
+                    except Exception:  # noqa: BLE001 -- abandoned or killed: the reset is expected
+                        pass
+
+                thread = threading.Thread(target=slow, daemon=True)
+                thread.start()
+                time.sleep(14.0)  # drain (<= 2 s) + grace (2 s) + the master's 6 s timeout, with room
+            finally:
+                proc.terminate()
+                output = proc.communicate(timeout=60)[0].decode(errors="replace")
+            return output
+
+    def test_a_running_request_is_abandoned_and_the_master_never_times_the_worker_out(self) -> None:
+        output = self._recycle_with_a_slow_request("1")
+        self.assertIn('"abandoned_running": 1', output, output[-3000:])
+        self.assertNotIn("WORKER TIMEOUT", output, output[-3000:])
+        self.assertNotIn("WEB_WORKER_STOCK_EXIT", output, output[-3000:])
+
+    def test_off_is_not_on_the_stock_exit_is_timed_out(self) -> None:
+        output = self._recycle_with_a_slow_request("0")
+        self.assertIn('"reason": "request_running"', output, output[-3000:])
+        self.assertIn("WORKER TIMEOUT", output, output[-3000:])
+        self.assertNotIn("abandoned_running", output, output[-3000:])
+
+
 if __name__ == "__main__":
     unittest.main()
