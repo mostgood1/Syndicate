@@ -2360,6 +2360,14 @@ death, never life — do not invert it.
 - Verification: (1) Tests: close_price / close_book_scope / clv_pct identical with and without the change on the same fixtures; overround from a two-way and a three-way (h2h) same-book close; a spread's other side matched at the negated line; a one-sided quote gives None with a named reason. (2) Fleet, after a user-approved load: the share of same-book marks stamped after the load that carry a fair CLV, by venue (bar: Polymarket >= 60%), and _quote_closes_for_openings seconds per settlement cycle before vs after. (3) Not a betting change: nothing that places, sizes, holds or exits reads the new fields (min_ev_tuner reads close_price / close_book_scope / clv_pct only). The readout half (live_book_edge_readout.py) is done under lane portfolio-monitor, which holds that file.
 - Blocked by: none
 
+### cell-calibration-847d-fit-fix — OPEN — opened 2026-11-27 — session 77184c63-3fcd-478d-bb0c-d949d38eb183
+- Goal: todo 847 use-d fit fix, option i of findings 8.3 (user "Yes, both", ~2:25 PM CST 11-27, relayed by session e32fef1a): keep the number from before use-d on every use-d-moved live row and in the opportunity recorder, refit the cell table and the optimizer w* on it, #780's fitter reads model_home_win_prob_cell_uncalibrated, every other live-number fitter traced. Default off: byte-identical to main whenever the c and d keys are absent, whatever #835 says. Branch only; the code push needs the user's own yes
+- Files: syndicate/features/shared/live_gameline_join.py (the use-d _cell_calibrate helper + its two pricer call sites + the use-d projection lines in _apply_verdict only), syndicate/features/shared/layer2_board.py (the use-d cell-uncalibrated model edge helper + its one candidate line beside model_edge_pct only), syndicate/features/shared/opportunity_population_ledger.py (the use-d mu record field only), syndicate/features/shared/probability_refusal.py, syndicate/features/shared/daily_optimizer.py, scripts/live_totals_width_fit.py, tests/test_cell_calibration_847d_fit.py
+- Hypothesis: n/a (build)
+- Falsification test: an A/B against main's modules that differs with the c and d keys absent (with #835 on or off), or a reachability test where d on equals d off at the refit
+- Verification: reachability d on != off through board row -> recorder -> grade -> accumulate -> fit_table; A/B byte-identical with c/d absent incl. #835 on; targeted tests pass; findings 9
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
