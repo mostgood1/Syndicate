@@ -9,9 +9,16 @@ Never prints the environ, a stake, a price or a balance. Writes nothing.
 
 Run by `portfolio_monitor_probe.py` through WSL, with the fleet's own interpreter and its checkout as cwd:
     cd /home/amyn/Syndicate && <refresh-worker's python> portfolio_alignment_reader.py <refresh-worker pid> <YYYY-MM-DD>
+
+STDOUT CARRIES THE JSON DOCUMENT AND NOTHING ELSE. The fleet code this imports logs with `print(..., flush=True)`, so
+the work runs with `sys.stdout` pointed at stderr. Measured 2026-11-26: `read_layer2_shortlist`'s card-shard merge
+prints `[intelligence_state] LAYER2_CARD_SHARD_MERGE ...` whenever the merged cards fall short of the index
+(`pipeline/intelligence_state.py:3402`). That line landed ahead of the JSON, and the probe's alignment half failed
+"reader output not JSON" in 25 of 153 readings from 11-24 (findings_2026-11-26_portfolio_monitor.md).
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sys
@@ -59,15 +66,26 @@ def with_placeable(out: dict, position: dict, refusal_fn) -> dict:
     return out
 
 
-def main() -> int:
-    t0 = time.monotonic()
-    pid, date = sys.argv[1], sys.argv[2]
+def fleet_environ(pid: str) -> dict:
     env = {}
     for item in open(f"/proc/{pid}/environ", "rb").read().split(b"\0"):
         if b"=" in item:
             k, v = item.split(b"=", 1)
             env[k.decode()] = v.decode(errors="replace")
-    os.environ.update(env)  # the store backend and its address; never printed
+    return env
+
+
+def main() -> int:
+    out_stream = sys.stdout
+    with contextlib.redirect_stdout(sys.stderr):  # the fleet's own print() lines go to stderr, never into the JSON
+        out = read_alignment(sys.argv[1], sys.argv[2])
+    out_stream.write(json.dumps(out, default=str))
+    return 0
+
+
+def read_alignment(pid: str, date: str) -> dict:
+    t0 = time.monotonic()
+    os.environ.update(fleet_environ(pid))  # the store backend and its address; never printed
     sys.path.insert(0, os.getcwd())
     from pipeline.intelligence_state import read_layer2_shortlist
     from pipeline.portfolio_commit import live_portfolio_plan_path_for_venue, portfolio_plan_path_for_venue
@@ -104,8 +122,7 @@ def main() -> int:
             }
     out["plans"] = plans
     out["seconds"] = round(time.monotonic() - t0, 2)
-    sys.stdout.write(json.dumps(out, default=str))
-    return 0
+    return out
 
 
 if __name__ == "__main__":

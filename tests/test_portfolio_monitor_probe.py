@@ -425,6 +425,34 @@ def test_the_reader_stamps_the_live_plans_own_placeable_predicate():
     assert "placeable" not in reader.with_placeable({}, venue, None)
 
 
+def test_the_readers_stdout_is_its_json_even_when_the_fleet_code_prints(monkeypatch, capsys):
+    """11-26: the board's card-shard merge printed a log line onto stdout ahead of the JSON, and the alignment half
+    failed "reader output not JSON" in 25 of 153 readings. Its print goes to stderr now; stdout parses whole."""
+    import json
+
+    import portfolio_alignment_reader as reader
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    import pipeline.intelligence_state as state
+    import syndicate.features.shared.refresh_state_store as store
+
+    def noisy_shortlist(date):
+        print(f"[intelligence_state] LAYER2_CARD_SHARD_MERGE date={date} loaded=['nfl'] missing=[] cards=1/2", flush=True)
+        return {"written_at": "2026-11-26T23:00:00Z", "rows": [{"sport": "nfl", "event_id": "e1", "suggested": True}]}
+
+    monkeypatch.setattr(sys, "path", list(sys.path))  # the reader inserts its cwd
+    monkeypatch.setattr(sys, "argv", ["portfolio_alignment_reader.py", "123", "2026-11-26"])
+    monkeypatch.setattr(reader, "fleet_environ", lambda pid: {})
+    monkeypatch.setattr(state, "read_layer2_shortlist", noisy_shortlist)
+    monkeypatch.setattr(store, "read_json_file", lambda path: None)
+    assert reader.main() == 0
+    got = capsys.readouterr()
+    doc = json.loads(got.out)
+    assert [r["event_id"] for r in doc["board"]["rows"]] == ["e1"] and doc["board"]["rows"][0]["suggested"] is True
+    assert set(doc["plans"]) == {"live_kalshi", "paper2_kalshi", "live_polymarket", "paper2_polymarket"}
+    assert "LAYER2_CARD_SHARD_MERGE" in got.err and "LAYER2_CARD_SHARD_MERGE" not in got.out
+
+
 def test_alignment_without_a_board_says_so_and_renders_the_error():
     al = pm.alignment({"board": {"error": "no shortlist for 2026-11-17"}, "plans": {}}, [_order()], {}, "2026-11-17", NOW)
     assert al["orders_today"]["board_read"] is False
