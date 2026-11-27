@@ -432,6 +432,18 @@ On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL 
 - **Leads, not done:** (1) the live board offers a book's pregame quote as a live price -- a per-book seen-age on the in-play window (betting change; adjacent to lane `nhl-inplay-props-drop`); (2) run the same last-seen join on NBA / NCAAB / NFL live rows; (3) first-scorer subs who came on after the first goal lose here where some books void; (4) `ethan mbappe` (FanDuel 11-08) shots ladder priced like a star striker -- odds identity.
 
 ### `#847` — **THE MODEL'S PROBABILITY IS OVER-CONFIDENT EVERYWHERE IT IS MEASURED, SO CALIBRATE IT ONCE, PER CELL, AND USE THE CALIBRATED NUMBER EVERYWHERE: the rail flag test, the board's shown EV, rank and stake (below the 0.5 floor where the evidence says so), and the shared live probability. This replaces backlog I-1 (the long-shot tail was not a separate effect)** `[2026-11-18, lane product-optimization-program (P1, theme T2)]` — OWNED by lane `cell-calibration-847` (session c124edc4, opened 11-18 7:13 PM CST)
+- **STATUS `[2026-11-27 3:30 PM CST, lane cell-calibration-847d-fit-fix]`: THE FIT FIX (8.3 option (i)) IS BUILT, NOT PUSHED.** User "Yes, both", ~2:25 PM CST 11-27 in session e32fef1a. It approves the build and tests; the code push needs the user's own yes. (d) loads 12-08 only if this is on main and tested by then; otherwise 12-22.
+  - Code: branch `cell-calibration-847d-fit-fix`, `8e771a40c` + `a449d9b3e` (local, `refs/keep/...`).
+  - What it does: the number from before (d) travels as `edge_pp_cell_uncalibrated` → projection → candidate `model_edge_pct_cell_uncalibrated` → recorder `mu`. `model_scorecard.strip_record` keeps it. `daily_optimizer.wrap_grade` refits w*, `edge_shrink` and the cell table's k on it, and #780's fitter reads the ledger's `model_home_win_prob_cell_uncalibrated`.
+  - The scorecard still grades the served number.
+  - FOUND on the way: the cron's `strip_record` would have dropped `mu`, so the fit copy would never have fired.
+  - Tests: 17 new, 549 targeted pass. Against main it is byte-identical in 8 cases with (c)/(d) absent or off, #835 on or off. With (d) on, main's w* moves and the branch's does not.
+  - Reader updated: it now requires `--fit-fix yes|no` (sha256 `e2c5f370e16d1d27`). The kit is unchanged.
+  - Decisions for the user, in findings §9.4 and §9.7:
+    - the order-path fitters: the staked-probability profile is live on the fleet and reads paper in-play orders' served edge;
+    - the pricing seam: it would put a second curve on a (d)-moved edge;
+    - #830's flag population;
+    - `join_reproduction`'s false mismatches.
 - **STATUS `[2026-11-27 2:35 PM CST, lane cell-calibration-847d-fixes]`: (d)'s THREE FIXES ARE ON MAIN, `a15d94bbc` + `d381a806a`.** The user typed "yes, push it" here about 2:30 PM CST 11-27. This supersedes "NOT PUSHED" below.
   - It is the tested diff rebased (same patch-id). 125 targeted tests pass on the pushed head.
   - A/B against main is byte-identical with the (c)/(d) keys absent, whatever #835 says. So it is inert, and not a betting change until (c) or (d) is on.

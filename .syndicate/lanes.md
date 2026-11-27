@@ -2369,6 +2369,7 @@ death, never life — do not invert it.
 - Falsification test: an A/B against main's modules that differs with the c and d keys absent (with #835 on or off), or a reachability test where d on equals d off at the refit
 - Verification: reachability d on != off through board row -> recorder -> grade -> accumulate -> fit_table; A/B byte-identical with c/d absent incl. #835 on; targeted tests pass; findings 9
 - Blocked by: none
+- STATUS 2026-11-27 3:30 PM CST: BUILT on branch cell-calibration-847d-fit-fix 8e771a40c + a449d9b3e (local, refs/keep pinned), NOT pushed (the code push needs the user's own yes). 17 new + 549 targeted pass; A/B vs main byte-identical in 8 c/d-absent cases incl. #835 on. Findings section 9; reader updated (--fit-fix required), kit unchanged. CORRECTION: the "- Files (added ...)" line above says 3:50 PM CST; it was pushed at about 3:10 PM CST
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 

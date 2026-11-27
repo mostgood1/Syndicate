@@ -645,3 +645,121 @@ Session e32fef1a narrowed the inertness condition: each fix must be inert whenev
   - The window's ff must reach at least `d381a806a`.
   - Run the after-load reader with `--fixes yes`.
 - **Still the user's calls** (§8.3 to §8.5): whether fix 1 is needed, NCAAF's optimizer 0.5, fit-feedback options (i) to (iii), and the engine-number fitters.
+
+## 9. The fit fix (8.3 option (i)) BUILT on a branch, NOT pushed (written 2026-11-27 3:30 PM CST, before any load)
+
+**User decision:** "Yes, both". Typed in coordinator session e32fef1a at about 2:25 PM CST 11-27, answering "Push the (d) fixes, with the fit fix built before (d) loads?". The first half shipped as `a15d94bbc` + `d381a806a` (8.7). This approves building and testing the fit fix; the code push needs the user's own yes. Lane `cell-calibration-847d-fit-fix`.
+
+### 9.1 What it does
+
+Branch `cell-calibration-847d-fit-fix`: `8e771a40c` + `a449d9b3e` (head, pinned `refs/keep/cell-calibration-847d-fit-fix-head`), cut from main `d3e7ec69c`, which carries the three fixes. Line ranges below are new-file lines.
+
+- **Pricer** (`live_gameline_join`):
+  - `_keep_cell_uncalibrated_edge` (+1906..1953), called from the distribution pricer (+1686, +1690) and the moneyline pricer (+2056, +2060).
+  - On a verdict (d) moved, `edge_pp_cell_uncalibrated` is the edge without (d), EXACTLY as that pricer produced it before (d). The distribution pricer rounds to 2 places; the moneyline pricer does not.
+  - It is None where the uncalibrated number misses its own precision bar, using the error from before (d) and the moneyline's `min_edge_pp` floor. So the refit's population is the one it had before (d), not a larger or smaller one.
+- **Projection** (`_apply_verdict`, +3169..3174 and +3245..3250):
+  - `edge_vs_market_pct_cell_uncalibrated`, plus `live_model_prob_cell_uncalibrated` on distribution rows, where the live probability is published.
+  - Set whatever (d)'s own gate decided.
+  - Blanked by the certainty refusal, exactly as the edge is.
+- **Candidate** (`layer2_board`):
+  - `_cell_uncalibrated_model_edge` (+2732..2765) puts the uncalibrated projection through the same `_model_edge_for` the served edge goes through: side, sign, the plausibility test on the uncalibrated probability. Then it goes through the pricing seam `_calibrate_model_edge`.
+  - The result is `model_edge_pct_cell_uncalibrated`, beside `model_edge_pct` (+3594..3596). A row whose raw 0.9 the plausibility test refuses, while (d)'s 0.66 passes, records None, as it recorded no edge before (d).
+- **Recorder** (`opportunity_population_ledger`, +177..182 and +233..238): the field becomes `mu`, only on such a record.
+- **Store** (`model_scorecard.strip_record`, +132..146): keeps `mu` whenever it is present, None included.
+  - **FOUND on the way: without this the fit copy NEVER fires in production.** The cron stores every record through `KEEP_FIELDS`, a fixed list that drops None values (`merge_board_date` → `strip_record`, then `grade_pending` grades the stored records).
+  - Every unit test that calls `wrap_grade` directly would still pass. A test now runs the cron's own path, and it fails with this change removed (checked).
+- **Refit** (`daily_optimizer`, +270..405):
+  - `fit_records` + `wrap_grade` grade a fit copy (`me` := `mu`), ONLY when a record of the game carries `mu`. Grading picks its sighting by key and time, never by `me`, so both passes grade the same rows.
+  - `accumulate(..., fit_graded)` takes the calibration sums from that copy. Those sums are the only input of `fit_calibration` (w*, `edge_shrink`), `cell_calibration.fit_table` (k) and `held_out_brier`.
+  - The betting bands keep the served `p_model`: model EV, pnl, and so `stake_scale`.
+  - `fit_mu` (`a449d9b3e`) is the number of records refit on `mu`, written only on such a game. It is the one trace in the published state that the copy fired; the sums alone cannot show it.
+- **The grader is untouched.** `bucket_search.grade_population` is digested into `publish_model_scorecard.grader_signature`, so editing it would reset every scorecard, optimizer and sim-gap state, even with all keys absent. The second pass therefore lives in the optimizer's wrapper.
+  - Cost: one extra grading pass per game that has a (d) record. It also re-runs that game's prop settlers, as the existing model-basis pass already does.
+- **#780** (`scripts/live_totals_width_fit.fit_prob`, +17..31 docstring, +188..194):
+  - It reads `model_home_win_prob_cell_uncalibrated` AFTER `_unscaled` and `_uncalibrated`, NOT first. The pricer applies k, then #816, then (d), so the number before (d) is after k. Read first, it would fit k on numbers k already tempered: the 11-24 false confirmation.
+  - The number before (d) is the engine's number exactly where neither k nor #816 moved the row, and that is where it is read.
+  - A `cell_cal` row with no number beside it is dropped as `no_engine_probability`. `recorded` still reads the recorded number.
+
+### 9.2 Tests and the A/B
+
+- **Tests:** 17 new in `tests/test_cell_calibration_847d_fit.py`, at Idle. Targeted runs: 549 pass (plus 34 subtests) on the branch head, across the new file plus
+  - `test_cell_calibration`, `_847d_fixes`, `test_daily_optimizer`, `test_bucket_search`, `test_layer2_board`, `test_layer2_projection_carry`;
+  - `test_live_gameline_{join,ledger,edge_basis,point_estimate,publish_switch,analytic_pricing}`, `test_live_gameline_ledger_{allowlist,caps,display_rows}`;
+  - `test_live_totals_width_fit_source`, `test_opportunity_population_ledger`, `test_optimizer_overlay`, `test_model_scorecard`, `test_publish_model_scorecard{,_seasons}`, `test_sim_gap_ev_study`, `test_grade_suggested_set`.
+- **Reachability through the REAL chain (off != on):**
+  - The chain: join → `build_layer2_rows` → `population_record` → `merge_board_date` / `strip_record` → `grade_pending` → `wrap_grade` → `commit` → `fit_table`.
+  - With (d) on, the committed calibration sums EQUAL the (d)-off sums exactly, and `fit_table`'s diagnostics are equal.
+  - Without the fit copy, the same graded rows give different sums. Without the `strip_record` change, the cron's sums differ.
+  - #780's `fit_prob` through the real ledger reads the same number with (d) on and off, while the recorded number moves.
+- **A/B against origin/main's six changed modules** (`live_gameline_join`, `layer2_board`, `opportunity_population_ledger`, `daily_optimizer`, `model_scorecard`, and the #780 script):
+  - Set-up: loaded under their real names in a separate process, 6 fixtures. They are NHL totals four ways (priced, even, plausibility-refused, a pregame certainty), NCAAF live totals, and NHL h2h.
+  - Every stage was compared: verdict, row, candidates, records, stored records, the cron's state and committed sums, `fit_table`, the ledger, and `fit_prob`.
+  - **Byte-identical in 8 cases:** all keys absent; (c) on; (a)+(b) on; #835 on; #835 spelled `1`; #835 with (a)+(b); #835 with (c)/(d) set `off`; #835 with (c) on. The ledger's wall-clock `recorded_at` was pinned.
+  - **(d) on:** only the intended fields differ. Main's refit w* MOVES (h2h 4.06 → 13.27, totals 5.01 → 3.63 on these fixtures); the branch's stays at its (d)-off value.
+
+### 9.3 Question 2: what the published scorecard grades
+
+**The scorecard's accuracy keeps grading the SERVED number.** `wrap_grade` returns `grade`'s own rows, and `msc.grade_pending` / `build_scorecard` and the measured-bucket overlay read those.
+- What fits on the number from before (d): the optimizer report's calibration block (w*, `brier_model_minus_market`, `edge_shrink`) and the cell table. On a (d)-served cell, that block now describes the number from before (d), because that block IS the fit.
+- What keeps the served number: the optimizer's model-EV bands and `stake_scale`, because they measure what was promised and paid.
+
+### 9.4 Every other fitter that reads a live model number (step 4)
+
+Surveyed by a read-only agent and spot-checked by hand. "Reachable" means (d) could move its input.
+
+| what | where it fits / reads | output used at runtime? | reachable by (d)? | done |
+|---|---|---|---|---|
+| optimizer w*, `edge_shrink` | `daily_optimizer.fit_calibration` 434+, from `accumulate`'s `cal` | yes: `optimizer_overlay` (rank and stake) | yes | **fixed** (reads the fit copy) |
+| cell table k | `cell_calibration.fit_table` 563+, same `cal` | yes: (a)-(d) | yes | **fixed** |
+| `stake_scale` | `daily_optimizer.stake_scales` 521+, bands over PUBLISHED rows (served model EV) | yes: `optimizer_overlay` | yes | no fix: it measures the served promise against what it paid, and fix 1 applies it to exactly those rows. No self-reference |
+| #780 width k | `scripts/live_totals_width_fit.py fit_prob` 170+ (ledger) | by hand into `_TOTALS/SPREADS_PROB_SCALE*` | yes | **fixed** |
+| measured-bucket-skill overlay | `model_scorecard.evaluate_ids` 409-488 / `overlay_payload` 678-707. It reads p_model (`bucket_search.py:563-566`) and `me` for the disagreement and direction bands (`measured_bucket_skill.py:163,175-183`) | yes: `skill_overlay.active_table` → `layer2_board._apply_skill_reliability`. `SYNDICATE_SKILL_OVERLAY`, absent = on | yes | no fix: it scores the number the board RANKS (its buckets carry the phase), and it never touches k, so it cannot undo (d). Caveat: for one 28-day window after the load, its live buckets mix pre-(d) and (d) rows |
+| staked-probability profile | `scripts/fit_staked_probability.py:167-172`: execution-ledger orders' `model_edge_pct`, paper and live, no in-play filter | yes: `portfolio_commit.sizing_inputs_with_provenance` 817-842, no switch. **It exists on the fleet**: one cell, `ncaaf\|spreads\|full\|regular`, β 0, market only, written 10-22 (read 11-27) | yes, through PAPER in-play orders (paper commits never meet the commence refusal, 8.1). Kalshi in-play orders carry no `model_edge_pct` (`inplay_entries_live.py:366` sets none) | **not fixed: user decision**. The fix is the field on orders: candidate → `portfolio_commit` (contested by two open lanes) → `execute_portfolio.py:278` → `execution_ledger`. The fitter is manual (`--write`), so nothing refits it unattended |
+| pricing-seam curves | `scripts/fit_probability_calibration.py:120,140`, the same orders | behind `SYNDICATE_PRICING_CALIBRATION`. The fleet has only `mlb_source/calibration/probability_calibration.json` (10-12) | yes, the same way | **not fixed: user decision** (the same order-path fix; manual, dry run by default) |
+| live skill notes | `measured_market_skill` constants (269-312, 454-470, 624-655), measured by hand from the ledger's `model_home_win_prob` → `projection_skill.live_skill_note` | yes: the category factor, and `decision_record` w_model | a re-measurement would read (d)'s number | no code. A re-measurement must say which number it grades: the ledger now has both |
+| #816 college live totals | `total_prob_calibration.live_fit_rows` 275-304 | yes | **no**: (d) skips ncaab/wncaab totals | none |
+| #780 anchor replays | `replay_nba_live_{margin,total}_anchor.py` | by hand | **no**: they price without `live_cell` | none |
+| sim-gap study | `sim_gap_ev_study` (trust w, slope) | report only | `me` yes; `mp` no: it reads the PREGAME `model_prob_over` (`layer2_board.py:2918`), which the live join never writes | none. After the load it grades the served number; `mu` is in the stored records if wanted |
+
+**Graders that (d) moves (report or display only; no fit applied):**
+- `grade_suggested_set` (daily, reports): no fit.
+- `score_ranking_backtest`: its fits read `fp` and `px` only.
+- `live_gameline_score`: display on `/api/board/book-grid`.
+- The ledger studies (`live_totals_grade`, `live_gameline_age_grade`, `live_moneyline_gap`, `bucket_*`).
+- `inplay_fair_score` → `inplay_scoreboard` (NBA `model_home_win_prob` as the `nba_resim` fair).
+- `engine_experts.live_resim_expert` → `join_reproduction` (624-629). It unwinds #780 through `_unscaled` but not (d), so after the load every (d)-moved row reads as a parity MISMATCH. Flagged, not fixed.
+
+**Out of (d)'s reach:** pregame-only fits (`prop_fair_side_lean`, `fair_price_eval`, `s7_prop_model_edge`), and market or price only (`min_ev_tuner`, `fit_decision_policy_z`, `syndicate_fair_fit`, `capital_ladder_calibration`, `live_cell_gate`, #835's constants).
+
+### 9.5 Predictions restated (8.3 and 8.4)
+
+- **With the fit fix loaded together with (d), 8.3's drift does not happen.**
+  - The refit's sums on a (d)-served cell are the sums it would have had with (d) off, so the served k moves only with the data, not toward 1 by construction.
+  - 8.3's table (served k at f = 0.25..1.00) describes (d) WITHOUT the fit fix only.
+- **New, read by the reader (with `--fit-fix yes`):**
+  - **P-d-fit-grid:** every stamped grid row carries `edge_pp_cell_uncalibrated` (None allowed), and a numeric one equals 100 (raw − m) within 0.011.
+  - **P-d-fit-recorder:** stamped grid rows > 0 implies records carrying `mu` > 0 in the same sports' population files for the date.
+  - **REPORTED, the day after:** optimizer-state games with `fit_mu` > 0. They appear only once the next day's cron has graded and committed the date.
+- **P-c and P-d:** 8.4 stands. The fit fix changes nothing served: it adds fields, and changes only what the refit reads.
+- **If (d) loads with the fixes but WITHOUT the fit fix,** 8.3 stands: k drifts toward 1 over about one window, starting at the first graded slate.
+
+### 9.6 Reader and kit
+
+- **Reader:** `C:\tmp\w1208_cellcal_cd\read_after_load_cd.py`, now sha256 `e2c5f370e16d1d27`. The previous version is kept as `read_after_load_cd.pre_fitfix_9cc79568.py`.
+  - It now REQUIRES `--fit-fix yes|no` with `--use d|both`, and refuses `--fit-fix yes` without `--fixes yes` (rc 2). `--opt-state` adds the `fit_mu` reading.
+  - Run on the fleet 11-27 (`--fixes yes --ncaaf-835 off --fit-fix yes --use both --opt-state`): rc 3, NOT LOADED. (c): 0 cards below 0.5. (d): 0 stamped of 137 eligible. Optimizer state: 2,973 games, 0 with `fit_mu`. With no flag: rc 2.
+- **Kit:** `kit_env_cd.sh` is unchanged. Its keys do not depend on the fixes.
+
+### 9.7 Owed, and what changes the 12-08 plan
+
+- **The code push** of `8e771a40c` + `a449d9b3e` needs the user's own yes. Before it: a fresh rebase and the targeted tests re-run. It is inert with the (c)/(d) keys absent whatever #835 says (9.2), so it can land outside a window.
+  - (d) loads 12-08 only if the fit fix is on main and tested by then; otherwise 12-22 (the coordinator's terms).
+  - The 12-08 ff must reach the fit fix's main SHA, and the reader runs with `--fit-fix yes`.
+- **User decisions:**
+  - the order-path fitters (the staked profile is live on the fleet), table rows 6 and 7;
+  - the pricing-seam hazard: `layer2_board._UPSTREAM_CALIBRATION_KEYS` lacks `live_cell_calibration`, so with `SYNDICATE_PRICING_CALIBRATION` on, a (d)-moved edge gets a second curve, the same class as fix 1. The key's value was not read;
+  - #830's forward test: its flags are `|edge_pp| >= 3`, so (d) loading mid-window changes the C6 (NBA) population, and C2-NCAAF's while #835 is off;
+  - `join_reproduction`'s false mismatches;
+  - the bucket overlay's one mixed window.
+- **Still open from 8.3-8.5:** whether fix 1 is needed, NCAAF's optimizer 0.5 under #835, and the 11-27 table's drift (7.3).
