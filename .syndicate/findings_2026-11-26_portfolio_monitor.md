@@ -84,3 +84,91 @@ Public repo: counts and percentages only. No dollars, balances, order ids or row
 - **Live reading at 9:55 PM CST (03:55:44Z 11-27):** the merge warning WAS printing (cards 4,228 of 4,383). The fixed reader gave rc 0, 1,110,512 bytes of stdout that parse as JSON, and 284 bytes of stderr holding the two merge lines. The full probe at 03:55:57Z rendered the ALIGNMENT section: board 4,256 rows, 60 Suggested, 1 of 60 bought today.
 - **Still to confirm:** the scheduled Portfolio Watch runs use the PRIMARY tree's `scripts/`, which is current only after the primary tree's fast-forward. The reading that confirms it: a scheduled reading with alignment ok while the merge is short.
 - **CONFIRMED in the scheduled runs `[read 2026-11-27 12:27 AM CST, 06:27Z]`:** the primary tree took the fix at 10:05:57 PM CST (`f9b72e447`, 04:05:57Z). Every scheduled Portfolio Watch reading on it rendered alignment: 4 of 4 (04:34, 05:04, 05:34, 06:04Z). The merge was short throughout that window: refresh-worker's log carries 55, 50 and 54 `LAYER2_CARD_SHARD_MERGE` lines in the 04:30, 05:00 and 05:30Z half hours, and the latest read 4,365 of 4,554 cards at 06:26Z. On the old code the three readings before it failed in the same condition (02:34, 03:04, 03:34Z; 46-53 lines per half hour). The 04:04:21Z reading, still on the old code, was ok, which fits the old failure rate of 25 in 153.
+
+## DAILY SUMMARY — Thu 11-26 (Central), written Fri 11-27 2:05 AM CST by the daily learning review
+
+Sources: `daily_rollup.json` and `performance.json` built from the 1:34 AM CST 11-27 watch reading (ledger saved
+07:34:02Z), and the 48 watch readings dated 11-26 CST. Every 11-26 game is graded: 0 started and unsettled, 0 late.
+The 11-25 review did not run (the network outage), so 11-25 has no summary of its own; its row is quoted here.
+Thanksgiving slate, and the third day since CHANGE P (live EV floor off), so volume is not comparable with pre-11-24.
+
+**Performance.**
+- **11-26: 4 graded bets / 2 games, ROI +6.34% [-9.7, +22.4].** Won 75.0% against a 66.7% breakeven. Too small to
+  read. (11-25: 11 bets / 7 games, +55.7% [+20.5, +90.9], won 63.6% vs 61.9%; also too few games to mean much.)
+- **7 d: 213 bets / 124 games, -0.24% [-13.3, +12.8]** (11-24: -2.55% on 177 games); won 52.6% vs 61.1% breakeven.
+- **30 d: 1,588 bets / 711 games, -8.16% [-13.8, -2.54]**, beyond noise and the worst 30 d reading since 11-20
+  (rollup r30: 11-21 -4.93, 11-22 -4.76, 11-23 -5.14, 11-24 -6.37, 11-25 -7.49, 11-26 -8.16). All-time: 2,397 bets /
+  1,290 games, -10.26% [-17.1, -3.42].
+- **Fee-net CLV:** 30 d -0.63 pp (622 bets / 422 games with a priced close; gross +1.11, beat close 60.6%, se 0.22;
+  wins minus close -4.4 pp, z -2.14); 7 d -2.17 pp (99 / 73; gross -0.41, beat close 43.4%, se 0.31); 11-26 alone
+  +1.29 pp on 3.
+- **Fees: 2.14% of stake on 11-26, 2.98% over 7 d, 3.90% over 30 d** (11-26 before fees +8.48%).
+- **Gate: 12 of 800 events** since BC-071 (CHANGE P, 11-24 2:30 AM CST = 08:30:37Z): 20 bets, ROI +28.0% (lower
+  -4.64%), excess wins +0.2. Conditions 1-3 fail, 4 passes. 2 deploys.md loads are still unclassified (the GATE
+  anomaly on 48 of 48 readings).
+
+**30-day slices beyond noise (95% range excludes 0):**
+- totals -13.63% [-25.4, -1.83] (354 bets / 278 games; won 43.8% vs 49.3%, -19.5 excess wins).
+- EV band 2-5 -11.09% [-19.0, -3.17] against a predicted +4.12% (1,040 / 556).
+- price 0.30-0.45 -14.28% [-26.5, -2.10] (205 / 141).
+- path model_edge -10.57% [-17.9, -3.27] (1,240 / 629).
+- **Kalshi -6.84% [-13.0, -0.71]** (1,085 / 591), back beyond noise (11-24: -5.31% incl. 0).
+- stake Q1 (6.4% of $) -11.46% [-21.9, -1.04] and **Q4 (61.8% of $) -9.21% [-17.4, -1.01]**; Q2 -8.56% and Q3
+  -4.13% include 0.
+- Passing TDs -66.3% on 10 bets / 10 games: too few to read.
+- Noise: Polymarket -12.95% [-26.2, +0.34], NCAAF -14.79% [-30.2, +0.57], totals_alt -18.04% [-37.0, +0.91],
+  h2h +4.75% [-6.9, +16.4].
+
+**Operations (48 readings).**
+- Anomaly kinds, by readings flagged: GATE 48; BANNER not ok 17, WORKER STATE stale 17, BALANCES stale 15 (all in
+  1:04-11:04 AM CST: the 11-hour network outage that ended with the 11:11 AM reboot; findings above); PLAN stale 1;
+  WEB 1. Nothing after the reboot except GATE.
+- Endpoint reads over 2 s: 1 (plan); over 3 s: 0.
+- Plan commits: 40 in the probe's 6 h series dated 11-26 UTC (02:07-06:03Z), max gap 22.6 min.
+- Orders 11-26: 8, of which 7 filled and 1 did not (11-25: 22 / 21 / 0).
+
+**Studies and window reads (this run).**
+- **S5 price-band forward test: NO-GO.** Forward set (selected >= 11-19): 271 graded bets / 150 games; dropping the
+  fitted band (.55-.70) gives D = -4.70 pp [-13.6, +4.28]. The rule was GO iff the lower bound > 0. S5 ends; nothing
+  changes live. Recorded in `findings_2026-11-18_s5_price_band_map.md`.
+- **F27 Kalshi sport scope, +24 h BACKSTOP (the 11-25 task left no Log line): PASS on both.** P1: 12,320 Kalshi rows
+  since the load, `differ=0`. Replay on the 11-27 board (5,579 rows): `report_pairs_equal_off=True`,
+  `lost_by_on_own_sport=0`, `gained_by_on_other_sport=0` (939 matched in every mode). +7 d is due after 12-01 5:00 AM CST.
+- **CHANGE N, Polymarket stale cancel SHADOW:** daily lines for 11-25 and 11-26 are in its Log. Both days: 0
+  would-cancel, 0 untouched >= 15 min (of 22 and 16 orders), `cancel_stale=0 cancel_sent=0`. The +3 d S1-S3 reading
+  (task `pm-stale-shadow-reading-1127`, 9:45 AM CST) is not yet due; its backstop is the next run.
+- **CHANGE P, live EV floor OFF:** `live_ev_floor_on_lines=0` on 11-26. 11-25 is NOT COVERED by the kit: the
+  refresh-worker log starts 15:44Z 11-25 and shows 0 plan writes, so its 0 is not evidence. Ledger counts: 11-25
+  pregame 19 (Kalshi 12, Polymarket 7), in-play 3 (Kalshi 3); 11-26 pregame 6 (Kalshi 6), in-play 2 (Kalshi 2).
+  The kit counted 3 orders on 11-26 against the ledger's 8. Pregame has been 8, 19, 6 a day against the registered
+  0-2: no floor lines, so not a defect, but the P-F prediction is not holding. That is for an interactive session.
+- S6 ended 11-23 (NO-GO); S8 finished (LOOK 2 PASS 11-26); the 11-24 window fields were read 11-24.
+
+### What the data teaches (11-26)
+- **The 30 d slide is the window, not new losses.** r30 fell from -4.93% to -8.16% over 11-21..11-26 while the last
+  7 days sit at -0.24% on 124 games and 11-25/11-26 were both positive. Late-October winning days are leaving the
+  window. Read the 7 d and the gate, not the r30 trend, for whether anything changed since 11-24.
+- **The close-beat decline is in its fourth reading and is now gross, not just fees.** 7 d fee-net CLV went -0.99 →
+  -1.18 → -1.26 → -2.17 pp (11-22, 11-23, 11-24, 11-26; 73 games, se 0.31), and 7 d gross CLV is -0.41 pp with
+  beat-close 43.4% against 60.6% over 30 d. The near-zero 7 d ROI is then luck against the close, not edge.
+- **The stake-quartile signal flips day to day.** On 11-24 Q1/Q2 were the beyond-noise losers and Q4 included 0;
+  today Q4 (61.8% of $) is -9.21% [-17.4, -1.01] again and Q1 -11.46%. Both tails lose, the middle (Q3) is least bad.
+  That is a U-shape across 397 bets a quartile, not a "big stakes lose" rule.
+- **Persistent since 11-17/11-20, still beyond noise:** totals (-13.6% on 278 games), EV 2-5 (realised -11.1% vs
+  claimed +4.1% on 556 games), price 0.30-0.45 (-14.3% on 141 games), Kalshi (-6.8% on 591 games). Fees 3.90% of
+  stake are 48% of the 30 d loss.
+- **CHANGE P cut live volume to 11 / 22 / 8 orders a day** (11-24 after the load, 11-25, 11-26) from ~59 a day. The
+  gate has 12 of 800 events after 3 days, so at ~4 events a day it would take about six months.
+
+**One optimization lead (pre-registrable, offline, changes nothing live).**
+- *Hypothesis:* the stake sizer feeds claimed EV straight into Kelly. EV 2-5 is overstated by ~15 pp. So the U-shape
+  comes from the overstatement being largest at the extremes of the claimed edge (small stakes on thin edges, big
+  stakes on the biggest claimed edges). Shrinking claimed EV by a fitted factor before sizing would lift ROI on stake.
+- *Data:* the 30 d graded live bets in the newest `live_all.json` (`ev_pct`, `requested_stake_dollars`, outcome,
+  fill price, fees). Fit one shrink factor k in [0, 1] on bets selected 10-28..11-17. Recompute each bet's Kelly
+  stake from k × claimed EV (bets whose shrunk stake falls below the venue minimum drop out). Compare stake-weighted
+  ROI against the actual stakes on bets selected 11-18..11-26, as a paired difference clustered by game. Then do a
+  forward copy on bets selected from 11-27 once it reaches 150 games.
+- *Decision rule:* GO (name a shrunk-EV sizing challenger for a later betting-change window) iff the held-out paired
+  difference has a 95% lower bound > 0 AND the forward copy's difference is > 0. Otherwise KILL. k is fitted once on
+  the fit window and frozen; the windows are frozen as written here.

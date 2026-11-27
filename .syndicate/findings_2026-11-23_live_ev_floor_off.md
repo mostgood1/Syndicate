@@ -93,3 +93,11 @@ Re-enabling is itself a BETTING CHANGE, so it goes in a later window on the user
   in-play 8.3 / 2.1 (Kalshi / Polymarket). Newest live-plan rows_in: Kalshi 9, Polymarket 8 (05:57Z). Pregame 8 is
   above the expected 0-2 a day; there are no floor lines, so it is not a defect, but which rows those 8 were is worth a
   look.
+- 2026-11-25 CST (06:00Z 11-25 to 06:00Z 11-26; read 11-27 2:00 AM CST = 08:00Z by the daily learning review):
+  live_ev_floor_on_lines 0, but NOT COVERED: the refresh-worker log starts 15:44:48Z 11-25 and the kit saw 0 plan
+  writes and 0 orders, so its 0 is not evidence. Ledger: pregame 19 (Kalshi 12, Polymarket 7), in-play 3 (Kalshi 3,
+  Polymarket 0). Newest live-plan rows_in: none in the kit's window.
+- 2026-11-26 CST (06:00Z 11-26 to 06:00Z 11-27; read 11-27 2:00 AM CST = 08:00Z): live_ev_floor_on_lines 0.
+  Ledger: pregame 6 (Kalshi 6, Polymarket 0), in-play 2 (Kalshi 2, Polymarket 0); the kit counted
+  live_orders_submitted 3. Newest live-plan rows_in: Kalshi 6, Polymarket 6 (05:58Z). Pregame has now been 8, 19, 6 a
+  day against the registered 0-2: no floor lines, so not a defect, but the prediction is not holding.

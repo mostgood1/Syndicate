@@ -107,3 +107,13 @@ Result: `C:\tmp\pfmon\s5_result.json`.
   (adverse-selection features), not to a band rule.
 - **Forward read:** the monitor re-runs `C:\tmp\pfmon\s5_band_map.py` once bets selected >= 11-19 cover >= 150 events
   (about 11-25/26 at 24 graded games a day). The verdict is reported then. Nothing goes to the 11-24 window from S5.
+
+## FORWARD RESULT — NO-GO (run 2026-11-27 ~2:00 AM CST = 08:00Z by the daily learning review, read-only)
+
+- Input: the 1:34 AM CST 11-27 watch reading's `live_all.json` (ledger saved 07:34:02Z), `s5_band_map.py ... forward`.
+- Forward set (bets selected >= 11-19, graded): 271 bets / 150 games. The challenger drops the fitted band (.55-.70):
+  129 bets dropped. ROI all -14.05%, challenger -18.75%, **D = -4.70 pp [-13.6, +4.28]**.
+- **Verdict as registered: NO-GO** (GO needed D's 95% lower bound > 0). The fitted map on the refit window also
+  moved: .55-.70 is now the excluded band (it was profitable on 11-01..11-17, +0.7%), so the band effect does not
+  hold its place between windows.
+- **S5 ends. Nothing changes live and nothing is queued for a window.**

@@ -173,3 +173,8 @@ checkout that carries `b65707658`, on exactly what the portfolio commit joins: `
   self-tested. The same-inputs replay reproduced the live join (802 = 802), and `on` changed 0 pairs on both board
   dates. Readings are scheduled for 11-25 9:30 AM CST (+24 h) and in the daily review after 12-01 (+7 d). Nothing is
   loaded; the fleet is at `b07e808823`, which does not carry `b65707658`.
+- 11-27 2:00 AM CST (08:00Z), +24 h BACKSTOP by the daily learning review (task `kalshi-sport-scope-reading-1125`
+  left no reading here): **P1 PASS**: 12,320 Kalshi rows from LOADED 2026-11-24T08:30:37Z, agree 12,320, `differ=0`,
+  unknown_sport 0. **Replay PASS** on the 11-27 board (5,579 rows; 19,366 Kalshi markets): matched 939 in off, report
+  and on; `report_pairs_equal_off=True`, `lost_by_on_own_sport=0`, `gained_by_on_other_sport=0` (lost/gained 0 in
+  total). +7 d owed on the first daily review after 12-01 5:00 AM CST.
