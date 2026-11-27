@@ -628,3 +628,20 @@ Session e32fef1a narrowed the inertness condition: each fix must be inert whenev
 - **A/B against main's three modules: byte-identical** with #835 on alone, spelled `1`, with (a)+(b) on, and with (c) and (d) set `off`.
 - **Pinned on the branch:** `test_fix2_835_alone_changes_nothing_while_c_and_d_are_absent`, for on / 1 / true / yes. With #835 on, these equal #835 off: rows, verdicts, `factor_for_row`, `build_records`, `rank_stake_factor` and `live_probability`. 23 of 23 in the file pass.
 - **The branch head to push is now `6c28e52c4`** (pinned `refs/keep/cell-calibration-847d-fixes-head`). It is `2f19ebde5` plus that one test. NOT pushed.
+
+### 8.7 The fixes are on main (added 2026-11-27 2:35 PM CST)
+
+**The user pushed them:** "yes, push it", typed in this session about 2:30 PM CST 11-27.
+- **On main as `a15d94bbc` + `d381a806a`** (pushed `3231ee493..d381a806a`). These are `2f19ebde5` and `6c28e52c4` rebased onto newer main; neither newer main commit touched these files. Patch-id `07359e3f` matches the tested diff exactly.
+- **Re-checked on the rebase before the push.**
+  - 125 targeted tests pass: the 23 in `test_cell_calibration_847d_fixes.py` plus the cell-calibration, optimizer-overlay and live-gameline-ledger files.
+  - A/B against main's three modules is byte-identical in seven cases: all keys absent; (c) on; (a)+(b) on; #835 on; #835 spelled `1`; #835 with (a)+(b); and #835 with (c)/(d) set `off`.
+  - With (d) on, only the intended diff appears.
+  - The 125 were re-run on the pushed head; all pass.
+- **Nothing loaded.** No fleet ff, env edit, restart or scheduled task.
+  - The next ff of `~/Syndicate` carries these commits, but they are inert while the (c) and (d) keys are absent, whatever #835's key says (§8.6).
+  - So this is not a betting change until (c) or (d) is switched on.
+- **The 12-08 plan:** the fixes are on main and tested before 12-08, so (d) can load in that window. It is still the user's call at the window.
+  - The window's ff must reach at least `d381a806a`.
+  - Run the after-load reader with `--fixes yes`.
+- **Still the user's calls** (§8.3 to §8.5): whether fix 1 is needed, NCAAF's optimizer 0.5, fit-feedback options (i) to (iii), and the engine-number fitters.

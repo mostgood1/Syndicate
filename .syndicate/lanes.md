@@ -2350,6 +2350,7 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS 2026-11-27 12:50 PM CST: BUILT on branch cell-calibration-847d-fixes 2f19ebde5 (local, refs/keep pinned), NOT pushed (the push needs the user's own yes via session e32fef1a). 19 new tests + 121 targeted pass; byte-identical to main with every key absent (A/B). Findings section 8 (stake trace, item-4 trace, restated predictions); reader updated, kit unchanged
 - STATUS 2026-11-27 1:30 PM CST: branch head now 6c28e52c4 (2f19ebde5 + a test pinning #835 on alone, (c)/(d) absent, as a no-op; A/B vs main byte-identical), NOT pushed. Findings 8.6
+- STATUS 2026-11-27 2:35 PM CST: PUSHED to main as a15d94bbc + d381a806a (user "yes, push it", typed here ~2:30 PM CST), the tested diff rebased (same patch-id); 125 targeted pass on the pushed head; A/B vs main byte-identical in 7 key-absent/#835 cases. Nothing loaded (no ff, env, restart). Findings 8.7
 
 ### clv-fair-close — OPEN — opened 2026-11-27 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
 - Goal: New same-book closing marks carry the close's overround and a fair (spread-free) CLV beside the quoted one -- taken from the same book's last pregame quote for the other selection(s) in the quote log -- with close_price, close_book_scope and clv_pct unchanged; measured on the fleet as the share of new same-book marks that carry a fair CLV, by venue
