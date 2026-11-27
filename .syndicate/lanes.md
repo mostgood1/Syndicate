@@ -2268,6 +2268,14 @@ death, never life — do not invert it.
 - Verification: unit tests incl. off-path (a row seen inside 24 h stays, a row with no last_seen stays) and the tick reaching the new prune; landed on origin/main; fleet ff + live-odds-worker TERM behind claim + preflight; first post-load KEYVALUE_WRITE_LARGE for execution_exits.json under 4.5 MB, the tick's pruned count > 0, and the archive file grew; no KEYVALUE_WRITE_REJECTED for it through 11-26's evening slate
 - Blocked by: none
 
+### cell-calibration-847-b-load — OPEN — opened 2026-11-26 — session 77184c63-3fcd-478d-bb0c-d949d38eb183
+- Goal: Todo #847 use (b): SYNDICATE_CELL_CALIBRATION_DISPLAY=on (display only, GLOBAL) loads in the Tue 12-08 window per the user's 'load (b) in the next window' (11-26 ~10:12 PM CST), riding with #861's SYNDICATE_LAYER2_ONE_MODEL_NUMBER=on (if #861 is dropped, (b) goes back to the user), and read_after_load_b.py returns MET (P-b1..P-b5) on the first board build after the up
+- Files: .syndicate/findings_2026-11-18_cell_calibration.md (NEW section 6 and later ONLY), docs/ai_context/todo.md (#847 section ONLY)
+- Hypothesis: n/a (a queued display load; predictions P-b1..P-b6 pre-registered in findings section 6.3 before any load)
+- Falsification test: read_after_load_b.py rc 1 on the first build after the up: a stamped card off the exact transform (2e-4) or the table's k (1e-4), a cal_cell outside the table or off the card's own cell, model_ev_cal_pct off by > 0.01, or unstamped eligible cards > 1% of eligible; rc 3 with eligible > 0 refutes reachability
+- Verification: deploys.md entry for the 12-08 load (betting change: no) + read_after_load_b.py output (rc 0 = MET) recorded in findings section 6; kit C:/tmp/w1208_cellcal_b/ (kit_env_b.sh self-test PASS 11-26)
+- Blocked by: the 12-08 window (2026-12-08T08:00Z..13:00Z) and its batch (not built on 11-26)
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —

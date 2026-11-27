@@ -331,3 +331,63 @@ The bootstrap draws 2,000 game resamples, seeded. The copy and output sit in tha
   No college-totals LIVE cell is served. `ncaab|totals|full|live` has 193 games / 8 dates since 11-17, which is past the sample floor, but this fit does not serve it.
 - **`wncaab|totals*`: none served.** `wncaab|totals|full|live` has 45 games / 3 dates.
 - **So H-R is NOT runnable to any new coverage yet.** The flags it lacked (NBA live 298, college full-game totals live 435 of 1,120) still fall in unserved cells. The re-run stays in todo #847 for the optimization program.
+
+## 6. (b) QUEUED FOR THE 12-08 WINDOW (written 2026-11-26 10:25 PM CST, before any load)
+
+**User decision:** "load (b) in the next window". The user typed it about 10:12 PM CST 11-26, in session 77184c63, after the H-F PASS. The next window is Tue 12-08, 2-7 AM CST (08:00-13:00Z). (b) is display only, not a betting change, so the window is the user's choice of timing, not the rule's.
+
+**The load.** One GLOBAL line in `~/syndicate-prod/local_production.env`, `SYNDICATE_CELL_CALIBRATION_DISPLAY=on`, carried by the window's drained full down/up.
+- It is GLOBAL, like #861's key, because the same function, `layer2_board._layer2_board_columns`, builds the cards on whichever role builds them.
+- Code is `75a787964`, absent = off.
+- Preflight: `--betting-change no`. The deploys.md entry says `- betting change: no`.
+
+**Fleet state, read 10:19-10:22 PM CST 11-26 (read-only, nice 19):**
+- Fleet HEAD `30b2be76e` carries (b)'s code (`75a787964`) and #861's (`d25f49964`).
+- The daily table `reports/model_scorecard/model_cell_calibration.json` exists: 43 cells, generated 11-26 11:30Z, expires 11-29 11:30Z (72 h). It is the same 43-cell fit as §5.3.
+- The key is absent from `local_production.env` and from all three roles' env (`local_production.py env --role`: refresh-worker 254 lines, web 145, live-odds-worker 224; 0 `SYNDICATE_CELL_CALIBRATION_*`, 0 `SYNDICATE_LAYER2_ONE_MODEL_NUMBER`).
+
+**Kit** (`C:\tmp\w1208_cellcal_b\`):
+- `kit_env_b.sh check | apply | restore <backup>` (sha256 `78fc20afeaa9a8d1`): appends exactly one line, idempotent, backs up first and keeps mode 600.
+- `kit_selftest_b.sh`: PASS 11-26 10:21 PM CST on a dummy file; the real file was untouched.
+- After-load reader: `read_after_load_b.py` (sha256 `f37c3a6a387e3ba6`; rc 0 MET / 1 violated / 2 blind / 3 not loaded).
+
+### 6.1 What (b) calibrates, traced 11-26 (read this before loading it without #861)
+
+- **H-F graded k on the scorecard's model number.** That is `p_model = fair + model_edge_pct/100` (`model_scorecard.py:34`; d = p_model − p_market).
+- **(b) calibrates the card's shown model number.** That is `model_prob` in `_layer2_board_columns`, AFTER #861's substitution (`layer2_board.py:5464-5469`, then `:5507-5509`).
+  - **#861 on:** a pregame card's number is `model_probability_cal` = fair + model edge, the number H-F graded.
+  - **#861 off:** it is the served projection number, `_model_prob_for_side`.
+  - **Live cards:** the served live number either way (#861 leaves live rows alone).
+- **Measured on the served board** (04:24Z 11-27, snapshot 03:44:46Z): 323 of 1,948 eligible cards with a model edge (16.6%) show a Win% more than 0.5 pp off fair + model edge. That is how often (b) with #861 off would calibrate a number H-F did not grade. #861's own 11-24 reading was 1,594 of 3,567 pregame cards.
+- **So (b) is queued to ride WITH #861** (`SYNDICATE_LAYER2_ONE_MODEL_NUMBER=on`, queued for 12-08 by the user on 11-24). Whether (b) still loads if #861 is dropped is the user's call, and it is not decided yet.
+- **This corrects the re-rank's line** "H-F graded exactly the probability (b) shows" (`findings_2026-11-18_product_optimization_program.md` §12.5). That holds for pregame cards only with #861 on.
+- **(b) serves the DAILY table, not the frozen one.** The cells served on 12-08 are the 12-08 cron's fit. Cells that joined after the frozen 11-18 table rest only on their own window's validation, not on H-F. One example: `ncaab|totals|full|pregame`, `h1` and `h2` at k 0.272 (97 eligible cards in the BEFORE reading).
+
+### 6.2 Readers of the fields (b) adds (grep on main 11-26)
+
+- (b) adds four card fields: `model_probability_cal`, `cal_k`, `cal_cell`, `model_ev_cal_pct`.
+- Their only reader is `intelligence.html`: the blotter's Sim cell (`:5339`) and the EV tooltip (`:5144`). No Python module reads them from a card. So nothing ranks, admits, sizes or records on them, and (b) is not a betting change.
+- **Naming hazard (not a bug today).** `model_probability_cal` also names a different number on SHORTLIST rows: the pricing seam's fair + model edge (`layer2_board.py:2814-2832`, copied onto the candidate at `:3565`). `decision_record._model` (`:680`), `cheat_sheets.game_line_check` (`:392`) and `scripts/surface_consistency_check.py` (`:132`) read the shortlist field, and none of them reads a card. A future reader that takes `model_probability_cal` from a CARD with (b) on gets p′, not fair + edge.
+
+### 6.3 Predictions (pre-registered here, before any load; judged by `read_after_load_b.py` on the first board build after the up)
+
+- **BEFORE** (04:24Z 11-27, board snapshot 03:44:46Z, night slate, pregame only): 0 cards stamped. 4,720 cards carry a Win% and a fair, and 1,977 of them sit in a served cell (NHL pregame 787, soccer pregame 738, NCAAF pregame 355, NCAAB pregame 97).
+- **P-b1, reachability:** the first board build after the up stamps `cal_cell` on cards in served cells. The count is > 0 on any board that has such cards (0 before). Refuted by 0 stamped while eligible > 0.
+- **P-b2, exact transform:** on every stamped card:
+  - `model_probability_cal` = sigmoid(logit fair + cal_k (logit Win% − logit fair)), within 2e-4;
+  - `cal_k` = the table's k for `cal_cell`, within 1e-4.
+
+  So Win% (`confidence`) stays the raw number and p′ sits beside it. Refuted by any card off either tolerance.
+- **P-b3, served cells only:** every `cal_cell` is in the fleet's table and equals the card's own cell. Refuted by any card outside.
+- **P-b4, model EV:** `model_ev_cal_pct` = `expected_value_pct(price, p′)`, within 0.01. Refuted by any card off.
+- **P-b5, coverage:** eligible cards left unstamped are at most 1% of eligible.
+- **P-b6, nothing else moves:** no bet, rank, admission or EV column changes. Covered by the off != on tests (`test_b_*`) and the reader trace in §6.2; no fleet reading separates it, because the shortlist does not read the card. The betting-change gate's count does not restart (`--betting-change no`).
+- **Reported, not judged:** the median |p′ − Win%| in pp per sport|phase, and how many stamped cards carry #861's `model_probability_basis = model_edge`. With #861 on, that should be every stamped pregame card.
+
+### 6.4 Owed
+
+- Before the window:
+  - the 12-08 batch (not built on 11-26) carries the kit;
+  - put #861's condition to the user if #861 is dropped.
+- After the up: run `read_after_load_b.py` on the first build (rc 0 = MET) and record the result here and in deploys.md.
+- A forward accuracy read of the SHOWN number: H-F's metric and pass rule on games 12-08..12-21, with the 12-08 table frozen at load, read 12-22. It is not scheduled; the user's call.
