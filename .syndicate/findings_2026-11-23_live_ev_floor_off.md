@@ -101,3 +101,15 @@ Re-enabling is itself a BETTING CHANGE, so it goes in a later window on the user
   Ledger: pregame 6 (Kalshi 6, Polymarket 0), in-play 2 (Kalshi 2, Polymarket 0); the kit counted
   live_orders_submitted 3. Newest live-plan rows_in: Kalshi 6, Polymarket 6 (05:58Z). Pregame has now been 8, 19, 6 a
   day against the registered 0-2: no floor lines, so not a defect, but the prediction is not holding.
+
+## Why pregame live orders run 6-19 a day, not 0-2 -- HYPOTHESES (written 2026-11-27 10:21 AM CST, before the per-order test)
+
+The user, 11-27, answering "Should I diagnose why pregame live orders run 6-19 a day instead of the predicted 0-2?": "Yes, diagnose it". Read-only.
+
+**Already read before this was written** (so not a test): the ledger in the 10:04 AM CST watch reading (`live_all.json`, 2,708 orders) splits each CST day's pregame live orders by `sizing_basis` and `execution_style`. After the load, 2 a day are `execution_style=maker_pilot` (2 on each of 11-24, 11-25, 11-26), the same as before the load (1-3 a day). The rest are `sizing_basis=model_edge` with no execution style: 17 on 11-25, 4 on 11-26. Those come from the live plan.
+
+- **H-A, the prediction used the wrong bar.** The 0-2 came from 11-23's "0 of 34 Suggested rows at >= 2% net at the venue". But the live plan buys a Suggested row at any EV net of the venue's fee above 0 (`min_ev_pct` 0.0; `below_min_ev_pct_net_of_fee`). On 11-23, 6 of the 34 (Kalshi 3, Polymarket 3) were above 0 in that one snapshot. Before the load, the non-floor paths were already about 19 orders a day (660 in about 34 days: Suggested, in-play and maker pilot). So the code is right and the prediction was not.
+  - *Test:* match each post-load `model_edge` pregame order (11-24 08:30:37Z .. 11-27) to the live-plan position that bought it, in the Portfolio Watch readings' ALIGNMENT plans. Those carry each position's `suggested` flag and EV, for readings from 11-24 (with gaps at the alignment failures and the 11-26 outage).
+  - *Survives if:* the matched orders are all `suggested=True` with no `live_ev_floor` tag, and most have a recorded EV at purchase between 0% and 2%.
+- **H-B, another admission path.** Some of these orders come from rows that are not Suggested: a live-plan input other than `suggested_rows`. *Confirmed if* any matched position reads `suggested=False` or carries `live_ev_floor`.
+- **H-C, repeat orders.** A few positions take several orders each (re-submits, increments), which inflates the count. *Test:* distinct `position_key` per day against orders per day.
