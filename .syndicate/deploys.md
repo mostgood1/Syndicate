@@ -63817,3 +63817,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **verify:** at the nightly closes, the monitor's `ours_resim_tick` count (dash_update `classify_ours`) reads 0 on every reading after 04:39:59Z 11-27. One flagged total whose card OURS differs from its own row's `live_total` after that instant falsifies it.
 - **For lane `web-silent-worker-kills`:** this reload retired workers 266330 / 266831 at 04:39:59Z, 4.5 min after your load.
 - **Revert:** `git revert fe46fb249` on main, then ff + reload-web.
+
+## 2026-11-27 07:00Z READING lane live-player-exit-gate (#814): 11-26 watch closed (17:00Z -> 07:00Z), summary
+- betting change: no (reading only)
+- **Priced key exits read live: 5.** Cincinnati Allenspach (NCAAB), Davidson Garcia Monje (WNCAAB), USC Cofie (NCAAB), TCU Avila (NCAAB), Cincinnati Fernandez (WNCAAB). Every hold read `fail`, and the board withdrew each game within 4-34 s of the refusal tick.
+- **Plan backstop: 1** (Davidson, a 22 s gap). Fernandez's plan also fell in a gap (1 s) but had no row for the game.
+- **Lifts: 2 real** (USC Cofie, Cincinnati Fernandez). Each cleared 63 s after the check-in and was back on the board 8-17 s later. **3 non-returns** (Allenspach, Garcia Monje and Avila ran to the final).
+- **Unpriced:** Xavier Maria Anais Rodriguez (WNCAAB), unpriced game, ran to the final.
+- **NFL (Thanksgiving, 3 games):** 10 distinct PLAYER_OUT players in DAL @ PHI and the KC game, all `key=False`. They include `PHI Saquon Barkley reason=injury key=False`. No refusal, so nothing to read. Whether a lead RB should be key is NOT examined here (a question for the NFL key-player set, not this lane).
+- **Not exercised:** live player props (NBA only this season; no NBA key exit in the window), and the backstop in NHL / soccer / NFL.
+- verify: `C:/tmp/lpeg/w1126/watch.log` (all verdicts), refresh-worker.log nfl PLAYER_OUT grep 07:02Z.
