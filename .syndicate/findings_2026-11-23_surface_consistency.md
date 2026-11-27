@@ -610,6 +610,68 @@ at a `reload-web` or a recycle. An ff ships ALL of main. When to load it is the 
   - Predicted: on the first full day of v4 sheets, every sheet `section_rules` 4 and value-not-suggested 0. The load
     day itself is mixed, because rows kept from earlier builds keep their v3 verdicts.
 
+## Step 1e -- the board shows the EV it judges, and the Kalshi / Polymarket prices `[built 2026-11-26, user "Start"; display only; NOT LOADED]`
+
+**Measured first** (the fleet's 00:23:40Z 11-27 shortlist, read 00:29:02Z; `C:\tmp\scc_oversight_d5aa\probe_1e_*.py`). D4 and
+the "venue price beside the sportsbook best" half of the target:
+- **EV column.** 1,929 pregame rows; the page showed the GROSS `ev_pct` (`ev_vs_fair_pct`) on all of them. On 305 the best
+  book charges a fee: Novig 104, Kalshi 101, ProphetX 59, Polymarket 41. `_suggested_reasons` judges those on
+  `score_v2.ev_net_pct` (`layer2_board.py:3709-3716`). The card carried no `score_v2` and no net number, so the page could
+  not show the number the flag judges.
+- **Venue prices.** The live book buys only at Kalshi and Polymarket. 355 pregame rows carry a Kalshi price in their own
+  quote grid (the best book on 101) and 241 a Polymarket price (best on 41). The page showed none of them: `book_prices`
+  is stripped from the wire (`blueprints/intelligence.py` `_UNCONSUMED_QUOTE_FIELDS`), and the Best price cell names only
+  the best book.
+- Priced by the purchaser's own `venue_scope.scope_rows_to_venue` (aggregator path): Kalshi 354 scoped + 1
+  `venue_ev_implausible`, net > 0 on 13, net >= +2 on 0; Polymarket 241 scoped, net > 0 on 8, >= +2 on 0.
+  11 of 46 Suggested pregame rows carry a venue price; 4 of those clear 0 net there and 0 clear +2.
+- On 18 Kalshi rows and 4 Polymarket rows the venue's raw price beats the board's best, and the board still names a
+  sportsbook. All 22 were refused (`ev_below_min` 15, both reasons 6, `ev_net_of_fee_below_min` alone 1), so none is a
+  hidden pick. Why the board names the sportsbook on them is NOT traced here.
+- The live book today (`/api/portfolio/live?date=2026-11-26`, 00:31Z): 4 live orders, all Kalshi. Too few to join.
+
+**The change** (`b8d0b5037`):
+- `layer2_board._layer2_fee_and_venue_columns`, spread into each card by `layer2_rows_to_board_cards`:
+  - `ev_net_pct`, `fee_basis`, `fee_per_contract`, `fee_is_upper_bound`: COPIED from `score_v2`, never recomputed.
+  - `venue_prices`: for Kalshi and Polymarket, where the row's quote grid prices them and neither is the best book, the
+    output of `scope_rows_to_venue([row], venue)`: price, gross EV, net EV, fee, fee basis, `price_source`
+    ("aggregator"). A refused price keeps its reason (`refused`).
+  - The venue that IS the best book is left out: its price is the Best price and its net EV is the EV column's. The two
+    can differ, so a second number for one price would be a new inconsistency. The board's score reads the side's own
+    Kalshi ticker; the purchaser's function has none here, and the board passes no phase for Novig (D3).
+  - The row is never written, and `_layer2_board_columns` (which `portfolio_commit` calls) is unchanged. Nothing that
+    places, sizes, ranks or flags a bet reads the new fields: **betting change NO**.
+- `templates/intelligence.html`:
+  - The EV column shows and sorts on `evShownValue`: the net number where a fee is charged, else the gross.
+  - The EV cell says "net of fee · +x% gross", with the fee in the tooltip. A card on an exchange without the net
+    number (built before the load, or an in-play overlay card) says "gross, before fee".
+  - The Best price cell lists "KALSHI +105 · -2.6% net" per venue, or "· not bought" with the reason.
+  - The top rail shows "+x% net", and the agree tab filters on the same number.
+  - The calibrated-sim tooltip of lane `cell-calibration-847` in `renderBlotterEv` is byte-identical.
+- What it does NOT say: the live plan's resolver reads the venue's own feed through its own join
+  (`portfolio_commit._venue_price_resolver`) and may hold a fresher or differently matched quote. Each venue line's tooltip
+  says so. Showing that number needs the plan's priced rows persisted for every line, not only its positions.
+
+**Replay** (`C:\tmp\scc_oversight_d5aa\replay_1e.py`, rc 0, HELD): the saved 2,000 rows -> the new card builder -> the
+page's own `renderBlotterEv` / `renderBlotterBook` / helpers extracted from the edited template and run in node.
+- Shown EV == the gate's number on 319 of 319 fee rows (305 pregame + 14 live) and == gross on 1,681 of 1,681 others.
+- Venue entries == `scope_rows_to_venue`'s on 480 of 480 (Kalshi 273, Polymarket 207; 6 refused), and that is every row
+  that prices a non-best venue.
+- 0 render errors; "net of fee" on 319; 474 venue lines + 6 "not bought"; rows unchanged.
+- One instrument artifact on the way: Python's `round(-0.25, 1)` is -0.2 and JS `toFixed(1)` is -0.3. The compare now
+  uses the unrounded value.
+- Reachability: the served payload carries card-level fields through (`book_confidence`, set only by the card builder,
+  on 5,982 of 5,982 served items, 00:43:01Z). Cost: +123 bytes per card, about 0.7 MB per list on the 97 MB unslimmed
+  response.
+- Tests: 12 new (`tests/test_layer2_venue_prices.py`); 1,355 pass across the card builder, query payload and board UI
+  suites. The board JS tests give main's results on both line endings (the CRLF checkout breaks one test's LF-only regex
+  on main too).
+
+**Reader** `C:\tmp\scc_oversight_d5aa\read_1e_after_load.py` (served payload). BEFORE, 00:48:11Z: rc 3, 5,954 cards, 353
+pregame exchange-priced cards without a net number, 0 venue lines. Predicted after both loads:
+`exchange_card_without_net` 353 -> 0 (once each date's shortlist is rebuilt), `cards_with_venue_line` 0 -> > 0,
+`venue_entry_is_best_book` 0, `venue_net_above_gross` 0.
+
 ## Step 1d -- the NHL and soccer pages lead with the board's pick; the sim is a labelled view `[built 2026-11-25, user "Yes, do 1d"; display only; DEPLOYED to web 2026-11-26 17:28:02Z, MET]`
 
 **Loaded and measured** (deploys.md 2026-11-26 17:28:02Z): rc 0 at 17:28:18Z. Board pick tile not first: NHL 15 -> 0, soccer
