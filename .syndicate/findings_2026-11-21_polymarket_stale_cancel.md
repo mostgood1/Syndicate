@@ -191,3 +191,17 @@ User, typed in this session, 11-23 about 8:00 AM CST: **"load the polymarket sta
 - 2026-11-26 CST (06:00Z 11-26 to 06:00Z 11-27; read 11-27 2:00 AM CST = 08:00Z): would_cancel 0, distinct orders 0;
   S2 outcomes none, mismatch_refusals 0; S3 later states none; untouched_15m_orders 0 of 16; covered yes;
   cancel_stale 0, cancel_sent 0.
+- **2026-11-27 +3 d shadow reading** (read 15:45Z = 9:45 AM CST 11-27; task pm-stale-shadow-reading-1127; READ-ONLY).
+  - Loaded: live-odds-worker boot 2026-11-24 08:30:36Z (2:30 AM CST), 11-24 window batch. `kit_env_pmstale.sh check`
+    at 15:45Z: live-odds-worker `SYNDICATE_POLYMARKET_STALE_CANCEL=shadow`, refresh-worker and web ABSENT,
+    `lines_pmstale_on=0`, `lines_pmstale_shadow=1`.
+  - Window 08:30:36Z 11-24 .. 15:41:54Z 11-27 (about 3.3 days); `covered=yes` (earliest log line 11-23 10:01Z);
+    22,946 live-odds-worker log lines in the window, 6 log files.
+  - would_cancel 0 (0 distinct orders); cancel_stale 0, cancel_sent 0, cancel_failed 0, hook_failed 0, scope_exceptions 0.
+  - S1 PASS (max 0 a CST day, limit 3). S2 n/a (no WOULD_CANCEL; mismatch_refusals 0). S3 n/a (no WOULD_CANCEL).
+  - Population: untouched_15m_orders 0 of 26 polymarket_orders_with_state_lines (baseline 1 of 104 over 3.6 days pre-load).
+    So this is a quiet PASS: nothing rested untouched >= 15 min. `pass_lines_by_mode={}`: the pass writes no line when
+    it finds nothing, so this reading cannot itself show the pass is running; with 0 candidate orders that cannot matter yet.
+  - S2 (the client id / slug match against the venue) is still UNTESTED: no order has reached the dry-run cancel. The
+    12-08 `on` load would rest on a cancel call never exercised in production. Order flow is thin (26 orders in 3.3 days,
+    cf. lead venue-order-family-census 11-27: polymarket placed 0 in 24 h).
