@@ -4746,7 +4746,7 @@
     }
     if (tab === "agree") {
       return items
-        .filter((item) => (evVsFairValue(item) ?? 0) > 0 && String(item.sim_view || "").replace(/^live_/, "") === "agrees")
+        .filter((item) => (evShownValue(item) ?? 0) > 0 && String(item.sim_view || "").replace(/^live_/, "") === "agrees")
         .sort(byScore);
     }
     const best = new Map();
@@ -4758,7 +4758,7 @@
   }
 
   function topRailCard(item) {
-    const ev = evVsFairValue(item);
+    const ev = evShownValue(item);
     const move = recentMovePp(item, Date.now());
     const view = String(item.sim_view || "").replace(/^live_/, "");
     const badges = [];
@@ -4775,7 +4775,7 @@
         <span class="board-top-rail__sport">${escapeHtml(String(item.sport_slug || item.sport || "").toUpperCase())}</span>
         <span class="board-top-rail__who">${playerHeadshot(item)}${escapeHtml(displayTitle(item))}</span>
         <span class="board-top-rail__pick">${escapeHtml(propLine(item) || "")}</span>
-        <span class="board-top-rail__price">${Number.isFinite(ev) ? `<b>${ev > 0 ? "+" : ""}${ev.toFixed(1)}%</b>` : ""}${odds ? ` · ${escapeHtml(odds)}` : ""}</span>
+        <span class="board-top-rail__price">${Number.isFinite(ev) ? `<b>${ev > 0 ? "+" : ""}${ev.toFixed(1)}%${evFeeCharged(item) ? " net" : ""}</b>` : ""}${odds ? ` · ${escapeHtml(odds)}` : ""}</span>
         <span class="board-top-rail__badges">${badges.join("")}</span>
       </button>
     `;
@@ -4914,6 +4914,75 @@
     return firstNumeric(item?.ev_vs_fair_pct, quote?.ev_pct);
   }
 
+  // STEP 1e (todo #861, lane surface-consistency-oversight): THE EV THE BOARD SHOWS IS THE ONE IT JUDGES.
+  // Where the best book charges a fee (Kalshi, Polymarket, Novig, ProphetX), the Suggested flag judges EV after
+  // that fee (`score_v2.ev_net_pct`, carried on the card as `ev_net_pct`), while this column showed the gross
+  // number. 305 of 1,929 pregame rows on 11-27. Sportsbook rows have no fee, so gross = net and nothing changes.
+  const EXCHANGE_BOOKS = new Set(["kalshi", "polymarket", "novig", "prophetx"]);
+  function evNetValue(item) {
+    return numeric(item && item.ev_net_pct);
+  }
+  function evFeeCharged(item) {
+    return evNetValue(item) !== null && String(item?.fee_basis || "none") !== "none";
+  }
+  function evShownValue(item) {
+    return evFeeCharged(item) ? evNetValue(item) : evVsFairValue(item);
+  }
+  function signedPct(value) {
+    return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+  }
+  function renderBlotterEvFee(item) {
+    const quote = itemQuote(item);
+    const book = String(item?.book ?? quote?.bookmaker ?? "").trim();
+    const name = book.toUpperCase() || "this venue";
+    const gross = evVsFairValue(item);
+    if (evFeeCharged(item)) {
+      const fee = numeric(item.fee_per_contract);
+      const title = `The best price is at ${name}, which charges a fee`
+        + (fee !== null ? ` of about $${fee.toFixed(3)} per $1 contract${item.fee_is_upper_bound ? " (an upper bound)" : ""}` : "")
+        + `. EV is ${gross !== null ? signedPct(gross) : "?"} before the fee and ${signedPct(evNetValue(item))} after it. The Suggested flag judges the number after the fee.`;
+      return `<div><span class="board-blotter__field" title="${escapeHtml(title)}">net of fee${gross !== null ? ` &middot; ${escapeHtml(signedPct(gross))} gross` : ""}</span></div>`;
+    }
+    if (evNetValue(item) === null && EXCHANGE_BOOKS.has(book.toLowerCase())) {
+      // A card built before the net number was carried (or an in-play overlay card): say what the number is.
+      return `<div><span class="board-blotter__field" title="${escapeHtml(`This EV is before ${name}'s fee. The Suggested flag judges it after the fee.`)}">gross, before fee</span></div>`;
+    }
+    return "";
+  }
+  const VENUE_REFUSAL_TEXT = {
+    venue_ev_implausible: "its EV at this price is past the board's plausibility limit",
+    derived_fair_probability_out_of_range: "the line has no usable fair price",
+    unusable_venue_price: "the price cannot be read",
+    no_ev_pct: "the line has no EV to re-price",
+    no_best_price: "the line has no best price to re-price from",
+  };
+  // THE PRICE AT EACH VENUE THE LIVE BOOK BUYS AT (step 1e). The live book buys only at Kalshi and Polymarket, and
+  // re-prices each pick there, so the board's best sportsbook price is not the price it pays. `venue_prices` is
+  // priced on the worker by the purchaser's own function (`venue_scope.scope_rows_to_venue`); the venue that IS
+  // the best book is left out, because its price is the Best price above and its net EV is the EV column's.
+  function renderBlotterVenues(item) {
+    const venues = Array.isArray(item?.venue_prices) ? item.venue_prices : [];
+    return venues.map((venue) => {
+      const name = String(venue?.venue || "").toUpperCase();
+      const price = numeric(venue?.price);
+      if (!name || price === null) return "";
+      if (venue.refused) {
+        const why = VENUE_REFUSAL_TEXT[venue.refused] || String(venue.refused).replace(/_/g, " ");
+        return `<div><span class="board-blotter__field" title="${escapeHtml(`The live book would not buy this at ${name}: ${why}.`)}">${escapeHtml(name)} ${escapeHtml(formatAmerican(price))} &middot; not bought</span></div>`;
+      }
+      const net = numeric(venue.ev_net_pct);
+      if (net === null) return "";
+      const gross = numeric(venue.ev_pct);
+      const fee = numeric(venue.fee_per_contract);
+      const tone = net > 0.01 ? "pos" : (net < -0.01 ? "neg" : "flat");
+      const title = `The live book buys only at Kalshi or Polymarket. At ${name} ${formatAmerican(price)} this line is EV `
+        + `${gross !== null ? signedPct(gross) : "?"} before ${name}'s fee and ${signedPct(net)} after it`
+        + (fee !== null ? ` (about $${fee.toFixed(3)} per $1 contract${venue.fee_is_upper_bound ? ", assumed at the full rate" : ""})` : "")
+        + `. Priced the way the live plan prices a venue; the plan may hold a fresher ${name} quote.`;
+      return `<div><span class="board-blotter__field" title="${escapeHtml(title)}">${escapeHtml(name)} ${escapeHtml(formatAmerican(price))} &middot; <span class="board-blotter__ev--${tone}">${escapeHtml(signedPct(net))} net</span></span></div>`;
+    }).join("");
+  }
+
   function bookAgeValue(item) {
     const quote = itemQuote(item);
     return firstNumeric(item?.book_age_seconds, quote?.book_age_seconds);
@@ -4942,7 +5011,8 @@
     // ROI points), not on the price itself.
     { key: "book", label: "Best price", type: "number", getValue: (item) => priceImprovementValue(item) },
     { key: "fair", label: "Fair", type: "number", getValue: (item) => fairPriceValue(item) },
-    { key: "ev", label: "EV", type: "number", getValue: (item) => evVsFairValue(item) },
+    { key: "ev", label: "EV", type: "number", getValue: (item) => evShownValue(item),
+      title: "Expected value against the no-vig fair price, after the venue's fee where the best book charges one: the number the Suggested flag judges." },
     { key: "winpct", label: "Sim", type: "number", getValue: (item) => confidenceValue(item),
       // `confidence` is the side-correct model probability (until 2026-08-21 it
       // was the books-quoting multiplier). Blank where there is no model view.
@@ -5002,7 +5072,7 @@
     const field = books !== null && books > 1
       ? `<span class="board-blotter__field" title="${books} books quoting this market">${books} bks</span>`
       : "";
-    return `<div class="board-blotter__book">${escapeHtml(book.toUpperCase())} ${escapeHtml(formatAmerican(price))}</div>${better}${field}`;
+    return `<div class="board-blotter__book">${escapeHtml(book.toUpperCase())} ${escapeHtml(formatAmerican(price))}</div>${better}${field}${renderBlotterVenues(item)}`;
   }
 
   function renderBlotterScore(item) {
@@ -5051,14 +5121,14 @@
   }
 
   function renderBlotterEv(item) {
-    const ev = evVsFairValue(item);
+    const ev = evShownValue(item);
     if (!Number.isFinite(ev)) return '<span class="board-blotter__muted">&mdash;</span>';
     const tone = ev > 0.01 ? "pos" : (ev < -0.01 ? "neg" : "flat");
     // (b) todo #847: the model's EV at its calibrated probability, beside the market EV this cell shows (stamped
     // only with SYNDICATE_CELL_CALIBRATION_DISPLAY on). The cell's own number is unchanged.
     const calEv = numeric(item && item.model_ev_cal_pct);
     const calNote = calEv !== null ? ` · our calibrated sim's EV at this price: ${calEv > 0 ? "+" : ""}${calEv.toFixed(1)}%` : "";
-    return `<span class="board-blotter__ev board-blotter__ev--${tone}" title="Expected value against the no-vig fair price${escapeHtml(calNote)}">${ev > 0 ? "+" : ""}${ev.toFixed(1)}%</span>`;
+    return `<span class="board-blotter__ev board-blotter__ev--${tone}" title="Expected value against the no-vig fair price${escapeHtml(calNote)}">${ev > 0 ? "+" : ""}${ev.toFixed(1)}%</span>${renderBlotterEvFee(item)}`;
   }
 
   function renderBlotterAge(item) {

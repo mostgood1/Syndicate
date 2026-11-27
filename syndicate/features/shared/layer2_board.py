@@ -4339,6 +4339,8 @@ def layer2_rows_to_board_cards(
                 # words, `segment` is the raw token a filter can group on.
                 "segment_label": _segment_label(row.get("segment"), sport),
                 **_layer2_board_columns(row, quote, score),
+                # The net EV the Suggested flag judges, and the Kalshi / Polymarket prices (todo #861 step 1e).
+                **_layer2_fee_and_venue_columns(row),
                 **(row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings, openings_by_line)),
                 # The sparkline draws the SAME consensus pair the movement verdict
                 # is computed from, so it reads the movement just spread above (recomputed only for a
@@ -5681,6 +5683,86 @@ def _layer2_board_columns(
     # (lane `layer2-row-parity`): it labelled props "not tracked" while the opening
     # ledger held their openings.
     return columns
+
+
+# THE VENUES THE LIVE BOOK BUYS AT, in the order the board names them (todo #861 step 1e).
+BOARD_VENUE_PRICE_VENUES = ("kalshi", "polymarket")
+
+
+def _layer2_fee_and_venue_columns(row: Mapping[str, Any]) -> dict[str, Any]:
+    """The EV the Suggested flag judges, and each venue's price as the live book prices it (todo #861 step 1e).
+
+    Lane `surface-consistency-oversight`, user "Yes, do 1e" / "Start", 2026-11-26. DISPLAY ONLY: card fields, and
+    the row is never written; nothing that places, sizes, ranks or flags a bet reads them.
+
+    WHY. Measured on the fleet's 00:23:40Z 11-27 board (1,929 pregame rows):
+    - The EV column showed the GROSS `ev_pct` on all of them. On 305 rows the best book charges a fee (Novig 104,
+      Kalshi 101, ProphetX 59, Polymarket 41), and `_suggested_reasons` judges those rows on the NET number in
+      `score_v2.ev_net_pct`. The card carried no net number at all, so the page could not show it.
+    - 355 rows had a Kalshi price and 241 a Polymarket price in the row's own quote grid. The live book buys only
+      at those two venues, and the page could not show those prices. `book_prices` is stripped from the wire
+      (`_UNCONSUMED_QUOTE_FIELDS`), and the Best price cell shows only the best book.
+
+    THE NET EV IS `score_v2`'s, copied and never recomputed: it is the number `_suggested_reasons` reads.
+
+    EACH VENUE IS PRICED BY THE PURCHASER'S OWN FUNCTION, `venue_scope.scope_rows_to_venue`: the same fair, the same
+    implausible-price refusal, the same fee lookup with the row's phase. It runs on the aggregator path, from the row's
+    own `book_prices`. The live plan's resolver reads the venue's feed through its own join and may hold a fresher
+    quote; `price_source` says which one this is. With no contract id here, a Kalshi series the market table cannot
+    name is charged the full rate and flagged `fee_is_upper_bound`, as that function does.
+
+    THE VENUE THAT IS THE BEST BOOK IS LEFT OUT. Its price is already the Best price, and its net EV is the one above.
+    A second number for the same price would be the inconsistency this step removes. (The two can differ: the board's
+    score reads the side's own ticker for a Kalshi series, and has no phase for Novig.)
+    """
+    out: dict[str, Any] = {}
+    v2 = row.get("score_v2") if isinstance(row.get("score_v2"), Mapping) else {}
+    net = _as_float(v2.get("ev_net_pct")) if v2 else None
+    if net is not None:
+        out["ev_net_pct"] = net
+        out["fee_basis"] = str(v2.get("fee_basis") or "none")
+        fee = _as_float(v2.get("fee_per_contract"))
+        if fee is not None:
+            out["fee_per_contract"] = fee
+        if v2.get("fee_is_upper_bound"):
+            out["fee_is_upper_bound"] = True
+    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    book_prices = quote.get("book_prices") if isinstance(quote.get("book_prices"), Mapping) else {}
+    if not book_prices:
+        return out
+    from syndicate.features.shared.venue_scope import _venue_price, scope_rows_to_venue
+
+    best_book = str(quote.get("bookmaker") or "").strip().lower()
+    venues: list[dict[str, Any]] = []
+    for venue in BOARD_VENUE_PRICE_VENUES:
+        raw_price = _venue_price(book_prices, venue)
+        if raw_price is None or venue == best_book:
+            continue
+        try:
+            scoped, refusals = scope_rows_to_venue([row], venue)
+        except Exception as exc:  # noqa: BLE001 -- a display field must not cost the board it decorates
+            print(f"[layer2_board] VENUE_PRICE_FAILED venue={venue} {type(exc).__name__}: {exc}", flush=True)
+            continue
+        if scoped:
+            s = scoped[0]
+            entry: dict[str, Any] = {
+                "venue": venue,
+                "price": _as_float((s.get("quote") or {}).get("price")),
+                "ev_pct": round(float(s["ev_pct"]), 4),
+                "ev_net_pct": round(float(s["ev_pct_net_of_fee"]), 4),
+                "fee_per_contract": s.get("venue_fee_per_contract"),
+                "fee_basis": s.get("venue_fee_basis"),
+                "price_source": s.get("price_source"),
+            }
+            if s.get("venue_fee_is_upper_bound"):
+                entry["fee_is_upper_bound"] = True
+        else:
+            # Refused BY NAME, as the purchaser refuses it: the price is shown with the reason it is not bought.
+            entry = {"venue": venue, "price": raw_price, "refused": next(iter(refusals), "unpriced")}
+        venues.append(entry)
+    if venues:
+        out["venue_prices"] = venues
+    return out
 
 
 def _sport_horizon_days(row: Mapping[str, Any], horizon_days: int | None) -> int | None:
