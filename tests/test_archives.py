@@ -7976,13 +7976,17 @@ class ArchiveRouteTests(unittest.TestCase):
         payload = response.get_json()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual((payload.get("card_sections") or [{}])[0].get("title"), "High confidence")
-        self.assertEqual((payload.get("card_sections") or [{}, {}])[1].get("title"), "Medium confidence")
+        # #861 step 1f: the board's section and a label lead; the page's own sections follow, unchanged.
+        sections = [s for s in payload.get("card_sections") or [] if s.get("key") not in ("board", "page_label")]
+        self.assertEqual((payload.get("card_sections") or [{}])[0].get("key"), "board")
+        self.assertEqual((sections or [{}])[0].get("title"), "High confidence")
+        self.assertEqual((sections or [{}, {}])[1].get("title"), "Medium confidence")
 
     def test_nfl_picks_api_keeps_full_confidence_section_counts(self) -> None:
         response = self.client.get("/nfl/api/picks?season=2025&week=17")
         payload = response.get_json()
-        sections = payload.get("card_sections") or []
+        # #861 step 1f: the board's section and a label lead; the page's own sections follow, unchanged.
+        sections = [s for s in payload.get("card_sections") or [] if s.get("key") not in ("board", "page_label")]
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual((sections[0].get("meta") if sections else None), "13 recommendations")
@@ -7990,14 +7994,18 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual((sections[-1].get("title") if sections else None), "Other")
         self.assertEqual((sections[-1].get("meta") if sections else None), "14 recommendations")
         self.assertEqual(len((sections[-1].get("cards") if sections else []) or []), 14)
-        self.assertEqual(len(payload.get("rank_cards") or []), payload.get("rows"))
+        self.assertEqual(sum(len(s.get("cards") or []) for s in sections), payload.get("rows"))
+        # A 2025 week is not a slate the board judges: no board picks lead it.
+        self.assertEqual(payload.get("rank_cards"), [])
 
     def test_nfl_picks_header_card_count_matches_full_snapshot(self) -> None:
         response = self.client.get("/nfl/api/picks?season=2025&week=17")
         payload = response.get_json()
+        stats = {s.get("label"): s.get("value") for s in payload.get("header_stats") or []}
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual((payload.get("header_stats") or [{}])[0].get("value"), str(payload.get("rows")))
+        self.assertEqual((payload.get("header_stats") or [{}])[0].get("label"), "Board picks")  # #861 step 1f
+        self.assertEqual(stats.get("Cards"), str(payload.get("rows")))
 
     def test_nfl_picks_api_preserves_explicit_missing_week_as_empty_state(self) -> None:
         response = self.client.get("/nfl/api/picks?season=2025&week=999")

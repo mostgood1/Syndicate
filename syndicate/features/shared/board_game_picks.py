@@ -146,14 +146,29 @@ class BoardLine:
         return f"EV {ev:+.1f}%" + (" net of fee" if net else "")
 
     @property
+    def _label_family(self) -> str:
+        """The family a label speaks of: an alternate spread or total reads as one (NBA's `spreads_alt` read
+        "Home -14.5" on the replay of 2026-11-27, with no team). Matching still uses `family`, which keeps them apart."""
+        if self.kind != "game":
+            return self.family
+        text = self.market.lower()
+        text = text[len("alternate_"):] if text.startswith("alternate_") else text
+        text = text[: -len("_alt")] if text.endswith("_alt") else text
+        return market_family(text)
+
+    @property
     def market_label(self) -> str:
         if self.kind == "prop":
-            return _PROP_LABEL.get(self.market.lower(), self.market.replace("_", " ").title())
-        if self.family == "h2h":
+            text = self.market.lower()
+            if text in _PROP_LABEL:
+                return _PROP_LABEL[text]
+            # "player_rebounds" (NBA) reads "Rebounds"; "Receiving Yards" (NFL) is left as the board names it.
+            return (self.market[7:] if text.startswith("player_") else self.market).replace("_", " ").title()
+        if self._label_family == "h2h":
             return "Moneyline"
-        if self.family == "spreads":
+        if self._label_family == "spreads":
             return _SPREAD_LABEL.get(self.sport, "Spread")
-        if self.family == "totals":
+        if self._label_family == "totals":
             return "Total"
         for word in ("corners", "cards"):
             if word in self.market.lower():
@@ -171,9 +186,9 @@ class BoardLine:
             ln = "" if line is None else f" {line:g}"
             return f"{self.player} {side.title()}{ln} {self.market_label.lower()}".strip()
         team = self.home if side == "home" else self.away if side == "away" else ""
-        if self.family == "h2h":
+        if self._label_family == "h2h":
             return team or ("Draw" if side == "draw" else side.title())
-        if self.family == "spreads":
+        if self._label_family == "spreads":
             ln = "" if line is None else f" {line:+g}"
             return f"{team or side.title()}{ln}"
         if side in ("yes", "no") and "btts" in self.market.lower():
@@ -363,6 +378,10 @@ class SportBoardView:
     _by_game: dict[str, tuple[BoardLine, ...]] = field(default_factory=dict, compare=False, repr=False)
     _games_by_away: dict[str, tuple[str, ...]] = field(default_factory=dict, compare=False, repr=False)
     _games_by_home: dict[str, tuple[str, ...]] = field(default_factory=dict, compare=False, repr=False)
+    # (player, market, side, line), each folded -> the board's prop rows. A props page asks once per card (2,189 NFL
+    # cards on 2026-11-27), so a scan per card would fold ~1,000 names 2,189 times.
+    _props: dict[tuple[str, str, str, float | None], tuple[BoardLine, ...]] = field(
+        default_factory=dict, compare=False, repr=False)
 
     @property
     def picks(self) -> tuple[BoardLine, ...]:
@@ -403,13 +422,28 @@ class SportBoardView:
             return row
         return None
 
-    def find_prop(self, player: Any, market: Any, side: Any, line: Any) -> BoardLine | None:
-        who, mkt, sd, ln = team_key(player), str(market or "").strip().lower(), str(side or "").strip().lower(), _line_key(line)
-        for row in self.lines:
-            if row.kind == "prop" and team_key(row.player) == who and row.market.lower() == mkt and row.side == sd \
-                    and row.line == ln:
-                return row
-        return None
+    def find_prop(self, player: Any, market: Any, side: Any, line: Any, *, away: Any = None, home: Any = None) -> BoardLine | None:
+        """The board's row for one prop side. Market names are folded like team names ("Receiving Yards" ==
+        "receiving_yards"). With `away` and `home`, only a row of that game counts: a weekly page spans several days,
+        and the same player and line next week is a different bet."""
+        rows = self._props.get((team_key(player), team_key(market), str(side or "").strip().lower(), _line_key(line)), ())
+        if away and home:
+            game = self.resolve_game(away, home)
+            rows = tuple(row for row in rows if game is not None and row.game_key == game)
+        return rows[0] if rows else None
+
+    def only_games(self, games: Iterable[tuple[Any, Any]], *, kind: str | None = None) -> "SportBoardView":
+        """This view cut to the page's own games (each resolved as `resolve_game` does), and to one `kind` ("prop" /
+        "game") when given: a props page leads with the board's prop picks, not its game lines."""
+        keys = {key for key in (self.resolve_game(away, home) for away, home in games) if key}
+        return _make_view(self.sport, self.day, ok=self.ok, shortlist_date=self.shortlist_date,
+                          written_at=self.written_at, min_value_pct=self.min_value_pct,
+                          lines=tuple(line for line in self.lines
+                                      if line.game_key in keys and (kind is None or line.kind == kind)))
+
+    @property
+    def game_days(self) -> tuple[str, ...]:
+        return tuple(sorted({line.ct_day for line in self.lines if line.ct_day}))
 
     def verdict(self, line: BoardLine | None, away: Any = None, home: Any = None) -> str:
         """`verdict_text` with what this view knows: whether the game is on the board, and the shortlist's floor."""
@@ -458,25 +492,50 @@ def sport_view(
         snap = _snapshot(today, read)
     if snap is None:
         return SportBoardView(sport=sp, day=wanted, ok=False, shortlist_date=None, written_at=None)
-    lines = tuple(line for line in snap.lines if line.sport == sp and line.ct_day == wanted)
+    return _make_view(sp, wanted, ok=True, shortlist_date=snap.shortlist_date, written_at=snap.written_at,
+                      min_value_pct=snap.min_value_pct,
+                      lines=tuple(line for line in snap.lines if line.sport == sp and line.ct_day == wanted))
+
+
+UPCOMING = "upcoming"
+
+
+def upcoming_view(sport: str, *, reader: Callable[[str], Mapping[str, Any] | None] | None = None) -> SportBoardView:
+    """Every pregame line the board holds now for `sport`, whatever day its game is played (today's shortlist and its
+    horizon). For the weekly pages (NFL, NCAAF), whose week spans several days (#861 step 1f): measured 2026-11-27,
+    the NFL board's 950 pregame rows were Sunday 11-29 (771) and Monday 11-30 (179, two of them on 12-01 UTC)."""
+    sp = str(sport or "").strip().lower()
+    snap = _snapshot(_central_today(), reader or _default_reader)
+    if snap is None:
+        return SportBoardView(sport=sp, day=UPCOMING, ok=False, shortlist_date=None, written_at=None)
+    return _make_view(sp, UPCOMING, ok=True, shortlist_date=snap.shortlist_date, written_at=snap.written_at,
+                      min_value_pct=snap.min_value_pct, lines=tuple(line for line in snap.lines if line.sport == sp))
+
+
+def _make_view(sport: str, day: str, *, ok: bool, shortlist_date: str | None, written_at: str | None,
+               min_value_pct: float | None, lines: tuple[BoardLine, ...]) -> SportBoardView:
     by_game: dict[str, list[BoardLine]] = {}
     by_away: dict[str, set[str]] = {}
     by_home: dict[str, set[str]] = {}
+    props: dict[tuple[str, str, str, float | None], list[BoardLine]] = {}
     for line in lines:
         by_game.setdefault(line.game_key, []).append(line)
         by_away.setdefault(team_key(line.away), set()).add(line.game_key)
         by_home.setdefault(team_key(line.home), set()).add(line.game_key)
+        if line.kind == "prop":
+            props.setdefault((team_key(line.player), team_key(line.market), line.side, line.line), []).append(line)
     return SportBoardView(
-        sport=sp,
-        day=wanted,
-        ok=True,
-        shortlist_date=snap.shortlist_date,
-        written_at=snap.written_at,
+        sport=sport,
+        day=day,
+        ok=ok,
+        shortlist_date=shortlist_date,
+        written_at=written_at,
         lines=lines,
-        min_value_pct=snap.min_value_pct,
+        min_value_pct=min_value_pct,
         _by_game={k: tuple(v) for k, v in by_game.items()},
         _games_by_away={k: tuple(v) for k, v in by_away.items()},
         _games_by_home={k: tuple(v) for k, v in by_home.items()},
+        _props={k: tuple(v) for k, v in props.items()},
     )
 
 
@@ -566,3 +625,160 @@ def verdict_text(line: BoardLine | None, *, game_on_board: bool | None = None, f
     if line.suggested:
         return f"Board pick: {where}."
     return f"Board: not a pick ({refusal_text(line.reasons)}); {where}."
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# #861 step 1f: the board's picks lead the rank pages (NFL props and picks, NCAAF picks, NBA picks).
+#
+# Measured on the fleet 2026-11-27 20:28-20:31Z (findings Reading 8): `/nfl/props` headlined 2,189 rate-model cards
+# at up to +50.9% "edge" (the price's implied probability with the vig left in); 0 of its top 50 were board Suggested,
+# and the board rated the 27 of them it carries at EV -6.5 to +0.5. The board's 7 Suggested NFL props sat at page ranks
+# 205-1,664. `/nfl/picks` (12 win-probability cards), `/ncaaf/picks` (24: 12 price-shopping, 12 win-probability) and
+# `/nba/picks` (empty: no saved slate) showed none of the board's picks. These helpers give every rank page the same
+# headline the NHL page has had since step 1d.
+# ---------------------------------------------------------------------------------------------------------------------
+
+_WEEKDAY = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def _pct_text(value: float | None) -> str:
+    return "-" if value is None else f"{100.0 * value:.1f}%"
+
+
+def board_built_text(board: SportBoardView) -> str:
+    return str(board.written_at or "").replace("T", " ").replace("Z", " UTC").strip()
+
+
+def kickoff_text(stamp: Any) -> str:
+    """A start time in Central, short: "Sun 11-29 12:00 PM CT". Empty when the stamp does not parse."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    text = str(stamp or "").strip()
+    try:
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if moment.tzinfo is None:
+        return ""
+    ct = moment.astimezone(ZoneInfo("America/Chicago"))
+    hour = ct.hour % 12 or 12
+    return f"{_WEEKDAY[ct.weekday()]} {ct.month:02d}-{ct.day:02d} {hour}:{ct.minute:02d} {'AM' if ct.hour < 12 else 'PM'} CT"
+
+
+def _days_text(days: Iterable[str]) -> str:
+    from datetime import date
+
+    out = []
+    for day in days:
+        try:
+            d = date.fromisoformat(day)
+        except ValueError:
+            continue
+        out.append(f"{_WEEKDAY[d.weekday()]} {d.month:02d}-{d.day:02d}")
+    return ", ".join(out)
+
+
+def board_pick_cards(board: SportBoardView, *, limit: int = 12) -> list[dict[str, Any]]:
+    """The board's Suggested rows for the view (its own order) as rank cards. On a view spanning several days the
+    meta names the kickoff, so a pick is never read as this page's game when it is not."""
+    built = board_built_text(board)
+    many_days = board.day == UPCOMING
+    cards: list[dict[str, Any]] = []
+    for pick in board.picks[: max(0, int(limit))]:
+        meta = f"{pick.away} at {pick.home}"
+        kick = kickoff_text(pick.commence_time) if many_days else ""
+        cards.append(
+            {
+                "title": pick.side_label,
+                "eyebrow": f"Board pick · {pick.market_label}",
+                "badge": pick.ev_label,
+                "source": "board",
+                "meta": f"{meta} · {kick}" if kick else meta,
+                "metrics": [
+                    {"label": "Price", "value": pick.price_text},
+                    {"label": "Fair", "value": _pct_text(pick.fair)},
+                    {"label": "Board win%", "value": _pct_text(pick.model_prob)},
+                    {"label": "Books", "value": "-" if pick.books_quoting is None else str(pick.books_quoting)},
+                ],
+                "summary": f"The board suggests this bet: {pick.ev_label} at {pick.price_text}, against its fair price.",
+                "list_items": [
+                    verdict_text(pick),
+                    f"Market: {pick.market_label}",
+                    "Source type: Layer 2 board" + (f" (built {built})" if built else ""),
+                ],
+            }
+        )
+    return cards
+
+
+def board_section_note(board: SportBoardView, sport_label: str, shown: int) -> str:
+    built = board_built_text(board)
+    if not board.ok:
+        return "The board has no saved shortlist to read now, so it has no picks to show here."
+    if board.day == UPCOMING:
+        days = _days_text(board.game_days)
+        scope = f" for games on {days}" if days else ""
+        tail = " The board judges upcoming games only, whatever week this page shows."
+    else:
+        scope, tail = f" for {board.day}", ""
+    if not board.picks:
+        return (f"The board suggests no {sport_label} bet{scope} ({len(board.lines)} pregame lines judged"
+                + (f", built {built}" if built else "") + ")." + tail)
+    note = (f"The Layer 2 board's {sport_label} pregame picks{scope}, in its own order"
+            + (f" (built {built})" if built else "") + ". Price, fair and EV are the board's.")
+    if len(board.picks) > shown:
+        note += f" Showing {shown} of {len(board.picks)}."
+    return note + tail
+
+
+def lead_with_board_picks(
+    context: dict[str, Any],
+    board: SportBoardView,
+    *,
+    sport_label: str,
+    other_title: str,
+    other_note: str,
+    limit: int = 12,
+    off_slate: str | None = None,
+) -> dict[str, Any]:
+    """Make the board's picks the page's headline (`rank_cards`, and the first of `card_sections`), and keep what the
+    page showed before after it: under one labelled divider (`key` "page_label") when the page had its own sections,
+    each kept as it was; else as one labelled section (`key` "page"). Web routes only; nothing here is recomputed.
+
+    `off_slate` names the page's slate when it is not one the board judges (a past week, another season): the board
+    section then says so and shows no picks, rather than this weekend's picks under last season's heading."""
+    board_cards = [] if off_slate else board_pick_cards(board, limit=limit)
+    old_cards = context.get("rank_cards") if isinstance(context.get("rank_cards"), list) else []
+    old_sections = [s for s in (context.get("card_sections") or []) if isinstance(s, Mapping)]
+    old_empty = context.get("empty_state") if isinstance(context.get("empty_state"), Mapping) else None
+    if off_slate:
+        note = f"The board judges upcoming games only, so it has no picks for {off_slate}."
+    else:
+        note = board_section_note(board, sport_label, len(board_cards))
+    sections: list[dict[str, Any]] = [{
+        "key": "board",
+        "title": f"The board's {sport_label} picks",
+        "note": note,
+        "meta": note,
+        "cards": board_cards,
+        "board": {"ok": board.ok, "day": board.day, "written_at": board.written_at, "off_slate": off_slate,
+                  "picks_total": 0 if off_slate else len(board.picks), "pregame_lines": len(board.lines)},
+    }]
+    if old_sections:
+        sections.append({"key": "page_label", "title": other_title, "note": other_note, "meta": other_note, "cards": []})
+        sections.extend(dict(s) for s in old_sections)
+    else:
+        empty_note = ""
+        if not old_cards and old_empty:
+            empty_note = " " + " ".join(str(old_empty.get(k) or "").strip() for k in ("title", "body")).strip()
+        sections.append({"key": "page", "title": other_title, "note": other_note + empty_note,
+                         "meta": other_note + empty_note, "cards": old_cards})
+    context["rank_cards"] = board_cards
+    context["card_sections"] = sections
+    if board_cards or old_cards or old_sections:
+        context["empty_state"] = None
+    stats = context.get("header_stats") if isinstance(context.get("header_stats"), list) else []
+    shown = "0" if off_slate else (str(len(board.picks)) if board.ok else "-")
+    context["header_stats"] = [{"label": "Board picks", "value": shown}, *stats]
+    return context

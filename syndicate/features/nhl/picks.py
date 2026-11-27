@@ -132,41 +132,14 @@ def _build_cards(
     return cards
 
 
-def _pct_text(value: float | None) -> str:
-    return "-" if value is None else f"{100.0 * value:.1f}%"
-
-
 def board_built_text(board: board_game_picks.SportBoardView) -> str:
-    return str(board.written_at or "").replace("T", " ").replace("Z", " UTC").strip()
+    return board_game_picks.board_built_text(board)
 
 
 def build_board_cards(board: board_game_picks.SportBoardView, *, limit: int = 12) -> list[dict[str, Any]]:
-    """The Layer 2 board's NHL picks for the slate (`suggested`, the board's own order) as the page's headline cards."""
-    built = board_built_text(board)
-    cards: list[dict[str, Any]] = []
-    for pick in board.picks[: max(0, int(limit))]:
-        cards.append(
-            {
-                "title": pick.side_label,
-                "eyebrow": f"Board pick · {pick.market_label}",
-                "badge": pick.ev_label,
-                "source": "board",
-                "meta": f"{pick.away} at {pick.home}",
-                "metrics": [
-                    {"label": "Price", "value": pick.price_text},
-                    {"label": "Fair", "value": _pct_text(pick.fair)},
-                    {"label": "Board win%", "value": _pct_text(pick.model_prob)},
-                    {"label": "Books", "value": "-" if pick.books_quoting is None else str(pick.books_quoting)},
-                ],
-                "summary": f"The board suggests this bet: {pick.ev_label} at {pick.price_text}, against its fair price.",
-                "list_items": [
-                    board_game_picks.verdict_text(pick),
-                    f"Market: {pick.market_label}",
-                    "Source type: Layer 2 board" + (f" (built {built})" if built else ""),
-                ],
-            }
-        )
-    return cards
+    """The Layer 2 board's NHL picks for the slate (`suggested`, the board's own order) as the page's headline cards.
+    The card is shared with the other rank pages since step 1f (`board_game_picks.board_pick_cards`)."""
+    return board_game_picks.board_pick_cards(board, limit=limit)
 
 
 def build_picks_page_context(selected_date: str | None) -> dict[str, Any]:

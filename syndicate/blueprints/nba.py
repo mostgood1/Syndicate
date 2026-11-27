@@ -35,6 +35,7 @@ from syndicate.features.nba.live_prop_accuracy import build_live_prop_accuracy_p
 from syndicate.features.nba.live_prop_audit import build_live_prop_audit_payload
 from syndicate.features.nba.market_accuracy import build_market_accuracy_payload
 from syndicate.features.nba.picks import build_picks_page_context
+from syndicate.features.shared import board_game_picks
 from syndicate.features.nba.props import build_props_page_context
 from syndicate.features.nba.sources import available_dates
 from syndicate.features.nba.sources import default_date
@@ -827,17 +828,29 @@ def api_live_lens_tuning():
     return jsonify(build_live_lens_tuning_payload(ttl=ttl))
 
 
+def _picks_context(selected_date: str) -> dict:
+    """#861 step 1f: the board's NBA picks for the day lead; the saved sim slate follows, labelled (web routes only)."""
+    context = build_picks_page_context(selected_date)
+    return board_game_picks.lead_with_board_picks(
+        context,
+        board_game_picks.sport_view("nba", selected_date),
+        sport_label="NBA",
+        other_title="Sim slate view: not the board's picks",
+        other_note="The NBA sim's saved recommendation slate, each at the sim's own price and EV.",
+    )
+
+
 @nba_bp.get("/picks")
 def picks():
     selected_date = _selected_date()
-    context = build_picks_page_context(selected_date)
+    context = _picks_context(selected_date)
     return render_template("nba/picks.html", show_app_header=False, **context)
 
 
 @nba_bp.get("/api/picks")
 def api_picks():
     selected_date = _selected_date()
-    context = build_picks_page_context(selected_date)
+    context = _picks_context(selected_date)
     return jsonify(build_rank_api_payload(context))
 
 

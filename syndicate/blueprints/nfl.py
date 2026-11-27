@@ -19,6 +19,7 @@ from syndicate.features.nfl.picks import build_betting_card_page_context
 from syndicate.features.nfl.picks import build_picks_page_context
 from syndicate.features.nfl.preseason_cards import build_nfl_preseason_market_board
 from syndicate.features.nfl.preseason_cards import build_preseason_cards_page_context
+from syndicate.features.nfl.props import attach_board_verdicts
 from syndicate.features.nfl.props import build_nfl_props_page_context
 from syndicate.features.nfl.props import nfl_props_available_weeks
 from syndicate.features.nfl.sources import available_weeks
@@ -28,6 +29,7 @@ from syndicate.features.nfl.sources import nfl_target_week
 from syndicate.features.nfl.sources import preseason_target_week
 from syndicate.features.nfl.sources import tracked_week
 from syndicate.features.nfl.sources import week_summaries
+from syndicate.features.shared import board_game_picks
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.hub_summary import build_hub_bettor_summary
@@ -167,11 +169,30 @@ def api_live_lens():
     return jsonify(payload)
 
 
+def _picks_context(season: int, sort: str) -> dict:
+    """#861 step 1f: the board's NFL picks lead; the page's SmartSim candidates follow, labelled (web routes only)."""
+    context = build_picks_page_context(_selected_week(season), season=season, sort=sort)
+    page_season, page_week = context.get("season"), context.get("week")
+    current_season = latest_season()
+    current = page_season == current_season and page_week == default_week(current_season)
+    return board_game_picks.lead_with_board_picks(
+        context,
+        board_game_picks.upcoming_view("nfl"),
+        off_slate=None if current else f"{page_season} Week {page_week}",
+        sport_label="NFL",
+        other_title="SmartSim view: not the board's picks",
+        other_note=(
+            "SmartSim 2.0's own projection for each game: its win probability and spread. A win probability is not "
+            "a bet; the board's picks above are the lines it suggests, at their price."
+        ),
+    )
+
+
 @nfl_bp.get("/picks")
 def picks():
     season = _selected_season()
     sort = str(request.args.get("sort") or "").strip().lower()
-    context = build_picks_page_context(_selected_week(season), season=season, sort=sort)
+    context = _picks_context(season, sort)
     return render_template("shared/rank_board.html", **context)
 
 
@@ -179,7 +200,7 @@ def picks():
 def api_picks():
     season = _selected_season()
     sort = str(request.args.get("sort") or "").strip().lower()
-    context = build_picks_page_context(_selected_week(season), season=season, sort=sort)
+    context = _picks_context(season, sort)
     payload = build_rank_api_payload(context)
     payload["season"] = context["season"]
     payload["week"] = context["week"]
@@ -272,17 +293,23 @@ def _selected_props_week(season: int) -> int:
     return weeks[-1] if weeks else default_week(season)
 
 
+def _props_context(season: int) -> dict:
+    """#861 step 1f: the board's NFL prop picks for the week's games lead; every rate card carries the board's verdict."""
+    context = build_nfl_props_page_context(season, _selected_props_week(season))
+    return attach_board_verdicts(context, board_game_picks.upcoming_view("nfl"))
+
+
 @nfl_bp.get("/props")
 def props():
     season = _selected_season()
-    context = build_nfl_props_page_context(season, _selected_props_week(season))
+    context = _props_context(season)
     return render_template("shared/rank_board.html", **context)
 
 
 @nfl_bp.get("/api/props")
 def api_props():
     season = _selected_season()
-    context = build_nfl_props_page_context(season, _selected_props_week(season))
+    context = _props_context(season)
     payload = build_rank_api_payload(context)
     payload["season"] = season
     return jsonify(payload)

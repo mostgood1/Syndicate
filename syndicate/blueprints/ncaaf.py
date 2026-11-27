@@ -18,6 +18,7 @@ from syndicate.features.ncaaf.picks import build_smartsim_picks_page_context
 from syndicate.features.ncaaf.sources import default_season
 from syndicate.features.ncaaf.sources import default_week
 from syndicate.features.ncaaf.sources import week_summaries
+from syndicate.features.shared import board_game_picks
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.hub_summary import build_hub_bettor_summary
@@ -135,9 +136,28 @@ def api_archive():
     return jsonify(build_archive_api_payload(_selected_week()))
 
 
+def _picks_context() -> dict:
+    """#861 step 1f: the board's NCAAF picks lead; the page's price-shopping and model cards follow, labelled (web
+    routes only)."""
+    context = build_smartsim_picks_page_context(_selected_week())
+    asked = (request.args.get("week") or "").strip()
+    current = not asked or asked == str(default_week())
+    return board_game_picks.lead_with_board_picks(
+        context,
+        board_game_picks.upcoming_view("ncaaf"),
+        off_slate=None if current else f"Week {context.get('week') or asked}",
+        sport_label="NCAAF",
+        other_title="Price-shopping and model view: not the board's picks",
+        other_note=(
+            "Cards ranked by how much better a price is than the vigged consensus (price shopping, not EV), and the "
+            "model's own win probabilities. The board's picks above are the lines it suggests, at their price."
+        ),
+    )
+
+
 @ncaaf_bp.get("/picks")
 def picks():
-    context = build_smartsim_picks_page_context(_selected_week())
+    context = _picks_context()
     return render_template("shared/rank_board.html", **context)
 
 
@@ -185,7 +205,7 @@ def api_betting_card(season: int):
 
 @ncaaf_bp.get("/api/picks")
 def api_picks():
-    context = build_smartsim_picks_page_context(_selected_week())
+    context = _picks_context()
     payload = build_rank_api_payload(context)
     payload["week"] = context["week"]
     payload["available_weeks"] = context["available_weeks"]

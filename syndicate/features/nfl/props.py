@@ -962,10 +962,22 @@ def build_nfl_props_page_context(season: int, week: int) -> dict[str, Any]:
         stat_label = _format_stat_label(nfl_prop_display_stat(row.get("market")))
         line = row.get("line")
         line_text = f"{line:g}" if isinstance(line, (int, float)) else "-"
+        away_name, _, home_name = str(row.get("game_id") or "").partition("|")
         cards.append({
             "title": f"{row.get('entity')} — {stat_label}",
-            "eyebrow": "NFL Props",
-            "badge": f"{edge:+.1%} edge",
+            # #861 step 1f: this is the season-rate view, not the board's pick, and its edge is against the price
+            # with the vig left in (the board's EV is against a no-vig fair). Measured 2026-11-27: the top 50 read
+            # +43% to +51% here and the board suggested none of them.
+            "eyebrow": "Rate view · NFL Props",
+            "badge": f"Rate edge {edge:+.1%}",
+            "source": "rate",
+            "line_key": {
+                "away": away_name.strip(), "home": home_name.strip(), "player": str(row.get("entity") or ""),
+                "market": stat_label,
+                # The board's one-sided anytime TD side is "yes"; this page's is "over".
+                "side": "yes" if (stat_label.lower() == "anytime td" and side.lower() == "over") else side.lower(),
+                "line": line,
+            },
             "meta": f"{side} {line_text}" if line is not None else side,
             "metrics": [
                 {"label": "Real rate model", "value": f"{model_prob:.1%}"},
@@ -1018,6 +1030,53 @@ def build_nfl_props_page_context(season: int, week: int) -> dict[str, Any]:
             "list_items": [f"Season: {season}", f"Week: {week}"],
         },
     )
+
+
+def attach_board_verdicts(context: dict[str, Any], board: Any) -> dict[str, Any]:
+    """#861 step 1f (web routes only): the board's NFL prop picks for this page's games lead the page, and every rate
+    card carries the board's verdict on the same line of the same game (`board_verdict`, first in `list_items`).
+
+    `board` is a `board_game_picks.SportBoardView` (normally `upcoming_view("nfl")`). Nothing is recomputed: the
+    verdict, price and EV are the board's own row."""
+    from syndicate.features.shared import board_game_picks
+
+    cards = context.get("rank_cards") if isinstance(context.get("rank_cards"), list) else []
+    games: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    on_board = picks = 0
+    for card in cards:
+        key = card.get("line_key") if isinstance(card, dict) else None
+        if not isinstance(key, dict) or not (key.get("away") and key.get("home")):
+            continue
+        pair = (str(key["away"]), str(key["home"]))
+        if pair not in seen:
+            seen.add(pair)
+            games.append(pair)
+        if not board.ok:
+            continue
+        line = board.find_prop(key.get("player"), key.get("market"), key.get("side"), key.get("line"),
+                               away=pair[0], home=pair[1])
+        verdict = board.verdict(line, pair[0], pair[1])
+        card["board_verdict"] = verdict
+        card["board_pick"] = bool(line is not None and line.suggested)
+        card["list_items"] = [verdict, *[i for i in (card.get("list_items") or []) if i != verdict]]
+        on_board += line is not None
+        picks += bool(line is not None and line.suggested)
+    page_board = board.only_games(games, kind="prop")
+    note = (
+        "Real quoted player-prop lines ranked by a RATE EDGE: the season-to-date rate model minus the price's own "
+        "implied probability, with the vig left in. It is not the board's EV, and it is not a trained model. Each card "
+        "says what the board makes of the same line"
+        + (f" ({on_board} of {len(cards)} are on the board, {picks} of them board picks)." if board.ok else ".")
+    )
+    board_game_picks.lead_with_board_picks(
+        context, page_board, sport_label="NFL prop", other_title="Rate view: not the board's picks", other_note=note,
+    )
+    context["intro_body"] = (
+        "The board's NFL prop picks for this week's games lead this page. The season-rate ladder follows, labelled as "
+        "the rate view, with the board's verdict on each line."
+    )
+    return context
 
 
 # --------------------------------------------------------------------------
