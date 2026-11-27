@@ -621,3 +621,10 @@ These hold only if the fixes' code is LOADED with (d). If (d) loads at 12-08 wit
   - the fit feedback, options (i)-(iii) (8.3);
   - the two engine-number fitters (8.2, item 3).
 - **After the load:** the reader with the flags stated, recorded here and in deploys.md.
+
+### 8.6 #835 on with (c) and (d) absent is a no-op (added 2026-11-27 1:30 PM CST)
+
+Session e32fef1a narrowed the inertness condition: each fix must be inert whenever the (c) and (d) keys are absent, WHATEVER #835's key says, because #835 may load on 12-08 without (c) or (d).
+- **A/B against main's three modules: byte-identical** with #835 on alone, spelled `1`, with (a)+(b) on, and with (c) and (d) set `off`.
+- **Pinned on the branch:** `test_fix2_835_alone_changes_nothing_while_c_and_d_are_absent`, for on / 1 / true / yes. With #835 on, these equal #835 off: rows, verdicts, `factor_for_row`, `build_records`, `rank_stake_factor` and `live_probability`. 23 of 23 in the file pass.
+- **The branch head to push is now `6c28e52c4`** (pinned `refs/keep/cell-calibration-847d-fixes-head`). It is `2f19ebde5` plus that one test. NOT pushed.

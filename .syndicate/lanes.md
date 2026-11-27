@@ -2346,6 +2346,7 @@ death, never life — do not invert it.
 - Verification: tests/test_cell_calibration_847d_fixes.py: per fix off != on, and all keys absent byte-identical to main's outputs; the targeted suites of the touched modules pass; findings section 8 restates the affected 7.3 predictions before any load
 - Blocked by: none
 - STATUS 2026-11-27 12:50 PM CST: BUILT on branch cell-calibration-847d-fixes 2f19ebde5 (local, refs/keep pinned), NOT pushed (the push needs the user's own yes via session e32fef1a). 19 new tests + 121 targeted pass; byte-identical to main with every key absent (A/B). Findings section 8 (stake trace, item-4 trace, restated predictions); reader updated, kit unchanged
+- STATUS 2026-11-27 1:30 PM CST: branch head now 6c28e52c4 (2f19ebde5 + a test pinning #835 on alone, (c)/(d) absent, as a no-op; A/B vs main byte-identical), NOT pushed. Findings 8.6
 
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
