@@ -398,3 +398,94 @@ The bootstrap draws 2,000 game resamples, seeded. The copy and output sit in tha
 - **So (b) loads only on a drained up that also loads `SYNDICATE_LAYER2_ONE_MODEL_NUMBER=on`.** If the 12-08 batch drops #861, it drops (b) too, and (b) waits for whichever window or drained up loads #861. (b) is not a betting change, so it does not itself need a window; #861 is one.
 - **Why:** H-F's evidence is for fair + model edge. Without #861, 323 of 1,948 eligible cards (16.6%, 04:24Z 11-27) would show a calibrated number H-F never graded, under a label that implies it was. (b) is display only, so waiting forgoes no bets.
 - **Not changed:** no fleet load, env, claim or scheduled task.
+
+## 7. (c) AND (d) QUEUED FOR THE 12-08 WINDOW (written 2026-11-27 10:40 AM CST, before any load)
+
+**User decision:** "Queue both", typed ~10:19 AM CST 11-27 in session e32fef1a, answering "should #847 (c) and (d) go into the 12-08 window? Queue both, only (d), or neither?" (relayed word for word by that session). It approves the QUEUE only: each load still needs the user's final yes in the window (Tue 12-08, 2-7 AM CST, 08:00-13:00Z). **Both are BETTING changes** (`--betting-change yes`; `betting_change.py add --kind yes` at the load).
+
+**The loads**, GLOBAL lines in `~/syndicate-prod/local_production.env`, carried by the window's drained full down/up. Absent = off; code on main and on the fleet (HEAD `8455f25c0` carries both):
+- (c) `SYNDICATE_CELL_CALIBRATION_RANK_STAKE=on`: `optimizer_overlay.factor_for_row` (code `75a787964`); rank and the stake's `_sizing_skill_factor` both read it.
+- (d) `SYNDICATE_CELL_CALIBRATION_LIVE_PROB=on`: `live_gameline_join._cell_calibrate` (wired `8acee817d`), called in `price_distribution_market` (:1686) and `price_moneyline` (:2006).
+
+**Fleet, read-only 11-27 10:2x AM CST (nice 19, key presence only):** 0 lines of either key in `local_production.env`, and 0 on every role (`local_production.py env --role`: refresh-worker 254 lines, web 145, live-odds-worker 224). The daily table is present: 42 cells, generated 11-27 11:30Z, expires 11-30 11:30Z, window 10-30..11-26 (2,250 games / 28 dates).
+
+**Kit** (`C:\tmp\w1208_cellcal_cd\`):
+- `kit_env_cd.sh check | apply c | apply d | apply both | restore <backup>` (sha256 `b1413796cc74dfe0`). It appends one line per key, is idempotent, backs up first and keeps mode 600. It prints presence and counts only, never a value.
+- `kit_selftest_cd.sh` (sha256 `0ac24863ab36dd0e`): PASS 11-27 10:28 AM CST on a dummy file that also carries (b)'s key, because both kits write the same file on 12-08. It checks: apply c and apply d each add ONE key; apply both is idempotent; (b)'s line is untouched; restore is exact; a bad argument returns rc 2 without writing; the real file is untouched.
+- After-load reader `read_after_load_cd.py --use c|d|both [--date]` (sha256 `352ac728e34faacf`; rc 0 MET / 1 violated / 2 blind / 3 not loaded). (c) is read on the served board; (d) on the book grids, `<sport>_source/data/book_grid/book_grid_<date>.json` `rows[].live_gameline`. The served board does not carry `live_gameline`, even with row diagnostics on, and `live_gameline_ledger` records no (d) stamp (see 7.4).
+
+### 7.1 Which table production serves at the load: the DAILY one; it cannot be frozen without code
+
+- Both uses read `reports/model_scorecard/model_cell_calibration.json` under the data root (`cell_calibration.TABLE_PATH`). No env key points them elsewhere, and `validate_table` refuses an expired file (72 h). The frozen 11-18 table expired 11-21. Serving it would take a code change, which this task may not push. It would also break the module's own rule: "a dead cron degrades to the raw model, never to a frozen table".
+- The cron rewrites the table at about 11:30Z (5:30 AM CST), inside the window. A load before then serves the 12-07 fit, and the 12-08 fit replaces it within 600 s (`CHECK_INTERVAL_SECONDS`). After that, a new fit serves every morning.
+- **Drift measured, frozen 11-18 against the daily fit of 11-27:**
+  - Cells: 41 against 42. Three left: `ncaaf|spreads|h2|pregame`, `ncaaf|spreads|q1|pregame`, `soccer|player_shots|full|pregame`. Four joined: `ncaab|totals|full|pregame`, `ncaab|totals|h1|pregame` and `ncaab|totals|h2|pregame` at k 0.348 (442 / 459 / 284 games over 10 dates), and `soccer|player_shots_on_target|full|pregame` at 0.973.
+  - 29 of the 38 shared cells moved by more than 0.0005, and the cells with k < 0.5 went from 25 to 19. The NCAAF spreads cells went 0.365 -> 0.519, which takes them out of (c). Soccer totals went 0.461 -> 0.625 and soccer btts 0.310 -> 0.565, both out of (c) as well. Soccer spreads pregame went 0.100 -> 0.214, NHL points 0.251 -> 0.330, NCAAB live spreads 0.345 -> 0.324.
+- **Decision: the predictions are RESTATED against the table served at the load (7.3), not frozen.** The reader reads the served table and records its `generated_at`. No cell is changed from the H-F result. The 3 NCAAF pregame spread cells that graded worse in H-F are not carved out: in today's fit they sit at 0.519, and neither (c) nor (d) touches them.
+- **What H-F does not cover:** H-F graded the frozen k. A cell that joined the daily fit after 11-18 rests only on its own window's validation. Today that is the 3 NCAAB totals pregame cells, which (c) would move (82 cards in the BEFORE reading, k 0.348).
+
+### 7.2 (d) and the NCAAF live totals loads queued for 12-08 (#835 + #852, #859 on top): they move the SAME cells
+
+- **§4.2 is right, and "(d) skips college totals" is right only for basketball.** The skip is `cell_calibration._LIVE_PROB_SKIP = (("ncaab", "wncaab"), "totals")` (`cell_calibration.py:320`, applied at :340): #816's basketball college totals. `_cell_calibrate`'s docstring line "a college total (#816 owns those)" (`live_gameline_join.py:1880-1881`) means #816's, not NCAAF's. So (d) MOVES `ncaaf|totals|full|live` (k 0.100, frozen and 11-27) and `ncaaf|spreads|full|live` (0.365 frozen, 0.519 on 11-27).
+- **The NCAAF keys move the same rows upstream of (d):**
+  - #835: `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION=on` anchors and widens the live total draws (`ncaaf/live_total_dispersion.calibrate_snapshot_totals`, in the NCAAF tick, `run_refresh_worker.py:2901`). `SYNDICATE_LIVE_TOTALS_PROB_SCALE_NCAAF=1` takes the join's NCAAF totals k from 2.48 to 1.
+  - #852 (damping) and #859 (end game) change the live re-sim's margins and totals (`ncaaf/live_resim.py:967-970`), so they reach both (d) NCAAF cells.
+  - (d) runs after all of them in `price_distribution_market`: after #780's scale and #816's step, at :1686.
+- **Not only confounded: on NCAAF live totals, (d) would correct the same over-confidence twice.** (d)'s k 0.10 is a residual fitted on today's NCAAF live total: the raw draw times #780's 2.48, calibration slope 0.41 in #835's findings. With #835 on, the number (d) shrinks is already calibrated (slope about 0.94). This is the hazard #835's own docstring names for #780's k. The daily fit would keep reading mostly pre-#835 rows for up to 28 days.
+- **(c) reaches the same cell:** `ncaaf|totals|full|live` (k 0.10 < 0.5), where rank and stake would go from the 0.5 floor to at most 0.10.
+- **Options, the user's call (NOT decided here):**
+  - (i) load (d) in a window without the NCAAF pair;
+  - (ii) load both and accept a double correction on NCAAF live totals (not recommended);
+  - (iii) before 12-08, land a default-off code change that skips `ncaaf|totals` in (d) while #835's switch is on, as #816's skip does. That is code, outside this task.
+
+  The NCAAF regular season is over by 12-08; what is left live is Army-Navy and the bowls.
+
+### 7.3 Predictions RESTATED against the served table (pre-registered here, before any load)
+
+**(c), judged by `read_after_load_cd.py --use c` on the first board build after the up:**
+- **BEFORE** (board 15:31:18Z 11-27, table 11-27 11:30Z): 0 of 6,387 cards carry an `optimizer_factor` below 0.5. 1,002 cards sit in 15 of the 19 k < 0.5 cells: NHL 410, NCAAF 373, soccer 136, NCAAB 83.
+- The 19 cells today:
+  - NCAAB: `ncaab|spreads|full|live` 0.324; `ncaab|totals|full/h1/h2|pregame` 0.348.
+  - NCAAF: `ncaaf|rushing yards|full|pregame` 0.162; `ncaaf|totals|full|live` 0.100; `ncaaf|totals|full/h1/h2/q1/q2/q3/q4|pregame` 0.100.
+  - NHL: `nhl|assists|full|pregame` 0.100; `nhl|points|full|pregame` 0.330; `nhl|sog|full|pregame` 0.355.
+  - Soccer: `soccer|h2h|full|live` and `soccer|h2h|full|pregame` 0.173; `soccer|spreads|full|pregame` 0.214.
+
+  Two cells sit above the floor today and would fall furthest: NCAAF totals q1 / q4 pregame, at overlay factors 0.667 / 0.793, would drop to about 0.10.
+- **P-c1, reachability:** more than 0 cards below 0.5 on a board that has eligible cards. Refuted by 0.
+- **P-c2, rails:** 0 cards with a factor below 0.10, and 0 cards OUTSIDE a k < 0.5 cell below 0.5.
+- **P-c-rule:** on eligible cards the factor lies in [0.10, the cell's k] (stake scale ≤ 1), with at most 1% of eligible cards off it.
+- **P-c3 and P-c4 stand as in §4.1**, judged on the cells served at the load. P-c3: staked orders per cell stay above 0 per day, and a cell at 0 for 3 slates reverts (c). P-c4: no detectable money change in two weeks. Both are multi-day readings, not in the reader.
+
+**(d), judged by `read_after_load_cd.py --use d --date <board date>` DURING the first live slate after the up.** The grid's last write after midnight carries few live rows.
+- **BEFORE** (book grids of 11-26, last written 06:01Z 11-27): 20 rows carry a live verdict. 10 are eligible, all `ncaab|spreads|full|live` and all priceable. 0 are stamped.
+- The 7 live game-line cells today: NCAAB spreads 0.324, NCAAF spreads 0.519, NCAAF totals 0.100, soccer h2h 0.173, soccer spreads 0.660, soccer totals 0.625, WNCAAB spreads 0.829.
+- **P-d1, reachability:** more than 0 stamped rows when eligible rows exist. Refuted by 0 stamped while eligible > 0.
+- **P-d-exact,** on every stamped row:
+  - the transform holds within 1e-6 (raw = `model_prob_cell_uncalibrated`, m = `market_prob`);
+  - k equals the table's k within 1e-4;
+  - `edge_pp` = 100 (p' − m) within 0.011;
+  - the stamp's cell is served and is the row's own cell;
+  - no ncaab / wncaab total is stamped.
+- **P-d-cov:** at most 1% of eligible rows are left unstamped.
+- **P-d2 (the 11-18 revision kept):** the median |edge| ratio lies within k ± 0.15 in each cell with at least 30 priceable stamped rows. The fall in priceable rows (under a third) needs the same slate's BEFORE and is reported only.
+- **P-d3 and P-d4 stand as in §4.2.**
+- **On NCAAF live cells, nothing here separates (d) from the NCAAF pair if both load (7.2).** The reader reports NCAAF totals' `prob_scale` (2.48 today, 1.0 with #835's pair) and `total_calibration`, so a reader can at least see which loaded.
+
+### 7.4 Traced 11-27, NOT addressed in §1-§4: weigh before the final yes
+
+- **(d)'s edge meets the optimizer factor on the stake.** `portfolio_commit._sizing_model_edge` = `model_edge_pct` × `_sizing_skill_factor`, and that factor includes `optimizer_overlay.factor_for_row` (`portfolio_commit.py:330-355, 405-413`). With (d) on, a live row's edge is already shrunk by about k. The optimizer factor, fitted on the unshrunk number, multiplies it again: by today's 0.5 floor, or by k with (c) on.
+  - Example, NCAAB live spreads (k 0.324): a raw +10 pp becomes about +3.2 under (d), so about 1.6 at the stake with (c) off and about 1.0 with (c) on.
+  - Not measured in money. I did not trace end to end which live orders size through this path.
+- **Feedback not traced:** after (d) loads, the scorecard may grade the CALIBRATED live edge. If it does, the daily fit sees an already-calibrated number, and the k of those cells drifts toward 1 over the 28-day window. Neither the table nor the optimizer knows which number it was fitted on.
+- **Instrument gap:** `live_gameline_ledger` (the series the live model is judged on) records the priced `model_home_win_prob` and #816's `model_home_win_prob_uncalibrated`. It does NOT record (d)'s `live_cell_calibration` or `model_prob_cell_uncalibrated`, so after (d) loads that series changes estimator with no marker. Fixing it is code (a ledger field) for before the load. It is not done here.
+
+### 7.5 Owed
+
+- Before the window:
+  - the 12-08 batch (not built on 11-27) carries `kit_env_cd.sh`;
+  - the user's final yes for each use;
+  - the user's call on 7.2 (the NCAAF overlap) and on 7.4 (composition, feedback, ledger marker).
+- After the up:
+  - run `--use c` on the first board build, and `--use d` during the first live slate;
+  - record both results here and in deploys.md (`- betting change: yes`, plus `betting_change.py add --kind yes --loaded-at <role pick-up>`);
+  - P-c3 / P-d3 / P-d4 over the following slates.
