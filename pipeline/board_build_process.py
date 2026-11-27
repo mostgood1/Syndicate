@@ -84,6 +84,16 @@ restarts it: its refusal count stays 0 and the board child always counts as a ru
   sufficient right now. Without it, a shortfall the pair alone does not explain is "transient" and holds; measured
   11-20, 3 of 3 such holds were followed by 3 refused builds and the same recycle anyway. The role's other processes
   measured p50 0, p90 288-427 MB, max 784-820 MB (11-20 day, evening and night): they run about half the time.
+- `SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_HEAD_RULE=loaded` (user "Yes build it now", 2026-11-26; findings §21-§22):
+  which checkout change holds the self-recycle. Absent / empty / anything else = `any`: every HEAD move holds, as
+  above. Measured 11-25: the parent was held 4 times of 4 by `code_on_disk_changed` after web-only ffs whose range
+  changed `gunicorn.conf.py`, `syndicate/app.py`, a web blueprint and two ci scripts, none of them loaded by
+  refresh-worker. The board child and every job child are fresh interpreters started from the checkout, so they
+  already run whatever is on disk at each spawn. A parent restart newly loads only the PARENT's own modules (and any
+  non-Python file it reads). So `loaded` holds only when `git diff --no-renames --name-only <boot> <disk>` names a
+  `.py` file in this process's `sys.modules` (with `__main__`), or a non-Python file outside the exempt paths at
+  `_HEAD_RULE_NON_RUNTIME_PREFIXES` (each pinned by a source-scan test). A diff it cannot read holds
+  (`code_diff_unknown`), and so does a loaded set it cannot read.
 
 THE HOST'S HEADROOM -- one more switch, same rule (user "Yes, build it", 2026-11-23; findings §16 and §18). A fresh
 parent on a busy slate still reaches the refusal zone by evening (11-21: 12 refusals, gaps of 19-26 min), so neither the
@@ -135,6 +145,7 @@ RECYCLE_AFTER_BUILD_ENV = "SYNDICATE_BOARD_PROCESS_RECYCLE_AFTER_BUILD"
 PARENT_RECYCLE_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB"
 PARENT_RECYCLE_HOURS_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_UTC_HOURS"
 PARENT_RECYCLE_MIN_UPTIME_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MIN_UPTIME_SECONDS"
+PARENT_RECYCLE_HEAD_RULE_ENV = "SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_HEAD_RULE"
 RECURRING_JOBS_MARGIN_ENV = "SYNDICATE_BOARD_PROCESS_RECURRING_JOBS_MARGIN_MB"
 # The host's headroom (2026-11-23): absent = unchanged behaviour. See the module doc, "THE HOST'S HEADROOM".
 HOST_OVERDRAFT_ENV = "SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB"
@@ -644,6 +655,101 @@ def parent_recycle_min_uptime_seconds(env: Mapping[str, str] | None = None) -> i
     return _positive_int_env(PARENT_RECYCLE_MIN_UPTIME_ENV, env) or _PARENT_RECYCLE_DEFAULT_MIN_UPTIME_S
 
 
+# Paths that no role imports or reads at runtime. A NON-Python change outside these holds the self-recycle under
+# `head_rule=loaded`, because this rule cannot see which data files a process read at boot (a `.py` file it CAN see:
+# `sys.modules`). Each exemption is pinned by a source-scan test in `tests/test_board_split_memory_guard.py`:
+# - `reports/live_gameline_accuracy/history.jsonl` is committed every night (~11:31 PM CST); only comments name it.
+# - `.md` outside `data/` and `reports/`: role code names no tracked markdown file (its `.md` literals are citations
+#   and three MLB recaps generated under a season data directory).
+# - `syndicate/templates/` and `syndicate/static/`: only `syndicate/app.py` builds an app that serves them (its
+#   `template_folder` / `static_folder` and every `register_blueprint`), so they are exempt only while this process
+#   has not loaded `syndicate/app.py`.
+_HEAD_RULE_NON_RUNTIME_PREFIXES = (".syndicate/", "docs/", "tests/", ".claude/", ".github/")
+_HEAD_RULE_NON_RUNTIME_FILES = frozenset({"reports/live_gameline_accuracy/history.jsonl"})
+_HEAD_RULE_GENERATED_PREFIXES = ("data/", "reports/")
+_HEAD_RULE_WEB_APP_PREFIXES = ("syndicate/templates/", "syndicate/static/")
+_HEAD_RULE_WEB_APP_MODULE = "syndicate/app.py"
+
+
+def parent_recycle_head_rule(env: Mapping[str, str] | None = None) -> str:
+    """`SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_HEAD_RULE`: "loaded" only for `loaded`; anything else (absent, empty,
+    junk) is "any", today's rule, so an unknown value can never loosen the hold."""
+    raw = str((os.environ if env is None else env).get(PARENT_RECYCLE_HEAD_RULE_ENV) or "").strip().lower()
+    return "loaded" if raw == "loaded" else "any"
+
+
+def _head_rule_non_runtime(path: str, *, web_app_loaded: bool = True) -> bool:
+    """A non-Python path that a parent restart cannot newly read (see the exemptions above `_HEAD_RULE_*`)."""
+    return (
+        path in _HEAD_RULE_NON_RUNTIME_FILES
+        or path.startswith(_HEAD_RULE_NON_RUNTIME_PREFIXES)
+        or (path.endswith(".md") and not path.startswith(_HEAD_RULE_GENERATED_PREFIXES))
+        or (not web_app_loaded and path.startswith(_HEAD_RULE_WEB_APP_PREFIXES))
+    )
+
+
+def head_change_holds(changed: list[str], loaded: set[str] | frozenset[str]) -> list[str]:
+    """Pure. The changed paths (repo-relative, posix) that hold a self-recycle under `head_rule=loaded`: a `.py` file
+    this process has loaded, or a non-Python file outside the non-runtime paths. A `.py` file it has not loaded does
+    not hold: if the process ever imports it, it reads it from disk anyway, restart or not."""
+    web_app_loaded = _HEAD_RULE_WEB_APP_MODULE in loaded
+    held: list[str] = []
+    for path in changed:
+        if path.endswith(".py"):
+            if path in loaded:
+                held.append(path)
+        elif not _head_rule_non_runtime(path, web_app_loaded=web_app_loaded):
+            held.append(path)
+    return held
+
+
+def _loaded_repo_files(
+    modules: Mapping[str, Any] | None = None, *, repo: Path = REPO_ROOT, cwd: str | None = None
+) -> set[str]:
+    """Repo-relative posix paths of every module file this process has loaded, `__main__` included. A relative
+    `__file__` is tried against both the repo and the working directory (both are kept), so it can only ADD holds."""
+    root = repo.resolve()
+    out: set[str] = set()
+    for module in list((sys.modules if modules is None else modules).values()):
+        raw = getattr(module, "__file__", None)
+        if not raw:
+            continue
+        candidates = [Path(raw)] if os.path.isabs(raw) else [root / raw, Path(cwd or os.getcwd()) / raw]
+        for candidate in candidates:
+            try:
+                out.add(candidate.resolve().relative_to(root).as_posix())
+            except (ValueError, OSError):
+                continue
+    return out
+
+
+_CHANGED_PATHS_CACHE: dict[tuple[str, str], Optional[list[str]]] = {}
+
+
+def _changed_paths(
+    boot_head: str, disk_head: str, *, repo: Path = REPO_ROOT, run: Callable[..., Any] = subprocess.run
+) -> list[str] | None:
+    """`git diff --no-renames --name-only <boot> <disk>` (a rename lists both names), or None when it cannot be read
+    (None holds). Cached per (boot, disk): the check runs every main-loop cycle while everything else says recycle."""
+    key = (boot_head, disk_head)
+    if key in _CHANGED_PATHS_CACHE:
+        return _CHANGED_PATHS_CACHE[key]
+    try:
+        out = run(
+            ["git", "-C", str(repo), "diff", "--no-renames", "--name-only", boot_head, disk_head],
+            capture_output=True, text=True, timeout=20,
+        )
+        paths: list[str] | None = (
+            [line.strip() for line in str(getattr(out, "stdout", "") or "").splitlines() if line.strip()]
+            if getattr(out, "returncode", 1) == 0 else None
+        )
+    except Exception:  # noqa: BLE001 - unreadable holds
+        paths = None
+    if paths is not None:  # a failure is retried next cycle; a success never changes for the same pair
+        _CHANGED_PATHS_CACHE[key] = paths
+    return paths
+
+
 def parent_recycle_decision(
     *,
     threshold_mb: int,
@@ -657,13 +763,17 @@ def parent_recycle_decision(
     draining: bool,
     boot_head: str | None,
     disk_head: str | None,
+    head_rule: str = "any",
+    head_diff: Mapping[str, Any] | None = None,
 ) -> tuple[bool, str, dict[str, Any]]:
     """(recycle, reason, detail). Pure. Should the split's PARENT exit now so the supervisor restarts it fresh?
 
     In order: switched on; its own RSS known and >= the threshold; inside the quiet window; up long enough; no child
     but the board child (a restart kills children exactly as a deploy does; unreadable = unknown = hold); the board
     child not mid-build (its busy flock); no drain; and the checkout's HEAD equal to the one it booted with, so a
-    self-recycle never loads code (unreadable = hold).
+    self-recycle never loads code (unreadable = hold). With `head_rule="loaded"` a different HEAD holds only when
+    `head_diff["held"]` is non-empty (`head_change_holds`), and a diff it could not read (`head_diff["changed"]`
+    None, or no `head_diff`) holds as `code_diff_unknown`.
     """
     detail: dict[str, Any] = {
         "parent_rss_mb": None if parent_rss_mb is None else round(float(parent_rss_mb), 1),
@@ -697,7 +807,19 @@ def parent_recycle_decision(
     if not boot_head or not disk_head:
         return False, "code_unknown", detail
     if boot_head != disk_head:
-        return False, "code_on_disk_changed", detail
+        if head_rule != "loaded":
+            return False, "code_on_disk_changed", detail
+        detail["head_rule"] = "loaded"
+        changed = None if head_diff is None else head_diff.get("changed")
+        if changed is None:
+            return False, "code_diff_unknown", detail
+        held = list((head_diff or {}).get("held") or [])
+        detail["changed_files"] = len(changed)
+        if held:
+            detail["changed_held_n"] = len(held)
+            detail["changed_held"] = held[:3]
+            return False, "code_on_disk_changed", detail
+        detail["changed_ignored"] = len(changed)
     return True, "recycle", detail
 
 
@@ -736,8 +858,11 @@ def _gather_parent_recycle_decision(
     env: Mapping[str, str] | None = None,
     head: Callable[[], str | None] | None = None,
     now: Callable[[], float] | None = None,
+    changed_paths: Callable[[str, str], list[str] | None] | None = None,
+    loaded_files: Callable[[], set[str]] | None = None,
 ) -> tuple[bool, str, dict[str, Any]]:
-    """The live inputs for `parent_recycle_decision`. The HEAD is read only when everything else says recycle."""
+    """The live inputs for `parent_recycle_decision`. The HEAD is read only when everything else says recycle, and
+    the diff (head rule `loaded`) only when that HEAD differs from the boot HEAD."""
     from syndicate.features.shared import worker_recycle
 
     head = head or _git_head
@@ -769,7 +894,17 @@ def _gather_parent_recycle_decision(
     recycle, reason, detail = parent_recycle_decision(**args, disk_head=boot_head)
     if not recycle:
         return recycle, reason, detail
-    return parent_recycle_decision(**args, disk_head=head())
+    disk_head = head()
+    rule = parent_recycle_head_rule(env)
+    head_diff: dict[str, Any] | None = None
+    if rule == "loaded" and boot_head and disk_head and disk_head != boot_head:
+        try:
+            changed = (changed_paths or _changed_paths)(boot_head, disk_head)
+            held = None if changed is None else head_change_holds(changed, (loaded_files or _loaded_repo_files)())
+        except Exception:  # noqa: BLE001 - unreadable holds
+            changed, held = None, None
+        head_diff = {"changed": changed, "held": held or []}
+    return parent_recycle_decision(**args, disk_head=disk_head, head_rule=rule, head_diff=head_diff)
 
 
 class ParentSelfRecycler:
@@ -825,7 +960,7 @@ def install_parent_self_recycle(
     _log(
         f"BOARD_PROCESS_PARENT_RECYCLE_ARMED pid={os.getpid()} threshold_mb={threshold} "
         f"window_utc={window[0]:02d}-{window[1]:02d} min_uptime_s={parent_recycle_min_uptime_seconds(env)} "
-        f"boot_head={(boot_head or 'unknown')[:12]}"
+        f"boot_head={(boot_head or 'unknown')[:12]} head_rule={parent_recycle_head_rule(env)}"
     )
     return recycler
 

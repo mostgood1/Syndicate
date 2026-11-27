@@ -797,3 +797,314 @@ def test_git_head_reads_a_sha_or_none():
     assert bbp._git_head(run=lambda *a, **k: (_ for _ in ()).throw(OSError("no git"))) is None
     real = bbp._git_head()  # this checkout
     assert real is None or len(real) == 40
+
+
+# ------------------------------------------- J's checkout-HEAD hold, narrowed behind a switch (2026-11-26, §21-§22)
+
+# The range that held all 4 of 11-25's free moments (672a18e87..76a006f45), minus the ledger: web and ci files only.
+WEB_ONLY_RANGE = [
+    "gunicorn.conf.py",
+    "scripts/pytest_rss_watch.py",
+    "scripts/run_ci_suite.py",
+    "syndicate/app.py",
+    "syndicate/blueprints/rail_watch.py",
+    ".syndicate/deploys.md",
+    "docs/ai_context/todo.md",
+]
+
+
+def _head_rule_inputs(monkeypatch, *, changed=WEB_ONLY_RANGE, loaded=frozenset({"pipeline/board_build_process.py"})):
+    """Booted on A, the checkout now on B; the diff and the loaded set faked at their sources."""
+    calls: list[tuple[str, str]] = []
+
+    def _changed(boot, disk):
+        calls.append((boot, disk))
+        return None if changed is None else list(changed)
+
+    _parent_live_inputs(monkeypatch, heads=[HEAD_A, HEAD_B])
+    monkeypatch.setattr(bbp, "_changed_paths", _changed)
+    monkeypatch.setattr(bbp, "_loaded_repo_files", lambda: set(loaded))
+    return calls
+
+
+def test_head_rule_off_is_not_on_through_maybe_recycle(monkeypatch, capsys):
+    """Reachability first: the same moved HEAD and the same web-only diff. Absent holds (today's rule, the diff is
+    never read); `loaded` exits through the worker main loop's own call and names what it ignored."""
+    worker_recycle._reset_for_tests()
+    try:
+        calls = _head_rule_inputs(monkeypatch)
+        bbp.install_parent_self_recycle(_FakeSup(777), _parent_env(**{bbp.PARENT_RECYCLE_ENV: "1500"}))
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is False
+        assert calls == []
+        off = capsys.readouterr().out
+        worker_recycle._reset_for_tests()
+        calls = _head_rule_inputs(monkeypatch)
+        on_env = _parent_env(**{bbp.PARENT_RECYCLE_ENV: "1500", bbp.PARENT_RECYCLE_HEAD_RULE_ENV: "loaded"})
+        bbp.install_parent_self_recycle(_FakeSup(777), on_env)
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is True
+        assert calls == [(HEAD_A, HEAD_B)]
+    finally:
+        worker_recycle._reset_for_tests()
+    on = capsys.readouterr().out
+    assert "head_rule=any" in off and "BOARD_PROCESS_PARENT_RECYCLE_CHECK held=code_on_disk_changed" in off
+    assert "BOARD_PROCESS_PARENT_RECYCLE pid=" not in off
+    assert "head_rule=loaded" in on
+    assert "BOARD_PROCESS_PARENT_RECYCLE pid=" in on and "[worker_recycle] RECYCLE_EXIT reason=board_parent_rss" in on
+    assert "'changed_files': 7" in on and "'changed_ignored': 7" in on and f"'disk_head': '{HEAD_B[:12]}'" in on
+
+
+def test_head_rule_loaded_still_holds_a_module_the_parent_loaded(monkeypatch, capsys):
+    """11-26's range changed the parent's own main script: that is code a restart would load, so it still holds."""
+    worker_recycle._reset_for_tests()
+    try:
+        _head_rule_inputs(monkeypatch, changed=WEB_ONLY_RANGE + ["scripts/run_refresh_worker.py"],
+                          loaded={"scripts/run_refresh_worker.py", "pipeline/board_build_process.py"})
+        env = _parent_env(**{bbp.PARENT_RECYCLE_ENV: "1500", bbp.PARENT_RECYCLE_HEAD_RULE_ENV: "loaded"})
+        bbp.install_parent_self_recycle(_FakeSup(777), env)
+        for _ in range(3):
+            assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is False
+    finally:
+        worker_recycle._reset_for_tests()
+    out = capsys.readouterr().out
+    assert out.count("BOARD_PROCESS_PARENT_RECYCLE_CHECK held=code_on_disk_changed") == 1
+    assert "'changed_held_n': 1" in out and "scripts/run_refresh_worker.py" in out
+
+
+@pytest.mark.parametrize(
+    "changed, loaded",
+    [
+        (None, set()),  # the diff could not be read
+        ("raise", set()),  # the diff reader itself broke
+        (WEB_ONLY_RANGE, "raise"),  # the loaded set could not be read: never "nothing loaded"
+    ],
+)
+def test_head_rule_loaded_fails_closed(monkeypatch, capsys, changed, loaded):
+    worker_recycle._reset_for_tests()
+    try:
+        _parent_live_inputs(monkeypatch, heads=[HEAD_A, HEAD_B])
+
+        def _changed(_b, _d):
+            if changed == "raise":
+                raise OSError("no git")
+            return changed
+
+        def _loaded():
+            if loaded == "raise":
+                raise RuntimeError("sys.modules changed size")
+            return set(loaded)
+
+        monkeypatch.setattr(bbp, "_changed_paths", _changed)
+        monkeypatch.setattr(bbp, "_loaded_repo_files", _loaded)
+        env = _parent_env(**{bbp.PARENT_RECYCLE_ENV: "1500", bbp.PARENT_RECYCLE_HEAD_RULE_ENV: "loaded"})
+        bbp.install_parent_self_recycle(_FakeSup(777), env)
+        assert worker_recycle.maybe_recycle(parent_pid=os.getpid(), uptime_seconds=40000.0) is False
+    finally:
+        worker_recycle._reset_for_tests()
+    assert "BOARD_PROCESS_PARENT_RECYCLE_CHECK held=code_diff_unknown" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "raw, rule",
+    [(None, "any"), ("", "any"), ("loaded", "loaded"), (" LOADED ", "loaded"), ("1", "any"), ("on", "any"),
+     ("all", "any"), ("loaded_modules", "any")],
+)
+def test_parent_recycle_head_rule_parse(raw, rule):
+    env = {} if raw is None else {bbp.PARENT_RECYCLE_HEAD_RULE_ENV: raw}
+    assert bbp.parent_recycle_head_rule(env) == rule
+
+
+@pytest.mark.parametrize(
+    "path, holds",
+    [
+        ("pipeline/board_build_process.py", True),  # loaded below
+        ("syndicate/features/shared/layer2_board.py", False),  # not loaded: read from disk anyway if ever imported
+        ("syndicate/app.py", False),
+        ("data/calibration/nfl_profile.json", True),  # a data file a restart may read: this rule cannot see reads
+        ("reports/model_scorecard/model_scorecard_latest.json", True),  # roles read REPO_ROOT/reports
+        ("syndicate/templates/intelligence.html", False),  # only syndicate/app.py serves it, and it is not loaded
+        ("syndicate/static/intelligence.js", False),
+        ("requirements.txt", True),
+        ("scripts/fleet_role_spec.json", True),
+        ("syndicate/features/mlb/FROZEN_FROM_VENDOR.md", False),
+        ("scripts/rail_monitor/RUNBOOK.md", False),
+        ("data/mlb_source/season/2026/season_eval_recap.md", True),  # generated recaps under data/ and reports/ hold
+        ("reports/model_scorecard/model_scorecard_latest.md", True),
+        ("reports/live_gameline_accuracy/history.jsonl", False),
+        (".syndicate/lanes.md", False),
+        ("docs/ai_context/todo.md", False),
+        ("tests/test_x.py", False),
+        ("tests/fixtures/board.json", False),
+        (".claude/hooks/deploy-guard.py", False),
+        (".github/workflows/ci.yml", False),
+        ("README.md", False),
+        ("CLAUDE.md", False),
+    ],
+)
+def test_head_change_holds_rules(path, holds):
+    assert bbp.head_change_holds([path], {"pipeline/board_build_process.py"}) == ([path] if holds else [])
+
+
+def test_templates_and_static_hold_once_the_web_app_is_loaded():
+    paths = ["syndicate/templates/intelligence.html", "syndicate/static/intelligence.js", "docs/x.md"]
+    assert bbp.head_change_holds(paths, {"pipeline/board_build_process.py"}) == []
+    assert bbp.head_change_holds(paths, {"syndicate/app.py"}) == paths[:2]
+
+
+def _role_sources():
+    root = Path(bbp.__file__).resolve().parents[1]
+    files = list((root / "pipeline").rglob("*.py")) + list((root / "syndicate").rglob("*.py"))
+    files.append(root / "scripts" / "run_refresh_worker.py")
+    return root, files
+
+
+def test_only_the_web_app_serves_the_template_and_static_folders():
+    """`syndicate/templates/` and `syndicate/static/` are exempt from the HEAD rule while `syndicate/app.py` is not
+    loaded, because only that module builds an app over them. A blueprint registered, or a template/static folder
+    named, anywhere else in role code ends the exemption: fix `_HEAD_RULE_WEB_APP_*` first."""
+    import re
+
+    root, files = _role_sources()
+    rx = re.compile(r"\bregister_blueprint\s*\(|\btemplate_folder\s*=|\bstatic_folder\s*=")
+    sites = sorted({p.relative_to(root).as_posix() for p in files if rx.search(p.read_text(encoding="utf-8", errors="replace"))})
+    assert sites == ["syndicate/app.py"]
+
+
+def _string_literals(path):
+    """(value, line) for every string literal in a source file; an f-string reads with `{}` for each field. `ast`,
+    not `tokenize`: Python 3.12 tokenizes f-strings into parts (the fleet runs 3.11, `py -3` here is 3.12)."""
+    import ast
+    import warnings
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # other files' invalid escape sequences are not this test's business
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+    except SyntaxError:
+        return []
+    parts = {id(v) for node in ast.walk(tree) if isinstance(node, ast.JoinedStr) for v in node.values}
+    out = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.JoinedStr):
+            value = "".join(v.value if isinstance(v, ast.Constant) else "{}" for v in node.values)
+            out.append((value, node.lineno))
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in parts:
+            out.append((node.value, node.lineno))
+    return out
+
+
+def test_role_code_names_no_tracked_markdown_file():
+    """`.md` outside data/ and reports/ is exempt from the HEAD rule because role code reads no tracked markdown file.
+    Its `.md` path literals today are citations (".syndicate/..."), the module's own rule, and generated outputs:
+    three MLB recaps under a season data directory, a backfill recap under `reports_root()/refresh_status`, the daily
+    scorecard and sim-gap reports under `reports/model_scorecard` and the decision-agreement report in the data root's
+    records directory. A new one fails here: decide whether the HEAD rule must hold on it first."""
+    root, files = _role_sources()
+    allowed = {
+        ".md",  # board_build_process's own rule
+        "season_eval_recap.md", "season_betting_cards_recap.md", "season_betting_cards_retuned_recap.md",
+        "mlb_betting_day_backfill_recap_{}.md", "{}/model_scorecard_simgap.md", "{}/model_scorecard_{}.md",
+        "{}.agreement_report.md",
+    }
+    found = {}
+    for path in files:
+        if ".md" not in path.read_text(encoding="utf-8", errors="replace"):
+            continue
+        for value, line in _string_literals(path):
+            if not value.endswith(".md") or "\n" in value or " " in value:
+                continue  # not a path (prose, a docstring)
+            if value.startswith((".syndicate/", "reports/", "data/")) or value in allowed:
+                continue  # a citation, or under the paths that still hold
+            found[value] = f"{path.relative_to(root).as_posix()}:{line}"
+    assert found == {}
+
+
+@pytest.mark.parametrize(
+    "over, reason, recycle",
+    [
+        ({}, "code_on_disk_changed", False),  # head_rule absent = "any": today's hold
+        ({"head_rule": "loaded"}, "code_diff_unknown", False),  # no diff = unreadable
+        ({"head_rule": "loaded", "head_diff": {"changed": None, "held": []}}, "code_diff_unknown", False),
+        ({"head_rule": "loaded", "head_diff": {"changed": ["a.py"], "held": ["a.py"]}}, "code_on_disk_changed", False),
+        ({"head_rule": "loaded", "head_diff": {"changed": ["docs/x.md"], "held": []}}, "recycle", True),
+        ({"head_rule": "loaded", "head_diff": {"changed": [], "held": []}}, "recycle", True),
+    ],
+)
+def test_parent_recycle_decision_head_rule(over, reason, recycle):
+    got_recycle, got, detail = _parent_decision(disk_head=HEAD_B, **over)
+    assert (got_recycle, got) == (recycle, reason)
+    if over.get("head_rule") != "loaded":
+        assert "head_rule" not in detail  # the off path's detail is unchanged
+    if reason == "code_on_disk_changed" and over.get("head_rule") == "loaded":
+        assert detail["changed_held_n"] == 1 and detail["changed_held"] == ["a.py"]
+
+
+def test_head_rule_loaded_same_head_is_unchanged():
+    assert _parent_decision(head_rule="loaded") == _parent_decision()
+
+
+def test_loaded_repo_files(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "pkg").mkdir(parents=True)
+    (repo / "pkg" / "a.py").write_text("")
+    (repo / "main.py").write_text("")
+
+    class _M:
+        def __init__(self, f):
+            self.__file__ = f
+
+    mods = {
+        "pkg.a": _M(str(repo / "pkg" / "a.py")),
+        "__main__": _M("main.py"),  # relative: tried against the repo and the cwd
+        "outside": _M(str(tmp_path / "elsewhere.py")),
+        "ns": _M(None),
+        "builtin": object(),
+    }
+    assert bbp._loaded_repo_files(mods, repo=repo, cwd=str(tmp_path)) == {"pkg/a.py", "main.py"}
+    real = bbp._loaded_repo_files()  # this process
+    assert "pipeline/board_build_process.py" in real
+    assert "tests/test_board_split_memory_guard.py" in real
+
+
+def test_changed_paths_reads_git_and_caches_only_a_success(monkeypatch):
+    class _Out:
+        def __init__(self, rc, out):
+            self.returncode, self.stdout = rc, out
+
+    monkeypatch.setattr(bbp, "_CHANGED_PATHS_CACHE", {})
+    calls: list[list[str]] = []
+
+    def _run(cmd, **_k):
+        calls.append(cmd)
+        return _Out(0, "a.py\n\ndocs/x.md\n") if len(calls) > 1 else _Out(128, "")
+
+    assert bbp._changed_paths(HEAD_A, HEAD_B, run=_run) is None  # failure: not cached
+    assert bbp._changed_paths(HEAD_A, HEAD_B, run=_run) == ["a.py", "docs/x.md"]
+    assert bbp._changed_paths(HEAD_A, HEAD_B, run=_run) == ["a.py", "docs/x.md"]  # cached
+    assert len(calls) == 2 and calls[0][3:6] == ["diff", "--no-renames", "--name-only"]
+    assert bbp._changed_paths(HEAD_B, HEAD_A, run=lambda *a, **k: (_ for _ in ()).throw(OSError())) is None
+
+
+def test_changed_paths_on_this_checkout(monkeypatch):
+    monkeypatch.setattr(bbp, "_CHANGED_PATHS_CACHE", {})
+    head = bbp._git_head()
+    if head is None:
+        pytest.skip("no git checkout")
+    assert bbp._changed_paths(head, head) == []
+    assert bbp._changed_paths(head, "f" * 40) is None  # an unknown commit cannot be read: holds
+
+
+def test_no_parent_code_reads_the_exempt_history_file():
+    """`reports/live_gameline_accuracy/history.jsonl` is exempt from the HEAD rule only because no role reads it
+    (comments name it). A path literal for it in the parent's code (pipeline/, syndicate/, the worker script) ends
+    the exemption: drop it from `_HEAD_RULE_NON_RUNTIME_FILES` before adding the reader."""
+    root, files = _role_sources()
+    hits = []
+    for path in files:
+        if path.name == "board_build_process.py":
+            continue  # the exemption itself
+        if "history.jsonl" not in path.read_text(encoding="utf-8", errors="replace"):
+            continue
+        for value, line in _string_literals(path):
+            if value == "history.jsonl" or value.endswith("/history.jsonl"):
+                hits.append(f"{path.relative_to(root).as_posix()}:{line}")
+    assert hits == []
