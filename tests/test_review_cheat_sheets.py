@@ -122,3 +122,26 @@ def test_the_population_is_the_primary_rows_under_the_sheets_own_rules():
     v2 = m.sheet_population({"sport": "nba", "date": DAY, "rows": rows, "section_rules": 2}, rec)
     assert [(p["stratum"][1], p["sections"]) for p in v1] == [("over", {"value"})]
     assert [(p["stratum"][1], p["sections"]) for p in v2] == [("under", {"sim_edge"})]
+
+
+def test_each_section_reports_its_record_under_each_rules_version(tmp_path, monkeypatch):
+    # todo #862: the season line mixes days built under retired rules, so the review also splits every section by the
+    # rules version its sheets were built with (2026-11-27: Consistency season -0.5% while its v3 days were -4.5%).
+    m = _script()
+    monkeypatch.setattr(m, "central_today", lambda: "2026-11-27")
+    rows = [{**_value_row(f"P{i}"), "projected": 3.5} for i in range(4)]     # the sim backs the over: Value from v2
+    for day, rules, results in (("2026-11-10", None, [1.0, 1.0, 1.0, 0.0]), ("2026-11-20", 3, [0.0, 0.0, 0.0, 1.0])):
+        _write(tmp_path, "nhl", day, rows, results)
+        if rules is not None:
+            p = tmp_path / "cheatsheets" / "nhl" / f"{day}.json"
+            sheet = json.loads(p.read_text(encoding="utf-8"))
+            sheet["section_rules"] = rules
+            p.write_text(json.dumps(sheet), encoding="utf-8")
+    bets = [b for s, r in m.load_days(tmp_path / "cheatsheets") for b in m.featured_bets(s, r)]
+    assert {b["rules"] for b in bets} == {1, 3}
+    trend = m.trends(bets, today="2026-11-27")
+    by_rules = {k: (v["w"], v["l"], v["first"]) for k, v in trend["value"]["by_rules"].items()}
+    assert by_rules == {"v1": (3, 1, "2026-11-10"), "v3": (1, 3, "2026-11-20")}
+    text = m.render({"date": "2026-11-27", "scope": "official", "generated_ct": "x", "health": [], "trends": trend,
+                     "against_price": {}, "flags": [], "price_flags": []})
+    assert "by section rules: v1 (from 2026-11-10) 3-1" in text and "v3 (from 2026-11-20) 1-3" in text

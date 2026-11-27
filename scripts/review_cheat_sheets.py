@@ -118,7 +118,8 @@ def featured_bets(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> li
     """Every featured bet of one sheet with its section, sport, price, EV and graded result (per-bet, for slices)."""
     rows = list(sheet.get("rows") or [])
     props = reconciled.get("props") or {}
-    secs = cs.sections(rows, rules=cs.sheet_rules(sheet))
+    rules = cs.sheet_rules(sheet)
+    secs = cs.sections(rows, rules=rules)
     out = []
     pick_results = reconciled.get("picks") or {}
     for pk in sheet.get("picks") or []:                         # the Syndicate picks: the board's suggested opps
@@ -127,7 +128,7 @@ def featured_bets(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> li
             section = "price_plays" if (pk.get("label") or cs.pick_label(pk)) == cs.PRICE_PLAY_LABEL else "picks"
             out.append({"section": section, "sport": sheet.get("sport"), "date": sheet.get("date"), "price": pk.get("price"),
                         "ev": pk.get("ev_pct"), "y": res["y"], "units": res["units"] or 0.0,
-                        "p_market": pk.get("p_market"), "event_id": pk.get("event_id")})
+                        "p_market": pk.get("p_market"), "event_id": pk.get("event_id"), "rules": rules})
     for key, _label in csr.FEATURED:
         if key in ("lines_value", "picks", "price_plays"):
             continue
@@ -139,7 +140,7 @@ def featured_bets(sheet: Mapping[str, Any], reconciled: Mapping[str, Any]) -> li
                 continue
             out.append({"section": key, "sport": sheet.get("sport"), "date": sheet.get("date"), "price": check.get("price"),
                         "ev": check.get("ev_market"), "y": res["y"], "units": res["units"] or 0.0,
-                        "p_market": check.get("p_market"), "event_id": r.get("event_id")})
+                        "p_market": check.get("p_market"), "event_id": r.get("event_id"), "rules": rules})
     return out
 
 
@@ -333,8 +334,16 @@ def trends(bets: list[dict[str, Any]], *, today: str) -> dict[str, Any]:
             for b in rows:
                 groups[fn(b)].append(b)
             slices[name] = {g: dict(_tally(v), verdict=verdict(_tally(v))) for g, v in sorted(groups.items())}
+        # The record under each section-rules version the bets' sheets were built with (todo #862). The season line
+        # mixes days built under retired rules, so it cannot say whether the rules in force now are working: measured
+        # 2026-11-27, Consistency read season -0.5% while its v3 days were -4.5% and its v4 days -19.9%.
+        by_rules: dict[int, list[dict]] = defaultdict(list)
+        for b in rows:
+            by_rules[int(b.get("rules") or 1)].append(b)
         out[key] = {"label": LABELS.get(key, key), "season": dict(season, verdict=verdict(season)),
-                    "last_7_days": dict(recent, verdict=verdict(recent)), "slices": slices}
+                    "last_7_days": dict(recent, verdict=verdict(recent)), "slices": slices,
+                    "by_rules": {f"v{v}": dict(_tally(b), verdict=verdict(_tally(b)), first=min(x["date"] for x in b))
+                                 for v, b in sorted(by_rules.items())}}
     return out
 
 
@@ -372,6 +381,9 @@ def render(review: Mapping[str, Any]) -> str:
     for key, t in review["trends"].items():
         lines.append(f"- **{t['label']}** season {rec(t['season'])} -- {t['season']['verdict']}; "
                      f"last {RECENT_DAYS} days {rec(t['last_7_days'])}")
+        if len(t.get("by_rules") or {}) > 1:
+            lines.append("  - by section rules: " + "; ".join(f"{v} (from {r['first']}) {rec(r)}"
+                                                              for v, r in t["by_rules"].items()))
         p = (review.get("against_price") or {}).get(key)
         if p:
             lines.append(f"  - against the price: vs its fair {price_text(p.get('excess'))}; "

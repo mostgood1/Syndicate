@@ -504,8 +504,16 @@ def _recent_form(subject: PropSubject, games: list[dict[str, Any]], box_path: Pa
 def _matchup(subject: PropSubject, found, games: list[dict[str, Any]], columns: tuple[str, ...] | None, label: str,
              advanced: dict[str, dict[str, float]]) -> LayerEvidence:
     if found is not None:
-        player = found[0]
-        opponent = _code(subject.sport, player.get("opponent"))
+        player, game, side = found[0], found[1], found[2]
+        # The NBA engine's sim rows carry no team or opponent (every NBA cards_sim_detail 10-03..11-27, read on the
+        # fleet 2026-11-27; the WNBA engine's rows do, and so does this file's test fixture), so for an NBA player the
+        # sim row alone resolved NO opponent and the whole layer went absent. Once the 11-10..11-14 name join found
+        # most NBA players in the sim, NBA sheet rows with 3+ meetings fell 348 -> 14 and NBA Matchups and defender
+        # matchups lost their evidence (todo #862). The game holds both tricodes; `side` says which one is his.
+        mine, other = ("home_tri", "away_tri") if side == "home" else ("away_tri", "home_tri")
+        opponent = _code(subject.sport, player.get("opponent") or (game or {}).get(other))
+        if not player.get("team") and (game or {}).get(mine):
+            player = {**player, "team": game.get(mine)}
     else:
         # No sim row for this day: the opponent is the side of THIS game the player's
         # newest team is not on (box rows are newest first). Unknown stays unknown.
