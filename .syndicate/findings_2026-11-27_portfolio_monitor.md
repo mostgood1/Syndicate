@@ -121,3 +121,69 @@ Falsification tests, fixed now:
 
 RECENT holds 73 priced games, so a range can be wide. A REJECTED for lack of data is reported as that, not as
 innocence.
+
+### RESULT, 2026-11-27 12:41 PM CST: Kalshi player props carry the drop, and over half of it is a change in what was bought
+
+Scripts: `scratchpad/clvlead/split.py`, `split2.py`, `split3.py` and `nhlprops.py` (session 69d80317), run at Idle
+priority on reading 20261127T180404Z. The floor log copy is `scratchpad/pf3/floor_log.json` (read 11-27 10:24 AM,
+entries 10-20..11-25).
+
+**The change is real.** Same-book gross CLV went from +1.40 pp to -0.41 pp, a change of **-1.81 [-2.59, -1.03]**.
+PRIOR is 523 priced bets / 353 games; RECENT is 99 / 73. Beat close fell 63.9% to 43.4%. Fee-net CLV went -0.33 to
+-2.17, a change of -1.83 [-2.62, -1.05].
+
+| hypothesis | test reading | verdict |
+|---|---|---|
+| H1 venue | Kalshi -2.11 [-3.03, -1.19] (279 to 56 games); rest = Polymarket -0.90 [-2.06, +0.26] | **SURVIVES: Kalshi** |
+| H2 sport | NCAAF -1.60 [-2.63, -0.57], NFL -1.81 [-3.39, -0.22], NHL -2.79 [-4.29, -1.28], each with the rest also below 0; NCAAB +0.16, soccer -0.61 (ranges include 0) | **REJECTED: spread over three sports** |
+| H3 totals | totals +0.04 [-1.08, +1.17]: no decline | **REJECTED for totals** |
+| H3, market dimension | coarse `other` -3.06 [-4.32, -1.79], rest -0.72 [-1.55, +0.12] | **the drop sits in `other`** |
+| H4 mix | mix part -1.03 of -1.81 (57%); within-cell -0.78, see below | **narrowly SURVIVES** |
+| H5 selection | priced share ROSE in both venues: Kalshi 41.7% to 51.8%, Polymarket 30.0% to 35.7% | **REJECTED** |
+
+- **`other` is the player props.** The coarse rule set before reading needed "player" in the market name. The live
+  names are ASSISTS, Receptions, GOALS, POINTS, Passing TDs and btts, so `other` is player props plus btts.
+  - ASSISTS: -3.99 [-6.02, -1.97].
+  - Receptions: -1.99 [-3.67, -0.31].
+  - Venue x market (exploratory, not a pre-registered test): Kalshi props -3.40 [-4.75, -2.05] (125 to 20 games);
+    Polymarket props -0.27 [-1.96, +1.42].
+- **H4 depends on which range is used.** Within-cell is -0.78.
+  - Counting only RECENT's error, the range is [-1.42, -0.13] (excludes 0).
+  - Adding the PRIOR cell means' own error (se 0.24, so total se 0.41) gives [-1.58, +0.02] (includes 0).
+  - The frozen test named no SE, and the fuller range is the correct one, so H4 narrowly survives.
+  - Reading: at least half of the drop is mix. A within-cell decline is possible, not established.
+- **What the mix shift is:**
+  - In PRIOR, NHL Kalshi props were 95 of 353 priced games, at +3.18 pp gross.
+  - In RECENT they are 11 priced bets. NFL Kalshi props (+0.30 pp in PRIOR) are now RECENT's largest cell, at 26
+    bets.
+  - Graded NHL Kalshi props by `selected_date`: about 2-17 a day from 11-06 to 11-21. There are none on 11-20,
+    11-22 or 11-23 (cause not checked), and **0 on every day since the 11-24 08:30Z floor-off load**.
+  - **142 of the 192 graded NHL Kalshi props selected 10-28..11-23 (74%) are in the EV floor log.** So the floor-off
+    removed most of the book's best-closing cell.
+- **That cell beat the close but did not make money.** Floor era 10-20..11-23, NHL Kalshi props admitted by the
+  floor (142 bets / 87 games):
+  - fee-net CLV +1.43 pp (se 0.55), gross +2.97, beat close 77.4%;
+  - ROI **-9.92% [-24.4, +4.6]**, excess wins -3.4, fees 3.14% of stake.
+  - The Suggested NHL Kalshi props (50 / 42) read the same way: CLV +1.65 net, ROI -26.2% [-54.1, +1.7].
+  - So the close and the results disagree on this cell. That fits the 30 d "wins minus close" of -4.4 pp (z -2.14):
+    the book wins LESS often than its closing prices imply.
+  - Re-admitting the cell is NOT supported by this study. It would be a betting change, so it needs its own
+    pre-registration and a window.
+- **NBA has no same-book close, so the review's closing-line figures never included it.**
+  - NBA is 584 of 1,375 graded PRIOR bets and 78 of 213 RECENT. 0 of them carry a same-book close.
+  - In the 30 d window, 463 of 662 NBA closes resolved against a DIFFERENT book (`different_book_close`); 199 read
+    `no_close_for_market`.
+  - On that scope NBA did not decline: +1.35 to +2.17 pp, a change of +0.82 [-0.34, +1.98]; beat close 69.9% to
+    77.0% (139 to 28 games).
+  - A different-book level is not comparable with a same-book level; only its change is read here.
+  - With 0 of the in-play bets priced either, the review's "losing to the close" describes the non-NBA pregame book:
+    about 46% of graded bets in 7 d.
+
+**Net answer:**
+- The 7 d decline is real.
+- It sits in Kalshi, mostly in player props.
+- More than half of it is that the book stopped buying NHL Kalshi props, most of which came through the EV floor
+  that went off on 11-24. Those props had beaten the close by about 3 pp gross yet lost money.
+- It is not lead time (the 11-24 study above), not totals, not a single sport, and not a priced-close selection
+  artefact.
+- The open question it leaves is why bets that beat the close keep losing: wins minus close is -4.4 pp over 30 d.
