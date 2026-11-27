@@ -63679,3 +63679,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Plan:** the first plan after the exit, 18:47:49 CST, had no `key_player_out` refusal and 0 mentions of TCU Horned Frogs or Creighton.
 - **Tally (11-26):** 4 priced off_floor exits read live (Cincinnati, Davidson, USC, TCU). The board withdrew the game within 4-34 s each time. The plan backstop fired once (Davidson, inside a 22 s gap); one lift so far (USC).
 - verify: `C:/tmp/lpeg/w1126/tcu.sh` 00:43:17Z, hold probe 00:43Z, `led_timeline.py` 00:44Z, `plan_wait.ps1` / `kpo_tcu.py` 00:48Z, `pbp_name.py 401920538 Avila` 00:48Z.
+
+## 2026-11-27 03:25:00Z READING lane live-player-exit-gate (#814): WNCAAB off_floor, Cincinnati's Marta Fernandez @ Miami (OH), read live
+- betting change: no (reading only)
+- **Player:** Cincinnati starter Marta Fernandez (ESPN event 401903571), subbed out at Q2 2:03 (02:46:25Z, 8:46 PM CST). No play names her after that (ESPN pbp read 03:26Z).
+- **Producer:** `PLAYER_OUT ... off_floor key=True since=2026-11-27T02:46:25Z` and the tick `refused_games=1`, both at 03:25:00.648Z. 17 priceable full-game rows in the 30 min before the flag. That fits the wncaab rule: half + 8:00 = Q3 2:00.
+- **Hold:** `fail key_player_out CIN:Marta Fernandez:off_floor` (snapshot 21:25:00 CST).
+- **Board:** book_grid wncaab index 1 -> 0 (priceable 2 -> 0) at 03:25:32.435Z, 32 s after the refusal tick. It was the only live wncaab game. Last priceable full-game ledger row 03:24:17Z.
+- **Plan:** generated 21:25:31 CST, inside that 32 s gap (1 s before the board withdrew). No `key_player_out` refusal and 0 mentions of Cincinnati Bearcats or Miami (OH) among rows_in 46. So the game's rows did not reach the plan inputs in that build. Davidson's did at 20:22Z. Not traced further: the row was likely filtered upstream of the plan (below the venue min-EV / not shortlisted).
+- verify: `C:/tmp/lpeg/w1126/mfc.sh` 03:26:09Z, hold probe 03:26Z, `plan_wait.ps1` / `kpo_mfc.py` 03:27Z, `pbp_name_w.py 401903571 "Marta Fernandez"` 03:26Z.
