@@ -354,3 +354,16 @@ Results, 30 d, covered set. Each cell is pp with its 95% range:
   preflight and the restart rule. It is NOT a betting change (nothing that places, sizes, holds or exits reads these
   fields; `min_ev_tuner._gross_clv` reads `close_price` / `close_book_scope` / `clv_pct`, unchanged on all 1,151).
   Landing, any load, and the readout half (`live_book_edge_readout.py`, lane portfolio-monitor) wait for the user.
+
+### Lane `clv-fair-close` PUSHED to main as `ed8f85d50`, not loaded -- 4:32 PM CST (user: "Yes, push it")
+- It is the tested `81b2b3a43`, rebased onto 7 newer main commits that did not touch its files (same patch-id
+  `d0285bc6d`). The 13 CLV / settlement / tuner test files pass on the pushed head (279).
+- NOT LOADED. This lane ran no ff and no restart. The code reaches the fleet at the first refresh-worker restart after
+  an ff of `~/Syndicate` that carries it, whichever lane runs that ff. For that deploy's `deploys.md` entry, this
+  commit is `betting change: no` (nothing that places, sizes, holds or exits reads the new mark fields).
+- Owed after the load:
+  - the share of same-book marks stamped after the load that carry `clv_fair_pct`, by venue (bar: Polymarket >= 60%;
+    the replay estimate is Kalshi 69%, Polymarket 86%);
+  - the settlement cycle's cost before and after (the replay grade took +6.3%);
+  - the lane's falsification test, on >= 100 new covered marks;
+  - then the readout half, `live_book_edge_readout.py`, under lane portfolio-monitor.
