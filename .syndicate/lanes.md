@@ -2315,6 +2315,14 @@ death, never life — do not invert it.
 - Verification: Fleet web.log per CST day after the load: 0 ncaaf and 0 wnba request-path fetch lines; the play-cards grader's past-date game-chips p99 vs 11-27's 7.1 s; NCAAF finals present for 10-16..11-16
 - Blocked by: none
 
+### cheat-sheet-optimization — OPEN — opened 2026-11-27 — session eda3ffd5-0d27-44c4-9c85-2b653a3fccfe
+- Goal: The cheat sheets stop losing where a defect or a measured rule is the cause: (1) NBA Matchups + NBA defender matchups get their evidence back (the sim-found path of prop_evidence/basketball._matchup resolves no opponent, so NBA primary rows with 3+ meetings fell 348 -> 14 after 11-13) -- fixed, tested off != on, and read back on served NBA sheets; (2) a committed per-sport x section x rules-version scorecard with game-clustered CIs; (3) a pre-registered v5 rule set built from it, brought to the user, and forward-graded on the reconciled record after it loads
+- Files: syndicate/features/shared/prop_evidence/basketball.py (the _matchup opponent + team resolution ONLY; disjoint from cheat-sheets' vs_opponent values field), tests/test_prop_evidence_basketball_sim_opponent.py (NEW), scripts/cheat_sheet_scorecard.py (NEW), tests/test_cheat_sheet_scorecard.py (NEW), .syndicate/findings_2026-11-27_cheat_sheet_optimization.md (NEW), docs/ai_context/todo.md (#862 section ONLY)
+- Hypothesis: MEASURED BEFORE OPENING (fleet, read-only, 11-27): NBA cards_sim_detail player rows carry no team/opponent (every file 10-03..11-27; WNBA rows do, and the test fixture is WNBA), so _matchup's found-branch opponent is '' and the whole MATCHUP layer is absent for every sim-found NBA player; the 11-10..11-14 name-join fix raised sim-found rows 67 -> 218 of ~220 a sheet, which starved NBA Matchups (+20.6% [+4.0, +37.7] on 142 before) and NBA defender matchups (pvp rows 172 -> 0, row opponent falls back to a full name that defender_matchups.team_code cannot read)
+- Falsification test: If the fixed _matchup on the 11-25 NBA slate's served rows still gives vs_opponent with 3+ meetings on fewer than ~10x the 2 rows the old code gives, or the opponent it resolves differs from the game's other tricode on any row, the mechanism is wrong
+- Verification: Unit: an NBA-shaped sim row (no team/opponent) gets the game's other tricode and its meetings; off != on (old code: absent). Fleet replay old vs new on a served NBA slate (rows with vs_opponent / 3+ meetings / strong). After the load: the next NBA sheets carry vs_opponent and pvp on most primary rows, and Matchups + Defender matchups feature NBA bets again
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
