@@ -2328,6 +2328,14 @@ death, never life — do not invert it.
 - Verification: Unit: an NBA-shaped sim row (no team/opponent) gets the game's other tricode and its meetings; off != on (old code: absent). Fleet replay old vs new on a served NBA slate (rows with vs_opponent / 3+ meetings / strong). After the load: the next NBA sheets carry vs_opponent and pvp on most primary rows, and Matchups + Defender matchups feature NBA bets again
 - Blocked by: none
 
+### nfl-request-path-espn — OPEN — opened 2026-11-27 — session 34a25e50-0779-4ac8-b30a-30f7f81d18c3
+- Goal: Fleet web makes no NFL ESPN call inside a web request: nfl_game_state_index and nfl_player_box_index read a worker-written record (keyvalue) or a final-week / final-event disk archive under reports/nfl_source/api/, never urlopen, behind SYNDICATE_REQUEST_PATH_ESPN_FETCH (absent = no fetch); measured on the fleet as 0 'compute in request path (operation=nfl_espn_*)' lines per CST day after the load, with past-date NFL final scores still served by game-chips
+- Files: syndicate/features/nfl/live_game_state.py (nfl_game_state_index + new record helpers ONLY) syndicate/features/nfl/live_player_box.py (nfl_player_box_index + new record helpers ONLY) scripts/backfill_nfl_final_archives.py (NEW) tests/test_nfl_live_state_request_path.py (NEW)
+- Hypothesis: NFL has no worker record the web can read: nfl_game_state_index (week-keyed) and nfl_player_box_index (event-keyed) fetch ESPN on every cache miss, in workers and in web alike. Web's misses are past-date game-chips builds (grader, 3.11 caller) and current-week page builds. The workers already call both ~200/h for the current week (0 request-path lines in either worker log, 11-27), so persisting what they fetch gives web a fresh record, and a once-all-final disk archive gives past weeks
+- Falsification test: After the load a web request still logs operation=nfl_espn_game_state_fetch or nfl_espn_player_box_fetch, or a past-date NFL game-chips build loses final scores it had before (final count with a score drops)
+- Verification: Fleet web.log per CST day after the load: 0 nfl_espn_* request-path lines; one past-date game-chips GET with sports=nfl before/after: same final chips with scores, ESPN fetches N -> 0; worker log shows NFL_GAME_STATE_RECORD writes and archive writes
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
