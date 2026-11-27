@@ -63845,3 +63845,13 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Since the GC revert: 11-24 0, 11-25 0, 11-26 1 (before the exit fix loaded), 11-27 0 to 7:45 AM.
   - Too few days to judge. Against the base rate a day is kill-free with p = 16/23 = 0.696, so 3 kill-free days happen by chance 34% of the time.
   - **Verdict rule (set here, before the data):** GOAL MET when the 9 CST days 11-27..12-05 have 0 kills (0.696^9 = 0.038 by chance). Any kill before then gets its kind read (recycle or silent) and its own diagnosis. The first reading that can close it is 7:45 AM CST 12-06.
+
+## 2026-11-27 15:05Z (9:05 AM CST) -- READING, no deploy: the registered forward read of the frozen NBA prop side shift (lane `prop-fair-side-lean`, scheduled task `prop-fair-forward-read`) -- **MISSED: the lean did not persist (NBA -0.29 [-2.15, +1.59], 96 games)**
+
+- worktree `session/prop-fair-side-lean` at origin/main `c62324876` (contains `3b74b1715`); read-only, no fleet change.
+- pull (WSL, nice 19): `prop_fair_side_lean.py pull --data-root ~/syndicate-prod/data --start 2026-11-12 --end 2026-11-26 --sports nba,nfl` -> `PULL records 290,440, graded 227,011` (`C:/tmp/edge-analyses/prop-fair-lean/forward_1113_1126/props.jsonl.gz`).
+- score: `prop_fair_side_lean.py holdout --sports nba,nfl --delta -0.146 --test 2026-11-13..2026-11-26`.
+- NBA: 36,608 groups / 96 games; lean -0.29 [-2.15, +1.59] -> +3.17 [+1.31, +5.05]; dLL +0.00210 [-0.00061, +0.00485]; `passes: false` -> **MISS**.
+- NFL (context only, no shift proposed): 11,088 groups / 30 games; lean -2.75 [-9.09, +3.47].
+- verify: holdout JSON `passes=false` for NBA; the bar (dLL CI entirely below 0) is not met, and the point estimate is a log-loss increase.
+- **betting change:** no (reading only). **Claims:** none.

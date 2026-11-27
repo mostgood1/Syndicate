@@ -166,3 +166,21 @@ The options as they were put:
 
 Scratch (not in git): `C:\tmp\edge-analyses\prop-fair-lean` holds `props_all.jsonl.gz` (535,238 graded prop rows),
 `quotes_rows.jsonl.gz` (83,409 rebuilt groups), `mechanism.json`, `impact.py`, `totals_lean.py` and `drift.py`.
+
+## 6. Forward read (11-13..11-26)
+
+Read 2026-11-27 15:05Z (9:05 AM CST) by scheduled task `prop-fair-forward-read`, read-only, from worktree `session/prop-fair-side-lean` at origin/main `c62324876` (contains `3b74b1715`).
+
+```
+nice -n 19 ~/.venvs/syndicate/bin/python scripts/prop_fair_side_lean.py pull --data-root ~/syndicate-prod/data --start 2026-11-12 --end 2026-11-26 --sports nba,nfl --out C:/tmp/edge-analyses/prop-fair-lean/forward_1113_1126/props.jsonl.gz
+python scripts/prop_fair_side_lean.py holdout --graded C:/tmp/edge-analyses/prop-fair-lean/forward_1113_1126/props.jsonl.gz --sports nba,nfl --delta -0.146 --test 2026-11-13..2026-11-26
+```
+
+PULL: 290,440 records, 227,011 graded (6,852 DNP voids, 4,128 not yet, 219 unsupported).
+
+| sport | test groups / games | lean before -> after (pts, 95% by game) | dLL [95% by game] | bar |
+|---|---|---|---|---|
+| NBA | 36,608 / 96 | -0.29 [-2.15, +1.59] -> +3.17 [+1.31, +5.05] | +0.00210 [-0.00061, +0.00485] | **MISSED** |
+| NFL (context; no shift proposed) | 11,088 / 30 | -2.75 [-9.09, +3.47] -> +0.75 | -0.00146 [-0.01071, +0.00762] | n/a |
+
+**Verdict: MISSED, and the lean itself did not persist.** On the forward window NBA overs hit at the board's fair (-0.29, interval spans 0), so the frozen -0.146 shift overcorrects to +3.17 pts and the point estimate of dLL is a log-loss INCREASE. The 10-17..11-12 lean (-3.48) was a period effect, consistent with H-E (the market's scoring lines were too high early season and have since moved). Recommendation: close the lane, shift not adopted; `prop_fair_side.py` stays unwired. If anything is revisited it is §5.3's trailing-window refit, not a constant.
