@@ -64000,3 +64000,45 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **verify:** `read_1f_after_load.py <day>` returns rc 0 on any day with board picks for these sports.
 - **Revert:** `git revert d2ae632bf` on main, then ff + reload-web.
 - **Claim released** 22:38:07Z (status: web free).
+
+## 2026-11-27 21:40:50Z (3:40 PM CST) -- READING (no deploy): the first NBA build on `3231ee493` (lane `cheat-sheet-optimization`; owed item (1) of `2026-11-27 20:37:49Z`; read-only)
+- The 3:30 PM CST `SyndicateCheatSheets` run's `CHEAT_SHEET nba date=2026-11-27` line (`cheat_sheets.log`, read by a watcher at 21:40:50Z) against the 11:30 AM line on the old code:
+  - `matchup_spots` **0 -> 25**, `pvp_scorers` **1 -> 21**: **MET**, far above the expectation (most groups were locked: `locked` 146 -> 129).
+  - The rest: groups 169 -> 171, rows 202 -> 221, `value` 16 -> 25, `sim_edge` 25 -> 25, `hot_streaks` 25 -> 14, `consistency` 25 -> 25.
+- **Cost:** the NBA build took **154.0 s -> 364.6 s**. The MATCHUP layer now reads meetings and the opposing defence for every primary row. The run is a nice-19 Windows task; the next full build is 7:30 AM CST. Watch the 11-28 builds' `secs=`.
+- Web serves the same: `/api/cheatsheets/nba/2026-11-27` at 22:35:14Z, `matchup_spots` 25, `pvp_scorers` 21.
+- Still owed: (2) the first 11-28 NBA build; (3) the board's NBA "Matchup:" clause; (4) the record once 50+ are graded.
+- betting change: no (a reading; nothing loaded).
+
+## 2026-11-27 22:39:28Z (4:39:28 PM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): cheat-sheet section rules v5 `c0950cdaf` (code `5539173c6`; lane `cheat-sheet-optimization`, todo #862; the user picked "Push and load now" when asked, ~4:25 PM CST) -- **LOADED on web; MET at the load; v5 sheets owed at the 8 PM CST build**
+- betting change: **no** (BC-078). The cheat sheets' sections are read only by the sheet tools: the page, record, reconcile, review and section study. Play cards select on each row's own verdict. The SGP pools, cross-game parlays and board picks import only `prop_result_key`, `consistency_posterior` and `board_refusal_text`, which are unchanged.
+- **What:** `cheat_sheets.py`, `build_cheat_sheets.py` and `cheat_sheets.html` (findings `findings_2026-11-27_cheat_sheet_optimization.md` section 6):
+  - One-sided fairs never feature in a bet section. Every prop and Price shopping keep them.
+  - Sim vs the line prints its official record since launch (`sim_edge_record`, stamped from `record.json`).
+  - Skater vs goalie and Defenders on his targets retired 11-28, and the page says where they used to be.
+  - A day keeps its rules once a game on it has started (`build_rules`).
+- **Ride-alongs** (`d72d4d536..c0950cdaf`, 8 commits):
+  - `ed8f85d50` (lane `clv-fair-close`: `clv_join.py`, `order_clv.py`, `paper_settlement.py`; fair CLV fields beside the quoted ones). Its lane block says any lane's ff may ship it and that its load is `betting change: no`. It reaches refresh-worker at that role's next restart, which this deploy did not do. Web imports it in `blueprints/intelligence.py` and `ops.py`, so web now runs it.
+  - `b259a089c` (lane `layer2-rail-monitor`: `scripts/rail_monitor/*`, monitor scripts that load at their next run, plus new research scripts).
+  - The rest is ledger.
+  - The later main commits `86fd3e943` / `d3ec5b72e` (#847 (d) fit fix) are NOT in `c0950cdaf` (`merge-base --is-ancestor` false).
+  - No dirty fleet file was in the range.
+- **Tests:** `tests/test_cheat_sheet_section_rules_v5.py`, 9. They include `main` stamping v5 plus the record on a fresh day, and keeping v4 with no record on a started one. 3 older tests were updated: one is on loan from `surface-consistency-oversight`, one assertion `== 4` -> `>= 4`. 333 passed across the cheat-sheet, evidence, review, reconcile, play-card and surface-consistency suites. The page script passes `node --check`.
+- **Locks:** the first acquire at 22:35:45Z was REFUSED, because the web claim was held by `surface-consistency-oversight`. I waited for it, did not force it, and it freed at 22:38:33Z. Claim web 22:38:51Z (ACQUIRED, rc 0). Baseline 22:35:14Z (`served_v5.py`: one GET `/api/cheatsheets/<sport>/<day>` per sheet). Preflight `--service web --target-commit c0950cdaf --betting-change no`, 5 pairs, from the worktree at origin/main: **CLEAR 22:39:16Z**.
+- **ff + reload:** `git merge --ff-only c0950cdaf` at **22:39:28Z** (`d72d4d536` -> `c0950cdaf`). `reload-web` 22:39:32Z: `RELOAD_WEB {"elapsed_s": 2.5, "failures": 0, "state": "done"}`, workers 1003870, 1006564 -> 1007266, 1007267.
+- **expect / measured** (22:39:53Z-22:40:08Z):
+  - `fleet_commit` d72d4d536 -> c0950cdaf: **MET**.
+  - healthz 200: **MET**.
+  - `served_nhl_1127_pvp_skaters` 9 -> **9, MET**.
+  - `served_soccer_1127_one_sided_featured` 2 -> **2, MET**.
+  - `served_soccer_1128_rules` 4 -> **4, MET** (until rebuilt).
+  - Every other served count on the 7 sheets read is identical: nba / nhl / soccer / nfl 11-27, nhl / soccer / ncaaf 11-28.
+  - `/cheatsheets?sport=nhl` 200 (4.2 MB, 543 ms) carries `const ONE_SIDED_V5` and `const RETIRED_V5`.
+  - web.log: 0 tracebacks, 0 `WORKER TIMEOUT`.
+- **Where v5 starts:** no full build of an 11-27 sheet remains today; the next `SyndicateCheatSheets` run is 7:30 AM CST. Tonight's 10:50 PM reconcile re-derives 11-27 under its v4 stamp, so 11-27's record is unchanged. `record.json` labels the two sections "(retired 11/28)" from that run. `SyndicateCheatSheetsTomorrow` at **8 PM CST** rebuilds the 11-28 sheets, none of whose games has started, so they become the first v5 sheets.
+- **verify (owed):**
+  - (1) The 8 PM CST build's 11-28 sheets serve `section_rules` 5. Soccer 11-28 then features 0 one-sided rows (1 now). NHL 11-28 has no `pvp_skaters`, and the page shows its retirement note. Each sheet's Sim vs the line header carries "Since launch".
+  - (2) A later build of a started day prints `keeps section rules v4`.
+  - (3) Per sport, featured counts on the first v5 days against v4, and the build's `secs=`.
+- **Revert:** `git revert 5539173c6` on main, then ff + reload-web. A day already stamped 5 would then be read by v4 code, which treats it as v4 and features what v4 would. Nothing to clean on disk.
+- **Claim released** 22:40:41Z (status: web free).
