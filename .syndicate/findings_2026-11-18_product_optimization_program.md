@@ -451,3 +451,308 @@ Both are read-only, so both were acted on.
 - **12-07 exits grade:** the `hold-value-exits` session was asked to schedule its pre-registered grade as a one-off
   read-only task before the 12-08 window. **Confirmed:** the 12-07 exits grade IS SCHEDULED (hold-value-exits, ledger `a3bc22764`, on the user's own "Yes, schedule it" ~11:20 AM CST in that session): read-only tasks `hold-value-shadow-grade-1207` (Mon 12-07 12:30 PM CST) and `-backup` (4:30 PM CST, stands down if graded), both enabled. The pre-registered window is shadow ticks and games through 12-06, verdict on or after 12-07 12:00 PM CST. That leaves the evening for the user's 12-08 decision.
 
+## 12. Re-rank 11-26
+
+Run 11-26 10:01-10:45 PM CST by a session started from the coordinating session (e32fef1a), with the stored prompt of
+task `product-optimization-rerank-1126`. Its four scheduled attempts (9:30-10:34 AM CST) failed at the API with
+ENOTFOUND during the host's DNS outage (about 12:00 AM-11:05 AM CST), and the task disabled itself. The user said "no
+you do it" (~9:55 PM CST). Before this write, this file had no `## 12.`.
+- **Read-only on the fleet:** GETs of `/api/portfolio/live` and `nice -n 19` reads of the data root. No deploy, claim,
+  env edit, POST or scheduled-task edit.
+- **#847 waited for:** its §5 landed on origin/main in `769387420` (~10:08 PM CST), and this section was written after it.
+- **Scratch:** `C:\tmp\optprog_1126\`. This is NOT durable; the numbers are here.
+
+### 12.1 Readings (a)-(i)
+
+**(a) The 11-24 window batch: ALL of A-H loaded, and none was dropped.**
+- **The load:** one claimed ff `d845fe345..672a18e87` at 2:30:10 AM CST, then ONE drained full down/up. Every role
+  booted on `672a18e8` at 2:30:36-37 AM CST (`deploys.md:63060`, `:63125-63132`). The batch was 16 changes (A-P).
+- **Each change** (load times CST 11-24, register rows `betting_changes.md:90-104`):
+  - A NFL t0.925, 2:30:37, BC-059;
+  - B #834 NBA live total anchor, 2:30:36, BC-060; 86 of 86 NBA ticks anchored (`deploys.md:63185`);
+  - C #842 look-ahead keys, BC-061; Pb0-Pb2 held (`:63490-63492`);
+  - D #844 grid newest stamp by time, BC-062;
+  - E #851 Polymarket slate sweep on its own thread, BC-063; P1-P6 predicted (`:63380`);
+  - F #853 one shared board copy in web, not a betting change; P5 falsified, 89.3 vs 77.7 builds an hour (`:63393`);
+  - G #854 college orientation join, BC-064;
+  - H #856 hold-value exits SHADOW, not a betting change.
+- A and G have no post-load reading in the ledger.
+- **Later loads:** every one after the batch is `betting change: no` (web 11-24 9:43 AM, BC-072, BC-073, 11-26 #861
+  step 1d, the 11-26 11:40 AM live-odds-worker ff+TERM). The latest betting change is **BC-071 at 2026-11-24T08:30:37Z**.
+  Nothing is pending. `betting_change.py candidates` still lists 2 unclassified loads, 11-18 17:58:30Z and 11-19
+  04:46:22Z, both before the clock start.
+
+**(b) M2's 11-24 read: FAIL on harm. M3 never started.**
+- The verdict is `M2_VERDICT FAIL harm=1 [outcome:ON_BY_AGE:nba|totals|live|a<=60] judged=18 pass=1` (`50319e3d3`;
+  `findings_2026-11-16_m2_gate.md:8-50`).
+  - The harm: NBA live totals, d_ll +0.024058 [+0.013761, +0.034215], 60 games.
+  - The only pass: `ncaaf|totals|live` −0.038165 [−0.063059, −0.014735], 63 games.
+  - The gate uses a 99% bound per stratum, with no BH or LODO.
+- **The diagnosis** (`882812442`, gates nothing): the re-sim's over-lean went from +0.113 in train to +0.359 after #821
+  F1. With the re-sim weight zeroed, the harm is +0.0009 [−0.0001, +0.0022]. This is P4's mechanism (§12.4).
+- **M3:** printed `NO_M3` 11-25 8:43 AM; user "yes, disable the M3 nightly task" (~9:35 AM 11-25); the lane is dormant.
+- **M2b:** user "Hold M2b" (11-25 10:10 AM). Only task: `engine-learner-kalshi-recheck-1201` (12-01, NBA, gates nothing).
+- **Nothing from these lanes goes to 12-08 except #836 `on`.**
+
+**(c) decision-policy-paper 11-23: P1 `ev_lb` took NO look** (`findings_2026-11-23_decision_policy_weekly_read.md:10-19`,
+`7ae99f1be`).
+- It has 188 sharp-graded bets / 142 games. L1 needs 400 / 100: the games are met, the bets are not.
+- Reported but not decisive:
+  - fee-net CLV −0.18% [−0.91, +0.53];
+  - against C0 on shared lines +4.17 pts [+1.72, +6.74], 75 bets / 64 games.
+- Next look Mon 11-30 9:43 AM CST. P1's L1 is projected around 12-13..12-20.
+
+**(d) The maker-entry re-judge (~11-24) was never scheduled and never ran.** The only re-judge task ran 11-14 (NOT YET
+DUE, 14 of 30 timed fills; `lanes_closed.md:15821`).
+- Read here from the live ledger (`execution_style = maker_pilot`): 80 posts; 33 rejected; 45 filled.
+- 43 decided bets / 42 events, ROI **+1.65% [−16.55, +19.86]**, fees 0.56% of stake (10-25..11-25).
+- 11-18 read: −4.76 [−27.5, +18.0] on 32 / 31.
+- The registered criterion (edge at fill ≥ +1.5 pp, 90% lower bound > 0) was not computed.
+
+**(e) #816's grade, 11-24 10:04 AM CST: it passes the registered FLIP-to-spread-only rule** (`findings_2026-11-16_ncaab_total_overprojection.md:196-263`).
+- T3 (served − spread only) is +0.00484 [90% game-clustered +0.00230, +0.00737] on 284 live games / 7 nights.
+  Spread only won 6 of 7 nights.
+- Our bar is not the registered one:
+  - the registered rule uses 90%, with no BH and no LODO;
+  - z ≈ 3.1 would survive BH over T1-T5;
+  - by the per-night table, dropping any single night keeps T3 > 0.
+- **The gain is shrinking.** The daily refit's level fell from −0.288 to −0.040 over the window, so 11-21..11-23 were
+  near ties.
+- **No user words since the grade.** The last on record: "Keep until 11-24" (11-18 ~7:40 AM CST).
+
+**(f) #847's forward grade H-F: PASSES** (`findings_2026-11-18_cell_calibration.md` §5, `769387420`, read 10:01 PM
+CST 11-26 by the parallel re-run).
+- ΔBrier −0.006815/row **[−0.009606, −0.004426]**, 32,372 rows / 486 games / 7 dates (11-19..11-25).
+- **38 of 41 cells are better** (bar 27.3). The 3 worse are NCAAF spreads pregame (q1, h1, full) at k 0.365. Full
+  was worse in H-S too.
+- H-R is **not runnable** to new coverage: no `nba|*|live` cell and no college-totals live cell is served.
+
+**(g) #830 and #844.**
+- **#830's interim** (11-18 slate only, 90% CIs): C1, C2, C2x, C4, C4r and C6 INSUFFICIENT; C3 NOT CONFIRMED; C5 FAILS.
+  The verdict task runs 12-02 10 AM CST.
+- **#844 FINAL** (rail monitor, `deploys.md:63573-63582`):
+  - P1 PREDICTED: 1,053 of 2,696 venue rows carry a sportsbook-spelled stamp, vs 22 of 1,213 on 11-19.
+  - P2 PREDICTED: NCAAB moneyline rows fresh by row age 274 of 352 (77.8%), equal to fresh by cell, 0 mismatches. It
+    was measured as a share of rows, not of live minutes.
+  - P3 PREDICTED: NBA mismatch 0 of 48 samples. NHL was not sampled.
+  - P4 NEITHER: NCAAB stale share flat (37.4% → 37.0%). WNCAAB's fell, but so did its priceable share.
+- **Rail daily grade** (90% CIs, no BH or LODO):
+  - 11-24: 631 flags / 102 games, hit 0.553 vs fair 0.501 [+0.011, +0.094], model 0.600;
+  - 11-25: 550 / 91, hit 0.512 vs 0.481 [−0.012, +0.075], model 0.584;
+  - 11-26: not written yet.
+  - Flags still hit far below the model's own probability (−4.7 and −7.2 pp), the same over-confidence as §2.
+
+**(h) The live book** (`py -3 scripts/live_book_edge_readout.py`, fleet GET 10:04 PM CST, 2,705 live orders, as of the
+11-25 slate). ROI is net of fees, with event-clustered 95% intervals.
+
+| window | bets / events | ROI | fees % of stake | before fees (selection at the fill price) | fee-net same-book CLV |
+|---|---|---|---|---|---|
+| last 30 (10-27..11-25) | 1,610 / 723 | **−7.51% [−13.19, −1.83]** | 3.89% | −3.62% | −0.63 pp ± 0.22 SE (624 bets); close calibration −4.05 pp (z −1.95) |
+| last 7 (11-19..11-25) | 263 / 148 | +0.24% [−11.49, +11.96] | 3.11% | +3.35% | −1.53 pp (se 0.5; portfolio monitor) |
+| since BC-071 (11-24T08:30:37Z) | 16 / 10 | +36.66% [−5.36, +78.67] | 2.29% | +38.94% | −5.18 pp, n = 2 |
+
+- **Fees are now 52% of the 30-day loss** (3.89 of 7.51 pp). On 11-18 they were 78% (since 11-03).
+- Selection before fees has gone from +0.65 to −3.62. The tool gives no CI on the before-fees figure, so this is not a
+  tested change.
+- **Gate: 10 of 800 events (NOT MET).** The clock starts at BC-071. This reconciles with the portfolio monitor's 6:30 PM
+  CST reading: the same 30-day and 7-day numbers, and 10 of 800.
+- **Live volume fell after BC-071** (0% live EV floor OFF; the live plans buy Suggested rows only). The fall was
+  predicted by its lane: rows_in went from hundreds to tens (`lanes.md:2204-2213`).
+  - Orders per UTC day: 53-68 on 11-17..11-23 (35 on 11-20), then 24 / 22 / 10 on 11-24 / 11-25 / 11-26. 11-26
+    includes 11 h of outage.
+  - Stake: ~$28-80/day before, ~$20-33/day after.
+  - At about 3.75 events/day, the gate's 800 events are about 200 days away. **Every Tier-1 $/day below is rescaled by
+    about 25/61.75 ≈ 0.4.**
+
+**(i) The scorecard funnel** (`model_scorecard_20261126.json`, generated 11:30Z = 5:30 AM CST, during the outage).
+28-day `optimizer.by_sport`, as pooled / recommended / staked ROI (staked bets):
+
+| sport | 11-20 | 11-26 | games / dates (11-26) |
+|---|---|---|---|
+| NBA | −7.6 / −1.5 / +4.2% (4,633) | −7.5 / −1.4 / **+2.6%** (4,560) | 193 / 26 |
+| NCAAB | −5.7 / −4.8 / +6.2% (598) | −5.7 / −4.7 / **+4.6%** (901) | 1,065 / 24 |
+| soccer | −44.1 / −35.6 / −5.2% (586) | −42.8 / −31.4 / −1.5% (633) | 394 / 18 |
+| NCAAF | −7.3 / −4.5 / +6.0% (1,277) | −7.3 / −4.5 / **−1.3%** (1,277) | 254 / 19 |
+| NFL | −5.3 / −5.4 / −1.0% (1,217) | −5.3 / −5.1 / +2.4% (1,427) | 56 / 12 |
+| NHL | −11.2 / −10.5 / −0.6% (1,550) | −10.4 / −9.9 / +0.5% (1,512) | 183 / 26 |
+| WNCAAB | −7.5 / −4.9 / −1.7% (27) | −7.3 / −5.3 / +8.5% (43) | 388 / 24 |
+
+- The windows overlap 22 of 28 days, so these are not independent samples. No CI is published per sport.
+- The 11-26 NCAAB pooled and recommended counts equal 11-25's (251,373 / 153,870 bets): that run graded no new NCAAB
+  rows.
+- All-sports staked: +1.69% on 10,401 bets (predicted +3.95%).
+- The pattern of §2 holds. The board loses, the recommended set loses less, and the staked paper book is near zero. NBA
+  staked fell from +4.2 to +2.6 and NCAAF from +6.0 to −1.3, but neither move is a tested change.
+
+### 12.2 STEP 2: the suggested-to-placed match, rerun
+
+Method of `C:\tmp\optprog\A_join2.py` (11-18), unchanged. The identity is (game, market, player, segment, side, line,
+phase), taken from `suggested_set_state.json` `graded` (37,543 lines, state written 11-26 13:23Z). The orders are the
+settled paper orders in `execution_ledger_archive` (68,969 latest per key). Script: `C:\tmp\optprog_1126\s2_join.py`.
+- **The window stops at the 11-24 slate:** the 13:23Z 11-26 grader ran in the outage and graded only 664 lines for 11-25.
+  11-19..11-23 graded 2,592-4,899 lines a day.
+- **The 11-18 numbers reproduce:** 1,784 of 10,576 in-set (16.9%), against 16.0% on 11-18. The difference is orders
+  that settled later.
+
+| window | orders (games / dates) | in-set share | in-set ROI | out-of-set ROI | in − out | LODO |
+|---|---|---|---|---|---|---|
+| **complete coverage:** submitted ≥ 04:46:47Z 11-19 (#sg live), slate ≤ 11-24 | 2,365 (398 / 7) | **95.4%** (2,257) | **+3.15% [−1.61, +7.91]** (377 g) | +7.72% [−13.93, +29.37] (49 g) | −4.57 [−26.55, +17.41], p 0.684 | fails |
+| full: slate 10-21..11-24 | 12,949 (1,649 / 35) | 31.2% (4,039) | +0.25% [−3.78, +4.29] (979 g) | +3.11% [+0.46, +5.76] (1,295 g) | −2.86 [−7.64, +1.92], p 0.241 | holds |
+| 11-18 (for reference) | 10,036 | 16.0% | −1.30% [−8.14, +5.55] | +3.04% [+0.32, +5.77] | −4.34 [−11.62, +2.94], p 0.243 | holds |
+
+- **What this says:** once the recorder sees every suggested line, **95.4% of staked orders sit on one.** The 11-18
+  "only 16.0%" was defect M1, the first-sighting recorder, not a selection gap.
+  - The board-to-staked selection gap that H1 named is **not a lever.** The staked paper book IS the suggested set.
+- **The slices clear nothing:** 0 of 9 slices clear BH at q 0.10 in either window.
+  - Complete-coverage NCAAF in-set −20.18% [−39.15, −1.21] (194 / 55 g), p 0.037; NBA in − out +29.55 (18
+    out-of-set orders), p 0.044.
+  - The out-of-set group is 108 orders, too thin to compare.
+- **Sensitivities:**
+  - Including the 11-25 slate pushes out-of-set to 392 orders, because 11-25's lines are not graded yet. This is the
+    lag, not selection.
+  - Restricting to games with a graded line gives 96.8% in-set.
+
+### 12.3 STEP 2b: the portfolio monitor's two slices under this program's bar
+
+Scope: live bets **selected 10-24..11-22** (30 days through 11-22): 1,717 bets / 774 events / 30 dates. That is
+`bets_from_orders` of the 10:04 PM CST GET. Nothing from 11-23 on is read, so the monitor's forward set is untouched.
+Script: `C:\tmp\optprog_1126\s2b_slices_v2.py`.
+- **The monitor's reading reproduces:** on its 11-22 window (10-23..11-21) the 0.30-0.45 band is −12.32% on 305 / 199,
+  and on 10-24..11-22 it is −12.16% [−23.86, −0.46] on 281 / 189, the monitor's exact figure.
+- **The family:** 12 price and EV bands × 3 metrics. The metrics:
+  - net ROI;
+  - net ROI − claimed EV, the monitor's comparison;
+  - ROI before fees − claimed EV, like for like, because `ev_pct` is the EV at the venue price BEFORE the fee
+    (`portfolio_commit.py:1224-1238` holds the separate `ev_pct_net_of_fee`).
+- Only 6 bands have bets in the window: price .30-.45 / .45-.55 / .55-.70 / .70-.85, and EV 2-5 / 5-10. So the
+  **family is m = 18 tests.** If the 18 empty band-tests were counted (m = 36), nothing would pass.
+
+| slice | metric | bets / events | estimate, 95% event-clustered | p | BH (m 18) | LODO | halves |
+|---|---|---|---|---|---|---|---|
+| **price .30-.45** | net ROI | 281 / 189 | −12.16% [−23.86, −0.46] | 0.042 | **FAILS** (rank 4, threshold 0.022) | holds [−13.91, −9.75] | −14.20 / **+1.98** |
+| **EV 2-5** | net ROI | 1,057 / 582 | −6.80% [−14.47, +0.87] | 0.082 | FAILS | holds | −8.38 / −3.74 |
+| **EV 2-5** | net − claimed (+4.13) | 1,057 / 582 | **−10.93 pp [−18.59, −3.26]** | 0.0052 | **CLEARS** | holds [−12.25, −9.15] | −12.51 / −7.87 |
+| **EV 2-5** | before fees − claimed | 1,057 / 582 | −7.54 pp [−15.24, +0.15] | 0.055 | FAILS | holds | −9.20 / −4.33 |
+| price .55-.70 | net − claimed (+4.10) | 509 / 309 | −13.88 pp [−23.88, −3.89] | 0.0065 | CLEARS | holds | −17.31 / −7.05 |
+| price .55-.70 | before fees − claimed | 509 / 309 | −10.87 pp [−20.89, −0.85] | 0.034 | FAILS | holds | −14.44 / −3.74 |
+| price .45-.55 | net ROI / before fees − claimed | 643 / 442, 546 / 383 | −0.65% [−10.36, +9.06] / −0.03 [−11.45, +11.39] | 0.90 / 1.00 | — | — | — |
+
+No other test has p < 0.11.
+
+- **Slice 1, fill price 0.30-0.45: FAILS the bar. 11-18's NOISE verdict STANDS.**
+  - It fails BH. LODO holds, but the two halves of the window disagree in sign (−14.20 before 11-08, +1.98 from
+    11-08), which is the same split that made 11-18 call it noise.
+  - **It is not the model over-rating underdogs, so the T2 / #847 mapping does not hold.** 265 of its 281 bets carry no
+    model probability:
+    - 133 are in-play orders sized on `inplay_book_median_novig`, −16.88% [−31.98, −1.78] (91 events);
+    - 132 are legacy Kalshi orders with no sizing basis, all selected 10-24..10-31, −5.37% [−22.11, +11.38] (89 events);
+      they leave the 30-day window by 11-30;
+    - only 16 are model-sized (`model_edge`).
+  - **Consequence for the monitor's pre-registered longshot lead:** its GO statistic, a model probability equal to the
+    fill price plus `model_edge`, exists on 16 of 281 bets in this window. The forward read cannot be computed on
+    the in-play bets. That is the portfolio monitor's to resolve before its forward read.
+  - Stays on the noise list (§7) with these numbers.
+- **Slice 2, claimed EV 2-5: it CLEARS as the monitor states it, and FAILS like for like.**
+  - Net realised against the pre-fee claimed EV: −10.93 pp, clearing BH (m 18) and LODO with halves that agree. But
+    about 3.4 pp of that gap is the fee, which `ev_pct` never included.
+  - Like for like (before fees against the claimed EV): −7.54 [−15.24, +0.15], p 0.055, fails BH.
+  - **11-18's NOISE verdict on the EV bands' ROI STANDS** (net ROI −6.80, p 0.082). The over-statement of EV at the
+    price we take is real in point estimate, but it does not clear on the live book once fees are separated.
+  - This is T1 (L2): it stays "watch". The lever it supports when it clears is a per-line fee-net lower-bound EV at
+    admission and sizing: `decision-policy-paper` P1 `ev_lb`, which has 188 of the 400 bets its first look needs.
+    Never an EV-band gate.
+- **New, not one of the two slices: the over-statement sits at FAVOURITE prices.**
+  - 0.55-0.70 gives −13.88 net / −10.87 like for like. The 0.45-0.55 band is inside noise like for like (−0.03).
+  - This contradicts a longshot reading. It is found in this family, so it is a watch item for T1, not a lever.
+
+### 12.4 Re-ranked table
+
+Tier-1 dollars are at the post-BC-071 stake, about $25/day; 11-18 used $61.75/day. Marks are against §3.
+
+**Tier 1: live money**
+
+| rank | lever | mark | the reading that moved it (or not) | EV now ($/day) | owner | betting change |
+|---|---|---|---|---|---|---|
+| L1 | Hold-value exits | **UNCHANGED, still #1 live** | shadow LOADED 11-24 2:30 AM CST (change H) and logging: `reports/intelligence/execution_exits_hold_value/shadow_<UTC date>.jsonl`, 5,625 / 9,515 / 5,161 / 1,750 rows for 11-24..11-27 (to 04:11Z). Pre-registered verdict 12-07 | ~0.2, ceiling ~0.64 (was 0.51 + 1.07, ceiling 1.58) | `hold-value-exits` | yes; NOT READY until 12-07 |
+| L2 | Lower-bound EV (T1) | **UNCHANGED** | P1 `ev_lb` took no look (188 / 142 of 400 / 100); live EV 2-5 like-for-like −7.54 [−15.24, +0.15] fails BH (§12.3) | live ≤ 0.5 | `decision-policy-paper` | yes |
+| L3 | Over-side shrink | UNCHANGED | holdout 11-27 not yet read. 30-day live totals −13.75% ± 6.03 SE (360 / 283), p ≈ 0.023, fails BH by inspection over the readout's 16 sport/market slices | 0.2-0.35 | `prop-fair-side-lean`; game totals → P1 | yes |
+| L4 | #830 game-shape cues | UNCHANGED | interim INSUFFICIENT / NOT CONFIRMED; verdict 12-02 | ~0.2 | `live-bet-timing-forward` | yes |
+| L5 | Maker entry | UNCHANGED | +1.65% [−16.55, +19.86] (43 / 42); re-judge never run | ≈ 0 | S3 pilot (no re-judge scheduled) | yes |
+| L6 | Exit fees in the readout | RESOLVED (11-19) | — | 0 | `portfolio-monitor` | no |
+
+**Tier 2: board, paper, evidence**
+
+| rank | lever | mark | the reading that moved it | owner | betting change |
+|---|---|---|---|---|---|
+| **P1** | **#847 calibration everywhere** | **MOVED UP: top board lever** | H-F PASS: −0.006815 [−0.009606, −0.004426], 486 games, 38 of 41 cells. H-R still not runnable | todo #847 (lane CLOSED) | (b) no; (c)(d) yes |
+| P5 | #816 spread-only | **MOVED UP** | registered flip rule met, T3 +0.00484 [90% +0.00230, +0.00737], 284 games; gain shrinking | `ncaab-total-overprojection` | yes |
+| P4 | NBA engine overshoot | **MOVED UP (corroborated)** | M2's only harm is NBA live totals d_ll +0.024 (60 games). The re-sim's over-lean went +0.113 → +0.359 after F1, and the harm goes when the re-sim weight is zeroed | `basketball-scenario-calibration` | yes |
+| P2 | #844 newest stamp by time | **RESOLVED** | BC-062; P1-P3 PREDICTED, P4 NEITHER | `ncaab-total-overprojection` (closing) | — |
+| P3 | #834 NBA live total anchor | **RESOLVED (loaded)** | BC-060, 86 of 86 NBA ticks anchored. Its keep or revert grade belongs to its lane | `nba-live-resim-total-anchor` | — |
+| P6 | NFL t0.925 | RESOLVED (loaded) | BC-059; no post-load reading yet | its lane | — |
+| P15 | #842 look-ahead | RESOLVED (loaded) | BC-061; Pb0-Pb2 held | `lookahead-day2-phase-lock` | — |
+| P7 | #836 end-game freshness `on` | UNCHANGED | shadow counts only (NBA 15%, NCAAF 26%, NHL 51% would refuse); no outcome grade; the named held-out check has no record of running | `engine-learner` | yes |
+| P10 | #835 (+ #852, #859) NCAAF live totals | UNCHANGED | 11-21 hold-out: log loss and slope pass, the 17+ mean F−c FAILS (+1.66 vs +0.86, 43 games). The 11-28 slate decides (task 11-30 10:30 AM CST) | NCAAF lanes | yes |
+| P14 | #845 Understat splice | UNCHANGED | Understat still down (`state: down`, probe 11-26 10:09 PM CST); real-gap read worse, +0.0084 [+0.0015, +0.0185], until the 12-05/06 re-run | todo #845 | yes |
+| — | M2 engine learner (D-level) | **FALSIFIED as gated** | FAIL harm=1, judged 18 / pass 1; M3 never ran; M2b held | `engine-learner` | — |
+| P8, P9, P11-P13, P16 | — | UNCHANGED (not re-read) | — | as §3.2 | — |
+
+**Tier 3, and the H1 selection gap**
+
+| item | mark | reading |
+|---|---|---|
+| M1 suggested grade half-blind | RESOLVED (11-20), now measured | 95.4% of staked orders sit on a graded suggested line under full coverage (§12.2) |
+| The board-to-staked selection gap (H1) | **FALSIFIED as a lever** | the 16.0% was M1. With complete coverage, in − out is −4.57 [−26.55, +17.41] on 108 out-of-set orders |
+
+**The noise list** (§7) gains, with numbers:
+- live price 0.30-0.45, −12.16 [−23.86, −0.46], fails BH, halves disagree;
+- live EV 2-5 net ROI −6.80, like-for-like over-statement −7.54 (p 0.055);
+- the 0.55-0.70 over-statement, like-for-like −10.87 (p 0.034, fails BH);
+- the STEP 2 in-vs-out split in both windows;
+- complete-coverage NCAAF in-set −20.18 (p 0.037, fails BH over 9).
+
+**Not changed:** H1 FALSIFIED, H2 HOLDS (§5). No live-money lever clears the bar. The only thing that cleared on a
+forward read is calibration (#847 H-F).
+
+### 12.5 The 12-08 window candidates (Tue 12-08 2-7 AM CST)
+
+Every "default-off" below was verified in the code on main at `388d77705`. This run adds nothing to any window task.
+
+| candidate | on main, default off? (the env read) | owner, and the user's words so far | evidence and prediction | betting change | verdict |
+|---|---|---|---|---|---|
+| **#847 (c) rank/stake** `SYNDICATE_CELL_CALIBRATION_RANK_STAKE` | yes: `cell_calibration.py:85-88,141`, on only for on/1/true/yes; read at `optimizer_overlay.py:129` | `cell-calibration-847` (CLOSED; todo #847). No load words | H-F PASS on the frozen k. Predictions (cell findings §4.1): P-c1 ≥ 1 Layer 2 score with `optimizer_factor` < 0.5 on the first build (0 before); P-c2 0 rows < 0.10 and the board's row count unchanged; P-c3 paper orders in the 25 cells stay > 0/day (3 slates at 0 = a gate, revert); P-c4 no detectable money change (≤ $6.9/day paper, live ≈ $0) | yes | **READY** on evidence; needs the user's yes |
+| **#847 (d) live probability** `SYNDICATE_CELL_CALIBRATION_LIVE_PROB` | yes: same parser; read at `live_gameline_join.py:1888`; skips college totals (`:1880`, #816's) | as above | H-F covers its 7 live cells (e.g. `ncaaf|totals|full|live` −0.019, `ncaab|spreads|full|live` −0.0009). Predictions (§4.2, P-d2 revised): P-d1 the `live_cell_calibration` stamp, edge ≈ k × raw; P-d2 priceable rows in moved cells fall by less than a third (half or more in NCAAB spreads refutes it), median abs(edge) ratio k ± 0.15; P-d3 Brier improves, flags in those cells hit within ±3 pp; P-d4 fewer live orders there, no detectable P&L | yes | **READY** on evidence; needs the user's yes |
+| #848 scorecard grading `SYNDICATE_SCORECARD_848_GRADING` | yes: `population_outcomes_soccer.py:68-72`, `population_outcomes_nhl.py:69,76` | `scorecard-grading-defects` (CLOSED); todo #848. No load words | grading fix; needs ONE manual `publish_model_scorecard.py --max-board-dates 40 --publish --verify` off-peak (todo #848) | yes (overlay) | NOT READY: the 40-date refill is unscheduled |
+| #816 spread-only | **NO, it is a code constant** (`total_prob_calibration.py:72` `FIT_LEVEL = True`); `False` on main would load at the next ff | `ncaab-total-overprojection`; "Keep until 11-24" (11-18), nothing since | the registered flip passes (§12.1 e); prediction per its lane: refit with the level off | yes | NOT READY: needs a default-off switch, or a window-only branch, first |
+| #836 `on` `SYNDICATE_LIVE_ENDGAME_FRESHNESS` | **absent = SHADOW, and any unrecognised value = ON** (`live_endgame_freshness.py:53,77-84`) | `engine-learner` (user "fix gap", 11-20); the owner asks for `on` on the user's yes | shadow counts only; dev-window refused cell +0.174 nats (se 0.053), cut set on the same dates | yes | NOT READY under this bar: no held-out outcome grade |
+| #852 + #835 (+ #859) NCAAF live totals | yes: `live_blowout_damping.py:33,49,57`; `live_total_dispersion.py:93-94`; `live_endgame.py:59-63` | NCAAF lanes. The user chose "Queue for 12-08 (Recommended)" (11-20 ~9:40 AM CST, an option label, conditional) and #859 "queue the end-game load set for the 12-08 window" (11-21 ~6:10 PM CST) | 11-21: 2 of 3 checks pass. The 11-28 slate decides | yes | NOT READY until the 11-30 check |
+| #845 Understat splice `SYNDICATE_SOCCER_UNDERSTAT_SPLICE` | yes: `build_soccer_artifacts.py:161,165-166` | todo #845; "queue the splice for the 12-08 window" (11-18 4:57 PM CST) | Understat still down. Real-gap worse +0.0084 [+0.0015, +0.0185]; the backtest favours it at 4+ rounds | yes | NOT READY until the 12-05/06 re-read is shown to the user (its own condition) |
+| L1 hold-value exits `on` `SYNDICATE_EXIT_HOLD_VALUE` | yes: `exit_hold_value.py:52-56,80-87`, only exactly `on` / `shadow` | `hold-value-exits`; "Yes, ride 11-24" (shadow only) | shadow loaded and logging (§12.4 L1); verdict 12-07 | yes | **NOT READY** (12-07) |
+| #861 one model number `SYNDICATE_LAYER2_ONE_MODEL_NUMBER` | yes: `layer2_row_context.py:400-402` | `surface-consistency-oversight`; "Queue for 12-08" (11-24 ~11:25 AM CST) | not assessed here | per its lane | queued by the user; not assessed |
+| Polymarket stale cancel `LIVE_ODDS_WORKER__SYNDICATE_POLYMARKET_STALE_CANCEL` | yes: `polymarket_stale_cancel.py:100-107` (off, shadow, on) | `polymarket-stale-cancel`; "yes, add the Polymarket stale cancel to the 12-08 queue" (relayed, 11-21); final yes owed | not assessed here | per its lane | queued; not assessed |
+| #857 web anon limit `WEB__SYNDICATE_WEB_WORKER_ANON_LIMIT_MB=1500` | env only, absent = today | `web-recycle-anon-limit`; "Next scheduled restart" (11-25 ~10:10 AM CST) | — | no | not a betting change |
+| #850 host overdraft | not verified here | "Yes, build it" covered the build only | — | — | proposal |
+
+**READY for the 12-08 window: #847 (c) and (d) only.** Both are calibration loads. Their money predictions are "no
+detectable change"; they ship for honest rank, stake and live edges.
+
+**Outside the window, no betting change: #847 (b) display, `SYNDICATE_CELL_CALIBRATION_DISPLAY`.**
+- H-F graded exactly the probability (b) shows.
+- The code adds the calibrated columns beside the raw ones and says nothing ranks, admits or stakes on them
+  (`layer2_board.py:5503-5509`). The lane classified it "not a betting change". This run did not trace every reader
+  of those columns.
+- Loading it needs the user's OK, claims, a preflight and an env load.
+
+### 12.6 What is owed
+
+- **The user:**
+  - #847 (b) now, or not;
+  - #847 (c) / (d) for 12-08;
+  - #816 needs a default-off build before it can be a candidate;
+  - #836 `on` is the owner's ask, without an outcome grade.
+- **The portfolio monitor:** its longshot forward read needs a model probability that 265 of 281 band bets do not
+  carry (§12.3). Noted here, not acted on.
+- **#847:** the H-R re-run, when NBA live and college-totals live cells are served (todo #847).
+- **The calendar:** 11-27 prop holdout (L3); 11-30 NCAAF check and P1 `ev_lb` look; 12-02 #830 verdict; 12-07 L1
+  verdict; 12-08 the window.
+
