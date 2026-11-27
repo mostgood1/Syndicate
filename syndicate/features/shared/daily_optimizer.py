@@ -398,6 +398,10 @@ def wrap_grade(grade: Callable[..., tuple[list[dict[str, Any]], dict[str, int]]]
                 cal, pooled = accumulate(graded, graded_model(records), fit_graded)
                 entry: dict[str, Any] = {"sport": gk.split("|", 1)[0], "cal": cal, "pool": pooled,
                                          "rec": {}, "pub_known": False, "pub_rows": 0}
+                if for_fit is not None:
+                    # todo #847 (d) fit fix: how many records were refit on `mu` -- the only trace in the published
+                    # state that the fit copy fired (the sums alone cannot say). Absent on every other game.
+                    entry["fit_mu"] = sum(1 for r in records if FIT_EDGE_FIELD in r)
                 pub = state["pub"].get(gk)
                 if pub is not None and pub.get("known"):
                     entry["pub_known"] = True

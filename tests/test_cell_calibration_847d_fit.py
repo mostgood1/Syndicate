@@ -394,3 +394,21 @@ def test_the_cron_keeps_a_none_number_before_d_so_an_implausible_row_stays_out(t
     rec_on = _records(_candidates([_grid_row(extreme)[0]]))
     assert any(r.get("mu", 0) is None for r in rec_on)
     assert _cron_cal(rec_on, _chips()) == _cron_cal(rec_off, _chips())
+
+
+def test_the_committed_game_says_how_many_records_were_refit_and_says_nothing_otherwise(tmp_path, monkeypatch):
+    def committed(records):
+        state = msc.empty_state("sig")
+        msc.merge_board_date(state, DAY, records, today="2026-11-27", central_date=bs.SCORECARD.central_date,
+                             fetched_at="2026-11-27T12:00:00Z")
+        opt_state = opt.empty_state("sig")
+        grade = opt.wrap_grade(bs.grade_population, opt_state, game_key=msc.game_key)
+        chips = _chips()
+        msc.grade_pending(state, today="2026-11-27", grade=grade, chips_for=lambda day: chips[day],
+                          central_date=bs.SCORECARD.central_date)
+        opt.commit(opt_state, state["games"])
+        return list(opt_state["games"].values())[0]
+
+    assert "fit_mu" not in committed(_records(_candidates([_grid_row(DIST_FOR)[0]])))
+    _d_on(monkeypatch, tmp_path)
+    assert committed(_records(_candidates([_grid_row(DIST_FOR)[0]])))["fit_mu"] == 2
