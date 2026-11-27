@@ -2376,6 +2376,14 @@ death, never life — do not invert it.
 - Blocked by: none
 - STATUS 2026-11-27 3:30 PM CST: BUILT on branch cell-calibration-847d-fit-fix 8e771a40c + a449d9b3e (local, refs/keep pinned), NOT pushed (the code push needs the user's own yes). 17 new + 549 targeted pass; A/B vs main byte-identical in 8 c/d-absent cases incl. #835 on. Findings section 9; reader updated (--fit-fix required), kit unchanged. CORRECTION: the "- Files (added ...)" line above says 3:50 PM CST; it was pushed at about 3:10 PM CST
 
+### soccer-live-lane-age-ceiling — OPEN — opened 2026-11-27 — session d58574cb-c55a-4f1f-aa9a-ab530a5f63e0
+- Goal: Give soccer live pricing a lane-age ceiling (600 s) behind a NEW switch SYNDICATE_LIVE_GAMELINE_SOCCER_LANE_AGE (absent = off = today's behaviour byte-identical; shadow = count what it would refuse; on = refuse), with the soccer source stamping the lens time as each lane's as_of while the switch is not off; on main default-off, queued for the 12-08 window (user 2026-11-27 ~4:35 PM CST "Yes, build it here" to "Should I build a soccer lane-age ceiling, default-off, queued for the 12-08 window?")
+- Files: syndicate/features/shared/live_gameline_join.py (the lane-age table, max_lane_age_seconds, the soccer lane-age switch and the lane verdict lines in the row loop only), syndicate/features/shared/soccer_live_gameline_source.py (the snapshot-time stamp in soccer_live_games and the index builder's call to it only), tests/test_soccer_live_lane_age_gate.py (NEW), scripts/rail_monitor/soccer_stale_1127/ (NEW)
+- Hypothesis: n/a (build). The defect it closes: 11-27 20:02-21:47Z the soccer live lens was frozen by its memory gate and the join priced 14-38 soccer rows per build from it (no soccer ceiling; no soccer lane carries a time, lane_age_max=None on all 287 soccer join lines 11-27)
+- Falsification test: off != on reachability fails, or off is not byte-identical to main on the same inputs, or a Saturday-slate measurement before 12-08 shows fresh soccer lanes (no gate skip since the last lens write) older than 450 s
+- Verification: tests: off identical / shadow counts and prices / on refuses > 600 s and an untimed lane / fresh lane priced; R-N: re-run soccer_lane_age_1127.sh after Saturday 11-28 (fresh max must stay < 450 s); at the 12-08 load: LIVE_GAMELINE_JOIN soccer lane_age_max non-None, 0 fresh builds refused, stalled builds refused
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
