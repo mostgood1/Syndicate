@@ -54,14 +54,49 @@ PowerShell's default UA got 403 on the same URL that urllib's honest
 default fetched fine. `urllib.request.Request(url)` with no headers is
 load-bearing, not an oversight. See
 scripts/fetch_espn_live_status_for_date.py for the original probe.
+
+--------------------------------------------------------------------------
+IN A WEB REQUEST THIS NO LONGER FETCHES `[2026-11-27]`
+--------------------------------------------------------------------------
+
+Lane `nfl-request-path-espn`, after NCAAF's and WNBA's (`c2fb7f49b`). Web
+fetched this scoreboard inside requests: 40
+`compute in request path (operation=nfl_espn_game_state_fetch)` lines on
+11-27 between 00:00Z and 16:39Z. Most were past-date `/api/board/game-chips`
+builds (the 8:15 AM play-cards grader asks for every date since 10-16). The
+rest were current-week page builds. When the host's network is down, each
+GET stalls in DNS inside the request (61-113 s game-chips requests on 11-26).
+
+The workers already call this for the current week about 200 times an hour,
+outside any request (0 request-path lines in either worker log, 11-27). So
+what they fetch is now kept:
+
+  * a WORKER RECORD per (season, seasontype, week), written through
+    `refresh_state_store` (the keyvalue store on the fleet) after each
+    successful fetch outside a request. The filename carries no date token,
+    so the store gives it no TTL; it is about 25 keys a season.
+  * a FINAL-WEEK ARCHIVE on disk, written once a fetch sees every game of the
+    week final. It never changes again. Written straight to disk under
+    `reports_root()`, because the fleet's roles share that disk, and the
+    store's disk marker sits in a file another lane owns.
+
+Inside a web request, with `SYNDICATE_REQUEST_PATH_ESPN_FETCH` absent or off:
+cache -> archive -> worker record (at any age; its age is printed) -> `{}`
+(state unknown, named `NFL_GAME_STATE_REQUEST_NO_FETCH`). Never a GET.
+`SYNDICATE_REQUEST_PATH_ESPN_FETCH=on` restores the request-path fetch.
+Outside a request (the workers) every read is unchanged; they only gain the
+writes. `scripts/backfill_nfl_final_archives.py` wrote the archive for the
+weeks that ended before this landed.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import urllib.request
+from pathlib import Path
 from typing import Any, Mapping
 
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
@@ -225,12 +260,219 @@ def _state_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _index_from_states(states: list[Any]) -> dict[str, dict[str, Any]]:
+    """Key each game by ESPN event id and by `"{AWAY}@{HOME}"`.
+
+    The one keying rule, used by the fetch and by both stored readers, so a
+    record can never resolve a card the fetch would not.
+    """
+    index: dict[str, dict[str, Any]] = {}
+    for state in states:
+        if not isinstance(state, Mapping):
+            continue
+        state = dict(state)
+        event_id = _text(state.get("event_id"))
+        away_abbr = _text(state.get("away_abbr"))
+        home_abbr = _text(state.get("home_abbr"))
+        if event_id:
+            index[event_id] = state
+        if away_abbr and home_abbr:
+            index.setdefault(f"{away_abbr}@{home_abbr}", state)
+    return index
+
+
+# --------------------------------------------------------------------------
+# The worker record and the final-week archive (2026-11-27, lane
+# `nfl-request-path-espn`). See the module docstring.
+# --------------------------------------------------------------------------
+
+RECORD_PARTS = ("nfl_source", "api", "game_state_index")
+FINAL_ARCHIVE_PARTS = ("nfl_source", "api", "game_state_final")
+
+# Weeks this process has already archived, so an all-final week the workers
+# keep building (they do, for hours after Monday night) costs one disk write.
+_archived_weeks: set[tuple[int, int, int]] = set()
+_archived_lock = threading.Lock()
+
+
+def _week_file_name(season: int, seasontype: int, week: int) -> str:
+    # Letters between the numbers on purpose: `refresh_state_store` gives a
+    # key a 10-day TTL when its path holds a date-like token
+    # (`20\d{2}[-_]?\d{2}[-_]?\d{2}`), and `2026_2_12` would not match but
+    # `2026_10_12` would. `s2026_t2_w12` never matches.
+    return f"game_state_s{int(season)}_t{int(seasontype)}_w{int(week):02d}.json"
+
+
+def record_path(season: int, seasontype: int, week: int) -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root().joinpath(*RECORD_PARTS, _week_file_name(season, seasontype, week))
+
+
+def final_archive_path(season: int, seasontype: int, week: int) -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root().joinpath(*FINAL_ARCHIVE_PARTS, _week_file_name(season, seasontype, week))
+
+
+def _in_web_request() -> bool:
+    try:
+        from flask import has_request_context
+
+        return bool(has_request_context())
+    except Exception:  # noqa: BLE001 -- no Flask, no request
+        return False
+
+
+def _request_path_fetch_enabled() -> bool:
+    """`SYNDICATE_REQUEST_PATH_ESPN_FETCH`: absent or anything but on = no ESPN fetch in a web request."""
+    return str(os.environ.get("SYNDICATE_REQUEST_PATH_ESPN_FETCH") or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def _unique_states(index: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """The index holds each game twice (id and matchup key); a record holds it once."""
+    seen: set[int] = set()
+    states: list[dict[str, Any]] = []
+    for state in index.values():
+        if id(state) in seen:
+            continue
+        seen.add(id(state))
+        states.append(dict(state))
+    return states
+
+
+def _write_final_archive(path: Path, record: Mapping[str, Any]) -> None:
+    from syndicate.features.shared.refresh_state_store import _atomic_write_text
+
+    _atomic_write_text(path, json.dumps(record, indent=2, sort_keys=True))
+
+
+def persist_week(season: int, seasontype: int, week: int, index: Mapping[str, Mapping[str, Any]], *, archive_only: bool = False) -> dict[str, Any]:
+    """Write the worker record and, once every game is final, the archive.
+
+    Never raises: a failed write costs the record, never the caller's board.
+    `archive_only` is the backfill's mode: it writes the archive (when the week
+    is all final) and leaves the live record alone.
+    """
+    states = _unique_states(index)
+    result: dict[str, Any] = {"games": len(states), "finals": sum(1 for s in states if s.get("final")),
+                              "recorded": False, "archived": False}
+    if not states:
+        return result
+    record = {
+        "season": int(season),
+        "seasontype": int(seasontype),
+        "week": int(week),
+        "games": states,
+        "count": len(states),
+        "finals": result["finals"],
+        "fetched_at": time.time(),
+    }
+    if not archive_only:
+        try:
+            from syndicate.features.shared.refresh_state_store import write_json_file
+
+            write_json_file(record_path(season, seasontype, week), record)
+            result["recorded"] = True
+        except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
+            print(f"NFL_GAME_STATE_RECORD_WRITE_FAILED season={season} seasontype={seasontype} week={week} "
+                  f"error={type(exc).__name__}: {exc}", flush=True)
+    if result["finals"] == len(states):
+        key = (int(season), int(seasontype), int(week))
+        with _archived_lock:
+            done = key in _archived_weeks
+        if not done:
+            try:
+                path = final_archive_path(season, seasontype, week)
+                if not path.exists():
+                    _write_final_archive(path, record)
+                    print(f"NFL_GAME_STATE_ARCHIVED season={season} seasontype={seasontype} week={week} "
+                          f"games={len(states)}", flush=True)
+                with _archived_lock:
+                    _archived_weeks.add(key)
+                result["archived"] = True
+            except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
+                print(f"NFL_GAME_STATE_ARCHIVE_WRITE_FAILED season={season} seasontype={seasontype} week={week} "
+                      f"error={type(exc).__name__}: {exc}", flush=True)
+    return result
+
+
+def _states_from_final_archive(season: int, seasontype: int, week: int) -> list[Any] | None:
+    """The archive's games, or None. Accepted only when every game is final."""
+    path = final_archive_path(season, seasontype, week)
+    try:
+        if not path.exists():
+            return None
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
+        print(f"NFL_GAME_STATE_ARCHIVE_READ_FAILED season={season} seasontype={seasontype} week={week} "
+              f"error={type(exc).__name__}: {exc}", flush=True)
+        return None
+    games = record.get("games") if isinstance(record, Mapping) else None
+    if not isinstance(games, list) or not games:
+        return None
+    if not all(isinstance(g, Mapping) and g.get("final") for g in games):
+        return None
+    return games
+
+
+def _states_from_worker_record(season: int, seasontype: int, week: int) -> tuple[list[Any], float | None] | None:
+    """The worker record's games and age in seconds, or None."""
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        record = read_json_file(record_path(season, seasontype, week))
+    except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
+        print(f"NFL_GAME_STATE_RECORD_READ_FAILED season={season} seasontype={seasontype} week={week} "
+              f"error={type(exc).__name__}: {exc}", flush=True)
+        return None
+    games = record.get("games") if isinstance(record, Mapping) else None
+    if not isinstance(games, list) or not games:
+        return None
+    try:
+        age = max(0.0, time.time() - float(record.get("fetched_at")))
+    except (TypeError, ValueError):
+        age = None
+    return games, age
+
+
+def _index_without_fetch(season: int, seasontype: int, week: int) -> dict[str, dict[str, Any]]:
+    """A web request's answer: archive -> worker record -> state unknown. No GET.
+
+    The archive goes first: it holds only settled weeks, so it can never be
+    older than what it says. The record is served at any age, because the
+    newest state a worker read beats a GET whose duration nobody bounds; its
+    age is printed. Nothing here is cached: these are cheap reads, and a cached
+    `{}` would also answer a later call outside a request in the same process,
+    which is still allowed to fetch.
+    """
+    games = _states_from_final_archive(season, seasontype, week)
+    if games is not None:
+        index = _index_from_states(games)
+        print(f"NFL_GAME_STATE_FROM_ARCHIVE season={season} seasontype={seasontype} week={week} "
+              f"games={len(games)}", flush=True)
+        return index
+    found = _states_from_worker_record(season, seasontype, week)
+    if found is not None:
+        games, age = found
+        index = _index_from_states(games)
+        age_text = f"{age:.0f}" if age is not None else "unknown"
+        print(f"NFL_GAME_STATE_FROM_WORKER season={season} seasontype={seasontype} week={week} "
+              f"games={len(games)} age_seconds={age_text}", flush=True)
+        return index
+    print(f"NFL_GAME_STATE_REQUEST_NO_FETCH season={season} seasontype={seasontype} week={week}", flush=True)
+    return {}
+
+
 def nfl_game_state_index(season: int, week: int, *, seasontype: int) -> dict[str, dict[str, Any]]:
     """Per-game ESPN state for one NFL week, keyed by ESPN event id.
 
     Also keyed by `"{AWAY}@{HOME}"` so a card whose `gamePk` is not an ESPN
     event id can still resolve. Returns `{}` on any failure -- callers must
     treat an empty index as "state unknown", never as "nothing is live".
+
+    Inside a web request it never fetches (see the module docstring); outside
+    one it fetches as before and keeps what it fetched for the web to read.
     """
     key = (int(season), int(seasontype), int(week))
     now = time.monotonic()
@@ -239,21 +481,22 @@ def nfl_game_state_index(season: int, week: int, *, seasontype: int) -> dict[str
         if cached is not None and now - cached[0] < _CACHE_TTL_SECONDS:
             return dict(cached[1])
 
+    in_request = _in_web_request()
+    if in_request and not _request_path_fetch_enabled():
+        return _index_without_fetch(int(season), int(seasontype), int(week))
+
     warn_if_compute_in_request_path("nfl_espn_game_state_fetch")
     payload = _fetch_scoreboard(int(season), int(seasontype), int(week))
-    index: dict[str, dict[str, Any]] = {}
+    states: list[dict[str, Any]] = []
     events = payload.get("events") if isinstance(payload, Mapping) else None
     if isinstance(events, list):
         for event in events:
             if not isinstance(event, Mapping):
                 continue
             state = _state_from_event(event)
-            if state is None:
-                continue
-            if state["event_id"]:
-                index[state["event_id"]] = state
-            if state["away_abbr"] and state["home_abbr"]:
-                index.setdefault(f"{state['away_abbr']}@{state['home_abbr']}", state)
+            if state is not None:
+                states.append(state)
+    index = _index_from_states(states)
 
     # An empty result is cached too, so a scoreboard outage costs one fetch
     # per TTL rather than one per request. It is still an EMPTY index, so it
@@ -263,6 +506,11 @@ def nfl_game_state_index(season: int, week: int, *, seasontype: int) -> dict[str
         if len(_cache) > 16:
             oldest = min(_cache, key=lambda item: _cache[item][0])
             _cache.pop(oldest, None)
+
+    # Kept for the web to read: outside a request only (the workers), and only
+    # a fetch that returned games. A web request never writes.
+    if index and not in_request:
+        persist_week(int(season), int(seasontype), int(week), index)
     return dict(index)
 
 

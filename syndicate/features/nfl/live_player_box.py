@@ -49,16 +49,36 @@ DO NOT ADD A BROWSER USER-AGENT. ESPN returns HTTP 403 to browser-spoof
 User-Agents from Render's outbound IP -- confirmed three times, most recently
 2026-08-13. `urllib.request.Request(url)` with no headers is load-bearing, not
 an oversight. `live_game_state.py`'s docstring carries the original probe.
+
+--------------------------------------------------------------------------
+IN A WEB REQUEST THIS NO LONGER FETCHES `[2026-11-27]`
+--------------------------------------------------------------------------
+
+Lane `nfl-request-path-espn`; the same change as `live_game_state.py`'s, which
+explains it. 35 `operation=nfl_espn_player_box_fetch` lines on 11-27 between
+00:00Z and 16:39Z. The workers read these boxes about 120 times an hour for
+the current week, outside any request. Each successful read is now kept: a
+WORKER RECORD per event through `refresh_state_store` (keyvalue on the fleet;
+the filename has no date token, so no TTL, about 285 small keys a season), and,
+for a final game, a FINAL-EVENT ARCHIVE on disk that never changes again.
+
+Inside a web request, with `SYNDICATE_REQUEST_PATH_ESPN_FETCH` absent or off,
+an event the cache does not hold is read from the archive, then the record at
+any age, and is otherwise ABSENT ("not read"), which the card already renders
+as a stated empty state. Never a GET. `=on` restores the fetch. Outside a
+request nothing is read differently; the workers only gain the writes.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
@@ -336,6 +356,133 @@ def _store(event_id: str, rows: list[dict[str, Any]] | None, *, final: bool) -> 
             _cache.pop(oldest, None)
 
 
+# --------------------------------------------------------------------------
+# The worker record and the final-event archive (2026-11-27, lane
+# `nfl-request-path-espn`). See the module docstring.
+# --------------------------------------------------------------------------
+
+RECORD_PARTS = ("nfl_source", "api", "player_box")
+FINAL_ARCHIVE_PARTS = ("nfl_source", "api", "player_box_final")
+
+# Events this process has already archived: a final box is re-read every
+# `_FINAL_TTL_SECONDS` while its week is on the board, and archived once.
+_archived_events: set[str] = set()
+_archived_lock = threading.Lock()
+
+
+def _event_file_name(event_id: str) -> str:
+    # `e` before the id keeps any digit run in it from reading as a date token
+    # to `refresh_state_store`'s TTL rule (see `live_game_state._week_file_name`).
+    safe = "".join(ch for ch in str(event_id) if ch.isalnum())
+    return f"player_box_e{safe}.json"
+
+
+def record_path(event_id: str) -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root().joinpath(*RECORD_PARTS, _event_file_name(event_id))
+
+
+def final_archive_path(event_id: str) -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root().joinpath(*FINAL_ARCHIVE_PARTS, _event_file_name(event_id))
+
+
+def _in_web_request() -> bool:
+    try:
+        from flask import has_request_context
+
+        return bool(has_request_context())
+    except Exception:  # noqa: BLE001 -- no Flask, no request
+        return False
+
+
+def _request_path_fetch_enabled() -> bool:
+    """`SYNDICATE_REQUEST_PATH_ESPN_FETCH`: absent or anything but on = no ESPN fetch in a web request."""
+    return str(os.environ.get("SYNDICATE_REQUEST_PATH_ESPN_FETCH") or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def persist_event(event_id: str, rows: list[dict[str, Any]], *, final: bool, archive_only: bool = False) -> dict[str, bool]:
+    """Write one event's record and, for a final game, its archive. Never raises."""
+    result = {"recorded": False, "archived": False}
+    event_id = str(event_id or "").strip()
+    if not event_id or not isinstance(rows, list):
+        return result
+    record = {"event_id": event_id, "final": bool(final), "rows": rows, "fetched_at": time.time()}
+    if not archive_only:
+        try:
+            from syndicate.features.shared.refresh_state_store import write_json_file
+
+            write_json_file(record_path(event_id), record)
+            result["recorded"] = True
+        except Exception as exc:  # noqa: BLE001 -- a box must never cost the board
+            print(f"NFL_PLAYER_BOX_RECORD_WRITE_FAILED event={event_id} error={type(exc).__name__}: {exc}", flush=True)
+    if final:
+        with _archived_lock:
+            done = event_id in _archived_events
+        if not done:
+            try:
+                from syndicate.features.shared.refresh_state_store import _atomic_write_text
+
+                path = final_archive_path(event_id)
+                if not path.exists():
+                    _atomic_write_text(path, json.dumps(record, indent=2, sort_keys=True))
+                with _archived_lock:
+                    _archived_events.add(event_id)
+                result["archived"] = True
+            except Exception as exc:  # noqa: BLE001 -- a box must never cost the board
+                print(f"NFL_PLAYER_BOX_ARCHIVE_WRITE_FAILED event={event_id} error={type(exc).__name__}: {exc}", flush=True)
+    return result
+
+
+def _rows_from_final_archive(event_id: str) -> list[dict[str, Any]] | None:
+    path = final_archive_path(event_id)
+    try:
+        if not path.exists():
+            return None
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 -- a box must never cost the board
+        print(f"NFL_PLAYER_BOX_ARCHIVE_READ_FAILED event={event_id} error={type(exc).__name__}: {exc}", flush=True)
+        return None
+    if not isinstance(record, Mapping) or not record.get("final") or not isinstance(record.get("rows"), list):
+        return None
+    return list(record["rows"])
+
+
+def _rows_from_worker_record(event_id: str) -> list[dict[str, Any]] | None:
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        record = read_json_file(record_path(event_id))
+    except Exception as exc:  # noqa: BLE001 -- a box must never cost the board
+        print(f"NFL_PLAYER_BOX_RECORD_READ_FAILED event={event_id} error={type(exc).__name__}: {exc}", flush=True)
+        return None
+    if not isinstance(record, Mapping) or not isinstance(record.get("rows"), list):
+        return None
+    return list(record["rows"])
+
+
+def _boxes_without_fetch(wanted: list[tuple[str, bool]], out: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    """A web request's answer: archive -> worker record -> absent. No GET, nothing cached."""
+    archive = record = absent = 0
+    for event_id, _final in wanted:
+        rows = _rows_from_final_archive(event_id)
+        if rows is not None:
+            archive += 1
+        else:
+            rows = _rows_from_worker_record(event_id)
+            if rows is not None:
+                record += 1
+        if rows is None:
+            absent += 1
+            continue
+        out[event_id] = rows
+    print(f"NFL_PLAYER_BOX_REQUEST_NO_FETCH requested={len(wanted)} archive={archive} "
+          f"worker={record} absent={absent}", flush=True)
+    return out
+
+
 def nfl_player_box_index(
     events: Iterable[tuple[str, bool]],
 ) -> dict[str, list[dict[str, Any]]]:
@@ -346,6 +493,9 @@ def nfl_player_box_index(
     the same as an event mapped to `[]`, which means "read, and nobody has a
     line yet", and the card renders the two differently. Collapsing them would
     put the confident empty state on a game whose box simply never arrived.
+
+    Inside a web request it never fetches (see the module docstring); outside
+    one it fetches as before and keeps each box it read for the web to read.
     """
     wanted: list[tuple[str, bool]] = []
     out: dict[str, list[dict[str, Any]]] = {}
@@ -363,6 +513,10 @@ def nfl_player_box_index(
         return out
     # The refusal cap, applied before any HTTP happens.
     wanted = wanted[:_MAX_EVENTS_PER_BUILD]
+
+    in_request = _in_web_request()
+    if in_request and not _request_path_fetch_enabled():
+        return _boxes_without_fetch(wanted, out)
 
     warn_if_compute_in_request_path("nfl_espn_player_box_fetch")
     deadline = time.monotonic() + _BATCH_BUDGET_SECONDS
@@ -384,6 +538,10 @@ def nfl_player_box_index(
                     _store(event_id, rows, final=final)
                 if rows is not None:
                     out[event_id] = rows
+                    # Kept for the web to read: outside a request only, and
+                    # only a box that was actually read. A request never writes.
+                    if not in_request:
+                        persist_event(event_id, rows, final=final)
     except Exception as exc:  # noqa: BLE001 -- a box must never cost the board
         print(f"NFL_PLAYER_BOX_FETCH_FAILED error={type(exc).__name__}: {exc}", flush=True)
     return out
