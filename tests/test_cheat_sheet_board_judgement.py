@@ -44,8 +44,8 @@ def _game(**over):
     return row
 
 
-def test_rules_version_is_four():
-    assert cs.SECTION_RULES == 4
+def test_rules_version_carries_v4():
+    assert cs.SECTION_RULES >= 4    # v4's board verdict holds in every later version (v5 2026-11-27)
 
 
 # ---------------------------------------------------------------- the pick is the board's

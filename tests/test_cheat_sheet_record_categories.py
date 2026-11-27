@@ -59,7 +59,9 @@ def test_every_scorecard_names_every_category_that_applies_to_its_sport():
     rec = csr.season_record([], generated_at="x")
     assert rec["sports"] == list(cs.SPORT_ORDER)
     assert rec["applies"]["value"] == sorted(cs.SPORT_ORDER) and rec["applies"]["picks"] == sorted(cs.SPORT_ORDER)
-    assert rec["applies"]["pvp_batters"] == ["mlb"] and rec["applies"]["pvp_skaters"] == ["nhl"]
+    assert rec["applies"]["pvp_batters"] == ["mlb"] and rec["applies"]["pvp_goalies"] == ["nhl"]
+    # retired in rules v5 (2026-11-28): a retired section applies to no sport, its record row stays where it has one
+    assert rec["applies"]["pvp_skaters"] == [] and rec["applies"]["pvp_receivers"] == []
     assert rec["applies"]["pvp_scorers"] == ["nba"] and rec["applies"]["pvp_qbs"] == ["nfl"]
     assert set(rec["applies"]["sgp"]) == set(csr.SGP_SPORTS)
     assert {k for k, _ in csr.FEATURED} | {"sgp", "xg_hit_rate", "xg_value"} == set(rec["applies"])

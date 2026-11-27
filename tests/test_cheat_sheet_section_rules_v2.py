@@ -31,7 +31,7 @@ def test_sim_edge_is_the_projection_beyond_the_line_toward_the_side():
 def test_sheet_rules_reads_the_stamp_and_an_unstamped_sheet_is_v1():
     assert cs.sheet_rules({}) == 1 and cs.sheet_rules(None) == 1 and cs.sheet_rules({"section_rules": True}) == 1
     assert cs.sheet_rules({"section_rules": "2"}) == 1 and cs.sheet_rules({"section_rules": 2}) == 2
-    assert cs.SECTION_RULES == 4    # v4 (#861 step 1c): a row's "value" verdict is the board's Suggested pick
+    assert cs.SECTION_RULES == 5    # v5 (#862, 2026-11-27): no one-sided fair featured, two pvp sections retired
 
 
 def test_v2_takes_the_sims_side_of_the_main_line_v1_the_better_ev_side():

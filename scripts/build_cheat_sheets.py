@@ -1394,6 +1394,29 @@ def main_picks_only(args: Any, data_root: Path) -> int:
         release_build_lock(lock)
 
 
+def build_rules(prior: Mapping[str, Any] | None, *, now: datetime) -> int:
+    """The section-rules version this build stamps. A day's rules never change once a game on it has started (rules v5,
+    2026-11-27): every reader re-derives a day's sections under its stamp, so a rebuild under a new version would
+    re-judge what the day already featured for games in play or graded. A sheet with nothing started yet, or no sheet,
+    takes the current version. A game whose start time cannot be read counts as started."""
+    if not prior:
+        return cs.SECTION_RULES
+    times = [r.get("commence_time") for r in prior.get("rows") or []] + [g.get("commence_time") for g in prior.get("games") or []]
+    if any((_parse_ts(t) or now) <= now for t in times):
+        return cs.sheet_rules(prior)
+    return cs.SECTION_RULES
+
+
+def load_season_record(data_root: Path) -> dict[str, Any] | None:
+    """`cheatsheets/record.json` (`cheat_sheet_record`, rebuilt by every reconcile), or None. Rules v5 stamps Sim vs the
+    line's record since launch from it (`cs.sim_edge_since_launch`)."""
+    try:
+        doc = json.loads((data_root / "cheatsheets" / "record.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
 def main_build(args: Any, data_root: Path) -> int:
     selected = args.date or central_today()
     if selected == "tomorrow":                      # the day ahead (user 2026-10-15): an early look, refreshed later
@@ -1409,6 +1432,7 @@ def main_build(args: Any, data_root: Path) -> int:
         positions = {}
     global news_root
     news_root = data_root if (data_root / "news").is_dir() else None
+    season_record = load_season_record(data_root)
     try:
         board_cards = fetch_board_cards(args.base_url)
     except Exception as exc:  # noqa: BLE001 -- no picks this run; every sheet still builds
@@ -1485,7 +1509,16 @@ def main_build(args: Any, data_root: Path) -> int:
                                                today=today, at=sheet["generated_at"])
         sheet["pool"] = pool_record(sheet, prior, today=today, at=sheet["generated_at"])
         # The rules version the sections were derived under: every reader re-derives this day under it (2026-11-13).
-        sheet["sections"], sheet["section_rules"] = cs.sections(sheet["rows"]), cs.SECTION_RULES
+        # A day keeps its rules once a game on it has started (`build_rules`, rules v5).
+        rules = build_rules(prior, now=datetime.now(timezone.utc))
+        sheet["sections"], sheet["section_rules"] = cs.sections(sheet["rows"], rules=rules), rules
+        if rules >= 5:
+            sheet["sim_edge_record"] = cs.sim_edge_since_launch(season_record, sport)
+        else:
+            sheet.pop("sim_edge_record", None)
+        if rules != cs.SECTION_RULES:
+            print(f"CHEAT_SHEET {sport} date={selected} keeps section rules v{rules} (a game on it has started; current "
+                  f"v{cs.SECTION_RULES})", flush=True)
         try:
             pending = dict((prior or {}).get("pick_pending") or {})
             sheet["picks"] = merge_picks(build_picks(board_cards, sheet, sport=sport, day=selected, now=datetime.now(timezone.utc)),
