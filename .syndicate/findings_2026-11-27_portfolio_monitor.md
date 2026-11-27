@@ -293,3 +293,12 @@ Results, 30 d, covered set. Each cell is pp with its 95% range:
 2. 192 Kalshi bets are one-sided in the quote log, so they cannot be de-vigged at all. The venue quotes BOTH asks
    (`yes_ask` / `no_ask`, `venue_quote_at_submit` on 149 recent Kalshi orders), so the quote log could carry both.
 3. NBA (different-book closes) and in-play bets remain outside this measure.
+
+### Lane `clv-fair-close` opened, 2:32 PM CST (user: "Yes, open it")
+- It claims `clv_join.py`, `order_clv.py`, `paper_settlement.py` and a new `tests/test_clv_fair_close.py`. No open lane
+  held any of them (checked against origin/main's claims, including directory and glob claims).
+- Scope: stamp the close's overround and a fair CLV beside the quoted one on NEW same-book marks. `close_price`,
+  `close_book_scope` and `clv_pct` stay unchanged, because `min_ev_tuner._gross_clv` reads them. Old marks are not
+  rewritten; for them the 30 d study above is the reading.
+- The readout half stays in this lane (`portfolio-monitor` holds `live_book_edge_readout.py`).
+- Building it, and any load, wait for the user's yes. A load restarts the role that settles, so the restart rules apply.

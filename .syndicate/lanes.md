@@ -2350,6 +2350,14 @@ death, never life — do not invert it.
 - STATUS 2026-11-27 12:50 PM CST: BUILT on branch cell-calibration-847d-fixes 2f19ebde5 (local, refs/keep pinned), NOT pushed (the push needs the user's own yes via session e32fef1a). 19 new tests + 121 targeted pass; byte-identical to main with every key absent (A/B). Findings section 8 (stake trace, item-4 trace, restated predictions); reader updated, kit unchanged
 - STATUS 2026-11-27 1:30 PM CST: branch head now 6c28e52c4 (2f19ebde5 + a test pinning #835 on alone, (c)/(d) absent, as a no-op; A/B vs main byte-identical), NOT pushed. Findings 8.6
 
+### clv-fair-close — OPEN — opened 2026-11-27 — session 69d80317-f1a0-4173-94b5-6610ff3e014b
+- Goal: New same-book closing marks carry the close's overround and a fair (spread-free) CLV beside the quoted one -- taken from the same book's last pregame quote for the other selection(s) in the quote log -- with close_price, close_book_scope and clv_pct unchanged; measured on the fleet as the share of new same-book marks that carry a fair CLV, by venue
+- Files: syndicate/features/shared/clv_join.py, syndicate/features/shared/order_clv.py, syndicate/features/shared/paper_settlement.py, tests/test_clv_fair_close.py
+- Hypothesis: The quoted same-book close carries the venue's spread. 30 d study 274f3e2bc: overround +2.69 pp [+1.90, +3.48] on 398 of 622 bets; CLV +0.56 against the quoted close but -0.74 [-1.17, -0.31] gross against the fair close. Stamped forward, fair CLV sits about 1.3 pp below quoted CLV on the same marks. Method per learnings 2026-10-26: the per-book close comes from book_quotes with captured_at < commence, never from closing_lines.
+- Falsification test: On >= 100 new covered same-book marks, the mean quoted-minus-fair gap has a 95% range inside [-0.3, +0.3] pp, or the overround's range includes 0.
+- Verification: (1) Tests: close_price / close_book_scope / clv_pct identical with and without the change on the same fixtures; overround from a two-way and a three-way (h2h) same-book close; a spread's other side matched at the negated line; a one-sided quote gives None with a named reason. (2) Fleet, after a user-approved load: the share of same-book marks stamped after the load that carry a fair CLV, by venue (bar: Polymarket >= 60%), and _quote_closes_for_openings seconds per settlement cycle before vs after. (3) Not a betting change: nothing that places, sizes, holds or exits reads the new fields (min_ev_tuner reads close_price / close_book_scope / clv_pct only). The readout half (live_book_edge_readout.py) is done under lane portfolio-monitor, which holds that file.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
