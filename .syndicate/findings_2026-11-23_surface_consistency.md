@@ -947,6 +947,37 @@ below take about 225 NBA games a month.
 
 **CORRECTION `[2026-11-27 ~1:10 PM CST]`: a SECOND refetch path exists.** A lineup/injury-change re-sim (`LINEUP_INJURY_CHANGE_RESIM_TRIGGERED`, live-odds-worker's `live_refresh_loop`) forces an NBA live-phase run whose in-play-only fetch takes every not-started game as due (`upcoming_events_due`, IN_PLAY_PROPS pass=full) and then runs the full pipeline. It matched 5 of 5 off-schedule NBA captures: 11-25 18:20, 20:22, 21:24, 22:02Z and 11-27 18:51:34Z (job log). So the stale windows are the gaps between pulls with NO injury trigger, irregular by day: 11-27 8:40-10:40 AM CST was one (0 Suggested of 627 at 16:23Z); 11-25 had triggers all afternoon. Reading 7's "only the forced pulls refetch" was wrong for afternoons. The pre-registered 12:40 PM CST window lasted 11 min (18:40-18:51Z; no board built inside it was read): at 19:00Z the snapshot was 516 s old and the board (18:59:06Z) had 4 stale of 1,012 NBA pregame rows, 165 Suggested. The age limit still bounds every gap; on trigger-heavy days it fires less, so the cost estimate is an upper bound.
 
+## Reading 8 -- the per-sport pages other than NHL and soccer `[2026-11-27 20:28:43Z-20:31:32Z, fleet, read-only; user "What's next"]`
+
+The board was written 20:28:25Z. Probes: `C:\tmp\scc_oversight_d5aa\sport_pages_peek*.py`, `nfl_props_vs_board.py` +
+`nfl_props_join.py` (join on folded player + side + line + stat), `picks_vs_board.py`.
+
+- **NFL props (`/nfl/api/props`, week 12): the largest gap left.**
+  - 2,189 cards ranked by "edge": the season-to-date rate model minus the price's single-sided implied probability,
+    so the vig is left in (`syndicate/features/nfl/props.py` `build_nfl_props_page_context`). Top 12 at +43.4% to +50.9%.
+  - Against the board: top 12, 8 on the board, 0 Suggested; top 50, 27 on the board, 0 Suggested; all 2,189, 789 on
+    the board, 7 Suggested.
+  - The board's EV on the top-12 cards it carries is -6.5 to +0.5. Example: Simi Fehoko receptions under 1.5 at +140,
+    page +50.9% edge, board -1.47 (`ev_below_min`, `ev_net_of_fee_below_min`).
+  - The board's 7 Suggested NFL pregame props (+2.2 to +5.2 EV) sit at page ranks 205, 562, 577, 621, 1037, 1073 and
+    1664. No card names the board's verdict.
+- **NFL picks (`/nfl/api/picks`):** 12 SmartSim win-probability cards, one a game ("82.7% win prob"), with no price or
+  EV. The board's 7 NFL picks are all props, so none appears. Not a conflicting claim: the page does not show the
+  board's picks.
+- **NCAAF picks (`/ncaaf/api/picks`):** 24 cards. 12 are anytime-TD "yes" ranked by points better than the vigged
+  consensus (labelled "price shopping, not model, not EV"); 12 are model win probabilities. The board's 12 NCAAF
+  Suggested (4 spreads, 4 totals, 2 receptions, 1 passing TDs, 1 h2h; +3.7 to +5.2 EV) are not on the page.
+- **NBA picks and props (`/nba/api/picks`, `/nba/api/props`): empty.** They render only a saved
+  `recommendations_slate_<day>.json` / `props_recommendations_top_by_game_<day>.json`, absent for 11-27. The NBA cards
+  (11 games) carry no recommendations (`game_market_recommendations` 0 and every `*_ev` 0.0): a market snapshot and the
+  sim's leaders. The board's NBA Suggested set (165 at 19:00Z, Reading 7 addendum) reaches none of these pages.
+- **NCAAB:** `/ncaab/api/cards` only (49 games, market tiles, no picks). Nothing to disagree with.
+
+**What follows:** a step 1f on 1d's pattern. The NFL props page leads with the board's Suggested NFL props, and every
+rate card carries the board's verdict and says its edge is against the vigged price. The NFL, NCAAF and NBA picks
+pages lead with the board's picks for the sport. Display only, web routes only; loads with an ff + `reload-web`;
+betting change no. The user's call.
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:
