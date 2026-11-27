@@ -1243,3 +1243,28 @@ Without both, nothing below is read.
     restarts or §22's `loaded` is loaded (12-08 at the earliest, on the user's call).
 - Seen, not chased: `RECYCLE_EXIT reason=heavy_build_refused` at 15:21:12Z, `consecutive_refusals: 3`, stage
   `pre_source_state_fingerprint`, uptime 5,975 s. That is another process, not the parent, whose uptime was about 79,700 s.
+
+## 24. QUEUED FOR THE 12-08 WINDOW: J's head-rule line (2026-11-27 ~10 AM CST, user "Queue it for 12-08")
+
+- **The user's words.** The user typed "Queue it for 12-08" in session 644b05ff's chat, answering "Queue the
+  head_rule=loaded line for the 12-08 betting window?". That message had said that queueing only adds the line to the
+  window's list, and that loading it there is still the user's call on the day. So **the LOAD yes is still owed.**
+- **The line:** `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_HEAD_RULE=loaded`, one line in
+  local_production.env. It loads in the window's one ff and drained down/up, with `--betting-change yes`.
+- **Conditions:**
+  - CHANGE J (`REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_MB=1500`) is still loaded. Without J the line is
+    inert.
+  - The window's ff carries `8e2149f0f`.
+- **Kit:** `C:\tmp\w1208_headrule\kit_env_headrule.sh` (check | apply | restore <backup> | after_up <up_utc>).
+  - Self-test 11 of 11 PASS at 16:19Z (10:19 AM CST) 11-27 (`kit_selftest_headrule.sh`).
+  - Read-only `check` on the fleet 11-27:
+    - 0 lines in local_production.env;
+    - ABSENT on all 3 roles;
+    - `fleet_checkout_has_code=8e2149f0f NO` (the fleet is at fe46fb249).
+  - `after_up 2026-11-26T00:00:00Z` reads the current ARMED line (pid 469, 17:12:11Z 11-26) as
+    `ARMED_HEAD_RULE_NOT_LOADED`, with the environ ABSENT. That is the reader's not-loaded path, measured.
+- **After the up:** `after_up <up_utc>` prints `ARMED_HEAD_RULE=loaded`, and the environ carries the key; those are
+  §22.1's load checks. Then P-HR1..P-HR4 apply.
+- **Queue entry:** the fleet-watcher's 12-08 queue (memory `project_betting_window_queue.md`), beside the #850
+  host-headroom switch. It has a different key, and either loads alone.
+- **Revert:** kit `restore <backup>`, then a drained down/up (allowed outside a window).
