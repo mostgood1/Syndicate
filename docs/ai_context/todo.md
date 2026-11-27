@@ -5,8 +5,8 @@
 - **Backfill:** 2026 regular weeks 1-11 and preseason 1-4 were archived before the load, with 212 final boxes (`scripts/backfill_nfl_final_archives.py`).
 - **Measured at the load:** a past-date GET (11-08) went from 2 ESPN fetches to 0, with the same 15 finals with scores.
 - **Owed:**
-  - 0 `nfl_espn_*` request-path lines per CST day from 11-28.
-  - The week record stays under ~60 s old during a live game once the board child respawns on the new code. Until then, odds-job children refresh it every few minutes.
+  - 0 `nfl_espn_*` request-path lines per CST day from 11-28. **SCHEDULED** for 11-29 9:00 AM CST as the one-time task `nfl864-day-reading-1129`, with a backup at 11:00 AM (`-backup`, a no-op if the first recorded). Reader `C:\tmp\nfl864\read_day.py`, ledger helper `C:\tmp\nfl864\record.py`. The reader was dry-run on 11-26, before the fix: NOT_MET with 45 + 11 lines.
+  - ~~The week record stays under ~60 s old during a live game~~ READ 11-27 2:28-2:30 PM CST with DEN @ PIT live: 184, 196, 14, 39, 6, 2, 27 s (deploys.md `2026-11-27 19:15Z`, `f85d4b25d`).
   - `NFL_GAME_STATE_ARCHIVED ... week=12` after MNF 11-30.
 
 ### `#862` — **CHEAT-SHEET OPTIMIZATION PROGRAM: most featured sections lose (official 10-15..11-26: featured 3,868-3,726, −196 u, −2.6%). One cause is a DEFECT: NBA Matchups — the one section that beat the price (+20.6% [+4.0, +37.7], 142 bets before 11-13) — and NBA defender matchups lost their evidence when the NBA sim began matching most players (11-10..11-14 name join): NBA `cards_sim_detail` player rows carry no team/opponent, so `prop_evidence/basketball._matchup` resolves no opponent for any sim-found player (NBA primary rows with 3+ meetings 348 -> 14 after 11-13)** `[2026-11-27, lane cheat-sheet-optimization, session eda3ffd5; user "i need a session dedicated to optimizing the cheat sheets across all sports ... Most of them are currently losing", chose "Do it here"; findings `.syndicate/findings_2026-11-27_cheat_sheet_optimization.md`]`
