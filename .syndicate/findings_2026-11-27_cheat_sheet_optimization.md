@@ -145,3 +145,57 @@ an ff; the board's NBA "Matchup:" sentence loads at refresh-worker's next restar
   record per rules version ("by section rules: v1 (from 10-15) …; v3 (from 11-13) …"). The season line mixed days built
   under retired rules: Consistency read season −0.5% while its v3 days were −4.5% and its v4 days −19.9%. Test
   `test_each_section_reports_its_record_under_each_rules_version`.
+
+## 6. Section rules v5 — BUILT (proposals 2-4 of section 4; user 2026-11-27 "Build proposals 1-3 as v5 rules")
+
+The user's 1-3 are this file's proposals 2-4 (the chat numbered them without the NBA fix, which loaded at 20:37:49Z).
+Display only, `--betting-change no`. Nothing outside the sheet tools reads a sheet's sections: `cheat_sheet_record`
+and the section study re-derive them; play cards select on each row's own verdict; the SGP pools, cross-game parlays
+and board picks import only `prop_result_key` / `consistency_posterior` / `board_refusal_text`.
+
+- **One-sided fairs never feature** in a bet section (`cs.sections`, rules >= 5: the bet sections draw from the primary
+  lines minus `verdict == "one_sided_fair"`). "Every prop on the board" keeps every row. "Price shopping" keeps them:
+  it is a price comparison, not graded as a pick. Hot form (v1 only) is unchanged on v1 days.
+- **Sim vs the line prints its since-launch record.** The build reads `cheatsheets/record.json` once per run and stamps
+  `sim_edge_record` (official `by_sport.<sport>.sim_edge`, first and last graded day) on each v5 sheet. The page appends
+  "Since launch, official sheets Nov 13 - Nov 26: 315 bets (162-153), ROI -4.3% at the best price -- it has not beaten
+  the price since launch." A v4 sheet never prints it.
+- **Skater vs goalie and Defenders on his targets stop featuring** (`RETIRED_IN_V5`; `RETIRED_SECTIONS` dates them
+  2026-11-28). The record keeps their rows as "(retired 11/28)" and drops their "no bets yet" placeholder, as with Hot
+  form. The page says where they used to be, with both windows' numbers. The rows keep their `pvp` history, and a
+  pick's evidence still cites it (`pvp_point`).
+- **A day keeps its rules once a game on it has started** (`build_cheat_sheets.build_rules`). The builder used to stamp
+  the current version on every rebuild, so a version loaded mid-day re-judged games already in play or graded. A
+  start time it cannot read counts as started. The build prints `keeps section rules v4` when it pins.
+
+**Replay** (fleet, ~3:05 PM CST 11-27). Every official sheet 11-13..11-26 (stamp >= 3; 64 graded sheets) was judged
+under v4 and v5 with the worktree code, graded by its own reconciled file, with posted rows pinned as the record pins
+them. "Featured" counts a bet once a day:
+
+| scope | v4 | v5 | removed |
+|---|---|---|---|
+| all featured | 1141-1116, −86.1 u, −3.8% (2,257) | 1101-1068, −75.9 u, −3.5% (2,169) | 40-48, −10.2 u, −11.6% (88) |
+| NFL featured | −9.0% (400) | −8.8% (345) | −10.5% (55) |
+| NFL Defenders on his targets | 39-46, −13.6% (85) | — | the whole section |
+| NHL featured | +2.4% (551) | +1.5% (533) | **+30.4% (18)** |
+| NHL Skater vs goalie | 35-34, −7.4% (69) | — | the whole section |
+| soccer featured | −44.3% (65) | −37.7% (50) | −66.1% (15) |
+| soccer Consistency / Matchups | −84.7% (10) / −64.6% (10) | −100% (2) / −100% (3) | the one-sided rows |
+
+NBA, NCAAF and NCAAB featured no one-sided row in the window, so they do not change. **Caveat: in sample.** This window
+is the holdout that motivated the rules, so the replay shows what v5 removes, not a forward test. NHL is the exception:
+the 18 bets only Skater vs goalie featured went 11-7 (+30.4%). The section lost overall because most of its rows were
+featured elsewhere too. 18 bets is noise, and the retirement rests on both windows (−7.0% on 564, then −7.4% on 69).
+
+**Tests:** `tests/test_cheat_sheet_section_rules_v5.py`, 9:
+- v4 vs v5 on the same rows for each rule;
+- the record labels;
+- the since-launch text, both signs;
+- the page prints it only under v5;
+- `build_rules`;
+- `main` stamps v5 and the record on a fresh day, and keeps v4 with no record on a started one.
+
+Three older tests pinned the version or the retired sections' scorecard rows and were updated. One of them,
+`tests/test_cheat_sheet_board_judgement.py::test_rules_version_is_four`, belongs to the OPEN lane
+`surface-consistency-oversight`. It changes only by loan: the user picked "Borrow it" when asked, and the loan is noted in both lane blocks. That one assertion moves `== 4` -> `>= 4`. 333 tests pass across the cheat-sheet, evidence, review, reconcile and play-card suites.
+The page script passes `node --check`. It was not rendered in a browser.
