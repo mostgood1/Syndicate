@@ -113,3 +113,42 @@ The user, 11-27, answering "Should I diagnose why pregame live orders run 6-19 a
   - *Survives if:* the matched orders are all `suggested=True` with no `live_ev_floor` tag, and most have a recorded EV at purchase between 0% and 2%.
 - **H-B, another admission path.** Some of these orders come from rows that are not Suggested: a live-plan input other than `suggested_rows`. *Confirmed if* any matched position reads `suggested=False` or carries `live_ev_floor`.
 - **H-C, repeat orders.** A few positions take several orders each (re-submits, increments), which inflates the count. *Test:* distinct `position_key` per day against orders per day.
+
+### RESULT, 2026-11-27 10:25 AM CST: H-A SURVIVES; H-B and H-C REJECTED. The floor is off and the code does what it should; the 0-2 prediction was wrong
+
+**Method, read-only.**
+- The ledger in the 10:04 AM CST watch reading (`live_all.json`).
+- The floor's own position log, `reports/intelligence/live_ev_floor_positions.json`, read from the fleet store under refresh-worker's environ at nice 19. It holds 3,998 entries, 10-20 4:29 PM CST .. **11-24 2:22:35 AM CST**, 8 minutes before the load.
+- An order counts as floor-admitted when its venue and `position_key` are in that log.
+- Definitions: "pregame" means submitted before commence. "Plan" means `sizing_basis=model_edge` with no execution style.
+
+**Live orders a day, by path:**
+
+| path | 30 d before the load | 7 d before | after the load (3.31 d, to 16:04Z 11-27) |
+|---|---|---|---|
+| pregame, plan, floor-admitted | 38.2 | 46.9 | **0** |
+| pregame, plan, Suggested (not in the floor log) | 5.1 | 4.9 | **9.1** (30 orders) |
+| pregame, maker pilot | 2.5 (2.3 of them floor) | 2.0 (1.9 floor) | 1.8 (0 floor) |
+| in-play entries (`inplay_order_dollars`) | 9.8 | 5.3 | 2.4 |
+
+**H-A survives.** The 0-2 came from one 11-23 snapshot, measured at the wrong bar (>= 2% at the venue). The plan buys at > 0 net of the venue's fee. The Suggested path was already placing 4.9-5.1 pregame orders a day before the load, and the 9.1 a day after it is that path alone. The review's daily counts match this split: 11-25 = 17 plan + 2 maker, 11-26 = 4 + 2.
+
+**H-B is rejected, by the code and the log; per-order flags not read.**
+- *Code:* with the key absent, `_live_ev_floor_population` returns None. Each venue's live plan then takes `scoped`, the venue-scoped `suggested_rows` set that paper2 uses too (`pipeline/portfolio_commit.py`, the `live_floor_rows` branch).
+- *Log:* it took no entry after 08:22:35Z 11-24, and 0 of the 44 post-load live orders (30 plan, 6 maker pilot, 8 in-play) are in it.
+- *Not read:* each order's `suggested` flag at purchase. The stored readings keep the board-match summary, not the plans.
+
+**Not a valid test, for the record.** The day-end board match (`orders_today` in the readings) puts only 1-3 of each day's orders on a Suggested row, and 4-6 on a line the board no longer carries. The board at 5:34 PM CST is not the board at purchase: flags and lines move during the day.
+
+**H-C is rejected.** 30 post-load plan orders, 30 distinct position keys, all filled.
+
+**P-F3 verdict.**
+- Half 1, floor-admitted pregame orders stop: **MET.**
+- Half 2, 0-2 a day: **FALSIFIED as a prediction.** It is not a defect.
+- The live-order count fell 82% for plan pregame orders (51.3 to 9.1 a day), not to near zero.
+
+**Lead, not followed.** The Suggested path rose from about 5 to 9.1 a day after the load. There are two candidate causes, neither tested, on 3.3 days of data:
+- the floor's rows had held the plans' `max_positions` slots and budget;
+- Thanksgiving's football slate (post-load plan orders: NCAAF 14, NFL 8, NBA 8).
+
+**For the daily review.** Its line still compares against 0-2 and will keep reading "not holding". The measured baseline is about 5 plan orders a day from Suggested rows plus about 2 maker-pilot orders.
