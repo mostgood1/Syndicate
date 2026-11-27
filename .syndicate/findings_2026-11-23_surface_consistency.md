@@ -696,7 +696,10 @@ pregame exchange-priced cards without a net number, 0 venue lines. Predicted aft
 
 **Loaded and measured** (deploys.md 2026-11-26 17:28:02Z): rc 0 at 17:28:18Z. Board pick tile not first: NHL 15 -> 0, soccer
 36 -> 0. Props without a verdict 12 -> 0. Live pages showed 0 unlabelled non-board EV, 0 console errors, and 0 web-log
-errors. Not yet exercised live: a picks headline made of board picks (no NHL pick on 11-26 / 11-27).
+errors. A picks headline made of board picks was first exercised live on 11-27. Read 15:32:05Z (board written 15:25:13Z),
+rc 0: the headline is the board's 6 Suggested NHL pregame picks, 0 not the board's; 12 sim cards, 0 unlabelled, 0 without a
+verdict; 12 props cards, 0 without a verdict; 4 of 15 NHL games carry a Board pick tile, first on all 4; soccer 11 games, 0
+unlabelled sim tiles. Saved `C:\tmp\scc_oversight_d5aa\reading_1d_after_1127.txt`. Nothing owed for 1d.
 
 **Measured first** (fleet, read-only, 16:10:55-16:15:21Z, back to back; `C:\tmp\scc_oversight_d5aa\probe_1d_fetch.py`,
 saved `probe_1d\`). Board build 16:06:33Z.
@@ -767,6 +770,48 @@ that places or sizes money reads these pages.
   - Predicted after the load: rc 0. The NHL picks headline is all board; sim cards are labelled with verdicts; every props
     card has a verdict; the bundle board is ok; the Board pick tile is first on every NHL and soccer game; soccer sim tiles
     are unlabelled 0.
+
+## Reading 5 -- the instrument after steps 1a-1e `[2026-11-27 15:29:22Z-15:33Z, fleet, read-only]`
+
+`scripts/surface_consistency_check.py` (exit 1), then a split of what is left
+(scratchpad `probe_resid.py`, read 15:30:58Z). The board was written 15:25:13Z; the six cheat sheets were generated
+13:30:23-13:35:36Z, about 2 h earlier.
+
+| check | 11-23 (Reading 2) | 11-27 |
+|---|---|---|
+| `same_price_ev:cheat` | 35 of 235 | 25 of 253 |
+| `pick_flag:layer2_vs_cheat` | 42 of 296 (both flag 4 of 44) | 6 of 321 (both flag 36 of 37) |
+| `ask_headline:all` | 5 of 5 | 0 of 5 |
+| `ask_headline:nba` | 5 of 5 | 0 of 5 |
+| `sim_attribution:ask_cards` | 2 of 15 | 0 of 13 |
+| `plan_vs_orders` | 33 of 33 | 1 of 2 |
+| `venue_price_hidden` | 12 of 16 | 0 of 2 |
+| `sport_card_bias:nhl_away_ml` | 1 of 7 (mean +4.11 pp) | 0 of 15 (mean +0.94 pp) |
+
+**What is left on the cheat sheet is the instrument and the sheet's age, not a rule difference.**
+- `same_price_ev`, 25 over:
+  - 10 are the fee basis. The check reads the board's GROSS `ev_pct` against the sheet's NET `ev_market`. On all 10
+    the board's own `ev_net_pct` is within 0.5 pt of the sheet (e.g. Polymarket total over 57.5 at +104: gross +1.43,
+    net -2.04, sheet -2.04). This is a defect in the check.
+  - 13 are a fair that moved after the sheet was published (more than 0.5 pp; up to 3.2 pp, e.g. Bo Nix rushing attempts
+    under 4.5 at draftkings -149: fair 0.568 at 13:30Z, 0.600 at 15:25Z).
+  - 2 looked like a rule difference but are fair moves too: below 0.5 pp absolute, at prices where that is about 1 pt
+    of EV (Kalshi +9900, fair 0.0096 -> 0.0097; Kalshi +113, fair 0.4750 -> 0.4797).
+  - So the 11-23 note "age cannot do that: the input price is identical" was wrong. The fair is a consensus over
+    every book, so it moves when other books move, at an unchanged price.
+- `pick_flag`, 6 over: 3 fair moved, 2 the best book or price changed since the sheet, 1 the same price and EV within
+  0.3 pt (betrivers +112, board Suggested now, sheet not). The last is probably the flag's own age (Suggested also
+  depends on rank and caps); not proven without the 13:30Z board.
+- **Owed in the instrument:** compare the board's `ev_net_pct` where it carries one, and report a pair whose fair or
+  best price moved since the sheet's `generated_at` as age, not as a disagreement.
+
+**`plan_vs_orders` is too small to read.** 11-27 to 15:29Z: 2 live orders (both Kalshi, both board Suggested), 1 not in
+the 11-position plan. 11-26 (read the same morning): 2 live orders, both not in the 10-position plan, 1 on the board, 0
+Suggested. 11-23 had 33. Volume belongs to `portfolio-monitor`; this lane only says the plan and the book still differ
+on the few orders there are.
+
+**Not covered by the instrument:** the per-sport pages other than NHL (NBA, NCAAF, NFL, NCAAB; Reading 1 item 6), the
+rail (age-confounded, Reading 1 item 7), and Layer 1 beyond the NHL moneyline.
 
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
