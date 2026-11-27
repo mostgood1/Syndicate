@@ -241,6 +241,8 @@ These two readings now belong to this monitor. The lane's findings: `.syndicate/
 
 ## NIGHTLY CLOSE
 
+**Owed readings at every close:** do each `R-` item above that is not marked DONE (from 11-27: R-M, the after-midnight carry, and the OURS fix's `ours_resim_tick` count), and write each result in the lane and the day's findings.
+
 1. The probe shows 0 live games. **Fetch day D's finals by date:**
    `curl -s "http://127.0.0.1:10000/api/board/game-chips?sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,wncaab,soccer&date=<D>" -o C:\tmp\railmon\final_<D>\chips.json`.
    After midnight the probe's own chips roll to D+1.
