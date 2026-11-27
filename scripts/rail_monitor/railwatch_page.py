@@ -355,6 +355,8 @@ def nomodel(extra, rows):
         f"<li>{esc(o['sport'].upper())} {esc(o['matchup'])}: {o.get('rows')} rows, "
         + ("teams REVERSED against the re-sim (I-29: the slate reoriented a neutral-site game)" if o.get("resim") == "REVERSED"
            else ("not matched in the re-sim snapshot" if o.get("resim") == "not_in_resim"
+                 else esc("the live snapshot is stale, so a game that started since is absent: " + str(o.get("detail") or ""))
+                 if o.get("resim") == "snapshot_stale"
                  else "re-simmed, but no row carries its model (join defect?)" if o.get("reason") == "resimmed"
                  else esc("the re-sim refused it: " + str(o.get("reason") or "reason not recorded (before 11-21)")
                           + (f" ({o['detail']})" if o.get("detail") else "")))) + "</li>"

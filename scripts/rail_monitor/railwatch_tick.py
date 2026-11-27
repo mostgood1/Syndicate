@@ -128,6 +128,13 @@ def tick(day, now_utc):
         if rc29 != 0 or not p29.strip():
             log(f"p29 retry rc={rc29} {s29:.0f}s {err29.strip()[-200:]!r}")
     rcps, ps, _, _ = wsl("ps -eo pid,rss,etimes,args | grep -E 'run_refresh_worker.py|board_build_process --serve' | grep -v grep", 30)
+    # 11-25 (R-B, #844 CHANGE D loaded 11-24): the lean tick never ran the #844 grid sampler, so the 11-24 evening has
+    # no P2/P3 samples. Sample the 11-25 and 11-26 slates at every tick (read-only: one grid JSON read per sport,
+    # appends to C:\tmp\railmon\p844_<day>.jsonl). Its result does not gate the tick.
+    if day <= "2026-11-26":
+        rc844, _, err844, _ = wsl(f"nice -n 19 bash /mnt/c/tmp/railmon/p844.sh {day} > /dev/null", 120)
+        if rc844 != 0:
+            log(f"p844 rc={rc844} {err844.strip()[-200:]!r}")
     note = "auto"
     # 11-21: hand p29's per-game lines to dash_update so the row says WHY each no-model game has none
     orient_args = []
@@ -240,7 +247,7 @@ def render(day):
     dark = [o for o in (last_x.get("orient") or []) if o.get("matchup")
             and ((o.get("priced") and not o.get("priced_with_model")) if "priced" in o else not o.get("with_model"))]
     dark_html = "".join(f"<li>{html.escape(o['sport'].upper())} {html.escape(o['matchup'])}: {o.get('rows')} rows, "
-                        f"{'teams REVERSED vs the re-sim (I-29)' if o.get('resim') == 'REVERSED' else ('not matched in the re-sim snapshot' if o.get('resim') == 'not_in_resim' else 're-simmed, but no row carries its model (join defect?)' if o.get('reason') == 'resimmed' else html.escape('re-sim refused it: ' + str(o.get('reason') or 'reason not recorded') + (' (' + str(o['detail']) + ')' if o.get('detail') else '')))}</li>"
+                        f"{'teams REVERSED vs the re-sim (I-29)' if o.get('resim') == 'REVERSED' else ('not matched in the re-sim snapshot' if o.get('resim') == 'not_in_resim' else html.escape('the live snapshot is stale, so a game that started since is absent: ' + str(o.get('detail') or '')) if o.get('resim') == 'snapshot_stale' else 're-simmed, but no row carries its model (join defect?)' if o.get('reason') == 'resimmed' else html.escape('re-sim refused it: ' + str(o.get('reason') or 'reason not recorded') + (' (' + str(o['detail']) + ')' if o.get('detail') else '')))}</li>"
                         for o in dark) or "<li>None at the latest reading.</li>"
     mem = "<br>".join(html.escape(l) for l in (last_x.get("p7") or [])) or "–"
     ps_html = ", ".join(f"{html.escape(p[3])} {int(p[1]) / 1024 / 1024:.2f} GB" for p in (last_x.get("ps") or []) if len(p) >= 4 and p[1].isdigit()) or "–"

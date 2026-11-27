@@ -13,6 +13,7 @@ Game line fields: sport, matchup, rows, with_model (non-player rail rows, and th
 row can say why a game has no model (the fleet-watcher's ask: skip deliberate fail-closed refusals).
 """
 import json, subprocess, sys, unicodedata, urllib.request
+from datetime import datetime, timezone
 
 PFX = "syndicate:refresh-state:/home/amyn/syndicate-prod/data/live/"
 SNAP = {  # sport -> keyvalue file. NCAAF and NHL keep their per-game refusals in the live lens, not a _live_resim file.
@@ -142,6 +143,27 @@ def alias_key(sport, name):
     return _ALIAS[k]
 
 
+# 11-27 R15-R18 (the fleet-watcher's flag): "Real Racing Club de Santander @ Levante" read not_in_resim in two
+# straight readings. Not a name miss (find() matches "Racing Santander" / "Racing de Santander" / "Real Racing Club"):
+# the soccer live lens was not rewritten from 20:01:59Z to 21:47Z, because its memory gate (300 MB headroom on the
+# 3,072 MB live-odds-worker) skipped every tick (LIVE_LENS_TICK_DIAG sport=soccer reason=low_headroom, 63 in 20-21Z),
+# so no 20:00Z kickoff was in it. A game missing from a snapshot older than this is "snapshot_stale": the writer, not
+# the helper. Every writer here rewrites each tick (1-4 min) while its sport has a live game; 900 s is a stall.
+STALE_SNAPSHOT_S = 900
+
+
+def snapshot_age_s(snap):
+    """Seconds since the snapshot's generatedAt / generated_at; None when absent, unparseable or naive."""
+    raw = (snap or {}).get("generatedAt") or (snap or {}).get("generated_at") if isinstance(snap, dict) else None
+    try:
+        t = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if t.tzinfo is None:
+        return None
+    return max(0.0, (datetime.now(timezone.utc) - t).total_seconds())
+
+
 rail = json.load(urllib.request.urlopen("http://127.0.0.1:10000/api/board/live-rail", timeout=30))
 rows = rail.get("rows") or []
 matchups = {}
@@ -169,6 +191,7 @@ for sport in sorted({s for s, _ in matchups if s in SNAP}):  # soccer etc.: no p
             snap = snap["payload"]
         games = (snap or {}).get("games") if isinstance(snap, dict) else None
         index = [(names(g), g) for g in (games or []) if isinstance(g, dict)]
+    age = snapshot_age_s(snap)
     for (s, mu), c in sorted(matchups.items(), key=lambda kv: str(kv[0])):
         if s != sport:
             continue
@@ -183,12 +206,18 @@ for sport in sorted({s for s, _ in matchups if s in SNAP}):  # soccer etc.: no p
                 state = "REVERSED" if g is not None else "not_in_resim"
         reason, detail = lens_reason(g) if g else (None, None)
         if state == "not_in_resim":  # say how old the snapshot is: a game that kicked off after it is not a defect
-            detail = f"snapshot generated {(snap or {}).get('generatedAt') or (snap or {}).get('generated_at')}"
+            gen = (snap or {}).get('generatedAt') or (snap or {}).get('generated_at')
+            detail = f"snapshot generated {gen}"
+            if age is not None and age > STALE_SNAPSHOT_S:
+                state = "snapshot_stale"
+                detail = (f"snapshot generated {gen}, {age / 60:.0f} min old: its writer has not rewritten it, "
+                          f"so a game that started since is absent (not a name miss)")
         out.append(dict(sport=sport, matchup=mu, rows=c["rows"], with_model=c["with_model"], priced=c["priced"],
                         priced_with_model=c["priced_with_model"], resim=state,
                         event_id=(g or {}).get("event_id"), reason=reason, detail=detail))
     if snap is not None:
         summaries.append(dict(sport=sport, resim_generated=snap.get("generatedAt") or snap.get("generated_at"),
+                              resim_age_s=None if age is None else round(age),
                               resim_games=len(index), counts=snap.get("counts") or snap.get("coverage")))
 # 11-21: what this helper's OWN live-rail GET held, per sport. dash_update labels a no-model game of a sport this read
 # lacks entirely "sport_absent_from_helper_read"; this line is how to tell that apart from a snapshot miss next time

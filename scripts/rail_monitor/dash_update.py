@@ -218,12 +218,15 @@ def row(args):
     # later read had none modelled either: a join defect, flag it); 11-24: "resimmed_model_by_helper_read" (the helper's
     # read had the model: timing between the two reads) and "resimmed_lane_joined_rows_withheld" (live_total on the
     # rows, no probability: the per-line gates);
-    # "not_in_resim" (no snapshot entry matched, possibly this helper's name miss: check); "sport_absent_from_helper_read"
+    # "not_in_resim" (no snapshot entry matched, possibly this helper's name miss: check); 11-27: "snapshot_stale" (no
+    # entry matched AND the sport's snapshot is over 900 s old: its writer stalled, not a name miss -- the soccer lens's
+    # memory gate 20:02-21:47Z 11-27); "sport_absent_from_helper_read"
     # (the helper's own live-rail GET, made a few minutes after the probe's, held no game of this sport; NOT a missing
     # snapshot. Renamed 11-21 from "no_snapshot_for_sport", which read as an NHL snapshot miss at R26; the helper's
     # `{"rail": ...}` line says what its read held); "unknown" (the helper's output was missing this tick).
     reasons, details = {}, {}
     orient = {}
+    stale_snapshots = {}
     if args.orient and os.path.exists(args.orient):
         for line in open(args.orient, encoding="utf-8", errors="replace"):
             if line.startswith("{"):
@@ -233,6 +236,12 @@ def row(args):
                     continue
                 if o.get("matchup"):
                     orient[f"{o.get('sport')} {o.get('matchup')}"] = o
+                elif o.get("sport") and isinstance(o.get("resim_age_s"), (int, float)) and o["resim_age_s"] > 900:
+                    # 11-27: a sport with live rail games whose snapshot is stale. Its games still IN the snapshot
+                    # carry a model that stopped moving (soccer has no lane-age ceiling in the live join), so this
+                    # is reported even when no game is on the no-model list.
+                    stale_snapshots[o["sport"]] = {"age_s": o["resim_age_s"], "generated": o.get("resim_generated"),
+                                                  "games_in_snapshot": o.get("resim_games")}
     covered = {o.get("sport") for o in orient.values()}
     for k in games_no_model:
         o = orient.get(k)
@@ -240,7 +249,7 @@ def row(args):
             reasons[k] = "unknown" if not orient else ("not_in_resim" if k.split(" ", 1)[0] in covered else "sport_absent_from_helper_read")
         elif o.get("resim") == "REVERSED":
             reasons[k] = "orientation_reversed"
-        elif o.get("resim") in ("not_in_resim", "no_snapshot"):
+        elif o.get("resim") in ("not_in_resim", "no_snapshot", "snapshot_stale"):
             reasons[k] = o["resim"]
         elif o.get("reason") == "resimmed":
             # 1-2 priced rows: the join's per-line withholds (stale quote, no distribution for that line, stoppage
@@ -332,6 +341,7 @@ def row(args):
         "live_games_no_model_list": games_no_model[:5],
         "live_games_no_model_reasons": reasons,
         "live_games_no_model_detail": details,
+        "stale_snapshots": stale_snapshots,
         "live_rows": lr.get("n"),
         "priced_le_120": lr.get("priced_le_120"),
         "priced_age_p50_s": (lr.get("priced_age") or {}).get("p50"),
