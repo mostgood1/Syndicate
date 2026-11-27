@@ -108,6 +108,28 @@ single number that cannot distinguish a dead join from a quiet slate.
 Only dates that have already begun are fetched. A future date is pregame by
 definition and ESPN adds nothing to it, so a 10-day NCAAF week costs one call
 on opening Saturday rather than ten.
+
+--------------------------------------------------------------------------
+IN A WEB REQUEST THE FALLBACK NO LONGER FETCHES `[2026-11-27]`
+--------------------------------------------------------------------------
+
+Lane `game-chips-request-path-espn`. The producer now runs (thousands of
+`NCAAF_LIVE_STATE_FROM_WORKER` lines a day), so the fallback above was firing
+for one reason: the live record lives in the keyvalue store under a 10-day
+date TTL, and a past-date `/api/board/game-chips` build (the 8:15 AM
+play-cards grader asks for every date since 10-16) found no record for any
+date older than that and fetched ESPN for each date of the week, serially,
+inside the request. On 11-26 the host's network was down, every GET stalled
+in DNS, and those requests took 61-113 s; one outlived a worker's recycle and
+the master timed the worker out (lane `web-silent-worker-kills`).
+
+So the order is now: cache -> live record -> FINAL-DATE ARCHIVE (a disk copy
+the producer writes once a date's games are all final; it has no TTL) ->
+fetch. And inside a web request the last step is replaced: a stale live
+record is SERVED, named `stale_worker`, and with no record at all the date
+contributes nothing, named `none` -- state unknown, never a fetch.
+`SYNDICATE_REQUEST_PATH_ESPN_FETCH=on` restores the request-path fetch.
+Outside a request (the workers) the fetch fallback is unchanged.
 """
 
 from __future__ import annotations
@@ -291,13 +313,74 @@ def _worker_record_max_age_seconds() -> float:
     return value if value > 0 else 240.0
 
 
-def _rows_from_worker_record(iso_date: str) -> dict[str, dict[str, Any]] | None:
+def _in_web_request() -> bool:
+    try:
+        from flask import has_request_context
+
+        return bool(has_request_context())
+    except Exception:  # noqa: BLE001 -- no Flask, no request
+        return False
+
+
+def _request_path_fetch_enabled() -> bool:
+    """`SYNDICATE_REQUEST_PATH_ESPN_FETCH`: absent or anything but on = no ESPN fetch in a web request."""
+    return str(os.environ.get("SYNDICATE_REQUEST_PATH_ESPN_FETCH") or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
+def _keyed(iso_date: str, games: list[Any]) -> dict[str, dict[str, Any]]:
+    rows_by_key: dict[str, dict[str, Any]] = {}
+    for state in games:
+        if not isinstance(state, Mapping):
+            continue
+        away_id = str(state.get("away_id") or "")
+        home_id = str(state.get("home_id") or "")
+        if away_id and home_id:
+            rows_by_key[f"{away_id}@{home_id}"] = {**state, "date": iso_date}
+    return rows_by_key
+
+
+def _rows_from_final_archive(iso_date: str) -> dict[str, dict[str, Any]] | None:
+    """The producer's final-date archive for one date, or None.
+
+    Accepted only as a SETTLED answer: every game final and keyed, or no games
+    at all (`{}`, the same complete "no games that date" the live record gives).
+    Anything else is refused, so an archive can never pin a moving date. Read
+    through `refresh_state_store`, which sends this path to disk on every
+    service; it carries no TTL, which is the whole point of it.
+    """
+    try:
+        from scripts.poll_ncaaf_live_state import final_archive_path
+        from syndicate.features.shared.refresh_state_store import read_json_file
+
+        record = read_json_file(final_archive_path(iso_date))
+    except Exception as exc:  # noqa: BLE001 -- named, never fatal to the board
+        print(f"NCAAF_LIVE_STATE_ARCHIVE_READ_FAILED date={iso_date} error={type(exc).__name__}: {exc}", flush=True)
+        return None
+    if not isinstance(record, Mapping) or not isinstance(record.get("games"), list):
+        return None
+    games = record["games"]
+    if not games:
+        return {}
+    if not all(isinstance(g, Mapping) and g.get("final") for g in games):
+        return None
+    rows_by_key = _keyed(iso_date, games)
+    if not rows_by_key:
+        return None
+    print(f"NCAAF_LIVE_STATE_FROM_ARCHIVE date={iso_date} keyed={len(rows_by_key)}", flush=True)
+    return rows_by_key
+
+
+def _rows_from_worker_record(iso_date: str, *, allow_stale: bool = False) -> dict[str, dict[str, Any]] | None:
     """The worker's record for one date, or None meaning "fetch instead".
 
     None is returned for absent, unreadable, stale, or shape-wrong records --
     every case where fetching is the right answer. It is NEVER returned as an
     empty dict for those, because `{}` is a POSITIVE claim ("no games keyed")
     and would suppress the fallback.
+
+    `allow_stale` is the web-request path's last resort (2026-11-27): there the
+    fallback no longer fetches, and the newest record the worker wrote beats
+    no state at all. It is named `NCAAF_LIVE_STATE_RECORD_STALE_SERVED`.
     """
     try:
         from scripts.poll_ncaaf_live_state import live_state_path
@@ -343,7 +426,8 @@ def _rows_from_worker_record(iso_date: str) -> dict[str, dict[str, Any]] | None:
     still_moving = any(
         isinstance(g, Mapping) and not g.get("final") for g in games
     )
-    if still_moving and age > _worker_record_max_age_seconds():
+    stale = still_moving and age > _worker_record_max_age_seconds()
+    if stale and not allow_stale:
         print(
             f"NCAAF_LIVE_STATE_RECORD_STALE date={iso_date} age_seconds={age:.0f} "
             f"unfinished_games={sum(1 for g in games if isinstance(g, Mapping) and not g.get('final'))}",
@@ -351,14 +435,7 @@ def _rows_from_worker_record(iso_date: str) -> dict[str, dict[str, Any]] | None:
         )
         return None
 
-    rows_by_key: dict[str, dict[str, Any]] = {}
-    for state in games:
-        if not isinstance(state, Mapping):
-            continue
-        away_id = str(state.get("away_id") or "")
-        home_id = str(state.get("home_id") or "")
-        if away_id and home_id:
-            rows_by_key[f"{away_id}@{home_id}"] = {**state, "date": iso_date}
+    rows_by_key = _keyed(iso_date, games)
 
     if not rows_by_key:
         # TWO DIFFERENT CASES, AND CONFLATING THEM COST A POINTLESS FETCH PER
@@ -383,6 +460,9 @@ def _rows_from_worker_record(iso_date: str) -> dict[str, dict[str, Any]] | None:
         print(f"NCAAF_LIVE_STATE_RECORD_UNKEYED date={iso_date} games={len(games)}", flush=True)
         return None
 
+    if stale:
+        print(f"NCAAF_LIVE_STATE_RECORD_STALE_SERVED date={iso_date} keyed={len(rows_by_key)} age_seconds={age:.0f}", flush=True)
+        return rows_by_key
     print(f"NCAAF_LIVE_STATE_FROM_WORKER date={iso_date} keyed={len(rows_by_key)} age_seconds={age:.0f}", flush=True)
     return rows_by_key
 
@@ -406,6 +486,8 @@ def ncaaf_game_state_index(
     miss from a dead producer.
     """
     index: dict[str, dict[str, Any]] = {}
+    # Asked once per call: every date of one build is either in a web request or not.
+    no_fetch_here = _in_web_request() and not _request_path_fetch_enabled()
     for iso_date in past_or_current_dates(dates):
         now = time.monotonic()
         with _cache_lock:
@@ -423,6 +505,33 @@ def ncaaf_game_state_index(
             rows_by_key = _rows_from_worker_record(iso_date)
             if rows_by_key is not None and sources is not None:
                 sources[iso_date] = "worker"
+
+        if rows_by_key is None:
+            # THE FINAL-DATE ARCHIVE, for a date whose live record aged out of
+            # the keyvalue store (10-day TTL). Settled dates only, so it can
+            # never answer for a moving one. See the module docstring, 2026-11-27.
+            rows_by_key = _rows_from_final_archive(iso_date)
+            if rows_by_key is not None and sources is not None:
+                sources[iso_date] = "archive"
+
+        if rows_by_key is None and no_fetch_here:
+            # IN A WEB REQUEST, NEVER FETCH. The newest record the worker wrote,
+            # even stale, beats a GET whose duration nobody bounds (61-113 s on
+            # 11-26); with no record the date is STATE UNKNOWN, named, and the
+            # cards keep what they had. Not cached: these are cheap store reads,
+            # and caching "none" would also answer a later worker-side call in
+            # the same process that is still allowed to fetch.
+            rows_by_key = _rows_from_worker_record(iso_date, allow_stale=True)
+            if rows_by_key is not None:
+                if sources is not None:
+                    sources[iso_date] = "stale_worker"
+            else:
+                print(f"NCAAF_LIVE_STATE_REQUEST_NO_FETCH date={iso_date}", flush=True)
+                if sources is not None:
+                    sources[iso_date] = "none"
+                rows_by_key = {}
+            index.update(rows_by_key)
+            continue
 
         if rows_by_key is None:
             # FALLBACK, and it is why this is safe to land before the producer

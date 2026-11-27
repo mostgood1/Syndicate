@@ -53,7 +53,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-__all__ = ["poll_ncaaf_live_state", "live_state_path", "ARTIFACT_PARTS"]
+__all__ = ["poll_ncaaf_live_state", "live_state_path", "final_archive_path", "ARTIFACT_PARTS", "ARCHIVE_PARTS"]
 
 _SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard"
 # Matches `nfl/live_game_state.py`. Short on purpose: a scoreboard outage must
@@ -61,12 +61,48 @@ _SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/football/colleg
 _FETCH_TIMEOUT_SECONDS = 6.0
 
 ARTIFACT_PARTS = ("ncaaf_source", "api", "live_state")
+# THE FINAL-DATE ARCHIVE (2026-11-27, lane `game-chips-request-path-espn`). The
+# live record above lives in the keyvalue store under a 10-day date TTL, so a
+# date older than ten days had no record and web fetched ESPN for it inside the
+# request. A date whose games are all final cannot change, so it is also written
+# here; `refresh_state_store` sends this path to DISK on every service (the
+# fleet's roles share one reports root, and disk has no TTL). The board reads it
+# when the live record is gone (`ncaaf/live_game_state._rows_from_final_archive`).
+ARCHIVE_PARTS = ("ncaaf_source", "api", "live_state_final")
 
 
 def live_state_path(iso_date: str):
     from syndicate.features.shared.refresh_state_store import reports_root
 
     return reports_root().joinpath(*ARTIFACT_PARTS, f"live_state_{iso_date}.json")
+
+
+def final_archive_path(iso_date: str):
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root().joinpath(*ARCHIVE_PARTS, f"live_state_final_{iso_date}.json")
+
+
+def _utc_today() -> str:
+    return time.strftime("%Y-%m-%d", time.gmtime())
+
+
+def archivable(record: Mapping[str, Any], *, today: str | None = None) -> bool:
+    """Whether a record is a date's settled answer, safe to keep forever.
+
+    Every game final, or -- for a date already past -- no games at all, which
+    is a complete answer too (`live_game_state` accepts `games == []` as "this
+    date has no games"). An empty TODAY is not archived: a schedule can still
+    gain a game, and an archived empty would hide it once the live record ages
+    out. A record with any unfinished game is never archived.
+    """
+    games = record.get("games")
+    if not isinstance(games, list):
+        return False
+    if not games:
+        iso_date = str(record.get("date") or "")
+        return bool(iso_date) and iso_date < (today or _utc_today())
+    return all(isinstance(game, Mapping) and game.get("final") for game in games)
 
 
 def _text(value: Any) -> str:
@@ -262,7 +298,7 @@ def _board_fields_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
     return out
 
 
-def poll_ncaaf_live_state(iso_date: str, *, persist: bool = True) -> dict[str, Any]:
+def poll_ncaaf_live_state(iso_date: str, *, persist: bool = True, archive_only: bool = False) -> dict[str, Any]:
     """Capture one date's NFL games. Returns a named result, never raises.
 
     `status="error"` with a reason rather than an exception, matching every
@@ -298,7 +334,7 @@ def poll_ncaaf_live_state(iso_date: str, *, persist: bool = True) -> dict[str, A
         # than the fetch this whole change removes.
         "fetched_at": time.time(),
     }
-    if persist:
+    if persist and not archive_only:
         try:
             from syndicate.features.shared.refresh_state_store import write_json_file
 
@@ -308,6 +344,21 @@ def poll_ncaaf_live_state(iso_date: str, *, persist: bool = True) -> dict[str, A
             # those as one thing would make a Redis hiccup indistinguishable
             # from ESPN being down, and they need opposite responses.
             record["persist_error"] = f"{type(exc).__name__}: {exc}"
+    # The archive is written AFTER the live record and from the same dict, so
+    # the two cannot disagree; its own failure is named separately for the same
+    # reason as `persist_error`. `archive_only` is the backfill mode: it never
+    # writes the live record, so a run outside the fleet's roles cannot recreate
+    # expired keyvalue keys.
+    archived = False
+    if persist and archivable(record):
+        try:
+            from syndicate.features.shared.refresh_state_store import write_json_file
+
+            write_json_file(final_archive_path(iso_date), record)
+            archived = True
+        except Exception as exc:  # noqa: BLE001 -- named, never fatal to the caller
+            record["archive_error"] = f"{type(exc).__name__}: {exc}"
+    record["archived"] = archived
     record["status"] = "ok"
     return record
 
@@ -343,6 +394,33 @@ def week_state_dates(season: int, week: int) -> tuple[str, ...]:
         return ()
 
 
+def week_capture_dates(season: int, week: int) -> tuple[str, ...]:
+    """Every ESPN date the BOARD reads for a week, past or current -- the backfill's date set.
+
+    `_ncaaf_week_espn_capture_dates`, not `week_state_dates`: the reader
+    (`ncaaf/cards._attach_live_state`) asks for the ESPN capture dates, a union
+    of the UTC kickoff dates and the Eastern dates ESPN files a night game under,
+    so an archive written for the UTC dates alone would leave the others missing.
+    """
+    try:
+        from syndicate.features.ncaaf.cards import _ncaaf_week_espn_capture_dates
+        from syndicate.features.ncaaf.live_game_state import past_or_current_dates
+
+        return tuple(past_or_current_dates(_ncaaf_week_espn_capture_dates(int(season), int(week))))
+    except Exception as exc:  # noqa: BLE001 -- named, never fatal
+        print(
+            f"[poll_ncaaf_live_state] CAPTURE_DATES_UNAVAILABLE season={season} week={week} "
+            f"error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return ()
+
+
+def _week_range(text: str) -> list[int]:
+    first, _, last = str(text).partition("-")
+    return list(range(int(first), int(last or first) + 1))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--date", required=True, help="ISO date, e.g. 2026-08-28")
@@ -350,6 +428,11 @@ def main() -> int:
                         help="with --week, also poll every past-or-current kickoff date in that week")
     parser.add_argument("--week", type=int, default=None,
                         help="with --season, also poll every past-or-current kickoff date in that week")
+    parser.add_argument("--weeks", default=None,
+                        help="with --season and --archive-only, e.g. 1-13: every past ESPN capture date of those weeks")
+    parser.add_argument("--archive-only", action="store_true",
+                        help="the final-date archive backfill: write only dates already past, and only the "
+                             "archive (never the keyvalue live record)")
     parser.add_argument("--no-persist", action="store_true", help="fetch and print, write nothing")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
@@ -359,21 +442,32 @@ def main() -> int:
         for iso in week_state_dates(args.season, args.week):
             if iso not in dates:
                 dates.append(iso)
+    if args.season is not None and args.weeks:
+        for week in _week_range(args.weeks):
+            for iso in week_capture_dates(args.season, week):
+                if iso not in dates:
+                    dates.append(iso)
+    if args.archive_only:
+        # A backfill archives settled dates only; today can still move.
+        today = _utc_today()
+        dates = sorted(iso for iso in dates if iso < today)
 
-    results = [poll_ncaaf_live_state(iso, persist=not args.no_persist) for iso in dates]
+    results = [poll_ncaaf_live_state(iso, persist=not args.no_persist, archive_only=args.archive_only) for iso in dates]
     if args.json:
-        print(json.dumps(results if len(results) > 1 else results[0], indent=2))
+        print(json.dumps(results if len(results) != 1 else results[0], indent=2))
     else:
         for result in results:
             print(
                 f"[poll_ncaaf_live_state] date={result.get('date')} status={result.get('status')}"
                 f" games={result.get('count')} finals={result.get('finals')}"
-                f" reason={result.get('reason')} persist_error={result.get('persist_error')}",
+                f" reason={result.get('reason')} persist_error={result.get('persist_error')}"
+                f" archived={result.get('archived')} archive_error={result.get('archive_error')}",
                 flush=True,
             )
         print(
             f"[poll_ncaaf_live_state] COVERAGE dates={len(results)} "
-            f"ok={sum(1 for r in results if r.get('status') == 'ok')}",
+            f"ok={sum(1 for r in results if r.get('status') == 'ok')} "
+            f"archived={sum(1 for r in results if r.get('archived'))}",
             flush=True,
         )
     return 0 if all(r.get("status") == "ok" for r in results) else 1

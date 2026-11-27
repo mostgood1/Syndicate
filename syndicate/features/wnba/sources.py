@@ -96,6 +96,20 @@ def _wnba_scoreboard_url() -> str:
     return str(os.environ.get("SYNDICATE_WNBA_SCOREBOARD_URL") or "").strip() or _DEFAULT_WNBA_SCOREBOARD_URL
 
 
+def _in_web_request() -> bool:
+    try:
+        from flask import has_request_context
+
+        return bool(has_request_context())
+    except Exception:  # noqa: BLE001 -- no Flask, no request
+        return False
+
+
+def _request_path_espn_fetch_enabled() -> bool:
+    """`SYNDICATE_REQUEST_PATH_ESPN_FETCH`: absent or anything but on = no ESPN fetch in a web request."""
+    return str(os.environ.get("SYNDICATE_REQUEST_PATH_ESPN_FETCH") or "").strip().lower() in {"1", "true", "on", "yes"}
+
+
 def has_games_for_date(date_str: str) -> bool | None:
     selected_date = str(date_str or "").strip()
     if not selected_date:
@@ -130,8 +144,25 @@ def has_games_for_date(date_str: str) -> bool | None:
     # confirmed and saved the 2026-08-30 slate under today's live_state key.
     # Only an ESPN-confirmed True (below) is safe to remember; this shortcut is
     # already cheap, since available_dates() is cached on the directory mtime.
-    if selected_date != central_today_iso() and selected_date in available_dates():
+    today_iso = central_today_iso()
+    if selected_date != today_iso and selected_date in available_dates():
         return True
+
+    # A PAST DATE IN A WEB REQUEST ANSWERS FROM THE ARTIFACTS, NEVER FROM ESPN
+    # (2026-11-27, lane `game-chips-request-path-espn`). A past date with no
+    # per-date artifact has no slate this platform tracked, so there is nothing to
+    # build a card or chip from whatever ESPN says; the fetch could only cost
+    # time. And that time is unbounded: on 11-26 the host's network was down, every
+    # request-path ESPN GET stalled in DNS, and the 8:15 AM play-cards grader's
+    # past-date `/api/board/game-chips` requests (all sports, 26 dates) took
+    # 61-113 s -- one of which outlived a worker's recycle and got it timed out.
+    # This fetch ran once per past-date build (30 in that hour). Today and future
+    # dates still check ESPN below: their answer can change, and only ESPN says
+    # so. Outside a request (the workers) nothing changes.
+    # `SYNDICATE_REQUEST_PATH_ESPN_FETCH=on` restores the fetch for past dates.
+    if selected_date < today_iso and _in_web_request() and not _request_path_espn_fetch_enabled():
+        print(f"WNBA_HAS_GAMES_REQUEST_NO_FETCH date={selected_date}", flush=True)
+        return False
 
     # No lru_cache here: a False/None verdict is only ever a snapshot of one
     # ESPN scoreboard call and can flip true later the same day (games not

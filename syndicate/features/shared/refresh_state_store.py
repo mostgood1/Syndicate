@@ -289,6 +289,17 @@ _KEYVALUE_EXCLUDED_PATH_MARKERS = (
     # `boxscores_20` and not `boxscores_`: the dated files only.
     # `boxscores_history.csv` has its own writer and is deliberately unchanged.
     "wnba_source/data/processed/boxscores_20",
+    # 2026-11-27, lane `game-chips-request-path-espn`. THE NCAAF FINAL-DATE
+    # ARCHIVE IS AN ARTIFACT, NOT COORDINATION STATE. `poll_ncaaf_live_state`
+    # writes its live record (`ncaaf_source/api/live_state/`) to the keyvalue
+    # store, where the 10-day date TTL above drops it -- so a game-chips build for
+    # a date older than ten days found no record and web fetched ESPN for every
+    # date of that week inside the request (6-10 serial GETs; 61-113 s on 11-26,
+    # when the host's network was down). The poller now also writes a date whose
+    # games are all final to `live_state_final/`, and this marker sends that
+    # path to disk on every service: the fleet's roles share one reports root,
+    # and disk has no TTL. The live record itself is unchanged.
+    "ncaaf_source/api/live_state_final/",
 )
 
 
