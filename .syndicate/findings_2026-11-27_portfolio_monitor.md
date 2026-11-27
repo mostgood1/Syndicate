@@ -231,3 +231,65 @@ Hypotheses, each with its falsification fixed now:
 
 **CLV consequence, reported whichever hypothesis survives:** fair CLV, gross and net of fee. If fair CLV is <= 0, then
 "beating the close" mostly measured the spread, not edge.
+
+### RESULT, 2026-11-27 1:02 PM CST: H-ASK SURVIVES; "beating the close" was the spread; against the fair close the book pays too much
+
+Scripts (session 69d80317, kept at `C:\tmp\pfmon\clvcal\`):
+- `build_keys.py`: the 622 priced same-book bets, mapped to `clv_join._quote_match_key`.
+- `fleet_quotes.py`: on the fleet at nice 19 / ionice idle; read-only. It loads the fleet checkout's `clv_join` by
+  file path. 104 shards in 84.6 s, 5,412,579 lines kept by the event filter, 12,652 pregame kalshi/polymarket rows
+  matched. 9 candidate shards were absent, all second-choice dates.
+- `calib.py`: the de-vig and the ranges.
+
+**Sanity:**
+- Gross CLV rebuilt from fill and close matches the recorded figure on 622 of 622 bets.
+- Our own side's last pregame quote equals the recorded close on 622 of 622.
+
+**Coverage: 398 of 622 bets (286 of 422 games) have the other side's closing quote.**
+- Kalshi 275 of 467; Polymarket 123 of 155. 14 were 3-way h2h, normalised over all three outcomes.
+- The 224 uncovered are one-sided in the quote log (192 of them Kalshi).
+- **Coverage is not random.** The covered subset's raw gap is -2.33 pp against -4.40 pp on all 621. That puts the
+  uncovered bets at about -8.1 pp. That figure is derived from the two means, not separately tested.
+
+Results, 30 d, covered set. Each cell is pp with its 95% range:
+
+| measure | all covered (286 games) | Kalshi (210) | Polymarket (112) | game lines (200) | props (88) |
+|---|---|---|---|---|---|
+| overround at close | **+2.69 [+1.90, +3.48]** | +2.59 | +2.91 [+1.17, +4.66] | +2.60 | +2.84 |
+| wins minus close (as the review computes it) | -2.33 [-7.49, +2.82] | -2.32 | -2.37 | -1.93 | -3.02 |
+| wins minus FAIR close | **-1.03 [-6.19, +4.13]** | -0.91 | -1.29 | -0.91 | -1.24 |
+| CLV vs the close as quoted, gross | +0.56 [+0.07, +1.06] | +0.73 | +0.20 | +0.08 | +1.38 |
+| **CLV vs the FAIR close, gross** | **-0.74 [-1.17, -0.31]** | -0.68 [-1.17, -0.19] | -0.88 [-1.66, -0.09] | -0.94 [-1.50, -0.37] | -0.41 [-1.05, +0.23] |
+| CLV vs the FAIR close, net of fee | **-2.53 [-2.96, -2.09]** | -2.26 | -3.13 | -2.83 | -2.01 |
+
+**Verdicts, by the tests fixed above:**
+- **H-ASK SURVIVES.** The overround's range is above 0 (+2.69 [+1.90, +3.48]), and wins minus the fair close
+  includes 0 (-1.03 [-6.19, +4.13]).
+  - Its venue sub-prediction is FALSIFIED. Polymarket's closing quotes carry the same spread (+2.91), so the
+    belief that its slate prices "sum near 1" was wrong.
+- **H-SEL REJECTED (not established).** Wins minus the fair close includes 0. With outcome noise of about +-5 pp at
+  this sample, a 1 pp adverse-selection effect cannot be seen or ruled out.
+- **H-LUCK SURVIVES.** Wins minus close as quoted includes 0 in both disjoint windows: PRIOR -4.28 [-8.68, +0.12]
+  (353 games) and RECENT -5.06 [-15.0, +4.88] (73). The 30 d -4.40 [-8.44, -0.36] (z -2.14) clears 0 only on the
+  pooled set.
+
+**What this answers:**
+- **The bets do not beat the close.** The closing price is quoted with a spread of about 2.7 pp across both
+  outcomes, so the close's implied probability for our side sits about 1.3 pp above the fair one.
+- Measured against that FAIR close, the book pays **0.74 pp more than the fair closing probability** before fees,
+  and 2.53 pp more after fees. That holds on both venues and on game lines; on props the range reaches 0.
+- So the reported "+1.11 pp, beats the close 60.6% of the time" is the spread, not edge.
+- The realised result agrees. Wins minus fill price is -3.29 [-7.38, +0.80] over 621 bets, within noise of the
+  -0.74 the fair close predicts.
+- The -4.4 pp "wins below the close" splits into about 1.3 pp of spread plus noise. It needs no extra
+  explanation at this sample.
+
+**Consequences for the instruments, all measurement and none a betting change:**
+1. Every same-book CLV figure the review, the gate (condition 3) and Portfolio Watch report is computed against an
+   ask-priced close, so each overstates edge by about half the overround.
+   - Fair CLV needs the other side's closing quote. `clv_join._resolve_from_quotes` reads only our selection.
+   - Stamping the other side's close, or the overround, on the closing mark is a code change in `clv_join.py` /
+     `order_clv.py`, which no open lane claims. It needs its own lane.
+2. 192 Kalshi bets are one-sided in the quote log, so they cannot be de-vigged at all. The venue quotes BOTH asks
+   (`yes_ask` / `no_ask`, `venue_quote_at_submit` on 149 recent Kalshi orders), so the quote log could carry both.
+3. NBA (different-book closes) and in-play bets remain outside this measure.
