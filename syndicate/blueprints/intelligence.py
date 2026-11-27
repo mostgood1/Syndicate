@@ -3632,6 +3632,143 @@ def board_live_rail_api():
     return response
 
 
+def _rail_prior_date_live_chips_enabled() -> bool:
+    """On unless SYNDICATE_RAIL_PRIOR_DATE_LIVE_CHIPS says 0/false/no/off. ABSENT IS ON (display only)."""
+    raw = str(os.environ.get("SYNDICATE_RAIL_PRIOR_DATE_LIVE_CHIPS") or "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _rail_prior_date_chip_max_age_seconds() -> float:
+    """How old the PRIOR date's chip artifact may be and still lend its live chips. Default 900 s.
+
+    While the prior-date carryover runs, refresh-worker republishes that date's chips every ~6.5 min (11-27
+    06:07-07:03Z). Once nothing is live it stops, and its last artifact can still say `live` for a game that has
+    since ended: this bound is how long such a stale `live` can sit on the Today rail.
+    """
+    raw = str(os.environ.get("SYNDICATE_RAIL_PRIOR_DATE_CHIP_MAX_AGE_SECONDS") or "").strip()
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            pass
+    return 900.0
+
+
+def _chip_central_date(chip: Mapping[str, Any]) -> str | None:
+    raw = str(chip.get("start_time_utc") or "").strip()
+    if not raw:
+        return None
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+
+    return stamp.astimezone(CENTRAL_TIMEZONE).date().isoformat()
+
+
+def _prior_date_live_chips(
+    selected_date: str,
+    sports: list[str],
+    chips: list,
+    *,
+    today: str | None = None,
+    now: datetime | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """The PREVIOUS Central date's still-live games, for the Games rail's Today tab after midnight.
+
+    THE GAP (rail monitor R-L, 11-25 and 11-26): at midnight CT the Today rail rolls to the new date, and a game
+    still in play from the evening before loses its card. On 11-26 Baylor @ Gonzaga and Texas Tech @ Oregon had 15
+    rows each at 11:43 PM and no card from 12:03 AM; on 11-25, five games, one with 125 rows. The reading at 12:43
+    AM held 0 chips, 0 board rows and 0 live-rail rows for them: today's chip feed carries no prior-date NCAAB
+    game, and the board's lower date bound (todo `#779`) drops them on purpose, because the `portfolio_commit`
+    plan is built from that shortlist. This adds the SCOREBOARD only: the card comes back with its score and clock
+    and no rows. It changes no board, no row and nothing that places or sizes money.
+
+    The prior date's games are kept alive by refresh-worker's carryover (`_maybe_carry_over_prior_date_layer2`),
+    which republishes that date's chips while anything is live. This reads that ARTIFACT only and never builds:
+    an inline build here would fan out over every sport on a request thread.
+
+    Bounds, each logged in the returned report's `reason`:
+    - opt-in (`carry_prior_live=1`), so other consumers of the endpoint see no change;
+    - the request is for Central TODAY (a Tomorrow tab or a deep-linked date gets nothing);
+    - within the carryover's own window, `_layer2_carryover_max_hours` past Central midnight (default 6);
+    - the prior artifact is at most `_rail_prior_date_chip_max_age_seconds` old (default 900 s);
+    - a chip is carried only if its state is `live` AND its own Central date is the prior date, and today's
+      list does not already hold that game.
+    Carried chips are copies tagged `carried_from_date` / `carried_onto`; the page keeps such a chip only on the
+    rail whose date equals `carried_onto`.
+    """
+    report: dict[str, Any] = {"enabled": _rail_prior_date_live_chips_enabled(), "date": None, "added": 0}
+    if not report["enabled"]:
+        report["reason"] = "off"
+        return [], report
+    today_value = str(today or "").strip() or central_today_iso()
+    if str(selected_date or "").strip() != today_value:
+        report["reason"] = "not_today"
+        return [], report
+    try:
+        today_date = datetime.fromisoformat(today_value).date()
+    except ValueError:
+        report["reason"] = "bad_date"
+        return [], report
+    prior_value = (today_date - timedelta(days=1)).isoformat()
+    report["date"] = prior_value
+    from pipeline.intelligence_state import _layer2_carryover_max_hours, read_game_chips
+    from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+
+    max_hours = _layer2_carryover_max_hours()
+    reference = now or datetime.now(timezone.utc)
+    if reference.tzinfo is None:
+        reference = reference.replace(tzinfo=timezone.utc)
+    midnight = datetime(today_date.year, today_date.month, today_date.day, tzinfo=CENTRAL_TIMEZONE)
+    hours_since_midnight = (reference - midnight).total_seconds() / 3600.0
+    report["hours_since_midnight"] = round(hours_since_midnight, 2)
+    if max_hours <= 0 or hours_since_midnight < 0 or hours_since_midnight > max_hours:
+        report["reason"] = "outside_window"
+        return [], report
+    try:
+        published = read_game_chips(prior_value)
+    except Exception:  # noqa: BLE001 -- never cost today's scoreboard
+        _LOGGER.exception("BOARD_GAME_CHIPS_PRIOR_DATE_READ_FAILURE")
+        published = None
+    if not isinstance(published, dict) or not isinstance(published.get("chips"), list):
+        report["reason"] = "no_artifact"
+        return [], report
+    age = _timestamp_age_seconds(published.get("written_at"))
+    report["artifact_age_seconds"] = None if age is None else round(age, 1)
+    if age is None or age > _rail_prior_date_chip_max_age_seconds():
+        report["reason"] = "artifact_stale"
+        return [], report
+    wanted = {str(slug).strip().lower() for slug in sports}
+    have = {
+        (str(chip.get("sport") or "").strip().lower(), str(chip.get("game_key") or "").strip())
+        for chip in chips
+        if isinstance(chip, Mapping)
+    }
+    carried: list[dict[str, Any]] = []
+    for chip in published["chips"]:
+        if not isinstance(chip, Mapping):
+            continue
+        sport = str(chip.get("sport") or "").strip().lower()
+        if sport not in wanted or str(chip.get("state") or "").strip().lower() != "live":
+            continue
+        if _chip_central_date(chip) != prior_value:
+            continue
+        identity = (sport, str(chip.get("game_key") or "").strip())
+        if identity[1] and identity in have:
+            continue
+        copy = dict(chip)
+        copy["carried_from_date"] = prior_value
+        copy["carried_onto"] = today_value
+        carried.append(copy)
+    report["added"] = len(carried)
+    report["reason"] = "ok"
+    return carried, report
+
+
 @intelligence_bp.get("/api/board/game-chips")
 def board_game_chips_api():
     # Shared scoreboard hydration for the Layer 1 and Layer 2 mini game
@@ -3759,6 +3896,13 @@ def board_game_chips_api():
             else:
                 chips = []
                 source = "unavailable"
+    # The Games rail's Today tab after midnight CT: the prior date's still-live games (see
+    # `_prior_date_live_chips`). Opt-in, so every other consumer of this endpoint is unchanged.
+    prior_date_live = None
+    if str(request.args.get("carry_prior_live") or "").strip().lower() in {"1", "true", "yes", "on"}:
+        carried, prior_date_live = _prior_date_live_chips(selected_date, sports, chips)
+        if carried:
+            chips = list(chips) + carried
     return _no_cache_response(
         jsonify(
             {
@@ -3766,6 +3910,7 @@ def board_game_chips_api():
                 "date": selected_date,
                 "chips": chips,
                 "source": source,
+                "prior_date_live": prior_date_live,
                 # ALWAYS THE ARTIFACT'S STAMP, even when chips were built
                 # inline, so a reader can see how far behind the worker is. The
                 # page keys its staleness badge on `source` being

@@ -2482,7 +2482,10 @@
   async function loadGameChips() {
     try {
       const dateParam = state.date ? `date=${encodeURIComponent(state.date)}&` : "";
-      const res = await fetch(`/api/board/game-chips?${dateParam}sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,wncaab,soccer`, { cache: "no-store" });
+      // `carry_prior_live=1`: after midnight CT the server adds the PRIOR date's still-live games, tagged
+      // `carried_onto` (see `railKeepsChip` in deriveGameCards). Only this rail asks; the endpoint's other
+      // consumers get the same chips as before.
+      const res = await fetch(`/api/board/game-chips?${dateParam}carry_prior_live=1&sports=mlb,nba,wnba,nhl,nfl,ncaaf,ncaab,wncaab,soccer`, { cache: "no-store" });
       if (!res.ok) {
         // A settled failure still unblocks the strip -- it must not hang on
         // "Loading…" forever just because this one fetch came back non-2xx.
@@ -4314,6 +4317,19 @@
     // pass above needs it too, and it used to be declared right here, below
     // that pass.)
     const railDate = String(state.date || "").slice(0, 10) || null;
+    // IS THIS CHIP'S GAME ON THIS RAIL'S DAY? Its own Central date decides, with ONE exception: a game from the
+    // evening before that is STILL LIVE after midnight CT, which the server carries onto today's chip list and tags
+    // `carried_onto` (`_prior_date_live_chips`, `/api/board/game-chips?carry_prior_live=1`). Measured on the fleet:
+    // 11-26 Baylor @ Gonzaga and Texas Tech @ Oregon had 15 rows each at 11:43 PM and no card from 12:03 AM, and
+    // 11-25 lost five, one with 125 rows. The tag names the day it was carried ONTO, so a Tomorrow tab never
+    // matches it, and the server stops carrying a game once it is no longer live. An UNDATED chip is kept, as
+    // before: absent evidence is not evidence of a different day.
+    const railKeepsChip = (chip) => {
+      if (!railDate) return true;
+      const chipDate = chipCentralDate(chip);
+      if (!chipDate || chipDate === railDate) return true;
+      return Boolean(chip) && chip.state === "live" && String(chip.carried_onto || "") === railDate;
+    };
     const claimedChips = new Set();
     // NO SURPLUS RULE HERE, and the attempt to add one on 2026-09-25 was a BAD
     // TRADE that `test_no_discriminator_attaches_no_chip` already documented:
@@ -4343,8 +4359,7 @@
       // different day, and dropping it would silently hide a game whose
       // provider gave no ISO timestamp -- the case the day-prefix fallback in
       // game_chip_scoreboard.py exists for.
-      const chipDate = chipCentralDate(chip);
-      if (railDate && chipDate && chipDate !== railDate) continue;
+      if (!railKeepsChip(chip)) continue;
       const away = String((chip.away || {}).abbr || (chip.away || {}).name || "").trim();
       const home = String((chip.home || {}).abbr || (chip.home || {}).name || "").trim();
       if (!away || !home) continue;
@@ -4421,6 +4436,9 @@
     const dateFilteredGames = gamesList.filter((group) => {
       if (!railDate) return true;
       const chip = chipForGame(group);
+      // A carried prior-date live chip (see `railKeepsChip`) keeps its card. Only a CHIP can carry a game: a
+      // group's own `fallbackDate` is never an exception.
+      if (chip && chip.state === "live" && String(chip.carried_onto || "") === railDate) return true;
       const groupDate = (chip ? chipCentralDate(chip) : null) || group.fallbackDate || null;
       return !groupDate || groupDate === railDate;
     });
