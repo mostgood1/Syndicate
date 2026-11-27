@@ -278,8 +278,30 @@ def _row_fair(row: Mapping[str, Any], quote: Mapping[str, Any] | None = None) ->
 
 
 #: The key (d)'s live-join wiring sets on a row's projection when it calibrated the live probability itself, so
-#: (a) never calibrates the same number twice.
+#: (a) never calibrates the same number twice, and the optimizer's calibration shrink is not applied on top of it
+#: (`live_prob_stamp_of`, read by `optimizer_overlay.factor_for_row`).
 LIVE_PROB_MARKER = "live_cell_calibration"
+
+
+def live_prob_stamp_of(row: Any) -> Mapping[str, Any] | None:
+    """(d)'s stamp on this row's projection -- the cell and k that moved its live probability -- or None.
+
+    None on every row while the LIVE_PROB switch is off: the join sets the marker only when (d) served p'
+    (`live_gameline_join._apply_verdict`). A stamp counts only with a numeric k in the table's rails, so a malformed
+    one cannot switch the optimizer's shrink off. Never raises.
+    """
+    try:
+        projection = row.get("projection") if isinstance(row, Mapping) else None
+        found = projection.get(LIVE_PROB_MARKER) if isinstance(projection, Mapping) else None
+        if not isinstance(found, Mapping):
+            return None
+        k = found.get("k")
+        # A real number only, as `validate_table` requires of the k it serves (the join writes `round(k, 4)`).
+        if isinstance(k, bool) or not isinstance(k, (int, float)):
+            return None
+        return found if K_FLOOR <= float(k) <= K_CEILING else None
+    except Exception:
+        return None
 
 
 def rail_columns(row: Mapping[str, Any], live_prob: Any) -> dict[str, Any]:
@@ -320,6 +342,34 @@ def display_columns(row: Mapping[str, Any], quote: Mapping[str, Any], model_prob
 _LIVE_PROB_SKIP = (("ncaab", "wncaab"), "totals")
 
 
+def ncaaf_live_total_owned_by_835(cell: Any) -> bool:
+    """True when `cell` is an NCAAF FULL-GAME LIVE total and #835's switch is on (todo #847 fix 2, lane
+    cell-calibration-847d-fixes, user "Yes, fix (d) first" 2026-11-27).
+
+    #835 (`ncaaf/live_total_dispersion`, `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION`) anchors the NCAAF live re-sim's
+    full-game total draws to the close and widens them, in the refresh-worker's NCAAF tick, upstream of the join. This
+    table's k for that cell (0.10 on 11-27) was fitted on the engine BEFORE that step, so serving it on top would
+    correct the same over-confidence twice. While #835 is on, (c) and (d) leave the cell alone, the way (d) leaves
+    #816's college basketball totals; with #835 off this is False and both behave exactly as before.
+
+    FULL GAME ONLY, because that is all #835 moves (`calibrate_snapshot_totals` rewrites `totalRunsDist`, never a
+    `segments` block). Every totals market of the cell (`totals`, `totals_alt`, ...) is priced from those draws.
+    The switch is #835's OWN predicate, read where this runs: its key is GLOBAL in `local_production.env`, so every
+    role that runs (c) or (d) reads the value the NCAAF tick reads. A failed import cannot leave #835 running either
+    (the tick imports the same module), so it reads as off.
+    """
+    parts = str(cell or "").split("|")
+    if len(parts) != 4 or parts[0] != "ncaaf" or not parts[1].startswith("totals") or parts[2] != "full" \
+            or parts[3] != "live":
+        return False
+    try:
+        from syndicate.features.ncaaf.live_total_dispersion import enabled as _835_on
+
+        return bool(_835_on())
+    except Exception:
+        return False
+
+
 def live_probability(sport: Any, market: Any, segment: Any, model_prob: Any, market_prob: Any, *,
                      table: Mapping[str, float] | None = None) -> tuple[float, dict[str, Any]] | None:
     """(d) The shared live probability, calibrated per cell: (p', stamp), or None to leave it as it is.
@@ -327,7 +377,8 @@ def live_probability(sport: Any, market: Any, segment: Any, model_prob: Any, mar
     Called where the live join has the side's model probability and its market probability (after the point
     estimator, #780's prob scale and #816's college-totals step), so it generalises #816 to every other served
     live cell: same transform shape with no level (#816's `a` = 0, `c` = k). None when the LIVE_PROB switch is off,
-    the cell is not served, or the cell is a college total (#816 owns it). A BETTING change: default off.
+    the cell is not served, the cell is a college basketball total (#816 owns it), or it is an NCAAF full-game live
+    total while #835's switch is on (#835 owns it: `ncaaf_live_total_owned_by_835`). A BETTING change: default off.
 
     THE CALLER MUST MARK THE ROW: when it serves p', it sets `projection[LIVE_PROB_MARKER]` to the stamp, so the
     rail's (a) does not calibrate the same live number a second time (`rail_columns`).
@@ -341,6 +392,8 @@ def live_probability(sport: Any, market: Any, segment: Any, model_prob: Any, mar
             return None
         segment_key = str(segment or "").strip().lower() or "full"
         cell = f"{sport_key}|{market_key}|{'full' if segment_key in ('game', 'full_game') else segment_key}|live"
+        if ncaaf_live_total_owned_by_835(cell):
+            return None
         k = k_for_cell(cell, table=table)
         if k is None:
             return None
@@ -383,6 +436,10 @@ def rank_stake_factor(cell: str | None, *, table: Mapping[str, float] | None = N
             return None
         from syndicate.features.shared import daily_optimizer as opt
 
+        # Fix 2 (#847): an NCAAF full-game live total is #835's while its switch is on, so its pre-#835 k (0.10) does
+        # not drop the cell's rank and stake; the optimizer's own factor stands, exactly as with (c) off.
+        if ncaaf_live_total_owned_by_835(cell):
+            return None
         k = k_for_cell(cell, table=table)
         if k is None or k >= opt.FACTOR_FLOOR:
             return None

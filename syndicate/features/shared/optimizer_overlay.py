@@ -119,6 +119,21 @@ def factor_for_row(row: Any, *, now: datetime | None = None, path: Path | None =
         stake = stakes.get(cell)
         if stake is None:
             stake = stakes.get(opt.props_tier_cell(cell) or "", 1.0)
+        # (d) ALREADY CALIBRATED THIS ROW'S PROBABILITY (todo #847 fix 1, lane cell-calibration-847d-fixes, user "Yes,
+        # fix (d) first" 2026-11-27). A live row carrying (d)'s stamp has its edge shrunk toward the market by its
+        # cell's k, the posterior of the SAME w* fit `edge_shrink` is the floored CI upper of, and (c) would serve as
+        # the factor. Taking either again would correct one over-confidence twice, in rank and in stake (this one
+        # function feeds both, so they stay the same factor). Only `stake_scale` stays: the shortfall of the cell's
+        # PUBLISHED bets against their predicted EV, which is other evidence. No stamp -- every row while (d)'s switch
+        # is off -- is the factor below, unchanged. A failed check reads as no stamp: the shrink applies.
+        try:
+            from syndicate.features.shared import cell_calibration as _cc
+
+            calibrated = _cc.live_prob_stamp_of(row) is not None
+        except Exception:
+            calibrated = False
+        if calibrated:
+            return max(opt.FACTOR_FLOOR, min(1.0, float(stake)))
         factor = float(table["edge_shrink"].get(cell, 1.0)) * float(stake)
         # (c) BELOW THE 0.5 FLOOR WHERE THE EVIDENCE SAYS SO (todo #847, lane cell-calibration-847; a BETTING change,
         # default OFF: `SYNDICATE_CELL_CALIBRATION_RANK_STAKE`). When on, a cell whose per-cell calibrated k (pooled

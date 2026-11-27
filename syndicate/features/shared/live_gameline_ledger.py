@@ -321,6 +321,36 @@ def _display_fields(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+#: The (d) stamp's fields this file keeps: which cell's k moved the probability, the k, the fit's own sd on it, and
+#: the calibration's version.
+_CELL_CAL_STAMP_FIELDS = ("cell", "k", "k_sd", "version")
+
+
+def _cell_cal_fields(lg: Mapping[str, Any]) -> dict[str, Any]:
+    """todo #847 (d) (fix 3, lane cell-calibration-847d-fixes, user "Yes, fix (d) first" 2026-11-27): `cell_cal` and
+    `model_home_win_prob_cell_uncalibrated` when (d) moved this row's live probability, else NOTHING.
+
+    THIS FILE IS THE SERIES THE LIVE MODEL IS JUDGED ON. With `SYNDICATE_CELL_CALIBRATION_LIVE_PROB` on,
+    `model_home_win_prob` is the per-cell CALIBRATED number on every row of a served cell, and the step from the
+    engine's number to it is not self-identifying (the `point_estimator` argument above). So the record says so --
+    the stamp (cell, k) -- and keeps the engine's number beside it, the way #816's `total_cal` and
+    `model_home_win_prob_uncalibrated` do, so a grader or a refit can read the number BEFORE (d) and a reader can
+    split the series where its estimator changed.
+
+    ABSENT, NOT NULL, WHEN (d) DID NOT ACT -- every row while its switch is off. So an off build writes records
+    byte-identical to before, `LEDGER_VERSION` stays 7 and `record_key` / `_moved` are untouched: the KEY's presence
+    is the marker (filter on `"cell_cal" in record`, never on `v`). Refusal records never carry it -- their observed
+    numbers are the raw segment probability, which (d) never touches.
+    """
+    stamp = lg.get("live_cell_calibration")
+    if not isinstance(stamp, Mapping) or not stamp:
+        return {}
+    return {
+        "cell_cal": {key: stamp.get(key) for key in _CELL_CAL_STAMP_FIELDS},
+        "model_home_win_prob_cell_uncalibrated": lg.get("model_prob_cell_uncalibrated"),
+    }
+
+
 def build_records(
     grid: Any,
     *,
@@ -523,6 +553,8 @@ def build_records(
                 "has_pinnacle": "pinnacle" in books,
                 # v6: the display-only number and its market (`_display_fields`).
                 **_display_fields(row),
+                # #847 (d): its stamp and the engine's number, only where it acted (`_cell_cal_fields`).
+                **_cell_cal_fields(lg),
             }
         )
 
