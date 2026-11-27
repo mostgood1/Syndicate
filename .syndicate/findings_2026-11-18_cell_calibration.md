@@ -763,3 +763,41 @@ Surveyed by a read-only agent and spot-checked by hand. "Reachable" means (d) co
   - `join_reproduction`'s false mismatches;
   - the bucket overlay's one mixed window.
 - **Still open from 8.3-8.5:** whether fix 1 is needed, NCAAF's optimizer 0.5 under #835, and the 11-27 table's drift (7.3).
+
+### 9.8 The fit fix is on main (added 2026-11-27 4:40 PM CST)
+
+**The user pushed it.** "Yes, push it", typed by the user in this session (77184c63) at about 4:30 PM CST 11-27, answering "Push the fit fix to main?". The user typed the same words in coordinator session e32fef1a at about 4:28 PM CST; the coordinator relayed them.
+- **On main as `86fd3e943` + `d3ec5b72e`**, pushed `e569f2f9e..d3ec5b72e` at about 4:37 PM CST. These are the tested `8e771a40c` + `a449d9b3e`, rebased three times as main moved.
+  - 12 main commits landed after the branch was cut from `d3e7ec69c`; two were this lane's own ledger commits. None touched the fix's code files or their graders. They touched cheat sheets, CLV, paper settlement, rail-monitor scripts, picks pages and ledger files. No tested module imports `clv_join`, `order_clv`, `paper_settlement` or `cheat_sheets`.
+  - Patch-id `fe38d34a` was the same on every rebase and equals the tested diff's.
+- **Re-checked before the push.**
+  - All 549 targeted tests pass, plus 34 subtests, on the first rebased head `f8b7c8431`. That is the same 24-file set as 9.2.
+  - The A/B against main's six modules was re-run on that head. All eight (c)/(d)-off cases are byte-identical, the same as 9.2:
+    - all keys absent;
+    - (c) on;
+    - (a)+(b) on;
+    - #835 on;
+    - #835 spelled `1`;
+    - #835 with (a)+(b);
+    - #835 with (c)/(d) set `off`;
+    - #835 with (c) on.
+  - With (d) on, alone or with #835, the diff is the intended one. Each rebased output equals its pre-rebase output byte for byte, main side and branch side both.
+  - The 549 are re-run on the pushed head `d3ec5b72e`; the result is in the lane STATUS.
+- **Nothing loaded.** No fleet ff, env edit, restart, claim, scheduled task or `SYNDICATE_CELL_CALIBRATION_*` key.
+  - The next ff of `~/Syndicate` carries these commits. They are inert while the (c) and (d) keys are absent, whatever #835 says, so this is not a betting change until (d) is switched on.
+- **The pricing-seam hazard (9.7), read by the coordinator read-only on 11-27:**
+  - `SYNDICATE_PRICING_CALIBRATION` is on in all three roles, set GLOBAL in `local_production.env`.
+  - The fleet's only profile is `mlb_source`'s (`mlb-market-shrink-2026-10-12`), so today the seam leaves every (d) cell's edge unchanged.
+  - The fix, adding `live_cell_calibration` to `_UPSTREAM_CALIBRATION_KEYS`, is small and inert. It is owed before a non-MLB profile is published, and it is not in this push.
+- **The 12-08 plan:** the fit fix is on main and tested before 12-08, so (d) can load in that window. Loading it is still the user's own yes at the window.
+  - The window's ff must reach at least `d3ec5b72e`. That covers the (d) fixes, `d381a806a`, as well.
+  - Run the after-load reader with `--fixes yes --fit-fix yes`. The reader pins no SHA, so it needs no change.
+- **Lane overlap:** lane `soccer-live-lane-age-ceiling`, opened at `e569f2f9e` just before this push, claims sections of `live_gameline_join.py`: the lane-age table, `max_lane_age_seconds`, its switch and the row loop's lane verdicts. The fit fix's sections are the two pricers, `_keep_cell_uncalibrated_edge` and `_apply_verdict`, so the sections do not overlap. That lane builds on top of this push.
+- **Still the user's calls** (9.7):
+  - the order-path fitters (the staked profile is live);
+  - #830's flag population;
+  - `join_reproduction`'s false mismatches;
+  - the bucket overlay's mixed window;
+  - whether fix 1 is needed;
+  - NCAAF's optimizer 0.5;
+  - the 11-27 table's drift.

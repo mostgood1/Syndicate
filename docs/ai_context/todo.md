@@ -443,6 +443,14 @@ On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL 
 - **Leads, not done:** (1) the live board offers a book's pregame quote as a live price -- a per-book seen-age on the in-play window (betting change; adjacent to lane `nhl-inplay-props-drop`); (2) run the same last-seen join on NBA / NCAAB / NFL live rows; (3) first-scorer subs who came on after the first goal lose here where some books void; (4) `ethan mbappe` (FanDuel 11-08) shots ladder priced like a star striker -- odds identity.
 
 ### `#847` — **THE MODEL'S PROBABILITY IS OVER-CONFIDENT EVERYWHERE IT IS MEASURED, SO CALIBRATE IT ONCE, PER CELL, AND USE THE CALIBRATED NUMBER EVERYWHERE: the rail flag test, the board's shown EV, rank and stake (below the 0.5 floor where the evidence says so), and the shared live probability. This replaces backlog I-1 (the long-shot tail was not a separate effect)** `[2026-11-18, lane product-optimization-program (P1, theme T2)]` — OWNED by lane `cell-calibration-847` (session c124edc4, opened 11-18 7:13 PM CST)
+- **STATUS `[2026-11-27 4:40 PM CST, lane cell-calibration-847d-fit-fix]`: THE FIT FIX IS ON MAIN as `86fd3e943` + `d3ec5b72e`.** The user typed "Yes, push it" in this session (77184c63) at about 4:30 PM CST 11-27, and the same words in session e32fef1a at about 4:28.
+  - Pushed `e569f2f9e..d3ec5b72e`. This is the tested `a449d9b3e`, rebased; patch-id `fe38d34a` matches.
+  - 549 targeted tests pass (+34 subtests) on the rebased head and again on the pushed head. The A/B against main is byte-identical in the 8 (c)/(d)-off cases.
+  - Nothing loaded. It is inert with (c)/(d) absent, so it is not a betting change until (d) is on.
+  - (d) can load in the 12-08 window, on the user's own yes there. The ff must reach at least `d3ec5b72e`. Run the reader with `--fixes yes --fit-fix yes`.
+  - The pricing seam today leaves the edge unchanged: `SYNDICATE_PRICING_CALIBRATION` is on, and the only profile is mlb's. Its skip-key fix is owed before a non-MLB profile is published.
+  - User calls still open: findings §9.7 and §9.8.
+
 - **STATUS `[2026-11-27 3:30 PM CST, lane cell-calibration-847d-fit-fix]`: THE FIT FIX (8.3 option (i)) IS BUILT, NOT PUSHED.** User "Yes, both", ~2:25 PM CST 11-27 in session e32fef1a. It approves the build and tests; the code push needs the user's own yes. (d) loads 12-08 only if this is on main and tested by then; otherwise 12-22.
   - Code: branch `cell-calibration-847d-fit-fix`, `8e771a40c` + `a449d9b3e` (local, `refs/keep/...`).
   - What it does: the number from before (d) travels as `edge_pp_cell_uncalibrated` → projection → candidate `model_edge_pct_cell_uncalibrated` → recorder `mu`. `model_scorecard.strip_record` keeps it. `daily_optimizer.wrap_grade` refits w*, `edge_shrink` and the cell table's k on it, and #780's fitter reads the ledger's `model_home_win_prob_cell_uncalibrated`.
