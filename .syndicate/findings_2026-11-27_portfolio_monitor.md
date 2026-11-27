@@ -187,3 +187,47 @@ PRIOR is 523 priced bets / 353 games; RECENT is 99 / 73. Beat close fell 63.9% t
 - It is not lead time (the 11-24 study above), not totals, not a single sport, and not a priced-close selection
   artefact.
 - The open question it leaves is why bets that beat the close keep losing: wins minus close is -4.4 pp over 30 d.
+
+## Why bets that beat the close still lose -- HYPOTHESES (written 12:57 PM CST, before the test)
+
+User 11-27 ~12:45 PM CST: "Yes, look into it" (answering "Should I look into why bets that beat the closing price
+still lose?").
+
+**The gap.** Over 30 d the book wins 4.4 pp less often than its same-book closing prices imply (z -2.14). It beats
+those closes by +1.11 pp gross, so it wins about 3.3 pp less often than its OWN fill prices imply.
+
+**Facts read before writing these:**
+- The same-book close is the venue's last pregame row in the quote log (`clv_join._resolve_from_quotes`,
+  `close_source=book_quotes_last_pregame`).
+- Kalshi's quoted price is the ASK: `kalshi_odds_refresh.py:2457` `yes_probability = dollars_to_probability(yes_ask)`.
+  `kalshi_board_join.py:37` says the yes and no asks "do not sum to 1".
+- So the close's implied probability for our side includes the spread, and so does every wins-minus-close figure.
+
+Test data:
+- The 30 d priced same-book bets (10-28..11-26, 622 bets).
+- For each bet, the OTHER selection(s) of the same (event, market, segment, player, line) at the same book: their
+  last quote before `commence_time`, from the fleet's own quote-log shards (`<sport>_source/tracking/book_quotes/`),
+  read-only at nice 19.
+- Overround o = sum of the selections' closing implied probabilities - 1.
+- Fair close f = p_close / (1 + o).
+- calib_ask = won - p_close (the review's figure); calib_fair = won - f; fair CLV = f - p_fill.
+- Pushes are out of calib, as in the review.
+- Bets where the other side cannot be found are counted. calib_ask is reported on the covered subset too, so a
+  coverage bias shows.
+
+Hypotheses, each with its falsification fixed now:
+- **H-ASK (the spread):** the gap is the bid-ask spread inside an ask-priced close.
+  - Survives iff, on the covered 30 d set, the mean overround has a 95% range above 0 AND calib_fair's 95% range
+    includes 0.
+  - Rejected iff calib_fair's range is entirely below 0.
+  - It also predicts a venue contrast: Polymarket's slate prices are outcome prices that sum near 1, so its overround
+    and its gap should both be near 0, and the gap should sit in Kalshi.
+- **H-SEL (adverse selection / self-impact):** we buy the sides the fair close still overprices. That could be
+  informed flow, or our own orders moving thin prop markets.
+  - Survives iff calib_fair's range is entirely below 0 (the gap outlives de-vigging).
+  - Then split descriptively by props vs game lines and by venue.
+- **H-LUCK (noise):** survives iff calib_ask's 95% range includes 0 in BOTH disjoint windows, PRIOR 10-28..11-19
+  and RECENT 11-20..11-26.
+
+**CLV consequence, reported whichever hypothesis survives:** fair CLV, gross and net of fee. If fair CLV is <= 0, then
+"beating the close" mostly measured the spread, not edge.
