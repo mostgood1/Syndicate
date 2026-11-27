@@ -610,7 +610,7 @@ at a `reload-web` or a recycle. An ff ships ALL of main. When to load it is the 
   - Predicted: on the first full day of v4 sheets, every sheet `section_rules` 4 and value-not-suggested 0. The load
     day itself is mixed, because rows kept from earlier builds keep their v3 verdicts.
 
-## Step 1e -- the board shows the EV it judges, and the Kalshi / Polymarket prices `[built 2026-11-26, user "Start"; display only; NOT LOADED]`
+## Step 1e -- the board shows the EV it judges, and the Kalshi / Polymarket prices `[built 2026-11-26, user "Start"; display only; LOADED 2026-11-27 04:18:28Z, MET]`
 
 **Measured first** (the fleet's 00:23:40Z 11-27 shortlist, read 00:29:02Z; `C:\tmp\scc_oversight_d5aa\probe_1e_*.py`). D4 and
 the "venue price beside the sportsbook best" half of the target:
@@ -671,6 +671,26 @@ page's own `renderBlotterEv` / `renderBlotterBook` / helpers extracted from the 
 pregame exchange-priced cards without a net number, 0 venue lines. Predicted after both loads:
 `exchange_card_without_net` 353 -> 0 (once each date's shortlist is rebuilt), `cards_with_venue_line` 0 -> > 0,
 `venue_entry_is_best_book` 0, `venue_net_above_gross` 0.
+
+**Loaded and MET** (user "Load both now"; deploys.md 2026-11-27 04:18:28Z).
+- **How it loaded:**
+  - Fleet ff to `30b2be76e` 03:56:22Z, then reload-web 03:56:28Z.
+  - The board builds ran back to back (3-11 s between a save and the next build), so the after-a-save window
+    never opened. A drain (~04:04Z) let the in-flight build save at 04:15:13Z.
+  - Preflight refresh-worker CLEAR 04:18:22Z. Then a TERM of the board child only (pid 535 -> 256375, ready
+    04:18:34Z) and the undrain at 04:18:47Z. The parent's sims and jobs were not touched.
+- **Reader 04:31:00Z, rc 0:**
+  - Exchange cards without a net number: 314 -> 0.
+  - The net field is on 5,323 of 5,433 cards.
+  - Cards with a venue line: 0 -> 375 (Kalshi 273, Polymarket 233 entries).
+  - 0 entries name the best book, 0 have net above gross, 0 are unpriced.
+  - 10 of 60 Suggested pregame cards carry a venue line, and 0 of them clear +2% net at the venue: the same
+    shape as the 00:23Z measurement (11 of 46, 0).
+- **Live page** (tomorrow's blotter): 60 "net of fee" cells, 127 venue lines with a net EV, 1 "not bought".
+  Example: Florida State +6.5 shows NOVIG +100 with "+0.4% net of fee · +1.9% gross", then "KALSHI +100 · -1.5% net"
+  and "POLYMARKET -104 · -3.4% net".
+- **Build cost:** the shortlist stage took 137 s and then 94 s on the new child, against 214 s and 395 s on the old
+  child the same evening. 0 `VENUE_PRICE_FAILED` lines.
 
 ## Step 1d -- the NHL and soccer pages lead with the board's pick; the sim is a labelled view `[built 2026-11-25, user "Yes, do 1d"; display only; DEPLOYED to web 2026-11-26 17:28:02Z, MET]`
 

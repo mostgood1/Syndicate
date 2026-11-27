@@ -63727,3 +63727,38 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - The heavy chunk's file is `tests/test_ops.py`: FILE_GROWTH_TOP rank 1, growth 1,827 MB, from its `test_build_refresh_plan_uses_*` tests.
   - The 11-26 run timed out (rc 124) in the DNS outage: CONFOUNDED.
 - verify: findings `findings_2026-11-18_board_split_memory_guard.md` section 21 (the reader output, the CHECK-line sequence, the run lines quoted whole).
+
+## 2026-11-27 04:18:28Z (10:18 PM CST 11-26) -- DEPLOY (ff + reload-web + board-child TERM; the refresh-worker parent NOT restarted): fleet `82bfc6bbd` -> `30b2be76e`, todo #861 step 1e, the board shows the EV it judges and the Kalshi / Polymarket prices (lane `surface-consistency-oversight`; user "Load both now") -- **LOADED and MET: 314 -> 0 exchange cards without a net number, 0 -> 375 cards with a venue line, 0 violations; the live page renders both**
+
+- betting change: **no.** Display only. The card gains `ev_net_pct` / `fee_basis` / `fee_per_contract` / `fee_is_upper_bound`, COPIED from `score_v2`, and `venue_prices`, the output of `venue_scope.scope_rows_to_venue` for Kalshi and Polymarket. The row is never written. `_layer2_board_columns`, the helper `portfolio_commit` calls, is unchanged (a test pins it). The page changes the shown EV and its sort, not the Suggested flag. Nothing that places, sizes, ranks or flags a bet reads the new fields.
+- **User decision (verbatim):** "Load both now", their reply to "How should step 1e load on the fleet?" (the choices were both now, or web now with the cards at the board child's next own restart).
+- **The change:** `ad05b4ab0` (`syndicate/features/shared/layer2_board.py` `_layer2_fee_and_venue_columns`, `syndicate/templates/intelligence.html`, 12 new tests); ledger `bba244b11`, `30b2be76e`. Findings `.syndicate/findings_2026-11-23_surface_consistency.md` "Step 1e".
+- **Ride-alongs:**
+  - ff `82bfc6bbd..30b2be76e`, 21 commits: the runtime files are this lane's two, plus `scripts/rail_monitor/*` (research scripts no role imports). None of the 14 dirty fleet paths is among the incoming files.
+  - The board child ran `e37a9697` (booted with the parent, 10.9 h). It also newly loads step 1d's display files (this lane) and `execution_exits.py` (`82bfc6bbd`, exit-watch prune). The exit tick runs only in live-odds-worker (`scripts/run_live_odds_refresh_worker.py:2618` `run_exit_tick`), which already runs `82bfc6bb`; the board child never calls it.
+- **Gates:**
+  - Claims web + refresh-worker 03:55:02Z (ACQUIRED). Baseline 03:55:09Z (`read_1e_after_load.py`, served payload): `exchange_card_without_net` 310, `cards_with_venue_line` 0, `loaded_cards_with_ev_net_pct` 0.
+  - Preflight web `--target-commit 30b2be76e --betting-change no`: **CLEAR** 03:55:28Z.
+  - Preflight refresh-worker: HOLD 03:55:34Z (build in flight); HOLD 04:00:14Z (the build had returned but not saved: "done" is the next LOOP_ITERATION); HOLD 04:01:44Z (1 refresh-worker job, an ESPN live-status fetch).
+  - The builds ran back to back: LOOP_ITERATION -> next BUILD_SPAN_ENTER was 3-11 s apart (03:42:37->03:42:40, 03:49:13->03:49:16, 03:54:01->03:54:12, 04:01:41->04:01:47). The after-a-save window never opened, as on 11-19 04:46Z.
+  - Drain (`C:\tmp\t834\window1124\kit_drain.sh ... drain surface-consistency-oversight 900`, refresh-worker's own environ) requested ~04:04Z, TTL 9,000 s. The parent logged `DRAIN_HOLD stage=mlb_sim_tick` while it held (MLB is off-season). The in-flight build (entered 04:01:47Z) returned 04:13:32Z (wall 717.6 s, ok=True; shortlist stage 395 s) and saved 04:15:13Z. No BUILD_SPAN_ENTER followed.
+  - Preflight refresh-worker HOLD 04:15:38-04:16:45Z (2-4 of its own jobs), then NO_EXPECTATION (baseline 20+ min old). Baseline re-read 04:18:02Z: 314 / 0 / 0. **CLEAR** 04:18:22Z, 0 processes, 0 build entries since the save.
+- **ff:** `git merge --ff-only 30b2be76e3214382a63aea712eb6f91bdc190de5` at **03:56:22Z**, from `82bfc6bbd`.
+- **reload-web** 03:56:28Z: workers 245428 / 245607 -> 246270 / 246271 in 4.0 s, 0 failed probes, healthz 200 throughout. The served `/intelligence` carries the new helpers (7 matching lines).
+- **Board-child TERM:** pid 535 (up 39,072 s, idle after the 04:15:13Z save) at **04:18:28.225Z**. `BOARD_PROCESS_EXITED pid=535 rc=0` 04:18:28.8Z. The new child 256375 STARTED 04:18:33.8Z and was READY 04:18:34.5Z, with the same switches (`raw_lifeline=1 recycle_after_build=1 ceiling_credit=7168+768 jobs_margin_mb=400`). The parent 469 was not touched.
+  - Undrain 04:18:47Z (`DRAIN_CLEARED`).
+  - Board cost: no build between the save at 04:15:13Z and the next BUILD_SPAN_ENTER at 04:22:37.8Z, 7.4 min, 3.8 min of it after the undrain.
+- **First build on the new code:** entered 04:22:37.8Z (board date 11-27), BOARD_BUILD_TIMING 04:27:52Z, wall 320.3 s, ok=True, saved 04:30:55.7Z. The shortlist stage took 136.7 s (11-27) and then 94.1 s (11-26), against 214 s and 395 s on the old child earlier this evening: no cost visible from the venue pricing. Since the TERM: 0 `VENUE_PRICE_FAILED`, 0 Traceback.
+- **expect / measured** (`C:\tmp\scc_oversight_d5aa\read_1e_after_load.py`, the served payload, **04:31:00Z, rc 0 MET**):
+  - `exchange_card_without_net` 314 -> **0**: MET.
+  - `loaded_cards_with_ev_net_pct` 0 -> **5,323 of 5,433** cards: MET.
+  - `cards_with_venue_line` 0 -> **375**: MET (entries: Kalshi 273, Polymarket 233).
+  - `venue_entry_is_best_book` 0, `venue_net_above_gross` 0, `venue_entry_unpriced` 0.
+  - Reported: 305 fee cards; 60 Suggested pregame cards, 10 with a venue line, 0 of them clear +2% net at the venue.
+- **Live page** (built-in browser, `/intelligence?day=tomorrow&view=blotter`, ~04:33Z): the rendered list has 60 "net of fee" EV cells, 127 venue lines with a net EV, 1 "not bought" and 0 "gross, before fee".
+  - Example: NCAAF Florida State +6.5. Best price NOVIG +100. EV "+0.4% · net of fee · +1.9% gross". Then "KALSHI +100 · -1.5% net" and "POLYMARKET -104 · -3.4% net".
+  - On the Today tab (5 live NCAAB lines), 1 "gross, before fee": an in-play overlay card on an exchange, as designed.
+- **verify:** the reading above, rc 0.
+- **Not verified:**
+  - Web memory with +123 bytes per card (about 0.7 MB per list).
+  - The live plan's own venue-feed quote (`portfolio_commit._venue_price_resolver`) against the board's grid price. Each venue line's tooltip says the plan may hold a fresher quote.
