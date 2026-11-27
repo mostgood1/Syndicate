@@ -630,7 +630,7 @@ the "venue price beside the sportsbook best" half of the target:
   hidden pick. Why the board names the sportsbook on them is NOT traced here.
 - The live book today (`/api/portfolio/live?date=2026-11-26`, 00:31Z): 4 live orders, all Kalshi. Too few to join.
 
-**The change** (`b8d0b5037`):
+**The change** (`ad05b4ab0`):
 - `layer2_board._layer2_fee_and_venue_columns`, spread into each card by `layer2_rows_to_board_cards`:
   - `ev_net_pct`, `fee_basis`, `fee_per_contract`, `fee_is_upper_bound`: COPIED from `score_v2`, never recomputed.
   - `venue_prices`: for Kalshi and Polymarket, where the row's quote grid prices them and neither is the best book, the
