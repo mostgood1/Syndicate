@@ -73,3 +73,51 @@ Same-book fee-net CLV by submit-to-commence hours. Each cell gives priced bets /
   CLV readings now rest on a thin, non-random share of the book.
 - **Still open:** where the 7 d gross decline (+1.11 to -0.41 pp) comes from. It is not lead time; sport, venue and
   market are the next splits. This is not yet a hypothesis, so nothing is pre-registered here.
+
+## Where the 7 d closing-line decline comes from -- HYPOTHESES (written 12:37 PM CST, before the split)
+
+User 11-27 ~12:36 PM CST: "Yes, split it" (answering "Should I split the 7-day closing-line decline by sport, venue
+and market next?").
+
+Read-only: the same `live_all.json` (reading 20261127T180404Z) and the review's own `bets_from_orders`, same-book
+scope. The windows are DISJOINT, so a change has a clean range: PRIOR = 10-28..11-19 (23 d) and RECENT = 11-20..11-26
+(7 d), both by `selected_date`. The review compares 7 d with 30 d, which overlap, so its 1.5 pp drop understates
+the change.
+
+Measures, per cell, for each window:
+- gross CLV (pp), the headline that went negative;
+- beat-close %;
+- fee-net CLV;
+- the share of graded bets that carry a priced same-book close.
+
+Change = RECENT minus PRIOR, with SE = sqrt(se_recent^2 + se_prior^2), event-clustered per window. A game falls in
+one window only. Dimensions:
+- sport;
+- venue;
+- market, raw and coarse, set before reading: `totals` if the name has "total"; `spreads` if it has "spread" or
+  "handicap"; `moneyline` for h2h / moneyline / ml / winner names; `props` if it has "player"; else `other`;
+- path: `model_edge` / `maker_pilot` (by `execution_style`) / `market_fair` / other.
+
+Hypotheses:
+- **H1 venue:** the drop sits in one venue. Kalshi is the persistent 30 d loser, -6.8% on 591 games.
+- **H2 sport:** the drop sits in one sport. NBA is about 73% of Suggested rows. Todo #863 (11-27) found NBA pregame
+  quotes go stale 2 h after each scheduled pull, so an NBA fair could lag a moving market.
+- **H3 market:** the drop sits in totals, persistent at -13.6% on 278 games.
+- **H4 mix:** the drop is a MIX shift. RECENT bought a different sport/venue/market mix, and within each cell CLV did
+  not change.
+  - Test: the within-cell change is the actual RECENT mean minus the mix-expected mean. The mix-expected mean weights
+    each cell's PRIOR mean by RECENT's bet count (cells with no PRIOR bets take the PRIOR overall mean).
+- **H5 selection:** the drop comes from WHICH bets get a priced close. The priced share fell to 46% in 7 d. If the
+  priced share fell unevenly (one venue's closes stopped pricing), RECENT's CLV describes a different population.
+
+Falsification tests, fixed now:
+- H1/H2/H3: a level "carries the drop" iff its gross change has a 95% range below 0, AND the rest of the book's
+  gross change (all other levels pooled) has a range that includes 0. If several levels or none meet that, the
+  hypothesis for that dimension is REJECTED (the drop is spread out, or there is too little data to place it).
+- H4 survives iff the within-cell change's 95% range includes 0 on the dimension the mix test runs on. That is
+  sport x venue x coarse market, collapsed to the coarser dimension when a cell has < 3 PRIOR games.
+- H5 survives iff the priced share fell by >= 20 points in one venue while another venue's priced share moved
+  < 10 points.
+
+RECENT holds 73 priced games, so a range can be wide. A REJECTED for lack of data is reported as that, not as
+innocence.
