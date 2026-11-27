@@ -63688,3 +63688,11 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Board:** book_grid wncaab index 1 -> 0 (priceable 2 -> 0) at 03:25:32.435Z, 32 s after the refusal tick. It was the only live wncaab game. Last priceable full-game ledger row 03:24:17Z.
 - **Plan:** generated 21:25:31 CST, inside that 32 s gap (1 s before the board withdrew). No `key_player_out` refusal and 0 mentions of Cincinnati Bearcats or Miami (OH) among rows_in 46. So the game's rows did not reach the plan inputs in that build. Davidson's did at 20:22Z. Not traced further: the row was likely filtered upstream of the plan (below the venue min-EV / not shortlisted).
 - verify: `C:/tmp/lpeg/w1126/mfc.sh` 03:26:09Z, hold probe 03:26Z, `plan_wait.ps1` / `kpo_mfc.py` 03:27Z, `pbp_name_w.py 401903571 "Marta Fernandez"` 03:26Z.
+
+## 2026-11-27 03:27:02Z READING lane live-player-exit-gate (#814): FIRST WNCAAB LIFT -- Cincinnati's Marta Fernandez returned; the game was cleared and back on the board within 71 s (follows the 03:25:00Z entry)
+- betting change: no (reading only)
+- **Return:** ESPN pbp `03:25:59Z Q3 1:31 Marta Fernandez subbing in for Cincinnati`, then `03:26:25Z ... (Marta Fernandez assists)`.
+- **Producer:** the refused tick was 03:25:00.648Z. The next wncaab tick, 03:27:02.515Z, read `key_players_out=0 refused_games=0`, **63 s after she checked in**. The 03:29:02Z tick was also clear.
+- **Board:** book_grid wncaab index 0 -> 1 at 03:27:10.849Z, **8 s after the lift tick**. The game's full-game ledger rows came back at 03:27:10Z and 03:28:37Z, withheld only for `prob_interval_swamps_edge` (an edge gate, not the exit). `first_priced_after=None` as of 03:29Z is therefore the model's own edge rule, not a held refusal. The game was off the board for 1 min 38 s (03:25:32Z -> 03:27:10Z).
+- **Tally (11-26):** 2 lifts read end to end in one day: USC Cofie (NCAAB, 63 s + 17 s) and Fernandez (WNCAAB, 63 s + 8 s). With Saint Peter's 11-25, lifts are now measured in NCAAF, NCAAB and WNCAAB.
+- verify: `pbp_name_w.py 401903571 "Marta Fernandez"` 03:29Z, `mfc.sh` / `mfc2.sh` 03:29:35Z.
