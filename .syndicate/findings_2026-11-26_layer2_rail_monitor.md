@@ -102,3 +102,9 @@ The Windows task took **46 readings**, every 20 min from 10:03 AM to 1:03 AM CST
   - (a2) card with rows and flags: also put the prior date's live L2-A rows on web's combined board read (`read_combined_intelligence_response`, `pipeline/intelligence_state.py`, claimed by `paper-alongside-live`, `web-silent-worker-kills`, `board-read-cold-share`). That read costs 5-18 s cold and is single-flighted; adding a date adds a shortlist read while the carryover runs.
 - **Nothing built.** Both need files other lanes hold; put to the user 9:40 AM CST.
 - Reader: `C:\tmp\railmon\carry_1127.sh` (copied to `scripts/rail_monitor/`).
+
+## After-midnight rail fix loaded (10:30 AM CST 11-27; user "Yes fix it here", "Yes, lend it")
+
+- **What:** a game from the evening before that is still live after midnight CT keeps a SCOREBOARD card on the Today rail. `/api/board/game-chips?carry_prior_live=1` lends the prior date's live chips from its published artifact (within 6 h of midnight, artifact <= 900 s old), and the rail keeps a live chip whose `carried_onto` is its date. `8455f25c0`, display only, not a betting change. No rows: the board's lower date bound (#779) still keeps them off today's board, on purpose.
+- **Load:** ff + reload-web 16:29:54Z 11-27. All 3 predictions MET (commit, served rule, endpoint report `outside_window` 10.5 h); web log 0 errors; live page 173 cards, 0 console errors. deploys.md 2026-11-27 16:29:54Z.
+- **Owed at the 11-27 close (R-M):** the first live reading, if a game is still live after midnight tonight. The probe asks with the same parameter now.

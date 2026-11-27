@@ -297,7 +297,8 @@ def main() -> int:
                 raise
     reading["page_age_min"] = round(page_age_min, 1)
     reading["load"].append(fetch(base, "/api/board/layer2-shortlist", rdir / "shortlist.json"))
-    reading["load"].append(fetch(base, f"/api/board/game-chips?sports={CHIP_SPORTS}", rdir / "chips.json"))
+    # `carry_prior_live=1`, as the page asks since 8455f25c0: after midnight CT the prior date's still-live games.
+    reading["load"].append(fetch(base, f"/api/board/game-chips?carry_prior_live=1&sports={CHIP_SPORTS}", rdir / "chips.json"))
     query_body = {k: v for k, v in QUERY_BODY.items() if not (args.no_row_refs and k == "row_refs")}
     reading["query_row_refs"] = bool(query_body.get("row_refs"))
     reading["load"].append(fetch(base, "/api/intelligence/query", rdir / "query.json", body=query_body))
@@ -456,13 +457,18 @@ def main() -> int:
                 fh.write(json.dumps(f) + "\n")
     # ---- teams
     chips = json.loads((rdir / "chips.json").read_bytes()).get("chips") or []
-    today_chips = [ch for ch in chips if (parse_ts(ch.get("start_time_utc")) or now).astimezone(CT).date().isoformat() == rail_date]
+    # A chip CARRIED onto this rail date (the prior date's still-live game, `carried_onto`) counts as today's: the
+    # page shows it, so `live_chips_without_live_card` checks it too.
+    carried_chips = [ch for ch in chips if str(ch.get("carried_onto") or "") == rail_date]
+    today_chips = [ch for ch in chips if (parse_ts(ch.get("start_time_utc")) or now).astimezone(CT).date().isoformat() == rail_date
+                   or str(ch.get("carried_onto") or "") == rail_date]
     live_chips = [ch for ch in today_chips if ch.get("state") == "live"]
     live_card_chips = {(c.get("chip") or {}).get("game_key") for c in live}
     truncated = [{"sport": ch.get("sport"), "matchup": ch.get("matchup"), "abbr": (ch.get(s) or {}).get("abbr"), "name": (ch.get(s) or {}).get("name")}
                  for ch in today_chips for s in ("away", "home") if looks_truncated((ch.get(s) or {}).get("abbr"))]
     reading["teams"] = {
         "chips_today": len(today_chips), "live_chips": len(live_chips),
+        "carried_chips": [f"{ch.get('sport')} {ch.get('matchup')} ({ch.get('state')})" for ch in carried_chips],
         # Game clock per live chip (HALF / intermission / Q3 7:24), to join 0-card overlay builds to game state.
         "live_chip_status": {f"{ch.get('sport')} {ch.get('matchup')}": ch.get("status_token") for ch in live_chips},
         "live_chips_without_live_card": [f"{ch.get('sport')} {ch.get('matchup')}" for ch in live_chips if ch.get("game_key") not in live_card_chips],
@@ -498,7 +504,8 @@ def summary(r):
         "live_by_sport": lv.get("by_sport"),
         "live_by_sport_phase": lv.get("by_sport_phase"),
         "live_by_sport_family": lv.get("by_sport_family"),
-        "teams": {"chips_today": tm["chips_today"], "live_chips": tm["live_chips"], "live_chip_status": tm.get("live_chip_status"),
+        "teams": {"chips_today": tm["chips_today"], "live_chips": tm["live_chips"], "carried_chips": tm.get("carried_chips"),
+                  "live_chip_status": tm.get("live_chip_status"),
                   "live_chips_without_live_card": tm["live_chips_without_live_card"],
                   "chipless": [(c["sport"], c["matchup"], c["count"]) for c in tm["chipless"] or []],
                   "det1": len(tm["det1"] or []), "det2": len(tm["det2"] or []), "det3": len(tm["det3"] or []),
