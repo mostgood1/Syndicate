@@ -118,6 +118,15 @@ earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehea
   `read_after_load_cd.py --use d --fixes yes --ncaaf-835 <on|off>`.
 - Live money: in-play live orders come from the Kalshi in-game module and do not size through `portfolio_commit`. So
   today (d) reaches rank, paper and decision records, not live in-play money.
+- UPDATE 2026-11-27 ~4:50 PM CST (session 91b0c989): the fit fix is ON MAIN.
+  - Commits `86fd3e943` + `d3ec5b72e`, pushed 4:37 PM CST on the user's "Yes, push it" (relayed by session 898e5510).
+    Both read as ancestors of `origin/main` `071dbf20a`. New test file: `tests/test_cell_calibration_847d_fit.py`.
+  - The batch's F condition is still NOT met: lane `cell-calibration-847d-fit-fix` has no `FIT FIX ON MAIN <sha>` line
+    yet. Its owner, session 77184c63, was sent the line's form ~4:40 PM CST.
+  - The ff must reach `d3ec5b72e` or later; any TIP from now on does.
+  - The reader now requires `--fit-fix yes` (sha16 `e2c5f370e16d1d27`). The installed prompt passes it.
+  - Read-only fact (session 898e5510): `SYNDICATE_PRICING_CALIBRATION` is on in all three roles, but the only pricing
+    profile is mlb_source's (2026-10-12). So the pricing seam recalibrates no in-season (d) cell.
 
 ### G — #863 NBA pregame reuse age limit
 - Line: GLOBAL `SYNDICATE_NBA_PREGAME_REUSE_MAX_AGE_SECONDS=4500`. BETTING CHANGE.
