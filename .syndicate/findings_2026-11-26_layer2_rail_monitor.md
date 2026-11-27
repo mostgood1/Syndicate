@@ -9,3 +9,9 @@ The user said, 11-19 ~1:00 AM CST: "this should just be an always on monitor mov
 - **Fixed in the monitor (`C:\tmp\railmon\p29_orient.py`, from 2:27 PM CST; repo copy `scripts/rail_monitor/p29_orient.py`).** `norm` maps native city names to the English ones word by word, on both sides, so it cannot split a pair that already matched: København, München, Köln, Praha, Beograd, București, Warszawa, Kiev, Athina, Wien, Moskva, Lisboa, Genève, Sevilla, Milano, Torino, Napoli, Roma, Firenze, Genova. It also folds curly apostrophes to straight ones.
 - **Re-run at 20:27:50Z (2:27 PM CST):** the game reads `direct`, `competition_not_modelled` (uecl), like the other 17 live UEL/UECL games. 18 of 18 live soccer games matched the lens, 0 `not_in_resim`.
 - The repo copy of `p29_orient.py` had not been refreshed since 11-22, so it also gains the 11-24 fixes (the ø fold, the UEFA `competition_not_modelled` reason, the `chip_join_key` fallback).
+
+## Rail card OURS fix loaded (10:40 PM CST; user "Yes, fix it here", "Yes, lend it")
+
+- **What:** a flagged full-game total's OURS on the rail card is now the flagged row's own live total, not the chip's PROJ box, which can be one re-sim tick apart (11-25 R20). The tooltip names the box's number when they differ. `fe46fb249`, display only, not a betting change.
+- **Load:** ff + reload-web at 04:39:59Z 11-27, after lane `web-silent-worker-kills` loaded `b709934b2` to its exact SHA. Served page carries the branch; web log 0 errors; live page 0 console errors. deploys.md 2026-11-27 04:39:59Z.
+- **Owed at the closes:** `ours_resim_tick` reads 0 on every reading after the load. No flagged total was a tick apart from its row at load time, so only the unit test exercised the new answer.
