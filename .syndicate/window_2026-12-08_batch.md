@@ -201,6 +201,15 @@ earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehea
     12-08 without being a betting change. The installed prompt requires only `b2ff241ae` for I, NOT a fix: a 12-07
     yes would load I as built unless the prompt is edited. Load as built, wait for a fix, or move to 12-22 is the
     user's call.
+- **ANSWERED 2026-11-28 ~9:58 AM CST:** the user answered "Fix it first" (session 91b0c989) to "Item I's
+  second-half timeouts read low. Fix it before 12-08, or move I to 12-22?".
+  - The task prompt now DROPS I unless todo `#859` on `origin/main` carries a dated `TIMEOUTS FIX ON MAIN <sha>` line
+    that names its tests, with `<sha>` an ancestor of `origin/main` and those tests passing in the batch's step 2.
+  - A 12-07 LOAD YES for I must be dated after that line. Without the fix, I waits for 12-22, and H still loads at
+    17 / 14.
+  - The fix is being built by session 309b272a, the session that took the timeouts reading, briefed ~10:00 AM CST
+    11-28. `live_resim.py` is held by lane `live-player-exit-gate`, so its loan goes to the user with the push question.
+  - The new prompt hashes are in lane `window-1208-batch`.
 - NOT in the batch: `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR` (`cf12ae61f`). The user has made no load decision and it has
   no kit line.
 
