@@ -64073,3 +64073,52 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Runs:** 10:50 PM and 6:45 AM CST (04:50Z / 12:45Z; the review's own log markers `RECONCILE_RUN start 2026-11-27T04:50:01` and `12:45:02`). The reconcile and review took ~10.5 min this morning (12:45:02Z -> 12:55:44Z), so the step adds ~13 s of the 30-minute limit.
 - **verify:** the 10:50 PM CST run (04:50Z 11-28) appends a `SCORECARD ... record_check=N/N` line after its `REVIEW` line, and `scorecard/latest.md` has an mtime after 04:50Z with `Generated 2026-11-28T04:5`. The task's LastTaskResult is the `cp`'s, so a scorecard crash shows as a MISSING SCORECARD line, not as a task failure.
 - No claim was taken (no deploy). Nothing to release.
+
+## 2026-11-28 00:43:40Z (6:43:40 PM CST 11-27) -- DEPLOY x2 (claimed web, ff + reload-web, no env change): the NBA / NCAAF / NFL / NCAAB game cards carry the board's pick first; NBA props and the NFL season betting card lead with the board `b02c76e43`, then the NBA tile's text colour `bcbb5465f` at 00:58:33Z (lane `surface-consistency-oversight`, todo #861 step 1g, user "Deploy to web now") -- **LOADED on web; MET**
+- betting change: no (display only, web routes and one stylesheet; nothing that places or sizes money reads these pages)
+- **Why** (findings Reading 9, 11-27 23:51-23:53Z):
+  - The NCAAF cards joined 0 of 69 games to the board (mascot spellings).
+  - The NBA cards showed only the sim's "Win | EV".
+  - The NBA props page was empty all season (no NBA top-props artifact on the fleet).
+  - The NFL season betting card had no board.
+- **Load 1: fleet `c0950cdaf` -> `b02c76e43`** (23 commits, read before the merge).
+  - **Runtime code, this change:** `e250f9642` (`board_game_picks.py`; the nba / ncaaf / nfl / ncaab blueprints; `static/nba/cards_source.js`; `templates/nba/prop_ladders.html`).
+  - **Ride-along, #847 (d) fit fix** (`86fd3e943` + `d3ec5b72e`: `layer2_board.py`, `live_gameline_join.py`, `daily_optimizer.py`, `model_scorecard.py`, `opportunity_population_ledger.py`, `scripts/live_totals_width_fit.py`). Default off, byte-identical with the (c) and (d) keys absent.
+  - **Ride-along, #865 soccer lane-age ceiling** (`fabdd54f7`: `live_gameline_join.py`, `soccer_live_gameline_source.py`). DEFAULT OFF (`SYNDICATE_LIVE_GAMELINE_SOCCER_LANE_AGE` absent = today); its own commit says an ff carrying it is not a betting change.
+  - **Switches read about 00:40Z, from each running role's own environ:** `SYNDICATE_LIVE_GAMELINE_SOCCER_LANE_AGE`, `SYNDICATE_CELL_CALIBRATION_LIVE_PROB` / `_RANK_STAKE` / `_RAIL` / `_DISPLAY`, `SYNDICATE_NCAAF_LIVE_TOTAL_CALIBRATION` and `SYNDICATE_OPTIMIZER_OVERLAY` are absent on web, refresh-worker and live-odds-worker.
+  - **They load without a restart.** The refresh-worker's board child and its scripts read the checkout at their next spawn, so these modules reach them that way, and stay inert.
+  - **Everything else:** scripts (`cheat_sheet_scorecard.py`, a Windows task's), `scripts/rail_monitor/*`, tests and ledger. `vendor/` is empty; the 6 locally modified fleet files overlap nothing. `betting_change.py` lists no pending `yes`.
+- **Preflight 1** `--betting-change no` with 3 expect / baseline pairs (baseline read 00:41:52Z): **CLEAR 00:43:02Z**. Claim acquired 00:41:44Z.
+  - `git merge --ff-only b02c76e43` at 00:43:22Z (ancestor checked first).
+  - `RELOAD_WEB {"elapsed_s": 10.1, "failures": 0, "state": "done"}` at 00:43:40Z.
+- **expect / measured, load 1:**
+  - `card_games_board_tile_first` 0 -> 145: **MET** (11 + 69 + 16 + 49).
+  - `pages_leading_with_board` 0 -> 2: **MET** (NBA props 12 board picks; betting card 6 board picks, then the 12 SmartSim).
+  - `read_1g_rc` 3 -> 0: **MET at 00:53:25Z**, after a reader fix (below).
+  - All 145 tiles were judged, past days included; 0 differ from the board's own `board_tile`. NCAAF 55 joined. The served `cards_source.js` draws the tile.
+- **The reader was wrong first, not the page.**
+  - At 00:43:52Z it returned rc 1: 31 NCAAF tiles "not the board's own", each "No board pick" with a line count of 25 against 24.
+  - The page reads a game day's own saved board first, and the board had written 11-28's at 00:38:47Z (25 lines for Notre Dame @ Syracuse; today's had 24). The reader fetched only today's.
+  - A second version fetched every day's board through `/api/board/layer2-shortlist?date=`, 36 calls per read. Each call decodes the whole ~40 MB shortlist on web, and the read went BLIND: its NCAAF request was dropped by a worker memory recycle.
+  - The reader now calls the page's own `read_layer2_shortlist(day)` from the fleet's store (`C:\tmp\scc_oversight_d5aa\fleetpy_kv.sh`, which prints key names only), at no cost to web. It still returns MET on the replay's pages and VIOLATED on the tampered copy.
+- **Load 2: `b02c76e43` -> `bcbb5465f`.** It was found in the browser pane after load 1, and it is the same lane.
+  - **The defect:** the NBA tile is a `<button>`, and `.cards-market-tile` set no colour, so every tile's main line was the browser's button black, rgb(0, 0, 0), on the dark card. The board tile showed "EV +4.5% at bovada +165 | +20 more" without the pick's name, and the sim tiles' main lines were hidden the same way.
+  - **The fix:** `color: inherit` on `.cards-market-tile`, plus 1 test pinning it.
+  - **Ride-alongs:** `5b8f81085` #866 (`scripts/build_soccer_artifacts.py`, MLS ratings season rollover; lane `mls-ratings-season-rollover`). Its own A/B on a real pull is identical for 11-28, 11-29 and 12-05, and it differs only from 2027. It reaches refresh-worker's next soccer run from the checkout. Also `343f8364f` (a Windows task's script), a skill file, and ledger.
+  - **Preflight 2:** baseline read 00:58:04Z in the browser (`nba_tile_main_color` rgb(0,0,0); 11 board tiles); **CLEAR 00:58:12Z**.
+  - ff 00:58:21Z; `RELOAD_WEB {"elapsed_s": 12.0, "failures": 0}` at 00:58:33Z.
+- **expect / measured, load 2** (browser pane at 00:58:47Z, `/nba/cards`):
+  - `nba_tile_main_color` rgb(0,0,0) -> rgb(237,244,251): **MET** on the board tile and the sim tiles. The CSS `?v=` changed.
+  - `nba_board_tiles` 11 -> 11: **MET**.
+  - The live card reads "Board pick: Nickeil Alexander-Walker Over 20.5 points, EV +4.8% at pinnacle +119 | +14 more", above "Moneyline: BOS ML -336, Sim win 69% | Sim EV 0.0%". 0 console errors.
+  - Reader at 00:59:03Z: **rc 0 MET**, with the same counts and 0 mismatches.
+  - HTML 200 with the tile: `/ncaaf/cards` 69, `/nfl/cards` 16, `/ncaab/cards?client=board` 49. `/nba/props` and `/nfl/season/2026/betting-card` show the board heading.
+- **Web log 00:43:20-01:00Z:** UNHANDLED_500 0, Traceback 0, `board_game_picks` READ_FAILED 0, WORKER TIMEOUT 0.
+- **Cost, measured on the fleet host with the page's own reader** (`C:\tmp\scc_oversight_d5aa\cost_1g.py`):
+  - A cold attach is 3.72 s on the NCAAF cards (four days' boards, about 0.7 s per read) and 2.13 s on the NFL cards. Warm it is 0.04 s, for 60 s per worker.
+  - Peak RSS did not move: the NCAAF cards build itself took the process from 286 MB to 1,100 MB.
+  - `/ncaaf/api/cards` took 3-17 s before the load and 18-40 s after. About 4 s of that is this attach; the rest is the page's own build under the evening's memory recycling.
+  - Web memory recycles: 7 (22:43-23:43Z) and 30 (23:43-00:43Z) before the load, 13 in its first 17 min. The rate was rising before the load; the NCAAF cards build alone is ~1.8x the 625 MB recycle limit.
+- **verify:** `fleetpy_kv.sh read_1g_after_load.py <day>` rc 0. NCAAF `joined_today_or_later` > 0 on a slate with NCAAF pregame games.
+- **Revert:** `git revert bcbb5465f e250f9642` on main, then ff + reload-web.
+- **Claim released** 01:01:59Z (status: web free).

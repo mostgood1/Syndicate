@@ -96,6 +96,10 @@
   - Measured first (00:23:40Z 11-27 board, 1,929 pregame rows): EV gross on all; 305 fee rows judged net; 355 Kalshi / 241 Polymarket prices invisible on the page. 11 of 46 Suggested pregame rows carry a venue price, and none clears +2% net there (4 clear 0).
   - Replay HELD: shown EV == the gate's number 319 / 319 fee rows, == gross 1,681 / 1,681; venue entries == the purchaser function's 480 / 480. Reader `read_1e_after_load.py`: BEFORE rc 3 (353 exchange cards without net, 0 venue lines). Loads: web + the board child. Betting change NO. Findings "Step 1e".
 - **Step 1d DEPLOYED to web 2026-11-26 17:28:02Z, MET** (user "Deploy to web now"; ff `75624d138` + reload-web). Served 17:28:18Z: Board pick tile first on 15 of 15 NHL and 36 of 36 soccer games, 12 of 12 sim prop cards carry the board's verdict; 0 unlabelled non-board EV on the live pages. The picks headline with live board picks was read 2026-11-27 15:32:05Z (9:32 AM CST), rc 0: the board's 6 Suggested NHL picks lead the page, 0 are not the board's, and 12 sim cards follow, all labelled with a verdict. Nothing owed for 1d.
+- **Step 1g LOADED on web 2026-11-28 00:43:40Z + tile colour 00:58:33Z** (user "Deploy to web now"; `b02c76e43`, `bcbb5465f`; betting change no).
+  - The reader returned rc 0 MET: board tile first on 145 of 145 games, 0 mismatches. NBA props and the betting card lead with board picks.
+  - The NBA tiles' main line had been invisible (button text colour); fixed in `bcbb5465f`.
+  - Owed lead: the NCAAF cards build peaks at ~1.1 GB (1.8x web's recycle limit), and the attach adds 3.7 s cold.
 - **Step 1g BUILT, NOT LOADED** (2026-11-27, user "Yes, cover them"; display only; findings "Reading 9" and "Step 1g"; `e250f9642`).
   - The NBA, NCAAF, NFL and NCAAB game cards carry the board's pick first. The NBA props page and the NFL season betting card lead with the board's picks.
   - The board joins a card through `team_aliases.chip_join_key` when the feeds spell clubs differently: NCAAF went from 0 to 56 of 69 games joined, with 0 earlier joins moved and every new join matching on both sides.

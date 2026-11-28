@@ -1130,6 +1130,12 @@ Self-check: MET (rc 0) on the replay's pages; VIOLATED (rc 1) on a copy with one
 - the NBA cards client's other sim panels (Game lens, props tab).
 - The upcoming view for the weekly NFL pages also carries next week's Thursday game (its note names the days).
 
+**LOADED on web 2026-11-28 00:43:40Z, then the tile-colour fix at 00:58:33Z (6:43 / 6:58 PM CST 11-27), user "Deploy to web now"; reader rc 0 MET at 00:53:25Z and 00:59:03Z** (deploys.md entry of 00:43:40Z):
+- All 145 card games (NBA 11, NCAAF 69, NFL 16, NCAAB 49) carry the board's tile first, and 0 differ from the board's own tile. NCAAF joins 55.
+- NBA props and the NFL betting card lead with board picks.
+- **Found in the browser pane after the load:** the NBA tiles' main line was black on the dark card (the tile is a `<button>`). Fixed in `bcbb5465f`.
+- **Cost:** a cold attach on the weekly cards reads each game day's own board, 3.7 s on NCAAF and 2.1 s on NFL. Peak memory is unchanged: the NCAAF build itself peaks at 1.1 GB.
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:
