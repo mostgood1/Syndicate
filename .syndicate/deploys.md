@@ -64328,3 +64328,57 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - The change is not in NCAAF or NFL. On 11-12 every NCAAF and NFL chip is final, with linescore, leader and plays, the same fields as on 10-22.
   - Soccer is 74% of that body (282 chips, 247 KB of 333 KB decoded), and on that past date it still shows 101 pregame and 13 live chips. One NHL chip on 11-12 also reads live.
 - **GOAL: NOT MET yet.** The first full CST day after the load is 11-28, a Saturday with live college games: the stale-record path's first real test. It closes at midnight CST and is read at 9:30 AM CST 11-29, with that morning's grader run.
+
+## 2026-11-28 16:30:00Z (10:30 AM CST) -- READING (no deploy): the 8:05 AM CT `cheat-sheet-review` run with the scorecard line (lane `cheat-sheet-optimization`, todo #862; the verify of `2026-11-28 02:40:00Z`; read-only) -- **MET**
+- betting change: no (a reading).
+- The run (`list_task_runs cheat-sheet-review`): started 14:07:55Z, succeeded 14:08:37Z.
+- Its report read the review and the scorecard, both "generated at 6:59 AM CT", so it took this morning's run and not last night's.
+- What it reported:
+  - The record check, "209 of 209 sport-days equal".
+  - The current version, v4, with All featured picks 259-295, ROI -10.5% [-18.6, -2.1], "losing beyond noise; trails the price".
+  - Four v4 cells beyond noise, labelled as resting on 3 days.
+  - Where the review and the scorecard disagree (Hot streaks / Consistency, soccer Matchups, the long-dog slice).
+  - The v3 -> v4 no-change note.
+  - Older cells as history.
+  - Every flag framed as a proposal.
+- **One gap, not in the prompt:** the run says "The phone notification wasn't sent because the terminal was active". That is the PushNotification tool's own behaviour, and the report reached the run's final message instead. No change made.
+
+## 2026-11-28 16:27:04Z (10:27 AM CST) -- DEPLOY (claimed web, ff + reload-web, no env change): the form sections print their own official record, `3f50a330d` (lane `cheat-sheet-optimization`, todo #862; proposal 2 of findings section 8; the user answered "Yes, add it" to "Add each form section's record since launch to its header?") -- **LOADED on web; MET at the load; the stamped text is owed at the 11:30 AM CST build**
+- betting change: **no**.
+  - The change is display only: `section_records` is stamped on the sheet and printed in two section headers.
+  - No section's members change, and `SECTION_RULES` stays 5. Tests pin `on["sections"] == off["sections"]`.
+  - Nothing that bets reads the sheet's sections (as BC-078 for v5).
+- **What changed:**
+  - `cheat_sheets.py`: `section_since_launch` gives the record since launch plus the last 14 days, from `record.json`'s per-day tallies. `section_record_text` adds a reading note under 30 bets. `sim_edge_since_launch` is now a wrapper, with the same output.
+  - `page_payload` adds `section_records_text`.
+  - `build_cheat_sheets.py` stamps `section_records` on v5 days.
+  - `cheat_sheets.html` prints it in the Consistency and Hot streaks headers.
+- **Ride-alongs** (`4bfaa108a..3f50a330d`, 27 commits, mostly ledger). The only other code is `0cc34ecd0`, `pipeline/board_build_process.py` (lane `board-split-memory-guard`, todo 850):
+  - It adds `scripts/rail_monitor/` to the head rule's non-runtime prefixes. That tuple is read only when `SYNDICATE_BOARD_PROCESS_PARENT_RECYCLE_HEAD_RULE=loaded`.
+  - The key is set in no layer: `fleet_role_spec.json`, `fleet_env/{web,refresh-worker,live-odds-worker}.json` and `local_production.env` each have 0 matches (read 16:26:03Z, the key name only). So it is inert here.
+  - Its window-1208-batch note classes it (a) as well.
+  - The rest is tests, `scripts/rail_monitor/RUNBOOK.md` and the ledger. There were 6 dirty fleet files (data, reports); none is in the range.
+- **Tests:** `tests/test_cheat_sheet_form_records.py`, 6, including the build through `main` (a fresh day is stamped, a started v4 day is not). 231 passed across the cheat-sheet, record, review, reconcile, scorecard, play-card and surface-consistency suites. The page script passes `node --check`.
+- **Computed on the fleet's own `record.json`** (generated 12:59:05Z) with this code before the load:
+  - NBA Consistency: 877 bets, -2.9%; last 14 days 294 bets, -8.1%.
+  - NFL Consistency: -6.9%; last 14 days -15.6%.
+  - NCAAF Consistency: +4.9%; last 14 days +5.4%.
+  - Soccer Consistency: 29 bets, -39.9%, with the reading note.
+  - NCAAB has none.
+- **Locks:**
+  - Claim web at 16:26:28Z (ACQUIRED, rc 0).
+  - Baseline at 16:26:40Z.
+  - Preflight `--service web --target-commit 3f50a330d --betting-change no`, 5 pairs, from the worktree at origin/main: **CLEAR 16:26:52Z**.
+- **ff + reload:**
+  - `git merge --ff-only 3f50a330d` at **16:27:04Z** (`4bfaa108a` -> `3f50a330d`).
+  - `reload-web` at 16:27:05Z: `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "state": "done"}`, workers 1905292, 1911590 -> 1913122, 1913123.
+- **expect / measured** (16:27:15Z):
+  - `fleet_commit` 4bfaa108a -> 3f50a330d: **MET**.
+  - healthz 200: **MET**.
+  - `page_since_launch` 1 -> 1: **MET**.
+  - `page_its_official_record` 0 -> 0: **MET**. No sheet carries the stamp until a build runs.
+  - `page_record_js`: predicted 1, measured **3**. `grep -c` counts LINES: the payload line, where every sheet now carries an empty `"section_records_text": {}`, plus the JS comment and the `RECORD` line. The prediction under-counted lines; the reader is served either way.
+  - web.log tail: 0 Traceback, 0 `WORKER TIMEOUT`.
+- **verify (owed):** the 11:30 AM CST `SyndicateCheatSheets` build (watcher `watch_1130.sh`) stamps `section_records` on the 11-28 sheets, and `/cheatsheets?date=2026-11-28` prints "Its official record, ..." in the Consistency and Hot streaks headers. 11-28's started days keep rules 5, so they take the stamp too.
+- **Revert:** `git revert 3f50a330d` on main, then ff + reload-web. A stamped sheet's extra field is then ignored. Nothing to clean on disk.
+- Claim released after this entry.
