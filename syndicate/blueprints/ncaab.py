@@ -22,6 +22,7 @@ from syndicate.features.ncaab.season import build_season_betting_card_api_payloa
 from syndicate.features.ncaab.season import build_season_betting_card_page_context
 from syndicate.features.ncaab.source_cards import build_ncaab_source_cards_payload
 from syndicate.features.shared.asset_version import cards_source_asset_version
+from syndicate.features.shared import board_game_picks
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
 from syndicate.features.shared.hub_summary import build_hub_bettor_summary
 from syndicate.features.shared.timezone import central_today_iso
@@ -91,7 +92,8 @@ def cards():
     # fed by `/ncaab/api/source/cards`. The shared board stays at ?client=board,
     # the same escape hatch NBA keeps.
     if (request.args.get("client") or "").strip().lower() == "board":
-        return render_template("shared/game_cards_board.html", **build_cards_page_context(_selected_date()))
+        context = board_game_picks.attach_board_picks(build_cards_page_context(_selected_date()), "ncaab")
+        return render_template("shared/game_cards_board.html", **context)
     selected = _selected_live_date()
     day = date.fromisoformat(selected)
     return render_template(
@@ -112,7 +114,7 @@ def api_source_cards():
 
 @ncaab_bp.get("/api/cards")
 def api_cards():
-    context = build_cards_page_context(_selected_date())
+    context = board_game_picks.attach_board_picks(build_cards_page_context(_selected_date()), "ncaab")
     return jsonify(build_game_board_api_payload(context))
 
 

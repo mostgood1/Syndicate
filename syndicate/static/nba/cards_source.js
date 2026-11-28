@@ -5126,10 +5126,29 @@
     `;
   }
 
+  // #861 step 1g: /nba/api/cards puts the Layer 2 board's pick for the game first in `market_tiles`
+  // (board_game_picks.attach_board_picks). It leads the row; the tiles after it are the sim's own and say so.
+  // A payload without it (the live-lens embed) draws the row as before.
+  function renderBoardPickTile(game) {
+    const tile = safeArray(game?.market_tiles).find((item) => item && item.label === 'Board pick');
+    if (!tile) return '';
+    return `
+      <button class="cards-market-tile" type="button" data-source="board" style="grid-column: 1 / -1;">
+        <div class="cards-market-top">
+          <div class="cards-market-label">Board pick</div>
+        </div>
+        <div class="cards-market-main">${escapeHtml(String(tile.title || 'No board pick'))}</div>
+        <div class="cards-market-bottom">
+          <div class="cards-market-sub">${escapeHtml(String(tile.sub || ''))}</div>
+        </div>
+      </button>
+    `;
+  }
+
   function renderMarketTile(title, pick, auxLine, noteText, cardIdValue) {
     const hasMetrics = Number.isFinite(Number(pick?.probability)) || Number.isFinite(Number(pick?.ev));
     const compactSub = pick
-      ? (hasMetrics ? `Win ${fmtPercent(pick.probability, 0)} | EV ${fmtPercentValue(pick.ev)}` : (pick.meta || 'Off card'))
+      ? (hasMetrics ? `Sim win ${fmtPercent(pick.probability, 0)} | Sim EV ${fmtPercentValue(pick.ev)}` : (pick.meta || 'Off card'))
       : 'Off card';
     const compactNote = String(auxLine || noteText || '').trim();
     return `
@@ -5137,7 +5156,7 @@
         <div class="cards-market-top">
           <div class="cards-market-label">${escapeHtml(title)}</div>
         </div>
-        <div class="cards-market-main">${escapeHtml(pick?.detail || 'No playable edge')}</div>
+        <div class="cards-market-main">${escapeHtml(pick?.detail || 'No sim edge')}</div>
         <div class="cards-market-bottom">
           <div class="cards-market-sub">${escapeHtml(compactSub)}</div>
           ${compactNote ? `<div class="cards-market-note">${escapeHtml(compactNote)}</div>` : ''}
@@ -6065,6 +6084,7 @@
         </div>
 
         <div class="cards-market-row">
+          ${renderBoardPickTile(game)}
           ${renderMarketTile('Moneyline', bestMarketPick(game, 'moneyline'), `${game.home_tri} ${fmtAmerican(betting.home_ml)} / ${game.away_tri} ${fmtAmerican(betting.away_ml)}`, `Home win ${fmtPercent(betting.p_home_win, 0)} · Away win ${fmtPercent(betting.p_away_win, 0)}`, id)}
           ${renderMarketTile('Spread', bestMarketPick(game, 'spread'), `${game.home_tri} ${fmtSigned(betting.home_spread)} · ${game.away_tri} ${fmtSigned(-Number(betting.home_spread))}`, `Model margin ${fmtSigned(score.margin_mean, 1)} · Market ${fmtSigned(-Number(market.market_home_spread), 1)}`, id)}
           ${renderMarketTile('Game Total', bestMarketPick(game, 'total'), `Total ${fmtNumber(betting.total, 1)}`, `Model total ${fmtNumber(score.total_mean, 1)} · Over ${fmtPercent(betting.p_total_over, 0)}`, id)}

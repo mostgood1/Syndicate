@@ -301,7 +301,19 @@
       {% endif %}
 
       <main class="ladder-grid" id="propLadderGrid" aria-live="polite">
-        {% if rank_cards %}
+        {#- #861 step 1g: the board's NBA prop picks lead, the saved top-props cards follow as a labelled section.
+            `card_sections` is absent on a filtered (player / team / market) view; `rank_cards` alone is the old grid. -#}
+        {% if card_sections and not empty_state %}
+          {% for section in card_sections %}
+            <section class="ladder-section" data-section="{{ section.key }}" style="grid-column: 1 / -1;">
+              {% if section.title %}<div class="ladder-section-label">{{ section.title }}</div>{% endif %}
+              {% if section.note %}<p class="ladder-summary-text">{{ section.note }}</p>{% endif %}
+            </section>
+            {% for card in section.cards or [] %}
+              {% include 'shared/_rank_card.html' %}
+            {% endfor %}
+          {% endfor %}
+        {% elif rank_cards %}
           {% for card in rank_cards %}
             {% include 'shared/_rank_card.html' %}
           {% endfor %}

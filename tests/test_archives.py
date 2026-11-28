@@ -6875,7 +6875,12 @@ class ArchiveRouteTests(unittest.TestCase):
         sort_control = next(control for control in (payload.get("extra_controls") or []) if control.get("name") == "sort")
         self.assertTrue(any(option.get("value") == "NYK" for option in (team_control.get("options") or [])))
         self.assertTrue(any(option.get("value") == "team" for option in (sort_control.get("options") or [])))
-        first_card = (payload.get("rank_cards") or [{}])[0]
+        # #861 step 1g: the board's NBA prop picks lead (`rank_cards`, the "board" section); the saved top-props cards
+        # follow in the "page" section, each still linking to its player focus.
+        sections = {section.get("key"): section for section in (payload.get("card_sections") or [])}
+        self.assertEqual(list(sections)[:2], ["board", "page"])
+        self.assertTrue(all(card.get("source") == "board" for card in (payload.get("rank_cards") or [])))
+        first_card = (sections["page"].get("cards") or [{}])[0]
         self.assertEqual(first_card.get("href"), f"/nba/prop-ladders?date={season_date}&player=Jose+Alvarado")
         self.assertEqual(first_card.get("href_label"), "Player focus")
 

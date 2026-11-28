@@ -141,7 +141,9 @@ def cards():
     context = build_cards_page_context(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
     client = (request.args.get("client") or "").strip().lower()
     if client == "board":
+        board_game_picks.attach_board_picks(context, "nba")
         return render_template("shared/game_cards_board.html", **context)
+    # The source client draws its cards from /nba/api/cards, which carries the board's tile (#861 step 1g).
     return render_template("nba/cards_source.html", asset_version=_cards_source_asset_version(), **context)
 
 
@@ -540,7 +542,8 @@ def game_detail(game_pk: str):
 @nba_bp.get("/api/cards")
 def api_cards():
     selected_date = _selected_date()
-    return jsonify(build_cards_api_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback()))
+    payload = build_cards_api_payload(selected_date, allow_stored_date_fallback=_allow_stored_date_fallback())
+    return jsonify(board_game_picks.attach_board_picks(payload, "nba"))
 
 
 @nba_bp.get("/api/archive")
@@ -856,16 +859,27 @@ def api_picks():
 
 def _props_response():
     selected_date = _selected_date()
-    context = build_props_page_context(
-        selected_date,
-        filters={
-            "market": request.args.get("market"),
-            "team": request.args.get("team"),
-            "player": request.args.get("player"),
-            "sort": request.args.get("sort"),
-        },
+    filters = {
+        "market": request.args.get("market"),
+        "team": request.args.get("team"),
+        "player": request.args.get("player"),
+        "sort": request.args.get("sort"),
+    }
+    context = build_props_page_context(selected_date, filters=filters)
+    if any(str(filters.get(key) or "").strip() for key in ("market", "team", "player")):
+        return context  # a player / team / market focus is the page's own ladder view
+    # #861 step 1g: the board's NBA prop picks for the day lead; the saved top-props cards follow, labelled. Measured
+    # 2026-11-27, the page was empty all season: the fleet holds no NBA top-props artifact (the newest are WNBA's).
+    return board_game_picks.lead_with_board_picks(
+        context,
+        board_game_picks.sport_view("nba", selected_date).only_kind("prop"),
+        sport_label="NBA prop",
+        other_title="Sim view: not the board's picks",
+        other_note=(
+            "The sim's top prop per game from the saved NBA top-props file, ranked by its own EV at one book's price. "
+            "The board's picks above are the props it suggests, at their price."
+        ),
     )
-    return context
 
 
 @nba_bp.get("/props")

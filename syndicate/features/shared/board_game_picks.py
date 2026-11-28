@@ -55,6 +55,33 @@ def game_key(away: Any, home: Any) -> str:
     return f"{team_key(away)}|{team_key(home)}"
 
 
+_CLUB_MEMO: dict[tuple[str, str], str | None] = {}
+_CLUB_MEMO_MAX = 8192
+
+
+def club_key(sport: Any, name: Any) -> str | None:
+    """The canonical club for one feed's spelling, folded (#861 step 1g): `team_aliases.chip_join_key`, the resolver the
+    board's Games strip already joins a card to its chip on (NCAAF through the CFBD registry, which strips mascots).
+    None when it cannot resolve, so it only ever ADDS a join. Memoised per (sport, name); a failed resolver is None."""
+    sp, text = str(sport or "").strip().lower(), str(name or "").strip()
+    if not (sp and text):
+        return None
+    memo_key = (sp, text)
+    if memo_key in _CLUB_MEMO:
+        return _CLUB_MEMO[memo_key]
+    try:
+        from syndicate.features.shared.team_aliases import chip_join_key
+
+        resolved = chip_join_key(sp, text)
+    except Exception:  # noqa: BLE001 -- a resolver that cannot load must not cost a page its board
+        resolved = None
+    out = (team_key(resolved) or None) if resolved else None
+    if len(_CLUB_MEMO) >= _CLUB_MEMO_MAX:
+        _CLUB_MEMO.clear()
+    _CLUB_MEMO[memo_key] = out
+    return out
+
+
 def market_family(market: Any) -> str:
     m = str(market or "").strip().lower()
     return _GAME_MARKET_FAMILY.get(m, m)
@@ -362,6 +389,7 @@ def _snapshot(shortlist_date: str, reader: Callable[[str], Mapping[str, Any] | N
 def clear_cache() -> None:
     with _LOCK:
         _CACHE.clear()
+    _CLUB_MEMO.clear()
 
 
 @dataclass(frozen=True)
@@ -378,6 +406,10 @@ class SportBoardView:
     _by_game: dict[str, tuple[BoardLine, ...]] = field(default_factory=dict, compare=False, repr=False)
     _games_by_away: dict[str, tuple[str, ...]] = field(default_factory=dict, compare=False, repr=False)
     _games_by_home: dict[str, tuple[str, ...]] = field(default_factory=dict, compare=False, repr=False)
+    # The same three indexes on `club_key` (#861 step 1g): the board and the cards spell clubs from different feeds.
+    _games_by_club_pair: dict[str, tuple[str, ...]] = field(default_factory=dict, compare=False, repr=False)
+    _games_by_club_away: dict[str, tuple[str, ...]] = field(default_factory=dict, compare=False, repr=False)
+    _games_by_club_home: dict[str, tuple[str, ...]] = field(default_factory=dict, compare=False, repr=False)
     # (player, market, side, line), each folded -> the board's prop rows. A props page asks once per card (2,189 NFL
     # cards on 2026-11-27), so a scan per card would fold ~1,000 names 2,189 times.
     _props: dict[tuple[str, str, str, float | None], tuple[BoardLine, ...]] = field(
@@ -393,12 +425,25 @@ class SportBoardView:
         """The board's key for the page's game. The exact pair first; failing that ONE side, when exactly one board
         game that day has that away club or that home club. A club plays once a day, and the page and the board
         spell clubs from different feeds: measured 2026-11-25, 3 of 13 soccer games missed on the pair ("Slavia
-        Prague" / "Slavia Praha", "Sporting CP" / "Sporting Lisbon", "Internazionale" / "Inter Milan")."""
+        Prague" / "Slavia Praha", "Sporting CP" / "Sporting Lisbon", "Internazionale" / "Inter Milan").
+
+        Step 1g adds the canonical club (`club_key`): both sides first, before the one-side rule, and one side last.
+        Measured 2026-11-27, 0 of 69 NCAAF card games joined on the folded pair: the board spells "Kent State Golden
+        Flashes", the card "Kent State". A name with no canonical club leaves every rule as it was."""
         key = game_key(away, home)
         if key in self._by_game:
             return key
+        club_away, club_home = club_key(self.sport, away), club_key(self.sport, home)
+        if club_away and club_home:
+            hits = self._games_by_club_pair.get(f"{club_away}|{club_home}", ())
+            if len(hits) == 1:
+                return hits[0]
         candidates = set(self._games_by_away.get(team_key(away), ())) | set(self._games_by_home.get(team_key(home), ()))
-        return next(iter(candidates)) if len(candidates) == 1 else None
+        if len(candidates) == 1:
+            return next(iter(candidates))
+        clubs = (set(self._games_by_club_away.get(club_away, ())) if club_away else set()) | (
+            set(self._games_by_club_home.get(club_home, ())) if club_home else set())
+        return next(iter(clubs)) if len(clubs) == 1 else None
 
     def game_lines(self, away: Any, home: Any) -> tuple[BoardLine, ...]:
         key = self.resolve_game(away, home)
@@ -440,6 +485,13 @@ class SportBoardView:
                           written_at=self.written_at, min_value_pct=self.min_value_pct,
                           lines=tuple(line for line in self.lines
                                       if line.game_key in keys and (kind is None or line.kind == kind)))
+
+    def only_kind(self, kind: str) -> "SportBoardView":
+        """This view cut to one `kind` ("prop" / "game"), every game kept: a page with no games of its own (the NBA props
+        page renders only a saved artifact, absent all season on 2026-11-27) still leads with the board's props."""
+        return _make_view(self.sport, self.day, ok=self.ok, shortlist_date=self.shortlist_date,
+                          written_at=self.written_at, min_value_pct=self.min_value_pct,
+                          lines=tuple(line for line in self.lines if line.kind == kind))
 
     @property
     def game_days(self) -> tuple[str, ...]:
@@ -518,12 +570,25 @@ def _make_view(sport: str, day: str, *, ok: bool, shortlist_date: str | None, wr
     by_away: dict[str, set[str]] = {}
     by_home: dict[str, set[str]] = {}
     props: dict[tuple[str, str, str, float | None], list[BoardLine]] = {}
+    pairs: dict[str, tuple[Any, Any]] = {}
     for line in lines:
         by_game.setdefault(line.game_key, []).append(line)
         by_away.setdefault(team_key(line.away), set()).add(line.game_key)
         by_home.setdefault(team_key(line.home), set()).add(line.game_key)
+        pairs.setdefault(line.game_key, (line.away, line.home))
         if line.kind == "prop":
             props.setdefault((team_key(line.player), team_key(line.market), line.side, line.line), []).append(line)
+    club_pair: dict[str, set[str]] = {}
+    club_away: dict[str, set[str]] = {}
+    club_home: dict[str, set[str]] = {}
+    for gkey, (away, home) in pairs.items():  # once per board game, not per row
+        ca, ch = club_key(sport, away), club_key(sport, home)
+        if ca:
+            club_away.setdefault(ca, set()).add(gkey)
+        if ch:
+            club_home.setdefault(ch, set()).add(gkey)
+        if ca and ch:
+            club_pair.setdefault(f"{ca}|{ch}", set()).add(gkey)
     return SportBoardView(
         sport=sport,
         day=day,
@@ -535,6 +600,9 @@ def _make_view(sport: str, day: str, *, ok: bool, shortlist_date: str | None, wr
         _by_game={k: tuple(v) for k, v in by_game.items()},
         _games_by_away={k: tuple(v) for k, v in by_away.items()},
         _games_by_home={k: tuple(v) for k, v in by_home.items()},
+        _games_by_club_pair={k: tuple(sorted(v)) for k, v in club_pair.items()},
+        _games_by_club_away={k: tuple(sorted(v)) for k, v in club_away.items()},
+        _games_by_club_home={k: tuple(sorted(v)) for k, v in club_home.items()},
         _props={k: tuple(v) for k, v in props.items()},
     )
 
@@ -563,13 +631,21 @@ def _team_name(game: Mapping[str, Any], side: str) -> str:
     return str(game.get(f"{side}_name") or "")
 
 
+_ISO_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def _game_day(game: Mapping[str, Any], fallback: str) -> str:
+    """The game's Central day. The NFL and NCAAF cards carry `startTime`, NCAAB `start_time_utc` (#861 step 1g), and a
+    weekly page's `date` is a label ("2026 Week 13"), so a day that is not ISO falls back to today."""
     odds = game.get("odds") if isinstance(game.get("odds"), Mapping) else {}
-    stamp = game.get("scheduled_start_utc") or odds.get("commence_time") or ""
+    stamp = (game.get("scheduled_start_utc") or game.get("startTime") or game.get("start_time_utc")
+             or odds.get("commence_time") or "")
     text = str(stamp or "").strip()
     if len(text) == 10:  # a bare date is already the slate's day
-        return text
-    return _ct_day(text) or fallback
+        day = text
+    else:
+        day = _ct_day(text) or fallback
+    return day if _ISO_DAY.match(str(day or "")) else _central_today()
 
 
 def attach_board_picks(context: dict[str, Any], sport: str, *, reader: Callable[[str], Mapping[str, Any] | None] | None = None) -> dict[str, Any]:

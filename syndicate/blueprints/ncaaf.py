@@ -83,13 +83,13 @@ def root_cards():
 
 @ncaaf_bp.get("/cards")
 def cards():
-    context = build_smartsim_cards_page_context(_selected_week())
+    context = board_game_picks.attach_board_picks(build_smartsim_cards_page_context(_selected_week()), "ncaaf")
     return render_template("shared/game_cards_board.html", **context)
 
 
 @ncaaf_bp.get("/api/cards")
 def api_cards():
-    context = build_smartsim_cards_page_context(_selected_week())
+    context = board_game_picks.attach_board_picks(build_smartsim_cards_page_context(_selected_week()), "ncaaf")
     return jsonify(build_game_board_api_payload(context))
 
 

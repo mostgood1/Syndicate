@@ -122,7 +122,7 @@ def api_archive():
 @nfl_bp.get("/cards")
 def cards():
     season = _selected_season()
-    context = build_cards_page_context(_selected_week(season), season=season)
+    context = board_game_picks.attach_board_picks(build_cards_page_context(_selected_week(season), season=season), "nfl")
     return render_template("shared/game_cards_board.html", **context)
 
 
@@ -136,7 +136,7 @@ def game_detail(game_pk: str):
 @nfl_bp.get("/api/cards")
 def api_cards():
     season = _selected_season()
-    context = build_cards_page_context(_selected_week(season), season=season)
+    context = board_game_picks.attach_board_picks(build_cards_page_context(_selected_week(season), season=season), "nfl")
     return jsonify(build_game_board_api_payload(context))
 
 
@@ -171,7 +171,12 @@ def api_live_lens():
 
 def _picks_context(season: int, sort: str) -> dict:
     """#861 step 1f: the board's NFL picks lead; the page's SmartSim candidates follow, labelled (web routes only)."""
-    context = build_picks_page_context(_selected_week(season), season=season, sort=sort)
+    return _lead_with_nfl_board(build_picks_page_context(_selected_week(season), season=season, sort=sort))
+
+
+def _lead_with_nfl_board(context: dict) -> dict:
+    """The picks page (1f) and the season betting card (1g) show the same SmartSim candidates: both lead with the
+    board's NFL picks, and a week the board does not judge says so."""
     page_season, page_week = context.get("season"), context.get("week")
     current_season = latest_season()
     current = page_season == current_season and page_week == default_week(current_season)
@@ -215,14 +220,14 @@ def api_picks():
 @nfl_bp.get("/season/<int:season>/betting-card")
 def betting_card(season: int):
     sort = str(request.args.get("sort") or "").strip().lower()
-    context = build_betting_card_page_context(season, _selected_week(season), sort=sort)
+    context = _lead_with_nfl_board(build_betting_card_page_context(season, _selected_week(season), sort=sort))
     return render_template("shared/rank_board.html", **context)
 
 
 @nfl_bp.get("/api/season/<int:season>/betting-card")
 def api_betting_card(season: int):
     sort = str(request.args.get("sort") or "").strip().lower()
-    context = build_betting_card_page_context(season, _selected_week(season), sort=sort)
+    context = _lead_with_nfl_board(build_betting_card_page_context(season, _selected_week(season), sort=sort))
     payload = build_rank_api_payload(context)
     payload["season"] = context["season"]
     payload["week"] = context["week"]
