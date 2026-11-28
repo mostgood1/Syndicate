@@ -64195,3 +64195,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Board:** `first_priced_after=03:21:12Z`. ESPN had the game FINAL by 03:20:57Z (last play), so this measures nothing about re-pricing in a live game.
 - **Tally:** lifts are now read in NCAAF, NCAAB, WNCAAB and NBA. NBA's is a buzzer-time return, so lift latency on NBA's ~4-min tick is the only new number.
 - verify: `pbp_name_nba.py 401909330 Gonzalez` 03:26Z, live-odds-worker tick grep 03:26Z, `watch_1127.log`.
+
+## 2026-11-28 03:46:46Z READING lane live-player-exit-gate (#814): NBA off_floor, Dallas's Caleb Martin vs Phoenix -- 3rd of 3 NBA key exits where the books stopped quoting the player's live props before our flag
+- betting change: no (reading only)
+- **Player:** Caleb Martin (DAL, ESPN event 401909332) sat at Q2 4:18 (02:57:52Z). The flag came at half + 8 (Q3 4:00): `PLAYER_OUT ... off_floor key=True` at 03:46:46.949Z.
+- **Hold:** `fail key_player_out DAL:Caleb Martin:off_floor` (snapshot 21:47:09 CST).
+- **Board:** last DAL full-game ledger row 03:46:16Z. book_grid nba index 6 -> 5 at 03:47:12.096Z, 25 s after the flag.
+- **Live props:** the registry last quoted him (ast / pra / pts / reb / threes) at **03:31:17Z**, 33 min into his bench stint and **15.5 min before our flag**. Every other player in that file was quoted through 03:46:49-03:48:04Z. The 03:48:23Z grid has 148 DAL-game prop cards, 0 naming him.
+- **Count tonight: 3 of 3 NBA key exits, books' last quote BEFORE our flag** (Walter -15.7 min, Gonzalez -22.8 min, Martin -15.5 min). The books here kept quoting a benched player for 16-33 min, then dropped him; our rule fires later still. The props mark has not had a live quote to act on. 3 cases on one night, one feed (OddsAPI registry).
+- verify: `C:/tmp/lpeg/w1126/cmartin2.sh` and `cm3.sh` 03:49Z, `pbp_name_nba.py 401909332 "Caleb Martin"` 03:49Z, hold probe 03:49Z.
