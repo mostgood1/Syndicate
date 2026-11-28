@@ -64204,3 +64204,18 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Live props:** the registry last quoted him (ast / pra / pts / reb / threes) at **03:31:17Z**, 33 min into his bench stint and **15.5 min before our flag**. Every other player in that file was quoted through 03:46:49-03:48:04Z. The 03:48:23Z grid has 148 DAL-game prop cards, 0 naming him.
 - **Count tonight: 3 of 3 NBA key exits, books' last quote BEFORE our flag** (Walter -15.7 min, Gonzalez -22.8 min, Martin -15.5 min). The books here kept quoting a benched player for 16-33 min, then dropped him; our rule fires later still. The props mark has not had a live quote to act on. 3 cases on one night, one feed (OddsAPI registry).
 - verify: `C:/tmp/lpeg/w1126/cmartin2.sh` and `cm3.sh` 03:49Z, `pbp_name_nba.py 401909332 "Caleb Martin"` 03:49Z, hold probe 03:49Z.
+
+## 2026-11-28 04:37:44Z READING lane live-player-exit-gate (#814): NBA off_floor, Utah's Jusuf Nurkic vs Denver -- a STALE-PBP FALSE REFUSAL (he was already back), and the first case where the books were still quoting the out player's props
+- betting change: no (reading only)
+- **Timeline (ESPN pbp, event 401909334):** sat Q3 8:18 (03:53:38Z), checked in again **Q4 5:02 at 04:37:09Z**.
+  - Our flag: `PLAYER_OUT ... off_floor key=True since=2026-11-28T03:53:38Z` at 04:37:44.192Z, 35 s AFTER he returned, and the tick at 04:37:55.771Z read `key_players_out=1`. The producer's pbp read did not yet hold the sub-in.
+  - The rule's fire time (1,662 s + 900 s = 2,562 s elapsed) was 18 s before the 2,580 s end-window cutoff, so the flag was eligible.
+  - Cleared at the next tick, 04:40:51.457Z (`key_players_out=0`): a **3 min 7 s false refusal**.
+- **Hold:** `fail key_player_out UTAH:Jusuf Nurkic:off_floor` (snapshot 22:37:55 CST).
+- **Board:** book_grid nba index 4 -> 3 at 04:38:33.583Z (38 s after the tick), back to 4 at 04:40:58.508Z (7 s after the clear). Utah full-game ledger rows kept coming in every 5-min bucket; per-row timing not read.
+- **Live props, the first live quote at an exit:** the registry quoted him through 04:37:21Z and 04:40:45Z (ast / pra / pts / reb), unlike Walter, Gonzalez and Martin.
+  - The 04:37:59Z grid (INPLAY_OVERLAY at 04:37:59.977Z, 4 s after the refusal tick) had 3 Nurkic `player_points` / `player_assists` cards: `board_lane=opportunity`, `fair_method=consensus`, `live_player_out None`, `edge_unavailable_reason None`.
+  - **Two grids were published INSIDE the refusal window (04:38:44.920Z, 04:39:16.853Z) and were NOT read.** The file is overwritten, so whether they marked his props is unrecoverable. The 04:41:03Z grid (after the clear) has 10 Nurkic cards, all `live_player_out None`, which is correct by then.
+  - The 04:37:59Z grid probably read the pre-tick snapshot (4 s gap), so the props mark is still UNMEASURED.
+- **Fix to the watch:** `C:/tmp/lpeg/w1126/grid_outlog.py` (read-only, nice 19, bounded to 07:00Z, inside this session's background task) now logs, for every NBA grid write, the cards of the players in the latest tick's key PLAYER_OUT lines, with `live_player_out`, to `grid_outlog.tsv`.
+- verify: `nurk4.sh` 04:38:24Z, `nurk5.sh` 04:41Z, `nurk6.sh` 04:41Z, `pbp_name_nba.py 401909334 Nurkic` 04:38Z, hold probe 04:38Z.
