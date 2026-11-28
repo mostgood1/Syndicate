@@ -64219,3 +64219,12 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - The 04:37:59Z grid probably read the pre-tick snapshot (4 s gap), so the props mark is still UNMEASURED.
 - **Fix to the watch:** `C:/tmp/lpeg/w1126/grid_outlog.py` (read-only, nice 19, bounded to 07:00Z, inside this session's background task) now logs, for every NBA grid write, the cards of the players in the latest tick's key PLAYER_OUT lines, with `live_player_out`, to `grid_outlog.tsv`.
 - verify: `nurk4.sh` 04:38:24Z, `nurk5.sh` 04:41Z, `nurk6.sh` 04:41Z, `pbp_name_nba.py 401909334 Nurkic` 04:38Z, hold probe 04:38Z.
+
+## 2026-11-28 05:03:09Z (11:03 PM CST 11-27) -- READING (no deploy): the scorecard's first SCHEDULED run, the 10:50 PM CST `SyndicateCheatSheetsReconcile` run (lane `cheat-sheet-optimization`, todo #862; the verify of `2026-11-28 00:46:41Z`; read-only) -- **MET**
+- betting change: no (a reading; nothing loaded).
+- **The run:** `RECONCILE_RUN start 2026-11-28T04:50:02+00:00`, then `RECORD days=210 official featured 3924-3800 -220.49u beta days=1`, then `REVIEW date=2026-11-27 scope=official health=ok flags=9 bets=11090`.
+- **The scorecard line, after the REVIEW line:** `SCORECARD days=44 sheets=206 bets=7724 record_check=206/206 -> .../cheatsheets/scorecard/latest.md`. It follows the review, as expected, with no Traceback or Error line in the run's part of `cheat_sheets_reconcile.log` (watcher, 05:02:53Z).
+- **Its files:** `latest.md` (26,701 B) and `latest.json` (101,482 B), both with mtime 05:01:18Z. The Windows mirror `cheat-sheet-review/scorecard.md` has the same size and mtime. The header reads `Generated 2026-11-28T05:01:13+00:00`, and "Checked against `record.json` (generated 2026-11-28T05:01:04+00:00): 206 of 206 sport-days equal." The 3 new sport-days are 11-27's, which tonight's reconcile graded.
+- The expectation said `Generated 2026-11-28T04:5`. The real time is 05:01:13Z, because tonight's reconcile and review took 11 min, not this morning's ~10.5. The step itself ran in under 10 s.
+- **The task:** LastRunTime 10:50:02 PM CST, LastTaskResult 0, NextRunTime 6:45 AM CST. The whole run took 04:50:02Z -> 05:01:18Z, 11 min 16 s of its 30-minute limit.
+- Still owed: the 8:05 AM CT `cheat-sheet-review` run's scorecard line (deploys.md 2026-11-28 02:40:00Z). It must read the 6:45 AM run's scorecard, not this one.
