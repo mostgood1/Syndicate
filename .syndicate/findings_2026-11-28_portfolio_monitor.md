@@ -117,3 +117,48 @@ k leaves ROI on stake EXACTLY unchanged. So after 11-02 the shrink can move ROI 
 venue minimum, which means the smallest stakes, the Q1 tail. It cannot touch the Q4 tail, which loses as much. In the
 band era it pulls stakes toward the floor, which is a move toward flat staking. So the held-out difference should be
 near 0, with a range spanning 0 (**KILL**), unless the dropped small stakes are a strongly losing group.
+
+### RESULT (10:05 AM CST): KILL. The fitted k is 1.00, so the best shrink is none; the held-out difference is exactly 0
+
+**Deviation from the restated rule, made before any result was used.** The first run took Polymarket's minimum as 1
+dollar notional, marked "(assumed)" above. That broke the design's own invariant, that k = 1 reproduces the actual
+stakes: at k = 1 it dropped 440 of the 505 Polymarket bets in the two windows, all of them placed below one dollar. So
+the assumption was false. Its output (a held-out +3.47 pp) came from that false drop and is void. The rerun uses one
+contract at the fill price on BOTH venues, which keeps k = 1 the identity (0 bets dropped). 4 Kalshi bets sit below one
+contract on the ledger. Their minimum is capped at what was placed, so they too are kept at k = 1.
+
+**Data:** the 9:58 AM CST ledger (`C:\tmp\pfmon\roi_slide\live_all.json`). Fit 10-28..11-17: 1,243 bets on 534 games,
+247 of them in the band era. Held out 11-18..11-26: 355 bets on 195 games, 0 band era. Scripts:
+`C:\tmp\pfmon\roi_slide\shrunk_ev2.py` (the rule) and `onecontract.py` (the descriptive split below), local scratch.
+
+| k (fit window) | 0.05 | 0.10 | 0.20 | 0.30 | 0.50 | 0.70 | 0.90 | **1.00** |
+|---|---|---|---|---|---|---|---|---|
+| stake-weighted ROI | -20.60% | -20.26% | -17.88% | -15.83% | -13.72% | -12.44% | -11.37% | **-9.67%** |
+| bets dropped (of 1,243) | 1,125 | 1,115 | 840 | 802 | 732 | 718 | 700 | 0 |
+
+- **Every shrink lowers the fit window's ROI**, and ROI falls steadily as k falls. So k* = 1.00. The held-out paired
+  difference is +0.00 pp [+0.00, +0.00], and the lower bound is not > 0. **KILL.** The forward copy cannot rescue it,
+  because the rule needs both, and none is owed.
+- **The prediction held for the reason given.** With proportional Kelly, a shrink moves ROI only through bets pushed
+  under one contract. In the fit window, 700 of 1,243 bets (56%, carrying 17.9% of the stake) sit within 10% of one
+  contract, so even k = 0.9 removes them all.
+
+**Descriptive, post hoc, not a test.** Here are the bets a 10% shrink would drop (stake under 1/0.9 contracts) against
+the rest:
+
+| window | dropped at k = 0.9 | kept |
+|---|---|---|
+| fit 10-28..11-17 | 700 bets / 353 games, -3.50% [-10.60, +3.60], 17.9% of stake | 543 / 300, -11.02% [-18.48, -3.56] |
+| held 11-18..11-26 | 266 / 152, -16.22% [-28.80, -3.64], 38.0% of stake | 89 / 70, +10.63% [-2.89, +24.16] |
+
+The near-one-contract bets did BETTER than the rest in the fit window and WORSE in the held-out window. A stake floor
+fitted on either window would have failed on the other. This matches the 11-26 stake-quartile U-shape flipping day to
+day: **stake size carries no stable signal on this book.**
+
+**Reading.** The 11-26 hypothesis is wrong in its mechanism. The sizer does feed claimed EV into Kelly. But a
+multiplicative shrink of EV is a multiplicative shrink of every stake, and that leaves ROI on stake unchanged. The EV
+2-5 overstatement (realised -11.1% against a claimed +4.1%) is a PROBABILITY problem, so a fix belongs where the
+probability is made: the cell calibration and the shrink w* that the daily optimizer reports. It does not belong in the
+stake scale. An additive haircut (EV - c, dropping bets under c) would change relative stakes, but it is an EV floor by
+another name. The live EV floor, which CHANGE P set to 0%, has its own 7-day reading on 12-01, so it is not proposed
+here. Nothing live changed.
