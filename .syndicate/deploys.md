@@ -64122,3 +64122,19 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **verify:** `fleetpy_kv.sh read_1g_after_load.py <day>` rc 0. NCAAF `joined_today_or_later` > 0 on a slate with NCAAF pregame games.
 - **Revert:** `git revert bcbb5465f e250f9642` on main, then ff + reload-web.
 - **Claim released** 01:01:59Z (status: web free).
+
+## 2026-11-28 02:09:20Z (8:09 PM CST 11-27) -- READING (no deploy): section rules v5's first sheets, the 8 PM CST `SyndicateCheatSheetsTomorrow` build of 11-28 (lane `cheat-sheet-optimization`, todo #862; owed verify (1) of `2026-11-27 22:39:28Z`; read-only) -- **MET**
+- betting change: no (a reading; nothing loaded).
+- **The build:** its end marker (`CHEAT_SHEET wnba date=2026-11-28 ... skipped`) logged by 02:07:14Z (watcher). The sheets' mtimes: ncaaf 02:01:37Z, nhl 02:05:54Z, soccer 02:07:05Z, ncaab 02:07:08Z. NBA and NFL have no 11-28 games with pregame props yet ("nothing written"), so they have no 11-28 sheet and the API 404s.
+- **`section_rules` 5** on all four 11-28 sheets web serves (`/api/cheatsheets/<sport>/2026-11-28`, 02:07Z): **MET**.
+- **Soccer 11-28 one-sided rows featured, 1 -> 0: MET.** It now features hot_streaks 1 and matchup_spots 1, on 148 rows.
+- **NHL 11-28 Skater vs goalie: MET.** There is no `pvp_skaters` section. The page (in-app browser, `/cheatsheets?date=2026-11-28&sport=nhl`, ~02:08Z) shows "Skater vs goalie is no longer a featured section (from Nov 28): it trailed its fair price in both periods measured (-7.0% over 564 bets, then -7.4% over 69)...". No Skater vs goalie section renders.
+  - Caveat: this build featured NO bet section on NHL 11-28 (72 rows, every section 0). Its sims are not in yet, as on the first 11-27 build (`groups=30/500`, all 0). So the "no `pvp_skaters`" half does not test the rule yet. The 7:30 AM CST build does.
+- **"Since launch" in Sim vs the line's header: MET on the page.** `/cheatsheets?date=2026-11-28` is one 1.6 MB payload for every sport. It carries:
+  - NCAAF: "Since launch, official sheets Nov 13 - Nov 26: 184 bets (93-91), ROI -8.5% at the best price -- it has not beaten the price since launch."
+  - NHL: "Nov 13 - Nov 25: 272 bets (158-114), ROI -1.3% ..." (the same wording).
+  - The builds stamped `sim_edge_record`: ncaaf n 184, nhl n 272, both with `record_at` 2026-11-27T12:55:37Z, this morning's reconcile. Soccer and NCAAB carry none, since neither sport has Sim vs the line.
+- **Instrument note:** the watcher's first reading said the header was MISSING (`sim_edge_measured` None). It read the wrong surface. `/api/cheatsheets/<sport>/<day>` returns the sheet as written. The header text is added by `cs.page_payload` for the page only (`syndicate/features/shared/cheat_sheets.py:2082`). The page reading above is the one that counts.
+- **Still owed:**
+  - (2) A later build of a started day prints `keeps section rules ...`. There were 0 such lines in `cheat_sheets.log` at 02:09Z. The 7:30 AM CST run rebuilds 11-28 after the first soccer kickoffs.
+  - (3) Per sport, featured counts on the first v5 days against v4, and the builds' `secs=`.
