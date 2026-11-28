@@ -2452,6 +2452,14 @@ FIT FIX ON MAIN d3ec5b72ed4fb6bbe5c17983fce2a7f06685d2c1 -- dated 2026-11-27 4:4
 - Verification: Fleet probe (Idle/nice 19, fleet data) before/after: time and peak RSS of the build, and json.dumps of the served payload byte-identical on the same inputs; targeted pytest green
 - Blocked by: none
 
+### web-recycle-routes — OPEN — opened 2026-11-28 — session 9ef6a9cf-ad23-41e7-9802-e8acc9debce7
+- Goal: Todo #867 (a): name the requests that carry fleet web workers over their ~650 MB anon recycle limit -- for every memory recycle in a stated window, which routes and callers the recycled worker served and how much anon each added, with denominators; READ-ONLY on the fleet, no code or env change
+- Files: .syndicate/findings_2026-11-28_web_recycle_routes.md (NEW), docs/ai_context/todo.md (#867 section only)
+- Hypothesis: Written 2026-11-28 ~9:55 AM CST before any attribution read. H-BOARD: the recycles are the Layer 2 board. A worker that serves /api/intelligence/query (or the shared-board build behind it, COMBINED_BOARD_SHARED_BUILD) takes on the full ~6,900-row board and sits near ~1 GB anon (#857's plateau), so it is recycled at its next guard check whatever else it serves. Rival H-OTHER: other routes (game-chips, layer2-shortlist's 32 MB state decode, live-rail, portfolio) carry workers over the limit without a board.
+- Falsification test: H-BOARD is falsified if more than 20% of the memory recycles in the window come from workers that logged no COMBINED_BOARD_SHARED_BUILD and served no /api/intelligence/query, or if a 1 Hz per-worker anon sampler shows limit crossings in intervals with no board request in flight.
+- Verification: Findings file: per-recycle attribution table for the window (n recycles, share with a board build, anon added per route from the 1 Hz sampler with n), the callers (user agents) behind the routes, todo #867 (a) updated; no fleet change.
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
