@@ -927,6 +927,11 @@ def test_parent_recycle_head_rule_parse(raw, rule):
         ("scripts/fleet_role_spec.json", True),
         ("syndicate/features/mlb/FROZEN_FROM_VENDOR.md", False),
         ("scripts/rail_monitor/RUNBOOK.md", False),
+        ("scripts/rail_monitor/prior_live/after.sh", False),  # the rail monitor's tooling: no role reads it
+        ("scripts/rail_monitor/soccer_stale_1127/rows.json", False),
+        ("scripts/rail_monitor/railwatch_tick.py", False),  # a .py file: holds only once loaded (not here)
+        ("scripts/rail_monitor_probe.sh", True),  # the prefix is the folder, not the name
+        ("scripts/layer2_rail_monitor_run.mjs", True),
         ("data/mlb_source/season/2026/season_eval_recap.md", True),  # generated recaps under data/ and reports/ hold
         ("reports/model_scorecard/model_scorecard_latest.md", True),
         ("reports/live_gameline_accuracy/history.jsonl", False),
@@ -942,6 +947,14 @@ def test_parent_recycle_head_rule_parse(raw, rule):
 )
 def test_head_change_holds_rules(path, holds):
     assert bbp.head_change_holds([path], {"pipeline/board_build_process.py"}) == ([path] if holds else [])
+
+
+def test_a_loaded_module_under_an_exempt_prefix_still_holds():
+    """The exempt prefixes speak only for non-Python files: a `.py` file the parent has loaded holds wherever it
+    lives, so the rail-monitor exemption can never hide the parent's own code."""
+    path = "scripts/rail_monitor/railwatch_tick.py"
+    assert bbp.head_change_holds([path], {path}) == [path]
+    assert bbp.head_change_holds(["tests/conftest.py"], {"tests/conftest.py"}) == ["tests/conftest.py"]
 
 
 def test_templates_and_static_hold_once_the_web_app_is_loaded():
@@ -969,9 +982,10 @@ def test_only_the_web_app_serves_the_template_and_static_folders():
     assert sites == ["syndicate/app.py"]
 
 
-def _string_literals(path):
+def _string_literals(path, *, skip_bare_strings=False):
     """(value, line) for every string literal in a source file; an f-string reads with `{}` for each field. `ast`,
-    not `tokenize`: Python 3.12 tokenizes f-strings into parts (the fleet runs 3.11, `py -3` here is 3.12)."""
+    not `tokenize`: Python 3.12 tokenizes f-strings into parts (the fleet runs 3.11, `py -3` here is 3.12).
+    `skip_bare_strings` leaves out strings that stand alone as a statement (docstrings): prose, never a read."""
     import ast
     import warnings
 
@@ -982,8 +996,13 @@ def _string_literals(path):
     except SyntaxError:
         return []
     parts = {id(v) for node in ast.walk(tree) if isinstance(node, ast.JoinedStr) for v in node.values}
+    bare = set()
+    if skip_bare_strings:
+        bare = {id(node.value) for node in ast.walk(tree) if isinstance(node, ast.Expr)}
     out = []
     for node in ast.walk(tree):
+        if id(node) in bare:
+            continue
         if isinstance(node, ast.JoinedStr):
             value = "".join(v.value if isinstance(v, ast.Constant) else "{}" for v in node.values)
             out.append((value, node.lineno))
@@ -1108,3 +1127,35 @@ def test_no_parent_code_reads_the_exempt_history_file():
             if value == "history.jsonl" or value.endswith("/history.jsonl"):
                 hits.append(f"{path.relative_to(root).as_posix()}:{line}")
     assert hits == []
+
+
+def test_no_role_code_names_the_rail_monitor_folder():
+    """`scripts/rail_monitor/` is exempt from the HEAD rule only because no role reads it: role code names the folder
+    in comments and docstrings, never as a path. Scanned: pipeline/, syndicate/ and the top-level scripts (any of
+    which the parent may import). A path literal for the folder (`"rail_monitor"` as a path part, or `rail_monitor/`
+    inside a path) ends the exemption: drop it from `_HEAD_RULE_NON_RUNTIME_PREFIXES` before adding the reader.
+    `layer2_rail_monitor_run.mjs` is a different file at the top of scripts/, so a name that merely contains the words
+    does not count."""
+    root, files = _role_sources()
+    files = sorted(set(files) | set((root / "scripts").glob("*.py")))
+    hits = []
+    for path in files:
+        if path.name == "board_build_process.py":
+            continue  # the exemption itself
+        if "rail_monitor" not in path.read_text(encoding="utf-8", errors="replace"):
+            continue
+        for value, line in _string_literals(path, skip_bare_strings=True):
+            parts = value.replace("\\", "/").split("/")
+            if "rail_monitor" in parts:
+                hits.append(f"{path.relative_to(root).as_posix()}:{line}")
+    assert hits == []
+
+
+def test_skip_bare_strings_leaves_out_docstrings_only(tmp_path):
+    src = tmp_path / "m.py"
+    src.write_text('"""doc scripts/rail_monitor/x.sh"""\nP = "scripts/rail_monitor/x.sh"\n"bare scripts/rail_monitor/y.sh"\n'
+                   'def f():\n    """inner scripts/rail_monitor/z.sh"""\n    return f"scripts/rail_monitor/{P}"\n')
+    every = [v for v, _ in _string_literals(src)]
+    kept = [v for v, _ in _string_literals(src, skip_bare_strings=True)]
+    assert len(every) == 5  # 3 bare strings (two docstrings and a statement), a constant, an f-string
+    assert sorted(kept) == ["scripts/rail_monitor/x.sh", "scripts/rail_monitor/{}"]

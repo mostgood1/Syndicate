@@ -664,7 +664,11 @@ def parent_recycle_min_uptime_seconds(env: Mapping[str, str] | None = None) -> i
 # - `syndicate/templates/` and `syndicate/static/`: only `syndicate/app.py` builds an app that serves them (its
 #   `template_folder` / `static_folder` and every `register_blueprint`), so they are exempt only while this process
 #   has not loaded `syndicate/app.py`.
-_HEAD_RULE_NON_RUNTIME_PREFIXES = (".syndicate/", "docs/", "tests/", ".claude/", ".github/")
+# - `scripts/rail_monitor/`: the rail monitor's tooling (shell scripts, readers, captured rows). Scheduled tasks and
+#   sessions run it; no role reads it, and role code names the folder only in comments and docstrings. Measured
+#   2026-11-28: it held 19 of the 22 files the morning's diff would have held, and 45 commits touched it in 9 days
+#   (findings §26-§27). A `.py` file there still holds once this process has loaded it, as anywhere.
+_HEAD_RULE_NON_RUNTIME_PREFIXES = (".syndicate/", "docs/", "tests/", ".claude/", ".github/", "scripts/rail_monitor/")
 _HEAD_RULE_NON_RUNTIME_FILES = frozenset({"reports/live_gameline_accuracy/history.jsonl"})
 _HEAD_RULE_GENERATED_PREFIXES = ("data/", "reports/")
 _HEAD_RULE_WEB_APP_PREFIXES = ("syndicate/templates/", "syndicate/static/")
