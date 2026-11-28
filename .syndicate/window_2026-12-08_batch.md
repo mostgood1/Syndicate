@@ -255,6 +255,10 @@ earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehea
 - LOAD yes OWED: a 12-07 LOAD YES under `#### N`, as for the betting items. Whether N should instead ride on standing
   words, as D and M do, was put to the user 11-27 in session 91b0c989. Until a recorded answer changes the task, N
   needs the 12-07 line.
+- **ANSWERED 2026-11-27 ~8:35 PM CST:** the user answered "Ride like M" (session 91b0c989) to "How should item N
+  (#865, shadow) get its load yes?". So N is STANDING, like M, and the 12-07 line above is NOT needed. A `- LOAD NO` or
+  `- HOLD` line under `#### N`, dated after 2026-11-27 8:35 PM CST, cancels it. N still rides only on a betting item's
+  down/up, in shadow only.
 - Not a betting change, checked by session 91b0c989 in the code on `origin/main`:
   - in the join's row loop, the soccer lane verdict refuses a row only when the mode is `on`;
   - otherwise the stamped time is read only by the shadow tally, the display-only block, `quote_behind_score_verdict`
