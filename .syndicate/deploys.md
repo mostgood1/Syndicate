@@ -64300,3 +64300,31 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - Base rate 11-01..11-23: kills on 7 of 23 days.
   - Since the GC revert: 11-24 0, 11-25 0, 11-26 1 (before the exit fix loaded), 11-27 0, 11-28 0 to 7:49 AM.
   - Verdict window 11-27..12-05: **day 1 of 9 kill-free.** A kill-free day happens by chance with p = 0.696. The rule stands: GOAL MET on 9 kill-free days (0.038 by chance), and any kill before then gets its kind read and its own diagnosis. Next reading 7:45 AM CST 11-29; the earliest verdict is 7:45 AM CST 12-06.
+
+## 2026-11-28 15:30:25Z (9:30 AM CST) -- READING (no deploy): game-chips request-path ESPN fetches, the first 8:15 AM grader run after `c2fb7f49b` (lane `game-chips-request-path-espn`; read-only, nice 19) -- **0 NCAAF / 0 WNBA request-path fetches; every past NCAAF final served; no latency gain**
+- betting change: no (reading only)
+- **Source:** scratchpad `gc_day_reading.sh` at 15:30:25Z, `gc_grader_cmp.sh` (the grader's 8 AM-hour run, same dates on 11-27 and 11-28), `gc_finals_check.sh` 15:31:45-15:32:12Z (archive beside one game-chips GET per date), `gc_shape.sh` and `gc_sport_fields.sh` (fields filled per sport). Fleet head `4bfaa108af12`, healthz 200.
+- **Request-path fetch lines in web.log, per CST day:**
+  - 11-27 after the load (16:42Z to midnight CST, 13.3 h): `ncaaf_espn_game_state_fetch` 0, `wnba_has_games_for_date_espn_fetch` 0. `nfl_espn_game_state_fetch` 3, all before the NFL fix's 18:55:05Z load.
+  - 11-28 to 9:30 AM: ncaaf 0, wnba 0, nfl 0.
+  - Fallback lines (11-27 / 11-28): `NCAAF_LIVE_STATE_FROM_ARCHIVE` 5 / 90, `WNBA_HAS_GAMES_REQUEST_NO_FETCH` 2 / 29, `NCAAF_LIVE_STATE_REQUEST_NO_FETCH` 0 / 0, `NCAAF_LIVE_STATE_RECORD_STALE_SERVED` 0 / 0, `NCAAF_LIVE_STATE_ARCHIVE_READ_FAILED` 0 / 0, `WORKER TIMEOUT` 0 / 0.
+- **The live producer archived a date by itself:** `live_state_final_2026-11-27.json` (13 games, all final) was written at 09:29:06Z 11-28 (3:29 AM CST). 69 files now. The backfill stopped at 11-26, and the poller is the only writer of that path. Its stdout does not reach refresh-worker.log (0 `archived=True` lines there), so this rests on the file, not the line.
+- **The grader** (`SyndicatePlayCards`, Python-urllib/3.12, 8:19-8:27 AM CST): 26 requests, all 200, dates 10-16..11-27, 0 over 30 s, p99 8.2 s, slowest 9.5 s.
+  - On the 25 dates both runs asked for, 12 were faster and 13 slower than on 11-27. The total went 62.7 s -> 72.4 s, and per-date swings ran -3.3 s to +6.3 s.
+  - **No steady-state latency gain:** with the network up, the NCAAF fetches were a small part of each build. What the fix removes is the dependency on ESPN's network inside a request: 11-26's 61-113 s requests.
+  - The 3.11 caller (5:32-7:46 AM CST) made 18 requests over 8 dates (11-20..11-27), p99 8.6 s; on 11-27 it made 34, p99 9.0 s.
+- **Past NCAAF finals still served** (archive beside one GET, final with a score; 0 ESPN fetches across the six):
+
+  | date | archive games | chips | source |
+  |---|---|---|---|
+  | 11-07 | 51 | 51 | archive |
+  | 11-08 | 0 | 0 | (no games) |
+  | 11-14 | 55 | 55 | archive |
+  | 11-15 | 1 | 1 | archive |
+  | 11-21 | 58 | 58 | worker record (inside its 10 days) |
+  | 11-27 | 13 | 13 | worker record |
+- **Response sizes (not attributed, outside this lane):**
+  - The grader's gzip bytes for 11-07..11-20 were 388-912 B smaller on 11-28 than on 11-27; the October dates were 14 B larger.
+  - The change is not in NCAAF or NFL. On 11-12 every NCAAF and NFL chip is final, with linescore, leader and plays, the same fields as on 10-22.
+  - Soccer is 74% of that body (282 chips, 247 KB of 333 KB decoded), and on that past date it still shows 101 pregame and 13 live chips. One NHL chip on 11-12 also reads live.
+- **GOAL: NOT MET yet.** The first full CST day after the load is 11-28, a Saturday with live college games: the stale-record path's first real test. It closes at midnight CST and is read at 9:30 AM CST 11-29, with that morning's grader run.
