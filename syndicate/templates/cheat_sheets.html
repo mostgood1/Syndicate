@@ -810,11 +810,14 @@ function render() {
     return;
   }
   let html = picksBlock(d, game) + sgpBlock(d, game) + crossBlock(d, game) + (game ? "" : slateBlock(d));
+  // The form sections' own official record (2026-11-28, `section_records_text`): label, never hide.
+  const RECORD = key => { const t = (d.section_records_text || {})[key]; return t ? " " + esc(t) : ""; };
   if (rulesOf(d) >= 2) html += sectionShell("sim_edge", "Sim vs the line", `The main line, on the side SmartSim projects at least 5% beyond it, the biggest gap first${rulesOf(d) >= 3 ? ", at most two per player (one player's props move together)" : ""}. ${esc(d.sim_edge_measured || "")} The sim's projection is the reason here; the price and its fair sit beside it.`, `${(secs.sim_edge || []).length} props`, withAfter("sim_edge", ids => simTable(d, ids)));
   html += SECTIONS.map(([key, title, blurb]) => {
     const ids = secs[key] || [];
     if (key === "value" && rulesOf(d) >= 2) blurb = VALUE_V2;
     if (key === "value" && rulesOf(d) >= 4) blurb = VALUE_V4;
+    if (key === "hot_streaks") blurb += RECORD("hot_streaks");
     if (!ids.length && key !== "value") return "";
     return sectionShell(key, title, blurb, `${ids.length} rows`, `<div class="rowlist">${ids.length ? ids.map(i => propRow(d.rows[i], i)).join("") : `<div class="empty">Nothing qualifies on this ${game ? "game" : "slate"}.</div>`}</div>`
       + afterPost(after[key], later => `<div class="rowlist">${later.map(i => propRow(d.rows[i], i)).join("")}</div>`));
@@ -822,7 +825,7 @@ function render() {
   html += ladderBlock(d, game);
   // Rules v5 (todo #862, 2026-11-27): a bet section never features a one-sided fair (findings_2026-11-27).
   const ONE_SIDED_V5 = rulesOf(d) >= 5 ? " One-sided markets are left out: their fair price assumes a hold, and they lost 26% and 33% in the two periods measured (Oct 15 - Nov 26). They stay on Every prop." : "";
-  if ((secs.consistency || []).length) html += sectionShell("consistency", "Consistency: recent hit rates", "Every prop with a full 10-game sample that cleared its line 70% of the time or more, with the trend (last 5 against last 10). We tested consistency across NFL, NBA and MLB: the price already accounts for it, so read the EV column, not the streak." + ONE_SIDED_V5, `${secs.consistency.length} props`, withAfter("consistency", ids => consistencyTable(d, ids)));
+  if ((secs.consistency || []).length) html += sectionShell("consistency", "Consistency: recent hit rates", "Every prop with a full 10-game sample that cleared its line 70% of the time or more, with the trend (last 5 against last 10). We tested consistency across NFL, NBA and MLB: the price already accounts for it, so read the EV column, not the streak." + ONE_SIDED_V5 + RECORD("consistency"), `${secs.consistency.length} props`, withAfter("consistency", ids => consistencyTable(d, ids)));
   const PVP_V2 = rulesOf(d) >= 2 ? " Featured only when the history points to this bet's side -- on probation since Nov 13, judged by its record." : "";
   if ((secs.matchup_spots || []).length) html += sectionShell("matchups", rulesOf(d) >= 2 ? "Matchups: his record against this opponent" : "Matchups: where the defense gives it up", (rulesOf(d) >= 2
     ? "Players who have cleared this exact line in two-thirds or more of 3+ games against this opponent, best record first. Measured Oct 15 - Nov 12, this record beat the price in the NBA and WNBA (+19.7% over 253 bets); a defense's rank alone did not (NFL overs -33%), so the rank is shown, not used to pick."

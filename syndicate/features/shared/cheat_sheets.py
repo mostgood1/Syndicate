@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -532,14 +532,35 @@ def _month_day(day: Any) -> str:
     return f"{d.strftime('%b')} {d.day}"
 
 
-def sim_edge_since_launch(record: Mapping[str, Any] | None, sport: str) -> dict[str, Any] | None:
-    """Sim vs the line's OFFICIAL record for `sport` since it launched, from `cheatsheets/record.json`
+# The form sections print their own official record in their headers (todo #862, user 2026-11-28 "Yes, add it", after
+# findings_2026-11-27 section 8): Consistency and Hot streaks returned about the price minus the vig since 11-13 (-6.0%
+# and -4.4% on the v5 replay), and the L10 signal they pick on stopped predicting the result. Label, never hide: the
+# record since launch, and the last FORM_RECENT_DAYS days beside it so a good October cannot cover a bad fortnight.
+# Stamped on the sheet at build time as `section_records` (`build_cheat_sheets`); display only, no section changes.
+FORM_RECORD_SECTIONS = ("consistency", "hot_streaks")
+FORM_RECENT_DAYS = 14
+OFFICIAL_LAUNCH = "2026-10-15"
+READING_MIN_BETS = 30          # the review's own floor: fewer bets than this is a reading, not a trend
+
+
+def _tally(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    rows = list(rows)                  # read four times below
+    w = sum(int(t.get("w") or 0) for t in rows)
+    l = sum(int(t.get("l") or 0) for t in rows)
+    n = sum(int(t.get("n") or 0) for t in rows)
+    units = sum(float(t.get("units") or 0.0) for t in rows)
+    return {"n": n, "w": w, "l": l, "units": round(units, 2), "roi_pct": round(100.0 * units / n, 1) if n else None}
+
+
+def section_since_launch(record: Mapping[str, Any] | None, sport: str, section: str, *, launch: str = OFFICIAL_LAUNCH,
+                         recent_days: int | None = FORM_RECENT_DAYS) -> dict[str, Any] | None:
+    """A section's OFFICIAL record for `sport` since it launched, from `cheatsheets/record.json`
     (`cheat_sheet_record.season_record`, rebuilt by every reconcile). None when the record holds no graded bet of it for
-    the sport. Rules v5 prints it beside the pre-launch number: the header said NBA "+8.0%" while the section ran -4.3%
-    on 315 bets 11-13..11-26 (label, never hide)."""
+    the sport. With `recent_days`, also `recent`: the same tally over the last that many calendar days that end on the
+    section's last graded day, summed from the record's per-day tallies (`days[].sections`)."""
     sport = str(sport or "").lower()
     try:
-        tally = record["official"]["by_sport"][sport]["sim_edge"]      # type: ignore[index]
+        tally = record["official"]["by_sport"][sport][section]      # type: ignore[index]
     except (KeyError, TypeError):
         return None
     if not isinstance(tally, Mapping) or not isinstance(tally.get("n"), int) or tally["n"] <= 0:
@@ -547,11 +568,57 @@ def sim_edge_since_launch(record: Mapping[str, Any] | None, sport: str) -> dict[
     units = float(tally.get("units") or 0.0)
     roi = tally.get("roi_pct")
     roi = float(roi) if isinstance(roi, (int, float)) else round(100.0 * units / tally["n"], 1)
-    days = sorted(str(d.get("date")) for d in (record.get("days") or []) if isinstance(d, Mapping)    # type: ignore[union-attr]
-                  and d.get("sport") == sport and not d.get("beta") and "sim_edge" in (d.get("sections") or {}))
-    return {"n": tally["n"], "w": int(tally.get("w") or 0), "l": int(tally.get("l") or 0), "units": round(units, 2),
-            "roi_pct": roi, "from": days[0] if days else SIM_EDGE_LAUNCH, "through": days[-1] if days else None,
-            "record_at": record.get("generated_at")}                                                  # type: ignore[union-attr]
+    entries = [d for d in (record.get("days") or []) if isinstance(d, Mapping)                      # type: ignore[union-attr]
+               and d.get("sport") == sport and not d.get("beta") and section in (d.get("sections") or {})]
+    days = sorted(str(d.get("date")) for d in entries)
+    out = {"n": tally["n"], "w": int(tally.get("w") or 0), "l": int(tally.get("l") or 0), "units": round(units, 2),
+           "roi_pct": roi, "from": days[0] if days else launch, "through": days[-1] if days else None,
+           "record_at": record.get("generated_at")}                                                  # type: ignore[union-attr]
+    if recent_days and days:
+        try:
+            end = date.fromisoformat(days[-1][:10])
+        except ValueError:
+            return out
+        start = (end - timedelta(days=recent_days - 1)).isoformat()
+        recent = _tally(d["sections"][section] for d in entries
+                        if isinstance(d["sections"].get(section), Mapping) and start <= str(d.get("date")) <= days[-1])
+        if recent["n"] > 0:
+            out["recent"] = dict(recent, days=recent_days, **{"from": start, "through": days[-1]})
+    return out
+
+
+def section_record_text(since: Mapping[str, Any] | None) -> str:
+    """The line a form section prints for its record (`section_since_launch`), or "" without one."""
+    if not isinstance(since, Mapping) or not isinstance(since.get("n"), int) or since["n"] <= 0 \
+            or not isinstance(since.get("roi_pct"), (int, float)):
+        return ""
+    def span(a: Any, b: Any) -> str:
+        if not b:
+            return f"from {_month_day(a)}"
+        return _month_day(a) if str(a) == str(b) else f"{_month_day(a)} - {_month_day(b)}"
+
+    bets = lambda n: f"{n:,} bet{'' if n == 1 else 's'}"
+    roi = float(since["roi_pct"])
+    text = (f"Its official record, {span(since.get('from'), since.get('through'))}: {bets(since['n'])} "
+            f"({since.get('w', 0)}-{since.get('l', 0)}), ROI {roi:+.1f}% at the best price"
+            f"{'' if roi > 0 else ' -- it has not beaten the price'}.")
+    thin = since["n"] < READING_MIN_BETS
+    recent = since.get("recent")
+    if isinstance(recent, Mapping) and isinstance(recent.get("n"), int) and recent["n"] > 0 \
+            and isinstance(recent.get("roi_pct"), (int, float)):
+        text += (f" The last {recent.get('days')} days ({span(recent.get('from'), recent.get('through'))}): "
+                 f"{bets(recent['n'])} ({recent.get('w', 0)}-{recent.get('l', 0)}), ROI {float(recent['roi_pct']):+.1f}%.")
+        thin = thin or recent["n"] < READING_MIN_BETS
+    if thin:
+        text += f" Under {READING_MIN_BETS} bets a record is a reading, not a trend."
+    return text
+
+
+def sim_edge_since_launch(record: Mapping[str, Any] | None, sport: str) -> dict[str, Any] | None:
+    """Sim vs the line's OFFICIAL record for `sport` since it launched (`section_since_launch`). Rules v5 prints it
+    beside the pre-launch number: the header said NBA "+8.0%" while the section ran -4.3% on 315 bets 11-13..11-26
+    (label, never hide)."""
+    return section_since_launch(record, sport, "sim_edge", launch=SIM_EDGE_LAUNCH, recent_days=None)
 
 
 def sim_edge_measured_text(sport: str, since: Mapping[str, Any] | None = None) -> str:
@@ -2080,6 +2147,10 @@ def page_payload(sheets: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any
         doc["section_rules"] = rules
         # Rules v5: the record since launch the build stamped (`sim_edge_record`) prints beside the pre-launch one.
         doc["sim_edge_measured"] = sim_edge_measured_text(sport, since=sheet.get("sim_edge_record") if rules >= 5 else None)
+        # The form sections' own record, as the build stamped it (`section_records`, 2026-11-28); a sheet without the
+        # stamp prints nothing extra.
+        stamped = sheet.get("section_records") if isinstance(sheet.get("section_records"), Mapping) else {}
+        doc["section_records_text"] = {k: t for k in FORM_RECORD_SECTIONS if (t := section_record_text(stamped.get(k)))}
         if posted:
             doc["posted"] = {"posts": len(posted.get("posts") or []), "rows": len(posted_rows), "lines": len(posted_lines)}
         finals = (rec or {}).get("scores") or {}

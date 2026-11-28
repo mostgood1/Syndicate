@@ -1514,8 +1514,15 @@ def main_build(args: Any, data_root: Path) -> int:
         sheet["sections"], sheet["section_rules"] = cs.sections(sheet["rows"], rules=rules), rules
         if rules >= 5:
             sheet["sim_edge_record"] = cs.sim_edge_since_launch(season_record, sport)
+            # The form sections' own record (2026-11-28): display only, printed in their headers.
+            records = {k: r for k in cs.FORM_RECORD_SECTIONS if (r := cs.section_since_launch(season_record, sport, k))}
+            if records:
+                sheet["section_records"] = records
+            else:
+                sheet.pop("section_records", None)
         else:
             sheet.pop("sim_edge_record", None)
+            sheet.pop("section_records", None)
         if rules != cs.SECTION_RULES:
             print(f"CHEAT_SHEET {sport} date={selected} keeps section rules v{rules} (a game on it has started; current "
                   f"v{cs.SECTION_RULES})", flush=True)
