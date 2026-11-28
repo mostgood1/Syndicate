@@ -2204,6 +2204,7 @@ death, never life — do not invert it.
 
 ### surface-consistency-oversight — OPEN — opened 2026-11-23 — session d5aa3287-9736-4080-bbac-59f9767838aa
 - **LOAN NOTE 2026-11-27 ~4:30 PM CST -- LOAN OUT to lane `cheat-sheet-optimization` (session eda3ffd5), USER-APPROVED (the user picked "Borrow it" when asked whether that lane may change this test for rules v5):** `tests/test_cheat_sheet_board_judgement.py` -- `test_rules_version_is_four` ONLY, renamed `test_rules_version_carries_v4`, `cs.SECTION_RULES == 4` -> `>= 4` (v5 keeps v4's board verdict). Nothing else in the file is touched. Returned when lane `cheat-sheet-optimization` closes.
+- **STATUS 2026-11-27 ~6:30 PM CST: STEP 1g BUILT, NOT LOADED** (`e250f9642` on main; user "Yes, cover them"; display only). The NBA / NCAAF / NFL / NCAAB cards carry the board tile first; NBA props and the NFL betting card lead with the board. Hypothesis HELD in the replay: NCAAF 0 -> 56 of 69 joined, 0 wrong joins, 0 earlier joins moved. Reader BEFORE rc 3. Loads with an ff + `reload-web`: the user's call.
 - **STATUS 2026-11-27 ~6:00 PM CST: STEP 1g BUILDING** (user "Yes, cover them"; display only, web routes only).
   - Reading 9, 23:51-23:53Z, board 23:47:37Z:
     - NBA cards: 11 games, all on the board, 210 board picks; the tiles show only the sim's "Win | EV".

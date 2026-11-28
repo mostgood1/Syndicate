@@ -1053,6 +1053,83 @@ cards, and the NFL betting-card route (a historical view of the stored snapshot)
 - All 2,211 NFL rate cards carry a verdict and a "Rate edge" badge.
 - The `/ncaaf/picks` page takes 4 to 12 s, but the page's own build is 4.0 to 7.0 s of that. The board view adds 0.1 s.
 
+## Reading 9 -- the pages step 1f left `[2026-11-27 23:51:43Z-23:53:42Z, fleet, read-only; user "Yes, cover them"]`
+
+The board was written 23:47:37Z. Probe: `C:\tmp\scc_oversight_d5aa\remaining_pages.py`; the boards of all sports are merged into one payload, because the view cache is per date, whatever the reader.
+
+- **NBA cards** (`/nba/api/cards`, 11 games): all 11 are on the board, with 210 board picks between them. The tiles (Away ML / Home ML / Spread / Total) and the source client's tile row show only the sim's "Win | EV" from `betting.*_ev`; nothing on the card names the board.
+- **NCAAF cards** (`/ncaaf/api/cards`, week 13, 69 games): **0 joined**, although the board held 1,105 NCAAF pregame lines.
+  - The board spells clubs with mascots ("Kent State Golden Flashes", "Air Force Falcons"); the cards do not ("Kent State").
+  - `team_key` folds case and punctuation only, and `canonical_team("ncaaf", ...)` is None for every name. `team_aliases.chip_join_key` already bridges exactly this gap for the Games strip (through the CFBD registry, which strips mascots).
+- **NFL cards** (16 games): 11 joined, carrying 8 board picks. The 5 unjoined were played before the board's window (11-25..11-27). Tiles read "Model LAR -5.0 · +2.5 vs market".
+- **NCAAB cards** (`/ncaab/api/cards`, 49 games): 23 joined, with 2 picks; the rest were live or final. The default `/ncaab/cards` is the WNBA-parity client fed by `/ncaab/api/source/cards`, which shows no sim numbers.
+- **NBA props** (`/nba/api/props`): empty, **all season**. The page renders only `props_recommendations_top_by_game_<day>.json`. The fleet holds none for NBA: the newest such files are WNBA's, from 10-21 to 10-31.
+- **NFL season betting card** (`/nfl/api/season/2026/betting-card`): the same 12 SmartSim candidates as `/nfl/picks` before 1f ("82.7% win prob"). No board.
+
+## Step 1g -- the game cards carry the board's pick first; the NBA props page and the NFL betting card lead with the board `[built 2026-11-27, user "Yes, cover them"; display only; NOT LOADED]`
+
+**What changed** (`e250f9642`; web routes only, nothing recomputed):
+- `board_game_picks.py`:
+  - `club_key(sport, name)`: `team_aliases.chip_join_key`, folded and memoised; None when it cannot resolve or the resolver raises.
+  - `resolve_game` order: the exact folded pair; then the canonical pair (both sides, exactly one board game); then the one-side rule as before; then one canonical side. A name with no canonical club leaves every rule as it was.
+  - `_game_day` reads `startTime` (NFL, NCAAF) and `start_time_utc` (NCAAB). A weekly page's label date ("2026 Week 13") falls back to today.
+  - `only_kind(kind)`.
+- Routes:
+  - `attach_board_picks`, which puts the "Board pick" tile first, now runs on: `/nba/api/cards` (the source client's feed) and `/nba/cards?client=board`; `/ncaaf/cards` and `/ncaaf/api/cards`; `/nfl/cards` and `/nfl/api/cards`; `/ncaab/cards?client=board` and `/ncaab/api/cards`.
+  - `/nba/props` and `/nba/api/props`: the board's NBA prop picks for the day lead (`only_kind("prop")`), and the saved top-props cards follow under "Sim view: not the board's picks". With a player, team or market focus set, the page is unchanged.
+  - `/nfl/season/<season>/betting-card` and its API share 1f's lead with `/nfl/picks` (`_lead_with_nfl_board`); a past week is off-slate.
+- `static/nba/cards_source.js`: `renderBoardPickTile` draws the tile from `market_tiles` on its own row above the four sim tiles. The sim tiles read "Sim win | Sim EV" and "No sim edge".
+- `templates/nba/prop_ladders.html` renders `card_sections`.
+
+**Replay** (read-only on the fleet host: the worktree's code over the fleet's data roots, and the board saved from the fleet API, built 00:08:43Z; `C:\tmp\scc_oversight_d5aa\replay_1g\`):
+
+| page | games | joined, main -> 1g | games with a board pick | board tile first |
+|---|---|---|---|---|
+| NBA cards (11-27) | 11 | 11 -> 11 | 11 | 11 |
+| NCAAF cards (week 13) | 69 | **0 -> 56** | 0 -> 9 | 69 |
+| NFL cards (week 12) | 16 | 11 -> 11 | 4 | 16 |
+| NCAAB cards (11-27) | 49 | 13 -> 13 | 1 | 49 |
+| NHL cards (11-27) | 15 | 3 -> 3 | 3 | 15 |
+| soccer cards (11-27) | 11 | 2 -> 2 | 0 | 11 |
+
+- **No earlier join moved** (0 on every page).
+- **Every new join matches on both sides.** All 56 NCAAF club-only joins have the card's and the board's canonical club equal on both sides; 0 are one-sided. Sample: "Minnesota" / "Wisconsin" -> "Minnesota Golden Gophers" / "Wisconsin Badgers".
+- **The unjoined games had started or finished.** The board held only 3 NHL, 2 soccer and 13 NCAAB games still pregame on 11-27, and every one of them joined. The 13 NCAAF games left unjoined were played 11-24 to 11-27 (a past day reads that day's own saved board on the fleet, which the replay did not load).
+- **NBA props:** 0 cards -> the board's 12 of 98 NBA prop picks, then the empty file's reason under the sim's label.
+- **NFL betting card:** 2026 week 12 leads with the board's 4 NFL picks, then the 12 candidates. 2025 week 12 shows no board picks and says why.
+- **Cost of the attach:** cold 0.07-0.28 s (NCAAF the most: 1,110 board rows, each club resolved once), warm 0.002-0.04 s. The NCAAF cards build itself took 16.9 s.
+
+**Tests:**
+- `tests/test_board_picks_cards_pages.py` (NEW, 16). Covers:
+  - the club join, off != on;
+  - the exact pair still winning, and the canonical pair before the one-side rule;
+  - a resolver that raises;
+  - the real NCAAF resolver (skipped without its registry; passes against the primary tree's NCAAF data);
+  - the weekly day;
+  - every route;
+  - the client's tile function through node.
+- One archive test (`test_nba_prop_ladders_api_exposes_unfiltered_controls`) now finds the props page's own cards in their section.
+- 56 board tests and 43 archive tests for these routes pass, as do 92 in the NCAAF, NCAAB and NFL card files.
+- `test_soccer_cards.py::...test_directory_hit_still_returns_the_real_tricode` fails in the worktree and passes in the primary tree. It is a branding-data difference; none of this change touches it.
+
+**Reader** `C:\tmp\scc_oversight_d5aa\read_1g_after_load.py`. Run it on the fleet host with `fleetpy_paths.sh`, where the NCAAF resolver has its registry. It checks:
+- the board tile is first on every card;
+- the tile equals the board's own `board_tile` for every game today or later, on either of two board reads;
+- the props page and betting card are led by board picks;
+- the served NBA client draws the tile.
+
+Self-check: MET (rc 0) on the replay's pages; VIOLATED (rc 1) on a copy with one tile changed, one tile removed and one non-board headline. **BEFORE** 00:15:46Z (6:15 PM CST): rc 3 NOT LOADED (0 board tiles on 11 / 69 / 16 / 49 games; NBA props 0 headline; betting card 12 SmartSim).
+
+**Prediction after the load:** rc 0, with 0 mismatches on every card page. NCAAF `joined_today_or_later` will be above 0 whenever the board holds NCAAF pregame games of the cards' week.
+
+**Loads with:** an ff + `reload-web` (web only); betting change NO. The user's call.
+
+**Not covered:**
+- the default `/ncaab/cards` client (WNBA parity; it shows no sim numbers);
+- the game detail pages;
+- the NBA cards client's other sim panels (Game lens, props tab).
+- The upcoming view for the weekly NFL pages also carries next week's Thursday game (its note names the days).
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:

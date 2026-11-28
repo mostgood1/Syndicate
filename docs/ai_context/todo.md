@@ -87,6 +87,13 @@
   - Measured first (00:23:40Z 11-27 board, 1,929 pregame rows): EV gross on all; 305 fee rows judged net; 355 Kalshi / 241 Polymarket prices invisible on the page. 11 of 46 Suggested pregame rows carry a venue price, and none clears +2% net there (4 clear 0).
   - Replay HELD: shown EV == the gate's number 319 / 319 fee rows, == gross 1,681 / 1,681; venue entries == the purchaser function's 480 / 480. Reader `read_1e_after_load.py`: BEFORE rc 3 (353 exchange cards without net, 0 venue lines). Loads: web + the board child. Betting change NO. Findings "Step 1e".
 - **Step 1d DEPLOYED to web 2026-11-26 17:28:02Z, MET** (user "Deploy to web now"; ff `75624d138` + reload-web). Served 17:28:18Z: Board pick tile first on 15 of 15 NHL and 36 of 36 soccer games, 12 of 12 sim prop cards carry the board's verdict; 0 unlabelled non-board EV on the live pages. The picks headline with live board picks was read 2026-11-27 15:32:05Z (9:32 AM CST), rc 0: the board's 6 Suggested NHL picks lead the page, 0 are not the board's, and 12 sim cards follow, all labelled with a verdict. Nothing owed for 1d.
+- **Step 1g BUILT, NOT LOADED** (2026-11-27, user "Yes, cover them"; display only; findings "Reading 9" and "Step 1g"; `e250f9642`).
+  - The NBA, NCAAF, NFL and NCAAB game cards carry the board's pick first. The NBA props page and the NFL season betting card lead with the board's picks.
+  - The board joins a card through `team_aliases.chip_join_key` when the feeds spell clubs differently: NCAAF went from 0 to 56 of 69 games joined, with 0 earlier joins moved and every new join matching on both sides.
+  - Replay on fleet data (board 00:08:43Z): board tile first on 11 / 69 / 16 / 49 games. NBA props 0 -> 12 board picks (the page was empty all season). Betting card 4 board picks, then the 12 SmartSim.
+  - Tests: 16 new; 1 archive test updated.
+  - Reader `C:\tmp\scc_oversight_d5aa\read_1g_after_load.py` (run on the fleet host): BEFORE 00:15:46Z rc 3; predicted rc 0 after the load.
+  - Loads with an ff + `reload-web`; betting change NO. The user's call.
 - **Step 1f LOADED on web 2026-11-27 22:32:52Z (4:32 PM CST)** (user "Deploy to web now"; ff `3231ee493` -> `d72d4d536` + reload-web; betting change no):
   - The reader returned rc 0 MET at 22:33:00Z. The 4 pages lead with the board's picks, with 0 non-board headline cards; all 2,211 NFL rate cards carry the board's verdict.
   - The ff also carried the #847 (d) fixes, which are inert: their keys are absent on all 3 roles.
