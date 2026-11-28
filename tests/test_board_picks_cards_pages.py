@@ -347,3 +347,12 @@ def test_the_nba_cards_client_draws_the_board_tile_first_and_labels_the_sims():
     drawn = json.loads(out.stdout)
     assert 'data-source="board"' in drawn["on"] and "San Antonio Spurs ML" in drawn["on"] and "+2 more" in drawn["on"]
     assert drawn["off"] == ""
+
+
+def test_the_nba_market_tile_text_inherits_the_cards_colour():
+    """The tile is a <button>: without `color: inherit` its main line (the board pick's name) is the browser's black
+    button text on the dark card. Measured live 2026-11-28 00:55Z: rgb(0, 0, 0) on every tile."""
+    css = (REPO_ROOT / "syndicate" / "static" / "nba" / "cards_source.css").read_text(encoding="utf-8")
+    block = css[css.index(".cards-market-tile {\n  display: grid;"):]
+    block = block[: block.index("}")]
+    assert "color: inherit;" in block

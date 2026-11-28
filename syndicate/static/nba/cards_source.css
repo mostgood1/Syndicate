@@ -1604,6 +1604,10 @@ body[data-viewport='phone'] .cards-scoreboard {
   background: rgba(10, 21, 34, 0.88);
   cursor: pointer;
   text-align: left;
+  /* #861 step 1g: the tile is a <button>, so without this its main line took the browser's button text colour, black
+     on this dark card: measured 2026-11-28 00:55Z, the main line of every tile (the board pick's name, the sim's
+     "NYK ML -154") was rgb(0, 0, 0) on rgba(10, 21, 34, 0.88). */
+  color: inherit;
 }
 
 .cards-market-tile.is-bet {
