@@ -205,3 +205,4 @@ User, typed in this session, 11-23 about 8:00 AM CST: **"load the polymarket sta
   - S2 (the client id / slug match against the venue) is still UNTESTED: no order has reached the dry-run cancel. The
     12-08 `on` load would rest on a cancel call never exercised in production. Order flow is thin (26 orders in 3.3 days,
     cf. lead venue-order-family-census 11-27: polymarket placed 0 in 24 h).
+- 2026-11-27 (CST) daily tally (daily review, 2:10 AM CST 11-28; window 06:00Z 11-27..06:00Z 11-28, covered=yes): would_cancel 0 (0 distinct), S2 n/a (mismatch_refusals 0), S3 n/a, untouched_15m_orders 0 of 17 polymarket_orders_with_state_lines, cancel_stale 0, cancel_sent 0.

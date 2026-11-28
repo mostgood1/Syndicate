@@ -157,3 +157,4 @@ The user, 11-27, answering "Should I diagnose why pregame live orders run 6-19 a
   - One line changed: the EV-floor step (b). Every other line and the frontmatter are identical by diff.
   - Step (b) now splits pregame orders into PLAN (`sizing_basis=model_edge`, no execution style) and MAKER-PILOT. It expects about 5-9 plan orders a day plus about 2 maker-pilot orders, says the registered 0-2 was a wrong prediction and not a defect, and mentions a day's count only above 20 plan orders.
   - Unchanged: the floor-on line check (non-zero = DEFECT), the daily Log line, and the 12-01 7-day summary.
+- 2026-11-27 (CST) daily line (daily review, 2:10 AM CST 11-28; window 06:00Z 11-27..06:00Z 11-28): live_ev_floor_on_lines=0. Pregame plan 16 (Kalshi 10, Polymarket 6), maker-pilot 2 (Kalshi 0+2), in-play 8 (Kalshi 8, Polymarket 0). Newest live-plan rows_in: Kalshi 15, Polymarket 17 (05:49Z 11-28).

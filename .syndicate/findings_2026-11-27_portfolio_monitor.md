@@ -400,3 +400,73 @@ Results, 30 d, covered set. Each cell is pp with its 95% range:
     portfolio-monitor readings;
   - (b) the falsification test, at >= 100 new covered marks;
   - (c) the readout half, `live_book_edge_readout.py`, under lane portfolio-monitor.
+
+## DAILY SUMMARY — Fri 11-27 (Central), written Sat 11-28 2:10 AM CST by the daily learning review
+
+Sources: `daily_rollup.json` and `performance.json` built from the 1:34 AM CST 11-28 watch reading (ledger saved
+07:34:01Z), and the 48 watch readings dated 11-27 CST. Every 11-27 game is graded: 0 started and unsettled, 0 late.
+
+**Performance.**
+- **11-27: 17 graded bets / 11 games, ROI +3.00% [-53.1, +59.1]**; won 52.9% against a 58.6% breakeven (excess wins
+  -1.0). Flat ROI -1.57%. Too few games to read.
+- **7 d: 203 bets / 117 games, -1.09% [-15.4, +13.3]**; won 54.2% vs 61.3% breakeven, **excess wins -14.5 (z -2.12)**.
+  Flat (equal-stake) ROI over the same 7 d is **-13.72%**.
+- **30 d: 1,559 bets / 707 games, -9.59% [-15.3, -3.87]**, beyond noise (r30: 11-24 -6.44, 11-25 -7.55, 11-26 -8.22,
+  11-27 -9.59). All-time: 2,424 bets / 1,306 games, -10.21% [-17.0, -3.40].
+- **Fee-net CLV:** 30 d -0.63 pp (619 bets / 422 games; gross +1.11, beat close 60.6%, se 0.22; wins minus close
+  -4.59 pp, z -2.21); 7 d -1.92 pp (85 / 65; gross -0.25, beat close 45.9%, se 0.33); 11-27 alone +0.13 pp on 2.
+- **Fees: 2.08% of stake on 11-27, 2.77% over 7 d, 3.85% over 30 d** (30 d before fees -5.74%; fees are 40% of the loss).
+- **Gate: 26 of 800 events** since BC-071 (11-24 2:30 AM CST = 08:30:37Z): 43 bets, ROI +16.26% (lower -14.17%),
+  excess wins -0.3. Conditions 1-3 fail; 4 passes (Q4 +27.1% vs flat -0.65%). 2 deploys.md loads still unclassified
+  (3 on 3 readings).
+
+**30-day slices beyond noise (95% range excludes 0):**
+- totals -16.00% [-28.1, -3.86] (342 bets / 268 games).
+- EV band 2-5 -13.84% [-21.7, -5.97] against a predicted +4.12% (1,030 / 550).
+- price 0.30-0.45 -13.29% [-26.1, -0.43] (186 / 129); **NEW: price 0.45-0.55 -13.03% [-23.8, -2.26]** (574 / 398).
+- path model_edge -12.78% [-20.0, -5.53] (1,231 / 623).
+- Kalshi -7.47% [-13.6, -1.32] (1,067 / 589); **NEW: Polymarket -18.09% [-31.1, -5.09]** (492 / 325).
+- **NEW: NCAAF -19.21% [-34.0, -4.46]** (201 / 118).
+- stake Q2 (9.9% of $) -10.95% [-20.2, -1.66] and Q4 (62.8% of $) -11.71% [-20.0, -3.45]; Q1 now includes 0.
+
+**Operations (48 readings).**
+- Anomaly kinds, by readings flagged: GATE 48 (2 unclassified loads on 45, 3 on 3); ENDPOINT live_today slow 2
+  (21.59 s at 3:05 PM CST, 3.66 s at 10:34 PM CST). Nothing else.
+- Endpoint reads over 2 s: 3 (all live_today); over 3 s: 2.
+- Plan cadence: 46 Kalshi and 46 Polymarket live-plan writes in the CST day; the plan's age at a reading exceeded
+  20 min on 5 of 48 (max 36.5 min, 12:04 AM CST).
+- Orders 11-27: 26, of which 23 filled and 3 did not.
+
+**Studies and window reads (this run).**
+- **CHANGE N, Polymarket stale cancel SHADOW, 11-27 tally:** 0 would-cancel, 0 untouched >= 15 min of 17 orders,
+  `cancel_stale=0 cancel_sent=0`, covered. Line in its Log. (The +3 d reading was done by its own task at 9:45 AM CST.)
+- **CHANGE P, live EV floor OFF, 11-27:** `live_ev_floor_on_lines=0`. Ledger: pregame plan 16 (Kalshi 10, Polymarket
+  6), maker-pilot 2 (Kalshi), in-play 8 (Kalshi). Below the 20-a-day mention bar. Line in its Log.
+- F27 +7 d is due after 12-01 5:00 AM CST; the CHANGE P 7-day summary after 12-01 12:00 PM CST; the PM-stale 12-08
+  summary after 12-07 5:00 AM CST. S5, S6 and S8 are finished.
+- `clv-fair-close` owed (a): not readable from `live_all.json` (its orders carry no closing-mark fields), so not done
+  here; it stays with an interactive portfolio-monitor reading.
+
+### What the data teaches (11-27)
+- **The 7 d near-zero is a sizing artefact, not edge.** Stake-weighted 7 d ROI is -1.09% but equal-stake is -13.72%
+  on the same 203 bets / 117 games, and the win count is 14.5 below breakeven (z -2.12). A few large winning stakes
+  carry the 7 d figure. The gate's condition 4 (Q4 +27% vs flat -0.65% on 26 games) is the same effect, too small to trust.
+- **The 30 d slide continues and is now partly new losses.** r30 went -4.93 (11-21) → -9.59% (11-27), and 7 d
+  fee-net CLV is the 5th straight negative reading (-0.99, -1.18, -1.26, -2.17, -1.92 pp; 65 games, se 0.33).
+- **The beyond-noise set widened.** Polymarket (-18.1% on 325 games), NCAAF (-19.2% on 118) and price 0.45-0.55
+  (-13.0% on 398) crossed out of noise since 11-26; totals, EV 2-5, price 0.30-0.45, model_edge and Kalshi persist.
+  With both 0.30-0.45 and 0.45-0.55 losing ~13%, the loss is not one price band: it spans near-coin-flip prices.
+- **EV 2-5 overstatement grew to ~18 pp** (realised -13.8% vs claimed +4.1% on 550 games; 11-26: ~15 pp on 556).
+  This is the band holding 66% of bets; the fair probability, not the band choice, is what is off.
+- **Fees are 3.85% of stake, 40% of the 30 d loss** (was "more than half" on 11-20: the pre-fee loss has grown).
+
+**One optimization lead (pre-registrable, offline, changes nothing live).**
+- *Hypothesis:* the staked probability is over-confident by a roughly constant shift toward our side across sports,
+  so a per-sport recalibration (Platt: logit(p') = a + b·logit(p), fit per sport with >= 60 games, pooled otherwise)
+  of the probability the book stakes on would reduce held-out log loss, which is what makes EV 2-5 read +4% and pay -14%.
+- *Data:* graded live bets in the newest `live_all.json` with the staked probability (from `ev_pct` and the fill
+  price) and outcome. Fit a, b on bets selected 10-28..11-17; score held-out log loss on bets selected 11-18..11-27,
+  recalibrated vs raw, as a per-game paired difference (games as clusters).
+- *Decision rule:* GO (name a recalibrated-fair challenger for a later betting-change window) iff the held-out paired
+  log-loss improvement has a 95% lower bound > 0 AND the recalibrated EV of the held-out EV 2-5 bets is within 5 pp of
+  their realised ROI. Otherwise KILL. Fit windows frozen as written; one run.
