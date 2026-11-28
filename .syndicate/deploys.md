@@ -64382,3 +64382,19 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **verify (owed):** the 11:30 AM CST `SyndicateCheatSheets` build (watcher `watch_1130.sh`) stamps `section_records` on the 11-28 sheets, and `/cheatsheets?date=2026-11-28` prints "Its official record, ..." in the Consistency and Hot streaks headers. 11-28's started days keep rules 5, so they take the stamp too.
 - **Revert:** `git revert 3f50a330d` on main, then ff + reload-web. A stamped sheet's extra field is then ignored. Nothing to clean on disk.
 - Claim released after this entry.
+
+## 2026-11-28 17:45:00Z (11:45 AM CST) -- READING (no deploy): the form sections' records on the 11:30 AM CST build (lane `cheat-sheet-optimization`, todo #862; the verify of `2026-11-28 16:27:04Z`; read-only) -- **MET**
+- betting change: no (a reading).
+- **The build.** The `SyndicateCheatSheets` 11:30 AM run's end marker logged by 17:39:53Z (watcher `watch_1130.sh`). The 11-28 sheets, all `section_rules` 5, with `section_records` as (since launch n, last 14 days n):
+  - NBA (generated 17:39:45Z): Consistency (877, 294), Hot streaks (749, 249).
+  - NCAAF (17:31:17Z): (407, 135) and (373, 117).
+  - NHL (17:34:54Z): (504, 165) and (360, 124).
+  - Soccer (17:35:55Z): (29, 10) and (1, 1).
+  - NCAAB (17:39:48Z): `{}`, since its record holds no form bet.
+  - NFL has no 11-28 sheet.
+  - Started days kept rules 5 and took the stamp, as expected.
+- **The page.** `/cheatsheets?date=2026-11-28` carries 8 "Its official record, ..." strings: 4 sports x 2 sections.
+- **In the in-app browser**, `?sport=nba`, ~17:44Z, 0 console errors:
+  - The Consistency header ends "Its official record, Oct 20 - Nov 27: 877 bets (448-429), ROI -2.9% at the best price -- it has not beaten the price. The last 14 days (Nov 14 - Nov 27): 294 bets (142-152), ROI -8.1%."
+  - The Hot streaks header ends "... 749 bets (392-357), ROI -1.1% ... The last 14 days (Nov 14 - Nov 27): 249 bets (123-126), ROI -6.2%." (screenshot zoom taken).
+- The numbers equal the pre-load dry run on the same `record.json`.
