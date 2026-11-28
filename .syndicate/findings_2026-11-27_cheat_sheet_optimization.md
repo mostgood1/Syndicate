@@ -199,3 +199,74 @@ Three older tests pinned the version or the retired sections' scorecard rows and
 `tests/test_cheat_sheet_board_judgement.py::test_rules_version_is_four`, belongs to the OPEN lane
 `surface-consistency-oversight`. It changes only by loan: the user picked "Borrow it" when asked, and the loan is noted in both lane blocks. That one assertion moves `== 4` -> `>= 4`. 333 tests pass across the cheat-sheet, evidence, review, reconcile and play-card suites.
 The page script passes `node --check`. It was not rendered in a browser.
+
+## 7. The scorecard — BUILT (`scripts/cheat_sheet_scorecard.py`, lane goal (2); user 2026-11-27 "Build the cheat sheet scorecard script")
+
+A committed per sport x section x rules-version scorecard, with 95% intervals from a bootstrap over GAMES. Read-only.
+Run on the fleet at 6:04 PM CST 11-27 (00:04Z 11-28): fleet venv, `nice -n 19`, worktree code against
+`~/syndicate-prod/data`, `--replay 5`; 29 s, 60 MB RSS. Output: scratchpad `scorecard_fleet.md` / `.json`.
+
+```powershell
+wsl -- bash -lc "cd ~/Syndicate && nice -n 19 ~/.venvs/syndicate/bin/python scripts/cheat_sheet_scorecard.py --data-root ~/syndicate-prod/data --out /tmp/scorecard.md"
+```
+
+(`~/Syndicate` carries the script only after the fleet is fast-forwarded past it. Until then, run it from a checkout
+of main against the same data root, as this reading did.)
+
+**It counts what the record counts, and checks this.** `day_bets` mirrors `cheat_sheet_record.day_record` line for line:
+- the sections come from the stamped rules;
+- posted rows are pinned and graded at the posted price;
+- "All featured picks" counts a bet once a day.
+
+A test holds the two equal under rules v1/3/4/5. At run time the script compares each sport-day with `record.json`'s own
+day and exits 3 on a difference. A day whose files changed after the record was built is skipped, not failed.
+**Measured: 203 of 203 sport-days equal, 7,594 bets** (the record's 3,868-3,726).
+
+**The verdict comes from the game interval, not from the review's per-bet z.** A cell is a reading until it has 30+ bets
+on 5+ games. It is beyond noise only when its ROI interval excludes 0. On the first run, the per-bet z disagreed twice:
+- it called NFL Sim vs the line v4 "losing beyond noise" on 45 bets from **4 games**;
+- it called NFL Hot streaks v3 "within noise" while its game interval was [−32.0, −0.6].
+
+**The cells beyond noise (official, 10-15..11-26):**
+
+| cell | record | ROI [95%] | vs fair, pts [95%] |
+|---|---|---|---|
+| NBA Matchups v1 | 87-55 (142) | +20.6% [+4.0, +37.7] | +10.2 [+1.4, +18.4] |
+| WNBA Matchups v1 | 74-37 (111) | +18.6% [+8.3, +30.1] (7 games) | +10.7 |
+| Hot form, one-sided v1 (soccer) | 16-26 (42) | −36.1% [−58.1, −15.3] | −13.1 |
+| NBA Price plays v3 | 54-82 (136) | −17.0% [−34.7, −0.2] | −9.9 [−18.3, −2.0] |
+| NFL Hot streaks v3 | 40-49 (89) | −17.4% [−32.0, −0.6] | −7.9 [−16.3, +1.4] |
+| soccer All featured v3 | 17-36 (53) | −35.2% [−58.8, −7.8] | −17.8 |
+| Hot streaks v4, all sports | 27-36 (63) | −23.0% [−40.6, −7.5] | −9.9 |
+| All featured v4, all sports | 129-152 (281) | −12.2% [−23.0, −2.3] | −6.0 [−11.3, −1.2] |
+
+v4 covers 2 days, 52 games.
+
+**CORRECTION to section 1:** "NBA Syndicate picks −18.8% [−35.8, −1.7] (139)" combined picks with price plays. Split the
+record's way, the losing cell is **Price plays** (the price edge the sim does NOT back): 54-82, −17.0% (136). The
+sim-backed NBA Syndicate picks are 3 bets in v3.
+
+**The 11-13 rule change, graded forward** (v1 -> v3 on every v3 sheet, 11-13..11-24). v2 never built a final sheet, so
+the comparison is with v1:
+- what it **removed**, featured once a day: 194-206, +0.8% [−9.9, +12.1];
+- what it **added**: 196-196, −5.1% [−16.2, +5.0];
+- both within noise, so **the forward data does not show the 11-13 change helping**;
+- the in-sample replay on the fit window (`--replay 5`, v1 days): +7.3% [+1.3, +13.1] for what it adds and −7.3% for
+  what it removes. That gap did not carry forward;
+- by sport, NCAAF's additions went 32-51, −28.9% [−49.5, −5.8]. Split by side (measured the same run): 74 of the 83
+  are OVERS, 25-49 (−37.7%); the 9 unders went 7-2. That is the NCAAF over-lean of section 3 (proposal 5,
+  `fair-price-v2`) reaching the sheets through the new sections, not a section rule of its own;
+- NFL Matchups' removals went 22-35, −27.6% [−57.8, −2.1]: the removal is borne out there.
+
+v3 -> v4 shows no change on its 9 sheets. v4 changed the "value" verdict stored on each row at build time, which a
+re-derivation from the same rows cannot undo. The scorecard names it rather than leaving it out. The v4 -> v5 change
+grades itself the same way from the 11-28 sheets on.
+
+**Tests:** `tests/test_cheat_sheet_scorecard.py`, 10. They cover:
+- parity with `day_record` under four rules versions, non-vacuous: every bet kind is present, the push is excluded, the
+  posted price is used and a bet counts once;
+- `check_day` names the differing section;
+- `main` matches the record and exits 3 on a tampered one, and skips a day changed since the record;
+- v5's removals graded on a v5 sheet, plus the replay mirror;
+- the interval and verdict thresholds;
+- v1 -> v3 labelling, the named no-change v3 -> v4 change, and the vN-1 fallback.
