@@ -64267,3 +64267,10 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **verify:** in `web.log`, every `[ncaaf_odds] LINE_INDEX_READ` after a worker's first shows `full_reads=0` (2 of 2 so far).
 - **Revert:** `git revert 4bfaa108a` on main, then ff + reload-web. Nothing on disk changes: the cache is per process.
 - **Claim released** 06:15:05Z (status: web free).
+
+### 2026-11-28T07:00Z — READING (lane live-player-exit-gate, todo #814): 11-27 watch closed, no further catches
+- betting change: no (read-only watch; nothing loaded)
+- Watcher (lift_watch_nba.ps1, 15:00 CST 11-27 → 01:00 CST 11-28) logged no catch after the Nurkic lift (8d0cd6c54).
+- Grid recorder (grid_outlog.py, nice 19) saw 37 NBA grid writes between 04:41:03Z and 05:14:07Z. Every one had OUT=[]: no key player was flagged out while it ran, so it recorded 0 out-player prop cards. Live props for a flagged-out player are STILL UNMEASURED. Of the 3 cases where the books' quotes could be timed, they stopped quoting before our flag in all 3 (Walter, Gonzalez, Martin). Nurkic was the 1 case where they kept quoting, and his in-window grids were missed.
+- 11-27 tally: 4 NBA key exits (Walter, Gonzalez, Martin, Nurkic); 1 NHL plan backstop (Buffalo goalie); 1 NBA real lift (Gonzalez, cleared at game end); 1 false refusal from stale play-by-play (Nurkic, 3 min 7 s).
+- Next: start grid_outlog.py at tip-off on the next NBA slate, so an exit inside its window yields the out player's cards and lpo=.
