@@ -29,13 +29,16 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import statistics
+import threading
 import unicodedata
 import re
-from collections import Counter
+from collections import Counter, OrderedDict
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, BinaryIO, Callable, Iterable, Mapping
 
 from syndicate.features.ncaaf.sources import team_registry_snapshot_path
 
@@ -397,58 +400,253 @@ def resolve_team(name: Any) -> str | None:
     return None
 
 
-def _iter_quote_rows(sport: str, date_str: str) -> Iterable[dict[str, Any]]:
-    """Every row in one date's shard, in append order. Never raises."""
-    try:
-        from syndicate.features.shared.odds_book_quotes import resolve_book_quotes_path
-
-        path = resolve_book_quotes_path(sport, date_str)
-    except Exception:
-        return []
-    if not path or not Path(path).is_file():
-        return []
-    rows: list[dict[str, Any]] = []
-    try:
-        opener = gzip.open if str(path).endswith(".gz") else open
-        with opener(path, "rt", encoding="utf-8") as handle:  # type: ignore[operator]
-            for line in handle:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    row = json.loads(line)
-                except Exception:
-                    continue
-                if isinstance(row, dict):
-                    rows.append(row)
-    except Exception:
-        return []
-    return rows
+def _latest_key(row: Mapping[str, Any]) -> tuple[str, str, str, str, str] | None:
+    """(home, away, market, selection, book) for a full-game line row, else None."""
+    if str(row.get("kind") or "game") != "game":
+        return None
+    if str(row.get("segment") or SEGMENT_FULL) != SEGMENT_FULL:
+        return None
+    return (
+        str(row.get("home_team") or ""),
+        str(row.get("away_team") or ""),
+        str(row.get("market") or ""),
+        str(row.get("selection") or ""),
+        str(row.get("bookmaker") or ""),
+    )
 
 
-def _latest_per_key(rows: Iterable[Mapping[str, Any]]) -> dict[tuple, dict[str, Any]]:
-    """Collapse the append log to one row per (game, market, selection, book).
+def _latest_per_key(rows: Iterable[Mapping[str, Any]]) -> dict[tuple, tuple[Any, Any]]:
+    """Collapse the append log to one (line, price) per (game, market, selection, book).
 
     The log is append-only and ordered, so the LAST occurrence is current. That
     is also why a line that stopped being quoted keeps its last value here --
     freshness is the caller's problem, and `line_index_freshness` reports it
     rather than this function silently dropping stale rows.
+
+    Only `line` and `price` are kept: they are the only fields
+    `_line_index_from_latest` reads off a row, and a whole row per key is more
+    than the per-shard cache below can afford to hold.
     """
-    latest: dict[tuple, dict[str, Any]] = {}
+    latest: dict[tuple, tuple[Any, Any]] = {}
     for row in rows:
-        if str(row.get("kind") or "game") != "game":
-            continue
-        if str(row.get("segment") or SEGMENT_FULL) != SEGMENT_FULL:
-            continue
-        key = (
-            str(row.get("home_team") or ""),
-            str(row.get("away_team") or ""),
-            str(row.get("market") or ""),
-            str(row.get("selection") or ""),
-            str(row.get("bookmaker") or ""),
-        )
-        latest[key] = dict(row)
+        key = _latest_key(row)
+        if key is not None:
+            latest[key] = (row.get("line"), row.get("price"))
     return latest
+
+
+# ---------------------------------------------------------------------------
+# READING THE SHARDS: STREAMED, AND ONLY THE APPENDED BYTES ONCE A SHARD IS SEEN
+# ---------------------------------------------------------------------------
+#
+# [2026-11-27, lane ncaaf-cards-build-cost] Measured on the fleet (week 13; the
+# 11-27 and 11-28 shards, 174 MB and 382,883 lines): the reader this replaced put
+# every row of the week into ONE list and collapsed it afterwards. That cost
+# +940-984 MB of peak RSS and 2.5-2.9 s on EVERY board build, cold or warm -- most
+# of a warm `/ncaaf/api/cards`, and enough to push a web worker past the memory
+# recycler (~625-647 MB anon) on nearly every NCAAF cards, picks or market-board
+# read.
+#
+# Two changes, and the index they produce is the same:
+#   1. Rows are collapsed AS THEY ARE READ, so a shard never exists as a list.
+#   2. A plain shard is append-only (`append_book_quotes` opens it "a"; the
+#      sanitize pass rewrites it through `os.replace`, which is a new inode). So
+#      the collapse of the bytes already read is kept per process, and a later
+#      read parses only what was appended. Anything that says the file is not the
+#      one read before -- another inode, a shorter size, different bytes at the
+#      head or just before the read offset -- re-reads it whole.
+#
+# WHAT "THE SAME" COVERS, case by case against the old text-mode reader
+# (`open(path, "rt", encoding="utf-8")`, one `json.loads` per stripped line):
+#   - universal newlines: "\r\n" and a lone "\r" end a line, as text mode does;
+#   - strict UTF-8: an undecodable byte anywhere drops the WHOLE date, as the old
+#     `except Exception: return []` did. Nothing is cached on that path, so the
+#     date stays dropped for as long as the bytes are there;
+#   - a last line with no newline is parsed, as before, but never cached: the next
+#     read parses it again, whether or not it has been completed since;
+#   - append order, the LAST quote per key winning, the key keeping the position
+#     of its FIRST occurrence -- what plain `dict` assignment did before, across
+#     dates as well as within one.
+
+#: Bytes compared at the head of a shard and just before the cached offset.
+_SHARD_ANCHOR_BYTES = 65536
+
+#: Shards held per process. A week's slate spans at most ~10 dates (2026 week 1).
+_SHARD_CACHE_LIMIT = 16
+
+
+@dataclass(frozen=True)
+class _ShardCollapse:
+    """What one process has collapsed of one shard. Never mutated once stored."""
+
+    #: (st_dev, st_ino) for a plain shard; for a `.gz`, also (st_size, st_mtime_ns).
+    identity: tuple[int, ...]
+    #: Bytes collapsed into `latest`. Plain: always just past a b"\n" (or 0).
+    offset: int
+    #: The first min(offset, _SHARD_ANCHOR_BYTES) bytes of the file (plain only).
+    head: bytes
+    #: The bytes ending at `offset`, at most _SHARD_ANCHOR_BYTES (plain only).
+    tail: bytes
+    #: The collapse of bytes [0, offset). Shared by readers: never written to.
+    latest: dict
+
+
+_SHARD_COLLAPSES: "OrderedDict[str, _ShardCollapse]" = OrderedDict()
+_SHARD_COLLAPSES_LOCK = threading.Lock()
+
+
+def clear_shard_cache() -> None:
+    """Forget every collapsed shard (tests; and a way to force full re-reads)."""
+    with _SHARD_COLLAPSES_LOCK:
+        _SHARD_COLLAPSES.clear()
+
+
+def _cached_collapse(key: str) -> _ShardCollapse | None:
+    with _SHARD_COLLAPSES_LOCK:
+        state = _SHARD_COLLAPSES.get(key)
+        if state is not None:
+            _SHARD_COLLAPSES.move_to_end(key)
+        return state
+
+
+def _store_collapse(key: str, state: _ShardCollapse) -> None:
+    with _SHARD_COLLAPSES_LOCK:
+        _SHARD_COLLAPSES[key] = state
+        _SHARD_COLLAPSES.move_to_end(key)
+        while len(_SHARD_COLLAPSES) > _SHARD_CACHE_LIMIT:
+            _SHARD_COLLAPSES.popitem(last=False)
+
+
+def _collapse_piece(raw: bytes, latest: dict) -> None:
+    """Collapse one b"\\n"-terminated piece of a shard (or its unterminated tail).
+
+    Split the way text mode splits it -- "\\r\\n" and a lone "\\r" both end a line --
+    then decoded strictly. A decode error is RAISED: the caller drops the date.
+    """
+    if b"\r" in raw:
+        pieces = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n").split(b"\n")
+    else:
+        pieces = (raw,)
+    for piece in pieces:
+        line = piece.decode("utf-8").strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except Exception:
+            continue
+        if isinstance(row, dict):
+            key = _latest_key(row)
+            if key is not None:
+                latest[key] = (row.get("line"), row.get("price"))
+
+
+def _collapse_stream(handle: BinaryIO, latest: dict) -> tuple[int, bytes]:
+    """Collapse every b"\\n"-terminated line left in `handle` into `latest`.
+
+    Returns (bytes collapsed, the unterminated tail -- b"" when the stream ends on
+    a newline). The tail is NOT collapsed: the caller decides where it goes.
+    """
+    consumed = 0
+    for raw in handle:
+        if not raw.endswith(b"\n"):
+            return consumed, raw
+        consumed += len(raw)
+        _collapse_piece(raw, latest)
+    return consumed, b""
+
+
+def _anchors_hold(handle: BinaryIO, state: _ShardCollapse) -> bool:
+    handle.seek(0)
+    if handle.read(len(state.head)) != state.head:
+        return False
+    handle.seek(state.offset - len(state.tail))
+    return handle.read(len(state.tail)) == state.tail
+
+
+def _collapse_plain_shard(path: Path, stats: dict[str, int]) -> dict:
+    """The collapse of a plain shard, parsing only what was appended since the last read."""
+    key = str(path)
+    prior = _cached_collapse(key)
+    with open(path, "rb") as handle:
+        info = os.fstat(handle.fileno())
+        identity = (int(info.st_dev), int(info.st_ino))
+        start = 0
+        latest: dict = {}
+        if (
+            prior is not None
+            and prior.identity == identity
+            and prior.offset <= int(info.st_size)
+            and _anchors_hold(handle, prior)
+        ):
+            start = prior.offset
+            latest = dict(prior.latest)
+        else:
+            stats["full_reads"] += 1
+        handle.seek(start)
+        consumed, tail = _collapse_stream(handle, latest)
+        offset = start + consumed
+        handle.seek(0)
+        head = handle.read(min(offset, _SHARD_ANCHOR_BYTES))
+        anchor_start = max(0, offset - _SHARD_ANCHOR_BYTES)
+        handle.seek(anchor_start)
+        anchor = handle.read(offset - anchor_start)
+    stats["reused_bytes"] += start
+    stats["parsed_bytes"] += consumed + len(tail)
+    _store_collapse(key, _ShardCollapse(identity, offset, head, anchor, latest))
+    if not tail:
+        return latest
+    view = dict(latest)
+    _collapse_piece(tail, view)
+    return view
+
+
+def _collapse_gz_shard(path: Path, stats: dict[str, int]) -> dict:
+    """The collapse of a compacted shard, kept while its (inode, size, mtime) hold.
+
+    A `.gz` is written whole and swapped in by `os.replace`, so it never grows:
+    either the same file is read again or it is read from scratch.
+    """
+    key = str(path)
+    info = path.stat()
+    identity = (int(info.st_dev), int(info.st_ino), int(info.st_size), int(info.st_mtime_ns))
+    prior = _cached_collapse(key)
+    if prior is not None and prior.identity == identity:
+        stats["reused_bytes"] += prior.offset
+        return prior.latest
+    stats["full_reads"] += 1
+    latest: dict = {}
+    with gzip.open(path, "rb") as handle:
+        _consumed, tail = _collapse_stream(handle, latest)
+        if tail:
+            _collapse_piece(tail, latest)
+    stats["parsed_bytes"] += int(info.st_size)
+    _store_collapse(key, _ShardCollapse(identity, int(info.st_size), b"", b"", latest))
+    return latest
+
+
+def _latest_for_date(sport: str, date_str: str, stats: dict[str, int]) -> dict:
+    """One date's shard collapsed to (line, price) per key. Never raises.
+
+    {} when the date has no shard, or when reading it failed anywhere -- the old
+    reader's "a partial read is no read" rule, kept.
+    """
+    try:
+        from syndicate.features.shared.odds_book_quotes import resolve_book_quotes_path
+
+        path = resolve_book_quotes_path(sport, date_str)
+    except Exception:
+        return {}
+    if not path or not Path(path).is_file():
+        return {}
+    stats["shards"] += 1
+    try:
+        if str(path).endswith(".gz"):
+            return _collapse_gz_shard(Path(path), stats)
+        return _collapse_plain_shard(Path(path), stats)
+    except Exception:
+        stats["failed"] += 1
+        return {}
 
 
 def _as_float(value: Any) -> float | None:
@@ -513,12 +711,33 @@ def build_line_index(
     analysis in NFL: using nflverse's `spread_line` negated inverted every
     conclusion while producing entirely plausible numbers.
     """
-    latest = _latest_per_key(rows)
+    return _line_index_from_latest(_latest_per_key(rows), key_fn=key_fn)
+
+
+def _line_index_from_latest(
+    latest: Mapping[tuple, tuple[Any, Any]],
+    *,
+    key_fn: Callable[[Any], str],
+) -> dict[tuple[str, str], dict[str, Any]]:
+    """`build_line_index` from an already-collapsed (line, price) per key.
+
+    `resolve_team` and `_selection_side` are pure for one call (the alias map is
+    `lru_cache`d), and a slate repeats the same few hundred names across ~10k
+    keys, so each distinct name is resolved once (measured 11-27: 21,748
+    `resolve_team` calls for one week's index).
+    """
+    resolved: dict[Any, str | None] = {}
+    sides: dict[tuple[Any, str, str], str | None] = {}
+
+    def _resolve(name: str) -> str | None:
+        if name not in resolved:
+            resolved[name] = resolve_team(name)
+        return resolved[name]
 
     per_game: dict[tuple[str, str], dict[str, Any]] = {}
-    for (home_raw, away_raw, market, selection, book), row in latest.items():
-        home = resolve_team(home_raw)
-        away = resolve_team(away_raw)
+    for (home_raw, away_raw, market, selection, book), (raw_line, price) in latest.items():
+        home = _resolve(home_raw)
+        away = _resolve(away_raw)
         if not home or not away:
             continue
         key = (key_fn(home), key_fn(away))
@@ -526,9 +745,11 @@ def build_line_index(
             key,
             {"spreads": {}, "totals": [], "h2h": {}, "home_name": home, "away_name": away},
         )
-        line = _as_float(row.get("line"))
-        price = row.get("price")
-        side = _selection_side(selection, home_raw=home_raw, away_raw=away_raw)
+        line = _as_float(raw_line)
+        side_key = (selection, home_raw, away_raw)
+        if side_key not in sides:
+            sides[side_key] = _selection_side(selection, home_raw=home_raw, away_raw=away_raw)
+        side = sides[side_key]
 
         if market == MARKET_SPREADS and line is not None:
             # Only the HOME side's line; the away side is its mirror and
@@ -578,13 +799,30 @@ def load_week_line_index(
     the board already holds the schedule -- and because NCAAF "week 1" spans ten
     calendar days (2026: 08-29 to 09-07), so guessing a date window from the week
     number would silently drop most of the slate.
+
+    Each date's shard is collapsed on its own and merged in date order, which is
+    the same as collapsing the dates' rows end to end: a key keeps the position it
+    first appeared at and takes the last quote. See "READING THE SHARDS" above.
     """
-    rows: list[dict[str, Any]] = []
-    for date_str in dict.fromkeys(str(d).strip() for d in kickoff_dates if d):
-        rows.extend(_iter_quote_rows("ncaaf", date_str))
-    if not rows:
+    stats = {"shards": 0, "full_reads": 0, "parsed_bytes": 0, "reused_bytes": 0, "failed": 0}
+    latest: dict[tuple, tuple[Any, Any]] = {}
+    dates = list(dict.fromkeys(str(d).strip() for d in kickoff_dates if d))
+    for date_str in dates:
+        for key, value in _latest_for_date("ncaaf", date_str, stats).items():
+            latest[key] = value
+    if stats["shards"]:
+        # Reads back which path ran: `full_reads=0` with `reused_bytes` > 0 is the
+        # append-only path; `failed` counts dates dropped whole. print/flush --
+        # `logger.info` never reached a role log.
+        print(
+            f"[ncaaf_odds] LINE_INDEX_READ season={season} week={week} dates={len(dates)} "
+            f"shards={stats['shards']} full_reads={stats['full_reads']} failed={stats['failed']} "
+            f"parsed_bytes={stats['parsed_bytes']} reused_bytes={stats['reused_bytes']} keys={len(latest)}",
+            flush=True,
+        )
+    if not latest:
         return {}
-    return build_line_index(rows, key_fn=key_fn)
+    return _line_index_from_latest(latest, key_fn=key_fn)
 
 
 def resolution_report(names: Iterable[Any]) -> dict[str, Any]:
