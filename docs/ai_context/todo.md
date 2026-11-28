@@ -1,5 +1,22 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#867` — **THE NCAAF CARDS BUILD READ THE WEEK'S WHOLE QUOTE SHARDS (174-182 MB, ~383k lines) INTO ONE LIST ON EVERY BUILD: +924-989 MB and 2.3-2.9 s, cold or warm, which pushed web workers past their ~625 MB recycle limit whenever an NCAAF page was polled. FIX LOADED on web 11-28 06:01:23Z (`4bfaa108a`, not a betting change; served body byte-identical). Memory MET; latency better only on a warm worker. OPEN: (a) web recycles ~21 an hour for other routes' memory** `[2026-11-28, lane ncaaf-cards-build-cost (CLOSED), session 9ef6a9cf, started by session local_671bbd22 (lane surface-consistency-oversight); user "Yes deploy" ~11:47 PM CST 11-27; findings `.syndicate/findings_2026-11-28_ncaaf_cards_build_cost.md`; deploys.md `2026-11-28 06:01:23Z`]`
+
+- **The fix:** `oddsapi_lines.load_week_line_index` collapses each shard as it reads it. A per-process, append-aware cache (16 shards, LRU) keeps that collapse, so a later read parses only the bytes appended since. Another inode, a shorter file or changed anchor bytes trigger a full re-read. Tests: `tests/test_ncaaf_oddsapi_line_index_stream.py` (14, against a verbatim copy of the old reader); 107 existing NCAAF tests pass with old and new code.
+- **Measured at the load** (5 GETs before and after, 130 s apart):
+  - a fresh worker's peak went 151 -> 1,193 MB before and 151 -> 512 MB after;
+  - hard recycles mid-request went 2 of 5 -> 0 of 5;
+  - warm requests take 4.96 / 5.66 s (old: 8.3-13.8 s);
+  - cold-worker requests are unchanged at 9.1-9.9 s;
+  - `LINE_INDEX_READ` shows `full_reads=0` with 16 KB / 326 KB parsed on a worker's second read.
+- **(a) OPEN: web recycles without NCAAF traffic.** It recycled 21 times in the hour to 05:49Z 11-28 with 0 NCAAF builds, and worker 1348200 reached 785 MB anon (hard recycle 06:05:18Z) without serving one NCAAF request. Which routes drive it was not identified. While workers live 3-6 min, the per-process caches (this one, card contracts, live state, the board contract, the step-1g attach) rarely warm, so most NCAAF requests stay ~9-10 s. Start from the `WEB_WORKER_MEMORY_RECYCLE` lines against the access log's requests per worker. Related: `#857` (lane `web-recycle-anon-limit`) sizes the limit itself; this item is which requests fill it.
+- **(b) Left as measured (cold-only, per process):**
+  - card contracts ~1.4 s / +106-176 MB;
+  - live state + box sections ~1.1 s / +138 MB;
+  - `apply_game_board_contract` ~1.6 s (it reads ~210 MB of `odds_events` JSONL);
+  - the step-1g board attach ~3.7 s cold with a 60 s cache.
+- **(c) Side effect:** the probes' 15 real page views appended 15 lines to the fleet's `ncaaf_source/data/smartsim2_trial_monitoring.jsonl` (5 at 02:40-02:43Z, 10 at 05:50-06:13Z 11-28). They were left in place.
+
 ### `#866` — **MLS TEAM RATINGS WOULD HAVE COLLAPSED AT THE 2027 OPENER: the MLS branch of `build_soccer_artifacts._load_team_ratings` fetched ASA's aggregates for `date.today().year`, so from 2027-01-01 it reads season 2027, which has no games until late February: 0 teams rated (measured on ASA 11-27), every MLS team on the same PROMOTED_TEAM_RATING. FIXED ON MAIN, identical for every 2026 build** `[2026-11-27, lane mls-ratings-season-rollover, session d58574cb (rail monitor); user "Fix the ratings year rollover before January" ~6:05 PM CST; findings `.syndicate/findings_2026-11-26_layer2_rail_monitor.md` "MLS ratings season rollover"]`
 
 - **FIXED 6:53 PM CST 11-27.** The season is the build date's (`_mls_season_for(as_of)`), and until a team has 34 games this season the gap is filled at last season's per-match rates (`_mls_team_rows`, window 34 = one regular season); a team with no game yet takes last season's alone, an expansion team this season's alone, a failed last-season fetch falls back to this season alone (`MLS_SEASON_CARRY_UNAVAILABLE`). Prints `MLS_SEASON_CARRY` when it carries.

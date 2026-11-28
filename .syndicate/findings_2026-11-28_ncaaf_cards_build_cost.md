@@ -170,3 +170,25 @@ Runtime code: `syndicate/features/ncaaf/oddsapi_lines.py` only, plus a test.
 
 **Revert:** `git revert <sha>` on main, then ff + `reload-web`. Nothing on disk changes: the cache is
 per process.
+## 8. Loaded on web 2026-11-28 06:01:23Z (12:01:23 AM CST), `4bfaa108a`
+
+The full entry is in deploys.md `2026-11-28 06:01:23Z`. The measurement used the same 5 GETs of `/ncaaf/api/cards`
+before and after, 130 s apart (`C:\tmp\ncc_9ef6\deploy_probe.py`).
+
+| | old code (05:50-06:00Z) | new code (06:01-06:13Z) |
+|---|---|---|
+| request ms | 9,245 / 9,067 / 8,272 / 13,769 / 11,995 | 9,096 cold / **4,960** warm / 9,777 cold / 9,928 cold / **5,664** warm |
+| fresh worker VmHWM after its first build | 151 -> 1,193 MB | 151 -> **512 MB** (twice) |
+| hard recycle mid-request | 2 of 5 (1,348 and 1,130 MB anon) | **0 of 5** |
+| `LINE_INDEX_READ` | none | 5; full reads only on a worker's first build; second reads parsed 16 KB and 326 KB |
+
+- **Missed:** the 6 s median and the 500 MB peak. 3 of 5 requests met a worker's first NCAAF build, because web
+  recycled both workers at 06:04-06:05Z for memory from other routes. A cold build is as slow as before (~9-10 s):
+  - its line read is a full read (~2.4 s), the same cost as the old one, and
+  - the card contracts, live state, board contract and step-1g attach caches are all cold-only and per process.
+- **Web recycles without NCAAF.** It recycled 21 times in the hour to 05:49Z, with 0 NCAAF builds; the #859 poller
+  had stopped at ~04:12Z. Worker 1348200 reached 785 MB anon and was hard-recycled at 06:05:18Z without serving one
+  NCAAF request. Which routes drive this was not identified: todo #867 (a).
+- **Log:** 06:01:20-06:13:49Z had UNHANDLED_500 0, Traceback 0, WORKER TIMEOUT 0, and all 5 requests returned 200.
+- **Side effect:** the 10 probe GETs appended 10 lines to `smartsim2_trial_monitoring.jsonl` (05:50-06:13Z), left in
+  place. Add the 5 from section 5 for 15 in all.

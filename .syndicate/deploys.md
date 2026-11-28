@@ -64228,3 +64228,42 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - The expectation said `Generated 2026-11-28T04:5`. The real time is 05:01:13Z, because tonight's reconcile and review took 11 min, not this morning's ~10.5. The step itself ran in under 10 s.
 - **The task:** LastRunTime 10:50:02 PM CST, LastTaskResult 0, NextRunTime 6:45 AM CST. The whole run took 04:50:02Z -> 05:01:18Z, 11 min 16 s of its 30-minute limit.
 - Still owed: the 8:05 AM CT `cheat-sheet-review` run's scorecard line (deploys.md 2026-11-28 02:40:00Z). It must read the 6:45 AM run's scorecard, not this one.
+
+## 2026-11-28 06:01:23Z (12:01:23 AM CST 11-28) -- DEPLOY (claimed web, ff + reload-web, no env change): the NCAAF line index reads the week's quote shards streamed and append-aware `4bfaa108a` (lane `ncaaf-cards-build-cost`, todo #867; user "Yes deploy") -- **LOADED on web; 2 of 4 expectations MET, 2 MISSED (latency and the 500 MB peak)**
+- betting change: no (display only. `load_week_line_index` has one caller, `ncaaf/cards.py`, under the NCAAF cards / picks / game / live-lens / market-board / betting-card pages, and the served body is byte-identical on the same inputs: findings section 3)
+- **Why** (findings sections 1-3, measured 11-28 02:40-03:30Z): `oddsapi_lines.load_week_line_index` read the week's whole NCAAF quote shards (174-182 MB, ~383k lines) into one list on every build. That was +924-989 MB of the build's own peak and 2.3-2.9 s, cold or warm.
+- **Ride-alongs `bcbb5465f..4bfaa108a`** (17 commits, listed in its own call before the merge):
+  - Runtime code is `syndicate/features/ncaaf/oddsapi_lines.py` only (`git diff --stat -- syndicate pipeline scripts vendor engines wsgi.py app.py gunicorn.conf.py requirements.txt`).
+  - The rest: `tests/test_ncaaf_oddsapi_line_index_stream.py`, `.claude/skills/cheat-sheet-review/SKILL.md`, `reports/live_gameline_accuracy/history.jsonl` and ledger. None of the 4 non-ledger paths is modified in the fleet checkout, and `vendor/` is empty.
+  - The workers import `oddsapi_lines` for `resolve_team`, `fold` and the alias map, all unchanged. They load the new file at their next restart.
+- **Baseline, old code** (`C:\tmp\ncc_9ef6\deploy_probe.py before`, 05:50:28-06:00:43Z): 5 GETs of `/ncaaf/api/cards` 130 s apart, the #859 poller's own request.
+  - 9,245 / 9,067 / 8,272 / 13,769 / 11,995 ms: median **9,245**.
+  - A fresh worker's VmHWM went **151 -> 1,193 MB** on its first build.
+  - **2 of 5** requests hard-recycled their worker mid-request (05:56:09Z at anon 1,347.9 MB; 06:00:04Z at 1,129.5 MB).
+  - There was no other NCAAF traffic. The #859 poller stopped at ~04:12Z, and web recycled 21 times in the hour to 05:49Z with 0 NCAAF builds.
+- **Preflight** `--betting-change no` with 4 expect / baseline pairs (baseline read 06:00:43Z): **CLEAR 06:01:07Z**. Claim acquired 05:49:12Z.
+- **ff + reload:**
+  - `git merge --ff-only 4bfaa108a` at 06:01:21Z (`bcbb5465f` -> `4bfaa108a`; on origin/main, checked first).
+  - `RELOAD_WEB {"elapsed_s": 2.0, "failures": 0, "state": "done"}`.
+  - Workers 1345198 / 1347435 -> **1348199 / 1348200**; master 413 unchanged.
+- **expect / measured** (`deploy_probe.py after`, the same 5 GETs 130 s apart, 06:01:33-06:13:23Z; rows in `C:\tmp\ncc_9ef6\deploy_probe.jsonl`):
+  - `line_index_read_lines` 0 -> 5, with full reads only on each worker's first: **MET**.
+    - Full reads (2 shards, 182.4 MB) came at 06:01:35, 06:07:09 and 06:09:59Z, each a worker's first NCAAF build.
+    - The two second reads (06:04:22 and 06:12:47Z) reused 182.4 MB and parsed 16 KB and 326 KB.
+    - All 5 reads gave 10,890 keys.
+  - `ncaaf_cards_probe_hard_recycles` 2 of 5 -> 0 of 5: **MET**. There was one soft timer recycle, at 06:04:29Z, 2 s after warm request 2. That request left its worker at 626 MB anon against a 622.6 MB limit, but other routes had already taken the worker from 96 to 531 MB.
+  - `ncaaf_cards_fresh_worker_vmhwm_mb` 1,193 -> **512**, the same on both cold workers (06:01:33Z and 06:09:57Z): **MISSED** the <=500 expectation by 12 MB. The first build's own peak is +361 MB, against +1,042 MB before.
+  - `ncaaf_cards_probe_median_ms` 9,245 -> **9,096**: **MISSED** (<=6,000).
+    - Warm-worker requests took **4,960 and 5,664 ms**. The old code took 8.3-13.8 s, cold or warm.
+    - 3 of the 5 met a worker's FIRST NCAAF build (9,096 / 9,777 / 9,928 ms), because web recycled both workers at 06:04-06:05Z for other routes' memory.
+    - A cold build is as slow as before. Its other caches (card contracts, live state, board contract, the step-1g attach) are cold-only and per process.
+- **Web log 06:01:20-06:13:49Z:** UNHANDLED_500 0, Traceback 0, Exception 0, WORKER TIMEOUT 0. All 5 requests returned 200 with 1,515,0xx B.
+- **What it says:**
+  - The NCAAF build no longer pushes web past its recycle limit on its own: +361 MB on a cold worker, +0-95 MB warm.
+  - A warm request takes ~5 s, and most of that is the step-1g attach (60 s cache).
+  - Web still recycles for other reasons: 21 an hour with no NCAAF traffic before the load. Worker 1348200 reached 785 MB anon and was hard-recycled at 06:05:18Z without serving one NCAAF request.
+  - While workers live 3-6 min, most NCAAF requests meet a cold process and still take ~9-10 s. That is todo #867's open item (a).
+- **Side effect:** the 10 probe GETs are page views, so web appended one line each (10 lines, 05:50-06:13Z) to `ncaaf_source/data/smartsim2_trial_monitoring.jsonl`. They were left in place.
+- **verify:** in `web.log`, every `[ncaaf_odds] LINE_INDEX_READ` after a worker's first shows `full_reads=0` (2 of 2 so far).
+- **Revert:** `git revert 4bfaa108a` on main, then ff + reload-web. Nothing on disk changes: the cache is per process.
+- **Claim released** 06:15:05Z (status: web free).
