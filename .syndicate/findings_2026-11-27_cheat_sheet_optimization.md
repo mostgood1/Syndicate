@@ -271,7 +271,7 @@ grades itself the same way from the 11-28 sheets on.
 - the interval and verdict thresholds;
 - v1 -> v3 labelling, the named no-change v3 -> v4 change, and the vN-1 fallback.
 
-## 8. The form-section study (Consistency, Hot streaks) -- NO v6 entry rule passes; the lever is the SIM, which follows recent form further than the outcomes do
+## 8. The form-section study (Consistency, Hot streaks) -- NO v6 entry rule passes (its engine reading was FALSIFIED 11-28: see the correction before the proposals)
 
 User 2026-11-28 "Yes, run it" to "Run the form-section study first?". Hypotheses H1-H6 and the bar were written into the
 lane and pushed (`60b324db6`) before the run. Read-only, nice 19, fleet checkout `4bfaa108a`, 16:01-16:03Z (1 min 53 s,
@@ -353,8 +353,28 @@ side's L10 hit rate at the line. Two-sided primary rows, intervals by game:
 - Follow-up (exploratory, not pre-registered): sim-backed rows split by the side's L10 rate show no stable ROI pattern
   pooled (holdout -9.4% / -4.3% / -4.5% for L10 < 0.5 / 0.5-0.7 / >= 0.7). No per-line rule comes from it.
 
+**CORRECTION 2026-11-28 ~10:45 AM CST: the engine READING above is FALSIFIED** (lane `sim-form-regression`,
+`findings_2026-11-28_sim_form_regression.md`, todo #868). The table stands, reproduced to the decimal on the same 13,010
+rows. Its reading does not.
+- "The projection follows recent form further than outcomes do" is WRONG. Holding the projection and the line fixed,
+  a player's L10 average predicts the actual POSITIVELY or not at all, never negatively beyond noise, in NBA, NFL and
+  NCAAF and in both windows. Fitted in its simple form, a form-shrink comes out with the opposite sign and steepens the
+  table.
+- What the table shows is the LINE. The actual lands most of the way from the projection back to the line (share b_l,
+  fit / holdout): NBA 0.54 / 0.59, NFL 0.80 / 0.75, NCAAF 0.50 / 0.76, NHL (the control) 0.30 / 0.31.
+- "L10 hit rate at the line" contains the line. A side that cleared 7 of 10 is a side whose line sits below his
+  recent games, and his projection sits above the line, so it reads as too high. This is the trap `learnings.md`
+  2026-10-19 names; this section fell into it.
+- NFL and NCAAF projections carry no recency weighting at all: equal-weighted season means.
+- So proposal 1 below is SUPERSEDED. The lever is still the engines, but as INPUTS the line already prices (NBA
+  minutes, NFL usage, NCAAF targets: todo #868), not a form-shrink. A fitted pull toward the line flattens this table
+  and improves Brier, but it does not improve ROI on the sim-backed bets (-6.2% -> -7.0%). Building it is the user's
+  decision in that lane.
+- What stands from this section: the betting read (no form split passes; H4 is the football fair), proposal 2 (built
+  and loaded 11-28, `3f50a330d`) and proposal 3.
+
 **Proposals (a person decides):**
-1. **For the engine owners: shrink the prop projections' response to recent form, per sport (NBA, NCAAF, NFL).**
+1. **SUPERSEDED 11-28 (see the correction above; todo #868).** ~~For the engine owners: shrink the prop projections' response to recent form, per sport (NBA, NCAAF, NFL).~~
    - The measured slope is the target: the holdout bucket error should flatten toward 0 across L10.
    - Per the model engine standard: a reachability test first, then a held-out fit. It is an estimator change, so the
      rates it absorbed must be re-fitted.
