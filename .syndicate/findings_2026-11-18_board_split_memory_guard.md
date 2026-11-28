@@ -1381,3 +1381,37 @@ lines.
   - Batch session 91b0c989 told.
 - **P-HR2 after a load:** a held path under `scripts/rail_monitor/` would now be a rule bug, like the other exempt
   prefixes.
+
+## 28. The parent's memory while J cannot recycle it (read 2026-11-28 ~16:40Z = 10:40 AM CST, read-only)
+
+Under today's rule (`any`), J's self-recycle is held on every morning the checkout has moved since the parent's boot
+(§23, §26). So until the 12-08 window, parent pid 469 (booted 2026-11-26 17:12Z on `e37a9697f`) restarts only for
+some other reason.
+
+- Its own `rss_mb` in the `ALL_PROCESS_MEMORY` samples, in 6-hour buckets from boot:
+
+  | hours | samples | p50 MB | max MB | `container_memory_headroom_mb` min |
+  |---|---|---|---|---|
+  | 0-6 | 1,472 | 1,096 | 1,184 | 1,815 |
+  | 6-12 | 1,548 | 1,181 | 1,352 | 1,584 |
+  | 12-18 | 1,658 | 1,297 | 1,385 | 1,519 |
+  | 18-24 | 1,621 | 1,550 | 2,963 | 1,264 |
+  | 24-30 | 1,186 | 1,659 | 1,876 | 1,185 |
+  | 30-36 | 1,042 | 2,166 | 2,616 | 783 |
+  | 36-42 | 1,488 | 2,188 | 2,546 | 925 |
+  | 42-48 | 1,211 | 2,170 | 3,397 | 1,047 |
+
+- **The median has been FLAT at 2,166-2,188 MB for the last 18 hours,** after climbing from 1,096 MB in the first
+  30. The spikes are larger (3,397 MB max in hours 42-48).
+- The previous parent read 2,054.8 MB at 51.5 h uptime (11-26 12:02Z, §21's last CHECK line before its restart).
+- **Not known:** how a parent behaves past about 2.5 days. Waiting for 12-08 means about 11.5 days of uptime. This
+  reading cannot say whether the median stays flat.
+- **What to watch until 12-08:**
+  - the 6-hour median climbing above about 2,400 MB;
+  - a `container_memory_headroom_mb` low under 500 MB (it was 783 MB in hours 30-36).
+- If either happens, the lever is a drained refresh-worker restart under the restart rules (claim, idle after the
+  save, preflight). It is the user's call, and it kills any in-flight sim. Loading item A early would not help: it
+  changes only which checkout moves hold J.
+- Reader: `C:\tmp\w1208_headrule\parent_trend.py <pid>`, read-only. Run it on the fleet with
+  `wsl -- nice -n 19 python3 /mnt/c/tmp/w1208_headrule/parent_trend.py 469`. Its boot time is hard-coded for pid
+  469.
