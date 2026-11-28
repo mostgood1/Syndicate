@@ -2421,6 +2421,14 @@ FIT FIX ON MAIN d3ec5b72ed4fb6bbe5c17983fce2a7f06685d2c1 -- dated 2026-11-27 4:4
 - CHECKS 11-27 (nothing applied, no fleet change): all 12 kit self-tests PASS (`C:\tmp\w1208_batch\selftests_1127.out`; the real env file's sha is unchanged); the whole-batch dummy rehearsal A..M PASS (`C:\tmp\w1208_batch\batch_dummy_rehearsal.sh`); `fleet_role_env_reading.py` snapshot + compare reads COMPARE OK on the fleet. New kits: `C:\tmp\w1208_batch\kit_env_845.sh` (K) and `kit_env_856on.sh` (L).
 - PROMPT EDITS before 12-08: edit with update_scheduled_task, then record the new sha256 here AND put it in the backup's prompt. Otherwise the backup stands down.
 
+### mls-ratings-season-rollover — OPEN — opened 2026-11-27 — session d58574cb-c55a-4f1f-aa9a-ab530a5f63e0
+- Goal: MLS team ratings pick the season from the date being built (not today's calendar year) and carry the previous season forward while the new one is thin, so the 2027 opener is not priced with every MLS team on the same promoted prior; byte-identical for every 2026 build; in place before 2027-01-01 (user 2026-11-27 ~6:05 PM CST "Fix the ratings year rollover before January")
+- Files: scripts/build_soccer_artifacts.py (the mls branch of _load_team_ratings + its new season helper only), syndicate/features/soccer/ingestion/player_history.py (fetch_asa_mls_team_history only), tests/test_mls_ratings_season_rollover.py (NEW), scripts/rail_monitor/mls_rollover/ (NEW)
+- Hypothesis: H1 today's code from 2027-01-01 fetches ASA season 2027, which is empty until the late-February opener, so every MLS team gets PROMOTED_TEAM_RATING (equal strengths). H2 a previous-season carry beats season-to-date ratings for the first weeks of a season, measured on ASA per-game xG for the 2025 and 2026 seasons (Poisson log-likelihood and 1X2 Brier of actual goals), and the gain shrinks to 0 once teams have a full season of games. H3 any carry that switches off by 34 games is byte-identical for every 2026 build (all 30 teams have 34-36 games)
+- Falsification test: H2 false if season-to-date is as good or better at 1-9 games; H3 false if a 2026 build's ratings differ from today's code
+- Verification: the study's per-bucket scores; tests: 2026 dates identical to today's code, a 2027 pre-opener build uses 2026 aggregates, the switch-over at the chosen threshold; A/B on the fleet's real ASA pull for 2026-11-28
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
