@@ -64161,3 +64161,19 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - This dry run found the v3 -> v4 case: the newest change has no rows, only the note. The prompt now handles it (a second `update_scheduled_task` call).
 - **verify:** the 8:05 AM CT run on 11-28 (`list_task_runs cheat-sheet-review`) sends a notification whose fifth line is the scorecard. It must read a scorecard generated at 6:45 AM CT or later (12:4xZ 11-28), not tonight's 10:50 PM one. Its run finishes without a permission prompt.
 - No claim was taken (no deploy). Nothing to release.
+
+## 2026-11-28 02:30:58Z READING lane live-player-exit-gate (#814): NBA Ja'Kobe Walter (TOR) injury + FIRST NHL PLAN BACKSTOP (Buffalo goalie change), Friday 11-27 slate
+- betting change: no (reading only)
+- **NBA, Brooklyn Nets @ Toronto Raptors (event 401909329):**
+  - Producer: `PLAYER_OUT ... player="Ja'Kobe Walter" reason=injury key=True source=injuries since=2026-11-28T02:28Z` at 02:30:58.836Z, with `key_players_out=1` on that tick.
+  - Hold: `fail key_player_out TOR:Ja'Kobe Walter:injury` (snapshot 20:30:58 CST).
+  - Board: book_grid nba index 7 -> 6 at 02:31:19.959Z, 21 s after the tick. Last Toronto full-game ledger rows 02:30:25Z.
+  - **Live props: NOT MEASURABLE here.** The books had quoted his live props all game (`live_lens_registry/oddsapi_props_2026-11-27_*`: pts / reb / ast / pra / threes, key `JAKOBE WALTER`). The last quotes were at **02:15:19Z, 15.7 min before our flag** (the injuries feed's `since` is 02:28Z). The 20:31:31 CST in-play grid (2,000 cards, 204 for this game, 11 players' props) has 0 rows naming him. With no live price there was nothing for `live_player_out` to mark. The books suspended before our producer knew.
+- **NHL, Pittsburgh Penguins @ Buffalo Sabres (game 2026020413):**
+  - Producer: `[nhl_live_resim] KEY_PLAYER_OUT_REFUSED ... players=['BUF:A. Lyon:goalie_change', 'BUF:U. Luukkonen:goalie_change']` at 02:24:23.801Z (8:24 PM CST). NHL logs no PLAYER_OUT line, so `lift_scan.py` does not see NHL exits; this one was found by hand.
+  - Hold: `fail` (snapshot 20:43:17 CST).
+  - Board ledger: last Buffalo row 02:24:21Z. Book_grid nhl index swings 2/1 after that (not a clean step).
+  - **The in-play grid still carries 3 Buffalo `totals` cards at 02:43:02Z** (lines 9.5 / 10.5, ev 4.19 / 2.83 / -0.27). They are `board_lane=opportunity`, `fair_method=consensus`, `live_model_probability None`, `live_player_out None`: the consensus lane, which the board's withdrawal does not touch (user decision 11-24 "Leave as is").
+- **Plan generated 20:32:41 CST: `refusals_by_sport.key_player_out = {"nba": 10, "nhl": 1}`.** The only key exits then live were Walter and the Buffalo goalie change, so these are those games' rows; per-row attribution is not read. **The first `key_player_out` plan refusal in NHL.** The backstop is what stops the consensus-lane cards the board keeps.
+- **Still open:** the props item. Books pulling an injured player's props before our injuries feed flags him may be the common case; then the `live_player_out` mark only matters for off-floor exits, where books keep quoting.
+- verify: `C:/tmp/lpeg/w1126/props_probe.sh nba` 02:32:07Z, `nba_props.sh` / `nba_props2.sh` 02:32Z, `walter3.sh` 02:35Z, `tor.sh` 02:33:17Z, hold probes 02:33Z / 02:44Z, `kpo_tor.py` 02:43:38Z, `nhl.sh` / `buf.sh` / `buf2.sh` / `buf3.sh` 02:44-02:47Z.
