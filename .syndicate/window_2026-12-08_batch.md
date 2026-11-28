@@ -240,6 +240,36 @@ earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehea
 - Kit: `C:\tmp\w857\kit_env_857.sh`. Load check: `kit_after_up_857.sh <up utc>`. P1-P9 are read the first evening,
   5-11 PM CST.
 
+### N — #865 soccer live lane-age ceiling, SHADOW only (NOT a betting change)
+- **Added 2026-11-27 ~6:50 PM CST, after install.** The load order is now A..N. The task prompt was edited; its new
+  hash is in lane `window-1208-batch`.
+- Line: GLOBAL `SYNDICATE_LIVE_GAMELINE_SOCCER_LANE_AGE=shadow`.
+  - Code is `fabdd54f7`, absent = off = today. Shadow stamps the soccer lens time on each live lane and counts what a
+    600 s ceiling would refuse (`lane_age_would_refuse` on `LIVE_GAMELINE_JOIN`). It refuses nothing.
+  - `on` refuses stale soccer lanes, is a BETTING CHANGE, and is NOT approved. The code reads any other set value as
+    `on`, so the batch runs the kit exactly as `apply shadow`.
+- Lane `soccer-live-lane-age-ceiling` (rail monitor, session d58574cb); todo #865.
+- Add yes: the user answered "yes, add #865 to the batch as shadow" (~6:10 PM CST 11-27, session 86352bc9, the
+  fleet-watcher) to "#865 soccer age limit: add it to the 12-08 batch as 'on' or 'shadow', or leave it out?". Session
+  91b0c989 read those words in that session's transcript as the user's own message. It adds N; it is NOT a load yes.
+- LOAD yes OWED: a 12-07 LOAD YES under `#### N`, as for the betting items. Whether N should instead ride on standing
+  words, as D and M do, was put to the user 11-27 in session 91b0c989. Until a recorded answer changes the task, N
+  needs the 12-07 line.
+- Not a betting change, checked by session 91b0c989 in the code on `origin/main`:
+  - in the join's row loop, the soccer lane verdict refuses a row only when the mode is `on`;
+  - otherwise the stamped time is read only by the shadow tally, the display-only block, `quote_behind_score_verdict`
+    (ncaab/wncaab only), the ledger record (not one of `_moved`'s dedupe fields) and `engine_experts` (paper-only);
+  - so it gets no register row.
+- Rides only on a betting item's down/up, like M, and never causes one.
+- Kit: `C:\tmp\w1208_soccer_lane_age\kit_env_soccer_lane_age.sh` (sha16 `eb2a77214f756828`), built by the rail
+  monitor. Self-test PASS 11-27: the real env was untouched, and the key reads ABSENT on all three roles. The
+  whole-batch rehearsal A..N also PASSED (`C:\tmp\w1208_batch\batch_dummy_rehearsal_a_to_n.sh`, output
+  `rehearsal_a_to_n_1127.out`).
+- Load check: `kit_after_up_soccer_lane_age.sh <up utc>` (sha16 `21189172f32096cd`). Soccer join lines with a match in
+  play carry a numeric `lane_age_max`, and shadow refuses none. With no soccer in play in the window, it is OWED at
+  the first match.
+- Revert: remove the one line (absent = off), then a drained down/up.
+
 ## Overlaps: what loading together confounds, and which readers still tell the changes apart
 
 - **One count restart.** Every betting item restarts the scale-up gate's count once, together.
@@ -267,6 +297,8 @@ earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehea
   - L's P1/P5 (take-profit sales, entries) are confounded likewise. Read them per cell, or with F/G's days excluded.
   - J's cancel counts (P1-P4) and L's `hold_value` rows are separable.
 - **K.** Soccer ratings only; no row collision found.
+- **N vs K.** Both are soccer. K changes the big-5 ratings. N in shadow prices nothing, and its counters (`lane_age_max`,
+  `lane_age_would_refuse`) are their own fields on the soccer join line.
 
 ## Not in the batch (no load yes, no kit line, or already loaded)
 
@@ -295,3 +327,4 @@ earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehea
 #### K
 #### L
 #### M
+#### N
