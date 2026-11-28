@@ -85,3 +85,35 @@ the post-P line are the readings, and both are too small to read yet.
 **Reading, for the user.** The slide is the window's composition, not the current book. The 10-29..11-04 week, the
 book's worst, is now 45% of the window's stake. Since 11-05 the book is -1.75% with a range spanning 0. This does not
 make the 30-day loss less real: 10-29..11-23 lost -10.22% beyond noise, and -6.31% of it before fees.
+
+## The 11-26 shrunk-EV sizing study, run 2026-11-28 -- RULE RESTATED BEFORE COMPUTING (written 10:03 AM CST)
+
+User 11-28 ~10:00 AM CST: "Yes, run it". The design is frozen as written in `findings_2026-11-26_portfolio_monitor.md`
+("One optimization lead"):
+- fit one k in [0, 1] on bets selected 10-28..11-17;
+- recompute each bet's stake from k x claimed EV, and drop bets whose shrunk stake falls below the venue minimum;
+- compare stake-weighted ROI against the actual stakes on bets selected 11-18..11-26, as a paired difference
+  clustered by game;
+- GO iff the held-out lower bound > 0 AND a forward copy (bets from 11-27, at 150 games) is > 0. Otherwise KILL.
+
+**What the ledger can and cannot reproduce.** The ledger has no Kelly fraction or band stamp per order. It carries
+`ev_pct`, the requested and filled stake, the fill price and fees. So each bet's shrunk stake is modelled from its
+ACTUAL stake, following the sizer that was live when it was placed:
+- **Band era** (submitted before 2026-11-02 18:23:01Z, when the live stake band went OFF): stake = floor + width x
+  Kelly / kelly_at_max, capped at the top. Shrinking Kelly by k gives `floor + k x (stake - floor)` for a stake inside
+  the band. A capped bet's Kelly is unknown, so it gets `floor + k x width`, the most it could shrink. A stake under
+  the floor (trimmed to cash) keeps `k x stake`.
+- **After the band** (proportional compounding Kelly): shrunk stake = `k x stake`.
+- **Venue minimum.** Kalshi: one contract at the fill price (a smaller stake is the named refusal
+  `stake_below_one_contract`). Polymarket: 1 dollar notional (assumed). A bet whose shrunk stake is below it drops out.
+- Fees are taken as proportional to stake. That understates the drag on small Kalshi orders, whose fee rounds up per
+  order.
+- k is picked on a grid of 0.05 to 1.00 in steps of 0.05, as the fit window's best stake-weighted ROI. A tie goes to
+  the larger k. The 95% range on the held-out paired difference comes from 2,000 bootstrap resamples of games, with a
+  fixed seed.
+
+**Prediction from the sizer's shape, written before computing.** Under proportional Kelly, multiplying every stake by
+k leaves ROI on stake EXACTLY unchanged. So after 11-02 the shrink can move ROI only through bets that drop below the
+venue minimum, which means the smallest stakes, the Q1 tail. It cannot touch the Q4 tail, which loses as much. In the
+band era it pulls stakes toward the floor, which is a move toward flat staking. So the held-out difference should be
+near 0, with a range spanning 0 (**KILL**), unless the dropped small stakes are a strongly losing group.
