@@ -1340,3 +1340,44 @@ lines.
   parent loaded changed. P-HR3 (a recycle when nothing it loaded changed) would rarely get its test.
 - The narrow fix is to exempt `scripts/rail_monitor/`. A source-scan guard would then fail if any role code names it
   as a path, outside comments and docstrings. Not built: that is the user's call (asked 11-28).
+
+## 27. J's head rule: `scripts/rail_monitor/` exempt (user "Yes, build it", 2026-11-28 ~10:15 AM CST); default-off, not loaded
+
+- **The user's words.** The user typed "Yes, build it" in session 644b05ff's chat, answering "Exempt
+  scripts/rail_monitor/ from the head rule before 12-07?" (after §26).
+  - It approves the build only. Item A's 12-07+ LOAD YES is unchanged and still owed.
+- **The change** is in `pipeline/board_build_process.py`, the parent self-recycle section, under the 11-21 loan from
+  `layer2-board-process-split`. `scripts/rail_monitor/` joins `_HEAD_RULE_NON_RUNTIME_PREFIXES`.
+  - It covers non-Python files only. A `.py` file there still holds once the parent has loaded it
+    (`test_a_loaded_module_under_an_exempt_prefix_still_holds`).
+  - Inert until item A loads: with the key absent, the rule is `any`, which never reads the diff.
+- **Guard:** `test_no_role_code_names_the_rail_monitor_folder`.
+  - It scans pipeline/, syndicate/ and every top-level `scripts/*.py` (the parent may import any of them).
+  - It looks for a string literal with `rail_monitor` as a path part, leaving out docstrings and other bare string
+    statements (`_string_literals(..., skip_bare_strings=True)`, which has its own test).
+  - 0 hits today. The only literal containing the words is `layer2_rail_monitor_run.mjs`
+    (`scripts/layer2_rail_monitor_probe.py:341`), a different file at the top of scripts/.
+- **Tests** (`tests/test_board_split_memory_guard.py`, now 132; 8 new):
+  - Windows: 132 passed.
+  - The fleet host's Linux (fleet venv, nice 19, scrubbed ci-shaped env, this worktree on /mnt/c), the file plus its
+    six neighbours: 266 passed / 1 skipped (the real-checkout git test: git refuses a /mnt/c worktree owned by another user), 0 new `wsl-crash` dumps (5 -> 5). Code commit `0cc34ecd0`.
+- **Replay with the exemption** (same proxy as §22). Every morning's verdict is unchanged; on 11-28 the 19
+  rail-monitor holds are gone:
+
+  | morning | files held | why |
+  |---|---|---|
+  | 11-25 | 0 | — |
+  | 11-26 | 1 | `scripts/run_refresh_worker.py` |
+  | 11-27 | 0 | — |
+  | 11-28 | 3 | all modules the parent loaded: `pipeline/board_build_process.py`, `refresh_state_store.py`, `wnba/sources.py` |
+
+  So 11-28 still holds, correctly.
+- **Item A in the batch** (`window-batch-load-1208`):
+  - Its line, kit (sha16 `08f90d8cf1bc5d24`, unchanged) and load check are untouched.
+  - This commit is class (a) in the batch's STEP 3: default-off behind a key the fleet does not set, and the batch's
+    own item. So it never stops the window's ff early.
+  - A requires only `8e2149f0f`. If TARGET carries this commit, A loads with the exemption; if not, it loads with the
+    stricter rule. Either is safe.
+  - Batch session 91b0c989 told.
+- **P-HR2 after a load:** a held path under `scripts/rail_monitor/` would now be a rule bug, like the other exempt
+  prefixes.
