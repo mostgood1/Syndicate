@@ -59,6 +59,16 @@ earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehea
   Without it, the line is inert.
 - Kit: `C:\tmp\w1208_headrule\kit_env_headrule.sh` (`check | apply | restore <b> | after_up <utc>`). The load check is
   `after_up` printing `ARMED_HEAD_RULE=loaded`. Then P-HR1..P-HR4 run on the first two qualifying mornings.
+- UPDATE 2026-11-28 ~10:30 AM CST (session 91b0c989): a default-off follow-up is on main as `0cc34ecd0` (records
+  `254d9f74e`, lane `board-split-memory-guard`, the user's "Yes, build it" in session 644b05ff). The `loaded` rule now
+  exempts `scripts/rail_monitor/`, tooling no role reads; a loaded `.py` there still holds. On 11-28 those files were
+  19 of the 22 the rule would have held on (findings s26-s27).
+  - Checked here: `head_change_holds` runs only when the rule reads `loaded` (`pipeline/board_build_process.py:904`),
+    and A's key is absent today, so the batch's step 3 classes it (a). A's line, kit (sha16 `08f90d8cf1bc5d24`), load
+    check and REQUIRED `8e2149f0f` are unchanged; the prompt needs no edit.
+  - If TARGET carries `0cc34ecd0`, A loads WITH the exemption; if TARGET stops before it, A loads with the stricter
+    rule. A's tests now include a guard that fails if role code names `scripts/rail_monitor` as a path; a failure
+    drops A in step 2.
 
 ### B — #850 host-headroom switch
 - Line: `REFRESH_WORKER__SYNDICATE_BOARD_PROCESS_HOST_OVERDRAFT_MB=1024`; the reserve stays at its default 2048.
