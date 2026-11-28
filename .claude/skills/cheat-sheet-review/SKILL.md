@@ -12,17 +12,23 @@ skill run based on section trends".
 
 | when (CT) | what | writes |
 |---|---|---|
-| 7:45 AM, 11:50 PM | Windows task `SyndicateCheatSheetsReconcile`: `scripts/reconcile_cheat_sheets.py` then `scripts/review_cheat_sheets.py` (WSL, nice 19) | `<data root>/cheatsheets/<sport>/<date>.reconciled.json`, `record.json`, `reviews/<date>.md|json`, `reviews/latest.*`, and a mirror in `C:\Users\tempadmin\.claude\scheduled-tasks\cheat-sheet-review\latest.*` |
+| 6:45 AM, 10:50 PM CST (7:45 / 11:50 in CDT) | Windows task `SyndicateCheatSheetsReconcile`: `scripts/reconcile_cheat_sheets.py`, then `scripts/review_cheat_sheets.py`, then (since 2026-11-27, user "Yes, schedule it") `scripts/cheat_sheet_scorecard.py` (WSL, nice 19; ~13 s) | `<data root>/cheatsheets/<sport>/<date>.reconciled.json`, `record.json`, `reviews/<date>.md|json`, `reviews/latest.*`, and a mirror in `C:\Users\tempadmin\.claude\scheduled-tasks\cheat-sheet-review\latest.*`; the scorecard writes `scorecard/latest.md|json` and a copy beside the mirror, `scorecard.md` |
 | ~8:05 AM | Claude scheduled task `cheat-sheet-review` | nothing: it READS the mirror with the Read tool and sends one notification |
 
 The task needs no shell command, so it never stops on a permission prompt. Log: `~/syndicate-prod/logs/cheat_sheets_reconcile.log`
-(each run starts with `RECONCILE_RUN start`; the review reads only the last run).
+(each run starts with `RECONCILE_RUN start`; the review reads only the last run; the scorecard writes one line, `SCORECARD days=.. sheets=.. bets=.. record_check=<equal>/<checked>[ MISMATCH n]`).
 
 Read it by hand:
 
 ```bash
 wsl -d Ubuntu-24.04 -- cat ~/syndicate-prod/data/cheatsheets/reviews/latest.md
+wsl -d Ubuntu-24.04 -- cat ~/syndicate-prod/data/cheatsheets/scorecard/latest.md
 ```
+
+The SCORECARD (`scripts/cheat_sheet_scorecard.py`) is the deeper read: every featured bet by sport x section x
+section-rules version, ROI and the excess over the shown fair with 95% intervals by GAME, and a verdict only when that
+interval excludes 0. It grades each rules change forward on the sheets the new rules built, and checks itself against
+`record.json` day by day (exit 3 on a difference). `--replay N` adds an in-sample replay of a rules version.
 
 ## What it checks
 
