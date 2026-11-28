@@ -1301,3 +1301,42 @@ Without both, nothing below is read.
     recycle day is not credited to this switch.
 - **Revert:** kit `restore <backup>`, then a drained down/up (allowed outside a window). P-H4 / P-H5 (an OOM kill or
   rc -9) mean revert.
+
+## 26. J on the 11-28 morning: held by the checkout rule as §23 expected; the `loaded` rule would have held too, mostly on rail-monitor tooling (read 2026-11-28 15:50Z = 9:50 AM CST, read-only)
+
+**The morning, 09:00-11:59Z (3:00-5:59 AM CST).** Counts are of timestamped lines that are not `ALL_PROCESS_MEMORY`
+lines.
+- Parent pid 469 (boot `e37a9697f`, uptime 39.8-42.8 h): its own samples (n = 808) read 1,963-2,181 MB, apart from
+  a 09Z low of 1,282 MB.
+  - Every J line in the window carried 1,865-2,177 MB, above the 1,500 MB threshold.
+- J logged 64 CHECK lines in the window, all holds, and 0 `RECYCLE_EXIT reason=board_parent_rss`:
+  - 32 `board_building`;
+  - 29 `children_running`;
+  - 3 `code_on_disk_changed`. Those are the 3 moments J's other rules cleared (09:50:53Z, 11:30:52Z, 11:51:04Z), each
+    with `boot_head` `e37a9697f677` and `disk_head` `4bfaa108af12`.
+- **§23's expectation MET:** under today's rule (`any`), the moved checkout held J.
+- At 15:50Z the parent is at 2,206 MB after 46.5 h.
+
+**Replay of the `loaded` rule on this morning's range** (`e37a9697f..4bfaa108a`, the same proxy as §22):
+- 189 files changed and 22 would hold, so the morning would still have been held. That is correct: 3 of the 22 are
+  modules the parent loaded:
+  - `pipeline/board_build_process.py`, the switch's own code, which the parent booted without;
+  - `syndicate/features/shared/refresh_state_store.py`;
+  - `syndicate/features/wnba/sources.py`.
+- **The other 19 of 22 are rail-monitor tooling** under `scripts/rail_monitor/`: `.sh` and data files in
+  `prior_live/`, `soccer_stale_1127/`, `ours_fix/`, `soccer_runs_1127/` and the folder itself. They hold because the
+  rule holds on any non-Python file outside the exempt list.
+- **No role reads that folder.** On origin/main, the 6 role files that name `rail_monitor` (pipeline/ and
+  syndicate/) do so only in comments and docstrings:
+  - `intelligence_state.py:10617`;
+  - `rail_watch.py:5`;
+  - `combined_board_shared_copy.py:6`;
+  - `live_gameline_join.py:821,2324`;
+  - `live_gameline_orientation.py:12`;
+  - plus `intelligence.py:388`, which names a different script.
+- **It lands often:** 45 commits touched `scripts/rail_monitor/` since 11-20, on 7 of 9 days. 31 non-Python files
+  are there now.
+- **So, as built, `loaded` would be held by rail-monitor tooling on most mornings,** whether or not anything the
+  parent loaded changed. P-HR3 (a recycle when nothing it loaded changed) would rarely get its test.
+- The narrow fix is to exempt `scripts/rail_monitor/`. A source-scan guard would then fail if any role code names it
+  as a path, outside comments and docstrings. Not built: that is the user's call (asked 11-28).
