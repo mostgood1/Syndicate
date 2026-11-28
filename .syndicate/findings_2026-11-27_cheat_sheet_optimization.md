@@ -270,3 +270,98 @@ grades itself the same way from the 11-28 sheets on.
 - v5's removals graded on a v5 sheet, plus the replay mirror;
 - the interval and verdict thresholds;
 - v1 -> v3 labelling, the named no-change v3 -> v4 change, and the vN-1 fallback.
+
+## 8. The form-section study (Consistency, Hot streaks) -- NO v6 entry rule passes; the lever is the SIM, which follows recent form further than the outcomes do
+
+User 2026-11-28 "Yes, run it" to "Run the form-section study first?". Hypotheses H1-H6 and the bar were written into the
+lane and pushed (`60b324db6`) before the run. Read-only, nice 19, fleet checkout `4bfaa108a`, 16:01-16:03Z (1 min 53 s,
+545 MB). Kit, durable: `C:\SyndicateProd\research\cheat_sheet_form_study_2026-11-28\` (`form_study.py`, `run_form_study.sh`, `form_study_out.txt`).
+
+**Population.** Every official sheet 10-15..11-27: fit 139 sport-days / 29 dates (10-15..11-12), holdout 70 / 15
+(11-13..11-27). Both sections were re-derived under rules v5 on every sheet, so one rule runs across both windows. The
+selection is a replay, but the split being tested is out of sample. Rows were graded at their best price; posted pins
+were not applied (a selection study, not the record).
+- Consistency: 1,608 fit / 797 holdout bets.
+- Hot streaks: 1,392 / 676.
+- Union: 2,090 / 1,011.
+- The whole two-sided primary population, for the engine read: 13,010 rows.
+
+**The sections, before any split:**
+- Consistency: fit +2.0% [-2.4, +6.2], holdout **-6.0% [-12.5, +0.5]**.
+- Hot streaks: fit +3.7% [-1.1, +8.6] (excess +2.9 [+0.4, +5.5]), holdout **-4.4% [-11.1, +2.6]**.
+- Both are within noise in the holdout. The featured record's v4 -16% (3 days) is the deep end of the same slide.
+
+**The pre-registered splits, holdout (the bar: keep-minus-drop excess > 0 in BOTH windows; in the holdout either the
+dropped rows' ROI interval below 0 or the difference's interval excluding 0; kept >= 30% of bets):**
+
+| split | Consistency fit / holdout keep-drop excess | Hot streaks fit / holdout | bar |
+|---|---|---|---|
+| H1 the sim on this side (edge >= 0) vs the other side | +4.6 / +6.4 [-7.5, +19.8] | +6.6 / **-1.8** | fails (holdout interval spans 0; only 8-15% of rows have the sim against them) |
+| H1b the sim backs it (edge >= 5%) vs the other side | +4.2 / +6.4 [-7.2, +19.9] | +6.9 / **-1.9** | fails |
+| H2 nearer even (p_market < 0.60) vs a short price | **-0.3** / **-0.6** | +2.3 / **-4.0** | fails: a short price did not do worse |
+| H3 "with room" (ev_posterior > 0) vs not | +7.3 / +3.3 [-9.6, +16.0] | +4.8 / **-6.8** | fails, as predicted (the 10-14 backtest) |
+| H4 unders vs overs | +2.2 / +5.0 [-2.6, +12.5]; holdout overs **-11.5% [-21.4, -1.5]** | **-1.0** / +7.3 | **Consistency PASSES** (overs' ROI interval below 0); Hot streaks fails the fit window |
+| H5 L5 holding (L5 >= L10) vs fading | **-0.8** / **-2.2** | +1.6 / **-3.3** | fails |
+| H6 by sport, holdout | NFL -15.6% [-31.6, -1.9]; NBA -7.4%; NCAAF +4.9%; NHL -3.8% | NFL -15.8% [-26.9, -4.5]; NBA -3.9%; NCAAF +3.7%; NHL -1.3% | readings |
+
+**The one pass is not a section rule.** H4's pass is the football fair's over-lean in another form. Overs vs unders on
+the union, by sport (follow-up, exploratory):
+- NFL holdout: overs **-23.8% [-39.8, -5.3]**, unders -4.1%.
+- NCAAF holdout: overs -10.7%, unders +15.0% (excess +11.9 [+1.9, +21.8]).
+- NBA holdout: overs -9.0%, unders -1.7% (both within noise).
+- NHL holdout: flat (-3.1% / -2.6%).
+- In the FIT window the side that did better flips by sport: MLB, NCAAF and NHL overs did better; NBA, WNBA and NFL unders
+  did.
+
+So "Consistency features unders only" is NOT proposed. It is a side-wide exclusion, which the standing rule forbids
+(every line is its own decision; a display section is no exception, memory `feedback_every_line_its_own_decision`). And
+its evidence is the NFL / NCAAF fair problem, which already belongs to `fair-price-v2` (proposal 5 of section 4).
+
+**The betting read.** No per-line property tested here separates the form rows that win from the ones that lose in both
+windows. Not the sim's agreement, the price, the "room" estimate or the L5 trend. Since 11-13 the form signal itself
+predicts nothing beyond the price. Excess by the row side's L10 hit rate, whole population:
+- fit: -7.3, -1.7, +0.8, +2.0 (monotone);
+- holdout: -4.5, -0.8, -2.6, -2.0 (flat).
+The sections show bets priced about at their fair, minus the vig. Neither meets the v5 retirement test (behind its fair
+in BOTH windows). In the fit window both beat their fair slightly.
+
+**The engine read (the lever).** The sim's error toward a row's side, (actual - projected) / max(line, 1), against that
+side's L10 hit rate at the line. Two-sided primary rows, intervals by game:
+
+| L10 on this side | 0-0.3 | 0.3-0.5 | 0.5-0.7 | 0.7-1.0 |
+|---|---|---|---|---|
+| all, fit | +3.2% [-3.9, +10.5] (428) | -0.7% (1,820) | -4.7% [-8.1, -0.9] (2,774) | **-8.7% [-13.2, -4.4]** (1,767) |
+| all, holdout | **+15.2% [+3.2, +27.4]** (199) | +1.0% (1,084) | -8.8% [-12.4, -5.5] (1,814) | **-17.1% [-22.8, -11.3]** (978) |
+| NBA, holdout | **+20.6% [+7.4, +33.9]** (142) | +6.7% [+2.3, +11.2] | -5.7% [-9.4, -1.9] | **-16.1% [-24.5, -8.4]** (370) |
+| NCAAF, holdout | +9.8% (16) | -5.8% | -12.3% [-20.7, -3.9] | -21.1% [-35.1, -6.1] (177) |
+| NFL, holdout | - | -18.0% | -15.2% | -27.6% [-39.5, -14.2] (250) |
+| NHL, holdout | -9.1% | -3.1% | -9.1% | -0.8% (no slope) |
+
+- **Monotone in both windows, beyond noise at both ends, in NBA, NCAAF and NFL.** When a player has cleared this line in
+  7+ of his last 10, the actual came in short of the sim's projection by 8.7% (fit) / 17.1% (holdout) of the line. When
+  he cleared it in 0-3 of 10, the actual came in beyond the projection. NHL shows no slope.
+- The pattern does not depend on which side a row is: orienting both the error and the L10 rate to the over flips both
+  signs together. So the sim's side choice cannot make it.
+- Reading: **the projection follows a player's recent form further than his outcomes do.** Either the engines regress
+  recent form too little, or they miss what the line moved on (minutes, role, injury) and recent form stands in for it.
+  Both are engine inputs to check (`docs/ai_context/model_engine_standard.md`). It is not a reason to drop any market.
+- It reaches every sim-driven section. On the form rows the sim is on the form side 71-73% of the time in the fit window
+  and 85-88% in the holdout, so it adds little as a filter (H1). It is also a candidate cause of section 3's "Sim vs the line takes the BIGGEST edges first; those did
+  worst in the holdout": a big edge on a hot player is partly this bias.
+- Where form and the sim disagree, the form side did NOT beat the sim: fit excess -0.6 [-5.7, +4.4], holdout -3.0
+  [-13.1, +7.5] (323 / 108 rows). The sim's projection is right about the side there, not form.
+- Follow-up (exploratory, not pre-registered): sim-backed rows split by the side's L10 rate show no stable ROI pattern
+  pooled (holdout -9.4% / -4.3% / -4.5% for L10 < 0.5 / 0.5-0.7 / >= 0.7). No per-line rule comes from it.
+
+**Proposals (a person decides):**
+1. **For the engine owners: shrink the prop projections' response to recent form, per sport (NBA, NCAAF, NFL).**
+   - The measured slope is the target: the holdout bucket error should flatten toward 0 across L10.
+   - Per the model engine standard: a reachability test first, then a held-out fit. It is an estimator change, so the
+     rates it absorbed must be re-fitted.
+   - It changes the board's model numbers, so it is a BETTING change and loads only in a betting-change window.
+   - Expected effect on the sheets: Sim vs the line and the sim-backed side choice stop leaning into hot players.
+2. **This lane, display only: Consistency and Hot streaks print their own official record since launch in their
+   headers, as Sim vs the line does since v5** (label, never hide). Their holdout record is about the price minus the
+   vig, and the page should say so in numbers.
+3. **For `fair-price-v2`, already proposal 5:** NFL form-row overs -23.8% in the holdout are the same over-lean.
+Not proposed: any side, market or sport exclusion.
