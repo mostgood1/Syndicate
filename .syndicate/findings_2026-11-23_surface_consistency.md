@@ -1136,6 +1136,46 @@ Self-check: MET (rc 0) on the replay's pages; VIOLATED (rc 1) on a copy with one
 - **Found in the browser pane after the load:** the NBA tiles' main line was black on the dark card (the tile is a `<button>`). Fixed in `bcbb5465f`.
 - **Cost:** a cold attach on the weekly cards reads each game day's own board, 3.7 s on NCAAF and 2.1 s on NFL. Peak memory is unchanged: the NCAAF build itself peaks at 1.1 GB.
 
+## Step 2 -- the Suggested flag at the venue price, net of fee: built, replayed, NOT landed `[2026-11-28 15:51-16:18Z, user "Yes, venue net"]`
+
+**Reading 10, 15:51Z** (`scripts/surface_consistency_check.py`, rc 1): 6 of 8 checks OK. Still over: `plan_vs_orders` 3 of 3
+(all `price_shopping`; 2 on the board, 1 Suggested now) and `venue_price_hidden` 1 of 2 (a Kalshi alt spread bought at -223 as
++3.1% EV; the board's best was BetMGM -225 at +0.03%). NBA: 995 of 1,032 board rows `suspect_stale_quote`, 0 Suggested (#863 again).
+NHL: 352 of 1,031 rows carry the same flag (lead, not followed).
+
+**Fleet switches, 16:00Z, from each role's environ:** `SYNDICATE_LIVE_EV_FLOOR` absent (the live plans are Suggested-only),
+`SYNDICATE_LIVE_NET_FLOOR_KALSHI=1.0`, `SYNDICATE_LIVE_NET_FLOOR_POLYMARKET=0.5`, `SYNDICATE_LIVE_CELL_GATE=on` (refresh-worker).
+So today's live rule is: Suggested at the best book (+2%), then the venue's own feed price net of fee at its floor.
+
+**Built (worktree only, default off):** `SYNDICATE_SUGGESTED_PRICE_BASIS=venue_net` judges each line at the better of Kalshi and
+Polymarket net of fee, priced by `venue_scope.scope_rows_to_venue` from the row's `book_prices`; absent is byte-identical; any other
+value refuses every row by name. The board tile then names the venue price with the best book beside it. 16 new tests; 201 pass
+across 11 suites.
+
+**Replay on the fleet's saved boards** (`C:\tmp\scc_oversight_d5aa\replay_step2.py`, `replay_step2_floors.py`; boards 16:12:27Z for
+11-28 and 15:42:10Z for 11-29; the off stamp reproduces the stored flag on 5,245 of 5,245 and 3,714 of 3,714 rows):
+
+| day | pregame Suggested today | venue net >= 2.0 | >= the live floors (K 1.0, P 0.5) | >= 0 |
+|---|---|---|---|---|
+| 11-28 | 40 | **0** | 8 (none of the 40) | 32 (2 of the 40) |
+| 11-29 | 11 | **0** | 1 (none of the 11) | 6 (none) |
+
+- **Why +2% net is empty:** a live venue's taker fee near even odds is about 1.7 probability points (fair 0.50 at +110: Kalshi
+  +1.29 net, Polymarket +1.31), and the board's plausible-EV cap allows at most +5.26% gross (`_MIN_IMPLIED_BOOK_TOTAL_PCT` 95).
+  Only heavy favourites can clear +2% net inside it. Every one of the 40 picks is priced at a sportsbook.
+- **At the floors:** 8 lines, +1.1 to +1.6% net: 4 NHL props on Kalshi, 2 NCAAF game lines and 1 soccer moneyline on Polymarket,
+  1 NFL prop on Kalshi.
+- **The board's venue price is not always the buyer's.** Today's one live position (Polymarket, NCAAF spread) is +0.86% net at the
+  buyer's feed price and -0.99% at the board's copy of the Polymarket price.
+- **Cost:** the on stamp took 0.55 s over 5,245 rows (0.1 ms a row).
+- **Returns already measured, not re-derived here:** the paper book staked the board's picks at the best sportsbook price, 28 days
+  10-31..11-27 (optimizer, 11:30Z): NBA +3.1% on 4,484 bets, NFL +4.0% on 1,544, NCAAB +4.4% on 967, NHL +0.4% on 1,401, soccer +0.7%
+  on 594, NCAAF -0.8% on 1,251. The live 0% venue floor population lost -7.06% [-13.60, -0.46] on 1,249 bets (peer's reading,
+  Reading 4). The floors were set where venue picks' CLV first beat their fee (826 paper bets, October).
+- **HYPOTHESIS (lane, 16:05Z): HELD in direction, wrong in size.** Predicted 70 -> 10 or fewer; measured 40 -> 0. The live position
+  is lost on a price disagreement, not on a missing price.
+- **Not landed:** the user's choice was asked on "far fewer picks"; it is none. Back to the user before anything lands.
+
 ## Evidence on what earns ROI (from the ledger, not re-measured here)
 
 Nothing has cleared the bar yet:
