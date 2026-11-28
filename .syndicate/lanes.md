@@ -2485,6 +2485,15 @@ FIT FIX ON MAIN d3ec5b72ed4fb6bbe5c17983fce2a7f06685d2c1 -- dated 2026-11-27 4:4
 - Verification: Findings file: per-recycle attribution table for the window (n recycles, share with a board build, anon added per route from the 1 Hz sampler with n), the callers (user agents) behind the routes, todo #867 (a) updated; no fleet change.
 - Blocked by: none
 
+### ncaaf-second-half-timeouts — OPEN — opened 2026-11-28 — session 309b272a-70e5-48c9-9334-42c1a7f35920
+- Goal: Todo #859 follow-up (user "Fix it first", 11-28 ~9:58 AM CST, relayed by session 91b0c989): make ncaaf/live_resim.py hand smartsim2 the timeouts left in the CURRENT HALF, not ESPN's whole-game carry-over, inert unless SYNDICATE_NCAAF_LIVE_ENDGAME=on; design picked by measurement; code on main only on the user's yes; then the TIMEOUTS FIX ON MAIN line in #859
+- Files: tests/test_ncaaf_live_second_half_timeouts.py (NEW), .syndicate/findings_2026-11-28_ncaaf_second_half_timeouts.md (NEW)
+- Hypothesis: PRE-REGISTERED 2026-11-28 ~11:05 AM CST, before any candidate arm ran. H1, on the 11-21 hold-out (548 games, Q4 checkpoints, ESPN's carry-over rebuilt from CFBD's per-half truth t and end-of-first-half value h as v = max(0, t - (3 - h))): fed today's RAW v, the queued end game h_eg is worse than h_eg on real timeouts at calibrated one-score Q4 3:00 (C3) by more than 1 paired SE; B1 (halftime-anchored: v>0 -> v + 3 - h, v=0 -> 3 - h) is within 1 paired SE of real on C1, C2 and C3; A (no value in Q3-Q4, the engine's 3) is within 1 paired SE of real on C1 and C2. H2, on live ESPN reads graded against ESPN play-by-play (11-27 design set; the 11-28 Saturday as hold-out): B1 has the lowest mean absolute error in Q4 <= 5:00 of RAW, A and B1.
+- Falsification test: B1 outside 1 paired SE of real on any of C1-C3, or another candidate beating B1 by more than 1 SE on any; or B1's Q4 <= 5:00 error not the lowest on 11-28. Rule: build B1 (falling back to A for a game with no halftime read) if H1's B1 clause and H2 hold; else build A if it is within 1 SE of real on C1-C3; else report that the fix cannot be made sound by 12-05.
+- Verification: Fix on origin/main on the user's yes; a test that with the switch absent resim_live_game is byte-identical with and without the fix, and a reachability test (off != on); targeted tests pass at Idle; the TIMEOUTS FIX ON MAIN line in todo #859.
+- Blocked by: none
+- NOTE 2026-11-28: `syndicate/features/ncaaf/live_resim.py` is held by OPEN lane `live-player-exit-gate` (session 86352bc9). This lane builds the timeouts change in its own worktree only; the loan (the `home_timeouts` / `away_timeouts` mapping and the `initial_timeouts_*` feed ONLY) goes to the user together with the push question, and the loan note is written into that lane only on their yes. The CFBD check is done before this hypothesis: the hold-out's timeouts are PER HALF (each team's value at its first Q3 play is 3 in 1,367 of 1,370 team-halves), so its MET verdict stands.
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
