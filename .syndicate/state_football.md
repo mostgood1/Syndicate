@@ -1952,6 +1952,13 @@ production.
 independently by `convergence-phase7-crps`'s 165-file/160-date check. This
 backtest measures the ceiling of a mean+stdev approximation, not a real
 simulated ladder like MLB's pitcher props.
+- **THE NFL AND NCAAF PROP MEANS DO NOT OVER-FOLLOW RECENT FORM; THEIR GAP TO THE LINE IS 50-80% NOISE** `[verified 2026-11-28, fleet cheat sheets 10-15..11-27, NFL 1,128 / 709 and NCAAF 991 / 582 rows (fit / holdout), lane sim-form-regression, todo #868]`
+  - Holding the projection and the line, form's coefficient is NFL +0.28 / +0.18 and NCAAF +0.54 / +0.16, never < 0 beyond noise.
+  - The line's coefficient is NFL +0.80 / +0.75 and NCAAF +0.50 / +0.76.
+  - Per market (NFL) it is about 1 for receiving and rushing yards.
+  - Both means are equal-weighted season means (NFL `player_stats.py:706`, NCAAF `prop_projections.py:572`), so there is no recency weight to shrink.
+  - A naive pull of the mean toward the line biases it +9-10% low, because a line sits near the median.
+  - Findings: `.syndicate/findings_2026-11-28_sim_form_regression.md`.
 
 ## [nfl-data-ingestion-autoruns] NFL ROSTER/DEPTH-CHART/INJURIES INGESTION — ALL 3 AUTORUNS ARMED, DEPLOYED, CONFIRMED FIRING — ONE PUBLISH SUCCESS STILL PENDING `[2026-08-21]`
 
