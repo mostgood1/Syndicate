@@ -150,3 +150,10 @@ The Windows task took **46 readings**, every 20 min from 10:03 AM to 1:03 AM CST
 - **H2 CONFIRMED, corners:** `corners_estimator.league_corner_rows` on the fleet's code: 402 history rows (last 09-27) + 118 `live_state` match-box rows (09-30..11-24) = 520 rows, 0 sharing (day, home, away). 520 is ASA's game count, so no match between the backfill's end and the live boxes' start is missing. (My own corner check over the boxes read 0 with corners: wrong key path; the estimator's count is the measurement.)
 - **Not a gap, noted only:** the ratings fetch takes `date.today().year`; from 2027-01-01 it reads the 2027 season, which has no games until late February. MLS 2026 ends in December, so nothing priced is affected this year.
 - **Readers:** `scripts/rail_monitor/soccer_runs_1127/mls_hist_gap_1127.py`, `mls_asa_lag_1127.py`.
+
+## MLS ratings season rollover fixed (#866; user "Fix the ratings year rollover before January")
+
+- **Defect:** `fetch_asa_mls_team_history(date.today().year)`. ASA season 2027 read 11-27: 0 teams, so a February 2027 build rates nobody and `_fill_promoted` puts every MLS team on PROMOTED_TEAM_RATING.
+- **Fix:** the build date's season, and last season fills each team's first 34 games (games-weighted). Identical while every team has 34+ (all of 2026); last season is not fetched then.
+- **Study** (`scripts/rail_monitor/mls_rollover/mls_rollover_study.py`; rules A season-to-date, B last season, C5/C10/C17 switch, D17/D34 window), pooled 2025+2026, log-lik vs A: 0 games -0.029 +- 0.120 (n 30, all carries equal); 1-4 D34 +0.304 +- 0.220 (n 122); 5-9 +0.030 (n 153); 10-16 +0.029 (n 214); 17-33 +0.011 +- 0.009 (n 501); all D34 +0.050 +- 0.030, D17 +0.045 +- 0.027, C10 +0.034 +- 0.031, B +0.020 +- 0.037; Brier A 0.6365, D34 0.6235. D34 is best in both seasons.
+- **Proof:** 10 / 10 new tests; soccer artifact / rating / live-lens regression 76 passed (its one SyntaxWarning is from an unchanged file: the changed script and test compile clean with it as an error); real-pull A/B 3 of 3 2026 dates identical; 2027-02-27 old 0 teams, new 30.

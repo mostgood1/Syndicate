@@ -98,6 +98,82 @@ def _api_root(league: str, out_root: Path) -> Path:
     return out_root / league / "api"
 
 
+#: MLS RATINGS ACROSS A SEASON BOUNDARY (lane `mls-ratings-season-rollover`; user 2026-11-27 "Fix the ratings year
+#: rollover before January").
+#:
+#: THE DEFECT. The MLS branch fetched ASA's aggregates for `date.today().year`. From 2027-01-01 that is season 2027,
+#: which has no games until the late-February opener, so the fetch returns nothing and `_fill_promoted` gives every
+#: MLS team the same PROMOTED_TEAM_RATING: the opener priced with no team strength at all, and the first weeks from
+#: 1-3 games each with no shrinkage. It happened at the 2026 opener too.
+#:
+#: THE FIX, two parts. (1) The season is the BUILD DATE's (`as_of`), not the wall clock's: MLS seasons are calendar
+#: years. (2) Until a team has a full season of games this season, the gap is filled at last season's per-match rates:
+#: `(n * this + max(0, W - n) * last) / (n + max(0, W - n))`, W = 34 (one regular season). A team with no game yet
+#: this season is rated from last season alone; one with no last season (expansion) from this season alone, as before.
+#:
+#: MEASURED 2026-11-27 (`scripts/rail_monitor/mls_rollover/mls_rollover_study.py`, ASA per-game xG, every 2025 and
+#: 2026 match rated from games before its day, Poisson log-likelihood of the actual goals vs season-to-date only):
+#: 1-4 games +0.304 +- 0.220 (n 122), 5-9 +0.030 (n 153), 10-16 +0.029 (n 214), 17-33 +0.011 +- 0.009 (n 501), all
+#: +0.050 +- 0.030 (n 1,060; 2025 +0.028, 2026 +0.072); 1X2 Brier 0.6365 -> 0.6235. The best of the seven rules tried
+#: (last season only, switch at 5 / 10 / 17 games, window 17 or 34). At 0 games (n 30) no rule beat equal teams
+#: (-0.029 +- 0.120): noise at that n, and the 1-4 bucket is where the old rule lost.
+#:
+#: IDENTICAL WHILE EVERY TEAM HAS 34+ GAMES: then the fetch's rows are returned untouched and the previous season is
+#: not even fetched. Every 2026 build since the regular season ended is in that case (30 teams at 34-36 games).
+_MLS_RATING_WINDOW_GAMES = 34.0
+
+
+def _mls_season_for(as_of: str) -> int:
+    """The MLS season a build is FOR: its date's calendar year (MLS runs February to December)."""
+    return int(str(as_of)[:4])
+
+
+def _mls_team_rows(as_of: str) -> list[dict[str, Any]]:
+    """ASA season-aggregate rows for the season `as_of` falls in, with last season filling each team's first 34
+    games (see the block above). One row per team, the shape `fetch_asa_mls_team_history` returns."""
+    season = _mls_season_for(as_of)
+    current = fetch_asa_mls_team_history(season)
+    window = _MLS_RATING_WINDOW_GAMES
+    if current and all(float(row.get("games") or 0.0) >= window for row in current):
+        return current
+    try:
+        previous = fetch_asa_mls_team_history(season - 1)
+    except Exception as exc:  # never worse than before: rate from this season alone
+        print(f"[soccer_ratings] MLS_SEASON_CARRY_UNAVAILABLE as_of={as_of} season={season} previous={season - 1} "
+              f"{type(exc).__name__}: {exc} -- rating from season {season} alone", flush=True)
+        return current
+    last = {str(row.get("team")): row for row in previous}
+    out: list[dict[str, Any]] = []
+    carried = 0
+    seen: set[str] = set()
+    for row in current:
+        team = str(row.get("team"))
+        seen.add(team)
+        n = float(row.get("games") or 0.0)
+        prior = last.get(team)
+        fill = max(0.0, window - n) if prior is not None else 0.0
+        if fill <= 0.0:
+            out.append(row)
+            continue
+        carried += 1
+        out.append({
+            **row,
+            "xg_for": round((n * float(row["xg_for"]) + fill * float(prior["xg_for"])) / (n + fill), 4),
+            "xg_against": round((n * float(row["xg_against"]) + fill * float(prior["xg_against"])) / (n + fill), 4),
+            "carried_games": fill,
+            "carried_from_season": str(season - 1),
+        })
+    for team, prior in last.items():
+        if team in seen:
+            continue
+        carried += 1
+        out.append({**prior, "season": str(season), "games": 0.0, "carried_games": window,
+                    "carried_from_season": str(season - 1)})
+    print(f"[soccer_ratings] MLS_SEASON_CARRY as_of={as_of} season={season} previous={season - 1} teams={len(out)} "
+          f"carried={carried} window_games={window:g}", flush=True)
+    return out
+
+
 def _load_team_ratings(league: str, source_root: Path, as_of: str) -> dict[str, dict[str, float]]:
     """PRODUCTION path. `as_of` is the date being built for (audit §7 #6).
 
@@ -109,7 +185,7 @@ def _load_team_ratings(league: str, source_root: Path, as_of: str) -> dict[str, 
     optional would have left exactly that hole open.
     """
     if league == "mls":
-        rows = fetch_asa_mls_team_history(date_cls.today().year)
+        rows = _mls_team_rows(as_of)
         # MLS rows are SEASON AGGREGATES with no date. Safe here and only
         # here: this builds for a future date, so no row can postdate `as_of`.
         # Dropping them would silently empty MLS ratings in production.
