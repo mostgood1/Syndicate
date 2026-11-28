@@ -64042,3 +64042,21 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
   - (3) Per sport, featured counts on the first v5 days against v4, and the build's `secs=`.
 - **Revert:** `git revert 5539173c6` on main, then ff + reload-web. A day already stamped 5 would then be read by v4 code, which treats it as v4 and features what v4 would. Nothing to clean on disk.
 - **Claim released** 22:40:41Z (status: web free).
+
+## 2026-11-27 23:59:28Z (5:59:28 PM CST) -- READING (no deploy): `ed8f85d50` (lane `clv-fair-close`, fair CLV on closing marks) is LOADED, since the board child's 23:02:03Z respawn; no restart was needed or done (user "Yes, load it" to "Should I load it on refresh-worker now?")
+- betting change: no. This entry loads nothing. The code reached the fleet in BC-078's ff to `c0950cdaf`, classified no. Nothing that places, sizes, holds or exits reads the new fields: `min_ev_tuner._gross_clv` reads `close_price`, `close_book_scope` and `clv_pct`, which are unchanged.
+- **Where it runs:** settlement and closing marks (`settle_orders` -> `stamp_closing_marks`) run inside `_build_candidate_pool` (`pipeline/intelligence_state.py` ~8097-8157), in the refresh-worker's board child `pipeline.board_build_process --serve`. That child is a fresh interpreter at each respawn, not the parent.
+  - The child that loaded it: pid 1022847, `BOARD_PROCESS_STARTED` at 23:02:03Z. The ff to `c0950cdaf` was at 22:39:28Z (reflog), and HEAD has not moved since.
+  - pid 1049097 has run it since 23:42:32Z. The parent, pid 469, is still on `e37a9697f`.
+  - So BC-078's line "It reaches refresh-worker at that role's next restart, which this deploy did not do" is wrong. So was this lane's 4:32 PM STATUS.
+- **Measured** (one GET of `/api/portfolio/live` at 23:57Z, counts only; `C:\tmp\pfmon\clvload\key_by_time.py`): of the marks checked since 21:00Z, those before 23:02:03Z have `clv_fair_pct` absent in **3 of 3**. Those after have it present in **6 of 6**.
+  - Two of the three keyless marks (22:59:50Z, 22:59:58Z) postdate web's 22:39Z reload onto the new code, so web stamps no marks.
+  - The 6 are `no_close_for_market` re-stamps (Kalshi), so there is no resolved one yet.
+  - Baseline at 23:55:56Z: 1,970 marks, 1,348 resolved, 6 with the key, 0 with a value.
+- **Cost:** `[clv_join] CLV_QUOTES_FALLBACK` seconds per 100k rows parsed, 11-27 12:00Z..23:59Z: **0.928 -> 0.954 (+2.8%)**. Old code: 234 lines, 21.3M rows. New code: 63 lines, 7.6M rows. Across sports it moves both ways. Board build wall: 362 s at 23:51Z.
+- **Ride-alongs the TERM would have loaded:** 149 commits `e37a9697f..c0950cdaf` into the parent. Each was read; all are classified no or are inert with their keys absent on pid 469's environ: the HEAD_RULE switch, the 6 cell-calibration / #835 / overlay keys, and the 82bfc6bbd exits prune, already on live-odds-worker. Nothing was restarted, so none of them loaded through this lane.
+- **verify (owed):**
+  - the share of resolved same-book marks stamped after 23:02:03Z that carry a non-null `clv_fair_pct`, by venue. Bar: Polymarket >= 60%. The replay estimate is Kalshi 69%, Polymarket 86%. Read with `C:\tmp\pfmon\clvload\marks_reading.py after 2026-11-27T23:02:03Z`;
+  - the lane's falsification test at >= 100 covered marks.
+- **Revert:** `git revert ed8f85d50` on main, then an ff. It loads at the board child's next respawn. Already-stamped marks keep their extra keys, and no reader depends on them.
+- No claim was taken. Nothing to release.

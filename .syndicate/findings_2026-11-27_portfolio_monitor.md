@@ -367,3 +367,36 @@ Results, 30 d, covered set. Each cell is pp with its 95% range:
   - the settlement cycle's cost before and after (the replay grade took +6.3%);
   - the lane's falsification test, on >= 100 new covered marks;
   - then the readout half, `live_book_edge_readout.py`, under lane portfolio-monitor.
+
+### Lane `clv-fair-close` LOADED at 23:02:03Z without a restart -- found 5:59 PM CST (user: "Yes, load it")
+- Asked "Should I load it on refresh-worker now?", the user said "Yes, load it". Before taking a claim I read the fleet:
+  - `~/Syndicate` was already at `c0950cdaf`, which carries `ed8f85d50`. It got there through lane `cheat-sheet-optimization`'s ff at
+    22:39:28Z (4:39 PM CST, BC-078).
+  - The refresh-worker parent (pid 469) still runs `e37a9697f`, from the 11-26 cold boot.
+- **My belief was wrong.** I had written that the change "loads on refresh-worker at the first restart after an ff".
+  - Closing marks are not stamped in the refresh-worker parent. `settle_orders` -> `stamp_closing_marks` runs inside
+    `_build_candidate_pool` (`pipeline/intelligence_state.py` ~8097-8157).
+  - Since the board split, that code runs in the board child (`pipeline.board_build_process --serve`). The child is a fresh
+    interpreter at each respawn, and the post-build recycle respawns it about every 40-60 min.
+  - So the change loaded at the first respawn after the ff: pid 1022847, `BOARD_PROCESS_STARTED` at **23:02:03Z (5:02 PM CST)**. It
+    has run in pid 1049097 since 23:42:32Z.
+  - BC-078's own line, "It reaches refresh-worker at that role's next restart", is wrong for the same reason.
+- **Evidence** (live ledger, one GET of `/api/portfolio/live` at 23:57Z, counts only). Of the marks checked since 21:00Z:
+  - The 3 checked before 23:02:03Z all lack `clv_fair_pct` (21:26:42Z, 22:59:50Z, 22:59:58Z). The last two came after web's
+    22:39Z reload onto the new code, under the old child 983004. So web does not stamp marks.
+  - The 6 checked after it all carry the key (23:34:15Z, 23:49:48Z x4, 23:49:56Z). None lacks it, so the old parent stamped none.
+- **Nothing was done:** no claim, no ff, no TERM. A restart would have cost a cold board rebuild and loaded nothing new for this lane.
+- **Coverage has no denominator yet.** The 6 are all `no_close_for_market` re-stamps (Kalshi: NCAAF 3, NHL 3). The first resolved
+  same-book marks come as tonight's games are decided.
+- **Cost:** `[clv_join] CLV_QUOTES_FALLBACK seconds` per 100k rows parsed (refresh-worker.log, 11-27 12:00Z..23:59Z;
+  `C:\tmp\pfmon\clvload\fallback_cost.py`, nice 19).
+  - Old code 0.928 (234 lines, 21.3M rows); new code 0.954 (63 lines, 7.6M rows): **+2.8%**.
+  - By sport the change runs both ways: NCAAB 1.275 -> 0.878, NCAAF 1.015 -> 1.156, NFL 0.841 -> 0.802, NHL 1.084 -> 1.006,
+    soccer 0.800 -> 0.751.
+  - A board build's wall time was 362 s at 23:51Z.
+  - This is the board's opening-CLV path. The order path, which stamps settlement marks, logs no timing line. The replay put it at +6.3%.
+- **Still owed:**
+  - (a) the share of new resolved same-book marks that carry `clv_fair_pct`, by venue (bar: Polymarket >= 60%), at the next
+    portfolio-monitor readings;
+  - (b) the falsification test, at >= 100 new covered marks;
+  - (c) the readout half, `live_book_edge_readout.py`, under lane portfolio-monitor.
