@@ -13,7 +13,7 @@ skill run based on section trends".
 | when (CT) | what | writes |
 |---|---|---|
 | 6:45 AM, 10:50 PM CST (7:45 / 11:50 in CDT) | Windows task `SyndicateCheatSheetsReconcile`: `scripts/reconcile_cheat_sheets.py`, then `scripts/review_cheat_sheets.py`, then (since 2026-11-27, user "Yes, schedule it") `scripts/cheat_sheet_scorecard.py` (WSL, nice 19; ~13 s) | `<data root>/cheatsheets/<sport>/<date>.reconciled.json`, `record.json`, `reviews/<date>.md|json`, `reviews/latest.*`, and a mirror in `C:\Users\tempadmin\.claude\scheduled-tasks\cheat-sheet-review\latest.*`; the scorecard writes `scorecard/latest.md|json` and a copy beside the mirror, `scorecard.md` |
-| ~8:05 AM | Claude scheduled task `cheat-sheet-review` | nothing: it READS the mirror with the Read tool and sends one notification |
+| ~8:05 AM | Claude scheduled task `cheat-sheet-review` | nothing: it READS the mirror (`latest.md`, and since 2026-11-28, user "Yes, add it", `scorecard.md`) with the Read tool and sends one notification, at most 5 lines: the review's health, sections and flags, then one scorecard line (record check, the current rules version's All featured picks, its cells beyond noise) |
 
 The task needs no shell command, so it never stops on a permission prompt. Log: `~/syndicate-prod/logs/cheat_sheets_reconcile.log`
 (each run starts with `RECONCILE_RUN start`; the review reads only the last run; the scorecard writes one line, `SCORECARD days=.. sheets=.. bets=.. record_check=<equal>/<checked>[ MISMATCH n]`).

@@ -64138,3 +64138,26 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - **Still owed:**
   - (2) A later build of a started day prints `keeps section rules ...`. There were 0 such lines in `cheat_sheets.log` at 02:09Z. The 7:30 AM CST run rebuilds 11-28 after the first soccer kickoffs.
   - (3) Per sport, featured counts on the first v5 days against v4, and the builds' `secs=`.
+
+## 2026-11-28 02:40:00Z (8:40 PM CST 11-27) -- CONFIG (no deploy): the Claude scheduled task `cheat-sheet-review` (8:05 AM CT) now reads the scorecard too (lane `cheat-sheet-optimization`, todo #862; the user answered "Yes, add it" to "Should the morning cheat-sheet review report also include the scorecard?")
+- betting change: no. The task reads two Markdown files with the Read tool and sends one notification. It runs no shell command and edits no file, and nothing that bets reads what it sends.
+- **What changed:** the prompt (`C:\Users\tempadmin\.claude\scheduled-tasks\cheat-sheet-review\SKILL.md`) and the task's description, through `update_scheduled_task`. The schedule (`5 8 * * *`), model and enabled state are unchanged.
+  - It now also reads `scorecard.md` in the same folder, the mirror copy the reconcile task's third step writes (deploys.md 2026-11-28 00:46:41Z).
+  - New step 3 says what to take from the scorecard:
+    - The "Generated" time, which is in UTC, converted to Central. If it is not today at 6:45 AM CT or later, that is a WARN, "scorecard STALE".
+    - The record check: a "MISMATCH" line is a FAIL.
+    - The current rules version: the highest one in the "Rules versions" line.
+    - The current version's All featured picks row, and every cell "beyond noise" or "beats/trails the price", current version first.
+    - The rule change into the current version: its removed and added rows, or the note saying it moved no re-derivable bet.
+  - The notification grows from 4 lines to 5. The fifth is the scorecard: the record check, the current version's All featured picks, and its cells beyond noise.
+  - A scorecard cell beyond noise is a PROPOSAL, like a flag. The review's per-bet-z flag and the scorecard's by-game interval are separate tests, and the report says so when they disagree.
+  - Its start time is corrected: the old prompt said the reconcile task writes "at 7:45 AM CT", the CDT time. It is 6:45 AM CT, and 10:50 PM CT.
+- **Backup of the old prompt:** `C:\SyndicateProd\task_backups\cheat-sheet-review_SKILL_20261128T0236Z.md`. To revert, send that file's body (below its front matter) back as the prompt through `update_scheduled_task`.
+- **Dry run by hand** on the current `scorecard.md` (the 6:45 PM CST hand run):
+  - The current version is v4.
+  - Its All featured picks row is 129-152, -12.2% [-23.0, -2.3], "losing beyond noise"; the other v4 cell beyond noise is Hot streaks, -23.0% [-40.6, -7.5].
+  - v3 -> v4 has the no-change note.
+  - The fifth line would read, roughly: "Scorecard 203/203 equal; v4 All featured 129-152 -12.2%, losing beyond noise; v4 Hot streaks -23.0% beyond noise".
+  - This dry run found the v3 -> v4 case: the newest change has no rows, only the note. The prompt now handles it (a second `update_scheduled_task` call).
+- **verify:** the 8:05 AM CT run on 11-28 (`list_task_runs cheat-sheet-review`) sends a notification whose fifth line is the scorecard. It must read a scorecard generated at 6:45 AM CT or later (12:4xZ 11-28), not tonight's 10:50 PM one. Its run finishes without a permission prompt.
+- No claim was taken (no deploy). Nothing to release.
