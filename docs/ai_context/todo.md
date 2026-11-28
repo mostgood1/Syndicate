@@ -1,5 +1,20 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#868` — **THE PROP PROJECTIONS DO NOT FOLLOW RECENT FORM TOO FAR. THEIR GAP TO THE LINE IS 50-90% NOISE. Section 8's L10-at-line slope (cheat-sheet findings 2026-11-27) is the line-ranked artefact: holding the projection and the line fixed, recent form predicts the actual POSITIVELY in NBA, NFL and NCAAF, and the actual lands 0.5-0.8 of the way back to the line. NO form-shrink built; a line anchor is the user's decision** `[2026-11-28, lane sim-form-regression, session 9abb92a5, started by session local_fe0cefa8 (lane cheat-sheet-optimization, todo #862 proposal 1); findings `.syndicate/findings_2026-11-28_sim_form_regression.md`]`
+- **Status 2026-11-28 11:00 CST:** pre-registered H-A FALSIFIED in all three sports, both windows; H-B holds.
+  - The fleet cheat sheets 10-15..11-27: 13,010 rows. Fit 10-15..11-12, holdout 11-13..11-27.
+  - b_l = NBA 0.54 / 0.59, NFL 0.80 / 0.75, NCAAF 0.50 / 0.76, NHL 0.30 / 0.31 (fit / holdout).
+  - Per market, b_l ≈ 1 for NBA points, P+R and rebounds and for NFL receiving and rushing yards: no information beyond the line.
+- **Decision owed (user):** whether to build a per-sport trust weight toward the line, default-off and window-gated.
+  - Measured on the mean: it flattens section 8's holdout table (0.7-1.0 bucket -20.8% to -3.1%) and improves Brier beyond noise (NBA -0.0071, NFL -0.0259, NCAAF -0.0114).
+  - Against it: still worse than the market, no ROI gain on the sim-backed side, and the naive mean pull biases football's mean +9-10% low (lines sit near the median).
+  - So it would go on the probability or a median.
+- **Engine owners (the real lever is the inputs the line has):**
+  - NBA minutes and teammate availability (`basketball-scenario-calibration`, `nba-lineup-pools`).
+  - NFL: no target or snap-share step. The pregame game-context multiplier may be inert (an inference from code, unverified; a population check is owed).
+  - NCAAF: receptions stand in for targets.
+- **For lane cheat-sheet-optimization:** #862's status line and section 8's engine read ("follows recent form further than outcomes do") are overturned by this test. That lane owns that text.
+
 ### `#867` — **THE NCAAF CARDS BUILD READ THE WEEK'S WHOLE QUOTE SHARDS (174-182 MB, ~383k lines) INTO ONE LIST ON EVERY BUILD: +924-989 MB and 2.3-2.9 s, cold or warm, which pushed web workers past their ~625 MB recycle limit whenever an NCAAF page was polled. FIX LOADED on web 11-28 06:01:23Z (`4bfaa108a`, not a betting change; served body byte-identical). Memory MET; latency better only on a warm worker. OPEN: (a) web recycles ~21 an hour for other routes' memory** `[2026-11-28, lane ncaaf-cards-build-cost (CLOSED), session 9ef6a9cf, started by session local_671bbd22 (lane surface-consistency-oversight); user "Yes deploy" ~11:47 PM CST 11-27; findings `.syndicate/findings_2026-11-28_ncaaf_cards_build_cost.md`; deploys.md `2026-11-28 06:01:23Z`]`
 
 - **The fix:** `oddsapi_lines.load_week_line_index` collapses each shard as it reads it. A per-process, append-aware cache (16 shards, LRU) keeps that collapse, so a later read parses only the bytes appended since. Another inode, a shorter file or changed anchor bytes trigger a full re-read. Tests: `tests/test_ncaaf_oddsapi_line_index_stream.py` (14, against a verbatim copy of the old reader); 107 existing NCAAF tests pass with old and new code.
