@@ -64279,3 +64279,24 @@ cal816\wncaab_fb_watch.py`, every 180 s). The first WNCAAB full-game totals row 
 - betting change: no (a reading; nothing loaded)
 - **`8455f25c0` (verify of 2026-11-27 16:29:54Z): MET.** refresh-worker `LAYER2_CARRYOVER date=2026-11-27`: `chips_live_now` 2 from 06:04Z to 06:38Z, 1 at 06:50-06:59Z, 0 at 07:06Z. Probe readings after the roll: 06:03, 06:23 and 06:43Z carried Creighton @ Gonzaga and Texas Tech @ San Diego State; 07:03Z carried Texas Tech @ San Diego State alone. 0 carried games in `live without card`. D's chip artifact published every 5-11 min after the roll. Readers: `C:\tmp\railmon\prior_live\read_carry.sh` and `read_carry.py`.
 - **`fe46fb249` (verify of 2026-11-27 04:39:59Z): MET.** `read_ours_fix.py` over 6 readings (01:23-04:03Z): 34 flagged uncalibrated full-game totals with their own live total. OURS equals own on 33; the 34th (own 219.25) is shown as 219.3, which the reader rounds to 219.2. The tooltip showed on the 5 rows whose PROJ box differed. `ours_resim_tick` 0 at all 46 readings of 11-27. Output: `C:\tmp\railmon\ours_fix\read_1127.txt`.
+
+## 2026-11-28 13:49:12Z (7:49 AM CST) -- READING (no deploy): web kills for 11-27 CST, and the first 33.2 h of the running-request exit fix `b709934b2` (lane `web-silent-worker-kills`; read-only, nice 19) -- **0 kills on 11-27; the new exit branch ran 3 times, 0 timeouts after it**
+- betting change: no (reading only)
+- **Source:** scratchpad `wsk_day_reading2.sh` (web.log.1 then web.log) at 13:49:12Z and `wsk_exit_verify.sh 2026-11-27T04:35` at 13:49:18Z, then `wsk_abandoned.sh` (each abandoned exit's own log lines) and `wsk_oom_owner.sh`. Fleet head `4bfaa108af12` (lane `ncaaf-cards-build-cost`'s 06:01:23Z load), the fix on disk, healthz 200, master 413 unchanged.
+- **11-27 CST (full day):** 0 `WORKER TIMEOUT`, 0 silent kills, 0 SIGKILLs. 351 boots: 327 timer recycles, 8 request recycles, 94 deferrals, 0 aborts, 351 watch armings, 0 guard errors. Exits: 351 fast, 0 stock; 26 drains with a request still in flight. 4,155 access lines. Three web reloads (16:29:54Z rail monitor, 16:42:19Z game-chips, 18:55:05Z NFL) retired workers by plan; none was a kill.
+- **11-28 CST to 7:49 AM:** 0 timeouts, 0 SIGKILLs. 16 boots (14 timer, 0 request, 2 deferrals), 16 fast exits, 0 stock exits, 2 drains busy. One more planned reload at 06:01:23Z (12:01 AM CST).
+- **Since the load (04:35:28Z 11-27 -> 13:49:18Z 11-28, 33.2 h):** 407 recycles (407 boots, 407 drains, 407 fast exits), 28 drains with a request still in flight, 0 stock exits, 0 `WORKER TIMEOUT`, 0 SIGKILLs, 0 `WEB_MEMORY_GUARD_ERROR`, 0 tracebacks.
+- **The branch proof, MET.** 25 of the 28 busy drains finished their requests inside the 30 s graceful wait. The other 3 took the new branch, 6:48-6:52 PM CST 11-27:
+
+  | pid | hard timer recycle (anon / limit MB) | drain 5 s, still in flight | worker exiting (drain + s) | `abandoned_running` | after loop |
+  |---|---|---|---|---|---|
+  | 1093991 | 00:48:04.8Z, 1,063.5 / 646.2 | 1 | 00:48:40.3Z (+30.0) | 1 | 0.323 s |
+  | 1093752 | 00:49:10.2Z, 1,029.6 / 647.0 | 3 | 00:49:46.7Z (+31.0) | 2 | 0.121 s |
+  | 1096523 | 00:51:51.4Z, 1,509.4 / 623.3 (emergency) | 2 | 00:52:27.4Z (+30.1) | 1 | 0.001 s |
+
+  That is the 11-26 8:42:42 AM kill's sequence (timer recycle, drain left a request busy, the request still running at exit). Then the stock exit joined the request thread for 30.6 s until the master's timeout. Now each worker was gone 0.001-0.323 s after its loop, and no `WORKER TIMEOUT` followed. The 4 abandoned requests got no response. Under the stock exit their clients lost them too, to the SIGABRT, after the slot had stayed held to the timeout. 0 5xx access lines 6:40-7:00 PM CST.
+- **Kernel OOM:** 1 kill in the ring since the 11-26 boot: a python of 7.8 GB anon with `oom_score_adj` 1000, early 11-28 by the kernel's clock (it runs behind on WSL). Not a fleet role and not web: every role runs at `oom_score_adj` 0, supervisor 310, web master 413 and refresh-worker 469 have run since the boot, the live-odds-worker's restarts are its own `exited code=0` recycles, and web logged 0 `was sent SIGKILL`. Its owner is not identified here.
+- **Kills per CST day:**
+  - Base rate 11-01..11-23: kills on 7 of 23 days.
+  - Since the GC revert: 11-24 0, 11-25 0, 11-26 1 (before the exit fix loaded), 11-27 0, 11-28 0 to 7:49 AM.
+  - Verdict window 11-27..12-05: **day 1 of 9 kill-free.** A kill-free day happens by chance with p = 0.696. The rule stands: GOAL MET on 9 kill-free days (0.038 by chance), and any kill before then gets its kind read and its own diagnosis. Next reading 7:45 AM CST 11-29; the earliest verdict is 7:45 AM CST 12-06.

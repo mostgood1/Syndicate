@@ -683,3 +683,11 @@ Read-only at nice 19. Scratchpad: `wsk_gctune_overnight.sh`, `wsk_recycle_hourly
 - 9.2 h since the load: 59 recycles, all fast exits, 0 kills. None left a request behind, so `abandoned_running` has not appeared yet.
 - The web master restart was the hand restart of Windows (master start 17:12:07Z 11-26), not a deploy. `ps etimes` on WSL ran 14 min behind the log's start line.
 - Verdict rule: 0 kills over the 9 CST days 11-27..12-05 (0.038 by chance against the 11-01..11-23 base rate). Details in the 2026-11-27 13:45:40Z entry in deploys.md.
+
+## 2026-11-28 13:49Z (7:49 AM CST) -- the exit fix's branch ran in production
+
+- 11-27 CST: 0 kills. 351 recycles, all fast exits, 0 stock exits.
+- The new branch ran 3 times, 6:48-6:52 PM CST 11-27. Three hard timer recycles in 4 min (one an emergency at 1,509 MB) each left requests running past the 30 s graceful wait. Each worker left through `os._exit(0)` within 0.3 s, abandoning 4 requests in all, and no `WORKER TIMEOUT` followed. On 11-26 the same sequence ended in the 8:42:42 AM kill.
+- 25 of the 28 busy drains since the load finished inside the graceful wait. The branch is the tail, not the common case.
+- The kernel's one OOM kill since the 11-26 boot was a 7.8 GB python with `oom_score_adj` 1000: not a fleet role, not web.
+- Verdict window: day 1 of 9 kill-free. Details in the 2026-11-28 13:49:12Z entry in deploys.md.
