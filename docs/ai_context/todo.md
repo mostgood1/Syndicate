@@ -584,6 +584,17 @@ On top of the live candidate (#852 damping 1.0/17 + #855 college OT), with REAL 
   - the 12-08 window candidates go to the user before 12-08: #847 (c)/(d), hold-value exits after a shadow, #816 spread-only, #836.
 
 ### `#845` — **QUEUED for the 12-08 betting-change window (user "queue the splice for the 12-08 window", 2026-11-18 4:57 PM CST): switch the Understat-outage SPLICE on then IF understat.com is still down. `SYNDICATE_SOCCER_UNDERSTAT_SPLICE` is on main default OFF; nothing to do now or at 11-24** `[2026-11-18, lane understat-fallback-backtest; `.syndicate/findings_2026-11-18_understat_fallback_backtest.md`; follows #841]`
+- **RE-READ 2026-11-27 7:10 PM CST, INTERIM (session 8eb30170, started by 91b0c989): the real-gap deficit shrank from +0.0084 to +0.0015, and its CI now spans 0.**
+  - On all 117 big-5 outage matches, 11-01..11-23 (up to 2 rounds in, median 1), SA − U0 1X2 log loss (re-fit) is
+    **+0.0015 [−0.0068, +0.0101]**. Without Cagliari v Frosinone it is −0.0006 [−0.0080, +0.0058], and the fixed map
+    reads +0.0008 [−0.0071, +0.0092].
+  - On the 48 matches since 11-08 alone it is −0.0083 [−0.0240, +0.0054]. The 69 of 11-01..11-08 reproduce +0.0084
+    exactly.
+  - Understat is still `down` (since 2026-11-18T19:22:04Z, `last_ok_at=None`, probe 11-27 6:36 PM CST).
+  - The re-read through the 12-05/06 weekend (about 222 matches, about 4 rounds in, EPL 5) is still OWED. Kit:
+    `bash /c/tmp/u845_reread/reread.sh <tag> <worktree at origin/main>`. football-data's Monday updates may land only
+    by about 10:30 AM / 5:55 PM CST on 12-07.
+  - Findings section 11.
 - **QUEUED 2026-11-18 4:57 PM CST** (user "queue the splice for the 12-08 window", 2026-11-18 4:57 PM CST). Nothing loads it automatically: it goes into the 12-08 window's batch (Tue 12-08 2-7 AM CST, one ff + ONE drained full down/up with that window's other changes). Owner of the entry: this item and the fleet-watcher's window queue (lane `understat-fetch-failures` CLOSED, user "close the lane", 2026-11-18 6:42 PM CST). Before loading, check:
   - **Understat still down:** `~/syndicate-prod/data/soccer_source/_understat_status.json` `state` = down, and the big-5 Understat steps still fail. If it is up, DROP the splice from the batch and close this item.
   - **Re-read the real-gap result and show it to the user:** on the 69 real outage matches (11-01..11-08, one round in) the splice was WORSE than frozen, +0.0084 [+0.0015, +0.0185] (+0.0048 [+0.0004, +0.0100] without Cagliari v Frosinone). The 1,818-match backtest is the estimate that favours it at 4+ rounds. Re-run the SA arm on the outage matches through the 12-05/06 weekend (`C:/tmp/ustale_1118/served_now.py`, findings section 5) and put the reading to the user with the load.

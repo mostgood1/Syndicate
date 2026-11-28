@@ -352,3 +352,73 @@ priced, and two rounds of extra data are worth ≈ 0 on goals/assists. The squad
   difference 0), although it reads the ESPN schedule where the harness read football-data.
 - It prints `SOCCER_UNDERSTAT_SPLICE league=.. as_of=.. understat_last_day=.. spliced_matches=.. unresolved=[..]` once
   per build, so a load can be verified from the role log.
+
+## 11. Re-read on the real gap, 2026-11-27 (INTERIM: 117 outage matches through 11-23, up to 2 rounds in)
+
+Session 8eb30170, started by session 91b0c989 (lane `window-1208-batch`) for todo `#845`. It is read-only towards
+the fleet and was run at Idle. The 12-05/06 re-read is still OWED (below).
+
+- **Understat status, read first** (`C:/tmp/w1208_batch/understat_status.sh`, 2026-11-28T00:43:06Z = 11-27 6:43 PM
+  CST): `state=down`, `down_since=2026-11-18T19:22:04Z`, `last_ok_at=None`, `last_probe_at=2026-11-28T00:36:24Z`.
+- **Substrate:** a fresh read-only copy of the same fleet families as section 1, made 2026-11-28T00:45:05Z
+  (`C:/tmp/u845_reread/1127/fleet_src`, sha256 `_manifest.sha256`). It also holds the served pre-kickoff freezes from 10-30 on.
+  - Every Understat `team_history` and football-data `history/matches_*` file is byte-identical to the 11-18 copy
+    (60 of 65 files the same). The 5 that changed are ESPN `player_match_log_2026.csv`, which Stage A does not read.
+  - football-data raw was re-fetched at 00:45Z (`C:/tmp/u845_reread/1127/fd_raw`). 2526 is byte-identical. 2627 is
+    Last-Modified 2026-11-23. Its newest match is 11-23 (epl, la_liga, serie_a) or 11-22 (bundesliga, ligue_1), and
+    every match has `AvgC*`.
+- **Harness:** `understat_staleness_backtest.py` is unchanged since `84a1fa85e`. It ran at `b02c76e43` (origin/main),
+  `PYTHONHASHSEED=0`, one Idle process per league, 00:46:28Z..01:09:54Z.
+  - The readout is `C:/tmp/u845_reread/1127/sa_now_readout.txt` (script `C:/tmp/u845_reread/sa_now.py`, with the
+    same bootstrap as `served_now.py`: 2,000 resamples over matches, seed 1118).
+- **Reproduction:**
+  - The 69 matches of 11-01..11-08 give SA and U0 log loss identical to the 11-18 rows on all 69 (max difference 0),
+    so +0.0084 again.
+  - The 1,818 hist rows are identical too (the S2 link that scores SA is unchanged).
+  - Six closes differ only past the fourth decimal.
+
+**Prediction, written before the new number was read** (00:47:49Z, side-session notes `845_reread_prediction.md`):
+the SA − U0 re-fit point estimate falls in [−0.002, +0.008] (from Stage A S1 − U1 +0.0000, S2 − U2 +0.0007). Result:
+**+0.0015, PREDICTED.**
+
+**Result: 117 outage matches, 11-01..11-23** (epl 22, la_liga 25, bundesliga 20, serie_a 27, ligue_1 23), every one
+with a true close.
+
+"Rounds in" counts the more-missing club's league matches since 10-31 before kickoff: 0 on 36 matches, 1 on 49, 2 on
+32 (median 1, max 2). The mean of the two clubs is 0.77.
+
+| SA − U0, per match | 1X2 re-fit | 1X2 fixed map | n |
+|---|---|---|---|
+| all outage matches | **+0.0015 [−0.0068, +0.0101]** | +0.0008 [−0.0071, +0.0092] | 117 |
+| without Cagliari v Frosinone | **−0.0006 [−0.0080, +0.0058]** | | 116 |
+| without both Frosinone gate exits (also Milan v Frosinone, 11-22) | −0.0015 [−0.0091, +0.0049] | | 115 |
+| new since 11-08 (11-20..11-23) | −0.0083 [−0.0240, +0.0054] | −0.0073 [−0.0224, +0.0061] | 48 |
+| 11-01..11-08 (section 5) | +0.0084 [+0.0015, +0.0185] | +0.0065 [−0.0003, +0.0167] | 69 |
+| rounds in 0 | +0.0026 [+0.0010, +0.0041] | +0.0003 [−0.0001, +0.0006] | 36 |
+| rounds in 1 | +0.0013 [−0.0155, +0.0183] | +0.0002 [−0.0163, +0.0169] | 49 |
+| rounds in 2 | +0.0007 [−0.0136, +0.0150] | +0.0025 [−0.0103, +0.0160] | 32 |
+| rounds in ≥ 1 | +0.0010 [−0.0103, +0.0129] | +0.0011 [−0.0096, +0.0128] | 81 |
+
+- O/U 2.5 re-fit: +0.0027 [−0.0075, +0.0176].
+- By league (re-fit): epl −0.0111 [−0.0283, +0.0022], la_liga +0.0115 [+0.0019, +0.0230], bundesliga +0.0005,
+  serie_a +0.0181 [+0.0019, +0.0415], ligue_1 −0.0158 [−0.0415, +0.0039]. Each league has 20-27 matches.
+- **Frosinone again.** Milan v Frosinone (11-22, +0.098) is the same mechanism as Cagliari v Frosinone (+0.250):
+  under SA, Frosinone's row count passes 10 (11 rows), so it leaves the few-match gate, and the match is priced on
+  its own rows instead of the promoted prior. Under U0 it stays at 9.
+- **The re-fit carries a link offset.** On the 36 round-0 matches the two arms' ratings are identical or nearly so.
+  Re-fit SA − U0 is still +0.0026 [+0.0010, +0.0041] there, because SA is scored through S2's link (section 2) and U0
+  through U0's. The fixed map, with one link for both arms, reads +0.0003 there.
+- **Reading:** the splice's real-gap deficit was +0.0084 on 69 matches at up to 1 round. It is +0.0015 on 117 at up
+  to 2 rounds, and every CI now spans 0. That agrees with Stage A at 1-2 rounds (S1 − U1 +0.0000, S2 − U2 +0.0007).
+  On 117 matches this cannot tell a −0.005 effect from a +0.005 one.
+- **Still owed: the re-read through the 12-05/06 weekend.**
+  - The fleet's ESPN schedules list about 105 more big-5 matches from 11-24 to 12-06, so about 222 in all. That is
+    about 4 rounds in for most clubs (EPL 5, with its 12-01..03 midweek round).
+  - Kit, one command from Git Bash, read-only and at Idle:
+    `bash /c/tmp/u845_reread/reread.sh <tag> <worktree at origin/main>`. It runs the status read, the fleet copy,
+    the football-data fetch, the newest date per league, Stage A, `sa_now.py` and `repro69.py`. It takes about
+    25 minutes.
+  - **Timing:** football-data's 2627 files carried Last-Modified Mon 11-23 16:28Z (D1, F1) and 23:53Z (E0, SP1, I1).
+    If 12-07 follows that pattern, the 12-05/06 results land Mon 12-07 about 10:30 AM CST, or about 5:55 PM CST for
+    the files with Monday matches (la_liga and serie_a play 12-07). The kit prints each league's newest date, so a
+    run made before both updates says which leagues it covers.
