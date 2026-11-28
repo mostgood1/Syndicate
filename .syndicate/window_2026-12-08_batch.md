@@ -182,6 +182,25 @@ earliest backup restored it byte for byte (`C:\tmp\w1208_batch\batch_dummy_rehea
 - Kit: `kit_env_ncaaf.sh apply endgame`.
 - OWED at the next live game: `NCAAF_LIVE_ENDGAME on concede_deficit=25 ...` and live lanes with
   `endgame.timeouts_fed=true`.
+- UPDATE 2026-11-28 (session 91b0c989): the timeouts reading is RECORDED, so I's third condition is met as written.
+  - Todo #859 carries `TIMEOUTS READING 2026-11-27 10:08 PM CST: 1227 of 1227 live NCAAF reads carry
+    homeTimeouts/awayTimeouts as ints 0..3` (7 games), ledger `bbcb51d21`, by session 309b272a. Details:
+    `.syndicate/findings_2026-11-27_ncaaf_live_timeouts_reading.md`. The fleet's own 296 live `/ncaaf/api/cards` rows
+    carry both keys too.
+  - **DEFECT, read before the yes.** ESPN's college scoreboard does NOT reset timeouts at halftime. It shows 3 minus
+    every timeout used in the game, floored at 0; college rules give each team a fresh 3 for the second half.
+    - At the break, in 3 of 3 games watched, the halftime value carried into the second half.
+    - Against ESPN play-by-play (6 games, 1164 reads): the carry-over reading has 0 mismatches, the per-half reading
+      has 403.
+    - In Q4, 541 of 606 team counts read low; in 170 a team showed 0 while it still had timeouts.
+  - Why it bites: `ncaaf/live_resim.py:1004-1007` passes the feed's values in every period, with no halftime check.
+    smartsim2 reads them only under `end_of_half_clock` (`smartsim2/game_simulator.py:175`), which
+    `SYNDICATE_NCAAF_LIVE_ENDGAME=on` turns on. So loaded as built, I runs the second half on too few timeouts. The
+    11-21 hold-out never tested this input; whether its CFBD timeouts also carry over is unchecked.
+  - A fix to the second-half value changes nothing while the end-game key is absent, so it can land on main before
+    12-08 without being a betting change. The installed prompt requires only `b2ff241ae` for I, NOT a fix: a 12-07
+    yes would load I as built unless the prompt is edited. Load as built, wait for a fix, or move to 12-22 is the
+    user's call.
 - NOT in the batch: `SYNDICATE_NCAAF_LIVE_MARGIN_ANCHOR` (`cf12ae61f`). The user has made no load decision and it has
   no kit line.
 
