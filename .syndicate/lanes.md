@@ -2436,6 +2436,14 @@ FIT FIX ON MAIN d3ec5b72ed4fb6bbe5c17983fce2a7f06685d2c1 -- dated 2026-11-27 4:4
 - Blocked by: none
 - **STATUS 2026-11-27 6:53 PM CST: FIXED ON MAIN, identical for every 2026 build (`#866`).** H1 CONFIRMED (ASA 2027 returns 0 teams today), H2 CONFIRMED (window-34 carry +0.050 +- 0.030 log-lik over 1,060 matches, +0.304 at 1-4 games), H3 CONFIRMED (A/B on the real pull: 2026-11-28 / 11-29 / 12-05 identical). Tests 10 / 10; soccer artifact / rating / live-lens regression 76 passed (its one SyntaxWarning is from an unchanged file: the changed script and test compile clean with it as an error). Loads with the next fleet ff (a subprocess per run); first effect at the first 2027 MLS build.
 
+### ncaaf-cards-build-cost — OPEN — opened 2026-11-27 — session 9ef6a9cf-ad23-41e7-9802-e8acc9debce7
+- Goal: Name where the memory and time go inside the web NCAAF cards build (week 13: peak RSS 286->1,100 MB, 15-24 s), with a fix whose served /ncaaf/api/cards payload is byte-identical on the same inputs (A/B), its tests, and a web-only deploy plan for the user's call
+- Files: syndicate/features/ncaaf/cards.py, tests/test_ncaaf_cards_build_cost.py (NEW), .syndicate/findings_2026-11-28_ncaaf_cards_build_cost.md (NEW)
+- Hypothesis: Profile first; the cost is in one or two stages of build_smartsim_cards_page_context (per-card artifact reads or per-card repeated parsing), not in the board attach
+- Falsification test: A stage profile on the fleet that spreads the time and the RSS growth evenly across stages with no stage over 30%
+- Verification: Fleet probe (Idle/nice 19, fleet data) before/after: time and peak RSS of the build, and json.dumps of the served payload byte-identical on the same inputs; targeted pytest green
+- Blocked by: none
+
 ## Archived lanes (full bodies in `lanes_closed.md`)
 
 > Moved 2026-09-08: ownership sweep + `trim_lane_blocks.py`. Nothing was deleted —
